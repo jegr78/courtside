@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -17,6 +18,7 @@ class ReferenceDeploymentSecurityTest {
 
     private static final Pattern REVERSE_PROXY_BLOCK = Pattern.compile(
             "(?m)^\\treverse_proxy app:8080 \\{\\R(?<directives>(?:\\t\\t[^\\r\\n]*\\R)*)\\t}$");
+    private static final Pattern UPSTREAM = Pattern.compile("(?m)^\\t*reverse_proxy [^\\r\\n]*\\{");
     private static final Pattern APPLICATION_HEADERS = Pattern.compile(
             "(?m)^\\(applicationHeaders\\) \\{\\R(?<directives>(?:\\t[^\\r\\n]*\\R)*)}$");
     private static final Pattern PRODUCTION_SITE_BLOCK = Pattern.compile(
@@ -135,15 +137,15 @@ class ReferenceDeploymentSecurityTest {
         // when
         String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
         Matcher headers = APPLICATION_HEADERS.matcher(caddyfile);
-        long upstreams = caddyfile.lines()
-                .filter(line -> line.strip().startsWith("reverse_proxy ")).count();
-        long carrying = caddyfile.lines()
-                .filter(line -> line.strip().equals("import applicationHeaders")).count();
 
         // then
         assertThat(headers.find()).isTrue();
-        assertThat(upstreams).isPositive();
-        assertThat(carrying).isEqualTo(upstreams);
+        assertThat(upstreamBodies(caddyfile)).isNotEmpty().allSatisfy(body -> {
+            assertThat(body.lines().map(String::strip)
+                    .filter("import applicationHeaders"::equals).count()).isEqualTo(1);
+            assertThat(body.lines().map(String::strip))
+                    .noneMatch(directive -> directive.startsWith("header_up"));
+        });
         assertThat(headers.group("directives").lines().map(String::strip).toList()).containsExactly(
                 "header_up -Forwarded",
                 "header_up -X-Forwarded-For",
@@ -155,6 +157,25 @@ class ReferenceDeploymentSecurityTest {
                 "header_up X-Forwarded-For {remote_host}",
                 "header_up X-Forwarded-Host {host}",
                 "header_up X-Forwarded-Proto {scheme}");
+    }
+
+    // An upstream that imported the snippet and then added a header_up of its own would put the
+    // client's value back, and an equal number of imports and upstreams would not notice.
+    private static List<String> upstreamBodies(String caddyfile) {
+        List<String> bodies = new ArrayList<>();
+        Matcher upstream = UPSTREAM.matcher(caddyfile);
+        while (upstream.find()) {
+            int depth = 0;
+            for (int cursor = upstream.end() - 1; cursor < caddyfile.length(); cursor++) {
+                char character = caddyfile.charAt(cursor);
+                depth += character == '{' ? 1 : character == '}' ? -1 : 0;
+                if (depth == 0) {
+                    bodies.add(caddyfile.substring(upstream.end(), cursor));
+                    break;
+                }
+            }
+        }
+        return bodies;
     }
 
     @Test

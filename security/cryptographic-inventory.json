@@ -533,18 +533,19 @@
       "class": "transport",
       "owner": "club-operator",
       "storageBoundary": "The connection between the proxy container and the application container, and the operator's own certificate, key and authority files where they are configured. Courtside reads them and holds no material of its own; the reference deployment ships none and defaults to plain HTTP on a network private to the compose project.",
-      "permittedUse": "Reaching the application from the proxy. `courtside.server.tls.mode` decides what that means: `plaintext` leaves the hop as HTTP, and `serve` makes the application serve the operator's certificate while the proxy trusts nothing but the authority the operator names. One setting drives both ends. Serving mode refuses to start when the certificate or the key is missing, unreadable, holds what the other one should, or is protected by a password this instance is given no way to open, and when Spring's own `server.ssl` configuration would decide what is served instead.",
+      "permittedUse": "Reaching the application from the proxy. `courtside.server.tls.mode` decides what that means: `plaintext` leaves the hop as HTTP, and `serve` makes the application serve the operator's certificate while the proxy trusts nothing but the authority the operator names. One setting drives both ends. Serving mode refuses to start when the certificate or the key is missing, unreadable, holds what the other one should, has expired or is not valid yet, or is protected by a password this instance is given no way to open, and when Spring's own `server.ssl` configuration would decide what is served instead.",
       "rotation": "The operator's, on their own authority, certificate and key. Both services read their file once at start, so a replacement takes effect when the service that reads it restarts.",
       "revocation": "The issuing authority's. Courtside performs no revocation check of its own.",
       "recovery": "Material that no longer matches is a refusal, not a loss: the application refuses to start, the proxy refuses the hop with a bad gateway rather than falling back to plain text, and the operator restores the right file or sets the mode back to `plaintext`.",
       "retirement": "What would be retired here is the plaintext default, and only a deployment that already runs an authority can retire it. Courtside issues no material, so it cannot make the encrypted hop the default for a club that has none.",
-      "evidence": "src/test/java/org/courtside/shared/ServerTlsTransportTest.java, src/test/java/org/courtside/shared/ServerTlsTest.java",
+      "evidence": "src/test/java/org/courtside/shared/ServerTlsTransportTest.java, src/test/java/org/courtside/shared/ServerTlsTest.java, src/test/java/org/courtside/shared/ServerTlsStartupTest.java, src/test/java/org/courtside/CourtsideApplicationTests.java",
       "detects": [
         "tls_trusted_ca_certs",
         "certificate-private-key",
         "private-key",
         "cacert",
-        "CertificateFactory"
+        "CertificateFactory",
+        "X509Certificate"
       ],
       "locations": [
         "deploy/Caddyfile",

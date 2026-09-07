@@ -47,7 +47,9 @@ class ServerTlsTest {
         // when / then
         serving(notACertificate, written(served.key()))
                 .run(context -> assertThat(refusalIn(context.getStartupFailure()))
-                        .hasMessageContaining("is not readable X.509 material"));
+                        .hasMessageContaining("is not readable X.509 material")
+                        .satisfies(refusal -> assertThat(refusal.action())
+                                .contains("Restore that file").doesNotContain("plaintext")));
     }
 
     // The two files are told apart by what they hold, so the certificate handed in twice -- the
@@ -96,6 +98,49 @@ class ServerTlsTest {
                 .run(context -> assertThat(refusalIn(context.getStartupFailure()))
                         .hasMessageContaining("server.ssl")
                         .hasMessageContaining("would decide what it serves"));
+    }
+
+    @Test
+    void givenAnExpiredCertificate_whenTheServingModeIsSet_thenItRefusesAndAsksForRenewal()
+            throws Exception {
+        // given
+        TestCertificate ranOut = TestCertificate.expiredFor("app");
+
+        // when / then
+        serving(written(ranOut.certificate()), written(ranOut.key()))
+                .run(context -> assertThat(refusalIn(context.getStartupFailure()))
+                        .hasMessageContaining("expired on")
+                        .satisfies(refusal -> assertThat(refusal.action()).contains("Renew")));
+    }
+
+    // Two clocks disagreeing is a different repair from a certificate that ran out, so the two are
+    // told apart rather than reported as one unusable file.
+    @Test
+    void givenACertificateThatIsNotValidYet_whenTheServingModeIsSet_thenItRefusesAndNamesTheClock()
+            throws Exception {
+        // given
+        TestCertificate future = TestCertificate.notYetValidFor("app");
+
+        // when / then
+        serving(written(future.certificate()), written(future.key()))
+                .run(context -> assertThat(refusalIn(context.getStartupFailure()))
+                        .hasMessageContaining("valid from")
+                        .satisfies(refusal -> assertThat(refusal.action()).contains("clock")));
+    }
+
+    // OpenSSL writes an encrypted key in two encodings, and the traditional one carries no
+    // ENCRYPTED in its label -- it says so in a header line instead.
+    @Test
+    void givenATraditionallyEncryptedKey_whenTheServingModeIsSet_thenItRefusesTheKey()
+            throws Exception {
+        // given
+        TestCertificate served = TestCertificate.issuedFor("app");
+        Path locked = written(TestCertificate.encryptedTraditionally(served.key(), "example"));
+
+        // when / then
+        serving(written(served.certificate()), locked)
+                .run(context -> assertThat(refusalIn(context.getStartupFailure()))
+                        .hasMessageContaining("password-protected private key"));
     }
 
     // A key the operator protected with a password is one nothing here can open, and Tomcat would

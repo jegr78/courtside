@@ -11,8 +11,14 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.X509Certificate;
+import java.util.Collection;
+import java.util.List;
 
 final class ServerTls {
 
@@ -22,13 +28,22 @@ final class ServerTls {
     private static final String KEY_HEADER = "-----BEGIN";
     private static final String KEY_LABEL = "PRIVATE KEY-----";
     private static final String ENCRYPTED_KEY_LABEL = "ENCRYPTED PRIVATE KEY-----";
+    private static final List<String> ENCRYPTED_KEY_MARKERS =
+            List.of(ENCRYPTED_KEY_LABEL, "Proc-Type:", "DEK-Info:");
     private static final String MATERIAL_ACTION = "Point " + CERTIFICATE + " and " + PRIVATE_KEY
             + " at the certificate this instance serves and the key belonging to it, or set"
             + " courtside.server.tls.mode back to plaintext.";
+    private static final String DAMAGED_ACTION = "Restore that file from your own copy. Something"
+            + " wrote material this instance cannot use, and turning the encryption off would"
+            + " answer whoever did in plain text.";
     private static final String OVERRIDE_ACTION = "Remove it, and leave what this instance serves"
             + " to courtside.server.tls.mode.";
     private static final String ENCRYPTED_ACTION = "Store the key this instance serves without a"
             + " password, readable only by the account the container runs as.";
+    private static final String RENEWAL_ACTION = "Renew the certificate this instance serves and"
+            + " restart it.";
+    private static final String CLOCK_ACTION = "Compare this host's clock with the period the"
+            + " certificate was issued for; one of the two is wrong.";
 
     private ServerTls() {
     }
@@ -65,16 +80,38 @@ final class ServerTls {
 
     private static Path certificate(ServerTlsProperties tls) {
         Path material = readable(tls.certificate(), CERTIFICATE);
+        Collection<? extends Certificate> chain;
         try (InputStream stream = Files.newInputStream(material)) {
-            if (CertificateFactory.getInstance("X.509").generateCertificates(stream).isEmpty()) {
-                throw new TlsConfigurationException(CERTIFICATE + " names " + material
-                        + ", which holds no certificate.", MATERIAL_ACTION);
-            }
+            chain = CertificateFactory.getInstance("X.509").generateCertificates(stream);
         } catch (IOException | CertificateException failure) {
             throw new TlsConfigurationException(CERTIFICATE + " names " + material
-                    + ", which is not readable X.509 material.", MATERIAL_ACTION, failure);
+                    + ", which is not readable X.509 material.", DAMAGED_ACTION, failure);
         }
+        if (chain.isEmpty()) {
+            throw new TlsConfigurationException(CERTIFICATE + " names " + material
+                    + ", which holds no certificate.", DAMAGED_ACTION);
+        }
+        chain.forEach(certificate -> stillValid(certificate, material));
         return material;
+    }
+
+    // The proxy would refuse every request rather than the application refusing to start, and a bad
+    // gateway says nothing about which of the two certificates the operator has to look at.
+    private static void stillValid(Certificate certificate, Path material) {
+        if (!(certificate instanceof X509Certificate dated)) {
+            return;
+        }
+        try {
+            dated.checkValidity();
+        } catch (CertificateExpiredException expired) {
+            throw new TlsConfigurationException(CERTIFICATE + " names " + material
+                    + ", which holds a certificate that expired on " + dated.getNotAfter() + ".",
+                    RENEWAL_ACTION, expired);
+        } catch (CertificateNotYetValidException early) {
+            throw new TlsConfigurationException(CERTIFICATE + " names " + material
+                    + ", which holds a certificate that is valid from " + dated.getNotBefore()
+                    + " onwards.", CLOCK_ACTION, early);
+        }
     }
 
     private static Path privateKey(ServerTlsProperties tls) {
@@ -82,9 +119,9 @@ final class ServerTls {
         String pem = read(material);
         if (!pem.contains(KEY_HEADER) || !pem.contains(KEY_LABEL)) {
             throw new TlsConfigurationException(PRIVATE_KEY + " names " + material
-                    + ", which holds no private key.", MATERIAL_ACTION);
+                    + ", which holds no private key.", DAMAGED_ACTION);
         }
-        if (pem.contains(ENCRYPTED_KEY_LABEL)) {
+        if (ENCRYPTED_KEY_MARKERS.stream().anyMatch(pem::contains)) {
             throw new TlsConfigurationException(PRIVATE_KEY + " names " + material
                     + ", which holds a password-protected private key, and this instance is given"
                     + " no password to open it with.", ENCRYPTED_ACTION);
@@ -99,7 +136,7 @@ final class ServerTls {
         }
         if (!Files.isReadable(material)) {
             throw new TlsConfigurationException(property + " names " + material
-                    + ", which does not exist or cannot be read.", MATERIAL_ACTION);
+                    + ", which does not exist or cannot be read.", DAMAGED_ACTION);
         }
         return material;
     }
@@ -109,7 +146,7 @@ final class ServerTls {
             return Files.readString(material, StandardCharsets.UTF_8);
         } catch (IOException failure) {
             throw new TlsConfigurationException(PRIVATE_KEY + " names " + material
-                    + ", which is not readable PEM material.", MATERIAL_ACTION, failure);
+                    + ", which is not readable PEM material.", DAMAGED_ACTION, failure);
         }
     }
 }

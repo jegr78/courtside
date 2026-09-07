@@ -1522,9 +1522,11 @@ whether it is built or designed. **Designed means absent today.**
   refused with a bad gateway rather than retried in plain text. One variable sets both ends, so they
   cannot disagree about which the hop is, and a value no snippet is defined for stops the proxy at
   startup rather than leaving the hop unencrypted. The application refuses to start when the
-  certificate or the key is missing, unreadable, holds what the other one should, or is protected by
-  a password this instance is given no way to open, and when Spring's own `server.ssl` configuration
-  would decide what is served instead. Here too Courtside ships no authority and issues no
+  certificate or the key is missing, unreadable, holds what the other one should, has expired or is
+  not valid yet, or is protected by a password this instance is given no way to open, and when
+  Spring's own `server.ssl` configuration would decide what is served instead. The name is checked
+  at the end that knows it: a certificate issued for another name is a refused hop, not a refused
+  start. Here too Courtside ships no authority and issues no
   production key material: issuance, storage, lifetime, renewal and revocation are the operator's.
 - **Whether a permanent password is one that has already leaked:** *Designed.* A check against a
   breached-password set, asking with a partial hash so that neither the password nor a reusable

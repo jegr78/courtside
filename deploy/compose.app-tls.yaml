@@ -6,7 +6,7 @@ services:
       COURTSIDE_APP_TLS_KEY: /etc/courtside/tls/app/server.key
     volumes:
       - ${COURTSIDE_APP_TLS_MATERIAL:-/srv/courtside/tls/app}:/etc/courtside/tls/app:ro
-      - ${COURTSIDE_APP_TLS_AUTHORITY:-/srv/courtside/tls/app-authority}:/etc/courtside/tls/app-authority:ro
+      - ${COURTSIDE_APP_TLS_AUTHORITY:-/srv/courtside/tls/app-authority/authority.pem}:/etc/courtside/tls/app-authority/authority.pem:ro
     # The image probes plaintext on this port. Verifying its own certificate against the anchor the
     # proxy uses reports a mismatched pair as an unhealthy application rather than as a bad gateway.
     healthcheck:
@@ -16,8 +16,10 @@ services:
       retries: 3
       start_period: 90s
 
+  # The authority is mounted as the one file it is, so a directory an operator kept the key in
+  # cannot hand that key to the proxy along with what it has to trust.
   proxy:
     environment:
       COURTSIDE_APP_TLS_MODE: serve
     volumes:
-      - ${COURTSIDE_APP_TLS_AUTHORITY:-/srv/courtside/tls/app-authority}:/etc/courtside/tls/app-authority:ro
+      - ${COURTSIDE_APP_TLS_AUTHORITY:-/srv/courtside/tls/app-authority/authority.pem}:/etc/courtside/tls/app-authority/authority.pem:ro

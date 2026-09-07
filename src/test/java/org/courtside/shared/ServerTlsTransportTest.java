@@ -10,7 +10,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServer;
 import org.testcontainers.Testcontainers;
+import org.testcontainers.containers.ContainerLaunchException;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.ToStringConsumer;
+import org.testcontainers.containers.startupcheck.OneShotStartupCheckStrategy;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
@@ -28,6 +31,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ServerTlsTransportTest {
 
@@ -35,6 +39,7 @@ class ServerTlsTransportTest {
     private static final String UPSTREAM = "host.testcontainers.internal";
     private static final int SERVED_PORT = 8080;
     private static final int PLAIN_PORT = 8081;
+    private static final int MISNAMED_PORT = 8082;
     private static final String AUTHORITY = "/etc/courtside/tls/app-authority/authority.pem";
     private static final Pattern CADDY_IMAGE =
             Pattern.compile("caddy:[\\w.-]+@sha256:[a-f0-9]{64}");
@@ -42,6 +47,8 @@ class ServerTlsTransportTest {
     private static TestCertificate served;
     private static WebServer application;
     private static WebServer plainApplication;
+    private static TestCertificate misnamed;
+    private static WebServer misnamedApplication;
 
     // A forwarding is registered for the whole JVM, so each of the two applications is reached
     // through a port of its own rather than through one the second run would be refused.
@@ -52,14 +59,19 @@ class ServerTlsTransportTest {
                 written(served.certificate()), written(served.key())));
         plainApplication = serving(
                 new ServerTlsProperties(ServerTlsProperties.Mode.PLAINTEXT, null, null));
+        misnamed = TestCertificate.issuedFor("app");
+        misnamedApplication = serving(new ServerTlsProperties(ServerTlsProperties.Mode.SERVE,
+                written(misnamed.certificate()), written(misnamed.key())));
         Testcontainers.exposeHostPorts(Map.of(application.getPort(), SERVED_PORT,
-                plainApplication.getPort(), PLAIN_PORT));
+                plainApplication.getPort(), PLAIN_PORT,
+                misnamedApplication.getPort(), MISNAMED_PORT));
     }
 
     @AfterAll
     static void stopTheApplications() {
         application.stop();
         plainApplication.stop();
+        misnamedApplication.stop();
     }
 
     // The deployment's own line decides which snippet is imported, and a club that sets nothing
@@ -130,6 +142,18 @@ class ServerTlsTransportTest {
     // The proxy dials the name the deployment's own snippet names, so only the host it resolves to
     // is substituted -- the transport, the anchor's path and the headers are the deployment's text.
     private static GenericContainer<?> proxy(String authority, String mode) throws IOException {
+        return proxy(authority, mode, SERVED_PORT);
+    }
+
+    private static GenericContainer<?> proxy(String authority, String mode, int servedPort)
+            throws IOException {
+        GenericContainer<?> proxy = built(authority, mode, servedPort);
+        proxy.start();
+        return proxy;
+    }
+
+    private static GenericContainer<?> built(String authority, String mode, int servedPort)
+            throws IOException {
         String caddyfile = """
                 {
                 	auto_https off
@@ -145,7 +169,7 @@ class ServerTlsTransportTest {
                 	%s
                 }
                 """.formatted(snippet("applicationHeaders"), dialingTheHost("plaintext", PLAIN_PORT),
-                dialingTheHost("serve", SERVED_PORT), theDeploymentsSwitch());
+                dialingTheHost("serve", servedPort), theDeploymentsSwitch());
         GenericContainer<?> proxy = new GenericContainer<>(DockerImageName.parse(deployedCaddy()))
                 .withCopyToContainer(forString(caddyfile), "/etc/caddy/Caddyfile")
                 .withCopyToContainer(forString(authority), AUTHORITY)
@@ -154,8 +178,38 @@ class ServerTlsTransportTest {
         if (mode != null) {
             proxy.withEnv("COURTSIDE_APP_TLS_MODE", mode);
         }
-        proxy.start();
         return proxy;
+    }
+
+    // Renaming a snippet would leave the switch pointing at nothing, and every other test here
+    // would stay green while the hop it describes no longer exists.
+    @Test
+    void givenAModeNoSnippetDefines_whenTheProxyStarts_thenItServesNothing() throws Exception {
+        // given
+        ToStringConsumer output = new ToStringConsumer();
+        GenericContainer<?> proxy = built(served.authority(), "no-such-mode", SERVED_PORT)
+                .withStartupCheckStrategy(new OneShotStartupCheckStrategy())
+                .withLogConsumer(output);
+
+        // when / then
+        assertThatThrownBy(proxy::start).isInstanceOf(ContainerLaunchException.class);
+        assertThat(output.toUtf8String()).contains("File to import not found: no-such-mode");
+    }
+
+    // The authority vouches for what is served, so the name on it is the only thing left that can
+    // fail -- which is the one check a proxy dialing a service name inside a network still needs.
+    @Test
+    void givenACertificateForAnotherName_whenTheProxyDialsTheApplication_thenItRefuses()
+            throws Exception {
+        // when
+        try (GenericContainer<?> proxy = proxy(misnamed.authority(), "serve", MISNAMED_PORT)) {
+            HttpResponse<String> answer = get(proxy);
+
+            // then
+            assertThat(answer.statusCode()).isEqualTo(502);
+            assertThat(answer.body()).doesNotContain(MARKER);
+            assertThat(proxy.getLogs()).contains("x509").contains("certificate is valid for");
+        }
     }
 
     // The upstream is the only token substituted: the transport, the anchor's path, the headers and
