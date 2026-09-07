@@ -14,7 +14,8 @@ function repositoryFile(path) {
 // The verification profiles beside these are not an operator surface, and documenting their
 // variables would describe this repository's harness to a club.
 const OPERATOR_FACING =
-  ["compose.yaml", "compose.database-tls.yaml", "compose.database-tls-local.yaml"];
+  ["compose.yaml", "compose.database-tls.yaml", "compose.database-tls-local.yaml",
+    "compose.app-tls.yaml"];
 const compose = OPERATOR_FACING.map(deploymentFile).join("\n");
 const readme = deploymentFile("README.md");
 const example = deploymentFile(".env.example");

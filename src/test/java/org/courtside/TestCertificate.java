@@ -29,6 +29,11 @@ public record TestCertificate(String certificate, String key, String authority) 
         return issued(name, now.minus(Duration.ofHours(1)), now.plus(Duration.ofDays(1)));
     }
 
+    public static TestCertificate notYetValidFor(String name) throws Exception {
+        Instant starts = Instant.now().plus(Duration.ofDays(30));
+        return issued(name, starts, starts.plus(Duration.ofDays(30)));
+    }
+
     public static TestCertificate expiredFor(String name) throws Exception {
         Instant ranOut = Instant.now().minus(Duration.ofDays(30));
         return issued(name, ranOut.minus(Duration.ofDays(30)), ranOut);
@@ -56,6 +61,32 @@ public record TestCertificate(String certificate, String key, String authority) 
                     "-startdate", MOMENT.format(from), "-enddate", MOMENT.format(until));
             return new TestCertificate(read(directory, "cert.pem"), read(directory, "key.pem"),
                     read(directory, "authority.pem"));
+        } finally {
+            discard(directory);
+        }
+    }
+
+    public static String encrypted(String key, String password) throws Exception {
+        return encrypted(key, password, "pkcs8", "-topk8");
+    }
+
+    // The two encodings OpenSSL writes carry different markers, and only one of them says
+    // ENCRYPTED in the label a reader would look for.
+    public static String encryptedTraditionally(String key, String password) throws Exception {
+        return encrypted(key, password, "rsa", "-aes256", "-traditional");
+    }
+
+    private static String encrypted(String key, String password, String command, String... form)
+            throws Exception {
+        Path directory = Files.createTempDirectory("courtside-key-");
+        try {
+            Files.writeString(directory.resolve("key.pem"), key);
+            List<String> arguments = new ArrayList<>(List.of(command));
+            arguments.addAll(List.of(form));
+            arguments.addAll(List.of("-in", "key.pem", "-out", "encrypted.pem",
+                    "-passout", "pass:" + password));
+            openssl(directory, arguments.toArray(String[]::new));
+            return read(directory, "encrypted.pem");
         } finally {
             discard(directory);
         }

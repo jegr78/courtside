@@ -55,7 +55,7 @@ final class DatabaseTls {
         }
         String jdbcUrl = dataSource.getJdbcUrl();
         if (jdbcUrl == null) {
-            throw new DatabaseTlsConfigurationException("The connection pool names no JDBC URL, so"
+            throw new TlsConfigurationException("The connection pool names no JDBC URL, so"
                     + " what would decide the transport cannot be read.", URL_ACTION);
         }
         if (jdbcUrl.indexOf('?') < 0) {
@@ -72,27 +72,27 @@ final class DatabaseTls {
         String name = named.toLowerCase(Locale.ROOT);
         if (name.startsWith(TRANSPORT_PARAMETER) || name.startsWith(GSS_PARAMETER)
                 || name.equals(SERVICE_PARAMETER)) {
-            throw new DatabaseTlsConfigurationException(carrier + " '" + name + "', which overrides"
+            throw new TlsConfigurationException(carrier + " '" + name + "', which overrides"
                     + " the verification " + ROOT_CERTIFICATE + " configures.", OVERRIDE_ACTION);
         }
     }
 
     private static Path usable(Path rootCertificate) {
         if (rootCertificate == null || rootCertificate.toString().isBlank()) {
-            throw new DatabaseTlsConfigurationException("Verified database TLS is configured, but "
+            throw new TlsConfigurationException("Verified database TLS is configured, but "
                     + ROOT_CERTIFICATE + " names no file.", PATH_ACTION);
         }
         if (!Files.isReadable(rootCertificate)) {
-            throw new DatabaseTlsConfigurationException(ROOT_CERTIFICATE + " names "
+            throw new TlsConfigurationException(ROOT_CERTIFICATE + " names "
                     + rootCertificate + ", which does not exist or cannot be read.", PATH_ACTION);
         }
         try (InputStream material = Files.newInputStream(rootCertificate)) {
             if (CertificateFactory.getInstance("X.509").generateCertificates(material).isEmpty()) {
-                throw new DatabaseTlsConfigurationException(ROOT_CERTIFICATE + " names "
+                throw new TlsConfigurationException(ROOT_CERTIFICATE + " names "
                         + rootCertificate + ", which holds no certificate.", MATERIAL_ACTION);
             }
         } catch (IOException | CertificateException failure) {
-            throw new DatabaseTlsConfigurationException(ROOT_CERTIFICATE + " names "
+            throw new TlsConfigurationException(ROOT_CERTIFICATE + " names "
                     + rootCertificate + ", which is not readable X.509 material.", MATERIAL_ACTION,
                     failure);
         }

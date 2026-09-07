@@ -2,6 +2,36 @@
 	auto_https disable_redirects
 }
 
+(applicationHeaders) {
+	header_up -Forwarded
+	header_up -X-Forwarded-For
+	header_up -X-Forwarded-Host
+	header_up -X-Forwarded-Port
+	header_up -X-Forwarded-Prefix
+	header_up -X-Forwarded-Proto
+	header_up -X-Forwarded-Ssl
+	header_up X-Forwarded-For {remote_host}
+	header_up X-Forwarded-Host {host}
+	header_up X-Forwarded-Proto {scheme}
+}
+
+(plaintext) {
+	reverse_proxy app:8080 {
+		import applicationHeaders
+	}
+}
+
+# No fallback to plaintext: an application this authority does not vouch for is refused, and the
+# name on the certificate has to be the name this block dials.
+(serve) {
+	reverse_proxy https://app:8080 {
+		import applicationHeaders
+		transport http {
+			tls_trusted_ca_certs /etc/courtside/tls/app-authority/authority.pem
+		}
+	}
+}
+
 http://:80 {
 	@mailHostname host {$COURTSIDE_MAIL_HOSTNAME}
 	handle @mailHostname {
@@ -64,18 +94,7 @@ http://:80 {
 	}
 	method @unknownMethod PATCH
 
-	reverse_proxy app:8080 {
-		header_up -Forwarded
-		header_up -X-Forwarded-For
-		header_up -X-Forwarded-Host
-		header_up -X-Forwarded-Port
-		header_up -X-Forwarded-Prefix
-		header_up -X-Forwarded-Proto
-		header_up -X-Forwarded-Ssl
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Host {host}
-		header_up X-Forwarded-Proto {scheme}
-	}
+	import {$COURTSIDE_APP_TLS_MODE:plaintext}
 }
 
 # Caddy issues only for the names it serves, and the mail server needs one for its own. Nothing

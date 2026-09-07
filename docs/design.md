@@ -1512,8 +1512,22 @@ whether it is built or designed. **Designed means absent today.**
   exposure it removes on one host. One verification profile disables the transport by name: the
   `postgres-exporter` in `compose.perf-telemetry.yaml` connects with `sslmode=disable` and carries
   its own password in that connection string, so requiring a verified connection for the
-  application does not move it. The reverse proxy's connection to the application is the other
-  half of this path and carries no encryption yet.
+  application does not move it. The reverse proxy's connection to the application is the other half
+  of this path and carries the same default for the same reason: plaintext on that private network
+  unless an operator supplies a certificate for it.
+- **Whether the reverse proxy's connection to the application is verified:** *Built, and off unless
+  an operator turns it on.* `courtside.server.tls.mode` is `plaintext` or `serve`. Under `serve` the
+  application serves a certificate the operator supplies, and the proxy dials it over TLS trusting
+  nothing but the authority the operator names — an application that authority does not vouch for is
+  refused with a bad gateway rather than retried in plain text. One variable sets both ends, so they
+  cannot disagree about which the hop is, and a value no snippet is defined for stops the proxy at
+  startup rather than leaving the hop unencrypted. The application refuses to start when the
+  certificate or the key is missing, unreadable, holds what the other one should, has expired or is
+  not valid yet, or is protected by a password this instance is given no way to open, and when
+  Spring's own `server.ssl` configuration would decide what is served instead. The name is checked
+  at the end that knows it: a certificate issued for another name is a refused hop, not a refused
+  start. Here too Courtside ships no authority and issues no
+  production key material: issuance, storage, lifetime, renewal and revocation are the operator's.
 - **Whether a permanent password is one that has already leaked:** *Designed.* A check against a
   breached-password set, asking with a partial hash so that neither the password nor a reusable
   digest of it leaves the instance, and refusing to set a password while that check cannot run.

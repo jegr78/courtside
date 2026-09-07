@@ -30,7 +30,7 @@ class DatabaseTransportVerification implements BeanPostProcessor, SmartInitializ
     @Override
     public void afterSingletonsInstantiated() {
         if (!applied && properties.getObject().mode() == DatabaseTlsProperties.Mode.VERIFY_FULL) {
-            throw new DatabaseTlsConfigurationException("Verified database TLS is configured, but"
+            throw new TlsConfigurationException("Verified database TLS is configured, but"
                     + " no connection pool was configured with it.", UNENFORCED_ACTION);
         }
     }

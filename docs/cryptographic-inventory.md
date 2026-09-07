@@ -49,8 +49,9 @@ guarantee and cryptography that does not:
 - `signing` — lets somebody else verify an origin. The release signature, DKIM.
 - `transport` — protects a connection, or records what one guarantees when that is less than
   protection. Public TLS and the mail relay are encrypted; the connection to PostgreSQL is
-  encrypted and verified only when an operator requires it, and its entry says which value of the
-  mode means which rather than claiming the strongest one.
+  encrypted and verified only when an operator requires it, as is the reverse proxy's connection to
+  the application. Each of those entries says which value of its mode means which rather than
+  claiming the strongest one.
 - `integrity` — recognises one expected party or artefact and refuses anything else. Certificate
   pinning. Unlike a `content-hash`, a mismatch here stops the operation.
 - `pseudonymisation` — replaces an identifier with a digest so a counter need not hold the
