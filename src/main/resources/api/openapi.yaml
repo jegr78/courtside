@@ -2307,6 +2307,12 @@ paths:
         Available only to an authenticated account marked for an initial password change. The
         successful change ends every active session for the account; sign in again with the new
         password.
+
+        The password is refused with `urn:courtside:error:password-too-guessable` when it appears
+        on a public list of common passwords, or when it contains the account's username, the
+        local part of its email address, or the club name. One type answers for all of them, so
+        the response never says which one matched. Nothing else about the password is required:
+        any composition, any alphabet and any length from the minimum upwards is accepted.
       security:
         - sessionCookie: []
           csrfToken: []
