@@ -180,6 +180,13 @@ test("given agent policy prose changes, when classifying, then bounded documenta
   assert.deepEqual(classifyChanges([{ status: "D", path: "CLAUDE.md" }], []).profiles, ["full"]);
 });
 
+test("given the community health files, when classifying, then bounded documentation checks apply", () => {
+  // when / then
+  assert.deepEqual(classifyChanges([{ status: "M", path: "CONTRIBUTING.md" }], []).profiles, ["docs"]);
+  assert.deepEqual(classifyChanges([{ status: "M", path: "CODE_OF_CONDUCT.md" }], []).profiles, ["docs"]);
+  assert.deepEqual(classifyChanges([{ status: "D", path: "CONTRIBUTING.md" }], []).profiles, ["full"]);
+});
+
 test("given every configured full trigger, when classifying, then each selects full", () => {
   // given
   const exactPaths = profileRules.profiles.full.exact;
