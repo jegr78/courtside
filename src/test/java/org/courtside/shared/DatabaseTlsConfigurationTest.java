@@ -251,10 +251,10 @@ class DatabaseTlsConfigurationTest {
                 .withPropertyValues("courtside.database.tls.mode=" + mode);
     }
 
-    private static DatabaseTlsConfigurationException refusalIn(Throwable failure) {
+    private static TlsConfigurationException refusalIn(Throwable failure) {
         for (Throwable step = failure; step != null && step != step.getCause();
                 step = step.getCause()) {
-            if (step instanceof DatabaseTlsConfigurationException refusal) {
+            if (step instanceof TlsConfigurationException refusal) {
                 return refusal;
             }
         }

@@ -61,6 +61,18 @@ public record TestCertificate(String certificate, String key, String authority) 
         }
     }
 
+    public static String encrypted(String key, String password) throws Exception {
+        Path directory = Files.createTempDirectory("courtside-key-");
+        try {
+            Files.writeString(directory.resolve("key.pem"), key);
+            openssl(directory, "pkcs8", "-topk8", "-in", "key.pem", "-out", "encrypted.pem",
+                    "-passout", "pass:" + password);
+            return read(directory, "encrypted.pem");
+        } finally {
+            discard(directory);
+        }
+    }
+
     private static String authorityConfiguration(String name) {
         return """
                 [ca]

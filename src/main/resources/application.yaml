@@ -58,6 +58,11 @@ courtside:
     tls:
       mode: ${COURTSIDE_DB_TLS_MODE:prefer}
       root-certificate: ${COURTSIDE_DB_TLS_ROOT_CERTIFICATE:}
+  server:
+    tls:
+      mode: ${COURTSIDE_APP_TLS_MODE:plaintext}
+      certificate: ${COURTSIDE_APP_TLS_CERTIFICATE:}
+      private-key: ${COURTSIDE_APP_TLS_KEY:}
   session:
     absolute-lifetime: ${COURTSIDE_SESSION_ABSOLUTE_LIFETIME:24h}
     concurrent-limit: ${COURTSIDE_SESSION_MAX_CONCURRENT:5}

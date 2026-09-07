@@ -17,6 +17,8 @@ class ReferenceDeploymentSecurityTest {
 
     private static final Pattern REVERSE_PROXY_BLOCK = Pattern.compile(
             "(?m)^\\treverse_proxy app:8080 \\{\\R(?<directives>(?:\\t\\t[^\\r\\n]*\\R)*)\\t}$");
+    private static final Pattern APPLICATION_HEADERS = Pattern.compile(
+            "(?m)^\\(applicationHeaders\\) \\{\\R(?<directives>(?:\\t[^\\r\\n]*\\R)*)}$");
     private static final Pattern PRODUCTION_SITE_BLOCK = Pattern.compile(
             "(?m)^\\{\\$COURTSIDE_DOMAIN} \\{\\R(?<body>(?:.*\\R)*?)^}$");
     private static final Pattern UAT_PUBLIC_SITE_BLOCK = Pattern.compile(
@@ -129,14 +131,20 @@ class ReferenceDeploymentSecurityTest {
     }
 
     @Test
-    void whenReadingCaddyfile_thenForwardedHeadersAreReplacedAtTrustBoundary() throws IOException {
+    void whenReadingCaddyfile_thenForwardedHeadersAreReplacedAtEveryUpstream() throws IOException {
         // when
         String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
-        Matcher reverseProxy = REVERSE_PROXY_BLOCK.matcher(caddyfile);
+        Matcher headers = APPLICATION_HEADERS.matcher(caddyfile);
+        long upstreams = caddyfile.lines()
+                .filter(line -> line.strip().startsWith("reverse_proxy ")).count();
+        long carrying = caddyfile.lines()
+                .filter(line -> line.strip().equals("import applicationHeaders")).count();
 
         // then
-        assertThat(reverseProxy.find()).isTrue();
-        assertThat(reverseProxy.group("directives").lines().map(String::strip).toList()).containsExactly(
+        assertThat(headers.find()).isTrue();
+        assertThat(upstreams).isPositive();
+        assertThat(carrying).isEqualTo(upstreams);
+        assertThat(headers.group("directives").lines().map(String::strip).toList()).containsExactly(
                 "header_up -Forwarded",
                 "header_up -X-Forwarded-For",
                 "header_up -X-Forwarded-Host",
