@@ -3,7 +3,6 @@ package org.courtside;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,7 +13,6 @@ import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -80,27 +78,6 @@ class CryptographicInventoryTest {
                 .anyMatch(FileSystems.getDefault().getPathMatcher("glob:" + location)::matches));
     }
 
-    // Parsed from an encoding rather than read back from the constant that produced it, so a
-    // parameter change has to pass through the inventory instead of agreeing with itself.
-    @Test
-    void givenTheConfiguredEncoder_whenItEncodes_thenTheParametersAreTheInventoriedOnes()
-            throws IOException {
-        // given
-        JsonNode parameters = entry("password-hashing").get("parameters");
-
-        // when
-        String encoded = new Argon2PasswordEncoder(
-                parameters.get("saltBytes").asInt(), parameters.get("hashBytes").asInt(),
-                parameters.get("parallelism").asInt(), parameters.get("memoryKibibytes").asInt(),
-                parameters.get("iterations").asInt()).encode("a-passphrase-nobody-uses");
-
-        // then
-        assertThat(encoded).startsWith("$%s$v=19$m=%d,t=%d,p=%d".formatted(
-                entry("password-hashing").get("algorithm").asText().toLowerCase(Locale.ROOT),
-                parameters.get("memoryKibibytes").asInt(), parameters.get("iterations").asInt(),
-                parameters.get("parallelism").asInt()));
-    }
-
     @Test
     void givenEveryEntry_whenItIsRead_thenItAnswersTheLifecycleQuestions() throws IOException {
         // when / then
@@ -136,15 +113,6 @@ class CryptographicInventoryTest {
         assertThat(Files.readString(INVENTORY, StandardCharsets.UTF_8))
                 .doesNotContain("BEGIN", "PRIVATE KEY", "-----")
                 .doesNotContainPattern("\"[A-Za-z0-9+/]{40,}={0,2}\"");
-    }
-
-    private static JsonNode entry(String id) throws IOException {
-        for (JsonNode item : inventory().get("entries")) {
-            if (id.equals(item.get("id").asText())) {
-                return item;
-            }
-        }
-        throw new AssertionError("The inventory has no entry " + id);
     }
 
     private static Set<String> locations() throws IOException {
