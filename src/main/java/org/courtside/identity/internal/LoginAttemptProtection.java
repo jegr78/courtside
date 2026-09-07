@@ -30,6 +30,12 @@ class LoginAttemptProtection {
 
     @Transactional
     Optional<LoginBlock> registerAttempt(String address) {
+        return registerAttempt(address, true, SecurityEventLog.ControlTrigger.LOGIN_ADDRESS_LIMIT);
+    }
+
+    @Transactional
+    Optional<LoginBlock> registerAttempt(String address, boolean observeGlobal,
+                                         SecurityEventLog.ControlTrigger addressLimitReason) {
         String normalizedAddress = normalizeAddress(address);
         lock(Scope.ADDRESS, hash(normalizedAddress));
 
@@ -38,23 +44,62 @@ class LoginAttemptProtection {
             return retryAfter;
         }
 
-        lock(Scope.GLOBAL, hash("all"));
-        recordAttempt(Scope.ADDRESS, normalizedAddress, properties.address());
-        observeGlobalAttempt();
+        recordAttempt(Scope.ADDRESS, normalizedAddress, properties.address(), addressLimitReason);
+        if (observeGlobal) {
+            lock(Scope.GLOBAL, hash("all"));
+            observeGlobalAttempt();
+        }
+        return Optional.empty();
+    }
+
+    @Transactional
+    Optional<LoginBlock> registerCredentialAttempt(String accountId, String address) {
+        String account = "credential-account:" + accountId;
+        String source = "credential-address:" + normalizeAddress(address);
+        // Every caller acquires the account lock first, so shared addresses cannot create a lock cycle.
+        lock(Scope.ACCOUNT, hash(account));
+        lock(Scope.ADDRESS, hash(source));
+
+        Optional<LoginBlock> retryAfter = retryAfter(Scope.ACCOUNT, account)
+                .or(() -> retryAfter(Scope.ADDRESS, source));
+        if (retryAfter.isPresent()) {
+            return retryAfter;
+        }
+
+        recordAttempt(Scope.ACCOUNT, account, properties.address(),
+                SecurityEventLog.ControlTrigger.PASSWORD_VERIFICATION_ACCOUNT_LIMIT);
+        recordAttempt(Scope.ADDRESS, source, properties.address(),
+                SecurityEventLog.ControlTrigger.PASSWORD_VERIFICATION_ADDRESS_LIMIT);
         return Optional.empty();
     }
 
     private Optional<LoginBlock> retryAfter(String address) {
         Instant now = clock.instant();
-        return blockedUntil(Scope.ADDRESS, address)
+        return retryAfter(Scope.ADDRESS, address);
+    }
+
+    private Optional<LoginBlock> retryAfter(Scope scope, String subject) {
+        Instant now = clock.instant();
+        return blockedUntil(scope, subject)
                 .filter(until -> until.isAfter(now))
-                .map(until -> new LoginBlock(Scope.ADDRESS.name(), Duration.between(now, until)));
+                .map(until -> new LoginBlock(scope.name(), Duration.between(now, until)));
     }
 
     @Transactional
     void clear(String address) {
-        jdbc.sql("DELETE FROM login_attempt_limit WHERE scope = 'ADDRESS' AND subject_hash = :address")
-                .param("address", hash(normalizeAddress(address)))
+        clear(Scope.ADDRESS, normalizeAddress(address));
+    }
+
+    @Transactional
+    void clearCredentialAccountAttempt(String accountId) {
+        String account = "credential-account:" + accountId;
+        clear(Scope.ACCOUNT, account);
+    }
+
+    private void clear(Scope scope, String subject) {
+        jdbc.sql("DELETE FROM login_attempt_limit WHERE scope = :scope AND subject_hash = :subject")
+                .param("scope", scope.name())
+                .param("subject", hash(subject))
                 .update();
     }
 
@@ -80,7 +125,8 @@ class LoginAttemptProtection {
                 .single();
     }
 
-    private void recordAttempt(Scope scope, String subject, LoginProtectionProperties.Limit limit) {
+    private void recordAttempt(Scope scope, String subject, LoginProtectionProperties.Limit limit,
+                               SecurityEventLog.ControlTrigger addressLimitReason) {
         String subjectHash = hash(subject);
         Instant now = clock.instant();
         Attempt current = currentAttempt(scope, subject).orElse(null);
@@ -92,7 +138,7 @@ class LoginAttemptProtection {
         Instant blockedUntil = attempts >= limit.maxFailures() ? now.plus(limit.block()) : null;
         if (blockedUntil != null && (current == null || current.blockedUntil() == null
                 || !current.blockedUntil().isAfter(now))) {
-            securityEvents.controlTriggered(null, SecurityEventLog.ControlTrigger.LOGIN_ADDRESS_LIMIT);
+            securityEvents.controlTriggered(null, addressLimitReason);
         }
 
         jdbc.sql("""
@@ -177,6 +223,7 @@ class LoginAttemptProtection {
     }
 
     private enum Scope {
+        ACCOUNT,
         ADDRESS,
         GLOBAL
     }

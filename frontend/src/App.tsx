@@ -19,6 +19,7 @@ import { InitialPasswordView } from "./views/InitialPasswordView";
 import { LoginView } from "./views/LoginView";
 import { MyBookingsPage } from "./views/MyBookingsPage";
 import { MyMessagesView } from "./views/MyMessagesView";
+import { AccountSecurityView } from "./views/AccountSecurityView";
 import { AdminAuditView } from "./views/AdminAuditView";
 import { AdminMessagesView } from "./views/AdminMessagesView";
 import { AdminConfigurationView } from "./views/AdminConfigurationView";
@@ -40,11 +41,13 @@ interface AppRoutesProps {
   refreshSession: () => Promise<void>;
   passwordChanged?: boolean;
   initialPasswordChanged?: () => void;
+  signedOut?: () => void;
   configurationChanged?: (config: ClubConfig) => void;
   clubName?: string;
 }
 
-export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, configurationChanged, clubName }: AppRoutesProps) {
+export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut,
+  configurationChanged, clubName }: AppRoutesProps) {
   const { pathname } = useLocation();
   const administrative = pathname === "/admin" || pathname.startsWith("/admin/");
 
@@ -69,6 +72,10 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       : <Navigate to="/login" replace />} />
     <Route path="/my-messages" element={session.authenticated
       ? <MyMessagesView />
+      : <Navigate to="/login" replace />} />
+    <Route path="/account/security" element={session.authenticated
+      ? <AccountSecurityView passwordChanged={() => initialPasswordChanged?.()}
+        signedOut={() => signedOut?.()} />
       : <Navigate to="/login" replace />} />
     {/* The role is asked once for the whole surface rather than once per destination. */}
     <Route path="/admin" element={session.roles.includes("ADMIN") ? <AdminShell /> : <Navigate to="/" replace />}>
@@ -209,7 +216,9 @@ export function App() {
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-start justify-center px-4 py-8">
       {offline ? <div data-testid="offline-status"><Alert>{t("status.offline")}</Alert></div> : session
-        ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged} initialPasswordChanged={initialPasswordChanged} configurationChanged={configurationChanged} clubName={club?.clubName} />
+        ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged}
+          initialPasswordChanged={initialPasswordChanged} signedOut={signOut}
+          configurationChanged={configurationChanged} clubName={club?.clubName} />
         : <p role="status">{t("status.loading")}</p>}
     </main>
     <footer className="text-muted flex flex-wrap justify-center gap-x-5 gap-y-2 px-5 pt-4 pb-[max(6rem,calc(4rem+env(safe-area-inset-bottom)))] text-sm sm:pb-4">

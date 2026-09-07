@@ -15,9 +15,9 @@
       "class": "credential-protection",
       "owner": "club-operator",
       "storageBoundary": "The instance database, in user_account.password_hash. The salt and the parameters travel inside the encoding; there is no separate key.",
-      "permittedUse": "Verifying a sign-in and re-encoding a stored hash that sits below the current parameters. Never for a digest, an identifier or a signature.",
+      "permittedUse": "Encoding a replacement password, verifying a sign-in or recent full-authentication proof, and re-encoding a stored hash that sits below the current parameters. Never for a digest, an identifier or a signature.",
       "rotation": "Raising the memory cost or the iteration count is the rotation, and a stored hash below either is re-encoded on its owner's next successful sign-in; storing that is best effort, so a database failure leaves the old hash in place rather than failing the login. Spring Security compares only those two, so changing the parallelism, the salt length or the hash length alone does not re-encode anything already stored, and existing hashes keep the parameters they were written with until one of the other two moves.",
-      "revocation": "Issuing a new credential replaces the hash and ends every session of the account.",
+      "revocation": "Issuing a new credential or choosing a new permanent password replaces the hash and ends every session of the account.",
       "recovery": "None is possible or needed: a hash is not recoverable by design, and a member who cannot sign in is given a new credential.",
       "retirement": "Argon2id is replaced by encoding new and re-encoded passwords under the successor while the old encoding stays verifiable, which is what the re-encode path already does for a parameter change.",
       "evidence": "src/test/java/org/courtside/identity/PasswordHashingTest.java, src/test/java/org/courtside/identity/PasswordRehashTest.java",
@@ -28,6 +28,8 @@
         "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
         "src/main/java/org/courtside/identity/internal/InitialPasswordService.java",
         "src/main/java/org/courtside/identity/internal/PasswordPolicy.java",
+        "src/main/java/org/courtside/identity/internal/PermanentPasswordService.java",
+        "src/main/java/org/courtside/identity/internal/ReauthenticationService.java",
         "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java",
         "src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java",
         "src/main/java/org/courtside/identity/internal/UnusablePassword.java",
@@ -155,6 +157,54 @@
       ],
       "locations": [
         "src/main/java/org/courtside/identity/internal/LoginAttemptProtection.java"
+      ]
+    },
+    {
+      "id": "breached-password-range-prefix",
+      "purpose": "Ask the breached-password service about a password without sending the password or its complete digest",
+      "algorithm": "SHA-1",
+      "parameters": {
+        "disclosedHexCharacters": 5,
+        "protocol": "Have I Been Pwned range API"
+      },
+      "class": "pseudonymisation",
+      "owner": "club-operator",
+      "storageBoundary": "The complete digest exists only in application memory. Five hexadecimal characters are sent to the range service, and successful suffix ranges may remain in the bounded in-memory cache.",
+      "permittedUse": "The Have I Been Pwned range protocol only. SHA-1 carries no collision-resistance or credential-protection claim here, and neither the complete digest nor the password may leave the instance.",
+      "rotation": "The range service defines the protocol digest. A successor requires a protocol that preserves or improves the disclosure boundary before this use can change.",
+      "revocation": "Cached ranges expire by age and process restart; no key exists to revoke.",
+      "recovery": "None is needed; the digest is recomputed for each password check.",
+      "retirement": "Remove the client and its cache when the range protocol is replaced or retired.",
+      "evidence": "src/test/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookupTest.java",
+      "detects": [
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java"
+      ]
+    },
+    {
+      "id": "account-session-revocation-handle",
+      "purpose": "Let an account select one stored session for revocation without exposing its bearer session identifier",
+      "algorithm": "SHA-256",
+      "parameters": {
+        "outputBytes": 16,
+        "encoding": "base64url-unpadded"
+      },
+      "class": "pseudonymisation",
+      "owner": "club-operator",
+      "storageBoundary": "Computed from the high-entropy session identifier in application memory and returned by the authenticated account-session API. The handle is not stored separately.",
+      "permittedUse": "Resolving a revocation request among sessions already owned by the authenticated account. It never authenticates a caller and cannot address another account's sessions.",
+      "rotation": "Not applicable: no key exists, and each platform-generated session identifier produces its own handle.",
+      "revocation": "The handle stops resolving when its session ends or expires.",
+      "recovery": "None is needed; it is recomputed from active session identifiers.",
+      "retirement": "A successor digest may replace it without migrating stored state because handles are computed on read.",
+      "evidence": "src/test/java/org/courtside/identity/internal/AccountSessionServiceTest.java",
+      "detects": [
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/AccountSessionService.java"
       ]
     },
     {

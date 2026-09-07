@@ -47,7 +47,7 @@ http://:80 {
 	@browserNavigation {
 		host {$COURTSIDE_DOMAIN}
 		method GET HEAD
-		path / /courts /login /initial-password /my-bookings /my-messages /admin /admin/* /index.html /assets/* /icon.svg /manifest.webmanifest /sw.js /workbox-*.js
+		path / /courts /login /initial-password /my-bookings /my-messages /account/security /admin /admin/* /index.html /assets/* /icon.svg /manifest.webmanifest /sw.js /workbox-*.js
 	}
 	handle @browserNavigation {
 		header {

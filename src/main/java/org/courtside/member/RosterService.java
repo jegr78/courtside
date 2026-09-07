@@ -238,6 +238,15 @@ public class RosterService {
     }
 
     @Transactional
+    public void endAccountSessions(UUID personId, UUID actorId) {
+        UUID id = requiredPersonId(personId);
+        UserAccount account = requireAccount(id);
+        sessions.revoke(account);
+        securityEvents.sessionTerminatedAfterCommit(account.getId(), actorId,
+                SecurityEventLog.SessionTermination.ADMINISTRATOR_REVOKED);
+    }
+
+    @Transactional
     public RosterEntry writeMembership(UUID personId, UUID membershipTypeId,
                                        MembershipPeriod period) {
         UUID id = requiredPersonId(personId);

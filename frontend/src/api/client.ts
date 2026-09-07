@@ -26,6 +26,7 @@ export type MessagePage = components["schemas"]["MessagePage"];
 export type MessageState = components["schemas"]["MessageState"];
 export type MessageKind = components["schemas"]["MessageKind"];
 export type MessageChoice = components["schemas"]["MessageChoice"];
+export type AccountSession = components["schemas"]["AccountSession"];
 export type PersonRequest = components["schemas"]["PersonRequest"];
 export type MembershipRequest = components["schemas"]["MembershipRequest"];
 export type MembershipType = components["schemas"]["MembershipType"];
@@ -194,6 +195,20 @@ export const api = {
   changeOwnLocale: (locale: string) => request<void>("/api/account/locale", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale })
   }),
+  accountSessions: () => request<AccountSession[]>("/api/account/sessions"),
+  endAccountSession: (handle: string) => request<void>(
+    `/api/account/sessions/${encodeURIComponent(handle)}`, { method: "DELETE" }
+  ),
+  endOwnSessions: () => request<void>("/api/account/sessions", { method: "DELETE" }),
+  reauthenticate: (password: string) => request<void>("/api/session/reauthentication", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password })
+  }),
+  changeOwnPassword: (currentPassword: string, newPassword: string) => request<void>(
+    "/api/account/password", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword })
+    }
+  ),
   ownMessageChoices: () => request<MessageChoice[]>("/api/account/messages"),
   chooseOwnMessages: (declined: MessageKind[]) => request<void>("/api/account/messages", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ declined })
@@ -322,6 +337,10 @@ export const api = {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
     }
   ),
+  endAccountSessions: (personId: string) => request<void>(
+    `/api/admin/roster/${personId}/account/sessions`, { method: "DELETE" }
+  ),
+  endAllSessions: () => request<void>("/api/admin/sessions", { method: "DELETE" }),
   assignMembership: (personId: string, membership: MembershipRequest) => request<RosterEntry>(
     `/api/admin/roster/${personId}/membership`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(membership)

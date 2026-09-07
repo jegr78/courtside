@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type ImportPreview, type ImportRun } from "../../api/client";
+import { api, ApiError, type ImportPreview, type ImportRun } from "../../api/client";
 import i18n from "../../i18n";
 import { ImportExecutionPanel } from "./ImportExecutionPanel";
 
@@ -103,6 +103,30 @@ describe("ImportExecutionPanel", () => {
     expect(executing).not.toHaveBeenCalled();
     await userEvent.click(await screen.findByTestId("confirm-execute"));
     expect(executing).toHaveBeenCalledWith("preview-1", false);
+  });
+
+  it("given stale authentication, when the password is confirmed, then the exact import is retried", async () => {
+    // given
+    const executing = vi.spyOn(api, "executeImportPreview")
+      .mockRejectedValueOnce(new ApiError(403, {
+        type: "urn:courtside:error:recent-authentication-required",
+        title: "Recent authentication required",
+        status: 403
+      }))
+      .mockResolvedValueOnce(run);
+    const prove = vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
+    show({ ...preview, needsConfirmation: true });
+    await userEvent.click(await screen.findByTestId("execute-preview"));
+    await userEvent.click(await screen.findByTestId("confirm-execute"));
+
+    // when
+    await userEvent.type(await screen.findByTestId("import-reauthentication-password"), "current-password");
+    await userEvent.click(screen.getByTestId("confirm-import-reauthentication"));
+
+    // then
+    expect(prove).toHaveBeenCalledWith("current-password");
+    expect(executing).toHaveBeenNthCalledWith(2, "preview-1", true);
+    expect(await screen.findByTestId("run-result")).toBeInTheDocument();
   });
 
   it("given a run that ends more than the source allows, when it is executed, then removals are confirmed explicitly", async () => {

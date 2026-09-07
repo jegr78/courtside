@@ -16,6 +16,9 @@ import org.springframework.session.web.http.CookieSerializer;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.net.URI;
+import java.time.Clock;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -151,6 +154,18 @@ class SecurityConfigurationTest {
     @Test
     void givenAControlledUatIsConfiguredWithoutSecureCookies_whenThePolicyIsValidated_thenItIsAccepted() {
         SecurityConfiguration.validateCookiePolicy(false, "UAT");
+    }
+
+    @Test
+    void givenProductionNamesAnotherBreachService_whenThePolicyStarts_thenTheOverrideIsRefused() {
+        PasswordPolicyProperties properties = new PasswordPolicyProperties(
+                Duration.ofSeconds(3), 1000, Duration.ofHours(24), "",
+                URI.create("http://127.0.0.1:9000/range/"));
+
+        assertThatThrownBy(() -> new SecurityConfiguration()
+                .breachedPasswordLookup(properties, Clock.systemUTC(), "PRODUCTION"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot override HIBP in production");
     }
 
     private Cookie issueCsrfCookie(boolean secureCookies, boolean requestSecure) {

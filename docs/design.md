@@ -1466,8 +1466,9 @@ whether it is built or designed. **Designed means absent today.**
   by tag and hash in `NOTICE` and refreshed by fetching that path again and comparing the two
   hashes. The terms are the member's username, their first and last name, the local part of the address the account carries now, and
   the club name, each taken whole and split on its non-alphanumeric boundaries, with tokens under
-  four characters dropped so a syllable does not refuse a passphrase. Comparison is
-  case-insensitive, and one refusal answers for both lists so it never says which one matched.
+  four characters dropped so a syllable does not refuse a passphrase. Comparison uses Unicode
+  NFKC normalization and is case-insensitive, and one refusal answers for both lists so it never
+  says which one matched. The original password remains unchanged for hashing.
   Keeping the issued credential is refused under its own type, because it is known to whoever read
   the message that carried it and because an account that keeps it can no longer withdraw it.
   Nothing about composition or alphabet is required — a 64-character passphrase outside ASCII is a
@@ -1528,11 +1529,13 @@ whether it is built or designed. **Designed means absent today.**
   at the end that knows it: a certificate issued for another name is a refused hop, not a refused
   start. Here too Courtside ships no authority and issues no
   production key material: issuance, storage, lifetime, renewal and revocation are the operator's.
-- **Whether a permanent password is one that has already leaked:** *Designed.* A check against a
-  breached-password set, asking with a partial hash so that neither the password nor a reusable
-  digest of it leaves the instance, and refusing to set a password while that check cannot run.
-  Until it exists, a password long enough and absent from the list above is accepted however often
-  it has appeared in a public breach.
+- **Whether a permanent password is one that has already leaked:** *Built.* Every initial and
+  self-service password change checks the Have I Been Pwned range API. Only the first five
+  hexadecimal characters of its SHA-1 protocol digest leave the instance; neither the password nor
+  a reusable digest does. Successful ranges are cached within fixed size and age bounds. A timeout,
+  malformed response or unavailable service refuses the password change with a typed `503`, while
+  sign-in never depends on that external service. An operator may add instance-specific terms in a
+  local file; leaving the setting absent is the supported default and does not affect startup.
 - **Password age is observable on a failed login.** *Accepted, not closed.* A wrong password against
   an account still on an older hash costs less than one against an unknown username, because the
   dummy verification that hides unknown usernames encodes at the current parameters. It needs no
@@ -1602,7 +1605,14 @@ whether it is built or designed. **Designed means absent today.**
   holds leave sessions alone, as does the rehash on a sign-in, which replaces the stored hash
   without touching the epoch. It does raise the account's row version, so an administrator editing
   that account at that moment is answered 409 and re-reads rather than overwriting the new hash.
-  Ending one single session while leaving the account's rights untouched still has no surface.
+  Members can list their active sessions and end one or all of them from account security. The list
+  exposes creation and last-activity time, whether it is the current browser, and a normalized
+  browser family — never the source address, raw user-agent or stored session id. Its revocation
+  handle is a one-way truncated SHA-256 value rather than a credential. Administrators can end one
+  account's sessions or every session in the instance; the global action also ends their own.
+  Ending another browser or using either administrative control requires a full password proof no
+  older than five minutes. Password replacement also verifies the current password and ends every
+  session. *Built.*
 - **CSRF:** on, double-submit cookie. *Built.*
 - **Brute force:** rate limiting before password verification. *Built.* Source-address counters
   absorb concentrated attacks, while a two-per-instance concurrency guard bounds simultaneous
@@ -1618,7 +1628,14 @@ whether it is built or designed. **Designed means absent today.**
   window. At 100 attempts it increments `courtside.login.distributed.thresholds` and writes one
   privacy-safe warning, but changes neither login decisions nor health. A repeated distributed
   attacker can still keep both verification slots busy; operators should investigate the metric and
-  restrict abusive sources at the reverse proxy or network edge.
+  restrict abusive sources at the reverse proxy or network edge. Reauthentication and password
+  changes use both an account-wide bucket and a source-address bucket, plus a
+  verification-capacity pool isolated from sign-in. Changing an address cannot reset a stolen
+  account's attempt budget, while a successful proof clears only that account's account-wide bucket.
+  The source bucket measures request volume and expires with its window; another account cannot
+  erase it by proving a password. These requests do not take the global login lock or enter its
+  observation count. A stalled breach lookup therefore cannot consume sign-in capacity, and their
+  typed `429` names password verification rather than login.
 - **Credential issuing:** limited per account over a configurable window, counted in PostgreSQL.
   *Built.* The account is the unit because the account is what the abuse targets: somebody holding a
   board member's session filling one member's mailbox with credentials that each invalidate the

@@ -66,6 +66,13 @@ courtside:
   session:
     absolute-lifetime: ${COURTSIDE_SESSION_ABSOLUTE_LIFETIME:24h}
     concurrent-limit: ${COURTSIDE_SESSION_MAX_CONCURRENT:5}
+    reauthentication-window: ${COURTSIDE_SESSION_REAUTHENTICATION_WINDOW:5m}
+  password:
+    breach-timeout: ${COURTSIDE_PASSWORD_BREACH_TIMEOUT:3s}
+    breach-cache-entries: ${COURTSIDE_PASSWORD_BREACH_CACHE_ENTRIES:128}
+    breach-cache-lifetime: ${COURTSIDE_PASSWORD_BREACH_CACHE_LIFETIME:24h}
+    terms-file: ${COURTSIDE_PASSWORD_TERMS_FILE:}
+    breach-endpoint: ${COURTSIDE_PASSWORD_BREACH_ENDPOINT:https://api.pwnedpasswords.com/range/}
   clock:
     fixed-instant: ${COURTSIDE_CLOCK_FIXED_INSTANT:}
   mail:

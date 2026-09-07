@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { setLocale, supportedLocale, type SupportedLocale } from "../i18n";
@@ -90,6 +91,10 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
             <option value="light">{t("preferences.light")}</option>
           </select>
         </label>
+        {authenticated && <Link to="/account/security" data-testid="account-security-link"
+          onClick={() => setOpen(false)} className="rounded-lg border px-4 py-3 text-center font-semibold hover:brightness-90">
+          {t("accountSecurity.menu")}
+        </Link>}
         {authenticated && <Button variant="secondary" type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>}
       </div>
     </details>

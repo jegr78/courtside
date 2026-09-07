@@ -30,7 +30,7 @@
       "result": "success",
       "allowedFields": ["account.id", "actor.account.id", "event.code", "event.outcome", "event.reason"],
       "allowedValues": {
-        "event.reason": ["EXPLICIT_LOGOUT", "ABSOLUTE_EXPIRY", "SECURITY_EPOCH_CHANGED", "CONCURRENT_LIMIT"]
+        "event.reason": ["EXPLICIT_LOGOUT", "ABSOLUTE_EXPIRY", "SECURITY_EPOCH_CHANGED", "CONCURRENT_LIMIT", "USER_REVOKED", "ADMINISTRATOR_REVOKED", "GLOBAL_REVOKED"]
       }
     },
     {
@@ -57,7 +57,7 @@
       "result": "success",
       "allowedFields": ["account.id", "event.code", "event.outcome", "event.reason"],
       "allowedValues": {
-        "event.reason": ["LOGIN_ADDRESS_LIMIT", "DISTRIBUTED_LOGIN_THRESHOLD"]
+        "event.reason": ["LOGIN_ADDRESS_LIMIT", "PASSWORD_VERIFICATION_ACCOUNT_LIMIT", "PASSWORD_VERIFICATION_ADDRESS_LIMIT", "DISTRIBUTED_LOGIN_THRESHOLD"]
       }
     },
     {
@@ -66,7 +66,7 @@
       "result": "failure",
       "allowedFields": ["account.id", "event.code", "event.outcome", "event.reason"],
       "allowedValues": {
-        "event.reason": ["CSRF", "LOGIN_VERIFICATION_CAPACITY", "CREDENTIAL_ISSUE_LIMIT", "ADMINISTRATOR_CONTINUITY", "REQUEST_VALIDATION"]
+        "event.reason": ["CSRF", "LOGIN_VERIFICATION_CAPACITY", "PASSWORD_VERIFICATION_CAPACITY", "CREDENTIAL_ISSUE_LIMIT", "ADMINISTRATOR_CONTINUITY", "RECENT_AUTHENTICATION", "REAUTHENTICATION_FAILED", "REQUEST_VALIDATION"]
       }
     }
   ]

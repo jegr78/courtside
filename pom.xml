@@ -355,6 +355,8 @@
                                 <useJakartaEe>true</useJakartaEe>
                                 <documentationProvider>none</documentationProvider>
                                 <openApiNullable>false</openApiNullable>
+                                <generateJsonIncludeAnnotations>false</generateJsonIncludeAnnotations>
+                                <generateJsonSetterNullsAnnotations>false</generateJsonSetterNullsAnnotations>
                                 <useTags>true</useTags>
                                 <useOptional>false</useOptional>
                                 <skipDefaultInterface>true</skipDefaultInterface>

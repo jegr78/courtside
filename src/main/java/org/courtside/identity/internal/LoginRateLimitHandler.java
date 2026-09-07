@@ -16,9 +16,11 @@ class LoginRateLimitHandler {
 
     private final ObjectMapper objectMapper;
 
-    void handle(HttpServletResponse response, Duration retryAfter) throws IOException {
+    void handle(HttpServletResponse response, Duration retryAfter, boolean login) throws IOException {
         long retryAfterSeconds = retryAfter.getSeconds() + (retryAfter.getNano() == 0 ? 0 : 1);
-        ProblemDetail problem = new LoginRateLimitedException().getBody();
+        ProblemDetail problem = login
+                ? new LoginRateLimitedException().getBody()
+                : new PasswordVerificationRateLimitedException().getBody();
 
         response.setStatus(problem.getStatus());
         response.setHeader("Retry-After", Long.toString(retryAfterSeconds));

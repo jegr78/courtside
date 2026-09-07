@@ -13,6 +13,11 @@ import org.courtside.api.ApiRosterEntry;
 import org.courtside.api.ApiRosterPage;
 import org.courtside.api.ApiUsernameRequest;
 import org.courtside.identity.Role;
+import org.courtside.identity.GlobalSessionAdministration;
+import org.courtside.identity.CurrentUser;
+import org.courtside.identity.RecentAuthentication;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.courtside.member.MembershipPeriod;
 import org.courtside.member.RosterService;
 import org.courtside.shared.CursorPage;
@@ -34,6 +39,10 @@ import java.util.function.Function;
 class RosterAdminController implements AdminRosterApi {
 
     private final RosterService roster;
+    private final GlobalSessionAdministration globalSessions;
+    private final HttpServletRequest servletRequest;
+    private final RecentAuthentication recentAuthentication;
+    private final CurrentUser currentUser;
 
     @Override
     public ResponseEntity<ApiRosterPage> listRoster(String query, UUID membershipTypeId, UUID cursor, Integer limit) {
@@ -60,12 +69,14 @@ class RosterAdminController implements AdminRosterApi {
 
     @Override
     public ResponseEntity<ApiRosterEntry> changePerson(UUID personId, ApiPersonRequest request) {
+        recentAuthentication.requireRecent();
         return ResponseEntity.ok(toResponse(roster.changePerson(
                 personId, request.getFirstName(), request.getLastName(), request.getEmail())));
     }
 
     @Override
     public ResponseEntity<ApiRosterEntry> createAccount(UUID personId, ApiAccountRequest request) {
+        recentAuthentication.requireRecent();
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(toResponse(roster.createAccount(personId, request.getUsername(),
                         roles(request.getRoles()))));
@@ -73,6 +84,7 @@ class RosterAdminController implements AdminRosterApi {
 
     @Override
     public ResponseEntity<ApiRosterEntry> changeAccountRoles(UUID personId, ApiRolesRequest request) {
+        recentAuthentication.requireRecent();
         return ResponseEntity.ok(toResponse(
                 roster.changeRoles(personId, roles(request.getRoles()))));
     }
@@ -80,6 +92,7 @@ class RosterAdminController implements AdminRosterApi {
     @Override
     public ResponseEntity<ApiRosterEntry> changeAccountUsername(UUID personId,
                                                                 ApiUsernameRequest request) {
+        recentAuthentication.requireRecent();
         return ResponseEntity.ok(toResponse(
                 roster.changeUsername(personId, request.getUsername())));
     }
@@ -92,13 +105,36 @@ class RosterAdminController implements AdminRosterApi {
 
     @Override
     public ResponseEntity<ApiRosterEntry> requestAccountCredentials(UUID personId) {
+        recentAuthentication.requireRecent();
         return ResponseEntity.ok(toResponse(roster.requestCredentials(personId)));
     }
 
     @Override
     public ResponseEntity<ApiRosterEntry> setAccountActive(UUID personId, ApiActiveRequest request) {
+        recentAuthentication.requireRecent();
         return ResponseEntity.ok(toResponse(
                 roster.setAccountEnabled(personId, request.getActive())));
+    }
+
+    @Override
+    public ResponseEntity<Void> endAccountSessions(UUID personId) {
+        recentAuthentication.requireRecent();
+        roster.endAccountSessions(personId, currentUser.accountId().orElseThrow());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<Void> endAllSessions() {
+        globalSessions.endAll();
+        HttpSession session = servletRequest.getSession(false);
+        if (session != null) {
+            try {
+                session.invalidate();
+            } catch (IllegalStateException ignored) {
+                // The global revocation already made this session unusable.
+            }
+        }
+        return ResponseEntity.noContent().build();
     }
 
     @Override

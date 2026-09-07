@@ -17,9 +17,12 @@ import static org.mockito.Mockito.when;
 class AccountControllerTest {
 
     private final InitialPasswordService passwords = mock(InitialPasswordService.class);
+    private final PermanentPasswordService permanentPasswords = mock(PermanentPasswordService.class);
+    private final AccountSessionService sessions = mock(AccountSessionService.class);
     private final AccountLocaleService locales = mock(AccountLocaleService.class);
     private final HttpServletRequest request = mock(HttpServletRequest.class);
-    private final AccountController controller = new AccountController(passwords, locales, request);
+    private final AccountController controller = new AccountController(
+            passwords, permanentPasswords, sessions, locales, request);
 
     @Test
     void givenAnExistingSession_whenChangingTheInitialPassword_thenTheSessionIsInvalidated() {

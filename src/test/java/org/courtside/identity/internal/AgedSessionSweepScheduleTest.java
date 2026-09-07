@@ -43,7 +43,7 @@ class AgedSessionSweepScheduleTest {
         @Bean
         AgedSessionSweep agedSessionSweep() {
             return new AgedSessionSweep(mock(JdbcClient.class),
-                    new CourtsideSessionProperties(Duration.ofHours(24), 5));
+                    new CourtsideSessionProperties(Duration.ofHours(24), 5, Duration.ofMinutes(5)));
         }
     }
 }

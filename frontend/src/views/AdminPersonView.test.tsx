@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -48,6 +48,12 @@ function showPerson(entry: RosterEntry = jane, shown: ClubConfig = club) {
       <Route path="/admin/roster/:personId" element={<AdminPersonView />} />
     </Routes>
   </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
+}
+
+function input(id: string): HTMLInputElement {
+  const element = document.getElementById(id);
+  if (!(element instanceof HTMLInputElement)) throw new Error(`Input ${id} is missing`);
+  return element;
 }
 
 describe("AdminPersonView", () => {
@@ -113,6 +119,121 @@ describe("AdminPersonView", () => {
 
     // then
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+  });
+
+  it("re-authenticates and retries the exact sensitive account change", async () => {
+    // given
+    const save = vi.spyOn(api, "changeAccountRoles")
+      .mockRejectedValueOnce(new ApiError(403, {
+        type: "urn:courtside:error:recent-authentication-required",
+        title: "Recent authentication required", status: 403
+      }))
+      .mockResolvedValue({ ...jane, roles: ["MEMBER", "TRAINER"] });
+    const prove = vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
+    showPerson();
+    await screen.findByTestId("save-roles");
+    await userEvent.click(screen.getByTestId("account-roles-TRAINER"));
+
+    // when
+    await userEvent.click(screen.getByTestId("save-roles"));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(input("admin-reauthentication-password"), "admin-password");
+    await userEvent.click(within(dialog).getByRole("button"));
+
+    // then
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(save).toHaveBeenNthCalledWith(2, "person-1", ["MEMBER", "TRAINER"]);
+    expect(prove).toHaveBeenCalledWith("admin-password");
+  });
+
+  it("reports rejected administrator reauthentication inside the open dialog", async () => {
+    // given
+    vi.spyOn(api, "changeAccountRoles").mockRejectedValue(new ApiError(403, {
+      type: "urn:courtside:error:recent-authentication-required",
+      title: "Recent authentication required", status: 403
+    }));
+    vi.spyOn(api, "reauthenticate").mockRejectedValue(new ApiError(403, {
+      type: "urn:courtside:error:reauthentication-failed",
+      title: "Reauthentication failed", status: 403
+    }));
+    showPerson();
+    await screen.findByTestId("save-roles");
+    await userEvent.click(screen.getByTestId("account-roles-TRAINER"));
+    await userEvent.click(screen.getByTestId("save-roles"));
+    const dialog = await screen.findByRole("dialog");
+
+    // when
+    await userEvent.type(input("admin-reauthentication-password"), "wrong-password");
+    await userEvent.click(within(dialog).getByRole("button"));
+
+    // then
+    expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("keeps the dialog open when the retried action still requires recent authentication", async () => {
+    // given
+    vi.spyOn(api, "changeAccountRoles").mockRejectedValue(new ApiError(403, {
+      type: "urn:courtside:error:recent-authentication-required",
+      title: "Recent authentication required", status: 403
+    }));
+    vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
+    showPerson();
+    await screen.findByTestId("save-roles");
+    await userEvent.click(screen.getByTestId("account-roles-TRAINER"));
+    await userEvent.click(screen.getByTestId("save-roles"));
+    const dialog = await screen.findByRole("dialog");
+
+    // when
+    await userEvent.type(input("admin-reauthentication-password"), "admin-password");
+    await userEvent.click(within(dialog).getByRole("button"));
+
+    // then
+    expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+    expect(api.changeAccountRoles).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("re-authenticates and retries the exact target session termination", async () => {
+    // given
+    const end = vi.spyOn(api, "endAccountSessions")
+      .mockRejectedValueOnce(new ApiError(403, {
+        type: "urn:courtside:error:recent-authentication-required",
+        title: "Recent authentication required", status: 403
+      }))
+      .mockResolvedValue(undefined);
+    const prove = vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
+    showPerson();
+    await screen.findByTestId("end-account-sessions");
+
+    // when
+    await userEvent.click(screen.getByTestId("end-account-sessions"));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(input("admin-reauthentication-password"), "admin-password");
+    await userEvent.click(within(dialog).getByRole("button"));
+
+    // then
+    await waitFor(() => expect(end).toHaveBeenCalledTimes(2));
+    expect(end).toHaveBeenNthCalledWith(2, "person-1");
+    expect(prove).toHaveBeenCalledWith("admin-password");
+  });
+
+  it("ends every session only after confirmation and reports that the administrator signed out", async () => {
+    // given
+    const end = vi.spyOn(api, "endAllSessions").mockResolvedValue(undefined);
+    const signedOut = vi.fn();
+    window.addEventListener("courtside:unauthenticated", signedOut, { once: true });
+    showPerson();
+    await screen.findByTestId("end-all-sessions");
+
+    // when
+    await userEvent.click(screen.getByTestId("end-all-sessions"));
+    expect(end).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId("confirm-end-all-sessions"));
+
+    // then
+    await waitFor(() => expect(end).toHaveBeenCalledOnce());
+    expect(signedOut).toHaveBeenCalledOnce();
   });
 
   it("given the account form is filled in, when it is read, then it holds work", async () => {

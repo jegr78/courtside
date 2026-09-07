@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.LocalDate;
+import java.time.Clock;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -71,11 +72,18 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @Autowired
     private MemberRepository members;
 
+    @Autowired
+    private Clock clock;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .defaultRequest(get("/").sessionAttr("courtside.authenticated-at",
+                        clock.instant().toEpochMilli()))
+                .apply(springSecurity())
+                .build();
     }
 
     @Test

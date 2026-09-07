@@ -88,6 +88,35 @@ describe("AppRoutes", () => {
     expect(screen.getByTestId("login-view")).toBeInTheDocument();
   });
 
+  it("given a member ends this browser session, when account security completes, then it signs out without reporting a password change", async () => {
+    // given
+    vi.spyOn(api, "accountSessions").mockResolvedValue([{
+      handle: "A234567890123456789012",
+      createdAt: "2026-09-07T10:00:00Z",
+      lastActivityAt: "2026-09-07T11:00:00Z",
+      current: true,
+      browserFamily: "FIREFOX"
+    }]);
+    vi.spyOn(api, "endAccountSession").mockResolvedValue(undefined);
+    const passwordChanged = vi.fn();
+    const signedOut = vi.fn();
+    render(<RoutedShell initialEntries={["/account/security"]}><AppRoutes session={{
+      authenticated: true,
+      username: "doe.jane",
+      displayName: "Jane Doe",
+      roles: ["MEMBER"],
+      passwordChangeRequired: false
+    }} refreshSession={() => Promise.resolve()} initialPasswordChanged={passwordChanged}
+    signedOut={signedOut} /></RoutedShell>);
+
+    // when
+    await userEvent.click(await screen.findByTestId("end-current-session"));
+
+    // then
+    await waitFor(() => expect(signedOut).toHaveBeenCalledOnce());
+    expect(passwordChanged).not.toHaveBeenCalled();
+  });
+
   it("given an anonymous visitor, when opening the court alias, then the public plan remains directly addressable", async () => {
     // given
     vi.spyOn(api, "bookingGrid").mockResolvedValue({

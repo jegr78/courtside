@@ -3,7 +3,8 @@ import { Buffer } from "node:buffer";
 import { once } from "node:events";
 import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash, randomUUID, X509Certificate } from "node:crypto";
-import { createServer, type AddressInfo } from "node:net";
+import { createServer as createNetServer, type AddressInfo } from "node:net";
+import { createServer as createHttpServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
@@ -389,13 +390,33 @@ export interface DatabaseLock {
 }
 
 async function availableLoopbackPort(): Promise<number> {
-  const server = createServer();
+  const server = createNetServer();
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const port = (server.address() as AddressInfo).port;
   await new Promise<void>((resolveClose, rejectClose) =>
     server.close((error) => error ? rejectClose(error) : resolveClose()));
   return port;
+}
+
+async function startBreachCheckStub(): Promise<{ endpoint: string; close: () => Promise<void> }> {
+  const server: Server = createHttpServer((request, response) => {
+    if (request.method !== "GET" || !/^\/range\/[A-F0-9]{5}$/.test(request.url ?? "")
+        || request.headers["add-padding"] !== "true") {
+      response.writeHead(400).end();
+      return;
+    }
+    response.writeHead(200, { "Content-Type": "text/plain; charset=us-ascii" });
+    response.end(`${"0".repeat(35)}:0\n`);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const port = (server.address() as AddressInfo).port;
+  return {
+    endpoint: `http://127.0.0.1:${port}/range/`,
+    close: () => new Promise<void>((resolveClose, rejectClose) =>
+      server.close((error) => error ? rejectClose(error) : resolveClose()))
+  };
 }
 
 async function snapshotJourneyData(postgres: StartedTestContainer): Promise<string[]> {
@@ -442,6 +463,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const resourceProfile = selectedResourceProfile(process.env);
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
+  let breachCheck: Awaited<ReturnType<typeof startBreachCheckStub>> | undefined;
   // As many lines as a container hands over, so both sides of a failed run read alike.
   const applicationLog = applicationLogBuffer(200);
   let staticDirectory: string | undefined;
@@ -592,6 +614,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     ]);
   };
   try {
+    breachCheck = await startBreachCheckStub();
     if (resourceProfile && resourceProfile !== "reference") {
       const dockerCapacity = await dockerJson(["info", "--format", "{{json .}}"]);
       assertDockerResourceCapacity(resourceProfile, dockerCapacity);
@@ -657,6 +680,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       COURTSIDE_ENVIRONMENT: "DEVELOPMENT",
       COURTSIDE_CLOCK_FIXED_INSTANT: journeyInstant,
       COURTSIDE_COOKIE_SECURE: "false",
+      COURTSIDE_PASSWORD_BREACH_ENDPOINT: breachCheck.endpoint,
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: "bootstrap-admin",
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: "temporary-password",
       COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: "Bootstrap Administrator",
@@ -920,6 +944,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
           () => process.env.COURTSIDE_WEBKIT_RELIABILITY === "true" ? stopResourceSampling() : Promise.resolve(),
           stopApplication,
           stopContainers,
+          () => breachCheck?.close() ?? Promise.resolve(),
           () => {
             rmSync(staticDirectory!, { recursive: true, force: true });
             return Promise.resolve();
@@ -932,7 +957,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     await resourceSamplePending;
     application?.kill();
     try {
-      await stopContainers();
+      await completeCleanup([stopContainers, () => breachCheck?.close() ?? Promise.resolve()]);
     } catch (cleanupError) {
       throw new AggregateError([error, cleanupError], "Journey startup and cleanup failed", { cause: cleanupError });
     } finally {

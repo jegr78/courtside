@@ -74,6 +74,15 @@ class SpaConfigurationTest extends AbstractIntegrationTest {
                 .andExpect(forwardedUrl("/index.html"));
     }
 
+    @Test
+    void givenAnAnonymousVisitor_whenOpeningAccountSecurity_thenTheLoginCapableAppShellIsServed()
+            throws Exception {
+        // when / then
+        mockMvc.perform(get("/account/security"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/index.html"));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"/admin", "/admin/setup", "/admin/configuration", "/admin/facility",
             "/admin/facility/courts", "/admin/facility/opening-hours", "/admin/facility/booking-cards",

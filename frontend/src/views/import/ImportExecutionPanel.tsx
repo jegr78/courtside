@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type ImportPreview, type ImportRun } from "../../api/client";
+import { api, ApiError, type ImportPreview, type ImportRun } from "../../api/client";
 import { Button } from "../../components/Button";
 import { Modal } from "../../components/Modal";
 import { SuccessFeedback } from "../../components/SuccessFeedback";
+import { TextField } from "../../components/TextField";
 import { formatDateTime } from "../../time/clubZone";
 import { isExecutable } from "./previewState";
 
@@ -11,6 +12,7 @@ const NUMBERS = [
   "created", "corrected", "membershipsEnded", "accountsCreated", "accountsDisabled",
   "rolesRemoved", "rowErrors"
 ] as const;
+const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
 
 export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, executed, reportError }: {
   sourceId: string;
@@ -25,6 +27,7 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, ex
   const [runs, setRuns] = useState<ImportRun[]>();
   const [result, setResult] = useState<ImportRun>();
   const [confirming, setConfirming] = useState(false);
+  const [retry, setRetry] = useState<ImportPreview>();
   const [pending, setPending] = useState(false);
 
   const read = useCallback(async () => setRuns(await api.importRuns(sourceId)), [sourceId]);
@@ -44,6 +47,30 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, ex
       executed(run);
     } catch (failure) {
       setConfirming(false);
+      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) {
+        setRetry(reviewed);
+      } else {
+        reportError(failure);
+      }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function reauthenticate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const password = new FormData(event.currentTarget).get("import-reauthentication-password");
+    if (typeof password !== "string" || !retry || pending) return;
+    setPending(true);
+    try {
+      await api.reauthenticate(password);
+      const reviewed = retry;
+      setRetry(undefined);
+      const run = await api.executeImportPreview(reviewed.previewId, reviewed.needsConfirmation);
+      setResult(run);
+      setRuns((current) => [run, ...(current ?? [])]);
+      executed(run);
+    } catch (failure) {
       reportError(failure);
     } finally {
       setPending(false);
@@ -102,6 +129,14 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, ex
           </Button>
         </div>
       </div>
+    </Modal>}
+    {retry && <Modal labelledBy="import-reauthentication-title" closed={() => setRetry(undefined)}>
+      <form className="grid gap-4" onSubmit={(event) => void reauthenticate(event)}>
+        <h2 id="import-reauthentication-title" className="text-2xl font-bold">{t("accountSecurity.reauthenticateTitle")}</h2>
+        <p>{t("accountSecurity.reauthenticate")}</p>
+        <TextField data-testid="import-reauthentication-password" id="import-reauthentication-password" name="import-reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
+        <Button data-testid="confirm-import-reauthentication" variant="primary" disabled={pending} type="submit">{t("accountSecurity.continue")}</Button>
+      </form>
     </Modal>}
   </section>;
 }
