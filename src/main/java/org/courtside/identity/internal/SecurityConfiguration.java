@@ -12,11 +12,13 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.session.SessionAuthenticationException;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -25,10 +27,13 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.session.Session;
+import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
-        LoginProtectionProperties.class, SessionLifetimeProperties.class})
+        LoginProtectionProperties.class, SessionLifetimeProperties.class, SessionLimitProperties.class})
 public class SecurityConfiguration {
 
     // OWASP's Argon2id minimum; the login filter limits how often a caller can incur this cost.
@@ -60,6 +65,8 @@ public class SecurityConfiguration {
             LoginRateLimitHandler loginRateLimitHandler,
             UserAccountRepository accounts,
             SessionLifetimeProperties sessionLifetime,
+            SessionLimitProperties sessionLimit,
+            SessionRegistry sessionRegistry,
             @Value("${courtside.performance.telemetry-enabled:false}") boolean performanceTelemetryEnabled,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
             throws Exception {
@@ -135,7 +142,16 @@ public class SecurityConfiguration {
                         UsernamePasswordAuthenticationFilter.class)
                 // The default only changes the session id, which keeps the creation time the absolute
                 // lifetime counts from, so a second member on a shared browser inherits the first's.
-                .sessionManagement(session -> session.sessionFixation(fixation -> fixation.migrateSession()))
+                .sessionManagement(session -> session
+                        .sessionFixation(fixation -> fixation.migrateSession())
+                        .maximumSessions(sessionLimit.concurrentLimit())
+                        .sessionRegistry(sessionRegistry)
+                        // The oldest inactive session goes rather than the sign-in being refused: a
+                        // member who cannot reach a device is not helped by being locked out of it.
+                        .maxSessionsPreventsLogin(false)
+                        .expiredSessionStrategy(expired -> authenticationEntryPoint.commence(
+                                expired.getRequest(), expired.getResponse(),
+                                new SessionAuthenticationException("session limit reached"))))
                 .addFilterAfter(new SecurityEpochFilter(accounts),
                         SecurityContextHolderFilter.class)
                 // Anchored behind the epoch filter: two filters sharing one anchor are ordered by
@@ -162,6 +178,11 @@ public class SecurityConfiguration {
                         .referrerPolicy(referrer -> referrer.policy(
                                 ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
                 .build();
+    }
+
+    @Bean
+    <S extends Session> SessionRegistry sessionRegistry(FindByIndexNameSessionRepository<S> sessions) {
+        return new SpringSessionBackedSessionRegistry<>(sessions);
     }
 
     static CookieCsrfTokenRepository csrfTokenRepository(boolean secureCookies) {

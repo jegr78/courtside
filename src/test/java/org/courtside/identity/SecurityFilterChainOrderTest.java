@@ -29,11 +29,15 @@ class SecurityFilterChainOrderTest extends AbstractIntegrationTest {
         // when / then — named before they are indexed: a filter that is not there answers -1, and
         // -1 comes before everything, so a missing anchor would make the order below pass by itself
         assertThat(names).contains("SecurityContextHolderFilter", "SecurityEpochFilter",
-                "AbsoluteSessionLifetimeFilter", "AuthorizationFilter");
+                "AbsoluteSessionLifetimeFilter", "AuthorizationFilter",
+                "HeaderWriterFilter", "ConcurrentSessionFilter");
         assertThat(names.indexOf("SecurityContextHolderFilter"))
                 .isLessThan(names.indexOf("AbsoluteSessionLifetimeFilter"));
         assertThat(names.indexOf("AbsoluteSessionLifetimeFilter"))
                 .as("authority is read after this filter has had its say")
                 .isLessThan(names.indexOf("AuthorizationFilter"));
+        assertThat(names.indexOf("HeaderWriterFilter"))
+                .as("this filter writes its own refusal, so the headers must already be set when it does")
+                .isLessThan(names.indexOf("ConcurrentSessionFilter"));
     }
 }

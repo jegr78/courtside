@@ -57,6 +57,7 @@ courtside:
     lock-timeout: ${COURTSIDE_DB_LOCK_TIMEOUT:5s}
   session:
     absolute-lifetime: ${COURTSIDE_SESSION_ABSOLUTE_LIFETIME:24h}
+    concurrent-limit: ${COURTSIDE_SESSION_MAX_CONCURRENT:5}
   clock:
     fixed-instant: ${COURTSIDE_CLOCK_FIXED_INSTANT:}
   mail:
