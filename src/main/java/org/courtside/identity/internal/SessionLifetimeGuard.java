@@ -24,12 +24,12 @@ class SessionLifetimeGuard implements InitializingBean {
                     + " inactivity window would be whatever Spring defaults to that day rather than"
                     + " the value this deployment states");
         }
-        // Spring Session reads a negative interval as one that never expires, so a window below this
-        // floor is the inactivity bound switched off rather than a strict one.
+        // The floor the absolute lifetime is held to as well. A negative value is not merely short:
+        // Spring Session reads it as an interval that never expires.
         if (timeout.compareTo(FLOOR) < 0) {
             throw new IllegalStateException("COURTSIDE_SESSION_INACTIVITY_TIMEOUT (" + timeout
-                    + ") is shorter than " + FLOOR + ", which is not a stricter window but one that"
-                    + " stops bounding anything");
+                    + ") is shorter than " + FLOOR + ", the floor the absolute lifetime is held to"
+                    + " as well; a negative one would not expire at all");
         }
         if (lifetime.absoluteLifetime().compareTo(timeout) < 0) {
             throw new IllegalStateException("COURTSIDE_SESSION_ABSOLUTE_LIFETIME (" + lifetime.absoluteLifetime()

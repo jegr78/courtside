@@ -17,7 +17,7 @@ class AgedSessionSweep {
     // session that died of age and was never used again would keep its row until that window passed.
     @Scheduled(cron = "${spring.session.jdbc.cleanup-cron}")
     @Transactional
-    void deleteSessionsPastTheirLifetime() {
+    public void deleteSessionsPastTheirLifetime() {
         // The system clock, because creation_time is written from it.
         jdbc.sql("DELETE FROM spring_session WHERE creation_time <= :cutoff")
                 .param("cutoff", System.currentTimeMillis() - lifetime.absoluteLifetime().toMillis())

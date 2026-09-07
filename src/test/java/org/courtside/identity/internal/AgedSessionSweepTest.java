@@ -26,7 +26,8 @@ class AgedSessionSweepTest extends AbstractIntegrationTest {
         String aged = storedSession(Duration.ofHours(25));
         String young = storedSession(Duration.ofHours(1));
 
-        // when — called rather than waited for, so no sweep of its own races the truncate between cases
+        // when — called rather than waited for. Spring Session runs its own cleanup on a scheduler
+        // of its own, which no profile disables; both rows outlive it because neither is idle.
         sweep.deleteSessionsPastTheirLifetime();
 
         // then

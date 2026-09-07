@@ -1470,7 +1470,9 @@ whether it is built or designed. **Designed means absent today.**
   of 24 hours counted from when the session began, which activity does not extend. Both are the
   deployment's to set, both are stated rather than inherited from a framework default that can move,
   and an absolute lifetime shorter than the inactivity window is refused at startup because the
-  window could then never be reached. The absolute one is counted from the creation time stored with
+  window could then never be reached. Neither may fall below a minute, so that a value meant as a
+  bound cannot be one in name only — and a negative inactivity window, which Spring Session reads
+  as an interval that never expires, is refused with them. The absolute one is counted from the creation time stored with
   the session, so restarting the application does not hand a live session a fresh lifetime,
   and signing in starts a session of its own so that a browser two members share hands the
   second of them a full lifetime rather than what the first had left. Reaching
