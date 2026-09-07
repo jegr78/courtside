@@ -33,33 +33,58 @@ class ServerTlsTransportTest {
 
     private static final String MARKER = "the-application-answered";
     private static final String UPSTREAM = "host.testcontainers.internal";
-    private static final int UPSTREAM_PORT = 8080;
+    private static final int SERVED_PORT = 8080;
+    private static final int PLAIN_PORT = 8081;
     private static final String AUTHORITY = "/etc/courtside/tls/app-authority/authority.pem";
     private static final Pattern CADDY_IMAGE =
             Pattern.compile("caddy:[\\w.-]+@sha256:[a-f0-9]{64}");
 
     private static TestCertificate served;
     private static WebServer application;
+    private static WebServer plainApplication;
 
-    // One forwarding carries the upstream port for the whole class: Testcontainers registers it
-    // globally, so a second one for the same port inside the container is refused.
+    // A forwarding is registered for the whole JVM, so each of the two applications is reached
+    // through a port of its own rather than through one the second run would be refused.
     @BeforeAll
-    static void startTheApplication() throws Exception {
+    static void startTheApplications() throws Exception {
         served = TestCertificate.issuedFor(UPSTREAM);
-        application = serving(served);
-        Testcontainers.exposeHostPorts(Map.of(application.getPort(), UPSTREAM_PORT));
+        application = serving(new ServerTlsProperties(ServerTlsProperties.Mode.SERVE,
+                written(served.certificate()), written(served.key())));
+        plainApplication = serving(
+                new ServerTlsProperties(ServerTlsProperties.Mode.PLAINTEXT, null, null));
+        Testcontainers.exposeHostPorts(Map.of(application.getPort(), SERVED_PORT,
+                plainApplication.getPort(), PLAIN_PORT));
     }
 
     @AfterAll
-    static void stopTheApplication() {
+    static void stopTheApplications() {
         application.stop();
+        plainApplication.stop();
+    }
+
+    // The deployment's own line decides which snippet is imported, and a club that sets nothing
+    // gets the default in it -- so the switch and its default are read rather than assumed.
+    @Test
+    void givenNoModeIsSet_whenTheProxyDialsTheApplication_thenItReachesItInPlainText()
+            throws Exception {
+        // given
+        TestCertificate foreign = TestCertificate.issuedFor(UPSTREAM);
+
+        // when
+        try (GenericContainer<?> proxy = proxy(foreign.authority(), null)) {
+            HttpResponse<String> answer = get(proxy);
+
+            // then
+            assertThat(answer.statusCode()).isEqualTo(200);
+            assertThat(answer.body()).isEqualTo(MARKER);
+        }
     }
 
     @Test
     void givenTheAuthorityThatIssuedIt_whenTheProxyDialsTheApplication_thenItAnswers()
             throws Exception {
         // when
-        try (GenericContainer<?> proxy = proxy(served.authority())) {
+        try (GenericContainer<?> proxy = proxy(served.authority(), "serve")) {
             HttpResponse<String> answer = get(proxy);
 
             // then
@@ -77,7 +102,7 @@ class ServerTlsTransportTest {
         TestCertificate foreign = TestCertificate.issuedFor(UPSTREAM);
 
         // when
-        try (GenericContainer<?> proxy = proxy(foreign.authority())) {
+        try (GenericContainer<?> proxy = proxy(foreign.authority(), "serve")) {
             HttpResponse<String> answer = get(proxy);
 
             // then
@@ -87,10 +112,9 @@ class ServerTlsTransportTest {
         }
     }
 
-    private static WebServer serving(TestCertificate served) throws Exception {
+    private static WebServer serving(ServerTlsProperties tls) {
         TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory(0);
-        ServerTls.apply(factory, new ServerTlsProperties(ServerTlsProperties.Mode.SERVE,
-                written(served.certificate()), written(served.key())));
+        ServerTls.apply(factory, tls);
         WebServer server = factory.getWebServer(servlet -> servlet
                 .addServlet("probe", new HttpServlet() {
                     @Override
@@ -105,7 +129,7 @@ class ServerTlsTransportTest {
 
     // The proxy dials the name the deployment's own snippet names, so only the host it resolves to
     // is substituted -- the transport, the anchor's path and the headers are the deployment's text.
-    private static GenericContainer<?> proxy(String authority) throws IOException {
+    private static GenericContainer<?> proxy(String authority, String mode) throws IOException {
         String caddyfile = """
                 {
                 	auto_https off
@@ -115,18 +139,37 @@ class ServerTlsTransportTest {
 
                 %s
 
+                %s
+
                 http://:80 {
-                	import serve
+                	%s
                 }
-                """.formatted(snippet("applicationHeaders"),
-                snippet("serve").replace("app:", UPSTREAM + ":"));
+                """.formatted(snippet("applicationHeaders"), dialingTheHost("plaintext", PLAIN_PORT),
+                dialingTheHost("serve", SERVED_PORT), theDeploymentsSwitch());
         GenericContainer<?> proxy = new GenericContainer<>(DockerImageName.parse(deployedCaddy()))
                 .withCopyToContainer(forString(caddyfile), "/etc/caddy/Caddyfile")
                 .withCopyToContainer(forString(authority), AUTHORITY)
                 .withExposedPorts(80)
                 .waitingFor(Wait.forLogMessage(".*serving initial configuration.*", 1));
+        if (mode != null) {
+            proxy.withEnv("COURTSIDE_APP_TLS_MODE", mode);
+        }
         proxy.start();
         return proxy;
+    }
+
+    // The upstream is the only token substituted: the transport, the anchor's path, the headers and
+    // the line that chooses between the two are the deployment's own text.
+    private static String dialingTheHost(String name, int port) throws IOException {
+        return snippet(name).replace("app:8080", UPSTREAM + ":" + port);
+    }
+
+    private static String theDeploymentsSwitch() throws IOException {
+        return Files.readString(Path.of("deploy", "Caddyfile")).lines()
+                .map(String::strip)
+                .filter(line -> line.startsWith("import {$COURTSIDE_APP_TLS_MODE"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("The deployment names no application mode"));
     }
 
     private static HttpResponse<String> get(GenericContainer<?> proxy) throws Exception {
