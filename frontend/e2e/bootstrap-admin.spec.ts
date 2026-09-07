@@ -556,7 +556,8 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await expect(page.getByTestId("credential-state"))
     .toHaveAttribute("data-state", "CREDENTIAL_ISSUED");
 
-  // when — the member signs in with what the instance mailed them and replaces it
+  // when — the member signs in with what the instance mailed them and replaces it. Their
+  // first name is in the first password they try, which is what the policy refuses.
   await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
@@ -567,9 +568,14 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await page.getByTestId("new-password").fill("mary-chose-this-one");
   await page.getByTestId("confirm-password").fill("mary-chose-this-one");
   await page.getByTestId("password-submit").click();
+  await expect(page.getByTestId("password-failure")).toBeVisible();
+  await expect(page.getByTestId("initial-password-view")).toBeVisible();
+  await page.getByTestId("new-password").fill("the-one-they-picked-alone");
+  await page.getByTestId("confirm-password").fill("the-one-they-picked-alone");
+  await page.getByTestId("password-submit").click();
   await expect(page.getByTestId("login-view")).toBeVisible();
   await page.getByTestId("username").fill("roe.mary");
-  await page.getByTestId("password").fill("mary-chose-this-one");
+  await page.getByTestId("password").fill("the-one-they-picked-alone");
   await page.getByTestId("login-submit").click();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
   await selectJourneyDate(page, journeyService.visualDate);
