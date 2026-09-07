@@ -1,6 +1,8 @@
 package org.courtside.identity.internal;
 
+import org.courtside.identity.CurrentUser;
 import org.courtside.identity.Role;
+import org.courtside.identity.RecentAuthentication;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.SecurityEventLog;
 
@@ -9,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -37,12 +40,17 @@ import org.springframework.session.Session;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 
+import java.net.URI;
+import java.time.Clock;
 import java.util.List;
+import java.util.Set;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
-        LoginProtectionProperties.class, CourtsideSessionProperties.class})
+        LoginProtectionProperties.class, CourtsideSessionProperties.class, PasswordPolicyProperties.class})
 public class SecurityConfiguration {
+
+    private static final URI HIBP_RANGE_ENDPOINT = URI.create("https://api.pwnedpasswords.com/range/");
 
     // OWASP's Argon2id minimum; the login filter limits how often a caller can incur this cost.
     private static final int MEMORY_IN_KIBIBYTES = 19456;
@@ -51,6 +59,20 @@ public class SecurityConfiguration {
     private static final int SALT_LENGTH_IN_BYTES = 16;
     private static final int HASH_LENGTH_IN_BYTES = 32;
     private static final String LOGIN_PROCESSING_URL = "/api/session";
+
+    private static RequestMatcher passwordVerificationEndpoints() {
+        RequestMatcher login = loginEndpoint();
+        RequestMatcher reauthentication = PathPatternRequestMatcher.withDefaults()
+                .matcher(HttpMethod.POST, "/api/session/reauthentication");
+        RequestMatcher initialPasswordChange = PathPatternRequestMatcher.withDefaults()
+                .matcher(HttpMethod.PUT, "/api/account/initial-password");
+        RequestMatcher passwordChange = PathPatternRequestMatcher.withDefaults()
+                .matcher(HttpMethod.PUT, "/api/account/password");
+        return request -> login.matches(request)
+                || reauthentication.matches(request)
+                || initialPasswordChange.matches(request)
+                || passwordChange.matches(request);
+    }
 
     private static RequestMatcher loginEndpoint() {
         return PathPatternRequestMatcher.withDefaults()
@@ -64,14 +86,38 @@ public class SecurityConfiguration {
     }
 
     @Bean
+    BreachedPasswordLookup breachedPasswordLookup(PasswordPolicyProperties properties, Clock clock,
+                                                   @Value("${courtside.environment}") String environment) {
+        URI endpoint = properties.breachEndpoint();
+        if ("PRODUCTION".equalsIgnoreCase(environment) && !HIBP_RANGE_ENDPOINT.equals(endpoint)) {
+            throw new IllegalStateException(
+                    "COURTSIDE_PASSWORD_BREACH_ENDPOINT cannot override HIBP in production");
+        }
+        if (!Set.of("http", "https").contains(endpoint.getScheme()) || endpoint.getUserInfo() != null
+                || endpoint.getQuery() != null || endpoint.getFragment() != null
+                || !endpoint.getPath().endsWith("/")) {
+            throw new IllegalStateException(
+                    "COURTSIDE_PASSWORD_BREACH_ENDPOINT must be an HTTP range base ending in '/'");
+        }
+        return new HaveIBeenPwnedPasswordLookup(
+                endpoint,
+                properties.breachTimeout(), properties.breachCacheEntries(),
+                properties.breachCacheLifetime(), clock);
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
             ProblemDetailAccessDeniedHandler accessDeniedHandler,
             ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
             LoginAttemptProtection loginAttemptProtection,
-            LoginVerificationCapacity loginVerificationCapacity,
+            @Qualifier("loginVerificationCapacity") LoginVerificationCapacity loginVerificationCapacity,
+            @Qualifier("credentialVerificationCapacity")
+            LoginVerificationCapacity credentialVerificationCapacity,
             LoginRateLimitHandler loginRateLimitHandler,
             SecurityEventLog securityEvents,
+            CurrentUser currentUser,
+            RecentAuthentication recentAuthentication,
             UserAccountRepository accounts,
             CourtsideSessionProperties sessionPolicy,
             SessionRegistry sessionRegistry,
@@ -103,7 +149,7 @@ public class SecurityConfiguration {
                                 new AuthorizationDecision(performanceTelemetryEnabled))
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
                         .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
-                                "/my-messages",
+                                "/my-messages", "/account/security",
                                 "/admin", "/admin/setup",
                                 "/admin/configuration", "/admin/facility",
                                 "/admin/facility/courts", "/admin/facility/opening-hours",
@@ -120,6 +166,7 @@ public class SecurityConfiguration {
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
                         .requestMatchers("/api/session/logout").authenticated()
+                        .requestMatchers("/api/session/reauthentication").authenticated()
                         .requestMatchers("/api/account/initial-password").access(
                                 (authentication, context) -> new AuthorizationDecision(
                                         hasAuthority(authentication.get(),
@@ -136,10 +183,14 @@ public class SecurityConfiguration {
                                         CourtsideUserDetailsService.PASSWORD_CHANGE_REQUIRED))))
                 .formLogin(form -> form
                         .loginProcessingUrl(LOGIN_PROCESSING_URL)
+                        .authenticationDetailsSource(request -> null)
                         .successHandler((request, response, authentication) -> {
-                            loginAttemptProtection.clear(request.getRemoteAddr());
+                            request.getSession(true).setAttribute(AccountSessionService.BROWSER_FAMILY,
+                                    AccountSessionService.browserFamily(
+                                            request.getHeader("User-Agent")).name());
                             if (authentication.getPrincipal() instanceof CourtsideUserDetails user) {
                                 securityEvents.authenticationSucceeded(user.accountId());
+                                recentAuthentication.record(request);
                             }
                             if (authentication.getAuthorities().stream().anyMatch(authority ->
                                     authority.getAuthority().equals(
@@ -149,8 +200,9 @@ public class SecurityConfiguration {
                             response.setStatus(HttpStatus.OK.value());
                         })
                         .failureHandler(authenticationEntryPoint::commence))
-                .addFilterBefore(new LoginAttemptFilter(loginEndpoint(), loginAttemptProtection,
-                        loginVerificationCapacity, loginRateLimitHandler, securityEvents),
+                .addFilterBefore(new LoginAttemptFilter(loginEndpoint(), passwordVerificationEndpoints(),
+                        loginAttemptProtection, loginVerificationCapacity, credentialVerificationCapacity,
+                        loginRateLimitHandler, securityEvents, currentUser),
                         UsernamePasswordAuthenticationFilter.class)
                 // The default only changes the session id, which keeps the creation time the absolute
                 // lifetime counts from, so a second member on a shared browser inherits the first's.
@@ -195,6 +247,16 @@ public class SecurityConfiguration {
                         .referrerPolicy(referrer -> referrer.policy(
                                 ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
                 .build();
+    }
+
+    @Bean("loginVerificationCapacity")
+    LoginVerificationCapacity loginVerificationCapacity(LoginProtectionProperties properties) {
+        return new LoginVerificationCapacity(properties);
+    }
+
+    @Bean("credentialVerificationCapacity")
+    LoginVerificationCapacity credentialVerificationCapacity(LoginProtectionProperties properties) {
+        return new LoginVerificationCapacity(properties);
     }
 
     @Bean

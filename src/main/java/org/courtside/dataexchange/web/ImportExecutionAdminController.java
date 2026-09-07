@@ -8,6 +8,7 @@ import org.courtside.api.ApiSnapshotMode;
 import org.courtside.dataexchange.ExecutionService;
 import org.courtside.dataexchange.RunOutcome;
 import org.courtside.identity.CurrentUser;
+import org.courtside.identity.RecentAuthentication;
 import org.courtside.shared.WireTypes;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,9 +22,11 @@ class ImportExecutionAdminController implements AdminImportRunsApi {
 
     private final ExecutionService executions;
     private final CurrentUser currentUser;
+    private final RecentAuthentication recentAuthentication;
 
     @Override
     public ResponseEntity<ApiImportRun> executeImportPreview(UUID id, ApiExecutionRequest request) {
+        recentAuthentication.requireRecent();
         return ResponseEntity.ok(toResponse(executions.execute(id, confirmRemovals(request),
                 currentUser.requireAccount().getId())));
     }

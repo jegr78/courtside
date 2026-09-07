@@ -16,7 +16,8 @@ class CourtsideSessionConfigurationTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withUserConfiguration(SessionConfiguration.class)
             .withPropertyValues("spring.session.timeout=30m",
-                    "courtside.session.absolute-lifetime=24h", "courtside.session.concurrent-limit=5");
+                    "courtside.session.absolute-lifetime=24h", "courtside.session.concurrent-limit=5",
+                    "courtside.session.reauthentication-window=5m");
 
     @Test
     void givenValuesInsideTheirBounds_whenTheContextStarts_thenTheyBind() {
@@ -25,7 +26,20 @@ class CourtsideSessionConfigurationTest {
             CourtsideSessionProperties session = context.getBean(CourtsideSessionProperties.class);
             assertThat(session.absoluteLifetime()).isEqualTo(Duration.ofHours(24));
             assertThat(session.concurrentLimit()).isEqualTo(5);
+            assertThat(session.reauthenticationWindow()).isEqualTo(Duration.ofMinutes(5));
         });
+    }
+
+    @Test
+    void givenAReauthenticationWindowBeyondFiveMinutes_whenTheContextStarts_thenItRefusesToStart() {
+        // given
+        ApplicationContextRunner runner = contextRunner
+                .withPropertyValues("courtside.session.reauthentication-window=6m");
+
+        // when / then
+        runner.run(context -> assertThat(context).getFailure().rootCause()
+                .hasMessageContaining("reauthenticationWindow")
+                .hasMessageContaining("PT6M"));
     }
 
     // A value this short ends a session inside the visit that opened it, which is a misconfiguration

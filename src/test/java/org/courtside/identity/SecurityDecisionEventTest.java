@@ -26,6 +26,7 @@ import static org.courtside.identity.AccountFixtures.enabled;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -187,6 +188,83 @@ class SecurityDecisionEventTest extends AbstractIntegrationTest {
         assertRequestCorrelation("courtside.control.refused");
     }
 
+    @Test
+    void givenASubmittedPassword_whenReauthenticationFails_thenOnlyTheTypedRefusalIsRecorded()
+            throws Exception {
+        // given
+        MockHttpSession session = signIn();
+        String submittedPassword = "private-password-not-for-logs";
+
+        // when
+        mockMvc.perform(post("/api/session/reauthentication").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"" + submittedPassword + "\"}"))
+                .andExpect(status().isForbidden());
+
+        // then
+        assertThat(fieldsOf("courtside.control.refused")).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "event.code", "courtside.control.refused",
+                "event.outcome", "failure",
+                "event.reason", "REAUTHENTICATION_FAILED",
+                "account.id", accountId.toString()));
+        assertThat(recorded.list).allSatisfy(event -> assertThat(event.toString())
+                .doesNotContain(submittedPassword));
+    }
+
+    @Test
+    void givenRecentProof_whenAMemberEndsAllOwnSessions_thenTheTypedTerminationIsRecorded()
+            throws Exception {
+        // given
+        MockHttpSession session = signIn();
+
+        // when
+        mockMvc.perform(delete("/api/account/sessions").session(session).with(csrf())
+                        .header("User-Agent", "private-browser-value"))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertTermination("USER_REVOKED", accountId, accountId);
+        assertThat(recorded.list).allSatisfy(event -> assertThat(event.toString())
+                .doesNotContain("private-browser-value", session.getId()));
+    }
+
+    @Test
+    void givenRecentAdminProof_whenOneAccountsSessionsEnd_thenSubjectAndActorAreRecorded()
+            throws Exception {
+        // given
+        Person administrator = persons.save(new Person("Ada", "Admin", "admin@example.org"));
+        UUID administratorId = accounts.save(enabled(new UserAccount(administrator, "admin",
+                passwordEncoder.encode(PASSWORD), Set.of(Role.ADMIN), "de"))).getId();
+        UUID personId = accounts.findById(accountId).orElseThrow().getPerson().getId();
+        MockHttpSession session = signIn("admin");
+
+        // when
+        mockMvc.perform(delete("/api/admin/roster/{personId}/account/sessions", personId)
+                        .session(session).with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertTermination("ADMINISTRATOR_REVOKED", accountId, administratorId);
+    }
+
+    @Test
+    void givenRecentAdminProof_whenEverySessionEnds_thenEachAccountNamesTheAdminAsActor()
+            throws Exception {
+        // given
+        Person administrator = persons.save(new Person("Ada", "Admin", "admin@example.org"));
+        UUID administratorId = accounts.save(enabled(new UserAccount(administrator, "admin",
+                passwordEncoder.encode(PASSWORD), Set.of(Role.ADMIN), "de"))).getId();
+        MockHttpSession session = signIn("admin");
+
+        // when
+        mockMvc.perform(delete("/api/admin/sessions").session(session).with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertTermination("GLOBAL_REVOKED", accountId, administratorId);
+        assertTermination("GLOBAL_REVOKED", administratorId, administratorId);
+    }
+
     private MockHttpSession signIn() throws Exception {
         return signIn(USERNAME);
     }
@@ -211,6 +289,20 @@ class SecurityDecisionEventTest extends AbstractIntegrationTest {
                 .filter(candidate -> code.equals(fields(candidate).get("event.code")))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private void assertTermination(String reason, UUID subject, UUID actor) {
+        assertThat(recorded.list.stream()
+                .map(SecurityDecisionEventTest::fields)
+                .filter(fields -> "courtside.session.terminated".equals(fields.get("event.code")))
+                .filter(fields -> reason.equals(fields.get("event.reason")))
+                .filter(fields -> subject.toString().equals(fields.get("account.id")))
+                .toList()).containsExactly(Map.of(
+                        "event.code", "courtside.session.terminated",
+                        "event.outcome", "success",
+                        "event.reason", reason,
+                        "account.id", subject.toString(),
+                        "actor.account.id", actor.toString()));
     }
 
     private void assertRequestCorrelation(String code) {

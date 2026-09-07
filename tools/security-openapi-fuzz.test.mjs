@@ -46,8 +46,8 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   const inventory = buildOpenApiFuzzInventory(api);
 
   // then
-  assert.equal(inventory.length, 101);
-  assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 101);
+  assert.equal(inventory.length, 108);
+  assert.equal(new Set(inventory.map(({ operationId }) => operationId)).size, 108);
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "getBookingEligibility"), {
     operationId: "getBookingEligibility",
     method: "GET",
@@ -78,6 +78,14 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "getApiDocument").modes, []);
   assert.match(inventory.find(({ operationId }) => operationId === "getApiDocument").excludedModes.all,
     /SECURITY deployment/);
+  const modes = (operationId) => inventory.find((entry) => entry.operationId === operationId).modes;
+  assert.deepEqual(modes("reauthenticate"), ["negative"]);
+  assert.deepEqual(modes("changeOwnPassword"), ["negative"]);
+  assert.deepEqual(modes("listOwnSessions"), ["positive"]);
+  assert.deepEqual(modes("endOwnSessions"), []);
+  assert.deepEqual(modes("endOwnSession"), ["negative"]);
+  assert.deepEqual(modes("endAccountSessions"), ["negative"]);
+  assert.deepEqual(modes("endAllSessions"), []);
   assert.match(openApiFuzzPolicy.image,
     /^schemathesis\/schemathesis:4\.25\.2@sha256:[a-f0-9]{64}$/);
   assert.ok(openApiFuzzPolicy.checks.includes("not_a_server_error"));

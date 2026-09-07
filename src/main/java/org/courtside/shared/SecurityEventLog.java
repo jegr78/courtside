@@ -41,6 +41,11 @@ public class SecurityEventLog {
         write(SecurityEvent.SESSION_TERMINATED, accountId, actorAccountId, "event.reason", reason);
     }
 
+    public void sessionTerminatedAfterCommit(UUID accountId, @Nullable UUID actorAccountId,
+                                             SessionTermination reason) {
+        afterCommit(() -> sessionTerminated(accountId, actorAccountId, reason));
+    }
+
     public void credentialChanged(UUID accountId, @Nullable UUID actorAccountId,
                                   CredentialChange action) {
         write(SecurityEvent.CREDENTIAL_CHANGED, accountId, actorAccountId, "event.action", action);
@@ -129,7 +134,10 @@ public class SecurityEventLog {
         EXPLICIT_LOGOUT,
         ABSOLUTE_EXPIRY,
         SECURITY_EPOCH_CHANGED,
-        CONCURRENT_LIMIT
+        CONCURRENT_LIMIT,
+        USER_REVOKED,
+        ADMINISTRATOR_REVOKED,
+        GLOBAL_REVOKED
     }
 
     public enum CredentialChange {
@@ -150,13 +158,18 @@ public class SecurityEventLog {
     public enum ControlRefusal {
         CSRF,
         LOGIN_VERIFICATION_CAPACITY,
+        PASSWORD_VERIFICATION_CAPACITY,
         CREDENTIAL_ISSUE_LIMIT,
         ADMINISTRATOR_CONTINUITY,
+        RECENT_AUTHENTICATION,
+        REAUTHENTICATION_FAILED,
         REQUEST_VALIDATION
     }
 
     public enum ControlTrigger {
         LOGIN_ADDRESS_LIMIT,
+        PASSWORD_VERIFICATION_ACCOUNT_LIMIT,
+        PASSWORD_VERIFICATION_ADDRESS_LIMIT,
         DISTRIBUTED_LOGIN_THRESHOLD
     }
 }

@@ -5,15 +5,22 @@ import org.courtside.identity.Person;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.ZoneId;
+import java.time.Duration;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PasswordPolicyTest {
+
+    @TempDir
+    Path temporaryDirectory;
 
     // Four sources that share no substring, so each refusal below names exactly one of them.
     private static final String STORED = "stored-credential-hash";
@@ -54,6 +61,18 @@ class PasswordPolicyTest {
         assertThatThrownBy(() -> POLICY.requireUnguessable("scaffold-example-lattice", ACCOUNT))
                 .isInstanceOf(GuessablePasswordException.class);
         assertThatThrownBy(() -> POLICY.requireUnguessable("scaffold-tennis-lattice", ACCOUNT))
+                .isInstanceOf(GuessablePasswordException.class);
+    }
+
+    @Test
+    void givenACanonicallyEquivalentName_whenThePasswordUsesAnotherUnicodeForm_thenItIsRefused() {
+        // given
+        UserAccount account = accountOf("wren8842", "Jos\u00e9", "Major",
+                "quill.harbor@example.org");
+
+        // when / then
+        assertThatThrownBy(() -> POLICY.requireUnguessable(
+                "scaffold-Jose\u0301-lattice", account))
                 .isInstanceOf(GuessablePasswordException.class);
     }
 
@@ -101,6 +120,46 @@ class PasswordPolicyTest {
                 .isInstanceOf(ReusedCredentialException.class);
     }
 
+    @Test
+    void givenABreachedPassword_whenItIsChecked_thenItIsRefusedWithoutRevealingTheSource() {
+        // given
+        PasswordPolicy policy = new PasswordPolicy(clubIdentity("Example Tennis Club"), encoder(),
+                password -> password.equals("scaffold-marmoset-lattice"), Set.of());
+
+        // when / then
+        assertThatThrownBy(() -> policy.requireUnguessable("scaffold-marmoset-lattice", ACCOUNT))
+                .isInstanceOf(GuessablePasswordException.class);
+    }
+
+    @Test
+    void givenAnOperatorTermFile_whenAPasswordContainsItsPrivateTerm_thenItIsRefused() throws Exception {
+        Path terms = temporaryDirectory.resolve("club-password-terms.txt");
+        Files.writeString(terms, "IndoorCourtSponsor\n");
+        PasswordPolicy policy = new PasswordPolicy(clubIdentity("Example Tennis Club"), encoder(),
+                password -> false, properties(terms.toString()));
+
+        assertThatThrownBy(() -> policy.requireUnguessable(
+                "scaffold-indoorcourtsponsor-lattice", ACCOUNT))
+                .isInstanceOf(GuessablePasswordException.class);
+    }
+
+    @Test
+    void givenNoOperatorTermFile_whenThePolicyStarts_thenOrdinaryPasswordsRemainAvailable() {
+        PasswordPolicy policy = new PasswordPolicy(clubIdentity("Example Tennis Club"), encoder(),
+                password -> false, properties(""));
+
+        assertThatCode(() -> policy.requireUnguessable("scaffold-marmoset-lattice", ACCOUNT))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void givenAConfiguredOperatorTermFileCannotBeRead_whenThePolicyStarts_thenItFailsLoudly() {
+        assertThatThrownBy(() -> new PasswordPolicy(clubIdentity("Example Tennis Club"), encoder(),
+                password -> false, properties("missing-relative-file.txt")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("readable absolute file");
+    }
+
     // Withdrawing an unused credential leaves the account without a hash, and the encoder has
     // nothing to match a password against then.
     @Test
@@ -131,7 +190,11 @@ class PasswordPolicyTest {
     }
 
     private static PasswordPolicy policyFor(String clubName) {
-        return new PasswordPolicy(clubIdentity(clubName), new PasswordEncoder() {
+        return new PasswordPolicy(clubIdentity(clubName), encoder());
+    }
+
+    private static PasswordEncoder encoder() {
+        return new PasswordEncoder() {
             @Override
             public String encode(CharSequence raw) {
                 return raw.toString();
@@ -141,7 +204,7 @@ class PasswordPolicyTest {
             public boolean matches(CharSequence raw, String encoded) {
                 return encoded.contentEquals(raw);
             }
-        });
+        };
     }
 
     private static ClubIdentity clubIdentity(String clubName) {
@@ -161,5 +224,10 @@ class PasswordPolicyTest {
                 return ZoneId.of("UTC");
             }
         };
+    }
+
+    private static PasswordPolicyProperties properties(String termsFile) {
+        return new PasswordPolicyProperties(Duration.ofSeconds(3), 1000, Duration.ofHours(24), termsFile,
+                java.net.URI.create("https://api.pwnedpasswords.com/range/"));
     }
 }

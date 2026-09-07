@@ -10,6 +10,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -40,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AdminSurfaceTest extends AbstractIntegrationTest {
 
-    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 70;
+    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 72;
 
     private static final String CATCH_ALL_UUID = "11111111-1111-1111-1111-111111111111";
 
@@ -66,6 +67,10 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     private static final Set<String> AUTHENTICATED_PATHS = Set.of(
             "/api/account/locale",
             "/api/account/messages",
+            "/api/account/password",
+            "/api/account/sessions",
+            "/api/account/sessions/{sessionHandle}",
+            "/api/session/reauthentication",
             "/api/public/booking-cards",
             "/api/public/participant-cards",
             "/api/public/participant-members",
@@ -82,6 +87,9 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/booking-series/{id}",
             "/api/booking-series/{id}/move",
             "/api/booking-series/{id}/move/preview");
+
+    private static final Set<String> RECENT_AUTHENTICATION_ENDPOINTS = Set.of(
+            "DELETE /api/account/sessions");
 
     @Autowired
     @Qualifier("requestMappingHandlerMapping")
@@ -118,6 +126,10 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
         assertThat(ANONYMOUS_ALLOWED_PATHS)
                 .as("a path cannot be both anonymous-allowed and authenticated-only")
                 .doesNotContainAnyElementsOf(AUTHENTICATED_PATHS);
+        assertThat(endpointsMatching(pattern -> true).stream()
+                        .map(endpoint -> endpoint.method() + " " + endpoint.pattern()))
+                .as("every declared recent-authentication exception must name a mapped endpoint")
+                .containsAll(RECENT_AUTHENTICATION_ENDPOINTS);
 
         List<String> mapped = mappedPatterns();
 
@@ -345,15 +357,22 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     // Only this app's two gates produce 401 and 403.
     private String reachableAsAuthenticatedMemberFailure(MappedEndpoint endpoint) {
         try {
-            int status = mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
+            MockHttpServletResponse response = mockMvc.perform(request(endpoint.method(), endpoint.concretePath())
                             .contentType(endpoint.consumes())
                             .content(endpoint.probeBody())
                             .with(csrf()))
-                    .andReturn().getResponse().getStatus();
+                    .andReturn().getResponse();
+            int status = response.getStatus();
             if (status == HttpStatus.UNAUTHORIZED.value()) {
                 return "still answered 401 Unauthorized";
             }
             if (status == HttpStatus.FORBIDDEN.value()) {
+                String endpointKey = endpoint.method() + " " + endpoint.pattern();
+                if (RECENT_AUTHENTICATION_ENDPOINTS.contains(endpointKey)
+                        && response.getContentAsString().contains(
+                        "urn:courtside:error:recent-authentication-required")) {
+                    return null;
+                }
                 return "answered 403 Forbidden — gated beyond plain authentication";
             }
             return null;

@@ -6,7 +6,7 @@ http://:80 {
 	@browserNavigation {
 		host localhost
 		method GET HEAD
-		path / /courts /login /initial-password /my-bookings /my-messages /admin /admin/* /index.html /assets/* /icon.svg /manifest.webmanifest /sw.js /workbox-*.js /api-ui /api-ui/*
+		path / /courts /login /initial-password /my-bookings /my-messages /account/security /admin /admin/* /index.html /assets/* /icon.svg /manifest.webmanifest /sw.js /workbox-*.js /api-ui /api-ui/*
 	}
 	handle @browserNavigation {
 		header {

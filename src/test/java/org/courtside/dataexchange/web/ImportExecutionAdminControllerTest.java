@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -64,6 +65,9 @@ class ImportExecutionAdminControllerTest extends AbstractIntegrationTest {
     @Autowired
     private MemberRepository members;
 
+    @Autowired
+    private Clock clock;
+
     private MockMvc mockMvc;
 
     private UUID source;
@@ -71,7 +75,10 @@ class ImportExecutionAdminControllerTest extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .defaultRequest(get("/").sessionAttr("courtside.authenticated-at",
+                        clock.instant().toEpochMilli()))
+                .apply(springSecurity()).build();
         source = sources.create("roster-system", "Membership system", ",", "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
@@ -159,6 +166,27 @@ class ImportExecutionAdminControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(execute(UUID.randomUUID(), null))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:import-preview-not-found"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenNoRecentProof_whenExecuting_thenThePreviewAndRosterRemainUntouched() throws Exception {
+        // given
+        UUID previewId = preview(TWO_MEMBERS);
+        MockMvc withoutProof = MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity()).build();
+
+        // when / then
+        withoutProof.perform(execute(previewId, null))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:recent-authentication-required"));
+        assertThat(members.count()).isZero();
+
+        // when / then — refusal did not consume or supersede the reviewed preview
+        mockMvc.perform(execute(previewId, null))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.created").value(2));
     }
 
     @Test

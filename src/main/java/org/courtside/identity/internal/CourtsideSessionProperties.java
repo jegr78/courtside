@@ -16,5 +16,7 @@ import java.time.Duration;
 // the variable still reads as though it were set, and an unbounded lifetime overflows the arithmetic.
 record CourtsideSessionProperties(@NotNull @DurationMin(minutes = 1) @DurationMax(days = 30)
                                   Duration absoluteLifetime,
-                                  @Min(1) @Max(50) int concurrentLimit) {
+                                  @Min(1) @Max(50) int concurrentLimit,
+                                  @NotNull @DurationMin(minutes = 1) @DurationMax(minutes = 5)
+                                  Duration reauthenticationWindow) {
 }

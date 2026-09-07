@@ -61,6 +61,65 @@ it("given a session response, when loading it, then the typed session is returne
   expect(session.displayName).toBe("Jane Doe");
 });
 
+it("when account-security operations are requested, then their exact contracts are used", async () => {
+  // given
+  const calls: string[] = [];
+  server.use(
+    http.get("/api/account/sessions", () => HttpResponse.json([])),
+    http.delete("/api/account/sessions/:handle", ({ params }) => {
+      calls.push(`one:${String(params.handle)}`);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.delete("/api/account/sessions", () => {
+      calls.push("all");
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.post("/api/session/reauthentication", async ({ request }) => {
+      calls.push(`prove:${JSON.stringify(await request.json())}`);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.put("/api/account/password", async ({ request }) => {
+      calls.push(`password:${JSON.stringify(await request.json())}`);
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+
+  // when / then
+  await expect(api.accountSessions()).resolves.toEqual([]);
+  await api.endAccountSession("session handle");
+  await api.endOwnSessions();
+  await api.reauthenticate("current-secret");
+  await api.changeOwnPassword("current-secret", "replacement-secret");
+  expect(calls).toEqual([
+    "one:session handle",
+    "all",
+    'prove:{"password":"current-secret"}',
+    'password:{"currentPassword":"current-secret","newPassword":"replacement-secret"}'
+  ]);
+});
+
+it("when an administrator ends sessions, then the target and global routes stay distinct", async () => {
+  // given
+  const calls: string[] = [];
+  server.use(
+    http.delete("/api/admin/roster/:personId/account/sessions", ({ params }) => {
+      calls.push(`person:${String(params.personId)}`);
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.delete("/api/admin/sessions", () => {
+      calls.push("global");
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+
+  // when
+  await api.endAccountSessions("person-1");
+  await api.endAllSessions();
+
+  // then
+  expect(calls).toEqual(["person:person-1", "global"]);
+});
+
 it("given an expired session, when an API call is rejected, then the app is notified", async () => {
   // given
   const listener = notifiedOfUnauthenticated();

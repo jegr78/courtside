@@ -412,6 +412,33 @@ test("an initial password change ends every active session for the account", asy
   await Promise.all([first.close(), second.close()]);
 });
 
+test("a member can inspect sessions and end another browser without exposing its credential", async ({ pinnedBrowser, journeyService }) => {
+  // given
+  const first = await memberContext(pinnedBrowser, journeyService, "doe.jane");
+  const second = await memberContext(pinnedBrowser, journeyService, "doe.jane");
+  const [firstPage] = first.pages();
+  const [secondPage] = second.pages();
+
+  // when
+  await secondPage.goto(`${journeyService.baseURL}/account/security`);
+  await expect(secondPage.getByTestId("account-security-view")).toBeVisible();
+  await expect(secondPage.getByTestId("end-current-session")).toHaveCount(1);
+  await expect(secondPage.getByTestId("end-other-session")).toHaveCount(1);
+  const ended = secondPage.waitForResponse((response) =>
+    response.request().method() === "DELETE"
+      && /\/api\/account\/sessions\/[^/]+$/.test(new URL(response.url()).pathname));
+  await secondPage.getByTestId("end-other-session").click();
+  expect((await ended).status()).toBe(204);
+
+  // then
+  await firstPage.goto(`${journeyService.baseURL}/`);
+  await expect(firstPage.getByTestId("sign-in-link")).toBeVisible();
+  await expect(secondPage.getByTestId("account-security-view")).toBeVisible();
+  expect(await journeyService.executeSql("SELECT count(*) FROM spring_session WHERE principal_name = 'doe.jane'"))
+    .toBe("1");
+  await Promise.all([first.close(), second.close()]);
+});
+
 // The epoch moves while the sign-out is in flight rather than before it, where the week view's next
 // refresh would consume the revocation first and this journey would prove nothing about signing out.
 test("a session the instance revoked signs out onto sign-in without an error", async ({ pinnedBrowser, journeyService }) => {

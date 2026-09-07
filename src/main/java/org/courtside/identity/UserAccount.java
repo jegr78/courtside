@@ -160,6 +160,16 @@ public class UserAccount {
         this.passwordChangeRequired = true;
     }
 
+    public void replacePermanentPassword(String replacementHash) {
+        if (replacementHash == null || replacementHash.isBlank()) {
+            throw new IllegalStateException("A permanent password hash must not be blank");
+        }
+        this.passwordHash = replacementHash;
+        this.passwordChangeRequired = false;
+        this.credentialsExpireAt = null;
+        revokeSessions();
+    }
+
     // Only while the issued credential is still the one in use: a member who has set their own
     // password keeps it, and the column the change query leaves behind must not lock them out.
     public boolean isCredentialExpired(Instant now) {

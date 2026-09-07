@@ -30,8 +30,8 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
   const matrix = buildOperationAuthorizationMatrix(api);
 
   // then
-  assert.equal(matrix.length, 101);
-  assert.equal(new Set(matrix.map((entry) => entry.operationId)).size, 101);
+  assert.equal(matrix.length, 108);
+  assert.equal(new Set(matrix.map((entry) => entry.operationId)).size, 108);
   assert.deepEqual(Object.keys(matrix[0].expectations).toSorted(), [...authorizationActors].toSorted());
   assert.ok(matrix.every((entry) => Object.keys(entry.expectations).length === authorizationActors.length));
   assert.deepEqual(matrix.find((entry) => entry.operationId === "getBookingEligibility").expectations, {
@@ -56,6 +56,39 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
     ADMIN: "allow",
     INITIAL_PASSWORD: "deny-forbidden"
   });
+  for (const operationId of ["changeOwnPassword", "listOwnSessions",
+    "endOwnSessions", "endOwnSession"]) {
+    assert.deepEqual(matrix.find((entry) => entry.operationId === operationId).expectations, {
+      ANONYMOUS: "deny-unauthenticated",
+      MEMBER: "allow",
+      TRAINER: "allow",
+      SPORT_DIRECTOR: "allow",
+      YOUTH_DIRECTOR: "allow",
+      GROUNDSKEEPER: "allow",
+      TREASURER: "allow",
+      ADMIN: "allow",
+      INITIAL_PASSWORD: "deny-forbidden"
+    });
+  }
+  assert.deepEqual(matrix.find((entry) => entry.operationId === "reauthenticate").expectations, {
+    ANONYMOUS: "deny-unauthenticated",
+    MEMBER: "allow",
+    TRAINER: "allow",
+    SPORT_DIRECTOR: "allow",
+    YOUTH_DIRECTOR: "allow",
+    GROUNDSKEEPER: "allow",
+    TREASURER: "allow",
+    ADMIN: "allow",
+    INITIAL_PASSWORD: "allow"
+  });
+  for (const operationId of ["endAccountSessions", "endAllSessions"]) {
+    const expectations = matrix.find((entry) => entry.operationId === operationId).expectations;
+    assert.equal(expectations.ANONYMOUS, "deny-unauthenticated");
+    assert.equal(expectations.ADMIN, "allow");
+    assert.ok(authorizationActors
+      .filter((actor) => !["ANONYMOUS", "ADMIN"].includes(actor))
+      .every((actor) => expectations[actor] === "deny-forbidden"));
+  }
 });
 
 test("given two members and an administrator, when substituting owned identifiers and fields, then state stays unchanged", async () => {
@@ -203,17 +236,69 @@ test("given typed authorization responses, when evaluating them, then status alo
   assert.equal(evaluateOperationResult("allow", { status: 400 }).outcome, "passed");
 });
 
-test("given a generated matrix, when executing it, then logout is last and every pair is observed once", async () => {
+test("given session-ending operations, when executing the matrix, then their side effects cannot poison later cases",
+  async () => {
   // given
   const matrix = buildOperationAuthorizationMatrix({ paths: {
     "/api/session/logout": { post: { operationId: "logOut" } },
+    "/api/account/sessions": { delete: { operationId: "endOwnSessions", security: [{}] } },
+    "/api/admin/sessions": { delete: { operationId: "endAllSessions", security: [{}] } },
     "/api/public/example": { get: { operationId: "readExample", security: [] } }
   } });
   const calls = [];
+  const prepared = [];
+  let activeActors = new Set(authorizationActors.filter((actor) => actor !== "ANONYMOUS"));
 
   // when
   const results = await executeOperationMatrix(matrix, async (operation, actor) => {
     calls.push(`${operation.operationId}:${actor}`);
+    const expectation = operation.expectations[actor];
+    if (["endOwnSessions", "endAllSessions"].includes(operation.operationId)
+        && actor !== "ANONYMOUS" && !activeActors.has(actor)) {
+      return { status: 401, problemType: "urn:courtside:error:unauthenticated" };
+    }
+    if (expectation === "deny-unauthenticated") {
+      return { status: 401, problemType: "urn:courtside:error:unauthenticated" };
+    }
+    if (expectation === "deny-forbidden") {
+      return { status: 403, problemType: "urn:courtside:error:access-denied" };
+    }
+    if (operation.operationId === "endOwnSessions" && actor !== "ANONYMOUS") activeActors.delete(actor);
+    if (operation.operationId === "endAllSessions" && actor === "ADMIN") activeActors.clear();
+    return { status: 200 };
+  }, async (operation) => {
+    if (["endOwnSessions", "endAllSessions", "logOut"].includes(operation.operationId)) {
+      prepared.push(operation.operationId);
+      activeActors = new Set(authorizationActors.filter((actor) => actor !== "ANONYMOUS"));
+    }
+  });
+
+  // then
+  assert.equal(results.length, matrix.length * authorizationActors.length);
+  assert.equal(new Set(calls).size, calls.length);
+  assert.deepEqual(prepared, ["endOwnSessions", "endAllSessions", "logOut"]);
+  assert.deepEqual(calls.slice(-2 * authorizationActors.length, -authorizationActors.length),
+    authorizationActors.filter((actor) => actor !== "ADMIN")
+      .map((actor) => `endAllSessions:${actor}`).concat("endAllSessions:ADMIN"));
+  assert.ok(calls.slice(-authorizationActors.length).every((call) => call.startsWith("logOut:")));
+  assert.ok(results.every((result) => result.outcome === "passed"));
+  });
+
+test("given credential-proof operations, when executing the matrix, then every actor has an isolated rate budget",
+  async () => {
+  // given
+  const matrix = buildOperationAuthorizationMatrix({ paths: {
+    "/api/session/reauthentication": { post: { operationId: "reauthenticate", security: [{}] } }
+  } });
+  let attempts = 0;
+  const resets = [];
+
+  // when
+  const results = await executeOperationMatrix(matrix, async (operation, actor) => {
+    attempts += 1;
+    if (attempts > 1) {
+      return { status: 429, problemType: "urn:courtside:error:password-verification-rate-limited" };
+    }
     const expectation = operation.expectations[actor];
     if (expectation === "deny-unauthenticated") {
       return { status: 401, problemType: "urn:courtside:error:unauthenticated" };
@@ -221,15 +306,16 @@ test("given a generated matrix, when executing it, then logout is last and every
     if (expectation === "deny-forbidden") {
       return { status: 403, problemType: "urn:courtside:error:access-denied" };
     }
-    return { status: 200 };
+    return { status: 400 };
+  }, undefined, async (operation, actor) => {
+    resets.push(`${operation.operationId}:${actor}`);
+    attempts = 0;
   });
 
   // then
-  assert.equal(results.length, matrix.length * authorizationActors.length);
-  assert.equal(new Set(calls).size, calls.length);
-  assert.ok(calls.slice(-authorizationActors.length).every((call) => call.startsWith("logOut:")));
+  assert.deepEqual(resets, authorizationActors.map((actor) => `reauthenticate:${actor}`));
   assert.ok(results.every((result) => result.outcome === "passed"));
-});
+  });
 
 test("given path query and body parameters, when creating a harmless probe, then all placeholders are bounded", () => {
   // given

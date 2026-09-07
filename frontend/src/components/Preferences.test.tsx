@@ -1,10 +1,16 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as testingRender, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError } from "../api/client";
 import i18n, { applyAccountLocale, initialLocale } from "../i18n";
 import { applyTheme } from "../theme";
 import { Preferences } from "./Preferences";
+
+function render(ui: ReactNode) {
+  return testingRender(<MemoryRouter>{ui}</MemoryRouter>);
+}
 
 beforeEach(async () => {
   vi.restoreAllMocks();

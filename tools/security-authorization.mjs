@@ -63,6 +63,12 @@ function operationExpectations(path, method, security) {
     expectations.INITIAL_PASSWORD = "allow";
     return expectations;
   }
+  if (path === "/api/session/reauthentication") {
+    expectations.ANONYMOUS = "deny-unauthenticated";
+    for (const role of roles) expectations[role] = "allow";
+    expectations.INITIAL_PASSWORD = "allow";
+    return expectations;
+  }
   if (security.length === 0) {
     return Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"]));
   }
@@ -75,12 +81,30 @@ function operationExpectations(path, method, security) {
   return expectations;
 }
 
-export async function executeOperationMatrix(matrix, send) {
+const terminalOperationOrder = new Map([
+  ["endOwnSessions", 1],
+  ["endAllSessions", 2],
+  ["logOut", 3]
+]);
+const credentialProofOperationIds = new Set([
+  "reauthenticate",
+  "changeInitialPassword",
+  "changeOwnPassword"
+]);
+
+export async function executeOperationMatrix(matrix, send, beforeOperation = async () => {},
+                                             beforeCase = async () => {}) {
   const ordered = [...matrix].sort((left, right) =>
-    Number(left.operationId === "logOut") - Number(right.operationId === "logOut"));
+    (terminalOperationOrder.get(left.operationId) ?? 0)
+      - (terminalOperationOrder.get(right.operationId) ?? 0));
   const results = [];
   for (const operation of ordered) {
-    for (const actor of authorizationActors) {
+    await beforeOperation(operation);
+    const actors = operation.operationId === "endAllSessions"
+      ? [...authorizationActors.filter((actor) => actor !== "ADMIN"), "ADMIN"]
+      : authorizationActors;
+    for (const actor of actors) {
+      await beforeCase(operation, actor);
       const expected = operation.expectations[actor];
       const response = await send(operation, actor, buildOperationProbe(operation));
       const evaluated = evaluateOperationResult(expected, response);
@@ -494,6 +518,15 @@ export async function runAuthorizationAssessment(plan, context) {
         return signInSecurityActor(request, client, loginActor, context.sharedPassword, context.resetLoginAttempts);
       }
       return request(clients[actor], probe, { csrf: operation.mutation });
+    }, async (operation) => {
+      if (!terminalOperationOrder.has(operation.operationId)) return;
+      for (const actor of authorizationActors.filter((candidate) => candidate !== "ANONYMOUS")) {
+        clients[actor] = new SecurityCookieJar();
+        await signInSecurityActor(request, clients[actor], actor, context.sharedPassword,
+          context.resetLoginAttempts);
+      }
+    }, async (operation) => {
+      if (credentialProofOperationIds.has(operation.operationId)) await context.resetLoginAttempts();
     });
     const authentication = await executeAuthenticationChecks(request, context.sharedPassword,
       context.resetLoginAttempts, context.maxAddressFailures);

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
@@ -53,6 +54,7 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
     private JdbcClient jdbc;
 
     @Autowired
+    @Qualifier("loginVerificationCapacity")
     private LoginVerificationCapacity verificationCapacity;
 
     private final ListAppender<ILoggingEvent> recorded = new ListAppender<>();

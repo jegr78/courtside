@@ -1,12 +1,9 @@
 package org.courtside.identity.internal;
 
-import org.springframework.stereotype.Component;
-
 import java.util.Optional;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-@Component
 public final class LoginVerificationCapacity {
 
     private final Semaphore available;

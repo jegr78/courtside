@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { api, type ClubConfig, type MembershipType, type MessageEntry, type PersonRequest, type Role, type RosterEntry } from "../api/client";
+import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry, type PersonRequest, type Role, type RosterEntry } from "../api/client";
+import { problemMessage } from "../api/problem-message";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
@@ -24,6 +25,7 @@ const roles: Role[] = [
 const NAME_LENGTH = 60;
 const EMAIL_LENGTH = 120;
 const USERNAME_LENGTH = 60;
+const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
 
 function arrivedFromPersonCreation(state: unknown): boolean {
   return typeof state === "object" && state !== null && "personCreated" in state
@@ -42,11 +44,25 @@ export function AdminPersonView() {
     ? t("admin.roster.personCreated")
     : undefined);
   const [pending, setPending] = useState(false);
+  const [retry, setRetry] = useState<{ run: () => Promise<void> }>();
+  const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
 
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
     report(failure);
   }, [report]);
+
+  function mutationCompleted(changed: RosterEntry, message: string) {
+    setEntry(changed);
+    clear();
+    setSuccess(t(message));
+  }
+
+  function securityActionCompleted(message: string, signsOut: boolean) {
+    clear();
+    setSuccess(t(message));
+    if (signsOut) window.dispatchEvent(new Event("courtside:unauthenticated"));
+  }
 
   useEffect(() => {
     void Promise.all([api.person(personId), api.membershipTypes()])
@@ -63,13 +79,62 @@ export function AdminPersonView() {
     setPending(true);
     try {
       const changed = await change();
-      setEntry(changed);
-      clear();
-      setSuccess(t(message));
+      mutationCompleted(changed, message);
       return changed;
     } catch (failure) {
-      reportError(failure);
+      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) {
+        setReauthenticationFailure(undefined);
+        setRetry({ run: async () => mutationCompleted(await change(), message) });
+      } else {
+        reportError(failure);
+      }
       return undefined;
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function runSecurityAction(action: () => Promise<void>, message: string, signsOut = false) {
+    if (pending) return;
+    setPending(true);
+    try {
+      await action();
+      securityActionCompleted(message, signsOut);
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH) {
+        setReauthenticationFailure(undefined);
+        setRetry({ run: async () => {
+          await action();
+          securityActionCompleted(message, signsOut);
+        } });
+      } else {
+        reportError(failure);
+      }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function reauthenticate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const password = new FormData(event.currentTarget).get("admin-reauthentication-password");
+    if (typeof password !== "string" || !retry) return;
+    setPending(true);
+    setReauthenticationFailure(undefined);
+    let proofCompleted = false;
+    try {
+      await api.reauthenticate(password);
+      proofCompleted = true;
+      const action = retry;
+      await action.run();
+      setRetry(undefined);
+    } catch (failure) {
+      if (!proofCompleted || (failure instanceof ApiError && failure.problem?.type === RECENT_AUTH)) {
+        setReauthenticationFailure(problemMessage(failure, t));
+      } else {
+        setRetry(undefined);
+        reportError(failure);
+      }
     } finally {
       setPending(false);
     }
@@ -100,6 +165,18 @@ export function AdminPersonView() {
       : <>
         {problem && <Alert>{problem}</Alert>}
         {success && <SuccessFeedback>{success}</SuccessFeedback>}
+        {retry && <Modal labelledBy="admin-reauthentication-title" closed={() => {
+          setRetry(undefined);
+          setReauthenticationFailure(undefined);
+        }}>
+          <form className="grid gap-4" onSubmit={(event) => void reauthenticate(event)}>
+            <h2 id="admin-reauthentication-title" className="text-2xl font-bold">{t("accountSecurity.reauthenticateTitle")}</h2>
+            <p>{t("accountSecurity.reauthenticate")}</p>
+            {reauthenticationFailure && <Alert>{reauthenticationFailure}</Alert>}
+            <TextField id="admin-reauthentication-password" name="admin-reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
+            <Button variant="primary" disabled={pending} type="submit">{t("accountSecurity.continue")}</Button>
+          </form>
+        </Modal>}
         <PersonSection entry={entry} disabled={pending} save={(person) => mutate(() => api.changePerson(personId, person))} />
         <MembershipSection
           entry={entry}
@@ -117,6 +194,8 @@ export function AdminPersonView() {
             saveLocale={(locale) => mutate(() => api.changeAccountLocale(personId, locale))}
             sendCredentials={() => mutate(() => api.requestAccountCredentials(personId), "admin.person.credentialsSent")}
             toggleAccount={() => mutate(() => api.setAccountActive(personId, !entry.enabled))}
+            endSessions={() => runSecurityAction(() => api.endAccountSessions(personId), "admin.person.sessionsEnded")}
+            endAllSessions={() => runSecurityAction(api.endAllSessions, "admin.person.allSessionsEnded", true)}
           />
           : <AccountCreateSection
             entry={entry}
@@ -228,7 +307,7 @@ function MembershipSection({ entry, types, disabled, save }: {
   </section>;
 }
 
-function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLocale, sendCredentials, toggleAccount }: {
+function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLocale, sendCredentials, toggleAccount, endSessions, endAllSessions }: {
   entry: RosterEntry;
   club: ClubConfig;
   disabled: boolean;
@@ -237,6 +316,8 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
   saveLocale: (locale: string) => Saved;
   sendCredentials: () => Saved;
   toggleAccount: () => Saved;
+  endSessions: () => Promise<void>;
+  endAllSessions: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [username, setUsername] = useState(entry.username ?? "");
@@ -246,6 +327,7 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
   const unsavedLocale = locale !== (entry.locale ?? club.defaultLocale);
   const unsavedRoles = differs({ roles: chosenRoles }, { roles: entry.roles });
   const [replacing, setReplacing] = useState(false);
+  const [endingAll, setEndingAll] = useState(false);
 
   // Only a chosen password can be destroyed by sending: the other three states have nothing to lose.
   function send() {
@@ -296,6 +378,20 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
       <Button variant="secondary" data-testid="send-credentials" disabled={disabled || !entry.enabled} className="justify-self-start" type="button" onClick={send}>{t("admin.person.sendCredentials")}</Button>
     </div>
     <Button variant={entry.enabled ? "destructive" : "primary"} data-testid="toggle-account" disabled={disabled} className="justify-self-start" type="button" onClick={() => void toggleAccount()}>{t(entry.enabled ? "admin.deactivate" : "admin.activate")}</Button>
+    <div className="flex flex-wrap gap-3">
+      <Button variant="destructive" data-testid="end-account-sessions" disabled={disabled} type="button" onClick={() => void endSessions()}>{t("admin.person.endSessions")}</Button>
+      <Button variant="destructive" data-testid="end-all-sessions" disabled={disabled} type="button" onClick={() => setEndingAll(true)}>{t("admin.person.endAllSessions")}</Button>
+    </div>
+    {endingAll && <Modal labelledBy="end-all-sessions-title" closed={() => setEndingAll(false)}>
+      <div className="grid gap-4">
+        <h2 id="end-all-sessions-title" className="text-2xl font-bold">{t("admin.person.endAllSessions")}</h2>
+        <p>{t("admin.person.endAllSessionsExplain")}</p>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="destructive" data-testid="confirm-end-all-sessions" disabled={disabled} type="button" onClick={() => void endAllSessions()}>{t("admin.person.endAllSessionsConfirm")}</Button>
+          <Button variant="secondary" type="button" onClick={() => setEndingAll(false)}>{t("admin.cancel")}</Button>
+        </div>
+      </div>
+    </Modal>}
     {replacing && <Modal labelledBy="replace-chosen-title" closed={() => setReplacing(false)}>
       <div className="grid gap-4">
         <h2 id="replace-chosen-title" className="text-2xl font-bold">{t("admin.person.replaceChosenTitle")}</h2>

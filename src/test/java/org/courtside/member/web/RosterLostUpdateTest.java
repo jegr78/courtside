@@ -12,7 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -34,7 +36,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Timeout(value = 30, unit = TimeUnit.SECONDS)
 @Import(IdentityTestFixture.class)
@@ -55,6 +59,9 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
 
     @Autowired
     private PlatformTransactionManager transactions;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     private MockMvc mockMvc;
 
@@ -106,6 +113,7 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
         UUID jane = accountHolder();
         CountDownLatch corrected = new CountDownLatch(1);
         CountDownLatch allowCommit = new CountDownLatch(1);
+        MockHttpSession adminSession = signInAdmin();
 
         try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
             Future<?> correction = pool.submit(() -> new TransactionTemplate(transactions)
@@ -123,6 +131,7 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
                                     .content("""
                                             {"roles": ["MEMBER", "TRAINER"]}
                                             """)
+                                    .session(adminSession)
                                     .with(user("admin").roles("ADMIN"))
                                     .with(csrf()))
                     .andReturn().getResponse());
@@ -146,6 +155,18 @@ class RosterLostUpdateTest extends AbstractIntegrationTest {
         UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
         identity.createEnabledAccount(jane, "doe.jane", Set.of(Role.MEMBER));
         return jane;
+    }
+
+    private MockHttpSession signInAdmin() throws Exception {
+        UUID admin = identity.createPerson("Ada", "Admin", "ada.admin@example.org");
+        identity.createEnabledAccount(admin, "admin", passwordEncoder.encode("admin-password"),
+                Set.of(Role.ADMIN));
+        return (MockHttpSession) mockMvc.perform(post("/api/session")
+                        .param("username", "admin")
+                        .param("password", "admin-password")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andReturn().getRequest().getSession(false);
     }
 
     private static void await(CountDownLatch latch) {

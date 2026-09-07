@@ -192,6 +192,48 @@ components:
           minLength: 12
           maxLength: 256
 
+    PasswordChangeRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 256
+        newPassword:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 256
+
+    ReauthenticationRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 256
+
+    BrowserFamily:
+      type: string
+      enum: [CHROME, EDGE, FIREFOX, SAFARI, OTHER]
+
+    AccountSession:
+      type: object
+      required: [handle, createdAt, lastActivityAt, current, browserFamily]
+      properties:
+        handle:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{22}$"
+          description: An opaque revocation handle. It is not the session cookie or a reusable credential.
+        createdAt: { type: string, format: date-time }
+        lastActivityAt: { type: string, format: date-time }
+        current: { type: boolean }
+        browserFamily: { $ref: "#/components/schemas/BrowserFamily" }
+
     SessionStatus:
       type: object
       required: [authenticated, roles, passwordChangeRequired]
@@ -2198,6 +2240,11 @@ components:
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
+    ServiceUnavailable:
+      description: A required external service could not complete this operation safely.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
 
 paths:
 
@@ -2299,6 +2346,35 @@ paths:
         "204":
           description: Logged out.
 
+  /api/session/reauthentication:
+    post:
+      tags: [session-reauthentication]
+      operationId: reauthenticate
+      summary: Prove the current account's authentication factors again.
+      description: |
+        A successful proof is retained only in this server-side session for five minutes. Courtside
+        currently supports the account password as its full proof; a later second factor extends
+        this operation rather than being bypassed by sensitive operations.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReauthenticationRequest" }
+      responses:
+        "204":
+          description: The current session now carries a recent full-authentication proof.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
   /api/account/initial-password:
     put:
       tags: [account]
@@ -2334,6 +2410,102 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/account/password:
+    put:
+      tags: [account]
+      operationId: changeOwnPassword
+      summary: Replace the signed-in account's permanent password.
+      description: |
+        The current password proves the request. The replacement uses the same common, contextual
+        and breached-password policy as the initial-password flow. Success ends every session for
+        the account, including this one, and requires a new sign-in.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordChangeRequest" }
+      responses:
+        "204":
+          description: Changed. Every session for the account has ended.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/account/sessions:
+    get:
+      tags: [account]
+      operationId: listOwnSessions
+      summary: List the signed-in account's active sessions.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Privacy-safe session metadata ordered by most recent activity.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AccountSession" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+    delete:
+      tags: [account]
+      operationId: endOwnSessions
+      summary: End every session of the signed-in account.
+      description: Requires a full re-authentication no older than five minutes.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204":
+          description: Every session ended after this response completed.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/account/sessions/{sessionHandle}:
+    delete:
+      tags: [account]
+      operationId: endOwnSession
+      summary: End one session of the signed-in account.
+      description: Ending another session requires a full re-authentication no older than five minutes.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: sessionHandle
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]{22}$"
+      responses:
+        "204":
+          description: The selected session ended.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/account/locale:
     put:
@@ -3762,6 +3934,10 @@ paths:
         address the person carried - unless they hold an account, which is reached by mail and
         would become unrecoverable. That is answered `400` with
         `urn:courtside:error:account-needs-address`; correcting the address is always allowed.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -3814,6 +3990,10 @@ paths:
 
         No `Location`: an account has no address of its own, and the roster entry in the response
         body is where its state is read.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -3861,6 +4041,10 @@ paths:
 
         A write that would overwrite a change to the account made since this entry was read is
         answered `409` with `urn:courtside:error:concurrent-modification`.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -3913,6 +4097,10 @@ paths:
 
         A write that would overwrite a change to the account made since this entry was read is
         answered `409` with `urn:courtside:error:concurrent-modification`.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -4016,6 +4204,10 @@ paths:
         limited — requests, not deliveries — and the excess call is answered `429` with
         `urn:courtside:error:credential-issue-rate-limited`. The account is the unit, so one
         member's mailbox cannot be filled and no member's issuing blocks another's.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -4043,6 +4235,55 @@ paths:
         "429":
           $ref: "#/components/responses/RateLimited"
 
+  /api/admin/roster/{personId}/account/sessions:
+    delete:
+      tags: [admin-roster]
+      operationId: endAccountSessions
+      summary: End every session of one account.
+      description: |
+        Requires a full re-authentication no older than five minutes. The account's durable
+        security epoch advances before its stored sessions are removed, so an in-flight request
+        cannot restore stale authority.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: personId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Every session of the account ended.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/admin/sessions:
+    delete:
+      tags: [admin-roster]
+      operationId: endAllSessions
+      summary: End every account session in the instance.
+      description: |
+        Requires a full re-authentication no older than five minutes. The response may complete;
+        the initiating administrator's session is then invalid as well. No second operator is
+        required.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204":
+          description: Every session ended after this response completed.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /api/admin/roster/{personId}/account/active:
     put:
       tags: [admin-roster]
@@ -4057,6 +4298,10 @@ paths:
 
         A write that would overwrite a change to the account made since this entry was read is
         answered `409` with `urn:courtside:error:concurrent-modification`.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -4650,6 +4895,10 @@ paths:
         Executing the same file twice changes nothing the second time. That is the property this
         whole design exists for: a record is matched by its member number, so a second run finds
         everybody it created the first time.
+
+        This operation requires a full reauthentication within the configured window, capped at
+        five minutes. Missing or stale proof is answered `403` with
+        `urn:courtside:error:recent-authentication-required` and changes nothing.
       security:
         - sessionCookie: []
           csrfToken: []
