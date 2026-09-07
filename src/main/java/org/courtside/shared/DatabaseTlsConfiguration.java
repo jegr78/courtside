@@ -1,8 +1,6 @@
 package org.courtside.shared;
 
-import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,16 +10,8 @@ import org.springframework.context.annotation.Configuration;
 class DatabaseTlsConfiguration {
 
     @Bean
-    static BeanPostProcessor databaseTransportVerification(
+    static DatabaseTransportVerification databaseTransportVerification(
             ObjectProvider<DatabaseTlsProperties> properties) {
-        return new BeanPostProcessor() {
-            @Override
-            public Object postProcessBeforeInitialization(Object bean, String beanName) {
-                if (bean instanceof HikariDataSource dataSource) {
-                    DatabaseTls.apply(dataSource, properties.getObject());
-                }
-                return bean;
-            }
-        };
+        return new DatabaseTransportVerification(properties);
     }
 }

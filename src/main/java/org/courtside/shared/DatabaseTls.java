@@ -15,7 +15,13 @@ final class DatabaseTls {
     private static final String VERIFY_FULL = "verify-full";
     private static final String DISABLED = "disable";
     private static final String TRANSPORT_PARAMETER = "ssl";
+    private static final String SERVICE_PARAMETER = "service";
     private static final String ROOT_CERTIFICATE = "courtside.database.tls.root-certificate";
+    private static final String ANCHOR_ACTION = "Point " + ROOT_CERTIFICATE + " at the certificate"
+            + " of the authority that issued the database's certificate, or set"
+            + " courtside.database.tls.mode back to prefer to connect without requiring one.";
+    private static final String OVERRIDE_ACTION = "Remove it, and leave the transport to"
+            + " courtside.database.tls.mode.";
 
     private DatabaseTls() {
     }
@@ -33,44 +39,54 @@ final class DatabaseTls {
 
     private static void verify(HikariDataSource dataSource, Path rootCertificate) {
         Path anchor = usable(rootCertificate);
-        refuseUrlThatDecidesTheTransport(dataSource.getJdbcUrl());
+        refuseWhatWouldDecideTheTransport(dataSource);
         dataSource.addDataSourceProperty("sslmode", VERIFY_FULL);
         dataSource.addDataSourceProperty("sslrootcert", anchor.toString());
     }
 
-    // The driver lets a URL argument override the pool's own property, so a URL that names the
-    // transport would silently connect in plaintext with verification configured.
-    private static void refuseUrlThatDecidesTheTransport(String jdbcUrl) {
+    // The driver takes the transport from a URL argument and from a pool property alike, and an
+    // argument beats the property, so either one could turn verification off without saying so.
+    private static void refuseWhatWouldDecideTheTransport(HikariDataSource dataSource) {
+        for (Object property : dataSource.getDataSourceProperties().keySet()) {
+            refuse(String.valueOf(property), "The connection pool carries the driver property");
+        }
+        String jdbcUrl = dataSource.getJdbcUrl();
         if (jdbcUrl == null || jdbcUrl.indexOf('?') < 0) {
             return;
         }
         for (String argument : jdbcUrl.substring(jdbcUrl.indexOf('?') + 1).split("&")) {
-            String name = argument.split("=", 2)[0].toLowerCase(Locale.ROOT);
-            if (name.startsWith(TRANSPORT_PARAMETER)) {
-                throw new DatabaseTlsMaterialException("The database connection URL carries the "
-                        + "argument '" + name + "', which overrides the verification "
-                        + ROOT_CERTIFICATE + " configures. Remove it from the URL.");
-            }
+            refuse(argument.split("=", 2)[0], "The database connection URL carries the argument");
+        }
+    }
+
+    // A service name reaches the driver as an ordinary word and pulls in a file of properties this
+    // guard cannot read, among them the socket factory that decides whether the anchor is used.
+    private static void refuse(String named, String carrier) {
+        String name = named.toLowerCase(Locale.ROOT);
+        if (name.startsWith(TRANSPORT_PARAMETER) || name.equals(SERVICE_PARAMETER)) {
+            throw new DatabaseTlsConfigurationException(carrier + " '" + name + "', which overrides"
+                    + " the verification " + ROOT_CERTIFICATE + " configures.", OVERRIDE_ACTION);
         }
     }
 
     private static Path usable(Path rootCertificate) {
         if (rootCertificate == null || rootCertificate.toString().isBlank()) {
-            throw new DatabaseTlsMaterialException("Verified database TLS is configured, but "
-                    + ROOT_CERTIFICATE + " names no file.");
+            throw new DatabaseTlsConfigurationException("Verified database TLS is configured, but "
+                    + ROOT_CERTIFICATE + " names no file.", ANCHOR_ACTION);
         }
         if (!Files.isReadable(rootCertificate)) {
-            throw new DatabaseTlsMaterialException(ROOT_CERTIFICATE + " names " + rootCertificate
-                    + ", which does not exist or cannot be read.");
+            throw new DatabaseTlsConfigurationException(ROOT_CERTIFICATE + " names "
+                    + rootCertificate + ", which does not exist or cannot be read.", ANCHOR_ACTION);
         }
         try (InputStream material = Files.newInputStream(rootCertificate)) {
             if (CertificateFactory.getInstance("X.509").generateCertificates(material).isEmpty()) {
-                throw new DatabaseTlsMaterialException(ROOT_CERTIFICATE + " names " + rootCertificate
-                        + ", which holds no certificate.");
+                throw new DatabaseTlsConfigurationException(ROOT_CERTIFICATE + " names "
+                        + rootCertificate + ", which holds no certificate.", ANCHOR_ACTION);
             }
         } catch (IOException | CertificateException failure) {
-            throw new DatabaseTlsMaterialException(ROOT_CERTIFICATE + " names " + rootCertificate
-                    + ", which is not readable X.509 material.", failure);
+            throw new DatabaseTlsConfigurationException(ROOT_CERTIFICATE + " names "
+                    + rootCertificate + ", which is not readable X.509 material.", ANCHOR_ACTION,
+                    failure);
         }
         return rootCertificate;
     }

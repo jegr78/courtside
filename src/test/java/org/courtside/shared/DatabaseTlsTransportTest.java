@@ -22,6 +22,7 @@ import org.springframework.mock.env.MockEnvironment;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.nio.file.Files;
+import java.security.cert.CertificateNotYetValidException;
 import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -34,8 +35,6 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 @ExtendWith(OutputCaptureExtension.class)
 class DatabaseTlsTransportTest {
-
-    private static Path anchorTheApplicationStartsWith;
 
     private static TestCertificate served;
     private static PostgreSQLContainer database;
@@ -110,7 +109,44 @@ class DatabaseTlsTransportTest {
         // then
         assertThat(refusal.getMessage()).contains("does not support SSL");
         assertThat(diagnosis(refusal).getDescription())
-                .contains("The database connection requires a verified TLS certificate");
+                .contains("the database offered no encryption at all");
+    }
+
+    // Suppressing the handshake produces exactly this refusal, so an action that offered the
+    // preferred mode here would talk whoever suppressed it through finishing the job.
+    @Test
+    void givenADatabaseWithoutTls_whenItIsDiagnosed_thenTheActionDoesNotOfferToLowerTheMode()
+            throws Exception {
+        // given
+        PostgreSQLContainer plaintext = TestPostgres.sharedPlaintext();
+
+        // when
+        SQLException refusal = refusalOf(plaintext.getJdbcUrl(), anchor(served.authority()));
+
+        // then
+        assertThat(diagnosis(refusal).getAction())
+                .contains("Turn TLS on at the database")
+                .doesNotContain("prefer");
+    }
+
+    // Both extend CertificateException, and an operator sent after the wrong one looks for a
+    // certificate nobody mis-issued instead of at two clocks.
+    @Test
+    void givenACertificateThatIsNotValidYet_whenItIsDiagnosed_thenItIsNotReportedAsAWrongAuthority() {
+        // given
+        SQLException refusal = new SQLException("SSL error", "08006",
+                new CertificateNotYetValidException("NotBefore lies ahead"));
+
+        // when / then
+        assertThat(diagnosis(refusal).getDescription()).contains("is not valid yet");
+    }
+
+    // The pool can wrap what the driver said in an exception carrying no state at all, and an
+    // analyzer that throws is one Boot swallows: the operator gets the stack trace instead.
+    @Test
+    void givenAFailureWithoutASqlState_whenItIsDiagnosed_thenTheAnalyzerStaysSilent() {
+        // when / then
+        assertThat(diagnosis(new SQLException("Failed to initialize pool"))).isNull();
     }
 
     @Test
@@ -183,21 +219,20 @@ class DatabaseTlsTransportTest {
         }
     }
 
-    // Boot resolves this analyzer's constructor argument itself and skips an analyzer it cannot
-    // build, silently, so only a real start proves the diagnosis reaches an operator at all.
+    // Handing the analyzer an exception proves how it classifies one. Only a real start proves
+    // that the `spring.factories` line and the wiring put its sentence in front of an operator.
     @Test
     void givenAnAuthorityThatDoesNotVouch_whenTheApplicationStarts_thenTheReportSaysSo(
             CapturedOutput output) throws Exception {
         // given
-        anchorTheApplicationStartsWith = anchor(TestCertificate.issuedFor("localhost").authority());
+        Path unrelated = anchor(TestCertificate.issuedFor("localhost").authority());
 
         // when
         Throwable failure = catchThrowable(() -> new SpringApplicationBuilder(ConnectingPool.class)
                 .web(WebApplicationType.NONE)
                 .bannerMode(Banner.Mode.OFF)
                 .run("--courtside.database.tls.mode=verify-full",
-                        "--courtside.database.tls.root-certificate="
-                                + anchorTheApplicationStartsWith));
+                        "--courtside.database.tls.root-certificate=" + unrelated));
 
         // then
         assertThat(failure).isNotNull();

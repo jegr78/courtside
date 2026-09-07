@@ -10,7 +10,7 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class DatabaseTlsMaterialTest {
+class DatabaseTlsConfigurationTest {
 
     private static final String URL = "jdbc:postgresql://db:5432/courtside";
 
@@ -79,7 +79,7 @@ class DatabaseTlsMaterialTest {
     }
 
     // The driver lets a URL argument beat the pool's own property, so a URL that names the
-    // transport is the one input that could turn verification back off without saying so.
+    // transport is one of two inputs that could turn verification back off without saying so.
     @Test
     void givenAUrlThatNamesTheTransport_whenTheVerifiedPoolStarts_thenItRefusesAndNamesTheArgument()
             throws Exception {
@@ -91,6 +91,75 @@ class DatabaseTlsMaterialTest {
                 .run(context -> assertThat(refusalIn(context.getStartupFailure()))
                         .hasMessageContaining("sslmode")
                         .hasMessageContaining("overrides the verification"));
+    }
+
+    // The other one, and the one no URL check would see: the factory the driver builds its socket
+    // with is chosen independently of the mode, and one of the driver's own verifies nothing.
+    @Test
+    void givenAPoolPropertyThatNamesTheTransport_whenTheVerifiedPoolStarts_thenItRefusesTheProperty()
+            throws Exception {
+        // given
+        Path authority = anchor(TestCertificate.issuedFor("db").authority());
+
+        // when / then
+        new ApplicationContextRunner()
+                .withUserConfiguration(DatabaseTlsConfiguration.class)
+                .withBean(HikariDataSource.class, () -> unverifying(pool(URL)))
+                .withPropertyValues("courtside.database.tls.mode=verify-full",
+                        "courtside.database.tls.root-certificate=" + authority)
+                .run(context -> assertThat(refusalIn(context.getStartupFailure()))
+                        .hasMessageContaining("sslfactory")
+                        .hasMessageContaining("overrides the verification"));
+    }
+
+    // The driver reads the named service file into the same properties, and what it may set there
+    // includes the socket factory, so the one argument that carries no `ssl` in its name is refused too.
+    @Test
+    void givenAUrlThatNamesAServiceFile_whenTheVerifiedPoolStarts_thenItRefusesTheArgument()
+            throws Exception {
+        // given
+        Path authority = anchor(TestCertificate.issuedFor("db").authority());
+
+        // when / then
+        verified(authority, URL + "?service=courtside")
+                .run(context -> assertThat(refusalIn(context.getStartupFailure()))
+                        .hasMessageContaining("service")
+                        .hasMessageContaining("overrides the verification"));
+    }
+
+    // A property whose value binds to something other than a string — a digit-only password, say —
+    // is invisible to the properties' own string view and would pass a scan built on it.
+    @Test
+    void givenAPoolPropertyThatIsNoString_whenTheVerifiedPoolStarts_thenItIsSeenAllTheSame()
+            throws Exception {
+        // given
+        Path authority = anchor(TestCertificate.issuedFor("db").authority());
+
+        // when / then
+        new ApplicationContextRunner()
+                .withUserConfiguration(DatabaseTlsConfiguration.class)
+                .withBean(HikariDataSource.class, () -> numeric(pool(URL)))
+                .withPropertyValues("courtside.database.tls.mode=verify-full",
+                        "courtside.database.tls.root-certificate=" + authority)
+                .run(context -> assertThat(refusalIn(context.getStartupFailure()))
+                        .hasMessageContaining("sslpassword"));
+    }
+
+    // Every other way to get this wrong refuses the start, and a requirement that reached no pool
+    // would connect exactly as prefer does while the configuration says it verifies.
+    @Test
+    void givenNoPoolAtAll_whenVerificationIsRequired_thenTheStartIsRefusedRatherThanUnenforced()
+            throws Exception {
+        // given
+        Path authority = anchor(TestCertificate.issuedFor("db").authority());
+
+        // when / then
+        new ApplicationContextRunner()
+                .withUserConfiguration(DatabaseTlsConfiguration.class)
+                .withPropertyValues("courtside.database.tls.mode=verify-full",
+                        "courtside.database.tls.root-certificate=" + authority)
+                .run(context -> assertThat(refusalIn(context.getStartupFailure()))
+                        .hasMessageContaining("no connection pool was configured with it"));
     }
 
     // The driver encrypts opportunistically on its own, so leaving it alone is a mode of its own
@@ -116,14 +185,14 @@ class DatabaseTlsMaterialTest {
                 .withPropertyValues("courtside.database.tls.mode=" + mode);
     }
 
-    private static DatabaseTlsMaterialException refusalIn(Throwable failure) {
+    private static DatabaseTlsConfigurationException refusalIn(Throwable failure) {
         for (Throwable step = failure; step != null && step != step.getCause();
                 step = step.getCause()) {
-            if (step instanceof DatabaseTlsMaterialException refusal) {
+            if (step instanceof DatabaseTlsConfigurationException refusal) {
                 return refusal;
             }
         }
-        throw new AssertionError("The context did not fail on the database TLS material: " + failure);
+        throw new AssertionError("The context did not fail on the database TLS configuration: " + failure);
     }
 
     private static ApplicationContextRunner verified(Path authority, String url) {
@@ -132,6 +201,16 @@ class DatabaseTlsMaterialTest {
                 .withBean(HikariDataSource.class, () -> pool(url))
                 .withPropertyValues("courtside.database.tls.mode=verify-full",
                         "courtside.database.tls.root-certificate=" + authority);
+    }
+
+    private static HikariDataSource numeric(HikariDataSource dataSource) {
+        dataSource.addDataSourceProperty("sslpassword", 1234);
+        return dataSource;
+    }
+
+    private static HikariDataSource unverifying(HikariDataSource dataSource) {
+        dataSource.addDataSourceProperty("sslfactory", "org.postgresql.ssl.NonValidatingFactory");
+        return dataSource;
     }
 
     private static HikariDataSource pool(String url) {

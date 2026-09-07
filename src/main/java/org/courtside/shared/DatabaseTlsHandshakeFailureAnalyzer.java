@@ -7,6 +7,7 @@ import org.springframework.core.env.Environment;
 
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateNotYetValidException;
 import java.sql.SQLException;
 import java.util.Set;
 
@@ -15,10 +16,10 @@ class DatabaseTlsHandshakeFailureAnalyzer extends AbstractFailureAnalyzer<SQLExc
     // The driver reports a name mismatch as an ordinary connection failure, and its sentence is
     // translated, so the verifier it names is the one part of the message a locale cannot move.
     private static final String HOSTNAME_VERIFIER = "PgjdbcHostnameVerifier";
+    private static final String NO_TLS = "does not support SSL";
     private static final Set<String> CONNECTION_STATES = Set.of("08004", "08006");
-    private static final String ACTION = "Reissue the database's certificate for the name the"
-            + " connection URL uses, point courtside.database.tls.root-certificate at the authority"
-            + " that signed it, or set courtside.database.tls.mode back to prefer.";
+    private static final String REQUIRED =
+            "The database connection requires a verified TLS certificate, and ";
 
     private final Environment environment;
 
@@ -28,25 +29,47 @@ class DatabaseTlsHandshakeFailureAnalyzer extends AbstractFailureAnalyzer<SQLExc
 
     @Override
     protected FailureAnalysis analyze(Throwable rootFailure, SQLException cause) {
-        if (!verificationRequired() || !CONNECTION_STATES.contains(cause.getSQLState())) {
+        if (!verificationRequired()
+                || !CONNECTION_STATES.contains(String.valueOf(cause.getSQLState()))) {
             return null;
         }
-        return new FailureAnalysis(described(cause), ACTION, cause);
+        Diagnosis diagnosis = diagnose(cause);
+        return new FailureAnalysis(REQUIRED + diagnosis.description(), diagnosis.action(), cause);
     }
 
-    private String described(SQLException cause) {
-        String required = "The database connection requires a verified TLS certificate, and ";
+    // Lowering the mode answers an anchor this instance configured wrongly. It never answers a
+    // peer that failed to prove who it is, because that is the peer the mode was raised against.
+    private Diagnosis diagnose(SQLException cause) {
         if (carries(cause, CertificateExpiredException.class)) {
-            return required + "the certificate the database served has expired.";
+            return new Diagnosis("the certificate the database served has expired.",
+                    "Renew the database's certificate, and point courtside.database.tls"
+                            + ".root-certificate at the authority that issued the new one.");
+        }
+        if (carries(cause, CertificateNotYetValidException.class)) {
+            return new Diagnosis("the certificate the database served is not valid yet.",
+                    "Compare the clocks of the two hosts, and roll the certificate out once it is"
+                            + " valid.");
         }
         if (carries(cause, CertificateException.class)) {
-            return required + "the configured authority does not vouch for the certificate the"
-                    + " database served.";
+            return new Diagnosis("the configured authority does not vouch for the certificate the"
+                    + " database served.",
+                    "Point courtside.database.tls.root-certificate at the authority that issued"
+                            + " the database's certificate. If it already names that authority,"
+                            + " what answered served a certificate nobody issued for it.");
         }
         if (String.valueOf(cause.getMessage()).contains(HOSTNAME_VERIFIER)) {
-            return required + "the certificate the database served names another host.";
+            return new Diagnosis("the certificate the database served names another host.",
+                    "Reissue the database's certificate for the name the connection URL uses, or"
+                            + " connect under a name that certificate already carries.");
         }
-        return required + "the connection failed: " + cause.getMessage();
+        if (String.valueOf(cause.getMessage()).contains(NO_TLS)) {
+            return new Diagnosis("the database offered no encryption at all.",
+                    "Turn TLS on at the database, and check that the connection reaches the host"
+                            + " you configured rather than something in front of it.");
+        }
+        return new Diagnosis("the connection failed: " + cause.getMessage(),
+                "Check that the database is reachable and serving TLS under the name the"
+                        + " connection URL uses.");
     }
 
     private static boolean carries(Throwable failure, Class<? extends Throwable> kind) {
@@ -63,5 +86,8 @@ class DatabaseTlsHandshakeFailureAnalyzer extends AbstractFailureAnalyzer<SQLExc
         return Binder.get(environment)
                 .bind("courtside.database.tls.mode", DatabaseTlsProperties.Mode.class)
                 .orElse(DatabaseTlsProperties.Mode.PREFER) == DatabaseTlsProperties.Mode.VERIFY_FULL;
+    }
+
+    private record Diagnosis(String description, String action) {
     }
 }
