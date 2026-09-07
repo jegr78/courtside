@@ -17,6 +17,17 @@ Apache Maven Wrapper
   These files are distributed unmodified under their own licence, which their
   headers state. The AGPL notice above does not apply to them.
 
+SecLists common-password list
+  Files: src/main/resources/security/common-passwords.txt
+  Copyright: Daniel Miessler, Jason Haddix, Ignacio Portal and SecLists contributors
+  Licence: MIT
+           https://github.com/danielmiessler/SecLists/blob/master/LICENSE
+
+  Copied unmodified from Passwords/Common-Credentials/Pwdb_top-100000.txt at tag
+  2026.1, blob 40d73752607deaab8aec6740a92d6165887858c9, SHA-256
+  07f876a616f08fb2cc5c3e0ce04e4a6d1123380580472b0997baebc4e8226977. Refreshing it
+  is a fetch of that path at a newer tag and a comparison of those two hashes.
+
 Dependencies resolved at build time are not distributed in this repository; their
 licences are declared in their own artifacts and reported by
 `./mvnw license:aggregate-third-party-report` or an SBOM.

@@ -32,6 +32,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:account-deactivated",
             "urn:courtside:error:credential-issue-rate-limited",
             "urn:courtside:error:account-not-found",
+            "urn:courtside:error:password-too-guessable",
             "urn:courtside:error:audit-cursor-unknown",
             "urn:courtside:error:message-cursor-unknown",
             "urn:courtside:error:message-not-declinable",

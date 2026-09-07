@@ -17,10 +17,12 @@ class InitialPasswordService {
     private final UserAccountRepository accounts;
     private final PasswordEncoder passwordEncoder;
     private final AccountSessions sessions;
+    private final PasswordPolicy policy;
 
     @Transactional
     void change(String password) {
         UserAccount account = currentUser.requireAccount();
+        policy.requireUnguessable(password, account.getUsername(), account.getPerson().getEmail());
         String passwordHash = passwordEncoder.encode(password);
         if (accounts.changeInitialPassword(account.getId(), passwordHash) != 1) {
             throw new IllegalStateException("The initial password was already changed");
