@@ -1471,7 +1471,9 @@ whether it is built or designed. **Designed means absent today.**
   deployment's to set, both are stated rather than inherited from a framework default that can move,
   and an absolute lifetime shorter than the inactivity window is refused at startup because the
   window could then never be reached. The absolute one is counted from the creation time stored with
-  the session, so restarting the application does not hand a live session a fresh lifetime. Reaching
+  the session, so restarting the application does not hand a live session a fresh lifetime,
+  and signing in starts a session of its own so that a browser two members share hands the
+  second of them a full lifetime rather than what the first had left. Reaching
   the absolute bound ends the session and nothing more — the request carries on without authority,
   so what needed it is refused the way every unauthenticated request is, and signing in again is not
   something an expired session stands in the way of; past the inactivity bound there is nothing left

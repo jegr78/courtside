@@ -19,7 +19,6 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
-
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -134,10 +133,13 @@ public class SecurityConfiguration {
                 .addFilterBefore(new LoginAttemptFilter(loginEndpoint(), loginAttemptProtection,
                         loginVerificationCapacity, loginRateLimitHandler),
                         UsernamePasswordAuthenticationFilter.class)
+                // The default only changes the session id, which keeps the creation time the absolute
+                // lifetime counts from, so a second member on a shared browser inherits the first's.
+                .sessionManagement(session -> session.sessionFixation(fixation -> fixation.migrateSession()))
                 .addFilterAfter(new SecurityEpochFilter(accounts),
                         SecurityContextHolderFilter.class)
-                // Anchored behind the epoch filter rather than beside it: two filters sharing one
-                // anchor are ordered by nothing but the order they were added here.
+                // Anchored behind the epoch filter: two filters sharing one anchor are ordered by
+                // nothing but the order they were added here.
                 .addFilterAfter(new AbsoluteSessionLifetimeFilter(sessionLifetime.absoluteLifetime()),
                         SecurityEpochFilter.class)
                 .logout(logout -> logout

@@ -30,8 +30,7 @@ class SecurityEpochFilter extends OncePerRequestFilter {
             }
             SecurityContextHolder.clearContext();
         }
-        // Ending it is enough. Answering from here refused the sign-in that would have replaced the
-        // session, and wrote a response the header writer downstream never got to see.
+        // Carried on rather than answered here: this request may be the sign-in that replaces it.
         filterChain.doFilter(request, response);
     }
 }
