@@ -153,6 +153,21 @@ test("given session cookies, when rotating and expiring them, then the request j
   assert.equal(jar.header(), "XSRF-TOKEN=one%20two");
 });
 
+test("given host and legacy CSRF cookies, when reading the token, then the host-bound value wins", () => {
+  // given
+  const hostOnly = new SecurityCookieJar();
+  hostOnly.update(["__Host-XSRF-TOKEN=host%20only; Path=/; Secure"]);
+  const collision = new SecurityCookieJar();
+  collision.update([
+    "XSRF-TOKEN=planted-legacy; Path=/; Secure",
+    "__Host-XSRF-TOKEN=trusted-host; Path=/; Secure"
+  ]);
+
+  // when / then
+  assert.equal(hostOnly.csrfToken(), "host only");
+  assert.equal(collision.csrfToken(), "trusted-host");
+});
+
 test("given public authenticated and administrative operations, when classifying actors, then access is explicit", () => {
   // given
   const matrix = buildOperationAuthorizationMatrix(api);

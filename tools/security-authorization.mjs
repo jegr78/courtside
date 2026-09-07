@@ -551,7 +551,7 @@ export class SecurityCookieJar {
   }
 
   csrfToken() {
-    const encoded = this.#cookies.get("XSRF-TOKEN");
+    const encoded = this.#cookies.get("__Host-XSRF-TOKEN") ?? this.#cookies.get("XSRF-TOKEN");
     return encoded ? decodeURIComponent(encoded) : undefined;
   }
 }
