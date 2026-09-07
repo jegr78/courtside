@@ -5,6 +5,7 @@ import org.courtside.config.ClubIdentity;
 import org.courtside.identity.Person;
 import org.courtside.identity.UserAccount;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -29,9 +30,11 @@ class PasswordPolicy {
 
     private final Set<String> common;
     private final ClubIdentity club;
+    private final PasswordEncoder passwordEncoder;
 
-    PasswordPolicy(ClubIdentity club) {
+    PasswordPolicy(ClubIdentity club, PasswordEncoder passwordEncoder) {
         this.club = club;
+        this.passwordEncoder = passwordEncoder;
         this.common = loaded();
         log.info("The permanent-password policy holds {} common passwords", common.size());
     }
@@ -46,6 +49,11 @@ class PasswordPolicy {
         }
         if (contextTerms(account).anyMatch(normalised::contains)) {
             throw new GuessablePasswordException();
+        }
+        // Last, because it is the only check that costs a key derivation.
+        if (account.getPasswordHash() != null
+                && passwordEncoder.matches(password, account.getPasswordHash())) {
+            throw new ReusedCredentialException();
         }
     }
 

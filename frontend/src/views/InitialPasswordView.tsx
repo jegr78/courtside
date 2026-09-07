@@ -46,8 +46,8 @@ export function InitialPasswordView({ changed }: { changed: () => void }) {
     <p className="text-muted mt-2">{t("password.description")}</p>
     <form className="mt-6 grid gap-5" onSubmit={(event) => void submit(event)}>
       {error && <Alert testId="password-failure">{error}</Alert>}
-      <TextField id="new-password" name="password" label={t("password.new")} data-testid="new-password" type="password" autoComplete="new-password" minLength={12} required autoFocus />
-      <TextField id="confirm-password" name="confirmation" label={t("password.confirm")} data-testid="confirm-password" type="password" autoComplete="new-password" minLength={12} required />
+      <TextField id="new-password" name="password" label={t("password.new")} data-testid="new-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} required autoFocus />
+      <TextField id="confirm-password" name="confirmation" label={t("password.confirm")} data-testid="confirm-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} required />
       <Button variant="primary" type="submit" data-testid="password-submit" disabled={pending}>{t("password.submit")}</Button>
     </form>
   </section>;

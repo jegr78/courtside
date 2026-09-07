@@ -27,6 +27,8 @@ class PermanentPasswordStrengthTest extends AbstractIntegrationTest {
     private static final String ISSUED = "issued-credential-9RtQ";
     private static final String REFUSED = "urn:courtside:error:password-too-guessable";
     private static final String CODE = "identity.password.tooGuessable";
+    private static final String REUSED = "urn:courtside:error:password-reuses-credential";
+    private static final String REUSED_CODE = "identity.password.reusesCredential";
 
     @Autowired
     private WebApplicationContext context;
@@ -59,8 +61,8 @@ class PermanentPasswordStrengthTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.violations[0].code").value(CODE));
     }
 
-    // The upstream list is lowercase throughout, so a comparison that skipped normalisation would
-    // accept every capitalised spelling of every entry in it.
+    // The shipped list mixes case and the policy folds both sides, so a differently-cased spelling
+    // of an entry has to be refused like the entry itself.
     @Test
     void givenACommonPasswordInAnotherCase_whenItIsChosen_thenItIsRefusedTheSameWay() throws Exception {
         // when / then
@@ -68,6 +70,17 @@ class PermanentPasswordStrengthTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(REFUSED))
                 .andExpect(jsonPath("$.violations[0].code").value(CODE));
+    }
+
+    // Whoever read the message knows this one, and re-typing what a form already gave you is what
+    // a member does when asked for a password they have.
+    @Test
+    void givenTheIssuedCredential_whenItIsChosenAsThePermanentOne_thenItIsRefused() throws Exception {
+        // when / then
+        choose(ISSUED)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(REUSED))
+                .andExpect(jsonPath("$.violations[0].code").value(REUSED_CODE));
     }
 
     // One context term is enough here: this proves the policy hangs on the endpoint and which
@@ -94,6 +107,18 @@ class PermanentPasswordStrengthTest extends AbstractIntegrationTest {
                         .param("password", "lattice-scaffold-marmoset-vellum")
                         .with(csrf()))
                 .andExpect(status().isOk());
+    }
+
+    // The document bounds the field, so the bound is what answers rather than the reverse proxy's
+    // body limit, which the member would see as a failure with nothing to read.
+    @Test
+    void givenAPasswordBeyondTheLengthTheContractAllows_whenItIsChosen_thenTheFieldIsNamed()
+            throws Exception {
+        // when / then
+        choose("lattice-scaffold-".repeat(16))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("password"));
     }
 
     // Neither length nor an alphabet outside ASCII is a reason to refuse: a passphrase a member

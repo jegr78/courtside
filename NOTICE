@@ -28,6 +28,10 @@ SecLists common-password list
   07f876a616f08fb2cc5c3e0ce04e4a6d1123380580472b0997baebc4e8226977. Refreshing it
   is a fetch of that path at a newer tag and a comparison of those two hashes.
 
+  This repository's maintainers own that refresh. It is considered before every
+  release and carried out whenever SecLists has published a newer tag, so a list
+  that ships is never older than the last release it went out with.
+
 Dependencies resolved at build time are not distributed in this repository; their
 licences are declared in their own artifacts and reported by
 `./mvnw license:aggregate-third-party-report` or an SBOM.

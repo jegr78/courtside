@@ -1455,18 +1455,21 @@ whether it is built or designed. **Designed means absent today.**
   parameters is re-encoded on its owner's next successful sign-in; storing it is best effort, so a
   database failure there leaves the old hash in place and never turns a correct password into a
   failed login.
-- **What a permanent password may be:** at least twelve characters, and neither on a public list of
-  common passwords nor built from something this instance already shows the member. *Built.* The
-  list is SecLists' 100,000 most common passwords, pinned by tag and hash in `NOTICE`, refreshed by
-  fetching that path again and comparing the two hashes. The terms are the member's username, their
-  first and last name, the local part of the address their credential was mailed to, and the club
-  name, each taken whole and split on its non-alphanumeric boundaries, with tokens under four characters dropped so a syllable
-  does not refuse a passphrase. Comparison is case-insensitive, the answer is one refusal for every
-  list so it never says which one matched, and nothing about composition, length above the minimum
-  or alphabet is required — a 64-character passphrase outside ASCII is a password this accepts.
-  Only 1,474 of the 100,000 entries reach twelve characters, so the length minimum, not the list,
-  is what refuses the other 98,526: against a long password the list is the weaker of the two
-  guards, and the breached-password check below is the one that would carry weight.
+- **What a permanent password may be:** twelve to 256 characters, neither on a public list of
+  common passwords nor built from something this instance already shows the member, and never the
+  one-time password the instance issued. *Built.* The list is SecLists' `Pwdb_top-100000`, pinned
+  by tag and hash in `NOTICE` and refreshed by fetching that path again and comparing the two
+  hashes. The terms are the member's username, their first and last name, the local part of the address the account carries now, and
+  the club name, each taken whole and split on its non-alphanumeric boundaries, with tokens under
+  four characters dropped so a syllable does not refuse a passphrase. Comparison is
+  case-insensitive, and one refusal answers for both lists so it never says which one matched.
+  Keeping the issued credential is refused under its own type, because it is known to whoever read
+  the message that carried it and because an account that keeps it can no longer withdraw it.
+  Nothing about composition or alphabet is required — a 64-character passphrase outside ASCII is a
+  password this accepts. Only a small share of the list reaches twelve characters, which is what
+  choosing it was measured against: nearly every entry is already refused by the length minimum, so
+  against a long password the list is the weaker of the two guards and the breached-password check
+  below is the one that would carry weight.
 - **Whether a permanent password is one that has already leaked:** *Designed.* A check against a
   breached-password set, asking with a partial hash so that neither the password nor a reusable
   digest of it leaves the instance, and refusing to set a password while that check cannot run.

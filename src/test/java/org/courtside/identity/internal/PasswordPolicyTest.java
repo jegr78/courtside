@@ -5,6 +5,7 @@ import org.courtside.identity.Person;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.ZoneId;
 import java.util.Set;
@@ -15,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PasswordPolicyTest {
 
     // Four sources that share no substring, so each refusal below names exactly one of them.
+    private static final String STORED = "stored-credential-hash";
     private static final UserAccount ACCOUNT =
             accountOf("wren8842", "Mary", "Major", "quill.harbor@example.org");
     private static final PasswordPolicy POLICY = policyFor("Example Tennis Club");
@@ -90,6 +92,15 @@ class PasswordPolicyTest {
                 .isInstanceOf(GuessablePasswordException.class);
     }
 
+    // Whoever read the message that carried it knows this one, so keeping it is no better than
+    // the day it was sent, and the account would never expire the credential again.
+    @Test
+    void givenTheStoredCredential_whenItIsCheckedAgain_thenItIsRefused() {
+        // when / then
+        assertThatThrownBy(() -> POLICY.requireUnguessable(STORED, ACCOUNT))
+                .isInstanceOf(ReusedCredentialException.class);
+    }
+
     // A null here is this application's own bug, not a member's input, and it must not leave as
     // the NullPointerException that a dereference two lines down would produce.
     @Test
@@ -103,11 +114,25 @@ class PasswordPolicyTest {
     private static UserAccount accountOf(
             String username, String firstName, String lastName, String emailAddress) {
         return new UserAccount(new Person(firstName, lastName, emailAddress),
-                username, "hash", Set.of(Role.MEMBER), "de");
+                username, STORED, Set.of(Role.MEMBER), "de");
     }
 
     private static PasswordPolicy policyFor(String clubName) {
-        return new PasswordPolicy(new ClubIdentity() {
+        return new PasswordPolicy(clubIdentity(clubName), new PasswordEncoder() {
+            @Override
+            public String encode(CharSequence raw) {
+                return raw.toString();
+            }
+
+            @Override
+            public boolean matches(CharSequence raw, String encoded) {
+                return encoded.contentEquals(raw);
+            }
+        });
+    }
+
+    private static ClubIdentity clubIdentity(String clubName) {
+        return new ClubIdentity() {
             @Override
             public String clubName() {
                 return clubName;
@@ -122,6 +147,6 @@ class PasswordPolicyTest {
             public ZoneId zoneId() {
                 return ZoneId.of("UTC");
             }
-        });
+        };
     }
 }
