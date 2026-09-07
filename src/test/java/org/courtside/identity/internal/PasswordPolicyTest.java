@@ -101,6 +101,19 @@ class PasswordPolicyTest {
                 .isInstanceOf(ReusedCredentialException.class);
     }
 
+    // Withdrawing an unused credential leaves the account without a hash, and the encoder has
+    // nothing to match a password against then.
+    @Test
+    void givenAnAccountWithoutAStoredCredential_whenAPasswordIsChecked_thenItIsAccepted() {
+        // given
+        UserAccount withdrawn = new UserAccount(new Person("Mary", "Major", null),
+                "wren8842", null, Set.of(Role.MEMBER), "de");
+
+        // when / then
+        assertThatCode(() -> POLICY.requireUnguessable("scaffold-marmoset-lattice", withdrawn))
+                .doesNotThrowAnyException();
+    }
+
     // A null here is this application's own bug, not a member's input, and it must not leave as
     // the NullPointerException that a dereference two lines down would produce.
     @Test
