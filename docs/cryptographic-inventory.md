@@ -23,6 +23,10 @@ nobody keeps current.
 
 `evidence` names the test or record that proves the entry, and every file it names has to exist.
 
+`detects` names the tokens the entry is responsible for. A file is covered only when some entry
+both matches its path and claims the token found in it, so a glob written for content hashes does
+not silently absorb a cipher that appears beside them.
+
 `locations` are glob patterns rather than file lists, so a new file of a kind the inventory already
 covers does not fail the build, while a cryptographic use in a place no entry describes does.
 
@@ -43,7 +47,11 @@ guarantee and cryptography that does not:
   password.
 - `confidentiality` — keeps content from a reader. The security-evidence envelope.
 - `signing` — lets somebody else verify an origin. The release signature, DKIM.
-- `transport` — protects a connection. Public TLS, the mail relay, PostgreSQL.
+- `transport` — protects a connection, or records that one is not protected. Public TLS and the
+  mail relay are encrypted; the connection to PostgreSQL inside the deployment is not, and its
+  entry says so rather than leaving it out.
+- `integrity` — recognises one expected party or artefact and refuses anything else. Certificate
+  pinning. Unlike a `content-hash`, a mismatch here stops the operation.
 - `pseudonymisation` — replaces an identifier with a digest so a counter need not hold the
   original. The login-attempt subject.
 - `content-hash` — names content so two things can be compared. A booking fingerprint, a logo's
@@ -53,7 +61,9 @@ guarantee and cryptography that does not:
 - `identifier` — a value that only has to be unique. An idempotency key, a scratch name in a test.
 
 Reading a `content-hash` or an `identifier` as an integrity control is the mistake this
-classification exists to prevent.
+classification exists to prevent — and the reverse, filing a real control under `content-hash`
+because it also computes a digest, is the same mistake from the other side. Certificate pinning
+computes SHA-256 exactly as a cache tag does, and only one of the two refuses a connection.
 
 ## Replacing an algorithm or a key
 
@@ -82,5 +92,11 @@ unnoticed.
 
 ## What this file is not
 
-It does not hold key material, a fingerprint or anything from which material could be derived, and
-a test refuses the file if it looks like it does. It records where material lives and who holds it.
+Neither this file nor the JSON holds key material, a fingerprint or anything from which material
+could be derived, and a test refuses both if either looks like it does. They record where material
+lives and who holds it.
+
+It is also not a complete list of every secret an instance handles, only of the ones this project
+generates or configures. Values the framework produces — the session identifier, the CSRF token —
+have entries that say what they are and who owns their lifecycle, but no parameters, because this
+project does not choose them.
