@@ -1470,7 +1470,9 @@ whether it is built or designed. **Designed means absent today.**
   of 24 hours counted from when the session began, which activity does not extend. Both are the
   deployment's to set, both are stated rather than inherited from a framework default that can move,
   and an absolute lifetime shorter than the inactivity window is refused at startup because the
-  window could then never be reached. The absolute one is counted from the creation time stored with
+  window could then never be reached. Neither may fall below a minute, so that a value meant as a
+  bound cannot be one in name only — and a negative inactivity window, which Spring Session reads
+  as an interval that never expires, is refused with them. The absolute one is counted from the creation time stored with
   the session, so restarting the application does not hand a live session a fresh lifetime,
   and signing in starts a session of its own so that a browser two members share hands the
   second of them a full lifetime rather than what the first had left. Reaching
@@ -1917,7 +1919,10 @@ deliver the implementation.
 - **A sign-in session's row goes when the session does.** A session stops working the moment it
   expires, but its row — and the attributes cascading from it, which carry the username, the account
   id, the roles and the security epoch it was signed in with — is deleted on the cadence of
-  `COURTSIDE_SESSION_CLEANUP_CRON`, a minute by default. The stored credential is not among them:
+  `COURTSIDE_SESSION_CLEANUP_CRON`, a minute by default. Both ways of dying are swept on it: the
+  store deletes what passed its inactivity window, and Courtside deletes what passed its absolute
+  lifetime, because the stored expiry is built from the inactivity window alone and a session that
+  died of age and was never used again would otherwise keep its row until that window passed too. The stored credential is not among them:
   it is erased once the account has been authenticated and never reaches the store. The cadence may
   be widened but not switched off, and an instance configured to switch it off refuses to
   start. **Built.**

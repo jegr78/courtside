@@ -36,6 +36,25 @@ class SessionLifetimeGuardTest {
                 .hasMessageContaining("COURTSIDE_SESSION_INACTIVITY_TIMEOUT");
     }
 
+    // Spring Session reads a negative interval as one that never expires, so such a window is not a
+    // strict setting but the inactivity bound switched off without saying so.
+    @Test
+    void givenAnInactivityWindowThatNeverExpires_whenTheApplicationStarts_thenItRefuses() {
+        // when / then
+        assertThatThrownBy(() -> guard(Duration.ofSeconds(-1), Duration.ofHours(24)).afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("COURTSIDE_SESSION_INACTIVITY_TIMEOUT");
+    }
+
+    @Test
+    void givenAnInactivityWindowBelowTheFloor_whenTheApplicationStarts_thenItRefuses() {
+        // when / then — the absolute bound is held to a minute at its shortest, and the window a
+        // member actually notices is not held to less
+        assertThatThrownBy(() -> guard(Duration.ofSeconds(30), Duration.ofHours(24)).afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("COURTSIDE_SESSION_INACTIVITY_TIMEOUT");
+    }
+
     private SessionLifetimeGuard guard(Duration inactivity, Duration absolute) {
         SessionProperties properties = new SessionProperties();
         properties.setTimeout(inactivity);
