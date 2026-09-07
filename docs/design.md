@@ -1491,9 +1491,11 @@ whether it is built or designed. **Designed means absent today.**
   holds no certificate, and it refuses to start when the connection URL carries an argument that
   would override it — the driver lets a URL argument beat the pool's own property, so
   `?sslmode=disable` would otherwise connect in plaintext with verification configured and say
-  nothing. An unknown, expired or wrong-name certificate is reported as a sentence naming which of
-  the three it was rather than a stack trace. A replaced authority decides the next connection the
-  pool opens, and one that no longer vouches for the database refuses rather than falling back.
+  nothing. An unknown, expired or wrong-name certificate is reported at startup as a sentence
+  naming which of the three it was rather than a stack trace; a certificate that expires while the
+  instance runs is not diagnosed that way and surfaces as the driver's own error. A replaced
+  authority decides the next connection the pool opens, and one that no longer vouches for the
+  database refuses rather than falling back.
   Courtside ships no authority and issues no production key material: issuance, storage, lifetime,
   renewal and revocation are the operator's.
 - **The default database connection is still unverified.** *Accepted, not closed.* `prefer` is what

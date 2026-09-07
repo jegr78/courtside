@@ -5,6 +5,16 @@ import org.courtside.TestPostgres;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.Banner;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.boot.diagnostics.FailureAnalysis;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -18,10 +28,14 @@ import java.sql.SQLException;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
+@ExtendWith(OutputCaptureExtension.class)
 class DatabaseTlsTransportTest {
+
+    private static Path anchorTheApplicationStartsWith;
 
     private static TestCertificate served;
     private static PostgreSQLContainer database;
@@ -169,6 +183,29 @@ class DatabaseTlsTransportTest {
         }
     }
 
+    // Boot resolves this analyzer's constructor argument itself and skips an analyzer it cannot
+    // build, silently, so only a real start proves the diagnosis reaches an operator at all.
+    @Test
+    void givenAnAuthorityThatDoesNotVouch_whenTheApplicationStarts_thenTheReportSaysSo(
+            CapturedOutput output) throws Exception {
+        // given
+        anchorTheApplicationStartsWith = anchor(TestCertificate.issuedFor("localhost").authority());
+
+        // when
+        Throwable failure = catchThrowable(() -> new SpringApplicationBuilder(ConnectingPool.class)
+                .web(WebApplicationType.NONE)
+                .bannerMode(Banner.Mode.OFF)
+                .run("--courtside.database.tls.mode=verify-full",
+                        "--courtside.database.tls.root-certificate="
+                                + anchorTheApplicationStartsWith));
+
+        // then
+        assertThat(failure).isNotNull();
+        assertThat(output.getOut())
+                .contains("APPLICATION FAILED TO START")
+                .contains("does not vouch for the certificate the database served");
+    }
+
     private static HikariDataSource pool(String url) {
         HikariDataSource dataSource = new HikariDataSource();
         dataSource.setJdbcUrl(url);
@@ -196,5 +233,22 @@ class DatabaseTlsTransportTest {
 
     private static Path anchor(String authority) throws Exception {
         return Files.writeString(Files.createTempFile("courtside-anchor-", ".pem"), authority);
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @Import(DatabaseTlsConfiguration.class)
+    static class ConnectingPool {
+
+        @Bean
+        HikariDataSource pool() {
+            return DatabaseTlsTransportTest.pool(database.getJdbcUrl());
+        }
+
+        // The pool opens nothing until something asks it to, and a start that never connects
+        // proves nothing about what a failed connection reports.
+        @Bean
+        InitializingBean reachTheDatabase(HikariDataSource pool) {
+            return () -> pool.getConnection().close();
+        }
     }
 }

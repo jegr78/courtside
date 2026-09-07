@@ -533,11 +533,15 @@ database serving one are separate decisions.
 ### Requiring a verified connection
 
 `compose.database-tls.yaml` mounts your authority into the application read-only and pins the mode.
-Name the file in `.env`:
+Name the directory that holds it in `.env`, and call the file inside it `authority.pem`:
 
 ```
-COURTSIDE_DB_TLS_AUTHORITY=/srv/courtside/tls/authority.pem
+COURTSIDE_DB_TLS_AUTHORITY=/srv/courtside/tls
 ```
+
+A directory rather than the file itself, because a bind mount of a single file pins the inode it had
+when the container started: renewal that writes a new file and renames it over the old one — which
+is what most renewal does — would leave the container reading the file it first saw.
 
 ```bash
 docker compose -f compose.yaml -f compose.database-tls.yaml up -d
@@ -569,10 +573,14 @@ to read it.
 
 ### Renewal
 
-Replacing the authority file takes effect for the next connection the pool opens, without a restart;
-connections already open keep running until the pool recycles them. A refusal after a replacement is
-a refusal, never a fallback to plaintext. Replacing the database's own certificate and key means
-restarting the `db` service, because the server reads them once at start.
+Replacing `authority.pem` inside that directory takes effect for the next connection the pool opens,
+without a restart; connections already open keep running until the pool recycles them. A refusal
+after a replacement is a refusal, never a fallback to plaintext. Replacing the database's own
+certificate and key means restarting the `db` service, because the server reads them once at start.
+
+A certificate that expires while the instance is running is not diagnosed the way one that is wrong
+at startup is: the sentences below are written when the application starts, and a pool that later
+fails to reconnect reports the driver's own error in the log.
 
 ## Environment variables
 
@@ -585,7 +593,7 @@ default.
 | `POSTGRES_PASSWORD` | *required* | Database password, used only between the containers. |
 | `COURTSIDE_DB_LOCK_TIMEOUT` | `5s` | Maximum time a database operation waits for a conflicting row or advisory lock. A refusal is returned as a retryable `503`; increase this only after diagnosing legitimate contention. Accepted range: `1s` to `1m`. |
 | `COURTSIDE_DB_TLS_MODE` | `prefer` | What the connection to PostgreSQL guarantees: `prefer`, `disable` or `verify-full`. See *Encrypting the connection to the database*. |
-| `COURTSIDE_DB_TLS_AUTHORITY` | *required with `compose.database-tls.yaml`* | Host path to the certificate authority that issued the database's certificate. |
+| `COURTSIDE_DB_TLS_AUTHORITY` | *required with `compose.database-tls.yaml`* | Host directory holding `authority.pem`, the certificate authority that issued the database's certificate. |
 | `COURTSIDE_DB_TLS_CERTIFICATE` | *required with `compose.database-tls-local.yaml`* | Host path to the certificate this deployment's own database serves. Its subject alternative name has to include `DNS:db`. |
 | `COURTSIDE_DB_TLS_KEY` | *required with `compose.database-tls-local.yaml`* | Host path to the private key belonging to that certificate. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` | *required on an empty account table* | Username of the first local administrator. |
