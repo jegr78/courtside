@@ -34,7 +34,6 @@ class SecurityConfigurationTest {
         // given
         UUID accountId = UUID.randomUUID();
         UserAccountRepository accounts = mock(UserAccountRepository.class);
-        ProblemDetailAuthenticationEntryPoint entryPoint = mock(ProblemDetailAuthenticationEntryPoint.class);
         FilterChain chain = mock(FilterChain.class);
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -45,13 +44,14 @@ class SecurityConfigurationTest {
         when(accounts.findSecurityEpochById(accountId)).thenReturn(Optional.of(2L));
 
         // when
-        new SecurityEpochFilter(accounts, entryPoint).doFilter(request, response, chain);
+        new SecurityEpochFilter(accounts).doFilter(request, response, chain);
 
         // then
         assertThat(request.getSession(false)).isNull();
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        verify(entryPoint).commence(request, response, null);
-        verifyNoInteractions(chain);
+        // The request carries on without authority: what needs it is refused by the layer that
+        // refuses every unauthenticated request, and the sign-in that replaces the session is not.
+        verify(chain).doFilter(request, response);
     }
 
     @Test

@@ -55,7 +55,8 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
     try {
       await api.logout();
     } catch (rejected) {
-      // A session the instance has already ended refuses the request that would have ended it.
+      // A missing or stale CSRF token is refused before the sign-out is reached; an ended session
+      // is not, because ending one that is already over is what was asked for.
       if (!(rejected instanceof ApiError) || rejected.status !== 401) {
         report(raisedDuring, problemMessage(rejected, t));
         return;

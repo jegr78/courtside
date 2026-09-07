@@ -28,7 +28,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
-        LoginProtectionProperties.class})
+        LoginProtectionProperties.class, SessionLifetimeProperties.class})
 public class SecurityConfiguration {
 
     // OWASP's Argon2id minimum; the login filter limits how often a caller can incur this cost.
@@ -59,6 +59,7 @@ public class SecurityConfiguration {
             LoginVerificationCapacity loginVerificationCapacity,
             LoginRateLimitHandler loginRateLimitHandler,
             UserAccountRepository accounts,
+            SessionLifetimeProperties sessionLifetime,
             @Value("${courtside.performance.telemetry-enabled:false}") boolean performanceTelemetryEnabled,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
             throws Exception {
@@ -132,8 +133,15 @@ public class SecurityConfiguration {
                 .addFilterBefore(new LoginAttemptFilter(loginEndpoint(), loginAttemptProtection,
                         loginVerificationCapacity, loginRateLimitHandler),
                         UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(new SecurityEpochFilter(accounts, authenticationEntryPoint),
+                // The default only changes the session id, which keeps the creation time the absolute
+                // lifetime counts from, so a second member on a shared browser inherits the first's.
+                .sessionManagement(session -> session.sessionFixation(fixation -> fixation.migrateSession()))
+                .addFilterAfter(new SecurityEpochFilter(accounts),
                         SecurityContextHolderFilter.class)
+                // Anchored behind the epoch filter: two filters sharing one anchor are ordered by
+                // nothing but the order they were added here.
+                .addFilterAfter(new AbsoluteSessionLifetimeFilter(sessionLifetime.absoluteLifetime()),
+                        SecurityEpochFilter.class)
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")
                         .logoutSuccessHandler((request, response, authentication) ->

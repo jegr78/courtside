@@ -77,19 +77,25 @@ class SignOutTest extends AbstractIntegrationTest {
         assertThat(result.getRequest().getSession(false)).isNull();
     }
 
+    // The status alone proves nothing: this endpoint answers 204 whoever ends the session, so what
+    // the revoked case has to show is the ended session and that no replacement was started.
     @Test
-    void givenARevokedSession_whenItSignsOut_thenTheRefusalNamesUnauthenticated() throws Exception {
+    void givenARevokedSession_whenItSignsOut_thenItIsAnsweredLikeAnyOtherSignOut() throws Exception {
         // given
         UserAccount jane = enabledAccount("Jane", "Doe", "doe.jane");
         MockHttpSession session = signIn("doe.jane");
         jane.disable();
         accounts.saveAndFlush(jane);
 
-        // when / then
-        mockMvc.perform(post("/api/session/logout").session(session).with(csrf()))
-                .andExpect(status().isUnauthorized())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.type").value(UNAUTHENTICATED));
+        // when
+        MvcResult result = mockMvc.perform(post("/api/session/logout").session(session).with(csrf()))
+                .andExpect(status().isNoContent())
+                .andReturn();
+
+        // then
+        assertThat(result.getResponse().getContentAsString()).isEmpty();
+        assertThat(session.isInvalid()).isTrue();
+        assertThat(result.getRequest().getSession(false)).isNull();
     }
 
     private UserAccount enabledAccount(String firstName, String lastName, String username) {

@@ -1465,14 +1465,31 @@ whether it is built or designed. **Designed means absent today.**
   limiting (below) counts every attempt before the password is checked, instance-wide as well as per
   address. The population shrinks on its own, since each sign-in removes one account from it.
 - **Sessions:** server-side via Spring Session in the database, delivered as an
-  `HttpOnly` / `Secure` / `SameSite=Lax` cookie. **No JWT** — the PWA and API share an
+  `HttpOnly` / `Secure` / `SameSite=Lax` cookie. Two expiries bound one, and they are different
+  promises: an inactivity window of 30 minutes that every request restarts, and an absolute lifetime
+  of 24 hours counted from when the session began, which activity does not extend. Both are the
+  deployment's to set, both are stated rather than inherited from a framework default that can move,
+  and an absolute lifetime shorter than the inactivity window is refused at startup because the
+  window could then never be reached. The absolute one is counted from the creation time stored with
+  the session, so restarting the application does not hand a live session a fresh lifetime,
+  and signing in starts a session of its own so that a browser two members share hands the
+  second of them a full lifetime rather than what the first had left. Reaching
+  the absolute bound ends the session and nothing more — the request carries on without authority,
+  so what needed it is refused the way every unauthenticated request is, and signing in again is not
+  something an expired session stands in the way of; past the inactivity bound there is nothing left
+  to end, because the store no longer returns the session at all. *Built.*
+  **No JWT** — the PWA and API share an
   origin, so no token gymnastics are needed, and an admin can terminate a session
   immediately, which JWT cannot do. A role, membership or account-status change must terminate
   that account's active sessions in the same operation — a role or an account status because
   cached authorities must not outlive the change, a membership because what its holder may book
   changes with it and neither direction of that change is harmless. Every path that ends an
   account's sessions deletes the stored rows and raises a persisted account security epoch, and the
-  epoch is what carries the guarantee where the deletion cannot reach: a request already in flight
+  epoch is what ends a session the deletion could not reach. Ending it is all that happens: the
+  request then carries no authority and is answered by whatever handles it without one, so the
+  status endpoint reports nobody signed in, a sign-out is already done, and the sign-in that would
+  replace the session is not the thing that gets refused. The guarantee reaches where the deletion
+  cannot: a request already in flight
   saves its session again afterwards, and a store that refuses the deletion must not fail the
   operation that revoked the session. A session created before the change fails closed either way.
   *Built.* The roster is the admin surface for it:

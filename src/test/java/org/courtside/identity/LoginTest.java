@@ -170,10 +170,11 @@ class LoginTest extends AbstractIntegrationTest {
                 .param("username", "doe.jane")
                 .update();
 
-        // when / then
+        // when / then — the status endpoint answers what it is for, and the document declares no
+        // other answer for it: the session is gone, so it reports nobody signed in
         mockMvc.perform(get("/api/session").session(session))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(false));
     }
 
     @Test

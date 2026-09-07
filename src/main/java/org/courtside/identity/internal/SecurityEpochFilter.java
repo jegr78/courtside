@@ -16,7 +16,6 @@ import java.io.IOException;
 class SecurityEpochFilter extends OncePerRequestFilter {
 
     private final UserAccountRepository accounts;
-    private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -30,9 +29,8 @@ class SecurityEpochFilter extends OncePerRequestFilter {
                 request.getSession(false).invalidate();
             }
             SecurityContextHolder.clearContext();
-            authenticationEntryPoint.commence(request, response, null);
-            return;
         }
+        // Carried on rather than answered here: this request may be the sign-in that replaces it.
         filterChain.doFilter(request, response);
     }
 }
