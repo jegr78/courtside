@@ -122,8 +122,10 @@ the category procedure is incomplete.
 
 - Prerequisites: qualified image, reference proxy, TLS evidence and an explicitly authorized origin.
 - Steps: inspect protocol versions, certificate chain, redirects, host handling, cache boundaries,
-  proxy normalization and service exposure; compare direct-container and proxied behavior; perform
-  passive production checks only when the assessment record names the production origin.
+  proxy normalization and service exposure; where the database transport is configured to verify,
+  confirm the connection is encrypted and that a certificate the configured authority does not
+  vouch for is refused rather than downgraded; compare direct-container and proxied behavior;
+  perform passive production checks only when the assessment record names the production origin.
 - Expected secure outcome: one canonical HTTPS boundary protects traffic and metadata, internal
   services remain unreachable, and ambiguous proxy interpretation fails closed.
 
