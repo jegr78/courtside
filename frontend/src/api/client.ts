@@ -182,9 +182,10 @@ async function reissuedCsrfToken(): Promise<string | undefined> {
 }
 
 function csrfToken(): string | undefined {
+  const name = location.protocol === "https:" ? "__Host-XSRF-TOKEN" : "XSRF-TOKEN";
   const cookie = document.cookie.split("; ")
-    .find((entry) => entry.startsWith("XSRF-TOKEN="));
-  return cookie ? decodeURIComponent(cookie.substring("XSRF-TOKEN=".length)) : undefined;
+    .find((entry) => entry.startsWith(`${name}=`));
+  return cookie ? decodeURIComponent(cookie.substring(name.length + 1)) : undefined;
 }
 
 export const api = {

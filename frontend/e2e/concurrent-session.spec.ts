@@ -46,7 +46,8 @@ async function slot(service: JourneyService): Promise<{ startsAt: string; endsAt
 
 async function createBooking(page: Page, body: object, key: string) {
   return page.evaluate(async ({ booking, idempotencyKey }) => {
-    const token = document.cookie.split("; ").find((cookie) => cookie.startsWith("XSRF-TOKEN="))?.split("=")[1];
+    const token = document.cookie.split("; ")
+      .find((cookie) => cookie.startsWith("__Host-XSRF-TOKEN="))?.split("=")[1];
     const response = await fetch("/api/bookings", {
       method: "POST",
       headers: {
@@ -62,7 +63,8 @@ async function createBooking(page: Page, body: object, key: string) {
 
 async function mutation(page: Page, path: string, method: "DELETE" | "POST", body?: object) {
   return page.evaluate(async ({ requestPath, requestMethod, requestBody }) => {
-    const token = document.cookie.split("; ").find((cookie) => cookie.startsWith("XSRF-TOKEN="))?.split("=")[1];
+    const token = document.cookie.split("; ")
+      .find((cookie) => cookie.startsWith("__Host-XSRF-TOKEN="))?.split("=")[1];
     const response = await fetch(requestPath, {
       method: requestMethod,
       headers: {
@@ -321,15 +323,16 @@ test("logout invalidates every tab and browser history reveals no personal view"
   const context = await journeyContext(pinnedBrowser);
   const first = await context.newPage();
   await context.addCookies([{
-    name: "SESSION", value: "attacker-fixed-session", url: journeyService.baseURL
+    name: "__Host-SESSION", value: "attacker-fixed-session", url: journeyService.baseURL,
+    secure: true
   }]);
   await first.goto(`${journeyService.baseURL}/login`);
   await first.getByTestId("username").fill("doe.jane");
   await first.getByTestId("password").fill("temporary-password");
   await first.getByTestId("login-submit").click();
   await expect(first.getByTestId("court-plan-view")).toBeVisible();
-  const authenticatedSession = (await context.cookies()).find((cookie) => cookie.name === "SESSION")?.value;
-  const authenticatedCsrf = (await context.cookies()).find((cookie) => cookie.name === "XSRF-TOKEN")?.value;
+  const authenticatedSession = (await context.cookies()).find((cookie) => cookie.name === "__Host-SESSION")?.value;
+  const authenticatedCsrf = (await context.cookies()).find((cookie) => cookie.name === "__Host-XSRF-TOKEN")?.value;
   const second = await context.newPage();
   await second.goto(`${journeyService.baseURL}/my-bookings`);
   await expect(second.getByTestId("my-bookings-page")).toBeVisible();
@@ -349,9 +352,9 @@ test("logout invalidates every tab and browser history reveals no personal view"
   expect(authenticatedSession).not.toBe("attacker-fixed-session");
   await expect(second.getByTestId("login-view")).toBeVisible();
   await expect(second.getByTestId("my-bookings-page")).not.toBeVisible();
-  expect((await context.cookies()).some((cookie) => cookie.name === "SESSION")).toBe(false);
+  expect((await context.cookies()).some((cookie) => cookie.name === "__Host-SESSION")).toBe(false);
   await expect.poll(async () => {
-    const anonymousCsrf = (await context.cookies()).find((cookie) => cookie.name === "XSRF-TOKEN")?.value;
+    const anonymousCsrf = (await context.cookies()).find((cookie) => cookie.name === "__Host-XSRF-TOKEN")?.value;
     return Boolean(anonymousCsrf && anonymousCsrf !== authenticatedCsrf);
   }).toBe(true);
   await context.close();

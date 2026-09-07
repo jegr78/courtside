@@ -184,13 +184,17 @@ test("given the ASVS 5 inventory, when assigning manual controls, then each chap
     ["13", "MAN-OPS-001"], ["14", "MAN-DATA-001"], ["15", "MAN-ARCH-001"],
     ["16", "MAN-OPS-001"], ["17", "MAN-COMMS-001"]
   ]);
+  const procedureByControl = new Map([
+    ["v5.0.0-4.1.2", "MAN-COMMS-001"]
+  ]);
   const controls = catalog.controlCoverage.flatMap(({ controls: entries }) => entries)
     .filter(({ id, manualProcedureId }) => id.startsWith("v5.0.0-") && manualProcedureId);
 
   // when / then
   for (const control of controls) {
     const chapter = control.id.slice("v5.0.0-".length).split(".")[0];
-    assert.equal(control.manualProcedureId, procedureByChapter.get(chapter), control.id);
+    assert.equal(control.manualProcedureId,
+      procedureByControl.get(control.id) ?? procedureByChapter.get(chapter), control.id);
   }
 });
 

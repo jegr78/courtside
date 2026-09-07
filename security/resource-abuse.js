@@ -48,7 +48,7 @@ export function setup() {
 
 function csrf(response) {
   captureCookies(response, sessionCookies);
-  const cookie = sessionCookies["XSRF-TOKEN"];
+  const cookie = sessionCookies["__Host-XSRF-TOKEN"];
   if (cookie) token = decodeURIComponent(cookie);
   return token;
 }
@@ -111,7 +111,7 @@ function failedLogin() {
   if (!failedToken) {
     const session = http.get(`${target}/api/session`);
     captureCookies(session, failedSessionCookies);
-    failedToken = decodeURIComponent(failedSessionCookies["XSRF-TOKEN"]);
+    failedToken = decodeURIComponent(failedSessionCookies["__Host-XSRF-TOKEN"]);
   }
   const response = http.post(`${target}/api/session`,
     `username=security.member.${(__VU % 3) + 1}&password=${encodeURIComponent(`${password}-wrong`)}`, {

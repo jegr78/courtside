@@ -24,11 +24,12 @@ event types and normalized CSP events, never storage or cookie values, response 
 credentials. Security journeys disable Playwright traces and screenshots. The build uploads only
 the two evidence documents after each has passed its closed JSON Schema.
 
-The shared browser world deliberately lowers the cookie `Secure` attribute because it also proves
-the documented plain-HTTP client boundary. It still inventories cookie names and the `HttpOnly`,
-`SameSite` and path attributes without retaining values. The default `Secure=true` contract is
-proved by the backend cookie test and by the passive SECURITY/UAT deployment checks; this browser
-journey does not replace or weaken those gates.
+The shared browser world runs Chromium and WebKit through its trusted TLS proxy. Both engines must
+accept `__Host-SESSION` and `__Host-XSRF-TOKEN`, complete login and a mutation, clear the cookies on
+logout and recover from expiry. The periodic Firefox header smoke remains on the plain origin
+because its remote process has a separate certificate store. Backend tests, local development and
+the restore and upgrade smokes prove the explicit unprefixed HTTP cookie policy. Evidence retains
+cookie names and `Secure`, `HttpOnly`, `SameSite` and path attributes without retaining values.
 
 The installed-PWA compatibility journey uses the trusted TLS origin in Chromium and WebKit. It
 proves service-worker registration, sign-in, an authenticated mutation and logout. Chromium alone
@@ -36,10 +37,11 @@ runs the offline navigation and worker-update lifecycle because WebKit's remote 
 does not complete the cached offline navigation reliably enough for a merge gate.
 
 A separate CSP probe creates a blocked inline script and requires an attributable
-`securitypolicyviolation` event. Chromium runs the complete projection, storage, cache and CSP
-suite. WebKit runs the CSP/clickjacking header smoke on every pull request; Firefox runs the same
-smoke in the periodic browser qualification. The existing service-worker transition journey also
-rechecks the CSP and API-cache boundary after activating the updated worker.
+`securitypolicyviolation` event. The Chromium and WebKit smoke also inserts a hostile `<base>` and
+proves that `base-uri 'none'` keeps a relative link on the Courtside origin. Chromium runs the
+complete projection, storage, cache and CSP suite. Firefox runs the header smoke in the periodic
+browser qualification. The existing service-worker transition journey also rechecks the CSP and
+API-cache boundary after activating the updated worker.
 `security/browser-rendering-contexts.json` is the maintained inventory of club-controlled browser
 contexts. Its policy test requires every entry to have a matching journey assertion.
 

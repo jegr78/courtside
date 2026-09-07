@@ -133,18 +133,22 @@ components:
     sessionCookie:
       type: apiKey
       in: cookie
-      name: SESSION
+      name: __Host-SESSION
       description: |
         A server-side session, established by `POST /api/session`. Deliberately not a JWT: the
         club's own frontend and the API share an origin, and an admin must be able to end a
-        session immediately, which a self-contained token cannot offer.
+        session immediately, which a self-contained token cannot offer. HTTPS uses the
+        host-bound `__Host-SESSION` name. The explicit local HTTP development policy uses
+        `SESSION`, because browsers reject `__Host-` cookies without `Secure`.
     csrfToken:
       type: apiKey
       in: header
       name: X-XSRF-TOKEN
       description: |
-        Required on every state-changing request. Any `GET` issues a readable `XSRF-TOKEN` cookie;
-        echo its value in this header. Modelled as a security scheme rather than as a header
+        Required on every state-changing request. Over HTTPS, any `GET` issues a readable
+        `__Host-XSRF-TOKEN` cookie; echo its value in this header. The explicit local HTTP
+        development policy uses the unprefixed `XSRF-TOKEN` name because browsers reject
+        `__Host-` cookies without `Secure`. Modelled as a security scheme rather than as a header
         parameter because it is consumed before the operation runs and is never part of its input.
 
         A write without it answers `403` carrying `urn:courtside:error:access-denied`, the same
@@ -2253,8 +2257,9 @@ paths:
         Form-encoded, not JSON: this is Spring Security's form login, and the encoding is part of
         the contract rather than an accident.
 
-        A `GET` beforehand issues the readable `XSRF-TOKEN` cookie whose value this request must
-        echo in `X-XSRF-TOKEN`. Without it the answer is `401`, indistinguishable from a wrong
+        A `GET` beforehand issues the readable `__Host-XSRF-TOKEN` cookie whose value this request
+        must echo in `X-XSRF-TOKEN`. Local HTTP development uses the unprefixed cookie name.
+        Without it the answer is `401`, indistinguishable from a wrong
         password — if credentials are certainly right and the answer is `401`, the token is
         missing.
       security:

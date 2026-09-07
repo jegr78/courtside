@@ -1,5 +1,33 @@
-http://localhost:80 {
-	redir https://localhost:9443{uri} permanent
+{
+	auto_https disable_redirects
+}
+
+http://:80 {
+	@browserNavigation {
+		host localhost
+		method GET HEAD
+		path / /courts /login /initial-password /my-bookings /my-messages /admin /admin/* /index.html /assets/* /icon.svg /manifest.webmanifest /sw.js /workbox-*.js
+	}
+	handle @browserNavigation {
+		header {
+			Cache-Control "no-store"
+			Content-Security-Policy "base-uri 'none'"
+			-Server
+			-Via
+		}
+		redir https://localhost:9443{uri} permanent
+	}
+	handle {
+		header {
+			Cache-Control "no-store"
+			Content-Security-Policy "base-uri 'none'"
+			-Location
+			-Server
+			-Set-Cookie
+			-Via
+		}
+		respond "Plain HTTP is not accepted." 400
+	}
 }
 
 https://localhost:443, https://proxy:443 {
@@ -7,6 +35,7 @@ https://localhost:443, https://proxy:443 {
 	encode zstd gzip
 
 	header {
+		+Content-Security-Policy "base-uri 'none'"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin

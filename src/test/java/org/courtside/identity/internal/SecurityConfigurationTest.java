@@ -10,12 +10,14 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.session.web.http.CookieSerializer;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -55,27 +57,35 @@ class SecurityConfigurationTest {
     }
 
     @Test
-    void givenSecureCookiesAreEnabled_whenTheCsrfTokenIsIssued_thenTheCookieIsSecure() {
+    void givenSecureCookiesAreEnabled_whenTheCsrfTokenIsIssued_thenTheCookieIsHostBound() {
         // when
-        Cookie cookie = issueCsrfCookie(true);
+        Cookie cookie = issueCsrfCookie(true, false);
 
         // then
+        assertThat(cookie.getName()).isEqualTo("__Host-XSRF-TOKEN");
         assertThat(cookie.getSecure()).isTrue();
+        assertThat(cookie.getDomain()).isNull();
     }
 
     @Test
     void givenSecureCookiesAreDisabled_whenTheCsrfTokenIsIssued_thenTheCookieIsNotSecure() {
         // when
-        Cookie cookie = issueCsrfCookie(false);
+        Cookie cookie = issueCsrfCookie(false, false);
 
         // then
+        assertThat(cookie.getName()).isEqualTo("XSRF-TOKEN");
         assertThat(cookie.getSecure()).isFalse();
+    }
+
+    @Test
+    void givenAnHttpsRequestInLocalMode_whenTheCsrfTokenIsIssued_thenTheCookieIsHostBound() {
+        assertThat(issueCsrfCookie(false, true).getName()).isEqualTo("__Host-XSRF-TOKEN");
     }
 
     @Test
     void whenTheCsrfTokenIsIssued_thenTheCookieUsesExplicitLaxIsolation() {
         // when
-        Cookie cookie = issueCsrfCookie(true);
+        Cookie cookie = issueCsrfCookie(true, false);
 
         // then
         assertThat(cookie.getAttribute("SameSite")).isEqualTo("Lax");
@@ -83,13 +93,85 @@ class SecurityConfigurationTest {
         assertThat(cookie.getPath()).isEqualTo("/");
     }
 
-    private Cookie issueCsrfCookie(boolean secureCookies) {
+    @Test
+    void givenSecureCookiesAreEnabled_whenTheSessionCookieIsIssued_thenItIsHostBound() {
+        assertThat(issueSessionCookie(true, false))
+                .startsWith("__Host-SESSION=")
+                .contains("; Path=/", "; Secure", "; HttpOnly", "; SameSite=Lax")
+                .doesNotContain("Domain=");
+    }
+
+    @Test
+    void givenAnHttpsRequestInLocalMode_whenTheSessionCookieIsIssued_thenItIsHostBound() {
+        assertThat(issueSessionCookie(false, true)).startsWith("__Host-SESSION=").contains("; Secure");
+    }
+
+    @Test
+    void givenSecureAndLegacySessionCookies_whenTheSecureRequestIsRead_thenOnlyTheHostCookieIsAccepted() {
+        String issuedCookie = issueSessionCookie(true, false);
+        String encodedHostSession = issuedCookie.substring(issuedCookie.indexOf('=') + 1, issuedCookie.indexOf(';'));
+        MockHttpServletRequest request = requestWithCookies(
+                new Cookie("SESSION", "planted-legacy-session"),
+                new Cookie("__Host-SESSION", encodedHostSession));
+
+        assertThat(SecurityConfiguration.sessionCookieSerializer(true).readCookieValues(request))
+                .containsExactly("opaque-session");
+    }
+
+    @Test
+    void givenSecureAndLegacyCsrfCookies_whenTheSecureRequestIsRead_thenOnlyTheHostCookieIsAccepted() {
+        MockHttpServletRequest request = requestWithCookies(
+                new Cookie("XSRF-TOKEN", "planted-legacy-token"),
+                new Cookie("__Host-XSRF-TOKEN", "host-token"));
+
+        assertThat(SecurityConfiguration.csrfTokenRepository(true).loadToken(request).getToken())
+                .isEqualTo("host-token");
+    }
+
+    @Test
+    void givenPlainHttpLocalMode_whenTheSessionCookieIsIssued_thenItUsesTheDevelopmentPolicy() {
+        assertThat(issueSessionCookie(false, false))
+                .startsWith("SESSION=")
+                .contains("; Path=/", "; HttpOnly", "; SameSite=Lax")
+                .doesNotContain("; Secure", "Domain=");
+    }
+
+    @Test
+    void givenProductionIsConfiguredWithoutSecureCookies_whenThePolicyIsValidated_thenStartupIsRefused() {
+        assertThatThrownBy(() -> SecurityConfiguration.validateCookiePolicy(false, "production"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("COURTSIDE_COOKIE_SECURE=false")
+                .hasMessageContaining("non-production");
+    }
+
+    @Test
+    void givenAControlledUatIsConfiguredWithoutSecureCookies_whenThePolicyIsValidated_thenItIsAccepted() {
+        SecurityConfiguration.validateCookiePolicy(false, "UAT");
+    }
+
+    private Cookie issueCsrfCookie(boolean secureCookies, boolean requestSecure) {
         MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSecure(requestSecure);
         MockHttpServletResponse response = new MockHttpServletResponse();
         CsrfTokenRepository repository = SecurityConfiguration.csrfTokenRepository(secureCookies);
 
         repository.saveToken(repository.generateToken(request), request, response);
 
-        return response.getCookie("XSRF-TOKEN");
+        return response.getCookies()[0];
+    }
+
+    private String issueSessionCookie(boolean secureCookies, boolean requestSecure) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setSecure(requestSecure);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        CookieSerializer serializer = SecurityConfiguration.sessionCookieSerializer(secureCookies);
+        serializer.writeCookieValue(new CookieSerializer.CookieValue(request, response, "opaque-session"));
+        return response.getHeader("Set-Cookie");
+    }
+
+    private MockHttpServletRequest requestWithCookies(Cookie... cookies) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setCookies(cookies);
+        return request;
     }
 }

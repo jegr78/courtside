@@ -143,20 +143,22 @@ test("given session cookies, when rotating and expiring them, then the request j
   const jar = new SecurityCookieJar();
 
   // when
-  jar.update(["SESSION=first; Path=/; Secure; HttpOnly", "XSRF-TOKEN=one%20two; Path=/; Secure"]);
-  jar.update(["SESSION=second; Path=/; Secure; HttpOnly"]);
+  jar.update(["__Host-SESSION=first; Path=/; Secure; HttpOnly", "__Host-XSRF-TOKEN=one%20two; Path=/; Secure"]);
+  jar.update(["__Host-SESSION=second; Path=/; Secure; HttpOnly"]);
 
   // then
-  assert.equal(jar.header(), "SESSION=second; XSRF-TOKEN=one%20two");
+  assert.equal(jar.header(), "__Host-SESSION=second; __Host-XSRF-TOKEN=one%20two");
   assert.equal(jar.csrfToken(), "one two");
-  jar.update(["SESSION=; Max-Age=0; Path=/"]);
-  assert.equal(jar.header(), "XSRF-TOKEN=one%20two");
+  jar.update(["__Host-SESSION=; Max-Age=0; Path=/"]);
+  assert.equal(jar.header(), "__Host-XSRF-TOKEN=one%20two");
 });
 
 test("given host and legacy CSRF cookies, when reading the token, then the host-bound value wins", () => {
   // given
   const hostOnly = new SecurityCookieJar();
   hostOnly.update(["__Host-XSRF-TOKEN=host%20only; Path=/; Secure"]);
+  const legacyOnly = new SecurityCookieJar();
+  legacyOnly.update(["XSRF-TOKEN=legacy-only; Path=/; Secure"]);
   const collision = new SecurityCookieJar();
   collision.update([
     "XSRF-TOKEN=planted-legacy; Path=/; Secure",
@@ -165,6 +167,7 @@ test("given host and legacy CSRF cookies, when reading the token, then the host-
 
   // when / then
   assert.equal(hostOnly.csrfToken(), "host only");
+  assert.equal(legacyOnly.csrfToken(), undefined);
   assert.equal(collision.csrfToken(), "trusted-host");
 });
 

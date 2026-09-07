@@ -74,8 +74,10 @@ change that day's opening hours rather than booking around them.
 
 The court's non-overlap constraint binds everyone too, and lives in the database.
 
-Then log in. CSRF protection is on, so the token has to be fetched before it can be sent back:
-any GET issues the readable `XSRF-TOKEN` cookie, and the login POST echoes it in the
+Then log in. CSRF protection is on, so the token has to be fetched before it can be sent back.
+The local development command uses the explicit HTTP-only `XSRF-TOKEN` and `SESSION` names shown
+below. The HTTPS reference and UAT deployments instead issue host-bound `__Host-XSRF-TOKEN` and
+`__Host-SESSION` cookies. In both cases the login POST echoes the readable CSRF value in the
 `X-XSRF-TOKEN` header.
 
 ```bash
@@ -88,7 +90,7 @@ curl -i -b cookies.txt -c cookies.txt \
   -d 'username=admin' -d 'password=your-password'
 ```
 
-`200` with a `SESSION` cookie and the header
+For this local HTTP flow, `200` with a `SESSION` cookie and the header
 `X-Courtside-Password-Change-Required: true` means it worked. That session can only replace the
 one-time password or log out:
 

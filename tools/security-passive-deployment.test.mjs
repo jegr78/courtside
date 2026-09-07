@@ -45,7 +45,7 @@ test("given the public response boundary, when CSP or proxy disclosure is broade
   const headers = new Map([
     ["content-security-policy", "default-src 'self'; object-src 'none'; img-src 'self' https:; "
       + "style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; "
-      + "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"],
+      + "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"],
     ["x-content-type-options", "nosniff"], ["x-frame-options", "DENY"],
     ["referrer-policy", "strict-origin-when-cross-origin"],
     ["permissions-policy", "geolocation=(), camera=(), microphone=()"]
@@ -56,6 +56,10 @@ test("given the public response boundary, when CSP or proxy disclosure is broade
   assert.deepEqual(evaluatePublicResponseHeaders(response), {
     passed: true, observation: "security-and-cache-headers-valid"
   });
+  assert.deepEqual(evaluatePublicResponseHeaders({ ...response,
+    headers: new Map([...headers, ["content-security-policy",
+      `${headers.get("content-security-policy")}, base-uri 'none'`]])
+  }), { passed: true, observation: "security-and-cache-headers-valid" });
   assert.deepEqual(evaluatePublicResponseHeaders({ ...response,
     headers: new Map([...headers, ["via", "1.1 Caddy"]])
   }), { passed: false, observation: "proxy-implementation-disclosed" });
@@ -108,12 +112,12 @@ test("given ZAP output on separate routes, when normalizing it, then safe route 
   // given
   const report = { site: [{ alerts: [{ pluginid: "10010", riskcode: "1", confidence: "2",
     instances: [
-      { uri: `${passiveScannerOrigin}/api/source`, method: "GET", param: "XSRF-TOKEN",
-        evidence: "Set-Cookie: XSRF-TOKEN", otherinfo: "" },
-      { uri: `${passiveScannerOrigin}/api/source`, method: "GET", param: "XSRF-TOKEN",
-        evidence: "Set-Cookie: XSRF-TOKEN", otherinfo: "" },
-      { uri: `${passiveScannerOrigin}/assets/index-a1b2c3.js`, method: "GET", param: "XSRF-TOKEN",
-        evidence: "Set-Cookie: XSRF-TOKEN", otherinfo: "" }
+      { uri: `${passiveScannerOrigin}/api/source`, method: "GET", param: "__Host-XSRF-TOKEN",
+        evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" },
+      { uri: `${passiveScannerOrigin}/api/source`, method: "GET", param: "__Host-XSRF-TOKEN",
+        evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" },
+      { uri: `${passiveScannerOrigin}/assets/index-a1b2c3.js`, method: "GET", param: "__Host-XSRF-TOKEN",
+        evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }
     ] }] }] };
 
   // when
@@ -128,7 +132,7 @@ test("given ZAP output on separate routes, when normalizing it, then safe route 
   ]);
   assert.match(alerts[0].fingerprint, /^sha256:[a-f0-9]{64}$/);
   assert.notEqual(alerts[0].fingerprint, alerts[1].fingerprint);
-  assert.doesNotMatch(JSON.stringify(alerts), /localhost|secret|SESSION/);
+  assert.doesNotMatch(JSON.stringify(alerts), /localhost|secret|__Host-SESSION/);
 });
 
 test("given a suspicious-comment alert, when normalizing it, then only a pattern id and bound location remain", () => {
@@ -258,14 +262,14 @@ test("given the remaining supported passive rules, when normalizing them, then o
   // given
   const report = { site: [{ alerts: [
     { pluginid: "10054", riskcode: "1", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
-      param: "XSRF-TOKEN", evidence: "Set-Cookie: XSRF-TOKEN", otherinfo: "" }] },
+      param: "__Host-XSRF-TOKEN", evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] },
     { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
       param: "Content-Security-Policy", evidence: "policy-value", otherinfo: "Broad directives:\nimg-src" }] },
     { pluginid: "10109", riskcode: "0", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
       param: "", evidence: "<script src=secret>",
       otherinfo: "No links have been found while there are scripts, indicating a modern application." }] },
     { pluginid: "10112", riskcode: "0", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
-      param: "SESSION", evidence: "SESSION", otherinfo: "cookie:SESSION\ncookie:XSRF-TOKEN" }] }
+      param: "__Host-SESSION", evidence: "__Host-SESSION", otherinfo: "cookie:__Host-SESSION\ncookie:__Host-XSRF-TOKEN" }] }
   ] }] };
 
   // when
@@ -284,8 +288,8 @@ test("given the remaining supported passive rules, when normalizing them, then o
 test("given session fields that name different tokens, when normalizing them, then the evidence fails closed", () => {
   // given
   const report = { site: [{ alerts: [{ pluginid: "10112", riskcode: "0", confidence: "2",
-    instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "SESSION", evidence: "SESSION",
-      otherinfo: "cookie:XSRF-TOKEN" }] }] }] };
+    instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "__Host-SESSION", evidence: "__Host-SESSION",
+      otherinfo: "cookie:__Host-XSRF-TOKEN" }] }] }] };
 
   // when / then
   assert.throws(() => normalizeZapAlerts(report), /unsupported rule evidence/);
@@ -337,8 +341,8 @@ test("given a foreign origin or URL credential, when normalizing alerts, then ta
 
 test("given contradictory ratings for one candidate, when normalizing alerts, then one fingerprint cannot mean both", () => {
   // given
-  const instance = { uri: `${passiveScannerOrigin}/api/source`, method: "GET", param: "XSRF-TOKEN",
-    evidence: "Set-Cookie: XSRF-TOKEN", otherinfo: "" };
+  const instance = { uri: `${passiveScannerOrigin}/api/source`, method: "GET", param: "__Host-XSRF-TOKEN",
+    evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" };
   const report = { site: [{ alerts: [
     { pluginid: "10010", riskcode: "1", confidence: "2", instances: [instance] },
     { pluginid: "10010", riskcode: "2", confidence: "3", instances: [instance] }
@@ -354,8 +358,8 @@ test("given an untriaged ZAP candidate, when building evidence, then the assessm
     targetFingerprint: digest, imageDigest: digest,
     observations: passingObservations(),
     zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10010", riskcode: "1",
-      confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "XSRF-TOKEN",
-        evidence: "Set-Cookie: XSRF-TOKEN", otherinfo: "" }] }] }] }, requestCount: 1
+      confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "__Host-XSRF-TOKEN",
+        evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] }] }] }, requestCount: 1
   });
 
   // then
@@ -368,8 +372,8 @@ test("given a forged retained fingerprint, when validating evidence, then its id
   const evidence = buildPassiveDeploymentEvidence({ targetFingerprint: digest, imageDigest: digest,
     observations: passingObservations(), requestCount: 1,
     zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10010", riskcode: "1",
-      confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "XSRF-TOKEN",
-        evidence: "Set-Cookie: XSRF-TOKEN", otherinfo: "" }] }] }] }
+      confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "__Host-XSRF-TOKEN",
+        evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] }] }] }
   });
   evidence.zap.alerts[0].fingerprint = `sha256:${"b".repeat(64)}`;
 
@@ -420,8 +424,8 @@ test("given non-canonical session evidence, when validating it, then equivalent 
   const evidence = buildPassiveDeploymentEvidence({ targetFingerprint: digest, imageDigest: digest,
     observations: passingObservations(), requestCount: 1,
     zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10112", riskcode: "0", confidence: "2",
-      instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "SESSION", evidence: "SESSION",
-        otherinfo: "cookie:SESSION\ncookie:XSRF-TOKEN" }] }] }] }
+      instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "__Host-SESSION", evidence: "__Host-SESSION",
+        otherinfo: "cookie:__Host-SESSION\ncookie:__Host-XSRF-TOKEN" }] }] }] }
   });
   evidence.zap.alerts[0].ruleEvidence.tokenNames.reverse();
 
