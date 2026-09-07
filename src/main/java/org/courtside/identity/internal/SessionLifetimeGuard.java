@@ -14,7 +14,7 @@ class SessionLifetimeGuard implements InitializingBean {
     private static final Duration FLOOR = Duration.ofMinutes(1);
 
     private final SessionProperties inactivity;
-    private final SessionLifetimeProperties lifetime;
+    private final CourtsideSessionProperties session;
 
     @Override
     public void afterPropertiesSet() {
@@ -31,8 +31,8 @@ class SessionLifetimeGuard implements InitializingBean {
                     + ") is shorter than " + FLOOR + ", the floor the absolute lifetime is held to"
                     + " as well; a negative one would not expire at all");
         }
-        if (lifetime.absoluteLifetime().compareTo(timeout) < 0) {
-            throw new IllegalStateException("COURTSIDE_SESSION_ABSOLUTE_LIFETIME (" + lifetime.absoluteLifetime()
+        if (session.absoluteLifetime().compareTo(timeout) < 0) {
+            throw new IllegalStateException("COURTSIDE_SESSION_ABSOLUTE_LIFETIME (" + session.absoluteLifetime()
                     + ") is shorter than COURTSIDE_SESSION_INACTIVITY_TIMEOUT (" + timeout + "), so the"
                     + " inactivity window can never be reached and configuring it would say nothing");
         }
