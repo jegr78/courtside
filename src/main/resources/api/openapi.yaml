@@ -2310,7 +2310,7 @@ paths:
 
         The password is refused with `urn:courtside:error:password-too-guessable` when it appears
         on a public list of common passwords, or when it contains the account's username, the
-        local part of its email address, or the club name. One type answers for all of them, so
+        member's own name, the local part of its email address, or the club name. One type answers for all of them, so
         the response never says which one matched. Nothing else about the password is required:
         any composition, any alphabet and any length from the minimum upwards is accepted.
       security:

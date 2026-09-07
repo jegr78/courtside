@@ -76,7 +76,7 @@ class InitialPasswordServiceTest {
         account.requirePasswordChange();
         when(currentUser.requireAccount()).thenReturn(account);
         doThrow(new GuessablePasswordException())
-                .when(policy).requireUnguessable("q1w2e3r4t5y6", "admin", "admin@localhost.invalid");
+                .when(policy).requireUnguessable("q1w2e3r4t5y6", account);
         InitialPasswordService service =
                 new InitialPasswordService(currentUser, accounts, encoder, sessions, policy);
 

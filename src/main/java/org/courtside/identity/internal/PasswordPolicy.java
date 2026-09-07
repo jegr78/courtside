@@ -2,6 +2,8 @@ package org.courtside.identity.internal;
 
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.config.ClubIdentity;
+import org.courtside.identity.Person;
+import org.courtside.identity.UserAccount;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -34,18 +36,23 @@ class PasswordPolicy {
         log.info("The permanent-password policy holds {} common passwords", common.size());
     }
 
-    void requireUnguessable(String password, String username, String emailAddress) {
+    void requireUnguessable(String password, UserAccount account) {
+        if (password == null) {
+            throw new IllegalStateException("A password reached the policy without being validated");
+        }
         String normalised = password.toLowerCase(Locale.ROOT);
         if (common.contains(normalised)) {
             throw new GuessablePasswordException();
         }
-        if (contextTerms(username, emailAddress).anyMatch(normalised::contains)) {
+        if (contextTerms(account).anyMatch(normalised::contains)) {
             throw new GuessablePasswordException();
         }
     }
 
-    private Stream<String> contextTerms(String username, String emailAddress) {
-        return Stream.of(username, localPart(emailAddress), club.clubName())
+    private Stream<String> contextTerms(UserAccount account) {
+        Person person = account.getPerson();
+        return Stream.of(account.getUsername(), localPart(person.getEmail()),
+                        person.getFirstName(), person.getLastName(), club.clubName())
                 .filter(source -> source != null && !source.isBlank())
                 .flatMap(source -> Stream.concat(Stream.of(source), SEPARATOR.splitAsStream(source)))
                 .map(term -> term.toLowerCase(Locale.ROOT))

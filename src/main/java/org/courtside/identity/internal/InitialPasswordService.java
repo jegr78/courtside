@@ -22,7 +22,7 @@ class InitialPasswordService {
     @Transactional
     void change(String password) {
         UserAccount account = currentUser.requireAccount();
-        policy.requireUnguessable(password, account.getUsername(), account.getPerson().getEmail());
+        policy.requireUnguessable(password, account);
         String passwordHash = passwordEncoder.encode(password);
         if (accounts.changeInitialPassword(account.getId(), passwordHash) != 1) {
             throw new IllegalStateException("The initial password was already changed");

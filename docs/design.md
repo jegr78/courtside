@@ -1458,9 +1458,9 @@ whether it is built or designed. **Designed means absent today.**
 - **What a permanent password may be:** at least twelve characters, and neither on a public list of
   common passwords nor built from something this instance already shows the member. *Built.* The
   list is SecLists' 100,000 most common passwords, pinned by tag and hash in `NOTICE`, refreshed by
-  fetching that path again and comparing the two hashes. The terms are the member's username, the
-  local part of the address their credential was mailed to, and the club name, each taken whole and
-  split on its non-alphanumeric boundaries, with tokens under four characters dropped so a syllable
+  fetching that path again and comparing the two hashes. The terms are the member's username, their
+  first and last name, the local part of the address their credential was mailed to, and the club
+  name, each taken whole and split on its non-alphanumeric boundaries, with tokens under four characters dropped so a syllable
   does not refuse a passphrase. Comparison is case-insensitive, the answer is one refusal for every
   list so it never says which one matched, and nothing about composition, length above the minimum
   or alphabet is required — a 64-character passphrase outside ASCII is a password this accepts.

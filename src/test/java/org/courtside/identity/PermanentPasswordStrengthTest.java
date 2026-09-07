@@ -70,28 +70,12 @@ class PermanentPasswordStrengthTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.violations[0].code").value(CODE));
     }
 
-    @Test
-    void givenAPasswordCarryingTheUsername_whenItIsChosen_thenItIsRefused() throws Exception {
-        // when / then
-        choose("scaffold-major.mary-lattice")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value(REFUSED))
-                .andExpect(jsonPath("$.violations[0].code").value(CODE));
-    }
-
+    // One context term is enough here: this proves the policy hangs on the endpoint and which
+    // type answers. Which source a term came from is PasswordPolicyTest's to separate.
     @Test
     void givenAPasswordCarryingTheClubName_whenItIsChosen_thenItIsRefused() throws Exception {
         // when / then
         choose("lattice-Courtside-scaffold")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value(REFUSED))
-                .andExpect(jsonPath("$.violations[0].code").value(CODE));
-    }
-
-    @Test
-    void givenAPasswordCarryingTheAddressItWasSentTo_whenItIsChosen_thenItIsRefused() throws Exception {
-        // when / then
-        choose("scaffold-mary.major-lattice")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(REFUSED))
                 .andExpect(jsonPath("$.violations[0].code").value(CODE));
