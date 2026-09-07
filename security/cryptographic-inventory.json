@@ -514,10 +514,13 @@
         "sslmode",
         "sslrootcert",
         "root-certificate",
+        "ssl_cert_file",
+        "ssl_key_file",
         "CertificateFactory"
       ],
       "locations": [
         "deploy/compose*.yaml",
+        "deploy/compose.database-tls.yaml",
         "src/main/resources/application.yaml",
         "src/main/java/org/courtside/shared/DatabaseTls.java",
         "src/main/java/org/courtside/shared/DatabaseTls*.java"
