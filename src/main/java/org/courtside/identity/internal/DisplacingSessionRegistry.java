@@ -42,25 +42,27 @@ class DisplacingSessionRegistry<S extends Session> implements SessionRegistry {
             @Override
             public void expireNow() {
                 super.expireNow();
-                sessions.deleteById(getSessionId());
-                record(information.getPrincipal());
+                end(getSessionId(), information.getPrincipal());
             }
         };
     }
 
-    // The displacement is the event that shows a credential in use somewhere the member is not, so
-    // it is recorded — by account, never by username, and never with the session it ended.
-    private void record(Object principal) {
+    // A store that refuses the deletion must not fail the sign-in that caused it, the way section 10
+    // already says of revocation: the bound slides by one and the next sign-in takes it back.
+    private void end(String sessionId, Object principal) {
         try {
+            sessions.deleteById(sessionId);
             accounts.findByUsername(String.valueOf(principal))
                     .ifPresent(account -> log.info(
                             "A sign-in displaced the least recently active session of account {}",
                             account.getId()));
         } catch (RuntimeException failure) {
-            log.warn("A displaced session could not be attributed to an account", failure);
+            log.warn("A displaced session could not be ended", failure);
         }
     }
 
+    // Nothing in this application ever marks a session expired, which is what lets the two
+    // answers below say nothing and what keeps the rewrapped information free of an expiry.
     @Override
     public List<Object> getAllPrincipals() {
         return stored.getAllPrincipals();

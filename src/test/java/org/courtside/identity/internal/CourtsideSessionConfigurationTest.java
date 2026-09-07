@@ -11,21 +11,21 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class SessionLifetimeConfigurationTest {
+class CourtsideSessionConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withUserConfiguration(SessionLifetimeConfiguration.class)
-            .withPropertyValues("spring.session.timeout=30m", "courtside.session.concurrent-limit=5");
+            .withUserConfiguration(SessionConfiguration.class)
+            .withPropertyValues("spring.session.timeout=30m",
+                    "courtside.session.absolute-lifetime=24h", "courtside.session.concurrent-limit=5");
 
     @Test
-    void givenALifetimeInsideItsBounds_whenTheContextStarts_thenItBinds() {
-        // given
-        ApplicationContextRunner runner = contextRunner
-                .withPropertyValues("courtside.session.absolute-lifetime=24h");
-
+    void givenValuesInsideTheirBounds_whenTheContextStarts_thenTheyBind() {
         // when / then
-        runner.run(context -> assertThat(context.getBean(CourtsideSessionProperties.class).absoluteLifetime())
-                .isEqualTo(Duration.ofHours(24)));
+        contextRunner.run(context -> {
+            CourtsideSessionProperties session = context.getBean(CourtsideSessionProperties.class);
+            assertThat(session.absoluteLifetime()).isEqualTo(Duration.ofHours(24));
+            assertThat(session.concurrentLimit()).isEqualTo(5);
+        });
     }
 
     // A value this short ends a session inside the visit that opened it, which is a misconfiguration
@@ -71,11 +71,9 @@ class SessionLifetimeConfigurationTest {
 
     @Test
     void givenAnInactivityWindowThatNeverExpires_whenTheContextStarts_thenItRefusesToStart() {
-        // given — the one value that switches this branch's guarantee off without saying so
-        ApplicationContextRunner runner = new ApplicationContextRunner()
-                .withUserConfiguration(SessionLifetimeConfiguration.class)
-                .withPropertyValues("spring.session.timeout=-1s",
-                        "courtside.session.absolute-lifetime=24h", "courtside.session.concurrent-limit=5");
+        // given — the one value that switches the inactivity bound off without saying so
+        ApplicationContextRunner runner = contextRunner
+                .withPropertyValues("spring.session.timeout=-1s");
 
         // when / then
         runner.run(context -> assertThat(context).getFailure().rootCause()
@@ -83,13 +81,37 @@ class SessionLifetimeConfigurationTest {
                 .hasMessageContaining("COURTSIDE_SESSION_INACTIVITY_TIMEOUT"));
     }
 
+    // Zero would refuse every sign-in, and a limit no account reaches is the policy switched off
+    // while the variable still reads as if it were set.
+    @Test
+    void givenALimitBelowTheFloor_whenTheContextStarts_thenItRefusesToStart() {
+        // given
+        ApplicationContextRunner runner = contextRunner
+                .withPropertyValues("courtside.session.concurrent-limit=0");
+
+        // when / then
+        runner.run(context -> assertThat(context).getFailure().rootCause()
+                .hasMessageContaining("concurrentLimit"));
+    }
+
+    @Test
+    void givenALimitBeyondTheCeiling_whenTheContextStarts_thenItRefusesToStart() {
+        // given
+        ApplicationContextRunner runner = contextRunner
+                .withPropertyValues("courtside.session.concurrent-limit=51");
+
+        // when / then
+        runner.run(context -> assertThat(context).getFailure().rootCause()
+                .hasMessageContaining("concurrentLimit"));
+    }
+
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties({SessionProperties.class, CourtsideSessionProperties.class})
-    static class SessionLifetimeConfiguration {
+    static class SessionConfiguration {
 
         @Bean
-        SessionLifetimeGuard sessionLifetimeGuard(SessionProperties inactivity, CourtsideSessionProperties lifetime) {
-            return new SessionLifetimeGuard(inactivity, lifetime);
+        SessionLifetimeGuard sessionLifetimeGuard(SessionProperties inactivity, CourtsideSessionProperties session) {
+            return new SessionLifetimeGuard(inactivity, session);
         }
     }
 }
