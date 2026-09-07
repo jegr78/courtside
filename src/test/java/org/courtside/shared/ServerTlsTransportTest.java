@@ -156,7 +156,7 @@ class ServerTlsTransportTest {
             throws IOException {
         String caddyfile = """
                 {
-                	auto_https off
+                \tauto_https off
                 }
 
                 %s
@@ -166,7 +166,7 @@ class ServerTlsTransportTest {
                 %s
 
                 http://:80 {
-                	%s
+                \t%s
                 }
                 """.formatted(snippet("applicationHeaders"), dialingTheHost("plaintext", PLAIN_PORT),
                 dialingTheHost("serve", servedPort), theDeploymentsSwitch());
