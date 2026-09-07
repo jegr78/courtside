@@ -11,7 +11,38 @@ const release = readFileSync(join(repository, ".github/workflows/release.yml"), 
 const scheduled = readFileSync(join(repository, ".github/workflows/security-assessment.yml"), "utf8");
 const policy = readFileSync(join(repository, "docs/security-scanning.md"), "utf8");
 const assessment = readFileSync(join(repository, "docs/security-assessment.md"), "utf8");
+const dependabot = readFileSync(join(repository, ".github/dependabot.yml"), "utf8");
+const npmAudit = readFileSync(join(repository, ".github/workflows/npm-audit.yml"), "utf8");
 const runContract = JSON.parse(readFileSync(join(repository, "security/run-contract.json"), "utf8"));
+
+test("given dependency findings, when scheduled and release gates run, then overdue evidence is enforced without hard update pins", () => {
+  // when / then
+  assert.doesNotMatch(dependabot, /\n\s+ignore:/);
+  assert.match(build, /actions\/dependency-review-action@[a-f0-9]{40}/);
+  assert.match(release, /security-events: read|security-events: write/);
+  assert.match(release, /--subject "\$\{\{ github\.sha \}\}"[\s\S]+node tools\/dependency-remediation\.mjs/);
+  assert.match(release, /--current-summary build\/security\/release-build\.json/);
+  assert.match(release, /id: release-security[\s\S]+continue-on-error: true[\s\S]+Require completed release security gates/);
+  assert.match(release, /dependency-remediation[\s\S]+if: always\(\)[\s\S]+build\/security\/dependency-remediation\.json/);
+  assert.match(release, /actions\/artifacts\?per_page=100[\s\S]+gh run download[\s\S]+--previous-evidence/);
+  assert.match(npmAudit, /security-events: read/);
+  assert.match(npmAudit, /node tools\/dependency-remediation\.mjs/);
+  assert.match(npmAudit, /--current-summary build\/security\/npm-audit-summary\.json[\s\S]+--current-summary build\/security\/npm-audit-site-summary\.json/);
+  assert.match(npmAudit, /dependency-remediation-completed-/);
+  assert.match(npmAudit, /id: frontend-security[\s\S]+continue-on-error: true[\s\S]+id: site-security[\s\S]+continue-on-error: true/);
+  assert.match(npmAudit, /id: dependency-remediation[\s\S]+if: always\(\)[\s\S]+DEPENDENCY_REMEDIATION_OUTCOME/);
+});
+
+test("given dependency remediation policy, when maintainers apply it, then clock, deadlines and outage semantics are explicit", () => {
+  // when / then
+  assert.match(policy, /first reliable Dependabot alert/i);
+  assert.match(policy, /24 hours/i);
+  assert.match(policy, /72 hours/i);
+  assert.match(policy, /High[\s\S]+7 days[\s\S]+Medium[\s\S]+30 days[\s\S]+Low[\s\S]+90 days/i);
+  assert.match(policy, /single maintainer/i);
+  assert.match(policy, /unavailable[\s\S]+not[^.]+success/i);
+  assert.match(assessment, /ASVS 15\.1\.1[\s\S]+ASVS 15\.2\.1[\s\S]+immutable/i);
+});
 
 test("given a pull request, when the required build runs, then dependency, source and built Java surfaces are scanned", () => {
   // when / then

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:dependency-remediation-policy:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "source", "deadlinesDays", "urgentCriticalContainmentHours"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "source": { "const": "github-dependabot" },
+    "deadlinesDays": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["critical", "high", "medium", "low"],
+      "properties": {
+        "critical": { "const": 3 },
+        "high": { "const": 7 },
+        "medium": { "const": 30 },
+        "low": { "const": 90 }
+      }
+    },
+    "urgentCriticalContainmentHours": { "const": 24 }
+  }
+}

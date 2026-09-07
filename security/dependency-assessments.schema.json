@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:dependency-assessments:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "assessments"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["identity", "directReachable", "activelyExploited", "rationale", "assessedAt"],
+        "properties": {
+          "identity": { "type": "string", "minLength": 1 },
+          "directReachable": { "type": "boolean" },
+          "activelyExploited": { "type": "boolean" },
+          "rationale": { "type": "string", "minLength": 1 },
+          "assessedAt": { "type": "string", "format": "date-time" },
+          "containedAt": { "type": "string", "format": "date-time" },
+          "remediationPlan": { "type": "string", "pattern": "^#[1-9][0-9]*$" }
+        }
+      }
+    }
+  }
+}

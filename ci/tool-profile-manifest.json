@@ -19,6 +19,8 @@
     { "path": "tools/data-model-documentation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/database-restore.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/database-upgrade.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/dependency-remediation.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/dependency-remediation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/dependency-snapshot.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/dependency-snapshot.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/deployment-documentation.test.mjs", "profiles": ["tooling"], "test": true },

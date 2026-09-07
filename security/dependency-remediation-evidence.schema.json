@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:dependency-remediation-evidence:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "source", "status", "subject", "observedAt", "lastSuccessfulEvidenceAt", "lastSuccessfulEvidenceAgeDays", "releaseReadiness", "findings"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "source": { "const": "github-dependabot" },
+    "status": { "enum": ["completed", "skipped"] },
+    "reason": { "enum": ["network-unavailable", "service-unavailable", "rate-limited"] },
+    "subject": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "observedAt": { "type": "string", "format": "date-time" },
+    "lastSuccessfulEvidenceAt": { "type": ["string", "null"], "format": "date-time" },
+    "lastSuccessfulEvidenceAgeDays": { "type": ["integer", "null"], "minimum": 0 },
+    "releaseReadiness": { "enum": ["ready", "blocked", "unknown"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["identity", "aliases", "affectedVersionRange", "severity", "firstDetectedAt", "remediationDueAt", "remediationState", "containmentDueAt", "containmentState", "disposition", "remediationPlan", "exception"],
+        "properties": {
+          "identity": { "type": "string", "minLength": 1 },
+          "aliases": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "affectedVersionRange": { "type": "string", "minLength": 1 },
+          "severity": { "enum": ["critical", "high", "medium", "low"] },
+          "firstDetectedAt": { "type": "string", "format": "date-time" },
+          "remediationDueAt": { "type": "string", "format": "date-time" },
+          "remediationState": { "enum": ["within-deadline", "due", "overdue"] },
+          "containmentDueAt": { "type": ["string", "null"], "format": "date-time" },
+          "containmentState": { "enum": ["not-required", "contained", "within-deadline", "due", "overdue"] },
+          "disposition": { "enum": ["pending-alert-correlation", "unavailable-upstream-fix", "unplanned-update", "planned-update"] },
+          "remediationPlan": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "string", "pattern": "^#[1-9][0-9]*$" }
+            ]
+          },
+          "exception": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "validUntil"],
+                "properties": {
+                  "id": { "type": "string", "minLength": 1 },
+                  "validUntil": { "type": "string", "format": "date-time" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "completed" } } },
+      "then": {
+        "properties": {
+          "releaseReadiness": { "enum": ["ready", "blocked"] },
+          "lastSuccessfulEvidenceAt": { "type": "string", "format": "date-time" },
+          "lastSuccessfulEvidenceAgeDays": { "const": 0 },
+          "reason": false
+        }
+      },
+      "else": {
+        "required": ["reason"],
+        "properties": {
+          "releaseReadiness": { "enum": ["blocked", "unknown"] }
+        }
+      }
+    }
+  ]
+}

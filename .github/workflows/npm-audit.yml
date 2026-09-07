@@ -6,7 +6,9 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
+  security-events: read
 
 jobs:
   audit:
@@ -17,6 +19,33 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
+      - id: previous-dependency-evidence
+        name: Find the latest successful dependency evidence
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! artifacts=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" --slurp); then
+            echo "::warning::Previous dependency evidence metadata is unavailable"
+            exit 0
+          fi
+          record=$(jq -r --arg branch "$DEFAULT_BRANCH" '[map(.artifacts[])[] | select(.expired == false) |
+            select(.workflow_run.head_branch == $branch) |
+            select(.name | startswith("dependency-remediation-completed-"))] |
+            sort_by(.created_at) | last | if . then "\(.workflow_run.id) \(.name)" else empty end' <<< "$artifacts")
+          if [ -z "$record" ]; then
+            exit 0
+          fi
+          read -r run_id artifact_name <<< "$record"
+          if [[ ! "$run_id" =~ ^[0-9]+$ || ! "$artifact_name" =~ ^dependency-remediation-completed-(ready|blocked)-[0-9]+$ ]]; then
+            echo "::warning::Previous dependency evidence metadata is malformed"
+            exit 0
+          fi
+          mkdir -p build/security/previous-dependency
+          if ! gh run download "$run_id" --name "$artifact_name" --dir build/security/previous-dependency; then
+            echo "::warning::Previous dependency evidence could not be downloaded"
+            rm -rf build/security/previous-dependency
+          fi
       - name: Install the documentation site
         run: npm --prefix site ci
       - name: Capture npm audit evidence
@@ -25,7 +54,9 @@ jobs:
       - name: Capture npm audit evidence for the documentation site
         working-directory: frontend
         run: npm run audit:security -- --output ../build/security/npm-site.json --directory ../site
-      - name: Enforce npm vulnerability policy
+      - id: frontend-security
+        name: Enforce npm vulnerability policy
+        continue-on-error: true
         run: >
           node tools/security-findings.mjs
           --npm build/security/npm.json
@@ -35,7 +66,9 @@ jobs:
           --scope scheduled-npm-audit
           --subject ${{ github.sha }}
           --output build/security/npm-audit-summary.json
-      - name: Enforce npm vulnerability policy for the documentation site
+      - id: site-security
+        name: Enforce npm vulnerability policy for the documentation site
+        continue-on-error: true
         run: >
           node tools/security-findings.mjs
           --npm build/security/npm-site.json
@@ -45,12 +78,44 @@ jobs:
           --scope scheduled-npm-audit-site
           --subject ${{ github.sha }}
           --output build/security/npm-audit-site-summary.json
+      - id: dependency-remediation
+        name: Evaluate dependency remediation deadlines
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          args=(
+            --repository "${{ github.repository }}"
+            --subject "${{ github.sha }}"
+            --current-summary build/security/npm-audit-summary.json
+            --current-summary build/security/npm-audit-site-summary.json
+            --output build/security/dependency-remediation.json
+          )
+          if [ -f build/security/previous-dependency/dependency-remediation.json ]; then
+            args+=(--previous-evidence build/security/previous-dependency/dependency-remediation.json)
+          fi
+          node tools/dependency-remediation.mjs "${args[@]}"
+      - id: dependency-evidence
+        name: Classify retained dependency evidence
+        if: always()
+        run: |
+          test -f build/security/dependency-remediation.json || exit 0
+          echo "status=$(jq -er '.status | select(. == "completed" or . == "skipped")' build/security/dependency-remediation.json)" >> "$GITHUB_OUTPUT"
+          echo "readiness=$(jq -er '.releaseReadiness | select(. == "ready" or . == "blocked" or . == "unknown")' build/security/dependency-remediation.json)" >> "$GITHUB_OUTPUT"
       - name: Require a completed scheduled audit
+        if: always()
+        env:
+          DEPENDENCY_REMEDIATION_OUTCOME: ${{ steps.dependency-remediation.outcome }}
+          FRONTEND_SECURITY_OUTCOME: ${{ steps.frontend-security.outcome }}
+          SITE_SECURITY_OUTCOME: ${{ steps.site-security.outcome }}
         run: |
           jq -e '.evidenceSources[] | select(.scanner == "npm") | .status == "completed"' \
             build/security/npm-audit-summary.json
           jq -e '.evidenceSources[] | select(.scanner == "npm") | .status == "completed"' \
             build/security/npm-audit-site-summary.json
+          test "$FRONTEND_SECURITY_OUTCOME" = success
+          test "$SITE_SECURITY_OUTCOME" = success
+          test "$DEPENDENCY_REMEDIATION_OUTCOME" = success
       - name: Remove raw npm audit reports
         if: always()
         run: rm -f build/security/npm.json build/security/npm-site.json
@@ -63,3 +128,10 @@ jobs:
             build/security/npm-audit-site-summary.json
           retention-days: 14
           if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: dependency-remediation-${{ steps.dependency-evidence.outputs.status }}-${{ steps.dependency-evidence.outputs.readiness }}-${{ github.run_id }}
+          path: build/security/dependency-remediation.json
+          retention-days: 14
+          if-no-files-found: warn

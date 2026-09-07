@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "source": "github-dependabot",
+  "deadlinesDays": {
+    "critical": 3,
+    "high": 7,
+    "medium": 30,
+    "low": 90
+  },
+  "urgentCriticalContainmentHours": 24
+}
