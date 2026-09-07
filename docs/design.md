@@ -1465,9 +1465,14 @@ whether it is built or designed. **Designed means absent today.**
   limiting (below) counts every attempt before the password is checked, instance-wide as well as per
   address. The population shrinks on its own, since each sign-in removes one account from it.
 - **Sessions:** server-side via Spring Session in the database, delivered as an
-  `HttpOnly` / `Secure` / `SameSite=Lax` cookie. One account may hold five of them at a time,
-  and a sixth sign-in is not refused — it succeeds and ends the least recently active one, so a
-  member is never locked out by a device out of reach. Two expiries bound one, and they are different
+  `HttpOnly` / `Secure` / `SameSite=Lax` cookie. How many an account may hold at a time is the
+  deployment's to set, five by default, and a sign-in past that is not refused — it succeeds and
+  ends the least recently active session, whose stored row goes with it, so a member is never locked
+  out by a device out of reach. Sign-ins that arrive at the same moment can pass the bound, because
+  each reads the count before the others are stored: it tidies what accumulates on devices, and it
+  does not contain somebody who already holds the credential — a password change, a role change or
+  a status change still ends every session of the account at once. Two expiries bound one, and they
+  are different
   promises: an inactivity window of 30 minutes that every request restarts, and an absolute lifetime
   of 24 hours counted from when the session began, which activity does not extend. Both are the
   deployment's to set, both are stated rather than inherited from a framework default that can move,

@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 class AgedSessionSweep {
 
     private final JdbcClient jdbc;
-    private final SessionLifetimeProperties lifetime;
+    private final CourtsideSessionProperties session;
 
     // Spring Session deletes by expiry_time, which is built from the inactivity window alone, so a
     // session that died of age and was never used again would keep its row until that window passed.
@@ -20,7 +20,7 @@ class AgedSessionSweep {
     public void deleteSessionsPastTheirLifetime() {
         // The system clock, because creation_time is written from it.
         jdbc.sql("DELETE FROM spring_session WHERE creation_time <= :cutoff")
-                .param("cutoff", System.currentTimeMillis() - lifetime.absoluteLifetime().toMillis())
+                .param("cutoff", System.currentTimeMillis() - session.absoluteLifetime().toMillis())
                 .update();
     }
 }

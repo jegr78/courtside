@@ -10,7 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SessionLimitConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withUserConfiguration(SessionLimitConfiguration.class);
+            .withUserConfiguration(SessionLimitConfiguration.class)
+            .withPropertyValues("courtside.session.absolute-lifetime=24h");
 
     @Test
     void givenALimitInsideItsBounds_whenTheContextStarts_thenItBinds() {
@@ -19,7 +20,7 @@ class SessionLimitConfigurationTest {
                 .withPropertyValues("courtside.session.concurrent-limit=5");
 
         // when / then
-        runner.run(context -> assertThat(context.getBean(SessionLimitProperties.class).concurrentLimit())
+        runner.run(context -> assertThat(context.getBean(CourtsideSessionProperties.class).concurrentLimit())
                 .isEqualTo(5));
     }
 
@@ -48,7 +49,7 @@ class SessionLimitConfigurationTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @EnableConfigurationProperties(SessionLimitProperties.class)
+    @EnableConfigurationProperties(CourtsideSessionProperties.class)
     static class SessionLimitConfiguration {
     }
 }

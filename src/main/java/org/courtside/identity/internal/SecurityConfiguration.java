@@ -18,7 +18,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.session.SessionAuthenticationException;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -29,11 +28,10 @@ import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
-import org.springframework.session.security.SpringSessionBackedSessionRegistry;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
-        LoginProtectionProperties.class, SessionLifetimeProperties.class, SessionLimitProperties.class})
+        LoginProtectionProperties.class, CourtsideSessionProperties.class})
 public class SecurityConfiguration {
 
     // OWASP's Argon2id minimum; the login filter limits how often a caller can incur this cost.
@@ -64,8 +62,7 @@ public class SecurityConfiguration {
             LoginVerificationCapacity loginVerificationCapacity,
             LoginRateLimitHandler loginRateLimitHandler,
             UserAccountRepository accounts,
-            SessionLifetimeProperties sessionLifetime,
-            SessionLimitProperties sessionLimit,
+            CourtsideSessionProperties sessionPolicy,
             SessionRegistry sessionRegistry,
             @Value("${courtside.performance.telemetry-enabled:false}") boolean performanceTelemetryEnabled,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
@@ -144,19 +141,16 @@ public class SecurityConfiguration {
                 // lifetime counts from, so a second member on a shared browser inherits the first's.
                 .sessionManagement(session -> session
                         .sessionFixation(fixation -> fixation.migrateSession())
-                        .maximumSessions(sessionLimit.concurrentLimit())
+                        .maximumSessions(sessionPolicy.concurrentLimit())
                         .sessionRegistry(sessionRegistry)
                         // The oldest inactive session goes rather than the sign-in being refused: a
                         // member who cannot reach a device is not helped by being locked out of it.
-                        .maxSessionsPreventsLogin(false)
-                        .expiredSessionStrategy(expired -> authenticationEntryPoint.commence(
-                                expired.getRequest(), expired.getResponse(),
-                                new SessionAuthenticationException("session limit reached"))))
+                        .maxSessionsPreventsLogin(false))
                 .addFilterAfter(new SecurityEpochFilter(accounts),
                         SecurityContextHolderFilter.class)
                 // Anchored behind the epoch filter: two filters sharing one anchor are ordered by
                 // nothing but the order they were added here.
-                .addFilterAfter(new AbsoluteSessionLifetimeFilter(sessionLifetime.absoluteLifetime()),
+                .addFilterAfter(new AbsoluteSessionLifetimeFilter(sessionPolicy.absoluteLifetime()),
                         SecurityEpochFilter.class)
                 .logout(logout -> logout
                         .logoutUrl("/api/session/logout")
@@ -181,8 +175,9 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    <S extends Session> SessionRegistry sessionRegistry(FindByIndexNameSessionRepository<S> sessions) {
-        return new SpringSessionBackedSessionRegistry<>(sessions);
+    <S extends Session> SessionRegistry sessionRegistry(FindByIndexNameSessionRepository<S> sessions,
+                                                        UserAccountRepository accounts) {
+        return new DisplacingSessionRegistry<>(sessions, accounts);
     }
 
     static CookieCsrfTokenRepository csrfTokenRepository(boolean secureCookies) {

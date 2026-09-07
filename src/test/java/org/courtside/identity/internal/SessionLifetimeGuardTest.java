@@ -58,6 +58,6 @@ class SessionLifetimeGuardTest {
     private SessionLifetimeGuard guard(Duration inactivity, Duration absolute) {
         SessionProperties properties = new SessionProperties();
         properties.setTimeout(inactivity);
-        return new SessionLifetimeGuard(properties, new SessionLifetimeProperties(absolute));
+        return new SessionLifetimeGuard(properties, new CourtsideSessionProperties(absolute, 5));
     }
 }
