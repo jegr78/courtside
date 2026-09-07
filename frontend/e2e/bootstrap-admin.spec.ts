@@ -573,7 +573,8 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await page.getByTestId("password-submit").click();
   const refusal = await refused;
   expect(refusal.status()).toBe(400);
-  expect((await refusal.json()).type).toBe("urn:courtside:error:password-too-guessable");
+  const problem = (await refusal.json()) as { type?: string };
+  expect(problem.type).toBe("urn:courtside:error:password-too-guessable");
   await expect(page.getByTestId("password-failure")).toBeVisible();
   await expect(page.getByTestId("initial-password-view")).toBeVisible();
   await page.getByTestId("new-password").fill("the-one-they-picked-alone");
