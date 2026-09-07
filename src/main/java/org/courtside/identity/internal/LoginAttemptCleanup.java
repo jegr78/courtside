@@ -17,7 +17,7 @@ class LoginAttemptCleanup {
     private final Clock clock;
 
     @Transactional
-    void deleteExpiredAttempts() {
+    public void deleteExpiredAttempts() {
         jdbc.sql("DELETE FROM login_attempt_limit WHERE window_started_at < :cutoff")
                 .param("cutoff", clock.instant().minus(properties.retention()).atOffset(ZoneOffset.UTC))
                 .update();

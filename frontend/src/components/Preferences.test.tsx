@@ -227,7 +227,9 @@ it("given signing out fails, when it is attempted, then the failure is shown and
   expect(signedOut).not.toHaveBeenCalled();
 });
 
-it("given the instance has already ended the session, when signing out, then it ends signed out without a failure", async () => {
+// Signing out was once answered 401 for a session the instance had already ended, and that answer
+// was swallowed. The instance answers 204 for it now, so a 401 means the sign-out did not happen.
+it("given signing out is refused as unauthenticated, when it is attempted, then it is reported rather than claimed done", async () => {
   // given
   const signedOut = vi.fn();
   vi.spyOn(api, "logout").mockRejectedValue(new ApiError(401, {
@@ -242,9 +244,8 @@ it("given the instance has already ended the session, when signing out, then it 
   await userEvent.click(screen.getByTestId("logout"));
 
   // then
-  await waitFor(() => expect(signedOut).toHaveBeenCalled());
-  expect(screen.queryByTestId("preferences-failure")).not.toBeInTheDocument();
-  expect(screen.getByTestId("preferences-menu").closest("details")).not.toHaveAttribute("open");
+  expect(await screen.findByTestId("preferences-failure")).toBeInTheDocument();
+  expect(signedOut).not.toHaveBeenCalled();
 });
 
 it("given nobody is signed in, when the menu is opened, then it offers nothing to sign out of", async () => {

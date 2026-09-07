@@ -95,3 +95,25 @@ it("given the sign-out is refused, when it is attempted from the error page, the
   await waitFor(() => expect(screen.getAllByRole("alert").length).toBeGreaterThan(1));
   expect(assign).not.toHaveBeenCalled();
 });
+
+// The status this endpoint answers for a session that is already over is 204, so a 401 says the
+// sign-out did not happen — the same reading Preferences holds.
+it("given the sign-out is refused as unauthenticated, when it is attempted from the error page, then nothing claims it ended", async () => {
+  // given
+  server.use(
+    http.get("/api/session", () => HttpResponse.json({
+      authenticated: true, roles: [], passwordChangeRequired: false
+    })),
+    http.post("/api/session/logout", () => HttpResponse.json({
+      type: "urn:courtside:error:unauthenticated", title: "Not authenticated", status: 401
+    }, { status: 401, headers: { "Content-Type": "application/problem+json" } }))
+  );
+  render(<ApplicationErrorView />);
+
+  // when
+  await userEvent.click(screen.getByTestId("application-error-sign-out"));
+
+  // then
+  await waitFor(() => expect(screen.getAllByRole("alert").length).toBeGreaterThan(1));
+  expect(assign).not.toHaveBeenCalled();
+});

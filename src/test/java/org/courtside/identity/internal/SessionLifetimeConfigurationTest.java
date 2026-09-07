@@ -69,6 +69,20 @@ class SessionLifetimeConfigurationTest {
                 .hasMessageContaining("COURTSIDE_SESSION_INACTIVITY_TIMEOUT"));
     }
 
+    @Test
+    void givenAnInactivityWindowThatNeverExpires_whenTheContextStarts_thenItRefusesToStart() {
+        // given — the one value that switches this branch's guarantee off without saying so
+        ApplicationContextRunner runner = new ApplicationContextRunner()
+                .withUserConfiguration(SessionLifetimeConfiguration.class)
+                .withPropertyValues("spring.session.timeout=-1s",
+                        "courtside.session.absolute-lifetime=24h");
+
+        // when / then
+        runner.run(context -> assertThat(context).getFailure().rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("COURTSIDE_SESSION_INACTIVITY_TIMEOUT"));
+    }
+
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties({SessionProperties.class, SessionLifetimeProperties.class})
     static class SessionLifetimeConfiguration {

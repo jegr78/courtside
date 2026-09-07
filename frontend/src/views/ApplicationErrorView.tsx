@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, ApiError } from "../api/client";
+import { api } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -21,10 +21,6 @@ export function ApplicationErrorView() {
       await api.logout();
       window.location.assign("/login");
     } catch (failure) {
-      if (failure instanceof ApiError && failure.status === 401) {
-        window.location.assign("/login");
-        return;
-      }
       setError(problemMessage(failure, t));
     } finally {
       setPending(false);

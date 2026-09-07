@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, ApiError } from "../api/client";
+import { api } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { setLocale, supportedLocale, type SupportedLocale } from "../i18n";
 import { initialTheme, setTheme, type Theme } from "../theme";
@@ -55,12 +55,8 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
     try {
       await api.logout();
     } catch (rejected) {
-      // A missing or stale CSRF token is refused before the sign-out is reached; an ended session
-      // is not, because ending one that is already over is what was asked for.
-      if (!(rejected instanceof ApiError) || rejected.status !== 401) {
-        report(raisedDuring, problemMessage(rejected, t));
-        return;
-      }
+      report(raisedDuring, problemMessage(rejected, t));
+      return;
     }
     setOpen(false);
     signedOut();

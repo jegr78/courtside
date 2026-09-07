@@ -30,7 +30,7 @@ class AbsoluteSessionLifetimeFilterTest {
             Clock.fixed(NOW, ZoneOffset.UTC), LIFETIME);
 
     @Test
-    void givenASessionOlderThanTheLifetime_whenARequestArrives_thenItIsEndedAndRefused() throws Exception {
+    void givenASessionOlderThanTheLifetime_whenARequestArrives_thenItIsEndedAndCarriedOn() throws Exception {
         // given
         HttpSession session = sessionCreated(LIFETIME.plusSeconds(1));
 
