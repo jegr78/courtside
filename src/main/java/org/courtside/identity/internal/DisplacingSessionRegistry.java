@@ -66,9 +66,11 @@ class DisplacingSessionRegistry<S extends Session> implements SessionRegistry {
         return stored.getAllPrincipals();
     }
 
+    // Nothing is ever marked here, so there is never an expiry to report, and the one caller that
+    // asks is the filter checking for exactly that — answering it costs a session read per request.
     @Override
     public SessionInformation getSessionInformation(String sessionId) {
-        return stored.getSessionInformation(sessionId);
+        return null;
     }
 
     @Override

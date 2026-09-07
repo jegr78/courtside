@@ -191,7 +191,7 @@ class ConcurrentSessionLimitTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenAnAuthenticatedRequestIsServed_thenTheBoundCostsOneStatementOnTopOfIt() throws Exception {
+    void whenAnAuthenticatedRequestIsServed_thenTheBoundAddsNoStatementToIt() throws Exception {
         // given
         Cookie session = signedIn();
         mockMvc.perform(get("/api/admin/config").cookie(session)).andExpect(status().isOk());
@@ -200,12 +200,11 @@ class ConcurrentSessionLimitTest extends AbstractIntegrationTest {
         statements.reset();
         mockMvc.perform(get("/api/admin/config").cookie(session)).andExpect(status().isOk());
 
-        // then — measured, not hoped: five of these serve the request itself and the sixth is the
-        // filter this bound brings, which reads the session again to see whether it still counts
+        // then — measured, not hoped: the same five that served the request before this bound existed
         assertThat(statements.snapshot().total())
-                .as("the bound costs one statement per authenticated request; a rise here is that"
-                        + " cost growing where nobody looks")
-                .isEqualTo(6);
+                .as("the bound reads no session of its own per request; a rise here is that cost"
+                        + " arriving where nobody looks")
+                .isEqualTo(5);
     }
 
     private long storedRows() {
