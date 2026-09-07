@@ -31,14 +31,28 @@ class CryptographicInventoryTest {
     private static final Map<String, Pattern> SCANNED = Map.of(
             "src/main/java", Pattern.compile("MessageDigest|SecureRandom|PasswordEncoder|Cipher"
                     + "|KeyStore|SSLContext|javax\\.crypto|java\\.security\\.Signature"),
-            "tools", Pattern.compile("createHash|createHmac|createSign|randomBytes"
-                    + "|webcrypto|crypto\\.subtle"),
+            "tools", Pattern.compile("createHash|createHmac|createSign|createVerify|randomBytes"
+                    + "|webcrypto|crypto\\.subtle|createCipheriv|createDecipheriv"
+                    + "|generateKeyPair|createPrivateKey|createPublicKey"),
+            "src/main/resources", Pattern.compile(
+                    "ssl|keystore|truststore|key-store|trust-store|cipher"),
             "frontend/src", Pattern.compile("crypto\\.subtle|getRandomValues|crypto\\.randomUUID"),
             ".github/workflows", Pattern.compile("cosign|openssl |actions/attest"),
             "deploy", Pattern.compile("(?i)\\btls\\b|DKIM|sslmode"));
 
     // Prose about a cipher is not a use of one, and every surface here carries documentation.
     private static final String DOCUMENTATION = ".md";
+
+    // The shipped password list is data rather than configuration, and among its hundred thousand
+    // lines are words like "cipher" that would read as a cryptographic use.
+    private static final Path DATA = Path.of("src/main/resources/security/common-passwords.txt");
+
+    // A digest or a random value may be covered by a pattern. A cipher, a key or a signature has
+    // to be named, so a new one cannot arrive under a glob nobody re-read.
+    private static final Pattern NAMED_INDIVIDUALLY = Pattern.compile(
+            "Cipher\\.getInstance|KeyStore\\.getInstance|javax\\.crypto"
+                    + "|java\\.security\\.Signature|createCipheriv|createDecipheriv"
+                    + "|generateKeyPair|createPrivateKey|createSign");
 
     @Test
     void givenEveryCryptographicUse_whenTheSourceIsScanned_thenEachMapsToAnInventoryEntry()
@@ -61,6 +75,26 @@ class CryptographicInventoryTest {
                 .allSatisfy(use -> assertThat(inventoried)
                         .as("%s uses cryptography and no inventory entry names it", use)
                         .anyMatch(location -> location.matches(use)));
+    }
+
+    @Test
+    void givenAKeyOrACipher_whenItIsScanned_thenAnEntryNamesThatFileRatherThanAPattern()
+            throws IOException {
+        // given
+        Set<String> named = new TreeSet<>(locations());
+        named.removeIf(location -> location.contains("*"));
+
+        // when
+        Set<Path> keyed = new TreeSet<>();
+        for (String surface : SCANNED.keySet()) {
+            keyed.addAll(filesMatching(Path.of(surface), NAMED_INDIVIDUALLY));
+        }
+
+        // then
+        assertThat(keyed).allSatisfy(use -> assertThat(named)
+                .as("%s handles a key or a cipher, so an entry has to name it rather than match"
+                        + " it with a pattern", use)
+                .contains(use.toString()));
     }
 
     // An entry naming nothing is an inventory describing a past release.
@@ -131,7 +165,7 @@ class CryptographicInventoryTest {
         List<Path> matches = new ArrayList<>();
         try (Stream<Path> files = Files.walk(root)) {
             for (Path file : files.filter(Files::isRegularFile).toList()) {
-                if (file.toString().endsWith(DOCUMENTATION)) {
+                if (file.toString().endsWith(DOCUMENTATION) || file.equals(DATA)) {
                     continue;
                 }
                 if (pattern.matcher(Files.readString(file, StandardCharsets.UTF_8)).find()) {

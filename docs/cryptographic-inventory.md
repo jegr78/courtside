@@ -26,6 +26,14 @@ nobody keeps current.
 `locations` are glob patterns rather than file lists, so a new file of a kind the inventory already
 covers does not fail the build, while a cryptographic use in a place no entry describes does.
 
+That leniency stops at keys. A digest or a random value may be matched by a pattern; a cipher, a
+generated key pair or a signature has to be named by an entry file by file, so a new one cannot
+arrive under a glob nobody re-read.
+
+Documentation is not scanned — a paragraph about TLS is not a use of it — and neither is the
+shipped common-password list, whose hundred thousand lines contain words like `cipher` that would
+read as cryptography.
+
 ## What `class` separates
 
 The distinction that matters most in this file is between cryptography that carries a security
