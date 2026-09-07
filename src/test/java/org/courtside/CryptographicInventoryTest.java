@@ -39,15 +39,18 @@ class CryptographicInventoryTest {
             + "|createHash|createHmac|createSign|createVerify|randomBytes|createCipheriv"
             + "|createDecipheriv|generateKeyPair|createPrivateKey|createPublicKey|crypto\\.subtle"
             + "|getRandomValues|randomUUID|X509Certificate|fingerprint256|timingSafeEqual|cosign"
-            + "|actions/attest|openssl|newkey|sslmode|starttls|checkserveridentity|trust-relay"
-            + "|tls internal|dkim|DKIM");
+            + "|actions/attest|openssl|newkey|starttls|checkserveridentity|trust-relay"
+            + "|tls internal|dkim|DKIM|CertificateFactory|keystore|key-store|truststore"
+            + "|trust-store|root-certificate|sslmode|sslrootcert|sslcert|sslkey|ssl_cert_file"
+            + "|ssl_key_file");
 
     // A digest or a random value may be covered by a pattern. Anything that handles a key has to
     // be named file by file, so a new one cannot arrive under a glob nobody re-read.
     private static final Pattern NAMED_INDIVIDUALLY = Pattern.compile("Cipher\\.getInstance"
             + "|KeyStore\\.getInstance|javax\\.crypto|java\\.security\\.Signature|createCipheriv"
             + "|createDecipheriv|generateKeyPair|createPrivateKey|createSign|createVerify"
-            + "|X509Certificate|fingerprint256|newkey");
+            + "|X509Certificate|fingerprint256|newkey|CertificateFactory|keystore|key-store"
+            + "|truststore|trust-store|sslcert|sslkey|ssl_key_file");
 
     // Prose about a cipher is not a use of one, and every surface here carries documentation.
     private static final String DOCUMENTATION = ".md";
