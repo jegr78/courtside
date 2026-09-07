@@ -1484,17 +1484,29 @@ whether it is built or designed. **Designed means absent today.**
   booking fingerprint and an artefact digest are content hashes and are never evidence that
   something was not tampered with. `docs/cryptographic-inventory.md` holds the policy and how an
   algorithm or a key is replaced without silently weakening what it replaced.
-- **The database connection inside the deployment carries no transport encryption.** *Accepted, not
-  closed.* The application reaches PostgreSQL over the compose network with no `ssl` parameter, and
-  one verification profile disables it by name. Session rows, password hashes and the hashed login
-  subjects travel that connection. What an observer needs is a position on the host's own container
-  network, which on a single-host deployment means the host itself — and an attacker with that
-  already reads the database's files. What bounds it: no database port is published, the network is
-  private to the compose project, and both ends live on one machine. It stays open because closing
-  it properly means operator-supplied trust material, strict validation, reload behaviour and
-  failure diagnosis rather than a connection-string flag, which is its own piece of work. An
-  operator who moves the database to another host owns adding TLS to the connection string, and
-  `security/cryptographic-inventory.json` records the path as unencrypted rather than omitting it.
+- **Whether the database connection requires a verified certificate:** *Built, and off unless an
+  operator turns it on.* `courtside.database.tls.mode` is `prefer`, `disable` or `verify-full`.
+  `verify-full` requires a certificate that chains to an operator-supplied authority and names the
+  host the connection URL names. It refuses to start when that authority is missing, unreadable or
+  holds no certificate, and it refuses to start when the connection URL carries an argument that
+  would override it — the driver lets a URL argument beat the pool's own property, so
+  `?sslmode=disable` would otherwise connect in plaintext with verification configured and say
+  nothing. An unknown, expired or wrong-name certificate is reported as a sentence naming which of
+  the three it was rather than a stack trace. A replaced authority decides the next connection the
+  pool opens, and one that no longer vouches for the database refuses rather than falling back.
+  Courtside ships no authority and issues no production key material: issuance, storage, lifetime,
+  renewal and revocation are the operator's.
+- **The default database connection is still unverified.** *Accepted, not closed.* `prefer` is what
+  the driver does on its own — encrypted when the database offers it, verified never — and the
+  reference deployment ships no certificate, so nothing changes for a club that does not act.
+  Session rows, password hashes and the hashed login subjects travel that connection. What an
+  observer needs is a position on the host's own container network, which on a single-host
+  deployment means the host itself — and an attacker with that already reads the database's files.
+  What bounds it: no database port is published, the network is private to the compose project, and
+  both ends live on one machine. It stays accepted rather than closed because requiring a
+  certificate means requiring a club to run an authority, which is a larger imposition than the
+  exposure it removes on one host. The reverse proxy's connection to the application is the other
+  half of this path and carries no encryption yet.
 - **Whether a permanent password is one that has already leaked:** *Designed.* A check against a
   breached-password set, asking with a partial hash so that neither the password nor a reusable
   digest of it leaves the instance, and refusing to set a password while that check cannot run.

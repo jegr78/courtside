@@ -501,6 +501,69 @@ To change the administrator password instead, edit `COURTSIDE_MAIL_ADMIN_PASSWOR
 `mail-configure` again: the plan upserts the account, so it reconciles rather than duplicates.
 
 
+## Encrypting the connection to the database
+
+By default the application reaches PostgreSQL over the compose network with whatever the driver
+chooses, which is `prefer`: encrypted when the database offers it, verified never. No database port
+is published and the network is private to the compose project, so on a single host that is the
+whole story. It stops being the whole story when the database is somewhere else.
+
+`COURTSIDE_DB_TLS_MODE` names what the connection guarantees.
+
+| Mode | What it means |
+|---|---|
+| `prefer` | The default. Courtside configures nothing and the driver encrypts opportunistically without checking who answered. |
+| `disable` | No encryption, stated rather than assumed. |
+| `verify-full` | Encryption is required, the certificate must chain to the authority you configure, and it must name the host the connection URL names. |
+
+### What each side owns
+
+Courtside owns the inputs and what they enforce: it reads your authority file, refuses to start when
+that file is missing, unreadable or holds no certificate, refuses to start when the connection URL
+carries an argument that would override the verification, and turns an unknown, expired or
+wrong-name certificate into a sentence rather than a stack trace.
+
+You own the rest: which authority issues the certificate, how it is issued, where the private key
+lives, how long it is valid, when it is renewed, how it is revoked and what you do when it is lost.
+Courtside ships no authority and generates no production key material.
+
+### Turning it on with the database this deployment runs
+
+Issue a server certificate whose subject alternative name includes `DNS:db` — `db` is the name the
+application connects to on the compose network, and `verify-full` checks exactly that name. Then
+name three files in `.env`:
+
+```
+COURTSIDE_DB_TLS_AUTHORITY=/srv/courtside/tls/authority.pem
+COURTSIDE_DB_TLS_CERTIFICATE=/srv/courtside/tls/server.crt
+COURTSIDE_DB_TLS_KEY=/srv/courtside/tls/server.key
+```
+
+and start with the overlay:
+
+```bash
+docker compose -f compose.yaml -f compose.database-tls.yaml up -d
+```
+
+The overlay mounts all three read-only, sets the mode to `verify-full`, and hands the server its key
+under the ownership PostgreSQL insists on. Keep the key at `0600` on the host; nothing outside these
+containers needs to read it.
+
+### Turning it on with a database elsewhere
+
+Point `SPRING_DATASOURCE_URL` at that host, set `COURTSIDE_DB_TLS_MODE=verify-full`, and mount your
+authority file into the `app` container yourself at the path `COURTSIDE_DB_TLS_ROOT_CERTIFICATE`
+names. The certificate has to name the host the URL names. Do not put an `ssl` argument in the URL:
+the driver lets a URL argument beat the pool's configuration, so a URL that decides the transport
+would quietly undo the verification, and the application refuses to start rather than let it.
+
+### Renewal
+
+Replacing the authority file takes effect for the next connection the pool opens, without a restart;
+connections already open keep running until the pool recycles them. A refusal after a replacement is
+a refusal, never a fallback to plaintext. Replacing the database's own certificate and key means
+restarting the `db` service, because the server reads them once at start.
+
 ## Environment variables
 
 These are a published surface: renaming one is a breaking change, and every optional variable has a
@@ -511,6 +574,10 @@ default.
 | `COURTSIDE_VERSION` | *required* | The release to run, optionally with `@sha256:…`. Pin it. |
 | `POSTGRES_PASSWORD` | *required* | Database password, used only between the containers. |
 | `COURTSIDE_DB_LOCK_TIMEOUT` | `5s` | Maximum time a database operation waits for a conflicting row or advisory lock. A refusal is returned as a retryable `503`; increase this only after diagnosing legitimate contention. Accepted range: `1s` to `1m`. |
+| `COURTSIDE_DB_TLS_MODE` | `prefer` | What the connection to PostgreSQL guarantees: `prefer`, `disable` or `verify-full`. See *Encrypting the connection to the database*. |
+| `COURTSIDE_DB_TLS_AUTHORITY` | *required with the database TLS overlay* | Host path to the certificate authority that issued the database's certificate. |
+| `COURTSIDE_DB_TLS_CERTIFICATE` | *required with the database TLS overlay* | Host path to the certificate the database serves. Its subject alternative name has to include `DNS:db`. |
+| `COURTSIDE_DB_TLS_KEY` | *required with the database TLS overlay* | Host path to the private key belonging to that certificate. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` | *required on an empty account table* | Username of the first local administrator. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | *required on an empty account table* | One-time password, at least 12 characters. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
