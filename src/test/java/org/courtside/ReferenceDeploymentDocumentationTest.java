@@ -146,7 +146,8 @@ class ReferenceDeploymentDocumentationTest {
     private static List<String> variablesReadByCompose() throws IOException {
         List<String> variables = new ArrayList<>();
         for (String operatorFacing : List.of("deploy/compose.yaml",
-                "deploy/compose.database-tls.yaml", "deploy/compose.database-tls-local.yaml")) {
+                "deploy/compose.database-tls.yaml", "deploy/compose.database-tls-local.yaml",
+                "deploy/compose.app-tls.yaml")) {
             VARIABLE.matcher(Files.readString(Path.of(operatorFacing))).results()
                     .map(match -> match.group(1))
                     .forEach(variables::add);

@@ -594,6 +594,65 @@ A certificate that expires while the instance is running is not diagnosed the wa
 at startup is. The diagnosis is written when the application starts; a pool that later fails to
 reconnect reports the driver's own error in the log.
 
+## Encrypting the connection between the proxy and the application
+
+By default the reverse proxy reaches the application over plain HTTP on the compose network. The
+application's own port is published on loopback only and the network is private to the compose
+project, so on a single host that is the whole story. It stops being the whole story when the proxy
+and the application are not on the same one.
+
+`compose.app-tls.yaml` turns that hop into TLS on both ends at once. The application serves the
+certificate you supply, and the proxy dials it over TLS trusting nothing but the authority you name:
+an application that authority does not vouch for is refused with a bad gateway, never retried in
+plain text.
+
+### What each side owns
+
+Courtside owns the inputs and what they enforce: it refuses to start when the certificate or the key
+is missing, unreadable, holds what the other one should, or is protected by a password it is given
+no way to open, and when Spring's own `server.ssl` configuration would decide what is served
+instead. One setting drives both ends, so the application and the proxy cannot disagree about which
+the hop is.
+
+You own the rest: which authority issues the certificate, how it is issued, where the private key
+lives, how long it is valid, when it is renewed, how it is revoked and what you do when it is lost.
+Courtside ships no authority and generates no production key material.
+
+### Turning it on
+
+Issue a certificate whose subject alternative name includes `DNS:app` — `app` is the name the proxy
+dials on the compose network, and that name is checked. Put the pair in one directory and the
+authority that issued it in another, and name both in `.env`:
+
+```
+COURTSIDE_APP_TLS_MATERIAL=/srv/courtside/tls/app
+COURTSIDE_APP_TLS_AUTHORITY=/srv/courtside/tls/app-authority
+```
+
+The first holds `server.crt` and `server.key`, the second `authority.pem`. Two directories, because
+both services read the authority while only the application reads the key — and a key readable by
+whatever a flaw in the proxy can be made to read is a key somebody else can serve with. Keep it at
+`0600` on the host.
+
+```bash
+docker compose -f compose.yaml -f compose.app-tls.yaml --profile proxy up -d
+```
+
+The application's own health probe then verifies its certificate against that same authority, so a
+pair that does not match reports an unhealthy application rather than a bad gateway.
+
+The published loopback port serves HTTPS from that point on. `https://127.0.0.1:8080/` presents the
+certificate issued for `app`, so anything reaching the application directly on the host has to trust
+your authority and address it by that name.
+
+### Renewal
+
+Replacing a file in either directory takes effect when the service that reads it restarts: the
+application reads the pair once at start, and the proxy reads the authority once at start. A
+directory rather than the file itself, because a bind mount of a single file pins the inode it had
+when the container started, and renewal that writes a new file and renames it over the old one would
+leave the container reading the file it first saw.
+
 ## Environment variables
 
 These are a published surface: renaming one is a breaking change, and every optional variable has a
@@ -609,6 +668,8 @@ default.
 | `COURTSIDE_DB_TLS_ROOT_CERTIFICATE` | *unset* | Path **inside the container** to that authority certificate. `compose.database-tls.yaml` sets it to `/etc/courtside/database-tls/authority.pem`; set it yourself only when running the image without that overlay. |
 | `COURTSIDE_DB_TLS_CERTIFICATE` | *required with `compose.database-tls-local.yaml`* | Host path to the certificate this deployment's own database serves. Its subject alternative name has to include `DNS:db`. |
 | `COURTSIDE_DB_TLS_KEY` | *required with `compose.database-tls-local.yaml`* | Host path to the private key belonging to that certificate. |
+| `COURTSIDE_APP_TLS_MATERIAL` | `/srv/courtside/tls/app` | Host directory holding `server.crt` and `server.key`, the certificate the application serves to the proxy and the key belonging to it. Read by `compose.app-tls.yaml` only. |
+| `COURTSIDE_APP_TLS_AUTHORITY` | `/srv/courtside/tls/app-authority` | Host directory holding `authority.pem`, the certificate authority that issued it, and nothing else. Both the application and the proxy read everything in it. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` | *required on an empty account table* | Username of the first local administrator. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | *required on an empty account table* | One-time password, at least 12 characters. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
