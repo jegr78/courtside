@@ -5,7 +5,9 @@ import org.courtside.TestPostgres;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.boot.diagnostics.FailureAnalysis;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.mock.env.MockEnvironment;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
@@ -16,6 +18,7 @@ import java.sql.SQLException;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 class DatabaseTlsRefusalTest {
@@ -130,6 +133,34 @@ class DatabaseTlsRefusalTest {
             rows.next();
             assertThat(rows.getBoolean(1)).isTrue();
         }
+    }
+
+    // Through the configuration the application really uses, so the mode this sets has to be the
+    // one that checks the name and not merely one that encrypts.
+    @Test
+    void givenTheConfiguredPool_whenTheNameDoesNotMatch_thenTheConnectionIsRefused()
+            throws Exception {
+        // given
+        String otherName = database.getJdbcUrl().replace("localhost", "127.0.0.1");
+
+        // when / then
+        new ApplicationContextRunner()
+                .withUserConfiguration(DatabaseTlsConfiguration.class)
+                .withBean(HikariDataSource.class, () -> pool(otherName))
+                .withPropertyValues("courtside.database.tls.mode=verify-full",
+                        "courtside.database.tls.root-certificate=" + anchor(served.authority()))
+                .run(context -> assertThatThrownBy(
+                        () -> context.getBean(HikariDataSource.class).getConnection())
+                        .hasStackTraceContaining("PgjdbcHostnameVerifier"));
+    }
+
+    private static HikariDataSource pool(String url) {
+        HikariDataSource dataSource = new HikariDataSource();
+        dataSource.setJdbcUrl(url);
+        dataSource.setUsername(database.getUsername());
+        dataSource.setPassword(database.getPassword());
+        dataSource.setConnectionTimeout(2000);
+        return dataSource;
     }
 
     private static FailureAnalysis diagnosis(SQLException refusal) {
