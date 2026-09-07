@@ -1,6 +1,8 @@
 package org.courtside.identity;
 
 import org.courtside.AbstractIntegrationTest;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
@@ -9,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 import java.util.TreeSet;
 import java.util.regex.MatchResult;
@@ -19,6 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // The design's published Argon2 parameters and the encoder configuration are one fact.
 class PasswordHashingTest extends AbstractIntegrationTest {
+
+    private static final Path INVENTORY = Path.of("security/cryptographic-inventory.json");
 
     private static final List<Path> PLACES_THAT_NAME_THE_PARAMETERS =
             List.of(Path.of("README.md"), Path.of("docs/design.md"));
@@ -62,6 +67,46 @@ class PasswordHashingTest extends AbstractIntegrationTest {
                 .as("an account hashed at the old cost must still be able to log in")
                 .isTrue();
         assertThat(passwordEncoder.matches("wrong", storedBeforeTheChange)).isFalse();
+    }
+
+    // The inventory is what a reviewer reads instead of the encoder, so what it states has to be
+    // what the encoder produces, down to the salt and hash it writes.
+    @Test
+    void whenHashingAPassword_thenTheParametersAreTheOnesTheInventoryRecords() throws IOException {
+        // given
+        JsonNode inventoried = parametersInTheInventory();
+
+        // when
+        String[] parts = hash().split("\\$");
+
+        // then
+        assertThat(parts[1]).isEqualTo(algorithmInTheInventory());
+        assertThat(parts[3]).isEqualTo("m=%d,t=%d,p=%d".formatted(
+                inventoried.get("memoryKibibytes").asInt(), inventoried.get("iterations").asInt(),
+                inventoried.get("parallelism").asInt()));
+        assertThat(Base64.getDecoder().decode(parts[4]))
+                .as("the salt the encoder writes is the inventoried length")
+                .hasSize(inventoried.get("saltBytes").asInt());
+        assertThat(Base64.getDecoder().decode(parts[5]))
+                .as("the hash the encoder writes is the inventoried length")
+                .hasSize(inventoried.get("hashBytes").asInt());
+    }
+
+    private static JsonNode passwordHashing() throws IOException {
+        for (JsonNode entry : new ObjectMapper().readTree(INVENTORY.toFile()).get("entries")) {
+            if ("password-hashing".equals(entry.get("id").asText())) {
+                return entry;
+            }
+        }
+        throw new AssertionError("The cryptographic inventory has no password-hashing entry");
+    }
+
+    private static JsonNode parametersInTheInventory() throws IOException {
+        return passwordHashing().get("parameters");
+    }
+
+    private static String algorithmInTheInventory() throws IOException {
+        return passwordHashing().get("algorithm").asText();
     }
 
     private String hash() {

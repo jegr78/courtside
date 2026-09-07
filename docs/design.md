@@ -1475,6 +1475,26 @@ whether it is built or designed. **Designed means absent today.**
   choosing it was measured against: nearly every entry is already refused by the length minimum, so
   against a long password the list is the weaker of the two guards and the breached-password check
   below is the one that would carry weight.
+- **What this product does with cryptography, in one list:** every use is recorded in
+  `security/cryptographic-inventory.json` with its purpose, algorithm, the parameters this project
+  chose, its owner as a role, where material lives, and what rotation, revocation, recovery and
+  retirement mean for it. *Built.* A cryptographic call in the source, the workflows or the
+  reference deployment that no entry names fails the build, and an entry naming a file that no
+  longer exists fails it too. The list separates what carries a guarantee from what does not: a
+  booking fingerprint and an artefact digest are content hashes and are never evidence that
+  something was not tampered with. `docs/cryptographic-inventory.md` holds the policy and how an
+  algorithm or a key is replaced without silently weakening what it replaced.
+- **The database connection inside the deployment carries no transport encryption.** *Accepted, not
+  closed.* The application reaches PostgreSQL over the compose network with no `ssl` parameter, and
+  one verification profile disables it by name. Session rows, password hashes and the hashed login
+  subjects travel that connection. What an observer needs is a position on the host's own container
+  network, which on a single-host deployment means the host itself — and an attacker with that
+  already reads the database's files. What bounds it: no database port is published, the network is
+  private to the compose project, and both ends live on one machine. It stays open because closing
+  it properly means operator-supplied trust material, strict validation, reload behaviour and
+  failure diagnosis rather than a connection-string flag, which is its own piece of work. An
+  operator who moves the database to another host owns adding TLS to the connection string, and
+  `security/cryptographic-inventory.json` records the path as unencrypted rather than omitting it.
 - **Whether a permanent password is one that has already leaked:** *Designed.* A check against a
   breached-password set, asking with a partial hash so that neither the password nor a reusable
   digest of it leaves the instance, and refusing to set a password while that check cannot run.

@@ -187,9 +187,10 @@ the category procedure is incomplete.
 ### MAN-CRYPTO-001 Cryptographic use and secret-lifecycle review
 
 - Prerequisites: configuration, dependency evidence and synthetic credentials; no production secrets.
-- Steps: inventory encryption, hashing, randomness, signing and trust stores; verify algorithm,
-  parameter and key-lifecycle choices against current project policy; inspect failure and rotation
-  paths and ensure logs and evidence never receive secret material.
+- Steps: read `security/cryptographic-inventory.json`, which lists every encryption, hashing,
+  randomness, signing and trust-store use and is kept complete by `CryptographicInventoryTest`;
+  verify its algorithm, parameter and key-lifecycle choices against `docs/cryptographic-inventory.md`;
+  inspect failure and rotation paths and ensure logs and evidence never receive secret material.
 - Expected secure outcome: approved primitives protect the intended property, keys and credentials
   have explicit lifecycles, and failure does not downgrade protection.
 
