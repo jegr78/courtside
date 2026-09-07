@@ -9,8 +9,8 @@ class DatabaseTlsMaterialFailureAnalyzer extends AbstractFailureAnalyzer<Databas
     protected FailureAnalysis analyze(Throwable rootFailure, DatabaseTlsMaterialException cause) {
         return new FailureAnalysis(cause.getMessage(),
                 "Point courtside.database.tls.root-certificate at the authority that issued the"
-                        + " database's certificate, or set courtside.database.tls.mode to disable"
-                        + " to connect without verification.",
+                        + " database's certificate, or set courtside.database.tls.mode back to"
+                        + " prefer to connect without requiring one.",
                 cause);
     }
 }

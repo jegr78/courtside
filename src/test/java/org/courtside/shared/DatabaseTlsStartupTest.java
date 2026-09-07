@@ -31,7 +31,7 @@ class DatabaseTlsStartupTest {
         assertThat(output.getOut())
                 .contains("APPLICATION FAILED TO START")
                 .contains("courtside.database.tls.root-certificate names no file")
-                .contains("set courtside.database.tls.mode to disable");
+                .contains("set courtside.database.tls.mode back to prefer");
     }
 
     @Configuration(proxyBeanMethods = false)

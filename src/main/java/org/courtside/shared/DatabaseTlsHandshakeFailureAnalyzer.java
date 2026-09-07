@@ -18,7 +18,7 @@ class DatabaseTlsHandshakeFailureAnalyzer extends AbstractFailureAnalyzer<SQLExc
     private static final Set<String> CONNECTION_STATES = Set.of("08004", "08006");
     private static final String ACTION = "Reissue the database's certificate for the name the"
             + " connection URL uses, point courtside.database.tls.root-certificate at the authority"
-            + " that signed it, or set courtside.database.tls.mode to disable.";
+            + " that signed it, or set courtside.database.tls.mode back to prefer.";
 
     private final Environment environment;
 
@@ -62,6 +62,6 @@ class DatabaseTlsHandshakeFailureAnalyzer extends AbstractFailureAnalyzer<SQLExc
     private boolean verificationRequired() {
         return Binder.get(environment)
                 .bind("courtside.database.tls.mode", DatabaseTlsProperties.Mode.class)
-                .orElse(DatabaseTlsProperties.Mode.DISABLE) == DatabaseTlsProperties.Mode.VERIFY_FULL;
+                .orElse(DatabaseTlsProperties.Mode.PREFER) == DatabaseTlsProperties.Mode.VERIFY_FULL;
     }
 }

@@ -32,7 +32,7 @@ final class DatabaseTls {
     }
 
     private static void verify(HikariDataSource dataSource, Path rootCertificate) {
-        Path anchor = readable(rootCertificate);
+        Path anchor = usable(rootCertificate);
         refuseUrlThatDecidesTheTransport(dataSource.getJdbcUrl());
         dataSource.addDataSourceProperty("sslmode", VERIFY_FULL);
         dataSource.addDataSourceProperty("sslrootcert", anchor.toString());
@@ -54,7 +54,7 @@ final class DatabaseTls {
         }
     }
 
-    private static Path readable(Path rootCertificate) {
+    private static Path usable(Path rootCertificate) {
         if (rootCertificate == null || rootCertificate.toString().isBlank()) {
             throw new DatabaseTlsMaterialException("Verified database TLS is configured, but "
                     + ROOT_CERTIFICATE + " names no file.");
