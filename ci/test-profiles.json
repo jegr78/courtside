@@ -52,7 +52,17 @@
       ]
     },
     "docs": {
-      "exact": ["AGENTS.md", "CHANGELOG.md", "CLAUDE.md", "LICENSE", "NOTICE", "README.md", "deploy/README.md"],
+      "exact": [
+        "AGENTS.md",
+        "CHANGELOG.md",
+        "CLAUDE.md",
+        "CODE_OF_CONDUCT.md",
+        "CONTRIBUTING.md",
+        "LICENSE",
+        "NOTICE",
+        "README.md",
+        "deploy/README.md"
+      ],
       "prefixes": ["bruno/", "docs/", "site/"]
     },
     "backend": {

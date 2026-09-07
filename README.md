@@ -132,6 +132,8 @@ handling is the database's job and is tested as such.
   `known-limit`, `operations` or `debt`. Completed decisions and accepted known limits are closed;
   pending choices use `question` and planned remediation uses a work label so both remain visible
   work.
+- How to contribute a change: `CONTRIBUTING.md`. The code of conduct that governs this
+  repository is `CODE_OF_CONDUCT.md`.
 - Conventions for contributors: `CLAUDE.md`. Courtside is developed with AI assistance, and
   that file is the ruleset it works under — architecture principles, migration policy, test
   discipline. It is written for a contributor of either kind.
