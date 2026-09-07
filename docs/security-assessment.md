@@ -143,6 +143,15 @@ record and run manifest plus a CMS-encrypted envelope of the protected normalize
 days. Missing scanners, missing evidence and incomplete outcomes fail the job; they are never
 normalized as a clean run.
 
+ASVS 15.1.1 and ASVS 15.2.1 are retested by matching the original Dependabot discovery history
+against npm and Trivy summaries bound to the immutable 40-character commit revision under
+assessment. The normalized record retains that subject. The review confirms the
+original-discovery clock, severity deadline, reachability judgment,
+upstream-fix disposition and any exact, unexpired exception. A completed overdue finding must
+refuse release readiness; a simulated service outage without a prior confirmed block must produce
+`skipped` evidence rather than a clean result or a release block. The assessment record names the
+immutable revision and the evidence artifact used for the judgment.
+
 Manual dispatch may select `active` for a focused retest or `baseline` for paired safe and active
 evidence. A baseline builds, qualifies and starts one immutable image, records safe as attempt 1 and
 continues with active as attempt 2 only after the safe attempt produced complete passive evidence.

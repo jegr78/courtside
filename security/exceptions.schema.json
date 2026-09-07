@@ -3,10 +3,11 @@
   "$id": "urn:courtside:security:exceptions:v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "exceptions", "riskAcceptances"],
+  "required": ["schemaVersion", "exceptions", "dependencyExceptions", "riskAcceptances"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "exceptions": { "type": "array", "items": { "$ref": "#/$defs/scannerException" } },
+    "dependencyExceptions": { "type": "array", "items": { "$ref": "#/$defs/dependencyException" } },
     "riskAcceptances": { "type": "array", "items": { "$ref": "#/$defs/riskAcceptance" } }
   },
   "$defs": {
@@ -29,6 +30,27 @@
         "compensatingControl": { "$ref": "#/$defs/nonEmpty" },
         "expiresOn": { "$ref": "#/$defs/date" },
         "independentReview": { "type": "boolean" }
+      }
+    },
+    "dependencyException": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "identity", "affectedVersionRange", "owner", "reachabilityAnalysis", "riskAnalysis", "compensatingControl", "acceptedAt"],
+      "anyOf": [
+        { "required": ["reviewOn"], "properties": { "reviewOn": {} } },
+        { "required": ["expiresOn"], "properties": { "expiresOn": {} } }
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmpty" },
+        "identity": { "$ref": "#/$defs/nonEmpty" },
+        "affectedVersionRange": { "$ref": "#/$defs/nonEmpty" },
+        "owner": { "$ref": "#/$defs/nonEmpty" },
+        "reachabilityAnalysis": { "$ref": "#/$defs/nonEmpty" },
+        "riskAnalysis": { "$ref": "#/$defs/nonEmpty" },
+        "compensatingControl": { "$ref": "#/$defs/nonEmpty" },
+        "acceptedAt": { "$ref": "#/$defs/timestamp" },
+        "reviewOn": { "$ref": "#/$defs/date" },
+        "expiresOn": { "$ref": "#/$defs/date" }
       }
     },
     "riskAcceptance": {

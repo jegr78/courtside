@@ -8,6 +8,46 @@ The `npm audit` workflow checks the complete locked frontend dependency tree eve
 
 Every other scanner outage or missing report fails its named workflow step and is never reported as a clean scan. Maintainers can run the same classified npm audit locally with `cd frontend && npm run audit:security -- --output ../build/security/npm.json`.
 
+## Dependency remediation deadlines
+
+The first reliable Dependabot alert on the default branch starts the remediation clock. The gate
+groups alert history by GHSA, ecosystem, package and manifest, and retains the earliest discovery
+when a scan runs again, a branch is rebased or an alert is reopened. The alert history supplies
+the clock, not the current dependency state. SHA-bound npm and Trivy summaries confirm which
+findings exist in the tested lockfile or runtime. This avoids treating a delayed Dependabot update
+as evidence about a newer commit. A current scanner finding that Dependabot has not ingested is
+recorded as `pending-alert-correlation` and blocks release until its version and original discovery
+can be correlated. It cannot use an exception while that version is unknown. Critical findings must be
+remediated within 72 hours. A Critical finding that is actively exploited or directly reachable
+must also be contained within 24 hours. Until its reachability is documented in
+`security/dependency-assessments.json`, a Critical finding is treated as directly reachable. High
+findings have 7 days, Medium findings 30 days and Low findings 90 days.
+
+The maintainer owns triage, containment and remediation. A finding with an upstream fix is an
+unplanned update until its assessment names the repository issue that plans it; a finding without
+a patched version is recorded separately as an unavailable upstream fix. An alert dismissed as
+inaccurate does not start the clock. A confirmed finding that reaches its deadline blocks a
+release. Dependabot proposals, including major updates, are evaluated by Dependency Review and CI
+rather than rejected by a hard pre-approval ignore rule.
+
+The project's single maintainer may approve a dependency exception in `security/exceptions.json`.
+It must match the stable alert identity and affected version range exactly and record an owner,
+reachability analysis, risk analysis, compensating control, acceptance time and a concrete review
+date or expiry. If both dates exist, the earlier one controls. The gate ignores a stale or
+mismatched exception. Duplicate and incomplete entries fail
+closed. The exception must be removed when the finding is fixed or the affected range changes.
+
+The GitHub alert API and the exact-revision scanner summaries are evidence, not availability
+infrastructure. A network failure, HTTP 502, 503 or 504, or a response proven to be rate-limited
+records the source as `skipped`; unavailable
+evidence is not reported as success and does not block a release by itself. A skipped npm scan has
+the same effect because it cannot confirm the current dependency state. Authentication,
+authorization, malformed data and unknown responses fail the gate. Skipped evidence records the
+latest successful default-branch evidence artifact and its age while that artifact remains
+available. The workflow also imports that artifact. A finding confirmed on the current revision
+therefore retains its clock and overdue state during a later alert-API outage. If no prior evidence
+is available, both fields remain explicitly unknown and the outage alone does not block release.
+
 The importer records each scanner's name, version, completion state, subject and finding count. A
 zero count therefore means a completed clean scan, not missing evidence. Findings retain their
 advisory source, aliases, CWE mappings, affected component and reachability state. Matching npm and
@@ -18,7 +58,7 @@ observations. The importer does not execute scanners.
 
 High and Critical npm and Trivy findings and CodeQL findings with a security severity of at least 7 block the gate. A maintainer validates reachability and exploitability before deciding whether to fix the dependency, remove the affected feature or record an exception.
 
-Exceptions live in `security/exceptions.json` and match one scan scope, scanner, finding id and target exactly. The maintained scopes are `required-build`, `release-build`, `release-image-amd64` and `release-image-arm64`. Each record contains a rationale, owning area, compensating control, expiry and whether independent review occurred. Expired, duplicate and incomplete exceptions fail every gate; an unused exception fails its own scope without blocking unrelated scopes.
+Static-scanner exceptions live in `security/exceptions.json` and match one scan scope, scanner, finding id and target exactly. The maintained scopes are `required-build`, `release-build`, `release-image-amd64` and `release-image-arm64`. Each record contains a rationale, owning area, compensating control, expiry and whether independent review occurred. Expired, duplicate and incomplete exceptions fail every gate; an unused exception fails its own scope without blocking unrelated scopes.
 
 The same file contains dynamic `riskAcceptances`, keyed by the stable fingerprint from the
 [security finding lifecycle](security-findings.md). The two lists are separate because a raw static

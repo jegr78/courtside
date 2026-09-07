@@ -88,11 +88,21 @@ attempts it comments that the issue is ready for closure review and says, in as 
 remains open. Somebody has to close it. A release that seems blocked for no reason is usually
 waiting on exactly that.
 
+## What the release refuses after scanning
+
+**No confirmed dependency finding may be past its remediation deadline.** The build matches the
+complete Dependabot alert history against npm and Trivy summaries bound to the tagged commit. The
+summaries establish current dependency state; alert history supplies the earliest reliable clock.
+An exact, current maintainer exception can keep the release ready. An unavailable alert service
+produces explicit skipped evidence and does not block publication by itself. The latest completed
+default-branch artifact keeps a still-current overdue finding blocked during that outage.
+Permission failures and malformed evidence still stop the build.
+
 ## What runs, and what each part proves
 
 | Job | What it establishes |
 |---|---|
-| `build` | The version is stamped, the full suite passes on the tagged commit, CodeQL analyses the sources, npm audit evidence is captured, and the release-build security policy holds |
+| `build` | Dependency-remediation deadlines hold, the version is stamped, the full suite passes on the tagged commit, CodeQL analyses the sources, npm audit evidence is captured, and the release-build security policy holds |
 | `image` | One multi-architecture image is built and pushed as `release-candidate-<sha>` |
 | `qualify` | That exact digest is brought up through the reference deployment on `amd64` and `arm64`, and its vulnerabilities are checked against the candidate-image policy |
 | `active-security` | The running candidate is exercised by the scanners of the `active` profile. The `destructive` profile — resource abuse — does not run here |

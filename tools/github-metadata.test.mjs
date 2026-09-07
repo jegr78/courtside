@@ -96,7 +96,7 @@ test("given Dependabot nested fields are malformed, when validating, then each f
   unknownGroupField.updates[0].groups.spring.command = "ignored";
   cases.push(unknownGroupField);
   const invalidUpdateType = structuredClone(source);
-  invalidUpdateType.updates.at(-1).ignore[0]["update-types"] = ["all"];
+  invalidUpdateType.updates.at(-1).ignore = [{ "dependency-name": "example", "update-types": ["all"] }];
   cases.push(invalidUpdateType);
 
   // when / then

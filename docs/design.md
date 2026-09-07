@@ -1586,7 +1586,15 @@ whether it is built or designed. **Designed means absent today.**
   nightly source scan and by nothing else. The release workflow signs each image keylessly with
   cosign and attaches an SBOM attestation. Trivy scans the application's extracted layers and the
   source tree on every pull request and every release; the container image's own base layers are
-  not, so that half is designed and not built.*
+  not, so that half is designed and not built. SHA-bound npm and Trivy summaries establish the
+  dependency findings on the tested revision; the earliest matching default-branch Dependabot
+  alert starts their retained remediation clock. Critical findings have 72 hours, High 7 days,
+  Medium 30 days and Low 90 days. An actively exploited, directly reachable or not-yet-assessed
+  Critical finding also needs containment within 24 hours. Confirmed overdue findings block
+  release unless the single maintainer records an exact, expiring exception. Current findings that
+  precede alert ingestion block until their version and original discovery can be correlated. Prior completed
+  evidence preserves confirmed blocks through alert-API outages; unavailable data stays visibly
+  skipped and is never treated as a clean scan.*
 - **Accepted: a long-lived token can publish under this project's name.** release-please cuts every
   release, and it holds a fine-grained personal access token scoped to this repository alone —
   contents (push the release branch and the tag), pull requests (open and update the release pull

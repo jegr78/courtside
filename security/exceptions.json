@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "exceptions": [],
+  "dependencyExceptions": [],
   "riskAcceptances": [
     {
       "id": "remote-https-club-logo-2026",

@@ -517,7 +517,7 @@ test("given separate runtime and source reports, when invoking the policy, then 
   writeFileSync(source, JSON.stringify({ Results: [{ Target: "Dockerfile", Misconfigurations: [{
     ID: "DS-001", Severity: "CRITICAL"
   }] }] }));
-  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [] }));
+  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [], dependencyExceptions: [] }));
 
   try {
     // when
@@ -542,7 +542,7 @@ test("given skipped npm evidence, when invoking release policy, then the visible
   const exceptions = join(directory, "exceptions.json");
   const output = join(directory, "summary.json");
   writeFileSync(report, JSON.stringify({ schemaVersion: 1, status: "skipped", reason: "service-unavailable" }));
-  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [] }));
+  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [], dependencyExceptions: [] }));
 
   try {
     // when
@@ -569,7 +569,7 @@ test("given skipped npm evidence, when invoking pull-request policy, then the ga
   const exceptions = join(directory, "exceptions.json");
   const output = join(directory, "summary.json");
   writeFileSync(report, JSON.stringify({ schemaVersion: 1, status: "skipped", reason: "network-unavailable" }));
-  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [] }));
+  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [], dependencyExceptions: [] }));
 
   try {
     // when
@@ -603,7 +603,9 @@ test("given a dynamic lifecycle, when invoking the existing policy CLI, then one
     },
     candidates: [], findings: [], riskAcceptances: []
   }));
-  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [], riskAcceptances: [] }));
+  writeFileSync(exceptions, JSON.stringify({
+    schemaVersion: 1, exceptions: [], dependencyExceptions: [], riskAcceptances: []
+  }));
 
   try {
     // when
@@ -629,7 +631,9 @@ test("given dynamic assessment is required, when its lifecycle is absent, then t
   const exceptions = join(directory, "exceptions.json");
   const output = join(directory, "summary.json");
   writeFileSync(report, JSON.stringify({ Results: [] }));
-  writeFileSync(exceptions, JSON.stringify({ schemaVersion: 1, exceptions: [], riskAcceptances: [] }));
+  writeFileSync(exceptions, JSON.stringify({
+    schemaVersion: 1, exceptions: [], dependencyExceptions: [], riskAcceptances: []
+  }));
 
   try {
     // when
