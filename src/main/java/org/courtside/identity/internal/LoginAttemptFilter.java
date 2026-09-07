@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.courtside.shared.SecurityEventLog;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -19,6 +20,7 @@ class LoginAttemptFilter extends OncePerRequestFilter {
     private final LoginAttemptProtection protection;
     private final LoginVerificationCapacity verificationCapacity;
     private final LoginRateLimitHandler handler;
+    private final SecurityEventLog securityEvents;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -35,6 +37,8 @@ class LoginAttemptFilter extends OncePerRequestFilter {
         }
         Optional<LoginVerificationCapacity.Permit> permit = verificationCapacity.tryAcquire();
         if (permit.isEmpty()) {
+            securityEvents.controlRefused(null,
+                    SecurityEventLog.ControlRefusal.LOGIN_VERIFICATION_CAPACITY);
             handler.handle(response, Duration.ofSeconds(1));
             return;
         }

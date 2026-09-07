@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "code": "courtside.authentication.succeeded",
+      "severity": "INFO",
+      "result": "success",
+      "allowedFields": ["account.id", "event.code", "event.outcome"],
+      "allowedValues": {}
+    },
+    {
+      "code": "courtside.authentication.failed",
+      "severity": "WARN",
+      "result": "failure",
+      "allowedFields": ["account.id", "event.code", "event.outcome", "event.reason"],
+      "allowedValues": {
+        "event.reason": ["BAD_CREDENTIALS", "DISABLED", "LOCKED", "CREDENTIALS_EXPIRED", "OTHER"]
+      }
+    },
+    {
+      "code": "courtside.authorization.denied",
+      "severity": "WARN",
+      "result": "failure",
+      "allowedFields": ["account.id", "event.code", "event.outcome"],
+      "allowedValues": {}
+    },
+    {
+      "code": "courtside.session.terminated",
+      "severity": "INFO",
+      "result": "success",
+      "allowedFields": ["account.id", "actor.account.id", "event.code", "event.outcome", "event.reason"],
+      "allowedValues": {
+        "event.reason": ["EXPLICIT_LOGOUT", "ABSOLUTE_EXPIRY", "SECURITY_EPOCH_CHANGED", "CONCURRENT_LIMIT"]
+      }
+    },
+    {
+      "code": "courtside.credential.changed",
+      "severity": "INFO",
+      "result": "success",
+      "allowedFields": ["account.id", "actor.account.id", "event.action", "event.code", "event.outcome"],
+      "allowedValues": {
+        "event.action": ["PERMANENT_PASSWORD_REPLACED", "TEMPORARY_CREDENTIAL_ISSUED", "TEMPORARY_CREDENTIAL_WITHDRAWN"]
+      }
+    },
+    {
+      "code": "courtside.administration.security-action",
+      "severity": "INFO",
+      "result": "success",
+      "allowedFields": ["account.id", "actor.account.id", "event.action", "event.code", "event.outcome"],
+      "allowedValues": {
+        "event.action": ["ACCOUNT_CREATED", "ROLES_CHANGED", "USERNAME_CHANGED", "CREDENTIAL_REQUESTED", "ACCOUNT_ENABLED", "ACCOUNT_DISABLED"]
+      }
+    },
+    {
+      "code": "courtside.control.triggered",
+      "severity": "WARN",
+      "result": "success",
+      "allowedFields": ["account.id", "event.code", "event.outcome", "event.reason"],
+      "allowedValues": {
+        "event.reason": ["LOGIN_ADDRESS_LIMIT", "DISTRIBUTED_LOGIN_THRESHOLD"]
+      }
+    },
+    {
+      "code": "courtside.control.refused",
+      "severity": "WARN",
+      "result": "failure",
+      "allowedFields": ["account.id", "event.code", "event.outcome", "event.reason"],
+      "allowedValues": {
+        "event.reason": ["CSRF", "LOGIN_VERIFICATION_CAPACITY", "CREDENTIAL_ISSUE_LIMIT", "ADMINISTRATOR_CONTINUITY", "REQUEST_VALIDATION"]
+      }
+    }
+  ]
+}

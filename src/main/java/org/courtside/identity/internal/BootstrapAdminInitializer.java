@@ -6,6 +6,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.SecurityEventLog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -29,6 +30,7 @@ class BootstrapAdminInitializer implements ApplicationRunner {
     private final PasswordEncoder passwordEncoder;
     private final BootstrapAdminProperties properties;
     private final ClubIdentity club;
+    private final SecurityEventLog securityEvents;
 
     @Override
     @Transactional
@@ -47,6 +49,10 @@ class BootstrapAdminInitializer implements ApplicationRunner {
         account.enable();
         account.requirePasswordChange();
         accounts.save(account);
+        securityEvents.administrativeActionAfterCommit(account.getId(), null,
+                SecurityEventLog.AdministrativeAction.ACCOUNT_CREATED);
+        securityEvents.credentialChangedAfterCommit(account.getId(), null,
+                SecurityEventLog.CredentialChange.TEMPORARY_CREDENTIAL_ISSUED);
     }
 
     private BootstrapValues requiredValues() {

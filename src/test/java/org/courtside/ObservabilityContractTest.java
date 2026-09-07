@@ -51,6 +51,17 @@ class ObservabilityContractTest {
     }
 
     @Test
+    void whenTheApplicationLogLevelChanges_thenTheSecurityEventInventoryRemainsComplete() throws IOException {
+        // given
+        String configuration = Files.readString(PROJECT.resolve("src/main/resources/application.yaml"));
+        String compose = Files.readString(PROJECT.resolve("deploy/compose.yaml"));
+
+        // when / then
+        assertThat(configuration).contains("org.courtside.security.events: INFO");
+        assertThat(compose).contains("LOGGING_LEVEL_ORG_COURTSIDE: ${COURTSIDE_LOG_LEVEL:-INFO}");
+    }
+
+    @Test
     void whenInspectingManagementExposure_thenOnlyHealthIsPubliclyExposed() throws IOException {
         // given
         String configuration = Files.readString(PROJECT.resolve("src/main/resources/application.yaml"));

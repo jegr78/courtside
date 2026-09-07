@@ -133,6 +133,7 @@ management:
 logging:
   level:
     com.google.protobuf.UnsafeUtil: ERROR
+    org.courtside.security.events: INFO
   structured:
     format:
       console: ecs

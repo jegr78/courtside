@@ -2,8 +2,8 @@ package org.courtside.identity.internal;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.courtside.shared.SecurityEventLog;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,7 +18,6 @@ import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.Optional;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 class LoginAttemptProtection {
@@ -27,6 +26,7 @@ class LoginAttemptProtection {
     private final LoginProtectionProperties properties;
     private final Clock clock;
     private final MeterRegistry meters;
+    private final SecurityEventLog securityEvents;
 
     @Transactional
     Optional<LoginBlock> registerAttempt(String address) {
@@ -92,8 +92,7 @@ class LoginAttemptProtection {
         Instant blockedUntil = attempts >= limit.maxFailures() ? now.plus(limit.block()) : null;
         if (blockedUntil != null && (current == null || current.blockedUntil() == null
                 || !current.blockedUntil().isAfter(now))) {
-            log.info("The {} limit now refuses sign-ins for {} seconds", scope,
-                    limit.block().toSeconds());
+            securityEvents.controlTriggered(null, SecurityEventLog.ControlTrigger.LOGIN_ADDRESS_LIMIT);
         }
 
         jdbc.sql("""
@@ -125,8 +124,8 @@ class LoginAttemptProtection {
 
         if (attempts == observation.threshold()) {
             meters.counter("courtside.login.distributed.thresholds").increment();
-            log.warn("The distributed sign-in observation threshold of {} attempts in {} seconds was crossed",
-                    observation.threshold(), observation.window().toSeconds());
+            securityEvents.controlTriggered(null,
+                    SecurityEventLog.ControlTrigger.DISTRIBUTED_LOGIN_THRESHOLD);
         }
 
         jdbc.sql("""

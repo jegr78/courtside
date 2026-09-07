@@ -562,7 +562,7 @@ default.
 | `COURTSIDE_IMPORT_PREVIEW_RETENTION` | `7d` | How long a roster-import preview keeps the change set it resolved. The uploaded file itself is never kept — only its SHA-256. Past this bound the row, the file's name and hash and the counts survive, and the change set does not. At most 30 days. |
 | `COURTSIDE_IMPORT_SWEEP_INTERVAL` | `1h` | How often previews past their retention are swept, between a minute and a day. The sweep drops the resolved change set and the person fingerprints, and keeps the row, the file's name and hash, and the counts. |
 | `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` | `500` | Logs Hibernate queries slower than this threshold in milliseconds. Bind values are not logged. |
-| `COURTSIDE_LOG_LEVEL` | `INFO` | Log level of the application's own loggers. `DEBUG` adds an `Answering` line for every error one of its exception handlers answers; sign-in and authorisation failures are not among them. |
+| `COURTSIDE_LOG_LEVEL` | `INFO` | Log level of the application's ordinary loggers. `DEBUG` adds an `Answering` line for every error one of its exception handlers answers. The security-event logger remains at `INFO`, so changing this setting cannot silently remove its successful authentication, session, credential or administrative events. |
 | `COURTSIDE_PORT` | `8080` | Host port on the loopback interface. |
 | `COURTSIDE_SOURCE_URL` | required | The absolute HTTP or HTTPS address without embedded credentials returned by `GET /api/source`. Point an unchanged installation here and a modified fork at the corresponding source for that fork. Compose refuses to start without this choice. |
 | `COURTSIDE_ENVIRONMENT` | `PRODUCTION` | Public environment designation: `PRODUCTION`, `UAT`, `DEVELOPMENT` or `PERFORMANCE`. UAT is visibly marked in the frontend. |
@@ -598,6 +598,14 @@ management using Spring's
 `MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION` environment variables; never commit tokens
 to `.env`. The collector and its retention policy remain the operator's responsibility.
 
+Courtside's security events use the stable catalogue described in
+[`docs/security-events.md`](../docs/security-events.md) and remain in the same ECS standard-output
+stream. Docker logging drivers, sidecars and collectors are optional ways to route that stream; the
+reference deployment makes no synchronous external delivery call and does not assert that a
+destination accepted an event. Operators remain responsible for choosing a logging configuration
+whose outage behavior cannot block requests, as well as storage, access, retention and alert
+thresholds for the installation.
+
 ## When a member reports an error
 
 An error a member causes leaves no `Answering` line at `INFO`: the handler that answers the request
@@ -614,12 +622,12 @@ the request fields where validation rejected them, and nothing where the respons
 say. That is enough to tell a member's mistake from the instance's. Restore the level and restart
 once you have what you need.
 
-Signing in is the exception, and it is the complaint this section is most likely to be opened for.
-A rejected password, a request from a member who is not allowed to make it, and a login stopped by
-the rate limit all answer with a problem document and log nothing, at any level. For those,
-`grep Answering` comes back empty however low you set the level, and the response the member got —
-its `type`, and the `Retry-After` a rate-limited login carries — is the whole of what there is to
-go on.
+Signing in and authorization decisions use the separate security-event inventory at every ordinary
+application log level. Search for `"logger":"org.courtside.security.events"` and select the stable
+`event.code`, `event.reason` or `event.action`; the records deliberately contain no submitted
+username, address, credential or request body. A rejected request still carries the member-facing
+detail — including its problem `type` and a rate limit's `Retry-After` — while the event supplies
+the privacy-safe operational correlation.
 
 `DEBUG` is for diagnosis and not a level to run a club on. It is loud, it pushes the record of
 everything else out of the rotated log files sooner, and every line it adds is one more line to keep
@@ -702,8 +710,9 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
 
 ## What this deployment does not solve yet
 
-- **No collector is included.** Courtside can export metrics and traces over OTLP, but operating,
-  securing and retaining telemetry remains the operator's responsibility.
+- **No collector is included.** Courtside can export metrics and traces over OTLP and emits ECS
+  application and security logs to standard output, but routing, operating, securing and retaining
+  telemetry remains the operator's responsibility.
 - **Inbound mail arrives and nothing reads it.** Port 25 is open so bounces and DMARC reports
   reach the instance rather than vanishing, but nothing acts on them. The instance records that it
   handed a message to this server and learns nothing after that, so a bounce arriving here

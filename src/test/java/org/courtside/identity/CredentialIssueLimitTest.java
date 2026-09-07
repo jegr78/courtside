@@ -1,7 +1,11 @@
 package org.courtside.identity;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.courtside.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -12,6 +16,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CredentialIssueLimitTest extends AbstractIntegrationTest {
@@ -54,8 +59,31 @@ class CredentialIssueLimitTest extends AbstractIntegrationTest {
         }
 
         // when / then
-        assertThatThrownBy(() -> credentials.issueTo(accountId))
-                .extracting("code").isEqualTo("identity.credentials.rateLimited");
+        ListAppender<ILoggingEvent> recorded = new ListAppender<>();
+        recorded.start();
+        eventLogger().addAppender(recorded);
+        try {
+            assertThatThrownBy(() -> credentials.issueTo(accountId))
+                    .extracting("code").isEqualTo("identity.credentials.rateLimited");
+            assertThat(recorded.list).filteredOn(event -> event.getKeyValuePairs().stream()
+                            .anyMatch(pair -> pair.key.equals("event.reason")
+                                    && pair.value.equals("CREDENTIAL_ISSUE_LIMIT")))
+                    .singleElement().satisfies(event -> {
+                assertThat(event.getKeyValuePairs()).anySatisfy(pair -> {
+                    assertThat(pair.key).isEqualTo("event.reason");
+                    assertThat(pair.value).isEqualTo("CREDENTIAL_ISSUE_LIMIT");
+                });
+                assertThat(event.getKeyValuePairs()).anySatisfy(pair -> {
+                    assertThat(pair.key).isEqualTo("account.id");
+                    assertThat(pair.value).isEqualTo(accountId.toString());
+                });
+                assertThat(event.getKeyValuePairs().toString())
+                        .doesNotContain("doe.jane", "jane.doe@example.org");
+            });
+        } finally {
+            eventLogger().detachAppender(recorded);
+            recorded.stop();
+        }
     }
 
     @Test
@@ -100,5 +128,9 @@ class CredentialIssueLimitTest extends AbstractIntegrationTest {
                 person, username, Set.of(Role.MEMBER), "de");
         account.enable();
         return accounts.save(account).getId();
+    }
+
+    private static Logger eventLogger() {
+        return (Logger) LoggerFactory.getLogger("org.courtside.security.events");
     }
 }

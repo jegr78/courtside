@@ -79,26 +79,36 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
         failLogin("first", "192.0.2.60");
         failLogin("second", "192.0.2.60");
 
-        // when — the attempts a blocked caller can make are bounded by nothing, so the log a
-        // refusal writes cannot be per attempt
+        // when — the attempts a blocked caller can make are bounded by nothing, so the trigger
+        // event cannot be repeated per refused attempt
         for (int attempt = 0; attempt < 5; attempt++) {
             mockMvc.perform(login("third", "wrong", "192.0.2.60"))
                     .andExpect(status().isTooManyRequests());
         }
 
         // then — which limit closed decides whether one client or the whole instance is affected
-        assertThat(blockMessages()).singleElement().satisfies(message -> assertThat(message)
-                .contains("ADDRESS")
-                .doesNotContain("192.0.2.60"));
+        assertThat(blockEvents()).singleElement().satisfies(event -> {
+            assertThat(event.getKeyValuePairs()).anySatisfy(pair -> {
+                assertThat(pair.key).isEqualTo("event.code");
+                assertThat(pair.value).isEqualTo("courtside.control.triggered");
+            });
+            assertThat(event.getKeyValuePairs()).anySatisfy(pair -> {
+                assertThat(pair.key).isEqualTo("event.reason");
+                assertThat(pair.value).isEqualTo("LOGIN_ADDRESS_LIMIT");
+            });
+            assertThat(event.toString()).doesNotContain("192.0.2.60");
+        });
     }
 
-    private List<String> blockMessages() {
-        return recorded.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+    private List<ILoggingEvent> blockEvents() {
+        return recorded.list.stream()
+                .filter(event -> event.getKeyValuePairs().stream().anyMatch(pair ->
+                        pair.key.equals("event.reason") && pair.value.equals("LOGIN_ADDRESS_LIMIT")))
+                .toList();
     }
 
     private static Logger blockLog() {
-        return (Logger) LoggerFactory.getLogger(
-                "org.courtside.identity.internal.LoginAttemptProtection");
+        return (Logger) LoggerFactory.getLogger("org.courtside.security.events");
     }
 
     @Test

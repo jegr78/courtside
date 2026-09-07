@@ -119,11 +119,15 @@ class CredentialMessageTest extends AbstractIntegrationTest {
         raise(accountId, CredentialsRequested.Reason.NEW_ACCOUNT);
         String credential = credentialIn(body(theMessageHandedOver()));
 
-        // then — the account id is what a log carries, and it names a row rather than a person
-        assertThat(logLines()).anyMatch(line -> line.contains(accountId.toString()));
-        assertThat(logLines()).noneMatch(line -> line.contains(credential)
-                || line.contains("jane.doe@example.org")
-                || line.contains("Jane") || line.contains("Doe"));
+        // then — the structured account id names a row rather than a person
+        assertThat(credentialIssueEvents()).singleElement().satisfies(event -> {
+            assertThat(event.getKeyValuePairs()).anySatisfy(pair -> {
+                assertThat(pair.key).isEqualTo("account.id");
+                assertThat(pair.value).isEqualTo(accountId.toString());
+            });
+            assertThat(event.toString())
+                    .doesNotContain(credential, "jane.doe@example.org", "Jane", "Doe");
+        });
     }
 
     @Test
@@ -187,8 +191,13 @@ class CredentialMessageTest extends AbstractIntegrationTest {
                 .param("id", accountId).query().singleRow();
     }
 
-    private List<String> logLines() {
-        return logged.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+    private List<ILoggingEvent> credentialIssueEvents() {
+        return logged.list.stream()
+                .filter(event -> event.getKeyValuePairs() != null
+                        && event.getKeyValuePairs().stream().anyMatch(pair ->
+                                pair.key.equals("event.action")
+                                        && pair.value.equals("TEMPORARY_CREDENTIAL_ISSUED")))
+                .toList();
     }
 
     private static Logger ownLogger() {

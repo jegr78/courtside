@@ -2,6 +2,7 @@ package org.courtside.identity.internal;
 
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.SecurityEventLog;
 import org.springframework.security.core.session.SessionInformation;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.session.FindByIndexNameSessionRepository;
@@ -18,11 +19,14 @@ class DisplacingSessionRegistry<S extends Session> implements SessionRegistry {
     private final SessionRegistry stored;
     private final FindByIndexNameSessionRepository<S> sessions;
     private final UserAccountRepository accounts;
+    private final SecurityEventLog securityEvents;
 
-    DisplacingSessionRegistry(FindByIndexNameSessionRepository<S> sessions, UserAccountRepository accounts) {
+    DisplacingSessionRegistry(FindByIndexNameSessionRepository<S> sessions, UserAccountRepository accounts,
+                              SecurityEventLog securityEvents) {
         this.stored = new SpringSessionBackedSessionRegistry<>(sessions);
         this.sessions = sessions;
         this.accounts = accounts;
+        this.securityEvents = securityEvents;
     }
 
     @Override
@@ -53,9 +57,8 @@ class DisplacingSessionRegistry<S extends Session> implements SessionRegistry {
         try {
             sessions.deleteById(sessionId);
             accounts.findByUsername(String.valueOf(principal))
-                    .ifPresent(account -> log.info(
-                            "A sign-in displaced the least recently active session of account {}",
-                            account.getId()));
+                    .ifPresent(account -> securityEvents.sessionTerminated(account.getId(), account.getId(),
+                            SecurityEventLog.SessionTermination.CONCURRENT_LIMIT));
         } catch (RuntimeException failure) {
             log.warn("A displaced session could not be ended", failure);
         }

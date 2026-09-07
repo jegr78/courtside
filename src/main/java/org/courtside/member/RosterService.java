@@ -20,6 +20,7 @@ import org.courtside.member.internal.PersonText;
 import org.courtside.member.internal.RosterCursorUnknownException;
 import org.courtside.member.internal.UsernameTakenException;
 import org.courtside.shared.CursorPage;
+import org.courtside.shared.SecurityEventLog;
 import org.courtside.shared.SqlConstraintViolation;
 import org.courtside.shared.SupportedLanguages;
 import org.springframework.context.ApplicationEventPublisher;
@@ -67,6 +68,7 @@ public class RosterService {
     private final ClubIdentity club;
     private final SupportedLanguages languages;
     private final ApplicationEventPublisher events;
+    private final SecurityEventLog securityEvents;
 
     public CursorPage.Result<RosterEntry> list(String query, UUID membershipTypeId, UUID cursor, int limit) {
         validateLimit(limit);
@@ -268,6 +270,8 @@ public class RosterService {
         }
         administrators.acquire();
         if (accounts.countEnabledHoldingRoleExcept(Role.ADMIN, account.getId()) == 0) {
+            securityEvents.controlRefused(account.getId(),
+                    SecurityEventLog.ControlRefusal.ADMINISTRATOR_CONTINUITY);
             throw new LastAdministratorException("roster.lastAdministrator", Map.of());
         }
     }
@@ -495,8 +499,12 @@ public class RosterService {
         }
         accounts.findByPersonIdIn(List.of(personId)).forEach(account -> {
             long epoch = account.getSecurityEpoch();
-            account.withdrawUnusedCredential();
+            boolean withdrawn = account.withdrawUnusedCredential();
             endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
+            if (withdrawn) {
+                securityEvents.credentialChangedAfterCommitForCurrentActor(account.getId(),
+                        SecurityEventLog.CredentialChange.TEMPORARY_CREDENTIAL_WITHDRAWN);
+            }
         });
     }
 

@@ -5,6 +5,7 @@ import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.SecurityEventLog;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -46,7 +47,8 @@ class SecurityConfigurationTest {
         when(accounts.findSecurityEpochById(accountId)).thenReturn(Optional.of(2L));
 
         // when
-        new SecurityEpochFilter(accounts).doFilter(request, response, chain);
+        SecurityEventLog securityEvents = mock(SecurityEventLog.class);
+        new SecurityEpochFilter(accounts, securityEvents).doFilter(request, response, chain);
 
         // then
         assertThat(request.getSession(false)).isNull();
@@ -54,6 +56,8 @@ class SecurityConfigurationTest {
         // The request carries on without authority: what needs it is refused by the layer that
         // refuses every unauthenticated request, and the sign-in that replaces the session is not.
         verify(chain).doFilter(request, response);
+        verify(securityEvents).sessionTerminated(accountId, null,
+                SecurityEventLog.SessionTermination.SECURITY_EPOCH_CHANGED);
     }
 
     @Test
