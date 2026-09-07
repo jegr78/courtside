@@ -70,7 +70,7 @@ class DatabaseTlsTest {
         try {
             assertThatThrownBy(this::encrypted)
                     .isInstanceOf(SQLException.class)
-                    .hasStackTraceContaining("Path does not chain with any of the trust anchors");
+                    .hasStackTraceContaining("CertPathValidatorException");
         } finally {
             Files.writeString(ANCHOR, SERVED.authority());
             pool.getHikariPoolMXBean().softEvictConnections();

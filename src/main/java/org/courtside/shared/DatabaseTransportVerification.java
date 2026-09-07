@@ -27,8 +27,6 @@ class DatabaseTransportVerification implements BeanPostProcessor, SmartInitializ
         return bean;
     }
 
-    // Every other way this configuration can be wrong refuses the start. A required verification
-    // that reached no pool at all would be the one way left back to an unverified connection.
     @Override
     public void afterSingletonsInstantiated() {
         if (!applied && properties.getObject().mode() == DatabaseTlsProperties.Mode.VERIFY_FULL) {

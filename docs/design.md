@@ -1488,13 +1488,14 @@ whether it is built or designed. **Designed means absent today.**
   operator turns it on.* `courtside.database.tls.mode` is `prefer`, `disable` or `verify-full`.
   `verify-full` requires a certificate that chains to an operator-supplied authority and names the
   host the connection URL names. It refuses to start when that authority is missing, unreadable or
-  holds no certificate, and it refuses to start when the connection URL or the pool carries something
-  that would decide the transport instead — an `ssl` argument, an `ssl` driver property, or a
-  `service` name that pulls in a file of them. The driver lets a URL argument beat the pool's own
-  property, so `?sslmode=disable` would otherwise connect in plaintext with verification configured
-  and say nothing. An unknown, expired, not-yet-valid or wrong-name certificate is reported at
-  startup as a sentence naming which of the four it was rather than a stack trace; a certificate that expires while the
-  instance runs is not diagnosed that way and surfaces as the driver's own error. A replaced
+  holds no certificate, when no connection pool was configured with it at all, and when the
+  connection URL or the pool carries anything whose name says it decides the transport — `ssl…`
+  and `gssEnc…` alike — or a `service` name that pulls in a file of them. The driver lets a URL
+  argument beat the pool's own property, so `?sslmode=disable` would otherwise connect in plaintext
+  with verification configured and say nothing. An unknown, expired, not-yet-valid or wrong-name
+  certificate is reported at startup as a sentence naming which of the four it was rather than a
+  stack trace; a certificate that expires while the instance runs is not diagnosed that way and
+  surfaces as the driver's own error. A replaced
   authority decides the next connection the pool opens, and one that no longer vouches for the
   database refuses rather than falling back.
   Courtside ships no authority and issues no production key material: issuance, storage, lifetime,

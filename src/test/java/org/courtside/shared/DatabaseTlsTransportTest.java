@@ -129,6 +129,19 @@ class DatabaseTlsTransportTest {
                 .doesNotContain("prefer");
     }
 
+    // Most of what carries these two states is not a certificate at all, and a sentence that
+    // opened by requiring one would blame TLS for an outage that has nothing to do with it.
+    @Test
+    void givenAFailureThatIsNoCertificateProblem_whenItIsDiagnosed_thenTlsIsNotBlamedForIt() {
+        // given
+        SQLException refusal = new SQLException("An I/O error occurred", "08006");
+
+        // when / then
+        assertThat(diagnosis(refusal).getDescription())
+                .doesNotContain("requires a verified TLS certificate")
+                .contains("failed before any certificate could be judged");
+    }
+
     // Both extend CertificateException, and an operator sent after the wrong one looks for a
     // certificate nobody mis-issued instead of at two clocks.
     @Test

@@ -34,40 +34,40 @@ class DatabaseTlsHandshakeFailureAnalyzer extends AbstractFailureAnalyzer<SQLExc
             return null;
         }
         Diagnosis diagnosis = diagnose(cause);
-        return new FailureAnalysis(REQUIRED + diagnosis.description(), diagnosis.action(), cause);
+        return new FailureAnalysis(diagnosis.description(), diagnosis.action(), cause);
     }
 
-    // Lowering the mode answers an anchor this instance configured wrongly. It never answers a
-    // peer that failed to prove who it is, because that is the peer the mode was raised against.
     private Diagnosis diagnose(SQLException cause) {
         if (carries(cause, CertificateExpiredException.class)) {
-            return new Diagnosis("the certificate the database served has expired.",
+            return new Diagnosis(REQUIRED + "the certificate the database served has expired.",
                     "Renew the database's certificate, and point courtside.database.tls"
                             + ".root-certificate at the authority that issued the new one.");
         }
         if (carries(cause, CertificateNotYetValidException.class)) {
-            return new Diagnosis("the certificate the database served is not valid yet.",
+            return new Diagnosis(REQUIRED + "the certificate the database served is not valid yet.",
                     "Compare the clocks of the two hosts, and roll the certificate out once it is"
                             + " valid.");
         }
         if (carries(cause, CertificateException.class)) {
-            return new Diagnosis("the configured authority does not vouch for the certificate the"
-                    + " database served.",
+            return new Diagnosis(REQUIRED + "the configured authority does not vouch for the"
+                    + " certificate the database served.",
                     "Point courtside.database.tls.root-certificate at the authority that issued"
                             + " the database's certificate. If it already names that authority,"
                             + " what answered served a certificate nobody issued for it.");
         }
         if (String.valueOf(cause.getMessage()).contains(HOSTNAME_VERIFIER)) {
-            return new Diagnosis("the certificate the database served names another host.",
+            return new Diagnosis(
+                    REQUIRED + "the certificate the database served names another host.",
                     "Reissue the database's certificate for the name the connection URL uses, or"
                             + " connect under a name that certificate already carries.");
         }
         if (String.valueOf(cause.getMessage()).contains(NO_TLS)) {
-            return new Diagnosis("the database offered no encryption at all.",
+            return new Diagnosis(REQUIRED + "the database offered no encryption at all.",
                     "Turn TLS on at the database, and check that the connection reaches the host"
                             + " you configured rather than something in front of it.");
         }
-        return new Diagnosis("the connection failed: " + cause.getMessage(),
+        return new Diagnosis("The database connection failed before any certificate could be"
+                + " judged: " + cause.getMessage(),
                 "Check that the database is reachable and serving TLS under the name the"
                         + " connection URL uses.");
     }

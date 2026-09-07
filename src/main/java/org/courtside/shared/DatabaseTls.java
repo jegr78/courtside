@@ -16,18 +16,22 @@ final class DatabaseTls {
     private static final String DISABLED = "disable";
     private static final String TRANSPORT_PARAMETER = "ssl";
     private static final String SERVICE_PARAMETER = "service";
+    private static final String GSS_PARAMETER = "gssenc";
     private static final String ROOT_CERTIFICATE = "courtside.database.tls.root-certificate";
-    private static final String ANCHOR_ACTION = "Point " + ROOT_CERTIFICATE + " at the certificate"
+    private static final String PATH_ACTION = "Point " + ROOT_CERTIFICATE + " at the certificate"
             + " of the authority that issued the database's certificate, or set"
             + " courtside.database.tls.mode back to prefer to connect without requiring one.";
+    private static final String MATERIAL_ACTION = "Restore the authority certificate at that path"
+            + " from your own copy. Something wrote a file this instance cannot read, and lowering"
+            + " the requirement would connect to whatever answers.";
+    private static final String URL_ACTION = "Configure the pool through spring.datasource.url, or"
+            + " set courtside.database.tls.mode back to prefer.";
     private static final String OVERRIDE_ACTION = "Remove it, and leave the transport to"
             + " courtside.database.tls.mode.";
 
     private DatabaseTls() {
     }
 
-    // PREFER leaves the driver's own default in place, which encrypts opportunistically and
-    // verifies nothing, so naming it after the driver is the only description that stays true.
     static void apply(HikariDataSource dataSource, DatabaseTlsProperties tls) {
         switch (tls.mode()) {
             case PREFER -> {
@@ -44,14 +48,17 @@ final class DatabaseTls {
         dataSource.addDataSourceProperty("sslrootcert", anchor.toString());
     }
 
-    // The driver takes the transport from a URL argument and from a pool property alike, and an
-    // argument beats the property, so either one could turn verification off without saying so.
+    // An argument beats the property it shares a name with, so both are read.
     private static void refuseWhatWouldDecideTheTransport(HikariDataSource dataSource) {
         for (Object property : dataSource.getDataSourceProperties().keySet()) {
             refuse(String.valueOf(property), "The connection pool carries the driver property");
         }
         String jdbcUrl = dataSource.getJdbcUrl();
-        if (jdbcUrl == null || jdbcUrl.indexOf('?') < 0) {
+        if (jdbcUrl == null) {
+            throw new DatabaseTlsConfigurationException("The connection pool names no JDBC URL, so"
+                    + " what would decide the transport cannot be read.", URL_ACTION);
+        }
+        if (jdbcUrl.indexOf('?') < 0) {
             return;
         }
         for (String argument : jdbcUrl.substring(jdbcUrl.indexOf('?') + 1).split("&")) {
@@ -59,11 +66,12 @@ final class DatabaseTls {
         }
     }
 
-    // A service name reaches the driver as an ordinary word and pulls in a file of properties this
-    // guard cannot read, among them the socket factory that decides whether the anchor is used.
+    // A service name pulls in a file of properties this guard cannot read, and GSS encryption is
+    // negotiated before TLS is, so the driver never reaches the mode configured here.
     private static void refuse(String named, String carrier) {
         String name = named.toLowerCase(Locale.ROOT);
-        if (name.startsWith(TRANSPORT_PARAMETER) || name.equals(SERVICE_PARAMETER)) {
+        if (name.startsWith(TRANSPORT_PARAMETER) || name.startsWith(GSS_PARAMETER)
+                || name.equals(SERVICE_PARAMETER)) {
             throw new DatabaseTlsConfigurationException(carrier + " '" + name + "', which overrides"
                     + " the verification " + ROOT_CERTIFICATE + " configures.", OVERRIDE_ACTION);
         }
@@ -72,20 +80,20 @@ final class DatabaseTls {
     private static Path usable(Path rootCertificate) {
         if (rootCertificate == null || rootCertificate.toString().isBlank()) {
             throw new DatabaseTlsConfigurationException("Verified database TLS is configured, but "
-                    + ROOT_CERTIFICATE + " names no file.", ANCHOR_ACTION);
+                    + ROOT_CERTIFICATE + " names no file.", PATH_ACTION);
         }
         if (!Files.isReadable(rootCertificate)) {
             throw new DatabaseTlsConfigurationException(ROOT_CERTIFICATE + " names "
-                    + rootCertificate + ", which does not exist or cannot be read.", ANCHOR_ACTION);
+                    + rootCertificate + ", which does not exist or cannot be read.", PATH_ACTION);
         }
         try (InputStream material = Files.newInputStream(rootCertificate)) {
             if (CertificateFactory.getInstance("X.509").generateCertificates(material).isEmpty()) {
                 throw new DatabaseTlsConfigurationException(ROOT_CERTIFICATE + " names "
-                        + rootCertificate + ", which holds no certificate.", ANCHOR_ACTION);
+                        + rootCertificate + ", which holds no certificate.", MATERIAL_ACTION);
             }
         } catch (IOException | CertificateException failure) {
             throw new DatabaseTlsConfigurationException(ROOT_CERTIFICATE + " names "
-                    + rootCertificate + ", which is not readable X.509 material.", ANCHOR_ACTION,
+                    + rootCertificate + ", which is not readable X.509 material.", MATERIAL_ACTION,
                     failure);
         }
         return rootCertificate;

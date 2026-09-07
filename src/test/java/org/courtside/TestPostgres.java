@@ -19,8 +19,6 @@ public final class TestPostgres {
     private TestPostgres() {
     }
 
-    // The reference deployment's own command, run against the reference deployment's own image, so
-    // that what an operator enables is what a verification run exercises.
     public static PostgreSQLContainer serving(TestCertificate pair) {
         String overlay = read();
         PostgreSQLContainer postgres = new PostgreSQLContainer(

@@ -13,8 +13,9 @@ function repositoryFile(path) {
 
 // The verification profiles beside these are not an operator surface, and documenting their
 // variables would describe this repository's harness to a club.
-const compose = ["compose.yaml", "compose.database-tls.yaml", "compose.database-tls-local.yaml"]
-  .map(deploymentFile).join("\n");
+const OPERATOR_FACING =
+  ["compose.yaml", "compose.database-tls.yaml", "compose.database-tls-local.yaml"];
+const compose = OPERATOR_FACING.map(deploymentFile).join("\n");
 const readme = deploymentFile("README.md");
 const example = deploymentFile(".env.example");
 const properties = repositoryFile("src/main/resources/application.yaml");
@@ -46,6 +47,23 @@ function announced(script) {
   return [...script.matchAll(/(?:announce|failed|healthy) "(.*)"/g)]
     .map((match) => match[1].replace(/^(?:failed|ok) /, ""));
 }
+
+test("given the two documentation contracts, when both read Compose, then they read the same files",
+  () => {
+    // given
+    const contract = repositoryFile(
+      "src/test/java/org/courtside/ReferenceDeploymentDocumentationTest.java");
+
+    // when
+    const named = [...new Set([...contract
+      .slice(contract.indexOf("variablesReadByCompose"))
+      .matchAll(/"deploy\/(compose[\w.-]*\.yaml)"/g)].map((match) => match[1]))];
+
+    // then
+    assert.deepEqual(named.sort(), [...OPERATOR_FACING].sort(),
+      "both contracts read the operator-facing Compose files, and an overlay added to only one of "
+      + "them narrows the other's gate without failing it");
+  });
 
 test("given the reference deployment, when a variable is read, then it is documented and offered",
   () => {

@@ -544,20 +544,25 @@ when the container started: renewal that writes a new file and renames it over t
 is what most renewal does — would leave the container reading the file it first saw.
 
 Put nothing else in that directory. The application container can read everything it holds, and the
-one thing the application needs is the authority. A private key kept beside it — the database's own,
-for instance — would be readable by whatever a flaw in the application can be made to read, and
-whoever holds the database's key can be the database.
+one thing the application needs is the authority. A private key kept beside it — the database's
+own, for instance — would be readable by whatever a flaw in the application can be made to read,
+and whoever holds the database's key can be the database.
 
 ```bash
 docker compose -f compose.yaml -f compose.database-tls.yaml up -d
 ```
 
-That is all a database somewhere else needs: point `SPRING_DATASOURCE_URL` at that host, and the
-certificate it serves has to name the host the URL names. Do not put an `ssl` argument or a
-`service` name in the URL, and do not set an `ssl` driver property on the pool. Each of them can
-decide the transport behind the verification — a URL argument beats the pool's own configuration,
-and a service name pulls in a file of properties — so the application refuses to start rather than
-let one quietly undo it.
+That is the application's side of a database somewhere else. Pointing it at that host is a change
+to `compose.yaml` itself and not a line in `.env`: `SPRING_DATASOURCE_URL` is set literally there,
+and the `app` service waits for the local `db` service through `depends_on`. Edit both, and drop
+the `db` service if this host no longer runs one. The certificate that host serves has to name the
+host the URL names.
+
+Do not put an `ssl` or `gssEncMode` argument, or a `service` name, in that URL, and do not set one
+as a driver property on the pool. Each decides the transport behind the verification — a URL
+argument beats the pool's own configuration, a service name pulls in a file of properties, and GSS
+encryption is negotiated before TLS is — so the application refuses to start rather than let one
+quietly undo it.
 
 ### Making this deployment's own database serve one
 

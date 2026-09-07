@@ -1,6 +1,8 @@
 package org.courtside.shared;
 
 import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.courtside.TestCertificate;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -143,6 +145,70 @@ class DatabaseTlsConfigurationTest {
                         "courtside.database.tls.root-certificate=" + authority)
                 .run(context -> assertThat(refusalIn(context.getStartupFailure()))
                         .hasMessageContaining("sslpassword"));
+    }
+
+    // GSS encryption is negotiated before TLS is, and the driver then never reaches the mode
+    // configured here, so the argument that carries no `ssl` at all is refused as well.
+    @Test
+    void givenAUrlThatNamesGssEncryption_whenTheVerifiedPoolStarts_thenItRefusesTheArgument()
+            throws Exception {
+        // given
+        Path authority = anchor(TestCertificate.issuedFor("db").authority());
+
+        // when / then
+        verified(authority, URL + "?gssEncMode=require")
+                .run(context -> assertThat(refusalIn(context.getStartupFailure()))
+                        .hasMessageContaining("gssencmode")
+                        .hasMessageContaining("overrides the verification"));
+    }
+
+    // The scan reads what the pool already carries, so it depends on running after the binding
+    // that puts an operator's driver properties there.
+    @Test
+    void givenAnOperatorSetDriverProperty_whenTheVerifiedPoolStarts_thenTheBindingIsSeen()
+            throws Exception {
+        // given
+        Path authority = anchor(TestCertificate.issuedFor("db").authority());
+
+        // when / then
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(DataSourceAutoConfiguration.class))
+                .withUserConfiguration(DatabaseTlsConfiguration.class)
+                .withPropertyValues("spring.datasource.url=" + URL,
+                        "spring.datasource.hikari.data-source-properties.sslfactory="
+                                + "org.postgresql.ssl.NonValidatingFactory",
+                        "courtside.database.tls.mode=verify-full",
+                        "courtside.database.tls.root-certificate=" + authority)
+                .run(context -> assertThat(refusalIn(context.getStartupFailure()))
+                        .hasMessageContaining("sslfactory"));
+    }
+
+    // A pool configured through a data-source class carries no URL, and the one channel this
+    // guard cannot read is the one its own policy says to refuse.
+    @Test
+    void givenAPoolWithoutAUrl_whenVerificationIsRequired_thenTheStartIsRefused() throws Exception {
+        // given
+        Path authority = anchor(TestCertificate.issuedFor("db").authority());
+
+        // when / then
+        verified(authority, null)
+                .run(context -> assertThat(refusalIn(context.getStartupFailure()))
+                        .hasMessageContaining("names no JDBC URL"));
+    }
+
+    // A path nobody set is this instance's own mistake. A file that is there and unreadable is
+    // not, so only the first names the mode an operator could lower.
+    @Test
+    void givenAnEmptyAnchor_whenItIsReported_thenTheActionDoesNotOfferToLowerTheMode()
+            throws Exception {
+        // given
+        Path empty = Files.createTempFile("courtside-anchor-", ".pem");
+
+        // when / then
+        verified(empty, URL).run(context ->
+                assertThat(refusalIn(context.getStartupFailure()).action())
+                        .contains("Restore the authority certificate")
+                        .doesNotContain("prefer"));
     }
 
     // Every other way to get this wrong refuses the start, and a requirement that reached no pool
