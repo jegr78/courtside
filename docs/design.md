@@ -1455,6 +1455,23 @@ whether it is built or designed. **Designed means absent today.**
   parameters is re-encoded on its owner's next successful sign-in; storing it is best effort, so a
   database failure there leaves the old hash in place and never turns a correct password into a
   failed login.
+- **What a permanent password may be:** at least twelve characters, and neither on a public list of
+  common passwords nor built from something this instance already shows the member. *Built.* The
+  list is SecLists' 100,000 most common passwords, pinned by tag and hash in `NOTICE`, refreshed by
+  fetching that path again and comparing the two hashes. The terms are the member's username, the
+  local part of the address their credential was mailed to, and the club name, each taken whole and
+  split on its non-alphanumeric boundaries, with tokens under four characters dropped so a syllable
+  does not refuse a passphrase. Comparison is case-insensitive, the answer is one refusal for every
+  list so it never says which one matched, and nothing about composition, length above the minimum
+  or alphabet is required — a 64-character passphrase outside ASCII is a password this accepts.
+  Only 1,474 of the 100,000 entries reach twelve characters, so the length minimum, not the list,
+  is what refuses the other 98,526: against a long password the list is the weaker of the two
+  guards, and the breached-password check below is the one that would carry weight.
+- **Whether a permanent password is one that has already leaked:** *Designed.* A check against a
+  breached-password set, asking with a partial hash so that neither the password nor a reusable
+  digest of it leaves the instance, and refusing to set a password while that check cannot run.
+  Until it exists, a password long enough and absent from the list above is accepted however often
+  it has appeared in a public breach.
 - **Password age is observable on a failed login.** *Accepted, not closed.* A wrong password against
   an account still on an older hash costs less than one against an unknown username, because the
   dummy verification that hides unknown usernames encodes at the current parameters. It needs no
