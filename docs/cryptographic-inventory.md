@@ -47,9 +47,10 @@ guarantee and cryptography that does not:
   password.
 - `confidentiality` — keeps content from a reader. The security-evidence envelope.
 - `signing` — lets somebody else verify an origin. The release signature, DKIM.
-- `transport` — protects a connection, or records that one is not protected. Public TLS and the
-  mail relay are encrypted; the connection to PostgreSQL inside the deployment is not, and its
-  entry says so rather than leaving it out.
+- `transport` — protects a connection, or records what one guarantees when that is less than
+  protection. Public TLS and the mail relay are encrypted; the connection to PostgreSQL is
+  encrypted and verified only when an operator requires it, and its entry says which value of the
+  mode means which rather than claiming the strongest one.
 - `integrity` — recognises one expected party or artefact and refuses anything else. Certificate
   pinning. Unlike a `content-hash`, a mismatch here stops the operation.
 - `pseudonymisation` — replaces an identifier with a digest so a counter need not hold the
