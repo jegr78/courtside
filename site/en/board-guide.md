@@ -184,8 +184,11 @@ in, and only for that.
 
 It does not protect an account against your own administration, and saying otherwise would be
 dishonest: whoever may change a person's email address can then have that person's credentials sent
-to it. What bounds this is not a technical limit but the change log, which carries both the changed
-address and the requested credentials with their time and their actor.
+to it. The change log holds both steps — *that* the person's details were corrected and *that*
+credentials were requested for this account, each with its time and its actor. Values are not in
+there: neither the address they went to nor the password itself. The log shows that something
+happened, not where it went. A real limit is an arrangement in the club, such as not leaving the
+administrator role with a single person.
 
 When somebody leaves the club, their account is **deactivated** rather than deleted: the button
 beside it switches the account off, and on again. A deactivated account cannot sign in and its open
@@ -194,8 +197,12 @@ sessions end at once; everything that person booked stays right in the reports.
 The same page ends this account's sessions, ends every session in the instance (yours included),
 links to this person's changes in the log, and produces the **answer to a data-access request**.
 When a member asks what the club holds about them, that button produces the answer as a file: the
-person, their account, their membership, their bookings and series, the messages sent to them,
-member numbers from an import, and the change log. It holds nothing about anybody else, and that the answer was produced is itself written
+person and their address, every account with its roles and its state, the membership and the period
+it ran, the bookings they made and the ones somebody else recorded them in, their series, what
+became of every message addressed to them and which kinds they asked not to receive, the member
+numbers an import linked them by, and the change log from both sides — what was done to them and
+what they did. Look at the file before handing it over: it holds more than a board sees about a
+person in the interface. It holds nothing about anybody else, and that the answer was produced is itself written
 to the log.
 
 The whole list exports as CSV, optionally carrying the member numbers of an import source.
@@ -210,7 +217,12 @@ separator and character set of its export, the mapping of its columns and of its
 membership types, and the fields that source owns. **Every snapshot overwrites an owned field**;
 what you leave unticked belongs to the club and stays untouched. For the email address that carries
 weight: every one-time password goes there, so this tick moves your members' account recovery into
-the other system. Here you also set the share of ending memberships above which Courtside asks
+the other system.
+
+The tick binds *updates* to people who already exist. **A creation writes every field of the file**,
+ticked or not — and on the first run practically every row is one. To keep the addresses in the
+club's hands, correct them after the import; the tick only decides whether the next snapshot
+overwrites them again. Here you also set the share of ending memberships above which Courtside asks
 before executing.
 
 To map the columns you pick an example file. **That file stays in your browser** and is read only to
@@ -229,8 +241,9 @@ Two things the preview needs from you:
 
 * **What the file means.** A *partial list* changes only what it contains; whoever is missing is left
   alone. A *complete list* is the whole truth about this source — whoever is missing has their
-  membership ended. And not only the membership: the account loses the member role, and if no other
-  role remains it is deactivated and its sessions end.
+  membership ended. It reaches the account too, in one of two ways: an account holding only the
+  member role is deactivated; one holding another — treasurer, administrator — stays active and
+  quietly loses the member role. Either way its sessions end at once.
 * **Who is already there.** A snapshot recognises a person by their member number, never by their
   name. Anyone you entered before reading this source in is unknown to the file — link the two by
   hand, or the import creates a second person.
@@ -245,9 +258,14 @@ memberships is above your threshold, Courtside demands an explicit confirmation 
 looks exactly like a club that shrank. Every run is then listed with its result.
 
 **Running it again does not undo it**, and a later correct run does not bring everything back. The
-memberships return; the deactivated accounts do not. A synchronisation never switches an account on,
-because a board may have switched it off for a reason no membership system knows about. After
-executing a truncated file by mistake, you switch those accounts on one by one on the person page.
+memberships return; the accounts do not. A synchronisation never switches an account on and never
+gives a role back, because a board may have changed either for a reason no membership system knows
+about.
+
+After executing a truncated file by mistake there are two things to do, both on the person page:
+switch the deactivated accounts back on, and give the others their member role back. The second
+group is the one that does not catch the eye — those accounts are active and look untouched, but
+their holders can no longer book on any card that asks for the member role.
 
 ## Records
 
@@ -257,6 +275,10 @@ booked are listed too; they are part of the answer.
 **Data export** gives the club's lists as CSV. The separator and character set decide whether your
 spreadsheet opens the file correctly. The booking export names the court, the slot and the kind of
 booking day by day — who booked is not in the file.
+
+The roster export is the other case: it carries every member's name and address, and it leaves **no**
+entry in the change log. Your instance cannot tell you afterwards who took the list out, or when.
+What bounds that is only who you give the administrator role to.
 
 **Change log** carries the administrative changes with their time, the change, the subject and the
 person who made it. Changing a court number, setting a rule, ending a membership: all of it is here.

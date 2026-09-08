@@ -192,9 +192,11 @@ nicht mehr hineinkommt — und nur dafür.
 
 Gegen die eigene Verwaltung schützt das ein Konto nicht, und es wäre unehrlich, das zu verschweigen:
 wer die E-Mail-Adresse einer Person ändern darf, kann sich danach deren Zugangsdaten zustellen
-lassen. Was diesen Weg begrenzt, ist keine technische Grenze, sondern das Änderungsprotokoll — es
-führt die geänderte Adresse und die angeforderten Zugangsdaten mit Zeitpunkt und ausführender
-Person.
+lassen. Das Änderungsprotokoll hält beide Schritte fest — *dass* Personendaten korrigiert und *dass*
+für dieses Konto Zugangsdaten angefordert wurden, je mit Zeitpunkt und ausführender Person. Werte
+stehen dort nicht: weder die Adresse, an die sie gingen, noch das Passwort selbst. Das Protokoll
+zeigt also, dass etwas geschah, nicht wohin. Eine echte Grenze ist erst eine Absprache im Verein,
+etwa dass die Administratorrolle nicht bei einer einzelnen Person liegt.
 
 Verlässt jemand den Verein, wird sein Konto **deaktiviert**, nicht gelöscht: die Schaltfläche
 daneben schaltet es ab und ebenso wieder an. Ein deaktiviertes Konto meldet sich nicht mehr an, und
@@ -204,9 +206,13 @@ Auswertungen richtig.
 Weiter finden Sie dort: die Sitzungen dieses Kontos beenden, alle Sitzungen der Instanz beenden
 (auch Ihre eigene), die Änderungen an dieser Person im Protokoll, und die **Auskunft über
 gespeicherte Daten**. Fragt ein Mitglied, was der Verein über es gespeichert hat, erzeugt diese
-Schaltfläche die Antwort als Datei: die Person, ihr Konto, ihre Mitgliedschaft, ihre Buchungen und
-Serientermine, die Nachrichten, die an sie gingen, Mitgliedsnummern aus einem Import und das
-Änderungsprotokoll. Über andere Personen steht nichts
+Schaltfläche die Antwort als Datei: die Person mit ihrer Adresse, jedes Konto mit Rollen und
+Zustand, die Mitgliedschaft und ihre Laufzeit, die Buchungen, die sie gemacht hat, und die, in die
+jemand anders sie eingetragen hat, ihre Serientermine, was aus jeder Nachricht an sie wurde und
+welche Arten sie abbestellt hat, die Mitgliedsnummern eines Imports und das Änderungsprotokoll von
+beiden Seiten — was an ihr geändert wurde und was sie selbst geändert hat. Sehen Sie die Datei an,
+bevor Sie sie herausgeben: sie enthält mehr, als ein Vorstand in der Oberfläche über eine Person
+sieht. Über andere Personen steht nichts
 darin, und dass die Auskunft erzeugt wurde, steht danach im Protokoll.
 
 Die ganze Liste lässt sich als CSV exportieren, wahlweise mit den Mitgliedsnummern einer Importquelle.
@@ -221,7 +227,12 @@ Trennzeichen und Zeichensatz des Exports, die Zuordnung der Spalten und der Kate
 Mitgliedsarten, und die Felder, die diese Quelle führt. **Jede Momentaufnahme überschreibt ein
 geführtes Feld**; was Sie nicht ankreuzen, gehört dem Verein und bleibt unangetastet. Bei der
 E-Mail-Adresse hat das Gewicht: an sie geht jedes Einmalpasswort, Sie verlagern mit diesem Häkchen
-also die Kontowiederherstellung Ihrer Mitglieder in das fremde System. Ausserdem stellen Sie hier
+also die Kontowiederherstellung Ihrer Mitglieder in das fremde System.
+
+Das Häkchen bindet allerdings nur *Änderungen* an bestehenden Personen. **Eine Neuanlage schreibt
+jedes Feld der Datei**, angekreuzt oder nicht — beim ersten Lauf ist das praktisch jede Zeile. Wer
+die Adressen in der Hand des Vereins behalten will, korrigiert sie nach dem Import; das Häkchen
+entscheidet nur, ob die nächste Momentaufnahme sie wieder überschreibt. Ausserdem stellen Sie hier
 die Schwelle ein, ab welchem Anteil wegfallender Mitgliedschaften nachgefragt wird.
 
 Zum Zuordnen der Spalten wählen Sie eine Beispieldatei aus. **Diese Datei bleibt in Ihrem Browser**
@@ -240,9 +251,9 @@ Zwei Dinge muss die Vorschau von Ihnen wissen:
 
 * **Was die Datei bedeutet.** Eine *Teilliste* ändert nur, was in ihr steht; wer fehlt, bleibt
   unangetastet. Eine *vollständige Liste* ist die ganze Wahrheit dieser Quelle — wessen Zeile fehlt,
-  dessen Mitgliedschaft endet. Das endet nicht nur die Mitgliedschaft: das Konto verliert die
-  Mitgliedsrolle, und bleibt keine andere übrig, wird es deaktiviert und seine Sitzungen werden
-  beendet.
+  dessen Mitgliedschaft endet. Das trifft auch das Konto, und zwar auf zwei Arten: hält es nur die
+  Mitgliedsrolle, wird es deaktiviert; hält es eine weitere — Kassenwart, Administrator —, bleibt es
+  aktiv und verliert still die Mitgliedsrolle. In beiden Fällen enden seine Sitzungen sofort.
 * **Wer schon da ist.** Eine Momentaufnahme erkennt eine Person an ihrer Mitgliedsnummer, nie am
   Namen. Wen Sie eingetragen haben, bevor Sie diese Quelle einlesen, ist der Datei unbekannt —
   verknüpfen Sie beide von Hand, sonst legt der Import eine zweite Person an.
@@ -258,10 +269,14 @@ eine abgeschnittene Ausfuhr sieht genau so aus wie ein Verein, der geschrumpft i
 danach mit seinem Ergebnis in der Liste der bisherigen Läufe.
 
 **Ein erneutes Ausführen macht nichts rückgängig**, und ein späterer richtiger Lauf holt nicht alles
-zurück. Die Mitgliedschaften kommen wieder, die deaktivierten Konten nicht: eine Synchronisation
-schaltet ein Konto nie ein, weil ein Vorstand es aus einem Grund abgeschaltet haben kann, den keine
-Mitgliederverwaltung kennt. Wer versehentlich eine abgeschnittene Datei ausgeführt hat, aktiviert die
-Konten einzeln auf der Personenseite wieder.
+zurück. Die Mitgliedschaften kommen wieder, die Konten nicht: eine Synchronisation schaltet ein Konto
+nie ein und gibt auch keine Rolle zurück, weil ein Vorstand beides aus einem Grund geändert haben
+kann, den keine Mitgliederverwaltung kennt.
+
+Wer versehentlich eine abgeschnittene Datei ausgeführt hat, hat deshalb zweierlei zu tun, beides auf
+der Personenseite: die deaktivierten Konten wieder aktivieren, und den übrigen die Mitgliedsrolle
+zurückgeben. Der zweite Fall fällt nicht auf — diese Konten sind aktiv und sehen unauffällig aus,
+aber ihre Inhaber buchen auf keiner Karte mehr, die die Mitgliedsrolle verlangt.
 
 ## Nachweise
 
@@ -271,6 +286,11 @@ Plätze ohne Buchung stehen mit dabei; sie sind Teil der Antwort.
 **Datenexport** gibt die Listen des Vereins als CSV. Trennzeichen und Zeichensatz entscheiden
 darüber, ob Ihre Tabellenkalkulation die Datei richtig öffnet. Der Buchungsexport nennt Platz,
 Zeitfenster und Buchungsart Tag für Tag — wer gebucht hat, steht nicht in der Datei.
+
+Der Mitgliederexport ist der andere Fall: er trägt Namen und Adressen des ganzen Vereins, und er
+hinterlässt **keinen** Eintrag im Änderungsprotokoll. Ihre Instanz kann Ihnen später nicht sagen, wer
+die Liste herausgezogen hat und wann. Was das begrenzt, ist allein, wem Sie die Administratorrolle
+geben.
 
 **Änderungsprotokoll** führt die administrativen Änderungen mit Zeitpunkt, Änderung, betroffenem
 Gegenstand und ausführender Person. Wer eine Platznummer ändert, eine Regel setzt oder eine
