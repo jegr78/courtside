@@ -11,17 +11,27 @@ import { loadProfileContract, localTasksForProfiles } from "./test-profile-contr
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const resultFile = join(repository, "build", "local-check", "result.json");
 const verificationOwnerFile = ".courtside-verification-owner.json";
-const protectedFullTask = {
-  label: "full",
-  workingDirectory: "repository",
-  executable: "maven",
-  arguments: ["clean", "verify"]
-};
+// Read from here rather than from the contract, so a weakened definition there cannot reduce what a
+// full verification runs — which is also why the documentation gate is repeated instead of resolved.
+const protectedFullTasks = [
+  {
+    label: "docs-check",
+    workingDirectory: "repository",
+    executable: "node",
+    arguments: ["tools/docs-check.mjs", "--check"]
+  },
+  {
+    label: "full",
+    workingDirectory: "repository",
+    executable: "maven",
+    arguments: ["clean", "verify"]
+  }
+];
 
 export function planTasks(classified) {
   const tasks = classified.localTasks
     ?? classified.tasks
-    ?? (classified.profiles.includes("full") ? [protectedFullTask]
+    ?? (classified.profiles.includes("full") ? protectedFullTasks
       : localTasksForProfiles(loadProfileContract(), classified.profiles));
   return { ...classified, tasks: structuredClone(tasks) };
 }
@@ -355,7 +365,7 @@ function fullClassification(reason) {
   return {
     schemaVersion: 1,
     profiles: ["full"],
-    localTasks: [structuredClone(protectedFullTask)],
+    localTasks: structuredClone(protectedFullTasks),
     isFull: true,
     reasons: [{ code: reason, path: null, profile: "full", status: null }]
   };
