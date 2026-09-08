@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "catalogVersion": "1.4.0",
+  "schemaVersion": 2,
+  "catalogVersion": "1.4.1",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -902,12 +902,14 @@
         {
           "id": "v5.0.0-8.1.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-AUTHZ-001"
+          "manualProcedureId": "MAN-AUTHZ-001",
+          "findingReference": "docs/security-findings.md#incomplete-authorization-rule-documentation"
         },
         {
           "id": "v5.0.0-8.1.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-AUTHZ-001"
+          "manualProcedureId": "MAN-AUTHZ-001",
+          "findingReference": "docs/security-findings.md#incomplete-authorization-rule-documentation"
         },
         {
           "id": "v5.0.0-8.2.1",
@@ -929,7 +931,11 @@
         {
           "id": "v5.0.0-8.2.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-AUTHZ-001"
+          "manualProcedureId": "MAN-AUTHZ-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/application.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/member/web/RosterAdminControllerTest.java#givenAccountFieldsInAPersonChange_whenUpdating_thenTheFieldsAndTheWholeRequestAreRejected"
+          }
         },
         {
           "id": "v5.0.0-8.3.1",
@@ -1629,8 +1635,9 @@
         },
         {
           "id": "WSTG-v4.2-ATHZ-01",
-          "status": "implemented",
-          "manualProcedureId": "MAN-AUTHZ-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-AUTHZ-001",
+          "rationale": "The shipped HTTP surface never resolves a request-controlled value as a filesystem path or file include. Snapshot and logo uploads are read as in-memory bytes, upload names remain display metadata, exports use server-selected names, and served application resources use fixed classpath locations. Operator-configured secret, TLS and password-term paths are deployment inputs outside the web-consumer boundary."
         },
         {
           "id": "WSTG-v4.2-ATHZ-02",
