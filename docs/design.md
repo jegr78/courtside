@@ -1214,7 +1214,9 @@ Import and export:
 - **A source** describes one system a club synchronises from and is configured once rather than
   chosen per file: which header holds which field, which category value means which membership
   type, which fields that source owns — a field it does not own is the club's own and no snapshot
-  overwrites it — and above what share of the roster disappearing an execution needs confirming.
+  overwrites it on somebody the roster already holds, while a creation writes every mapped column
+  because there is nothing of the club's there yet — and above what share of the roster
+  disappearing an execution needs confirming.
   Every part of it is correctable, and a change decides what the *next* snapshot means rather than
   touching the people an earlier one created.
 - **The preview refuses whatever the run would refuse.** A file is measured against the source's
