@@ -17,7 +17,8 @@ Die Legende unter dem Plan erklärt die Zustände: **Frei**, **Belegt**, **Deine
 dass die Anlage an diesem Tag geschlossen ist.
 
 Ob bei einer fremden Buchung die Bezeichnung ihrer Buchungsart steht oder nur *Belegt*, entscheidet
-dein Verein je Buchungsart.
+dein Verein je Buchungsart. Öffentlich ist ausserdem, wie viele Personen zu einer Buchung gehören;
+wer sie sind, ist es nicht. Namen stehen im Platzplan nur an deinen eigenen Buchungen.
 
 ## Anmelden
 
@@ -26,18 +27,29 @@ E-Mail zu dir, nicht über den Vorstand: niemand dort sieht oder wählt dein ers
 
 Über *Anmelden* kommst du zum Formular mit Benutzername und Passwort. Wird die Anmeldung
 abgelehnt, obwohl du dich nicht vertippt hast, können die Zugangsdaten abgelaufen oder nie
-angekommen sein. Dann bittest du deinen Vorstand um neue. Nach zu vielen Versuchen in kurzer Zeit sagt
-Courtside das ausdrücklich und lässt dich eine Weile warten, bevor es weitergeht.
+angekommen sein, oder das Konto ist deaktiviert. In allen drei Fällen hilft dein Vorstand weiter.
+
+Nach zu vielen Versuchen in kurzer Zeit sagt Courtside das ausdrücklich und lässt eine Weile
+warten. Gezählt wird dabei der Netzanschluss, von dem die Versuche kommen, nicht dein Konto:
+niemand kann dich aussperren, indem er dein Passwort oft genug falsch rät.
 
 ## Das Einmalpasswort ersetzen
 
 Mit dem Einmalpasswort kommst du nur an eine einzige Seite: *Einmalpasswort ersetzen*. Solange du
-kein eigenes Passwort gesetzt hast, führt jeder andere Weg dorthin zurück.
+kein eigenes Passwort gesetzt hast, führt dich jede Seite der Anwendung dorthin zurück. Zeit hast
+du dafür nicht unbegrenzt: wie lange ein zugeschicktes Passwort gilt, legt dein Verein fest, und
+danach braucht es ein neues vom Vorstand.
 
-Das neue Passwort braucht mindestens zwölf Zeichen. Courtside lehnt es ausserdem ab, wenn es auf
-einer öffentlichen Liste häufiger Passwörter steht oder deinen Namen, deinen Benutzernamen, deine
-E-Mail-Adresse oder den Vereinsnamen enthält, und ebenso, wenn es dem aktuellen oder dem
-zugeschickten Passwort entspricht. Danach meldest du dich einmal neu an und bist drin.
+Das neue Passwort braucht mindestens zwölf und höchstens 256 Zeichen. Courtside lehnt es ausserdem
+ab, wenn es auf einer mitgelieferten Liste häufiger Passwörter steht, wenn es deinen Namen, deinen
+Benutzernamen, deine E-Mail-Adresse, den Vereinsnamen oder einen Begriff enthält, den dein Verein
+zusätzlich gesperrt hat, und wenn es dem aktuellen oder dem zugeschickten Passwort entspricht.
+
+Dazu fragt Courtside einen öffentlichen Dienst, ob dieses Passwort schon einmal in einem Datenleck
+aufgetaucht ist. Dein Passwort verlässt die Instanz dabei nicht: übertragen werden fünf Zeichen
+eines Prüfwerts, aus denen es sich nicht zurückrechnen lässt. Antwortet der Dienst nicht, lehnt
+Courtside die Änderung ab, statt ungeprüft zu speichern; dann versuchst du es später noch einmal.
+Sonst meldest du dich einmal neu an und bist drin.
 
 ## Eine Buchung anlegen
 
@@ -45,8 +57,9 @@ Im Platzplan klickst du auf die freie Zelle, in der du spielen willst. Sie nennt
 und daraus wird der Anfang deiner Buchung. Der Dialog *Buchung anlegen* zeigt dann:
 
 * **Dauer**, als Auswahl der Längen, die die Regeln deines Vereins zulassen.
-* Den **Platz**, den du angeklickt hast. Mehrere Plätze auf einmal belegt nur, wer im Verein eine
-  Aufgabe über die Mitgliedschaft hinaus hat.
+* Den **Platz**, den du angeklickt hast. Die Auswahl mehrerer Plätze auf einmal bietet die
+  Anwendung nur einem Konto mit einer Rolle über die Mitgliedschaft hinaus an, etwa für ein
+  Training über drei Plätze; allen anderen nennt sie den gewählten Platz.
 * **Art der Buchung**. Zur Auswahl steht, was deine Rolle benutzen darf.
 * **Mitglieder**: über die Suche findest du sie und trägst sie als Mitspieler ein.
 * Unter **Weitere Angaben**: Gäste, *Was mitspielt* und eine Notiz.
@@ -134,10 +147,10 @@ spielen kann.
 ## Serientermine
 
 Ein Serientermin ist ein Rezept: erster Termin, Uhrzeit, Dauer, Wochentage, Abstand in Wochen und
-ein Ende. Daraus entstehen ganz normale Buchungen. Angelegt werden Serien von denen, die im Verein
-eine Aufgabe über die Mitgliedschaft hinaus haben, etwa für ein Training. Eine Serie erfasst keine
-Spieler, also wirst du in ihr auch nicht eingetragen; du begegnest ihr im Platzplan als belegte
-Zeit.
+ein Ende. Daraus entstehen ganz normale Buchungen. Das Formular dafür steht unter *Meine
+Buchungen*, und die Anwendung zeigt es nur einem Konto mit einer Rolle über die Mitgliedschaft
+hinaus, etwa für ein Training. Eine Serie erfasst keine Spieler, also wirst du in ihr auch nicht
+eingetragen; du begegnest ihr im Platzplan als belegte Zeit.
 
 Zwei Dinge sind dabei wichtig:
 
@@ -184,7 +197,8 @@ abschalten.
 
 Unter *Kontosicherheit* änderst du dein Passwort und siehst, in welchen Browsern dein Konto
 angemeldet ist, seit wann und wann sie zuletzt aktiv waren. Für die Änderung des Passworts gibst du
-dein aktuelles mit ein.
+dein aktuelles mit ein. Sie beendet anschliessend alle Sitzungen deines Kontos, auch die, in der du
+sie vorgenommen hast.
 
 Du kannst eine einzelne Sitzung beenden oder alle auf einmal. Beendest du eine andere Sitzung als
 die, in der du gerade arbeitest, oder alle, und liegt deine Anmeldung schon eine Weile zurück,

@@ -15,7 +15,8 @@ the states: **Available**, **Occupied**, **Your booking**, **Unavailable** and *
 the club is closed, the plan says so instead of showing a grid.
 
 Whether somebody else's booking shows the name of its kind or only *Occupied* is something your
-club decides per kind of booking.
+club decides per kind of booking. How many people belong to a booking is public as well; who they
+are is not. Names appear on the plan only on your own bookings.
 
 ## Signing in
 
@@ -23,19 +24,30 @@ Your board creates the account. The username and a one-time password then reach 
 than through the board: nobody there sees or chooses your first password.
 
 *Sign in* takes you to the form with username and password. If the sign-in is refused although you
-typed everything correctly, the credentials may have expired or never arrived, and your board can
-send new ones. After too many attempts in a short time Courtside says exactly that and makes you wait a
-while before trying again.
+typed everything correctly, the credentials may have expired or never arrived, or the account is
+deactivated. Your board can help in all three cases.
+
+After too many attempts in a short time Courtside says exactly that and makes you wait a while. It
+counts the network connection the attempts come from, not your account: nobody can lock you out by
+guessing your password often enough.
 
 ## Replacing the one-time password
 
 The one-time password gets you to one page and no further: *Replace one-time password*. Until you
-have chosen a password of your own, every other route leads back there.
+have chosen a password of your own, every page of the application leads back there. You do not have
+unlimited time for it: how long an issued password stays valid is your club's setting, and after
+that the board has to send a new one.
 
-The new password needs at least twelve characters. Courtside also refuses it if it is on a public
-list of common passwords, if it contains your name, your username, your email address or the club
-name, or if it matches your current or the issued password. After that you sign in once more and
-you are in.
+The new password needs at least twelve characters and at most 256. Courtside also refuses it if it
+is on a list of common passwords shipped with the application, if it contains your name, your
+username, your email address, the club name or a term your club added to that list, and if it
+matches your current or the issued password.
+
+On top of that, Courtside asks a public service whether this password has appeared in a known data
+breach. Your password does not leave the instance for that: what travels is five characters of a
+checksum, which the password cannot be recovered from. If the service does not answer, Courtside
+refuses the change rather than storing something unchecked, and you try again later. Otherwise you
+sign in once more and you are in.
 
 ## Creating a booking
 
@@ -43,8 +55,9 @@ On the court plan, click the free cell you want to play in. It names the court a
 that becomes the start of your booking. The *Create booking* dialog then shows:
 
 * **Duration**, as the lengths your club's rules allow.
-* The **court** you clicked. Taking several courts at once is for people who hold a role in the
-  club beyond membership.
+* The **court** you clicked. The choice of several courts at once is offered only to an account
+  holding a role beyond membership, for a training block across three courts for instance;
+  everyone else is told which court they picked.
 * **Kind of booking**, offering what your own role may use.
 * **Members**: the search finds them and adds them as players.
 * Under **More details**: guests, *What plays* and a note.
@@ -128,9 +141,10 @@ booking asks of you: if you cannot play, cancel, so that somebody else can.
 ## Series
 
 A series is a recipe: first appointment, time, duration, weekdays, interval in weeks and one kind
-of end. What it produces are ordinary bookings. Series are created by people who hold a role in the
-club beyond membership, for training for instance. A series records no players, so you are never
-entered in one; you meet it on the court plan as occupied time.
+of end. What it produces are ordinary bookings. The form for it sits under *My bookings*, and the
+application shows it only to an account holding a role beyond membership, for training for
+instance. A series records no players, so you are never entered in one; you meet it on the court
+plan as occupied time.
 
 Two things matter about them:
 
@@ -177,6 +191,7 @@ switched off.
 
 Under *Account security* you change your password and see which browsers your account is signed in
 on, since when, and when they were last active. Changing the password asks for your current one.
+It then ends every session of your account, including the one you changed it in.
 
 You can end a single session or all of them. If you end a session other than the one you are
 working in, or all of them, and your sign-in is no longer recent, Courtside asks for your password
