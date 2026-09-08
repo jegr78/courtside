@@ -554,6 +554,7 @@ test("given a manual outcome, when its control carries no control-specific evide
     outcome: "pass"
   };
   const anchored = { ...control, controlId: "v5.0.0-8.3.1" };
+  const automated = { ...control, controlId: "v5.0.0-15.3.3" };
   const evidence = {
     schemaVersion: 2, catalogVersion: catalog.catalogVersion, runId: "manual-baseline-1",
     tester: "Maintainer", recordedAt: "2026-08-21T20:00:00Z", sourceCommit: "a".repeat(40),
@@ -585,4 +586,12 @@ test("given a manual outcome, when its control carries no control-specific evide
   assert.equal(validateManualAssessmentEvidence(blocked, assessmentDate), blocked);
   const passing = withControls([anchored]);
   assert.equal(validateManualAssessmentEvidence(passing, assessmentDate), passing);
+  const onAnAutomatedLink = {
+    ...evidence,
+    selectedControlIds: [automated.controlId],
+    authorization: { ...evidence.authorization, procedureIds: ["MAN-ARCH-001"] },
+    procedures: [{ ...evidence.procedures[0], procedureId: "MAN-ARCH-001", controls: [automated] }]
+  };
+  assert.throws(() => validateManualAssessmentEvidence(onAnAutomatedLink, assessmentDate),
+    /v5\.0\.0-15\.3\.3 passed without control-specific evidence in the catalog/);
 });
