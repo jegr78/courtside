@@ -81,6 +81,12 @@ class PasswordHashingTest extends AbstractIntegrationTest {
 
         // then
         assertThat(parts[1]).isEqualTo(algorithmInTheInventory());
+        assertThat(parts[1]).isEqualTo("argon2id");
+        assertThat(inventoried.get("memoryKibibytes").asInt()).isGreaterThanOrEqualTo(19456);
+        assertThat(inventoried.get("iterations").asInt()).isGreaterThanOrEqualTo(2);
+        assertThat(inventoried.get("parallelism").asInt()).isGreaterThanOrEqualTo(1);
+        assertThat(inventoried.get("saltBytes").asInt()).isGreaterThanOrEqualTo(16);
+        assertThat(inventoried.get("hashBytes").asInt()).isGreaterThanOrEqualTo(32);
         assertThat(parts[3]).isEqualTo("m=%d,t=%d,p=%d".formatted(
                 inventoried.get("memoryKibibytes").asInt(), inventoried.get("iterations").asInt(),
                 inventoried.get("parallelism").asInt()));

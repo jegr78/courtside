@@ -52,6 +52,24 @@ Neither is a complete, maintained policy for every function, resource attribute 
 or write restriction. Tool expectations cannot silently stand in for the normative authorization
 documentation these controls require.
 
+### Incomplete cryptographic implementation and strength policy
+
+- State: validated design and evidence gap
+- Priority: P2
+- Controls: ASVS 5.0.0 `v5.0.0-11.2.1`, `v5.0.0-11.2.3`, `v5.0.0-11.4.3`,
+  `v5.0.0-11.6.1`
+- Review: `MAN-CRYPTO-001`, 8 September 2026
+- Remediation: #887
+
+The cryptographic inventory keeps known source, workflow and deployment uses complete, but it does
+not assign an implementation provider or an effective-strength disposition to every
+security-bearing primitive. Repository-selected paths include individually strong choices such as
+the RSA-3072 evidence recipient and AES-256-GCM envelope, while other choices are delegated. In
+particular, the reference mail configuration enables automatic DKIM key generation without a
+repository-side minimum-parameter check, while keyless release signing delegates its signature
+hash choice to the external implementation. Those individual positive paths cannot establish a
+claim about every implementation, primitive, signature hash and public-key parameter.
+
 [`finding-lifecycle.schema.json`](../security/finding-lifecycle.schema.json) defines the retained run
 record. [`exceptions.schema.json`](../security/exceptions.schema.json) defines the shared policy for
 static scanner exceptions and accepted dynamic risk. Both schemas are closed. Unknown fields fail
