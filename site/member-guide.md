@@ -172,7 +172,7 @@ Immer geschickt werden:
 * die Nachricht, dass jemand dich als Mitspieler eingetragen hat,
 * die Nachricht, dass sich unter deiner Buchung etwas geändert hat.
 
-Ohne die vier kämst du nicht an dein Konto, erführest nichts von einer Sperrung unter deiner
+Ohne diese vier kommst du nicht an dein Konto, erfährst nichts von einer Sperrung unter deiner
 Buchung und nichts davon, dass jemand dich eingetragen hat. Deshalb lassen sie sich nicht
 abschalten.
 
