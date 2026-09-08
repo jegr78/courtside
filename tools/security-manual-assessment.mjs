@@ -104,6 +104,9 @@ export function validateManualAssessmentEvidence(evidence, assessmentDate = new 
           fail(`evidence ${reference.id} has expired`);
         }
       }
+      if (outcome.outcome === "pass" && !control.controlEvidence) {
+        fail(`${controlId} passed without control-specific evidence in the catalog`);
+      }
       requireSafeText(outcome.stepsPerformed, `${controlId} steps`);
       requireSafeText(outcome.expectedSecureOutcome, `${controlId} expected outcome`);
       requireSafeText(outcome.observedResult, `${controlId} observed result`);

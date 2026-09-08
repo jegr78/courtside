@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +16,23 @@ const contract = readFileSync(new URL("../docs/security-assessment.md", import.m
 const manualRunbook = readFileSync(new URL("../docs/security-manual-assessment.md", import.meta.url), "utf8");
 const manualEvidenceSchema = JSON.parse(readFileSync(
   new URL("../security/manual-assessment-evidence.schema.json", import.meta.url), "utf8"));
+const baseline = readFileSync(new URL("../docs/security-baseline.md", import.meta.url), "utf8");
+const controlOutcomes = JSON.parse(readFileSync(
+  new URL("../security/manual-baseline-control-outcomes.json", import.meta.url), "utf8"));
+const controlOutcomeSchema = JSON.parse(readFileSync(
+  new URL("../security/manual-baseline-control-outcomes.schema.json", import.meta.url), "utf8"));
+const repositoryFile = (path) => new URL(`../${path}`, import.meta.url);
+const readableFile = (path) => {
+  try {
+    return statSync(repositoryFile(path)).isFile() ? readFileSync(repositoryFile(path), "utf8") : null;
+  } catch {
+    return null;
+  }
+};
+const declarationOf = (name) => {
+  const literal = name.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return [new RegExp(String.raw`\bvoid\s+${literal}\s*\(`), new RegExp(String.raw`\b(?:test|it)\(\s*"${literal}"`)];
+};
 
 test("given the security catalog, when validating it, then every entry satisfies the documented schema", () => {
   // given
@@ -222,15 +239,15 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
     expiresOn: "2026-09-21"
   };
   const control = {
-    controlId: "v5.0.0-1.1.1",
-    stepsPerformed: ["Reviewed canonical input decoding"],
-    expectedSecureOutcome: "Each encoded input is decoded once before validation.",
-    observedResult: "The typed parsers decode each accepted representation once.",
+    controlId: "v5.0.0-8.3.1",
+    stepsPerformed: ["Called an administrative operation as a member"],
+    expectedSecureOutcome: "The server refuses the call regardless of what the client renders.",
+    observedResult: "The filter chain refused the call before the controller was reached.",
     redactedEvidenceReferences: [evidenceReference],
     outcome: "pass"
   };
   const procedure = {
-    procedureId: "MAN-INPUT-001",
+    procedureId: "MAN-AUTHZ-001",
     prerequisites: ["Qualified target"],
     controls: [control],
     tester: "Maintainer",
@@ -255,10 +272,10 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
       targetFingerprint: digest,
       targetImageDigest: digest,
       profile: "active",
-      procedureIds: ["MAN-INPUT-001"],
+      procedureIds: ["MAN-AUTHZ-001"],
       expiresAt: "2026-09-21T20:00:00Z"
     },
-    selectedControlIds: ["v5.0.0-1.1.1"],
+    selectedControlIds: ["v5.0.0-8.3.1"],
     independentReview: { performed: false },
     procedures: [procedure]
   };
@@ -321,9 +338,9 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
   assert.doesNotMatch(unreadableCli.stderr, /missing-path-do-not-retain/);
   const blockedControl = {
     ...control,
-    controlId: "v5.0.0-1.1.2",
+    controlId: "v5.0.0-8.1.1",
     outcome: "blocked",
-    rationale: "A physical review is not available in this run.",
+    rationale: "No falsifying check reads this rule yet.",
     owner: "Maintainer",
     trackingReference: "issue-1"
   };
@@ -354,17 +371,17 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
   // given
   const digest = `sha256:${"a".repeat(64)}`;
   const control = {
-    controlId: "v5.0.0-1.1.1",
-    stepsPerformed: ["Compared canonical decoding with the pinned requirement"],
-    expectedSecureOutcome: "Encoded input has one canonical representation.",
-    observedResult: "The parser decodes before validation without a second decoding path.",
+    controlId: "v5.0.0-8.3.1",
+    stepsPerformed: ["Compared the enforced role boundary with the pinned requirement"],
+    expectedSecureOutcome: "Authorization is decided in the server, not in the client.",
+    observedResult: "The filter chain decided the boundary without a client-side check.",
     redactedEvidenceReferences: [{
       id: "evidence-001", digest, classification: "restricted-security-evidence", expiresOn: "2026-09-21"
     }],
     outcome: "pass"
   };
   const procedure = {
-    procedureId: "MAN-INPUT-001",
+    procedureId: "MAN-AUTHZ-001",
     prerequisites: ["Qualified target"],
     controls: [control],
     tester: "Maintainer",
@@ -389,40 +406,54 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
       targetFingerprint: digest,
       targetImageDigest: digest,
       profile: "active",
-      procedureIds: ["MAN-INPUT-001"],
+      procedureIds: ["MAN-AUTHZ-001"],
       expiresAt: "2026-09-21T20:00:00Z"
     },
-    selectedControlIds: ["v5.0.0-1.1.1"],
+    selectedControlIds: ["v5.0.0-8.3.1"],
     independentReview: { performed: false },
     procedures: [procedure]
   };
   const invalidRecords = [
-    { ...evidence, catalogVersion: "99.0.0" },
-    { ...evidence, selectedControlIds: ["v5.0.0-1.1.2"] },
-    { ...evidence, procedures: [procedure, procedure] },
-    { ...evidence, procedures: [{ ...procedure,
+    [{ ...evidence, catalogVersion: "99.0.0" },
+      /catalogVersion does not match the current catalog/],
+    [{ ...evidence, selectedControlIds: ["v5.0.0-8.1.1"] },
+      /v5\.0\.0-8\.3\.1 was not selected/],
+    [{ ...evidence, procedures: [procedure, procedure] },
+      /duplicate procedure MAN-AUTHZ-001/],
+    [{ ...evidence, procedures: [{ ...procedure,
       controls: [{ ...control, controlId: "v5.0.0-2.1.1" }] }] },
-    { ...evidence, procedures: [{ ...procedure, targetImageDigest: `sha256:${"b".repeat(64)}` }] },
-    { ...evidence, authorization: { ...evidence.authorization, targetFingerprint: `sha256:${"b".repeat(64)}` } },
-    { ...evidence, targetOrigin: "https://127.0.0.1:9443" },
-    { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-08-20T20:00:00Z" } },
-    { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-99-21T20:00:00Z" } },
-    { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-09-31T20:00:00Z" } },
-    { ...evidence, recordedAt: "2026-02-30T20:00:00Z",
+      /v5\.0\.0-2\.1\.1 is not assigned to MAN-AUTHZ-001/],
+    [{ ...evidence, procedures: [{ ...procedure, targetImageDigest: `sha256:${"b".repeat(64)}` }] },
+      /procedure MAN-AUTHZ-001 provenance differs from the run/],
+    [{ ...evidence, authorization: { ...evidence.authorization, targetFingerprint: `sha256:${"b".repeat(64)}` } },
+      /authorization target differs from the run target/],
+    [{ ...evidence, targetOrigin: "https://127.0.0.1:9443" },
+      /authorization origin differs from the run target/],
+    [{ ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-08-20T20:00:00Z" } },
+      /authorization expired before recordedAt/],
+    [{ ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-99-21T20:00:00Z" } },
+      /authorization expiry is not a real timestamp/],
+    [{ ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-09-31T20:00:00Z" } },
+      /authorization expiry is not a real timestamp/],
+    [{ ...evidence, recordedAt: "2026-02-30T20:00:00Z",
       procedures: [{ ...procedure, recordedAt: "2026-02-30T20:00:00Z" }] },
-    { ...evidence, procedures: [{ ...procedure, controls: [{ ...control,
+      /recordedAt is not a real timestamp/],
+    [{ ...evidence, procedures: [{ ...procedure, controls: [{ ...control,
       redactedEvidenceReferences: [{ ...control.redactedEvidenceReferences[0], expiresOn: "2026-99-21" }]
-    }] }] },
-    { ...evidence, procedures: [{ ...procedure,
+    }] }] }, /evidence evidence-001 expiry is not a real date/],
+    [{ ...evidence, procedures: [{ ...procedure,
       controls: [{ ...control, observedResult: "cookie=opaque-value" }] }] },
-    { ...evidence, procedures: [{ ...procedure,
+      /v5\.0\.0-8\.3\.1 observed result contains credential-like material/],
+    [{ ...evidence, procedures: [{ ...procedure,
       controls: [{ ...control, outcome: "blocked", rationale: "Awaiting review", owner: "Maintainer",
-        trackingReference: "secret=opaque-value" }] }] }
+        trackingReference: "secret=opaque-value" }] }] },
+      /v5\.0\.0-8\.3\.1 tracking reference contains credential-like material/]
   ];
 
   // when / then
-  for (const invalidRecord of invalidRecords) {
-    assert.throws(() => validateManualAssessmentEvidence(invalidRecord, new Date("2026-08-21T20:00:00Z")));
+  for (const [invalidRecord, refusal] of invalidRecords) {
+    assert.throws(() => validateManualAssessmentEvidence(invalidRecord,
+      new Date("2026-08-21T20:00:00Z")), refusal);
   }
   assert.throws(() => validateManualAssessmentEvidence({
     ...evidence,
@@ -484,9 +515,109 @@ test("given an active-only procedure, when safe or production execution is claim
   };
 
   // when / then
-  assert.throws(() => validateManualAssessmentEvidence(evidence, new Date("2026-08-21T20:00:00Z")));
+  assert.throws(() => validateManualAssessmentEvidence(evidence, new Date("2026-08-21T20:00:00Z")),
+    /procedure MAN-INPUT-001 requires active/);
   assert.equal(new Ajv({ strict: true, strictRequired: false }).compile(manualEvidenceSchema)({
     ...evidence, environment: "EXPLICIT_PRODUCTION", profile: "active",
     authorization: { ...evidence.authorization, profile: "active" }
   }), false);
+});
+
+test("given the recorded manual baseline, when reading its outcomes, then every published count names its controls", () => {
+  // given
+  const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true })
+    .compile(controlOutcomeSchema);
+  const catalogControls = new Set(catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .map(({ id }) => id));
+  const published = Object.fromEntries([...baseline.matchAll(
+    /^\| (pass|not applicable|fail|blocked)[^|]*\| *([0-9]+) \|$/gm)]
+    .map(([, outcome, controls]) => [outcome.replace(" ", "-"), Number(controls)]));
+
+  // when
+  const counted = controlOutcomes.controls.reduce((total, { outcome }) =>
+    ({ ...total, [outcome]: total[outcome] + 1 }),
+    { pass: 0, fail: 0, "not-applicable": 0, blocked: 0 });
+
+  // then
+  assert.equal(validate(controlOutcomes), true, JSON.stringify(validate.errors));
+  assert.deepEqual(controlOutcomes.controls.filter(({ id }) => !catalogControls.has(id)), []);
+  assert.equal(new Set(controlOutcomes.controls.map(({ id }) => id)).size, controlOutcomes.controls.length);
+  assert.deepEqual(counted, published);
+  assert.match(baseline, new RegExp(`covers ${controlOutcomes.controls.length} unique selected controls`));
+  assert.match(baseline, new RegExp(`\`${controlOutcomes.run.runId}\``));
+  assert.match(baseline, new RegExp(`\`${controlOutcomes.run.sourceCommit}\``));
+});
+
+test("given a control-specific anchor, when reading the catalog, then its production path and falsifying test exist", () => {
+  // given
+  const anchored = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ controlEvidence }) => controlEvidence);
+
+  // when / then
+  assert.ok(anchored.length > 0);
+  for (const { id, controlEvidence } of anchored) {
+    assert.notEqual(readableFile(controlEvidence.productionPath), null,
+      `${id} names a production path that is no readable file`);
+    const [testPath, testName] = controlEvidence.falsifyingTest.split("#");
+    const source = readableFile(testPath);
+    assert.notEqual(source, null, `${id} names a test file that is no readable file`);
+    assert.equal(declarationOf(testName).some((declaration) => declaration.test(source)), true,
+      `${id} names ${testName}, which ${testPath} declares no test for`);
+  }
+});
+
+test("given a manual outcome, when its control carries no control-specific evidence, then a pass is refused", () => {
+  // given
+  const digest = `sha256:${"a".repeat(64)}`;
+  const control = {
+    controlId: "v5.0.0-8.1.1",
+    stepsPerformed: ["Compared the documented rules with the enforced ones"],
+    expectedSecureOutcome: "Every operation states who may call it.",
+    observedResult: "The document states role rules for one prefix only.",
+    redactedEvidenceReferences: [{
+      id: "evidence-001", digest, classification: "restricted-security-evidence", expiresOn: "2026-09-21"
+    }],
+    outcome: "pass"
+  };
+  const anchored = { ...control, controlId: "v5.0.0-8.3.1" };
+  const automated = { ...control, controlId: "v5.0.0-15.3.3" };
+  const evidence = {
+    schemaVersion: 2, catalogVersion: catalog.catalogVersion, runId: "manual-baseline-1",
+    tester: "Maintainer", recordedAt: "2026-08-21T20:00:00Z", sourceCommit: "a".repeat(40),
+    targetImageDigest: digest, targetFingerprint: digest, targetOrigin: "https://127.0.0.1:8443",
+    environment: "SECURITY", profile: "active",
+    authorization: {
+      id: "protected-record-1", origin: "https://127.0.0.1:8443", targetFingerprint: digest,
+      targetImageDigest: digest, profile: "active", procedureIds: ["MAN-AUTHZ-001"],
+      expiresAt: "2026-09-21T20:00:00Z"
+    },
+    selectedControlIds: [control.controlId], independentReview: { performed: false },
+    procedures: [{
+      procedureId: "MAN-AUTHZ-001", prerequisites: ["Qualified target"], controls: [control],
+      tester: "Maintainer", recordedAt: "2026-08-21T20:00:00Z", targetImageDigest: digest
+    }]
+  };
+  const assessmentDate = new Date("2026-08-21T20:00:00Z");
+  const withControls = (controls) => ({
+    ...evidence,
+    selectedControlIds: controls.map(({ controlId }) => controlId),
+    procedures: [{ ...evidence.procedures[0], controls }]
+  });
+
+  // when / then
+  assert.throws(() => validateManualAssessmentEvidence(evidence, assessmentDate),
+    /v5\.0\.0-8\.1\.1 passed without control-specific evidence in the catalog/);
+  const blocked = withControls([{ ...control, outcome: "blocked",
+    rationale: "No falsifying check names this rule yet.", owner: "Maintainer", trackingReference: "issue-804" }]);
+  assert.equal(validateManualAssessmentEvidence(blocked, assessmentDate), blocked);
+  const passing = withControls([anchored]);
+  assert.equal(validateManualAssessmentEvidence(passing, assessmentDate), passing);
+  const onAnAutomatedLink = {
+    ...evidence,
+    selectedControlIds: [automated.controlId],
+    authorization: { ...evidence.authorization, procedureIds: ["MAN-ARCH-001"] },
+    procedures: [{ ...evidence.procedures[0], procedureId: "MAN-ARCH-001", controls: [automated] }]
+  };
+  assert.throws(() => validateManualAssessmentEvidence(onAnAutomatedLink, assessmentDate),
+    /v5\.0\.0-15\.3\.3 passed without control-specific evidence in the catalog/);
 });
