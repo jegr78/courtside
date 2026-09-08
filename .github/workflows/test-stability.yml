@@ -58,7 +58,6 @@ jobs:
           retention-days: 14
 
   browser-order:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -126,7 +125,6 @@ jobs:
           retention-days: 90
 
   browser-compatibility:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

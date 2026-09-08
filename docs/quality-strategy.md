@@ -265,7 +265,7 @@ unguessable per-run value, is the only thing standing in front of it.
 
 A deliberate UI change creates a baseline candidate with:
 `npx playwright test visual-regression.spec.ts --project=visual --update-snapshots`, then
-commit what changed after the x64 pull-request gate has verified it. The suite pins
+review and commit what changed so the x64 pull-request gate can verify it before merge. The suite pins
 `updateSnapshots: "missing"`; the values nobody may reach are
 `changed` and `all`, under which a missing baseline is created and the run **passes**, so a deleted
 baseline would go unnoticed. The pull request must expose the changed PNG baselines for review.

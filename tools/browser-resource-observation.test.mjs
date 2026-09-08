@@ -31,5 +31,16 @@ test("given a completed run, when validating its timeline, then all targets and 
     samples: evidence.samples.map((sample) => sample.target === "browser" && sample.sequence === 2
       ? { ...sample, recordedAt: "2026-09-05T08:00:08.000Z" } : sample) }), /sampling gap/);
   assert.throws(() => validateResourceTimeline({ ...evidence,
+    samples: evidence.samples.map((sample) => sample.target === "browser" && sample.sequence === 2
+      ? { ...sample, recordedAt: "2026-09-05T08:00:00.000Z" } : sample) }), /sampling gap/);
+  assert.throws(() => validateResourceTimeline({ ...evidence,
+    samples: evidence.samples.map((sample) => sample.target === "browser" && sample.sequence === 2
+      ? { ...sample, sequence: 3 } : sample) }), /sampling gap/);
+  assert.throws(() => validateResourceTimeline({ ...evidence,
+    samples: evidence.samples.filter(({ sequence }) => sequence !== 1) }), /sequence is incomplete/);
+  assert.throws(() => validateResourceTimeline({ ...evidence,
+    samples: evidence.samples.map((sample) => ({ ...sample, sequence: sample.sequence + 100 }))
+  }), /sequence is incomplete/);
+  assert.throws(() => validateResourceTimeline({ ...evidence,
     samples: [...evidence.samples, { ...evidence.samples[0], target: "mail-sink" }] }), /target/);
 });

@@ -5,7 +5,7 @@ import { arch, cpus, platform, totalmem } from "node:os";
 import { basename, relative, resolve, sep } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { validateResourceTimeline } from "./browser-resource-observation.mjs";
+import { validateResourceCoverage, validateResourceTimeline } from "./browser-resource-observation.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const frontend = resolve(root, "frontend");
@@ -54,17 +54,13 @@ function outcome(execution) {
   return { status: "incomplete", classifications: ["harness"], exitCode: execution.exitCode };
 }
 
-function resourceEvidenceIsComplete(timeline, lifecycle) {
+function resourceEvidenceIsComplete(timeline, lifecycle, startedAt, finishedAt) {
   try {
-    validateResourceTimeline(timeline);
+    validateResourceCoverage(timeline, { startedAt, finishedAt }, lifecycle);
   } catch {
     return false;
   }
-  const sampledBrowsers = new Set(timeline.samples
-    .filter(({ target }) => target === "browser").map(({ containerId }) => containerId));
-  const lifecycleBrowsers = new Set(lifecycle?.processes?.map(({ processId }) => processId));
-  return sampledBrowsers.size === lifecycleBrowsers.size
-    && [...sampledBrowsers].every((containerId) => lifecycleBrowsers.has(containerId));
+  return true;
 }
 
 function resourceTimelineForRecord(timeline) {
@@ -158,7 +154,8 @@ export function buildReliabilityRecord(input) {
   let result = outcome(input.execution);
   if (result.status !== "incomplete"
     && (!lifecycleEvidenceIsComplete(input.execution.browserLifecycle, input.isolationVariant, testPopulation.count)
-      || !resourceEvidenceIsComplete(resourceTimeline, input.execution.browserLifecycle))) {
+      || !resourceEvidenceIsComplete(resourceTimeline, input.execution.browserLifecycle,
+        input.startedAt, input.finishedAt))) {
     result = { status: "incomplete",
       classifications: [...new Set([...result.classifications.filter((classification) => classification !== "none"), "harness"])],
       exitCode: input.execution.exitCode };
@@ -564,7 +561,8 @@ export function validateReliabilityRecord(record) {
     throw new Error("A completed reliability run has contradictory browser lifecycle evidence");
   }
   if (record.outcome.status !== "incomplete"
-      && !resourceEvidenceIsComplete(record.resourceTimeline, record.browserLifecycle)) {
+      && !resourceEvidenceIsComplete(record.resourceTimeline, record.browserLifecycle,
+        record.startedAt, record.finishedAt)) {
     throw new Error("A completed reliability run has contradictory resource evidence");
   }
   if (record.outcome.status !== "incomplete" && !resourceEnvironmentIsComplete(record.resourceEnvironment)) {
