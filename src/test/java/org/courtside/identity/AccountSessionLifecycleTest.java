@@ -17,7 +17,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.Base64;
+import java.util.List;
 import java.util.Set;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.courtside.identity.AccountFixtures.enabled;
@@ -26,6 +30,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -116,6 +121,30 @@ class AccountSessionLifecycleTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnAttackerChosenSession_whenLoginSucceeds_thenTheSessionIdentifierChanges()
+            throws Exception {
+        // given
+        Session planted = sessionRepository.createSession();
+        save(planted);
+        Cookie plantedCookie = new Cookie("SESSION",
+                Base64.getEncoder().encodeToString(planted.getId().getBytes(UTF_8)));
+
+        // when
+        Cookie issuedCookie = mockMvc.perform(post("/api/session")
+                        .cookie(plantedCookie)
+                        .param("username", "doe.jane").param("password", PASSWORD).with(csrf()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getCookie("SESSION");
+
+        // then
+        assertThat(issuedCookie).isNotNull();
+        assertThat(issuedCookie.getValue()).isNotEqualTo(plantedCookie.getValue());
+        mockMvc.perform(get("/api/session").cookie(plantedCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(false));
+    }
+
+    @Test
     void givenNoExistingSession_whenLoginFails_thenNoAnonymousSessionIsPersisted() throws Exception {
         // given
         long sessionsBefore = storedSessionCount();
@@ -132,6 +161,30 @@ class AccountSessionLifecycleTest extends AbstractIntegrationTest {
 
     private long storedSessionCount() {
         return jdbc.sql("SELECT COUNT(*) FROM SPRING_SESSION").query(Long.class).single();
+    }
+
+    @Test
+    void givenTwoActiveSessions_whenThePermanentPasswordChanges_thenEverySessionEnds()
+            throws Exception {
+        // given
+        Cookie firefox = signIn("Mozilla/5.0 Firefox/142.0");
+        Cookie edge = signIn("Mozilla/5.0 Edg/140.0 Chrome/140.0");
+        assertThat(sessionRepository.findByPrincipalName("doe.jane")).hasSize(2);
+
+        // when
+        mockMvc.perform(put("/api/account/password").cookie(edge).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"currentPassword\":\"" + PASSWORD
+                                + "\",\"newPassword\":\"lattice-scaffold-marmoset-vellum\"}"))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertThat(sessionRepository.findByPrincipalName("doe.jane")).isEmpty();
+        for (Cookie ended : List.of(firefox, edge)) {
+            mockMvc.perform(get("/api/session").cookie(ended))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.authenticated").value(false));
+        }
     }
 
     @Test
