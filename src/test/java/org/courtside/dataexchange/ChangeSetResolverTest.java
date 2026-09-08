@@ -60,6 +60,25 @@ class ChangeSetResolverTest {
     }
 
     @Test
+    void givenACreationWhoseAddressThisSourceDoesNotOwn_whenResolving_thenTheFileWritesItAnyway() {
+        // given
+        CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Mary", "Major",
+                Map.of(CanonicalField.EMAIL, "mary.major@example.com")));
+
+        // when
+        ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, emptyRoster());
+
+        // then — ownership only decides what a snapshot may take away from the club, and a creation
+        // takes nothing away, so the file writes every mapped column including the address a
+        // credential is sent to
+        assertThat(resolved.changes()).singleElement().satisfies(change -> {
+            assertThat(change.kind()).isEqualTo(ResolvedChangeSet.ChangeKind.CREATE);
+            assertThat(change.values())
+                    .containsEntry(CanonicalField.EMAIL, "mary.major@example.com");
+        });
+    }
+
+    @Test
     void givenAKnownRecordWhoseUnownedFieldsDiffer_whenResolving_thenTheClubsOwnValueStands() {
         // given
         CsvSnapshot snapshot = snapshotOf(row(1, "4711", "Jane", "Doe",

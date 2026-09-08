@@ -927,10 +927,13 @@ components:
           type: array
           uniqueItems: true
           description: |
-            The fields this source owns. An owned field is overwritten by every later snapshot; a
-            field left out is the club's own and no synchronisation touches it, however different
-            the file is. `EXTERNAL_ID` cannot be owned — it identifies the record rather than
-            describing anybody.
+            The fields this source owns. An owned field is overwritten by every later snapshot,
+            except by an empty cell, which says nothing rather than clearing the value. A field
+            left out is the club's own on people who already exist, and no synchronisation touches
+            it there, however different the file is. A creation is the exception: it has nothing of
+            the club's to leave alone, so it writes every mapped column whether the source owns it
+            or not. `EXTERNAL_ID` cannot be owned — it identifies the record rather than describing
+            anybody.
           items: { $ref: "#/components/schemas/CanonicalField" }
         removalWarningPercent:
           type: integer
