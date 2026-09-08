@@ -118,7 +118,7 @@ tags:
   - name: admin-import-runs
     description: Executing a reviewed snapshot, and the log of what was executed.
   - name: admin-audit
-    description: The configuration changes this instance recorded.
+    description: The changes this instance recorded.
   - name: admin-messages
     description: What became of the messages this instance sent.
   - name: admin-subject-access
@@ -1895,7 +1895,11 @@ components:
         subjectId: { type: string, format: uuid }
         subjectName:
           type: [string, "null"]
-          description: What the entity is called today, or `null` once the entity is gone.
+          description: |
+            What the entity is called today, or `null` where nothing names it. A name is resolved
+            for the configuration entities and for a person; a booking subject and an account
+            subject have no resolver, so those entries are always `null` while the entity is very
+            much alive. Read `null` as "not resolvable", never as "erased".
         actorAccountId: { type: [string, "null"], format: uuid }
         actorUsername:
           type: [string, "null"]
@@ -5567,11 +5571,20 @@ paths:
     get:
       tags: [admin-audit]
       operationId: readAuditLog
-      summary: The configuration changes this instance recorded, newest first.
+      summary: The changes this instance recorded, newest first.
       description: |
         Every entry names the account that made the change, or no account at all when the change
         had no signed-in person behind it. An account id that resolves to nothing is an account
         that has been erased; the id stands in its place.
+
+        Entries come from two places. The administrative surfaces record what a board configures:
+        `facility.court.added`, `card.bookingCard.changed`, `config.club.changed`,
+        `rules.ruleSet.changed`, `roster.person.corrected` and `dataexchange.source.described`,
+        each with siblings. The rest is recorded outside those surfaces:
+        `booking.booking.confirmed` and the four other booking entries, and
+        `identity.account.credentialsRequested`, which names the account a credential was issued
+        for. Treat `eventType` as an open set — a page may carry a name this description does not
+        list.
 
         The page is ordered by `occurredAt` descending, and by `id` descending where several
         entries share one `occurredAt` — which happens whenever one administrative call records
@@ -5582,7 +5595,7 @@ paths:
           in: query
           required: false
           schema: { type: string, format: uuid }
-          description: Restrict the page to one configuration entity.
+          description: Restrict the page to one entity.
         - name: from
           in: query
           required: false
@@ -5660,7 +5673,7 @@ paths:
         `/api/admin/export/person/{personId}` is a `POST`: the file discloses what the club holds
         about every one of its members at once, and that is not a request a browser may make on its
         own from a link somebody sent. It is not written to the change log, though — that log
-        records what changed about a configuration entity, and an export changes nothing and names
+        records a change against the entity it concerns, and an export changes nothing and names
         no entity. The subject access answer is recorded because answering *that* request is a
         processing activity the law attaches to one person, which is a reason about the person and
         not about the file.
