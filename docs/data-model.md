@@ -190,11 +190,17 @@ that was not running, and Courtside neither reads nor migrates it by hand.
 |---|---|
 | `login_attempt_limit` | Failed sign-in counts per scope and hashed subject, and how long that subject stays blocked |
 | `credential_issue_limit` | How often a credential was issued for an account inside the current window |
+| `spring_session` | Server-side sign-in sessions, including creation, last access, expiry and the associated principal |
+| `spring_session_attributes` | The serialized attributes belonging to a server-side session |
 
 Both are rate-limit bookkeeping and both are expired by their `window_started_at`. They are keyed
 differently on purpose: a sign-in attempt is counted against a *hash* of its subject, because the
 subject is an address somebody typed, while a credential is issued for an `account_id` that is
 already in the database. Nothing outside the mechanism they protect reads either table.
+
+Spring Session manages `spring_session` and `spring_session_attributes`; Courtside migrates their
+schema so the bounded runtime identity never needs DDL authority. Removing a session cascades to its
+attributes, and the configured cleanup schedule removes expired rows.
 
 ## What a fresh instance holds
 

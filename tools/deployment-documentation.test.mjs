@@ -15,7 +15,7 @@ function repositoryFile(path) {
 // variables would describe this repository's harness to a club.
 const OPERATOR_FACING =
   ["compose.yaml", "compose.database-tls.yaml", "compose.database-tls-local.yaml",
-    "compose.app-tls.yaml"];
+    "compose.app-tls.yaml", "compose.database-identities.yaml"];
 const compose = OPERATOR_FACING.map(deploymentFile).join("\n");
 const readme = deploymentFile("README.md");
 const example = deploymentFile(".env.example");

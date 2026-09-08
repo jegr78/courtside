@@ -1,0 +1,77 @@
+services:
+  db:
+    environment:
+      POSTGRES_USER: ${COURTSIDE_DB_OWNER_USERNAME:-courtside_owner}
+      POSTGRES_PASSWORD: !reset null
+      POSTGRES_PASSWORD_FILE: /run/secrets/database-owner-password
+    volumes:
+      - ${COURTSIDE_DB_OWNER_PASSWORD_FILE:?set COURTSIDE_DB_OWNER_PASSWORD_FILE in .env}:/run/secrets/database-owner-password:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${COURTSIDE_DB_OWNER_USERNAME:-courtside_owner} -d courtside"]
+
+  database-setup:
+    image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
+      COURTSIDE_DB_OWNER_USERNAME: ${COURTSIDE_DB_OWNER_USERNAME:-courtside_owner}
+      COURTSIDE_DB_OWNER_PASSWORD_FILE: /run/secrets/database-owner-password
+      COURTSIDE_DB_MIGRATION_USERNAME: ${COURTSIDE_DB_MIGRATION_USERNAME:-courtside_migration}
+      COURTSIDE_DB_MIGRATION_PASSWORD_FILE: /run/secrets/database-migration-password
+      COURTSIDE_DB_RUNTIME_USERNAME: ${COURTSIDE_DB_RUNTIME_USERNAME:-courtside_runtime}
+      COURTSIDE_DB_RUNTIME_PASSWORD_FILE: /run/secrets/database-runtime-password
+      COURTSIDE_DB_TLS_MODE: ${COURTSIDE_DB_TLS_MODE:-prefer}
+      COURTSIDE_DB_TLS_ROOT_CERTIFICATE: /etc/courtside/database-tls/authority.pem
+    volumes:
+      - ${COURTSIDE_DB_OWNER_PASSWORD_FILE}:/run/secrets/database-owner-password:ro
+      - ${COURTSIDE_DB_MIGRATION_PASSWORD_FILE:?set COURTSIDE_DB_MIGRATION_PASSWORD_FILE in .env}:/run/secrets/database-migration-password:ro
+      - ${COURTSIDE_DB_RUNTIME_PASSWORD_FILE:?set COURTSIDE_DB_RUNTIME_PASSWORD_FILE in .env}:/run/secrets/database-runtime-password:ro
+      - ${COURTSIDE_DB_TLS_AUTHORITY:-./database-tls-disabled}:/etc/courtside/database-tls:ro
+    command: ["--courtside-database-setup"]
+
+  database-migrate:
+    image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      database-setup:
+        condition: service_completed_successfully
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
+      COURTSIDE_DB_MIGRATION_USERNAME: ${COURTSIDE_DB_MIGRATION_USERNAME:-courtside_migration}
+      COURTSIDE_DB_MIGRATION_PASSWORD_FILE: /run/secrets/database-migration-password
+      COURTSIDE_DB_TLS_MODE: ${COURTSIDE_DB_TLS_MODE:-prefer}
+      COURTSIDE_DB_TLS_ROOT_CERTIFICATE: /etc/courtside/database-tls/authority.pem
+    volumes:
+      - ${COURTSIDE_DB_MIGRATION_PASSWORD_FILE}:/run/secrets/database-migration-password:ro
+      - ${COURTSIDE_DB_TLS_AUTHORITY:-./database-tls-disabled}:/etc/courtside/database-tls:ro
+    command: ["--courtside-database-migrate"]
+
+  app:
+    depends_on:
+      database-migrate:
+        condition: service_completed_successfully
+    environment:
+      SPRING_DATASOURCE_USERNAME: !reset null
+      SPRING_DATASOURCE_PASSWORD: !reset null
+      COURTSIDE_DB_IDENTITY_MODE: separate
+      COURTSIDE_DB_RUNTIME_USERNAME: ${COURTSIDE_DB_RUNTIME_USERNAME:-courtside_runtime}
+      COURTSIDE_DB_RUNTIME_PASSWORD_FILE: /run/secrets/database-runtime-password
+    volumes:
+      - ${COURTSIDE_DB_RUNTIME_PASSWORD_FILE}:/run/secrets/database-runtime-password:ro

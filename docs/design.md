@@ -1501,6 +1501,22 @@ whether it is built or designed. **Designed means absent today.**
   database refuses rather than falling back.
   Courtside ships no authority and issues no production key material: issuance, storage, lifetime,
   renewal and revocation are the operator's.
+- **Whether the application holds database schema authority:** *Built, and off unless an operator
+  turns it on.* The standard deployment keeps its single PostgreSQL credential. The optional
+  `compose.database-identities.yaml` overlay instead runs setup, Flyway, and the application as
+  three separate processes. Setup alone receives the database-owner credential and reconciles two
+  bounded login roles. Flyway owns the application schema but cannot create roles or databases.
+  The running application receives only table and sequence data privileges; it cannot create or
+  alter schema, roles, databases, or grants, and neither Flyway nor Spring Session runs DDL there.
+  Each password arrives from a read-only file mounted only into the processes that need it. Missing,
+  multiline, unreadable, stale, or ambiguously combined inputs stop that process rather than falling
+  back to the shared credential. Re-provisioning replaces migration and runtime passwords and
+  removes inherited role memberships. The upgrade-and-restore evidence runs these identities over
+  verified database TLS, preserves application state across V43 to V44 and a `pg_dump`/`pg_restore`,
+  and proves that the archive does not reactivate the retired runtime password.
+  Courtside owns the commands, validation, and minimum grants. Credential creation, storage,
+  rotation timing, revocation, destruction, database-owner recovery, and any vault remain the
+  operator's. The overlay requires none of those systems and is not a condition for normal use.
 - **The default database connection is still unverified.** *Accepted, not closed.* `prefer` is what
   the driver does on its own — encrypted when the database offers it, verified never — and the
   reference deployment ships no certificate, so nothing changes for a club that does not act.

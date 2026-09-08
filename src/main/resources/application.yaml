@@ -26,7 +26,7 @@ spring:
   session:
     timeout: ${COURTSIDE_SESSION_INACTIVITY_TIMEOUT:30m}
     jdbc:
-      initialize-schema: always
+      initialize-schema: never
       cleanup-cron: ${COURTSIDE_SESSION_CLEANUP_CRON:0 * * * * *}
   messages:
     basename: messages
@@ -55,6 +55,10 @@ courtside:
   environment: ${COURTSIDE_ENVIRONMENT:PRODUCTION}
   database:
     lock-timeout: ${COURTSIDE_DB_LOCK_TIMEOUT:5s}
+    identity:
+      mode: ${COURTSIDE_DB_IDENTITY_MODE:shared}
+      runtime-username: ${COURTSIDE_DB_RUNTIME_USERNAME:}
+      runtime-password-file: ${COURTSIDE_DB_RUNTIME_PASSWORD_FILE:}
     tls:
       mode: ${COURTSIDE_DB_TLS_MODE:prefer}
       root-certificate: ${COURTSIDE_DB_TLS_ROOT_CERTIFICATE:}

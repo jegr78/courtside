@@ -559,7 +559,7 @@
       "revocation": "The issuing authority's. Courtside performs no revocation check of its own.",
       "recovery": "An authority file that no longer matches is a refusal, not a loss: the operator restores the right file, or sets the mode back to `prefer`.",
       "retirement": "Encrypting the reverse proxy's connection to the application is the remaining half of this path and has its own entry.",
-      "evidence": "src/test/java/org/courtside/DatabaseTlsTest.java, src/test/java/org/courtside/shared/DatabaseTlsTransportTest.java, src/test/java/org/courtside/shared/DatabaseTlsConfigurationTest.java",
+      "evidence": "src/test/java/org/courtside/DatabaseTlsTest.java, src/test/java/org/courtside/shared/DatabaseTlsTransportTest.java, src/test/java/org/courtside/shared/DatabaseTlsConfigurationTest.java, src/test/java/org/courtside/shared/DatabaseIdentityLifecycleTest.java",
       "detects": [
         "sslmode",
         "sslrootcert",
@@ -570,10 +570,13 @@
       ],
       "locations": [
         "deploy/compose*.yaml",
+        "deploy/compose.database-identities.yaml",
         "deploy/compose.database-tls-local.yaml",
         "src/main/resources/application.yaml",
         "src/main/java/org/courtside/shared/DatabaseTls.java",
-        "src/main/java/org/courtside/shared/DatabaseTls*.java"
+        "src/main/java/org/courtside/shared/DatabaseTls*.java",
+        "src/main/java/org/courtside/shared/DatabaseMigration.java",
+        "src/main/java/org/courtside/shared/DatabaseProvisioning.java"
       ]
     },
     {
