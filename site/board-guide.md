@@ -187,6 +187,10 @@ Hat das Mitglied bereits ein eigenes Passwort, warnt Courtside vor dem Senden: n
 löschen das gewählte Passwort und beenden alle laufenden Sitzungen. Das ist der Weg für jemanden, der
 nicht mehr hineinkommt — und nur dafür.
 
+Verlässt jemand den Verein, wird sein Konto **deaktiviert**, nicht gelöscht: die Schaltfläche
+daneben schaltet es ab und ebenso wieder an. Ein deaktiviertes Konto meldet sich nicht mehr an, und
+alles, was die Person gebucht hat, bleibt in den Auswertungen richtig.
+
 Weiter finden Sie dort: die Sitzungen dieses Kontos beenden, alle Sitzungen der Instanz beenden
 (auch Ihre eigene), die Änderungen an dieser Person im Protokoll, und die **Auskunft über
 gespeicherte Daten**. Fragt ein Mitglied, was der Verein über es gespeichert hat, erzeugt diese

@@ -180,6 +180,10 @@ If the member already chose a password, Courtside warns before sending: new cred
 password and end every session they have open. That is the route for somebody who can no longer get
 in, and only for that.
 
+When somebody leaves the club, their account is **deactivated** rather than deleted: the button
+beside it switches the account off, and on again. A deactivated account cannot sign in, and
+everything that person booked stays right in the reports.
+
 The same page ends this account's sessions, ends every session in the instance (yours included),
 links to this person's changes in the log, and produces the **answer to a data-access request**.
 When a member asks what the club holds about them, that button produces the answer as a file: the
