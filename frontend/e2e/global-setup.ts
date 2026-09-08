@@ -34,14 +34,6 @@ import {
   type ResourceTarget
 } from "./resource-timeline";
 import {
-  applicationResourceLimits,
-  assertDockerResourceCapacity,
-  assertedContainerLimits,
-  configureResourceContainer,
-  enforceContainerPidLimit,
-  selectedResourceProfile
-} from "./resource-profile";
-import {
   browserContainerLabels,
   ObservableGenericContainer,
   ownedBrowserContainerIds,
@@ -460,7 +452,7 @@ async function emptyMailbox(mailboxURL: string): Promise<void> {
 }
 
 export async function startJourneyService(): Promise<StartedJourneyService> {
-  const resourceProfile = selectedResourceProfile(process.env);
+  const retainReliabilityResources = process.env.COURTSIDE_WEBKIT_RELIABILITY === "true";
   let postgres: StartedTestContainer | undefined;
   let application: ChildProcess | undefined;
   let breachCheck: Awaited<ReturnType<typeof startBreachCheckStub>> | undefined;
@@ -488,28 +480,10 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const dockerJson = async (args: string[]): Promise<unknown> => JSON.parse(await dockerText(args));
   const resourceEnvironment: {
     schemaVersion: 1;
-    profile?: "normal" | "stress";
-    profileDigest?: string;
     docker?: { cpuCount: number; memoryBytes: number; memoryLimit: boolean; pidsLimit: boolean };
-    targets: Record<string, unknown>;
-  } = { schemaVersion: 1, targets: {} };
+  } = { schemaVersion: 1 };
   const retainResourceEnvironment = () => writeFileSync(resourceEnvironmentPath,
     `${JSON.stringify(resourceEnvironment, null, 2)}\n`, { mode: 0o600 });
-  const retainContainerLimits = async (target: "proxy" | "postgres" | "browser", container: StartedTestContainer) => {
-    if (!resourceProfile || resourceProfile === "reference") return;
-    const observed = await dockerJson(["inspect", "--format", "{{json .HostConfig}}", container.getId()]);
-    const retained = {
-      containerId: container.getId(),
-      ...assertedContainerLimits(resourceProfile, target, observed)
-    };
-    if (target === "browser") {
-      const browsers = resourceEnvironment.targets.browser as unknown[] | undefined;
-      resourceEnvironment.targets.browser = [...browsers ?? [], retained];
-    } else {
-      resourceEnvironment.targets[target] = retained;
-    }
-    retainResourceEnvironment();
-  };
   const containerObservation = async (target: Exclude<ResourceTarget, "application">,
     container: StartedTestContainer, includeProcessId = false): Promise<ResourceObservation> => {
     const [usage, sharedMemory, state] = await Promise.all([
@@ -615,29 +589,23 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   };
   try {
     breachCheck = await startBreachCheckStub();
-    if (resourceProfile && resourceProfile !== "reference") {
+    if (retainReliabilityResources) {
       const dockerCapacity = await dockerJson(["info", "--format", "{{json .}}"]);
-      assertDockerResourceCapacity(resourceProfile, dockerCapacity);
       const capacity = dockerCapacity as { NCPU: number; MemTotal: number; MemoryLimit: boolean; PidsLimit: boolean };
-      resourceEnvironment.profile = resourceProfile;
-      resourceEnvironment.profileDigest = `sha256:${createHash("sha256")
-        .update(readFileSync(resolve("../quality/browser-resource-profiles.json"))).digest("hex")}`;
       resourceEnvironment.docker = { cpuCount: capacity.NCPU, memoryBytes: capacity.MemTotal,
         memoryLimit: capacity.MemoryLimit, pidsLimit: capacity.PidsLimit };
       retainResourceEnvironment();
     }
     const visualDate = journeyDate;
-    postgres = await configureResourceContainer(new GenericContainer(deployedPostgresImage())
+    postgres = await new GenericContainer(deployedPostgresImage())
       .withEnvironment({
         POSTGRES_DB: "courtside",
         POSTGRES_USER: "courtside",
         POSTGRES_PASSWORD: "courtside"
       })
-      .withExposedPorts(5432), resourceProfile, "postgres")
+      .withExposedPorts(5432)
       .start();
-    await enforceContainerPidLimit(postgres.getId(), resourceProfile, "postgres", dockerText);
-    await retainContainerLimits("postgres", postgres);
-    if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true") await startResourceSampling();
+    if (retainReliabilityResources) await startResourceSampling();
     const relayCertificate = selfSignedRelayCertificate();
     mailSink = await new GenericContainer(deployedMailSinkImage())
       .withEnvironment({
@@ -692,22 +660,10 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       SPRING_WEB_RESOURCES_STATIC_LOCATIONS: `file:${staticDirectory}/,classpath:/static/`
     };
     const startApplication = async () => {
-      const limits = applicationResourceLimits(resourceProfile);
-      const javaArguments = limits ? [
-        `-XX:ActiveProcessorCount=${Math.max(1, Math.ceil(limits.cpu))}`,
-        `-XX:MaxRAM=${limits.memoryMegabytes}m`,
-        "-XX:MaxRAMPercentage=75.0"
-      ] : [];
-      application = spawn(java, [...javaArguments, "-jar", applicationJar()], {
+      application = spawn(java, ["-jar", applicationJar()], {
         env: applicationEnvironment,
         stdio: ["ignore", "pipe", "pipe"]
       });
-      if (limits && application.pid) {
-        resourceEnvironment.targets.application = { processId: application.pid, enforcement: "observed-threshold",
-          configuredProcessorCount: Math.max(1, Math.ceil(limits.cpu)), jvmMaxRamMegabytes: limits.memoryMegabytes,
-          jvmMaxRamPercentage: 75 };
-        retainResourceEnvironment();
-      }
       for (const stream of [application.stdout, application.stderr]) {
         stream?.on("data", (chunk: Buffer) => {
           process.stdout.write(chunk);
@@ -783,7 +739,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     await seedJourneyData(postgres, visualDate);
     const tables = await snapshotJourneyData(postgres);
     clubNetwork = await new Network().start();
-    clubProxy = await configureResourceContainer(new GenericContainer(deployedProxyImage())
+    clubProxy = await new GenericContainer(deployedProxyImage())
       .withNetwork(clubNetwork)
       .withNetworkAliases(CLUB_HOST)
       .withCopyContentToContainer([
@@ -792,10 +748,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       // Reaching the host the way deploy/Caddyfile.dev does. The Testcontainers host tunnel runs
       // inside this process, and its socket errors are uncaught when the application restarts.
       .withExtraHosts([{ host: "host.docker.internal", ipAddress: "host-gateway" }])
-      .withWaitStrategy(Wait.forLogMessage(/serving initial configuration/)), resourceProfile, "proxy")
+      .withWaitStrategy(Wait.forLogMessage(/serving initial configuration/))
       .start();
-    await enforceContainerPidLimit(clubProxy.getId(), resourceProfile, "proxy", dockerText);
-    await retainContainerLimits("proxy", clubProxy);
     const rootCertificate = await readProxyCertificates(clubProxy, CADDY_LOCAL_AUTHORITY);
     const servedKeys = publicKeyFingerprints(
       rootCertificate + await readProxyCertificates(clubProxy, CADDY_ISSUED_CERTIFICATES));
@@ -841,7 +795,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
           }));
       };
       const container = await startOwnedBrowserContainer(
-        async (created) => configureResourceContainer(new ObservableGenericContainer(PINNED_BROWSER_IMAGE, created)
+        async (created) => new ObservableGenericContainer(PINNED_BROWSER_IMAGE, created)
           .withLabels(browserContainerLabels(journeyId, startupId))
           .withNetwork(clubNetwork!)
           .withCopyDirectoriesToContainer([
@@ -858,15 +812,13 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
             + ` && node /opt/courtside/node_modules/playwright/cli.js launch-server --browser ${browserName}`
             + " --config /tmp/launch-options.json"])
           .withExposedPorts(3000)
-          .withWaitStrategy(Wait.forLogMessage(/ws:\/\//)), resourceProfile, "browser")
+          .withWaitStrategy(Wait.forLogMessage(/ws:\/\//))
           .start(),
         () => ownedBrowserContainerIds(journeyId, undefined, dockerText, startupId),
         startupDiagnostics,
         (containerId) => executeFile("docker", ["rm", "-f", containerId], { timeout: 5_000 })
       );
       const endpoint = `ws://${container.getHost()}:${container.getMappedPort(3000)}${wsPath}`;
-      await enforceContainerPidLimit(container.getId(), resourceProfile, "browser", dockerText);
-      await retainContainerLimits("browser", container);
       browserServers.set(browserName, { container, endpoint });
       browserLifecycle.start(browserName, container.getId(), new Date().toISOString());
       retainBrowserLifecycle();

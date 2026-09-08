@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "attemptId", "sourceCommit", "sourceTreeState", "startedAt", "finishedAt", "durationMs", "executionDeadlineMs", "terminationGraceMs", "toolchain", "matrix", "host", "testPopulation", "browserLifecycle", "resourceTimeline", "resourceEnvironment", "outcome"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "attemptId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
     "sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "sourceTreeState": { "enum": ["clean", "modified"] },
@@ -28,11 +28,11 @@
     "matrix": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["projectOrder", "isolationVariant", "resourceProfile", "seedFingerprint"],
+      "required": ["projectOrder", "isolationVariant", "resourceMode", "seedFingerprint"],
       "properties": {
         "projectOrder": { "enum": ["configured", "reversed"] },
         "isolationVariant": { "enum": ["fresh-project-browser", "fresh-test-browser"] },
-        "resourceProfile": { "enum": ["normal", "stress"] },
+        "resourceMode": { "const": "observation" },
         "seedFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "experimentId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
         "pairIndex": { "type": "integer", "minimum": 1 },
@@ -146,11 +146,9 @@
     "resourceEnvironment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "targets"],
+      "required": ["schemaVersion"],
       "properties": {
         "schemaVersion": { "const": 1 },
-        "profile": { "enum": ["normal", "stress"] },
-        "profileDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "docker": {
           "type": "object",
           "additionalProperties": false,
@@ -160,31 +158,6 @@
             "memoryBytes": { "type": "integer", "minimum": 1 },
             "memoryLimit": { "type": "boolean" },
             "pidsLimit": { "type": "boolean" }
-          }
-        },
-        "targets": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "application": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["processId", "enforcement", "configuredProcessorCount", "jvmMaxRamMegabytes", "jvmMaxRamPercentage"],
-              "properties": {
-                "processId": { "type": "integer", "minimum": 1 },
-                "enforcement": { "const": "observed-threshold" },
-                "configuredProcessorCount": { "type": "integer", "minimum": 1 },
-                "jvmMaxRamMegabytes": { "type": "integer", "minimum": 1 },
-                "jvmMaxRamPercentage": { "type": "number", "exclusiveMinimum": 0, "maximum": 100 }
-              }
-            },
-            "proxy": { "$ref": "#/$defs/containerLimits" },
-            "postgres": { "$ref": "#/$defs/containerLimits" },
-            "browser": {
-              "type": "array",
-              "minItems": 1,
-              "items": { "$ref": "#/$defs/containerLimits" }
-            }
           }
         }
       }
@@ -202,20 +175,6 @@
           "items": { "enum": ["none", "product", "harness", "environment"] }
         },
         "exitCode": { "type": ["integer", "null"], "minimum": 0 }
-      }
-    }
-  },
-  "$defs": {
-    "containerLimits": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["containerId", "memoryBytes", "nanoCpus", "pids", "sharedMemoryBytes"],
-      "properties": {
-        "containerId": { "type": "string", "pattern": "^[a-f0-9]{12,64}$" },
-        "memoryBytes": { "type": "integer", "minimum": 1 },
-        "nanoCpus": { "type": "integer", "minimum": 1 },
-        "pids": { "type": "integer", "minimum": 1 },
-        "sharedMemoryBytes": { "type": "integer", "minimum": 1 }
       }
     }
   }
