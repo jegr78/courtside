@@ -20,12 +20,14 @@ test("given dependency findings, when scheduled and release gates run, then over
   assert.doesNotMatch(dependabot, /\n\s+ignore:/);
   assert.match(build, /actions\/dependency-review-action@[a-f0-9]{40}/);
   assert.match(release, /security-events: read|security-events: write/);
+  assert.match(release, /vulnerability-alerts: read/);
   assert.match(release, /--subject "\$\{\{ github\.sha \}\}"[\s\S]+node tools\/dependency-remediation\.mjs/);
   assert.match(release, /--current-summary build\/security\/release-build\.json/);
   assert.match(release, /id: release-security[\s\S]+continue-on-error: true[\s\S]+Require completed release security gates/);
   assert.match(release, /dependency-remediation[\s\S]+if: always\(\)[\s\S]+build\/security\/dependency-remediation\.json/);
   assert.match(release, /actions\/artifacts\?per_page=100[\s\S]+gh run download[\s\S]+--previous-evidence/);
-  assert.match(npmAudit, /security-events: read/);
+  assert.match(npmAudit, /vulnerability-alerts: read/);
+  assert.doesNotMatch(npmAudit, /security-events:/);
   assert.match(npmAudit, /node tools\/dependency-remediation\.mjs/);
   assert.match(npmAudit, /--current-summary build\/security\/npm-audit-summary\.json[\s\S]+--current-summary build\/security\/npm-audit-site-summary\.json/);
   assert.match(npmAudit, /dependency-remediation-completed-/);
