@@ -79,7 +79,7 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
     GROUNDSKEEPER: "allow",
     TREASURER: "allow",
     ADMIN: "allow",
-    INITIAL_PASSWORD: "allow"
+    INITIAL_PASSWORD: "deny-forbidden"
   });
   for (const operationId of ["endAccountSessions", "endAllSessions"]) {
     const expectations = matrix.find((entry) => entry.operationId === operationId).expectations;

@@ -63,12 +63,6 @@ function operationExpectations(path, method, security) {
     expectations.INITIAL_PASSWORD = "allow";
     return expectations;
   }
-  if (path === "/api/session/reauthentication") {
-    expectations.ANONYMOUS = "deny-unauthenticated";
-    for (const role of roles) expectations[role] = "allow";
-    expectations.INITIAL_PASSWORD = "allow";
-    return expectations;
-  }
   if (security.length === 0) {
     return Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"]));
   }
