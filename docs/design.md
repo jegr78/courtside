@@ -24,13 +24,14 @@ Fifteen modules exist: `api`, `audit`, `booking`, `card`, `config`, `dataexchang
 `facility`, `identity`, `member`, `notification`, `performance`, `rules`, `securityassessment`,
 `shared`. `api` holds the OpenAPI-generated request, response and controller-interface types and
 carries no logic of its own, which is why it is declared shared alongside `shared` rather than given
-`allowedDependencies` of its own. `demo` and `performance` seed disposable environments — a
-walkthrough dataset and a synthetic load-test dataset — and each refuses to start unless its
-environment guard confirms the database it is about to fill is the disposable one it names
-(`courtside_dev` for `demo`, `courtside_perf` for `performance`), not whatever the deployment
-happens to point at. The `reporting` and `integration` modules of section 3 are designed and not
-built. `audit` is built: every configuration change made through the admin API — facility, cards,
-config, rule sets, the roster and the import configuration — is recorded in the append-only
+`allowedDependencies` of its own. `demo`, `performance` and `securityassessment` seed disposable
+environments — a walkthrough dataset, a synthetic load-test dataset and the dataset a security
+assessment runs against — and each refuses to start unless its environment guard confirms the
+database it is about to fill is the disposable one it names (`courtside_dev` for `demo`,
+`courtside_perf` for `performance`, `courtside_security` for `securityassessment`), not whatever the
+deployment happens to point at. The `reporting` and `integration` modules of section 3 are designed
+and not built. `audit` is built: every configuration change made through the admin API — facility,
+cards, config, rule sets, the roster and the import configuration — is recorded in the append-only
 `domain_event` table before the commit that makes it: actor, time, entity, and, except for free
 text, the values. Which services that covers is derived from the admin API rather than listed, so a
 surface is covered on the day its controller is written instead of on the day somebody remembers to
