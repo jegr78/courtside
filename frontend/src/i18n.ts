@@ -273,7 +273,7 @@ const resources = {
     "admin.import.defaultType": "Mitgliedsart, wenn die Datei nichts sagt",
     "admin.import.retiredType": "{{name}} (nicht mehr angeboten)",
     "admin.import.ownedFields": "Felder, die diese Quelle führt",
-    "admin.import.ownedFieldsHint": "Ein geführtes Feld überschreibt jede Momentaufnahme. Was Sie hier nicht ankreuzen, gehört dem Verein und bleibt unangetastet.",
+    "admin.import.ownedFieldsHint": "Jede Momentaufnahme überschreibt ein geführtes Feld. Was Sie hier nicht ankreuzen, gehört dem Verein und bleibt unangetastet.",
     "admin.import.removalWarning": "Ab wie viel Prozent wegfallender Mitgliedschaften nachgefragt wird",
     "admin.import.field.EXTERNAL_ID": "Mitgliedsnummer",
     "admin.import.field.FIRST_NAME": "Vorname",
