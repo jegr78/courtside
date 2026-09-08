@@ -72,6 +72,14 @@ as [`manual-baseline-control-outcomes.json`](../security/manual-baseline-control
 protected record they derive from expires; the list of controls the next run has to work through
 does not.
 
+Publishing it is a deliberate disclosure, and a narrow one. The 59 failed controls are exactly the
+controls `manual-baseline-finding-summary.json` already maps its eleven findings to, so nothing about
+what is broken is new. What is new is the split of the remaining 257 into 111 that do not apply and
+146 nobody has read against a named production path. That tells a reader where this assessment has
+not looked yet, which the counts above already say in aggregate and which the source of an AGPL
+application says in full. Being able to name them is worth more than the hint, because a control
+nobody can name is a control nobody fixes.
+
 The first review had assigned 158 pass outcomes from chapter-level file inventories. Independent
 review showed that those records were not control-specific and contradicted ten known gaps. None of
 those generated outcomes remains a pass: 12 map to a validated or accepted finding and the other
