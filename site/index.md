@@ -30,7 +30,7 @@ Datenbank, ein Container, die Mitglieder des Vereins und niemand sonst.
 
 ## Anleitungen
 
-- [**Anleitung für Mitglieder**](/member-guide): anmelden, einen freien Platz finden, buchen,
+- [**Anleitung für Mitglieder**](member-guide.md): anmelden, einen freien Platz finden, buchen,
   Mitspieler und Gäste eintragen, absagen, Benachrichtigungen wählen.
 
 Eine **Anleitung für Vorstände** über Plätze, Regeln, Mitglieder, Konten und Import fehlt noch

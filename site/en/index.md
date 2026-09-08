@@ -30,7 +30,7 @@ container, that club's members and nobody else.
 
 ## Guides
 
-- [**A guide for members**](/en/member-guide): signing in, finding a free court, booking, recording
+- [**A guide for members**](member-guide.md): signing in, finding a free court, booking, recording
   players and guests, cancelling, choosing notifications.
 
 A **guide for boards** covering courts, rules, members, accounts and import is still missing
