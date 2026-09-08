@@ -194,6 +194,8 @@ test("an expired session cannot turn a supported browser back into an authentica
   await signIn(page, "doe.jane");
   const secure = new URL(page.url()).protocol === "https:";
   const sessionName = secure ? "__Host-SESSION" : "SESSION";
+  const otherSessionName = secure ? "SESSION" : "__Host-SESSION";
+  const otherCsrfName = secure ? "XSRF-TOKEN" : "__Host-XSRF-TOKEN";
   expect((await page.context().cookies()).some((cookie) => cookie.name === sessionName)).toBe(true);
   await journeyService.executeSql(
     "UPDATE spring_session SET last_access_time = 0, max_inactive_interval = 1, expiry_time = 1");
@@ -215,6 +217,6 @@ test("an expired session cannot turn a supported browser back into an authentica
     httpOnly: true, maxAge: "0", isEmpty: true });
   expect((await page.context().cookies()).some((cookie) => cookie.name === sessionName)).toBe(false);
   const names = expiryCookies.map(({ name }) => name);
-  expect(names).not.toContain("SESSION");
-  expect(names).not.toContain("XSRF-TOKEN");
+  expect(names).not.toContain(otherSessionName);
+  expect(names).not.toContain(otherCsrfName);
 });

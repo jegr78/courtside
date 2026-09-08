@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -21,39 +20,27 @@ const frontendRequire = createRequire(new URL("../frontend/package.json", import
 const Ajv = frontendRequire("ajv/dist/2020").default;
 const schema = JSON.parse(readFileSync(new URL("../quality/webkit-reliability.schema.json", import.meta.url), "utf8"));
 const validate = new Ajv({ strict: true, allErrors: true, formats: { "date-time": true } }).compile(schema);
-const resourceProfileContents = readFileSync(new URL("../quality/browser-resource-profiles.json", import.meta.url));
-
 function resourceEnvironment() {
-  const container = (target, id) => {
-    const limits = JSON.parse(resourceProfileContents).profiles.normal.targets[target];
-    return { containerId: id.repeat(64), memoryBytes: limits.memoryMegabytes * 1024 * 1024,
-      nanoCpus: Math.ceil(limits.cpu * 1_000_000_000), pids: limits.pids,
-      sharedMemoryBytes: limits.sharedMemoryMegabytes * 1024 * 1024 };
-  };
   return {
     schemaVersion: 1,
-    profile: "normal",
-    profileDigest: `sha256:${createHash("sha256").update(resourceProfileContents).digest("hex")}`,
-    docker: { cpuCount: 8, memoryBytes: 16_000_000_000, memoryLimit: true, pidsLimit: true },
-    targets: {
-      application: { processId: 1234, enforcement: "observed-threshold", configuredProcessorCount: 3,
-        jvmMaxRamMegabytes: 1280, jvmMaxRamPercentage: 75 },
-      proxy: container("proxy", "a"),
-      postgres: container("postgres", "b"),
-      browser: [container("browser", "c"), container("browser", "d"), container("browser", "e")]
-    }
+    docker: { cpuCount: 4, memoryBytes: 16_000_000_000, memoryLimit: true, pidsLimit: true }
   };
 }
 
 function resourceTimeline() {
-  const containerIds = { proxy: "a", postgres: "b", browser: "c" };
+  const containerIds = { proxy: ["a"], postgres: ["b"], browser: ["c", "d", "e"] };
   return { schemaVersion: 1, intervalMs: 1_000,
-    samples: ["application", "proxy", "postgres", "browser"].flatMap((target) => [1, 2].map((sequence) => ({
-      recordedAt: `2026-08-27T08:00:0${sequence}.000Z`, sequence, target,
-      ...target === "application" ? { processId: 1234 } : { containerId: containerIds[target].repeat(64) },
-      ...target === "browser" ? { processId: 77 } : {},
-      cpuPercent: 1, memoryUsageBytes: 1_000, pids: 1, sharedMemoryUsageBytes: 0
-    }))) };
+    samples: ["application", "proxy", "postgres", "browser"].flatMap((target) =>
+      (target === "application" ? [undefined] : containerIds[target]).flatMap((containerId, index) =>
+        [1, 2].map((position) => {
+          const sequence = index * 2 + position;
+          return {
+            recordedAt: `2026-08-27T08:00:${String(sequence).padStart(2, "0")}.000Z`, sequence, target,
+            ...target === "application" ? { processId: 1234 } : { containerId: containerId.repeat(64) },
+            ...target === "browser" ? { processId: 77 + index } : {},
+            cpuPercent: 1, memoryUsageBytes: 1_000, pids: 1, sharedMemoryUsageBytes: 0
+          };
+        }))) };
 }
 
 function record(overrides = {}) {
@@ -67,7 +54,6 @@ function record(overrides = {}) {
     browserImage: "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:" + "b".repeat(64),
     projectOrder: "configured",
     isolationVariant: "fresh-project-browser",
-    resourceProfile: "normal",
     seedFingerprint: `sha256:${"e".repeat(64)}`,
     host: { provider: "github-hosted", platform: "linux", architecture: "x64", cpuCount: 4, totalMemoryBytes: 16_000_000_000 },
     execution: { exitCode: 0, gateOutcome: { schemaVersion: 1, testPopulation: {
@@ -134,6 +120,8 @@ test("given a completed first attempt, when building its record, then the closed
   assert.equal(JSON.stringify(result).includes("cookie"), false);
   assert.deepEqual(result.outcome.classifications, ["none"]);
   assert.equal(result.durationMs, 120_000);
+  assert.equal(result.schemaVersion, 2);
+  assert.equal(result.matrix.resourceMode, "observation");
   assert.equal(result.executionDeadlineMs, 1_500_000);
   assert.equal(result.terminationGraceMs, 10_000);
   assert.equal(result.testPopulation.count, 3);
@@ -288,8 +276,8 @@ test("given both implemented isolation variants, when parsing the run, then they
   // then
   assert.equal(project.isolation, "fresh-project-browser");
   assert.equal(testScoped.isolation, "fresh-test-browser");
-  assert.equal(project.resourceProfile, "normal");
-  assert.equal(reliabilityOptions(["--resource-profile", "stress"]).resourceProfile, "stress");
+  assert.equal(Object.hasOwn(project, "resourceProfile"), false);
+  assert.throws(() => reliabilityOptions(["--resource-profile", "stress"]), /Unsupported option/);
 });
 
 test("given an isolation experiment, when selecting its output, then completed attempts cannot be cleared by playwright", () => {
@@ -302,10 +290,10 @@ test("given an isolation experiment, when selecting its output, then completed a
     /outside Playwright test-results/);
 });
 
-test("given an unknown isolation or resource profile, when parsing the run, then it cannot be claimed", () => {
+test("given an unknown isolation or removed resource profile, when parsing the run, then it cannot be claimed", () => {
   // given / when / then
   assert.throws(() => reliabilityOptions(["--isolation", "shared-browser"]), /Unsupported isolation/);
-  assert.throws(() => reliabilityOptions(["--resource-profile", "large-runner"]), /Unsupported resource profile/);
+  assert.throws(() => reliabilityOptions(["--resource-profile", "large-runner"]), /Unsupported option/);
 });
 
 test("given lifecycle evidence does not match the declared isolation, when validating, then it fails closed", () => {
@@ -403,30 +391,34 @@ test("given unsafe or incomplete lifecycle evidence, when the run claims success
   assert.throws(() => validateReliabilityRecord(missingFreshTestProjects), /contradictory browser lifecycle/);
 });
 
-test("given claimed resource limits differ from the runtime, when validating, then completion is rejected", () => {
+test("given observed Docker capacity is missing or malformed, when validating, then completion is rejected", () => {
   // given
-  const missingBrowser = record();
-  missingBrowser.resourceEnvironment.targets.browser.pop();
+  const unsupportedLimits = record();
+  unsupportedLimits.resourceEnvironment.docker.memoryLimit = false;
+  unsupportedLimits.resourceEnvironment.docker.pidsLimit = false;
+  const missingDocker = record();
+  delete missingDocker.resourceEnvironment.docker;
   const wrongMemory = record();
-  wrongMemory.resourceEnvironment.targets.postgres.memoryBytes += 1;
-  const staleProfile = record();
-  staleProfile.resourceEnvironment.profileDigest = `sha256:${"f".repeat(64)}`;
+  wrongMemory.resourceEnvironment.docker.memoryBytes = 0;
+  const unsupportedFlag = record();
+  unsupportedFlag.resourceEnvironment.docker.memoryLimit = "yes";
 
   // when / then
-  assert.throws(() => validateReliabilityRecord(missingBrowser), /resource environment/);
-  assert.throws(() => validateReliabilityRecord(wrongMemory), /resource environment/);
-  assert.throws(() => validateReliabilityRecord(staleProfile), /resource environment/);
+  assert.doesNotThrow(() => validateReliabilityRecord(unsupportedLimits));
+  assert.throws(() => validateReliabilityRecord(missingDocker), /resource environment/);
+  assert.throws(() => validateReliabilityRecord(wrongMemory), /reliability record/);
+  assert.throws(() => validateReliabilityRecord(unsupportedFlag), /reliability record/);
 });
 
 test("given malformed raw resource evidence, when building the record, then the attempt remains retainable", () => {
   // given
   const evidence = record();
   const invalidEnvironment = structuredClone(evidence.resourceEnvironment);
-  invalidEnvironment.targets.application = null;
+  invalidEnvironment.docker.cpuCount = "four";
   const partialEnvironment = structuredClone(evidence.resourceEnvironment);
-  partialEnvironment.targets.application = {};
+  delete partialEnvironment.docker;
   const unknownEnvironment = structuredClone(evidence.resourceEnvironment);
-  unknownEnvironment.targets.application.commandLine = "secret";
+  unknownEnvironment.machineName = "secret";
   const invalidTimeline = structuredClone(evidence.resourceTimeline);
   invalidTimeline.samples.push({ ...invalidTimeline.samples[0], target: "mail-sink" });
   const gateOutcome = { schemaVersion: 1, testPopulation: evidence.testPopulation, claims: [
@@ -456,8 +448,8 @@ test("given malformed raw resource evidence, when building the record, then the 
   assert.equal(validate(timelineResult), true, JSON.stringify(validate.errors));
   assert.equal(validate(partialResult), true, JSON.stringify(validate.errors));
   assert.equal(validate(unknownResult), true, JSON.stringify(validate.errors));
-  assert.deepEqual(partialResult.resourceEnvironment, { schemaVersion: 1, targets: {} });
-  assert.deepEqual(unknownResult.resourceEnvironment, { schemaVersion: 1, targets: {} });
+  assert.deepEqual(partialResult.resourceEnvironment, { schemaVersion: 1 });
+  assert.deepEqual(unknownResult.resourceEnvironment, { schemaVersion: 1 });
 });
 
 test("given twenty paired attempts per variant, when comparing isolation, then conditions and results stay visible", () => {

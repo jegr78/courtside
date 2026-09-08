@@ -5,19 +5,11 @@ import { arch, cpus, platform, totalmem } from "node:os";
 import { basename, relative, resolve, sep } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import {
-  resourceLimits,
-  validateResourceProfileContract,
-  validateResourceTimeline
-} from "./browser-resource-profile.mjs";
+import { validateResourceTimeline } from "./browser-resource-observation.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const frontend = resolve(root, "frontend");
 const schemaPath = resolve(root, "quality", "webkit-reliability.schema.json");
-const resourceProfileContract = JSON.parse(readFileSync(resolve(root, "quality", "browser-resource-profiles.json"), "utf8"));
-validateResourceProfileContract(resourceProfileContract);
-const resourceProfileDigest = `sha256:${createHash("sha256")
-  .update(readFileSync(resolve(root, "quality", "browser-resource-profiles.json"))).digest("hex")}`;
 const frontendRequire = createRequire(resolve(frontend, "package.json"));
 const executionDeadlineMs = 25 * 60 * 1_000;
 const terminationGraceMs = 10_000;
@@ -34,10 +26,8 @@ function resourceEnvironmentValidator() {
   if (validateResourceEnvironmentShape) return validateResourceEnvironmentShape;
   const Ajv = frontendRequire("ajv/dist/2020").default;
   const schema = JSON.parse(readFileSync(schemaPath, "utf8"));
-  validateResourceEnvironmentShape = new Ajv({ strict: true, allErrors: true }).compile({
-    ...schema.properties.resourceEnvironment,
-    $defs: schema.$defs
-  });
+  validateResourceEnvironmentShape = new Ajv({ strict: true, allErrors: true })
+    .compile(schema.properties.resourceEnvironment);
   return validateResourceEnvironmentShape;
 }
 
@@ -64,19 +54,17 @@ function outcome(execution) {
   return { status: "incomplete", classifications: ["harness"], exitCode: execution.exitCode };
 }
 
-function resourceEvidenceIsComplete(timeline, profileName) {
+function resourceEvidenceIsComplete(timeline, lifecycle) {
   try {
     validateResourceTimeline(timeline);
   } catch {
     return false;
   }
-  return timeline.samples.every((sample) => {
-    const limits = resourceLimits(resourceProfileContract, profileName, sample.target);
-    return sample.cpuPercent <= limits.cpu * 100
-      && sample.memoryUsageBytes <= limits.memoryBytes
-      && sample.pids <= limits.pids
-      && sample.sharedMemoryUsageBytes <= limits.sharedMemoryBytes;
-  });
+  const sampledBrowsers = new Set(timeline.samples
+    .filter(({ target }) => target === "browser").map(({ containerId }) => containerId));
+  const lifecycleBrowsers = new Set(lifecycle?.processes?.map(({ processId }) => processId));
+  return sampledBrowsers.size === lifecycleBrowsers.size
+    && [...sampledBrowsers].every((containerId) => lifecycleBrowsers.has(containerId));
 }
 
 function resourceTimelineForRecord(timeline) {
@@ -91,50 +79,16 @@ function resourceTimelineForRecord(timeline) {
 }
 
 function resourceEnvironmentForRecord(environment) {
-  const fallback = { schemaVersion: 1, targets: {} };
+  const fallback = { schemaVersion: 1 };
   return environment !== undefined && resourceEnvironmentValidator()(environment) ? environment : fallback;
 }
 
-function resourceEnvironmentIsComplete(environment, profileName, lifecycle) {
-  if (environment?.schemaVersion !== 1 || environment.profile !== profileName
-      || environment.profileDigest !== resourceProfileDigest
-      || environment.docker?.memoryLimit !== true || environment.docker?.pidsLimit !== true) return false;
-  const profile = resourceProfileContract.profiles[profileName]?.targets;
-  if (!profile) return false;
-  const requiredCpu = Object.values(profile).reduce((sum, limits) => sum + limits.cpu, 0);
-  const requiredMemory = Object.values(profile)
-    .reduce((sum, limits) => sum + limits.memoryMegabytes * 1024 * 1024, 0);
-  if (environment.docker.cpuCount < requiredCpu || environment.docker.memoryBytes < requiredMemory) return false;
-  if (JSON.stringify(Object.keys(environment.targets ?? {}).toSorted())
-      !== JSON.stringify(["application", "browser", "postgres", "proxy"])) return false;
-  const application = environment.targets.application;
-  if (!Number.isInteger(application.processId) || application.enforcement !== "observed-threshold"
-      || application.configuredProcessorCount !== Math.max(1, Math.ceil(profile.application.cpu))
-      || application.jvmMaxRamMegabytes !== profile.application.memoryMegabytes
-      || application.jvmMaxRamPercentage !== 75) return false;
-  for (const target of ["proxy", "postgres"]) {
-    const observed = environment.targets[target];
-    const expected = resourceLimits(resourceProfileContract, profileName, target);
-    if (!/^[a-f0-9]{12,64}$/.test(observed.containerId ?? "")
-        || observed.memoryBytes !== expected.memoryBytes
-        || observed.nanoCpus !== Math.ceil(expected.cpu * 1_000_000_000)
-        || observed.pids !== expected.pids
-        || observed.sharedMemoryBytes !== expected.sharedMemoryBytes) return false;
-  }
-  if (!Array.isArray(environment.targets.browser) || environment.targets.browser.length === 0) return false;
-  const browserIds = new Set();
-  const expectedBrowser = resourceLimits(resourceProfileContract, profileName, "browser");
-  for (const observed of environment.targets.browser) {
-    if (!/^[a-f0-9]{12,64}$/.test(observed.containerId ?? "") || browserIds.has(observed.containerId)
-        || observed.memoryBytes !== expectedBrowser.memoryBytes
-        || observed.nanoCpus !== Math.ceil(expectedBrowser.cpu * 1_000_000_000)
-        || observed.pids !== expectedBrowser.pids
-        || observed.sharedMemoryBytes !== expectedBrowser.sharedMemoryBytes) return false;
-    browserIds.add(observed.containerId);
-  }
-  const lifecycleIds = new Set(lifecycle?.processes?.map((process) => process.processId));
-  if (browserIds.size !== lifecycleIds.size || [...browserIds].some((id) => !lifecycleIds.has(id))) return false;
-  return true;
+function resourceEnvironmentIsComplete(environment) {
+  return environment?.schemaVersion === 1
+    && Number.isInteger(environment.docker?.cpuCount) && environment.docker.cpuCount > 0
+    && Number.isInteger(environment.docker?.memoryBytes) && environment.docker.memoryBytes > 0
+    && typeof environment.docker.memoryLimit === "boolean"
+    && typeof environment.docker.pidsLimit === "boolean";
 }
 
 function lifecycleEvidenceIsComplete(lifecycle, isolationVariant, testCount) {
@@ -204,20 +158,18 @@ export function buildReliabilityRecord(input) {
   let result = outcome(input.execution);
   if (result.status !== "incomplete"
     && (!lifecycleEvidenceIsComplete(input.execution.browserLifecycle, input.isolationVariant, testPopulation.count)
-      || !resourceEvidenceIsComplete(resourceTimeline, input.resourceProfile))) {
+      || !resourceEvidenceIsComplete(resourceTimeline, input.execution.browserLifecycle))) {
     result = { status: "incomplete",
       classifications: [...new Set([...result.classifications.filter((classification) => classification !== "none"), "harness"])],
       exitCode: input.execution.exitCode };
   }
-  if (result.status !== "incomplete"
-      && !resourceEnvironmentIsComplete(resourceEnvironment, input.resourceProfile,
-        input.execution.browserLifecycle)) {
+  if (result.status !== "incomplete" && !resourceEnvironmentIsComplete(resourceEnvironment)) {
     result = { status: "incomplete",
       classifications: [...new Set([...result.classifications.filter((classification) => classification !== "none"), "harness"])],
       exitCode: input.execution.exitCode };
   }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     attemptId: input.attemptId,
     sourceCommit: input.sourceCommit,
     sourceTreeState: input.sourceTreeState,
@@ -234,7 +186,7 @@ export function buildReliabilityRecord(input) {
     matrix: {
       projectOrder: input.projectOrder,
       isolationVariant: input.isolationVariant,
-      resourceProfile: input.resourceProfile,
+      resourceMode: "observation",
       seedFingerprint: input.seedFingerprint,
       ...input.experimentId === undefined ? {} : {
         experimentId: input.experimentId,
@@ -349,8 +301,8 @@ export function compareIsolationVariants(records) {
     "Isolation comparison requires the same browser image digest");
   const projectOrder = oneValue(records, ({ matrix }) => matrix.projectOrder,
     "Isolation comparison requires the same project order");
-  const resourceProfile = oneValue(records, ({ matrix }) => matrix.resourceProfile,
-    "Isolation comparison requires the same resource profile");
+  const resourceMode = oneValue(records, ({ matrix }) => matrix.resourceMode,
+    "Isolation comparison requires the same resource mode");
   oneValue(records, ({ matrix }) => matrix.seedFingerprint,
     "Isolation comparison requires the same journey seed");
   oneValue(records, ({ host }) => JSON.stringify(host),
@@ -393,7 +345,7 @@ export function compareIsolationVariants(records) {
     sourceCommit,
     browserImageDigest,
     projectOrder,
-    resourceProfile,
+    resourceMode,
     populationFingerprint,
     variants,
     selectedVariant: testFailures < projectFailures ? "fresh-test-browser" : "fresh-project-browser",
@@ -561,7 +513,6 @@ async function runAttempt(options, updateExitCode = true) {
       cwd: frontend,
       env: { ...process.env, COURTSIDE_PROJECT_ORDER: options.order, COURTSIDE_WEBKIT_AXE: "true",
         COURTSIDE_WEBKIT_RELIABILITY: "true",
-        COURTSIDE_BROWSER_RESOURCE_PROFILE: options.resourceProfile,
         COURTSIDE_WEBKIT_BROWSER_ISOLATION: options.isolation === "fresh-test-browser" ? "test" : "project" },
       stdio: "inherit"
     })
@@ -577,7 +528,6 @@ async function runAttempt(options, updateExitCode = true) {
     browserImage,
     projectOrder: options.order,
     isolationVariant: options.isolation,
-    resourceProfile: options.resourceProfile,
     seedFingerprint: journeySeedFingerprint(),
     experimentId: options.experimentId,
     pairIndex: options.pairIndex,
@@ -614,12 +564,10 @@ export function validateReliabilityRecord(record) {
     throw new Error("A completed reliability run has contradictory browser lifecycle evidence");
   }
   if (record.outcome.status !== "incomplete"
-      && !resourceEvidenceIsComplete(record.resourceTimeline, record.matrix.resourceProfile)) {
+      && !resourceEvidenceIsComplete(record.resourceTimeline, record.browserLifecycle)) {
     throw new Error("A completed reliability run has contradictory resource evidence");
   }
-  if (record.outcome.status !== "incomplete"
-      && !resourceEnvironmentIsComplete(record.resourceEnvironment, record.matrix.resourceProfile,
-        record.browserLifecycle)) {
+  if (record.outcome.status !== "incomplete" && !resourceEnvironmentIsComplete(record.resourceEnvironment)) {
     throw new Error("A completed reliability run has contradictory resource environment evidence");
   }
   const classifications = new Set(record.outcome.classifications);
@@ -634,14 +582,13 @@ export function validateReliabilityRecord(record) {
 
 export function reliabilityOptions(args) {
   const values = { order: "configured", isolation: "fresh-project-browser",
-    resourceProfile: "normal", output: resolve(frontend, "test-results", "webkit-reliability") };
+    output: resolve(frontend, "test-results", "webkit-reliability") };
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index];
     const value = args[index + 1];
     if (value === undefined) throw new Error(`Missing value for ${name}`);
     if (name === "--order") values.order = value;
     else if (name === "--isolation") values.isolation = value;
-    else if (name === "--resource-profile") values.resourceProfile = value;
     else if (name === "--output") values.output = resolve(frontend, value);
     else throw new Error(`Unsupported option: ${name}`);
   }
@@ -649,7 +596,6 @@ export function reliabilityOptions(args) {
   if (!new Set(["fresh-project-browser", "fresh-test-browser"]).has(values.isolation)) {
     throw new Error("Unsupported isolation variant");
   }
-  if (!new Set(["normal", "stress"]).has(values.resourceProfile)) throw new Error("Unsupported resource profile");
   return values;
 }
 

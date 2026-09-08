@@ -3,22 +3,27 @@ name: test stability
 on:
   schedule:
     - cron: '17 2 * * 2,5'
+  pull_request:
+    paths:
+      - '.github/workflows/test-stability.yml'
+      - 'frontend/e2e/**'
+      - 'frontend/playwright.config.ts'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - 'quality/webkit-reliability.schema.json'
+      - 'tools/browser-resource-observation.mjs'
+      - 'tools/browser-resource-observation.test.mjs'
+      - 'tools/test-stability-workflow.test.mjs'
+      - 'tools/webkit-reliability.mjs'
+      - 'tools/webkit-reliability.test.mjs'
   workflow_dispatch:
-    inputs:
-      resource_profile:
-        description: Browser resource profile
-        required: true
-        default: normal
-        type: choice
-        options:
-          - normal
-          - stress
 
 permissions:
   contents: read
 
 jobs:
   varied-order:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -53,6 +58,7 @@ jobs:
           retention-days: 14
 
   browser-order:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -79,13 +85,11 @@ jobs:
         working-directory: frontend
         env:
           COURTSIDE_PROJECT_ORDER: ${{ matrix.project_order }}
-          COURTSIDE_BROWSER_RESOURCE_PROFILE: ${{ inputs.resource_profile || 'normal' }}
           COURTSIDE_WEBKIT_AXE: 'true'
           COURTSIDE_WEBKIT_RELIABILITY: 'true'
         run: >
           npm run reliability:webkit --
           --order "${COURTSIDE_PROJECT_ORDER}"
-          --resource-profile "${COURTSIDE_BROWSER_RESOURCE_PROFILE}"
       - name: Validate the closed first-attempt result
         id: validate-webkit-record
         if: always()
@@ -117,12 +121,12 @@ jobs:
           name: webkit-reliability-${{ matrix.project_order }}-${{ github.run_id }}
           path: |
             frontend/test-results/webkit-reliability/*.json
-            quality/browser-resource-profiles.json
             quality/webkit-reliability.schema.json
           if-no-files-found: error
           retention-days: 90
 
   browser-compatibility:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

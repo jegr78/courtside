@@ -235,9 +235,11 @@ administration surfaces.
 **The renderer is pinned, not the host.** Every project draws its browser from the Playwright image
 matching the installed Playwright version, addressed by digest, started as a browser server by the
 journey service and reached over `connect`. Nothing installs a browser on the runner, so no gate
-waits on distribution packages. One reviewed baseline per surface therefore holds on every machine
-with Docker, `mvn verify` compares pixels wherever it runs, and a red run means a regression rather
-than a different operating system. There is exactly one PNG per surface and no platform suffix.
+waits on distribution packages. The digest addresses a multi-architecture image index, however;
+Docker selects an architecture-specific image beneath it. GitHub's x64 runner is therefore the
+canonical blocking pixel environment. A local run on another architecture remains a valuable
+compatibility check, but a passing run on one host does not prove identical rendering everywhere.
+There is exactly one reviewed PNG per surface and no platform suffix.
 
 **Browsers reach the application the way a member does.** The journey service puts the same
 digest-pinned Caddy the reference deployment uses in front of the application, issuing a certificate
@@ -261,9 +263,10 @@ what the alternative server command would have required. Its client limit is the
 server accepts any number of connections and offers no way to cap them, so the endpoint path, an
 unguessable per-run value, is the only thing standing in front of it.
 
-A deliberate UI change updates the baselines the same way anywhere:
+A deliberate UI change creates a baseline candidate with:
 `npx playwright test visual-regression.spec.ts --project=visual --update-snapshots`, then
-commit what changed. The suite pins `updateSnapshots: "missing"`; the values nobody may reach are
+commit what changed after the x64 pull-request gate has verified it. The suite pins
+`updateSnapshots: "missing"`; the values nobody may reach are
 `changed` and `all`, under which a missing baseline is created and the run **passes**, so a deleted
 baseline would go unnoticed. The pull request must expose the changed PNG baselines for review.
 Unreviewed dimension-only screenshots remain diagnostic artifacts and never replace these
@@ -290,47 +293,24 @@ red for reasons nobody can reproduce is answered from that file, not from a reru
 
 #### WebKit reliability evidence
 
-Run `npm run reliability:webkit -- --order configured --resource-profile normal` from `frontend` for the same bounded
-first-attempt sequence used by the scheduled workflow. Use `reversed` for the alternate project
-order. The command runs WebKit core, installed-PWA and axe projects without a retry and writes one
-immutable record below `test-results/webkit-reliability`. A diagnostic repetition gets a new
-attempt identity and cannot replace the original result.
+Run `npm run reliability:webkit -- --order configured` from `frontend` for the same bounded
+first-attempt sequence used by the scheduled and path-scoped pull-request workflow. Use `reversed`
+for the alternate project order. The command runs WebKit core, installed-PWA and axe projects
+without a retry and writes one immutable record below `test-results/webkit-reliability`. A
+diagnostic repetition gets a new attempt identity and cannot replace the original result.
 
-`quality/browser-resource-profiles.json` is the executable resource contract. Its normal profile
-is each peak from the retained unconstrained reference run at commit
-`7b6cb5891ea052c8eec31be33e6d257f6c35f1dd`, multiplied by 1.25 and rounded up. The stress profile
-is 75 percent of those normal limits. Run it explicitly with
-`npm run reliability:webkit -- --resource-profile stress`. The application receives JVM processor
-and RAM settings. Docker enforces memory, CPU, PID and shared-memory limits for PostgreSQL, the proxy
-and every browser container. Startup fails before the journey if the Docker host cannot supply the
-selected total capacity or does not support memory and PID limits.
-
-Requalify the reference only on a clean committed tree. From `frontend`, run
-`COURTSIDE_WEBKIT_RELIABILITY=true COURTSIDE_BROWSER_RESOURCE_PROFILE=reference npx playwright test --project=webkit-core --project=webkit-pwa --project=webkit-accessibility`.
-Then, from the repository root, run
-`node tools/browser-resource-profile.mjs derive frontend/test-results/resource-timeline.json $(git rev-parse HEAD)`.
-Review the measured peaks and replace `quality/browser-resource-profiles.json` with that command's
-output. Contract validation recomputes every normal and stress threshold from the retained peaks, so a
-hand-edited limit cannot claim the documented derivation.
-
-Docker applies hard CPU, total-memory, PID and shared-memory limits to PostgreSQL, the proxy and
-each browser container, and the record verifies their inspected `HostConfig`. The application runs
-as a host process. Its CPU, complete process-tree RSS and process count are sampled and checked
-against the same profile after the run. `ActiveProcessorCount` and the JVM RAM settings reduce
-runtime variance but are not reported as operating-system limits. A sample above an application
-threshold makes the attempt incomplete; the current setup does not claim a hard application
-resource limit.
-
-| Target | Normal CPU | Normal memory | Normal PIDs | Normal shared memory | Stress CPU | Stress memory | Stress PIDs | Stress shared memory |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Application | 2.9 | 1280 MiB | 16 | 16 MiB | 2.175 | 960 MiB | 12 | 12 MiB |
-| Proxy | 0.15 | 64 MiB | 32 | 16 MiB | 0.1125 | 48 MiB | 24 | 12 MiB |
-| PostgreSQL | 0.3 | 128 MiB | 32 | 16 MiB | 0.225 | 96 MiB | 24 | 12 MiB |
-| Browser | 4.05 | 1408 MiB | 240 | 16 MiB | 3.0375 | 1056 MiB | 180 | 12 MiB |
+The run observes available Docker capacity and samples application, proxy, PostgreSQL and browser
+CPU, memory, process and shared-memory use. These measurements are diagnostic evidence, not a
+minimum-runner contract. Courtside neither sums independently observed peaks into a fictitious
+reservation nor rejects a runner because it is smaller than one development machine. The same
+semantic test path must complete on GitHub's standard `ubuntu-latest` runner; local Docker executes
+that path with the resources actually available there. A repeatable failure on the supported CI
+runner must be diagnosed or the affected scheduled job removed instead of being hidden by a retry,
+a longer timeout or a larger-machine assumption.
 
 Use `npm run reliability:webkit-experiment -- --pairs 20 --order configured` for the browser
 isolation comparison. Each pair runs the project-scoped and test-scoped browser lifecycle against
-the same commit, image digest, project order, resource profile and planned test population. The
+the same commit, image digest, project order, resource-observation mode and planned test population. The
 starting variant alternates between pairs. Every first attempt remains an immutable record. The
 comparison rejects fewer than twenty pairs, unequal sample sizes or mixed conditions. Existing
 records remain below `target/webkit-isolation-experiment` even when a later attempt fails. Check
@@ -349,10 +329,10 @@ network. A failed diagnostic or removal remains a harness failure; it cannot ski
 cleanup or turn the first attempt green.
 
 The closed record retains the commit and whether its working tree was clean, the pinned toolchain,
-non-identifying host capacity, project order, browser-isolation variant, resource-profile name,
+non-identifying host capacity, project order, browser-isolation variant, resource-observation mode,
 experiment and pair identity, planned test-population fingerprint, browser-process identity,
-lifetime, test position, one-second CPU, memory, PID and shared-memory samples, the inspected runtime
-limits for every container, application JVM settings, exit state, duration and outcome classes.
+lifetime, test position, one-second CPU, memory, PID and shared-memory samples, container state,
+exit state, duration and outcome classes.
 It retains
 no test title, URL, log, request, cookie or credential. Raw traces and diagnostics expire after 14
 days; the safe records remain available for 90 days. Validate one record with

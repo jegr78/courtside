@@ -5,9 +5,12 @@ import test from "node:test";
 const workflow = readFileSync(new URL("../.github/workflows/test-stability.yml", import.meta.url), "utf8");
 const build = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
 const browserOrder = workflow.slice(workflow.indexOf("  browser-order:"), workflow.indexOf("  browser-compatibility:"));
+const browserCompatibility = workflow.slice(workflow.indexOf("  browser-compatibility:"));
 
 test("given periodic stability evidence, when reading its workflow, then backend and browser order proofs retain first attempts", () => {
   assert.match(workflow, /schedule:/);
+  assert.match(workflow, /pull_request:[\s\S]*test-stability\.yml[\s\S]*frontend\/e2e\/\*\*/);
+  assert.doesNotMatch(workflow, /resource_profile|COURTSIDE_BROWSER_RESOURCE_PROFILE|--resource-profile/);
   assert.match(workflow, /reversealphabetical, random/);
   assert.match(workflow, /surefire\.runOrder\.random\.seed/);
   assert.match(workflow, /project_order: \[configured, reversed\]/);
@@ -19,8 +22,11 @@ test("given periodic stability evidence, when reading its workflow, then backend
   assert.match(workflow, /Upload first-attempt browser evidence/);
 });
 
-test("given the WebKit reliability matrix, when comparing local and hosted execution, then both use the bounded orchestrator", () => {
-  assert.match(browserOrder, /npm run reliability:webkit --\s+--order \"\$\{COURTSIDE_PROJECT_ORDER\}\"\s+--resource-profile \"\$\{COURTSIDE_BROWSER_RESOURCE_PROFILE\}\"/);
+test("given the WebKit reliability matrix, when comparing local and hosted execution, then both use the observing orchestrator", () => {
+  assert.match(browserOrder, /npm run reliability:webkit --\s+--order \"\$\{COURTSIDE_PROJECT_ORDER\}\"/);
+  assert.doesNotMatch(browserOrder, /resource-profile|COURTSIDE_BROWSER_RESOURCE_PROFILE/);
+  assert.match(browserOrder,
+    /if: github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
   assert.match(browserOrder, /browser-order:[\s\S]*timeout-minutes: 40/);
   assert.match(browserOrder, /Package application\n\s+timeout-minutes: 10/);
   assert.match(browserOrder, /Prove browser isolation under varied project order\n\s+timeout-minutes: 27/);
@@ -31,6 +37,8 @@ test("given the WebKit reliability matrix, when comparing local and hosted execu
   assert.doesNotMatch(browserOrder, /continue-on-error/);
   assert.match(browserOrder, /Upload first-attempt browser evidence[\s\S]*retention-days: 14/);
   assert.match(browserOrder, /Upload redacted WebKit reliability history[\s\S]*retention-days: 90/);
+  assert.match(browserCompatibility,
+    /if: github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
 });
 
 test("given a required build failure, when collecting evidence, then backend and browser diagnostics survive", () => {
