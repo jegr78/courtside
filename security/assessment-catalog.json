@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.4.3",
+  "catalogVersion": "1.4.4",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -825,22 +825,32 @@
         {
           "id": "v5.0.0-7.2.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/application.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/identity/JdbcSessionConfigurationTest.java#whenApplicationStarts_thenHttpSessionsUsePostgreSql"
+          }
         },
         {
           "id": "v5.0.0-7.2.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenTwoActiveSessions_whenOneIsListedAndEnded_thenOnlyPrivacySafeMetadataAndTheOtherRemain"
+          }
         },
         {
           "id": "v5.0.0-7.2.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "findingReference": "docs/security-findings.md#session-token-entropy-and-reauthentication-renewal-fall-short"
         },
         {
           "id": "v5.0.0-7.2.4",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "findingReference": "docs/security-findings.md#session-token-entropy-and-reauthentication-renewal-fall-short"
         },
         {
           "id": "v5.0.0-7.3.1",
@@ -862,17 +872,29 @@
         {
           "id": "v5.0.0-7.4.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/member/RosterService.java",
+            "falsifyingTest": "src/test/java/org/courtside/member/RosterAccountTest.java#givenASignedInMember_whenTheirAccountIsDisabled_thenTheirNextRequestIsRefused"
+          }
         },
         {
           "id": "v5.0.0-7.4.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/PermanentPasswordService.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenTwoActiveSessions_whenThePermanentPasswordChanges_thenEverySessionEnds"
+          }
         },
         {
           "id": "v5.0.0-7.4.4",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/App.tsx",
+            "falsifyingTest": "frontend/src/App.test.tsx#given the account menu opened before the session arrives, when it arrives, then the menu stays open under the hand that opened it"
+          }
         },
         {
           "id": "v5.0.0-7.4.5",
@@ -897,7 +919,11 @@
         {
           "id": "v5.0.0-7.6.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#session identifiers are issued only by successful login and remain confined to a host-bound cookie"
+          }
         },
         {
           "id": "v5.0.0-8.1.1",
@@ -2123,17 +2149,29 @@
         {
           "id": "WSTG-v4.2-SESS-03",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenAnAttackerChosenSession_whenLoginSucceeds_thenTheSessionIdentifierChanges"
+          }
         },
         {
           "id": "WSTG-v4.2-SESS-04",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#session identifiers are issued only by successful login and remain confined to a host-bound cookie"
+          }
         },
         {
           "id": "WSTG-v4.2-SESS-05",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/CsrfRefusalTest.java#whenAnAuthenticatedCallerWritesWithoutAToken_thenTheRefusalNamesAccessDenied"
+          }
         },
         {
           "id": "WSTG-v4.2-SESS-06",
@@ -2148,7 +2186,11 @@
         {
           "id": "WSTG-v4.2-SESS-08",
           "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "manualProcedureId": "MAN-SESSION-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/RecentAuthentication.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/SessionVariableScopeTest.java#givenEveryCourtsideSessionVariable_whenItsWritersAndAuthorityAreReviewed_thenEachHasOnePurpose"
+          }
         },
         {
           "id": "WSTG-v4.2-SESS-09",
