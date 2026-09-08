@@ -728,6 +728,29 @@ test("given the session and concurrent-authority controls were reviewed, when re
   }
 });
 
+test("given the parser and protocol-ambiguity controls were reviewed, when reading their dispositions, then none is left implicit", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-INPV-02", "WSTG-v4.2-INPV-03", "WSTG-v4.2-INPV-04", "WSTG-v4.2-INPV-05",
+    "WSTG-v4.2-INPV-10", "WSTG-v4.2-INPV-11", "WSTG-v4.2-INPV-12", "WSTG-v4.2-INPV-13",
+    "WSTG-v4.2-INPV-14", "WSTG-v4.2-INPV-15", "WSTG-v4.2-INPV-16", "WSTG-v4.2-INPV-17",
+    "WSTG-v4.2-INPV-18", "WSTG-v4.2-INPV-19", "v5.0.0-1.1.1", "v5.0.0-1.1.2",
+    "v5.0.0-1.2.2", "v5.0.0-1.2.3", "v5.0.0-1.2.4", "v5.0.0-1.3.3",
+    "v5.0.0-1.3.11", "v5.0.0-1.4.1", "v5.0.0-1.4.2", "v5.0.0-1.4.3",
+    "v5.0.0-1.5.2", "v5.0.0-4.2.1", "v5.0.0-5.3.1"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+  }
+});
+
 test("given a manual outcome, when its control carries no control-specific evidence, then a pass is refused", () => {
   // given
   const digest = `sha256:${"a".repeat(64)}`;

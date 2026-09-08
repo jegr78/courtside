@@ -5,6 +5,8 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -68,6 +70,22 @@ class UnsupportedMethodTest extends AbstractIntegrationTest {
         assertThat(problem.at("/type").asString())
                 .isEqualTo("urn:courtside:error:method-not-supported");
         assertThat(problem.at("/title").asString()).isEqualTo("Method not allowed");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"X-HTTP-Method", "X-HTTP-Method-Override", "X-Method-Override"})
+    void givenAMethodOverrideHeader_whenPostingToAReadOnlyRoute_thenItCannotTurnTheRequestIntoAGet(
+            String overrideHeader) throws Exception {
+        // when
+        HttpResponse<String> response = send("POST", "/api/public/config", sessionCookie,
+                overrideHeader, "GET");
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(405);
+        assertThat(response.headers().firstValue("Content-Type").orElseThrow())
+                .startsWith(PROBLEM_JSON);
+        assertThat(objectMapper.readTree(response.body()).at("/type").asString())
+                .isEqualTo("urn:courtside:error:method-not-supported");
     }
 
     @Test
@@ -148,9 +166,17 @@ class UnsupportedMethodTest extends AbstractIntegrationTest {
     }
 
     private HttpResponse<String> send(String method, String path, String session) throws Exception {
+        return send(method, path, session, null, null);
+    }
+
+    private HttpResponse<String> send(String method, String path, String session,
+                                      String headerName, String headerValue) throws Exception {
         HttpRequest.Builder request = HttpRequest.newBuilder(uri(path))
                 .header("X-XSRF-TOKEN", CSRF_TOKEN)
                 .method(method, HttpRequest.BodyPublishers.noBody());
+        if (headerName != null) {
+            request.header(headerName, headerValue);
+        }
         request.header("Cookie", session == null
                 ? "XSRF-TOKEN=" + CSRF_TOKEN
                 : session + "; XSRF-TOKEN=" + CSRF_TOKEN);

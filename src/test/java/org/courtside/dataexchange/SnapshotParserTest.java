@@ -202,6 +202,23 @@ class SnapshotParserTest {
     }
 
     @Test
+    void givenPercentEncodedText_whenParsing_thenItIsNotDecodedAsAnotherInputLayer() {
+        // given
+        String content = "Member number,First name,Last name,Email\n"
+                + "47%2531,Jane%2520Ann,Doe,jane.doe@example.org\n";
+
+        // when
+        CsvSnapshot snapshot = parse(content);
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.rows()).singleElement().satisfies(row -> {
+            assertThat(row.externalId()).isEqualTo("47%2531");
+            assertThat(row.values()).containsEntry(CanonicalField.FIRST_NAME, "Jane%2520Ann");
+        });
+    }
+
+    @Test
     void givenAFileWrittenInWindows1252_whenThatEncodingIsChosen_thenItsUmlautsArriveIntact() {
         // given
         byte[] windows1252 = "Member number,First name,Last name,Email\n4711,Janè,Doe,jane.doe@example.org\n"

@@ -91,4 +91,22 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
+
+    @Test
+    @WithMockUser(username = "member", roles = "MEMBER")
+    void givenSqlSyntax_whenSearchingMembers_thenItRemainsALiteralNameFragment() throws Exception {
+        // given
+        UUID literal = identity.createPerson("' OR 1=1 --", "Literal", "literal@example.org");
+        members.save(memberSince(literal, MEMBERSHIP_TYPE_ID));
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+
+        // when / then
+        mockMvc.perform(get("/api/public/participant-members")
+                        .queryParam("query", "' OR 1=1 --"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].personId").value(literal.toString()))
+                .andExpect(jsonPath("$[0].displayName").value("' OR 1=1 -- Literal"));
+    }
 }

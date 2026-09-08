@@ -19,6 +19,7 @@ import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
 import java.io.IOException;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -36,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ServerTlsTransportTest {
 
     private static final String MARKER = "the-application-answered";
+    private static final String PRODUCTION_HOST = "courtside.test";
     private static final String UPSTREAM = "host.testcontainers.internal";
     private static final int SERVED_PORT = 8080;
     private static final int PLAIN_PORT = 8081;
@@ -159,11 +161,29 @@ class ServerTlsTransportTest {
                     @Override
                     protected void doGet(HttpServletRequest request, HttpServletResponse response)
                             throws IOException {
+                        response.setHeader("X-Probe-Forwarded-Host",
+                                String.valueOf(request.getHeader("X-Forwarded-Host")));
                         response.getWriter().write(MARKER);
                     }
                 }).addMapping("/probe"));
         server.start();
         return server;
+    }
+
+    @Test
+    void givenTheProductionHostBoundary_whenAnotherHostArrives_thenItIsNotForwarded()
+            throws Exception {
+        // given
+        try (GenericContainer<?> proxy = productionHostProxy()) {
+            // when
+            String accepted = rawGet(proxy, PRODUCTION_HOST, "attacker.example");
+            String hostile = rawGet(proxy, "attacker.example", "attacker.example");
+
+            // then
+            assertThat(accepted).contains("200 OK", MARKER, "X-Probe-Forwarded-Host")
+                    .doesNotContain("X-Probe-Forwarded-Host: attacker.example");
+            assertThat(hostile).doesNotContain(MARKER, "X-Probe-Forwarded-Host");
+        }
     }
 
     // The proxy dials the name the deployment's own snippet names, so only the host it resolves to
@@ -205,6 +225,19 @@ class ServerTlsTransportTest {
         if (mode != null) {
             proxy.withEnv("COURTSIDE_APP_TLS_MODE", mode);
         }
+        return proxy;
+    }
+
+    private static GenericContainer<?> productionHostProxy() throws IOException {
+        String caddyfile = "%s\n\n%s\n\n%s".formatted(
+                snippet("applicationHeaders"), dialingTheHost("plaintext", PLAIN_PORT),
+                productionSite().replace("{$COURTSIDE_DOMAIN}", "http://" + PRODUCTION_HOST)
+                        .replace("import {$COURTSIDE_APP_TLS_MODE:plaintext}", "import plaintext"));
+        GenericContainer<?> proxy = new GenericContainer<>(DockerImageName.parse(deployedCaddy()))
+                .withCopyToContainer(forString(caddyfile), "/etc/caddy/Caddyfile")
+                .withExposedPorts(80)
+                .waitingFor(Wait.forLogMessage(".*serving initial configuration.*", 1));
+        proxy.start();
         return proxy;
     }
 
@@ -273,6 +306,32 @@ class ServerTlsTransportTest {
             }
         }
         throw new AssertionError("The " + name + " snippet is not closed");
+    }
+
+    private static String productionSite() throws IOException {
+        String caddyfile = Files.readString(Path.of("deploy", "Caddyfile"));
+        int start = caddyfile.indexOf("{$COURTSIDE_DOMAIN} {");
+        assertThat(start).as("the deployment defines one production host").isNotNegative();
+        int opening = caddyfile.indexOf('{', start + "{$COURTSIDE_DOMAIN}".length());
+        int depth = 0;
+        for (int cursor = opening; cursor < caddyfile.length(); cursor++) {
+            char character = caddyfile.charAt(cursor);
+            depth += character == '{' ? 1 : character == '}' ? -1 : 0;
+            if (depth == 0 && character == '}') {
+                return caddyfile.substring(start, cursor + 1);
+            }
+        }
+        throw new AssertionError("The production site is not closed");
+    }
+
+    private static String rawGet(GenericContainer<?> proxy, String host, String forwardedHost)
+            throws IOException {
+        try (Socket socket = new Socket(proxy.getHost(), proxy.getMappedPort(80))) {
+            socket.getOutputStream().write(("GET /probe HTTP/1.1\r\nHost: " + host
+                    + "\r\nX-Forwarded-Host: " + forwardedHost
+                    + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            return new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private static String deployedCaddy() throws IOException {

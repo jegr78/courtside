@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.4.4",
+  "catalogVersion": "1.4.5",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -223,12 +223,20 @@
         {
           "id": "v5.0.0-1.1.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/dataexchange/internal/SnapshotParser.java",
+            "falsifyingTest": "src/test/java/org/courtside/dataexchange/SnapshotParserTest.java#givenPercentEncodedText_whenParsing_thenItIsNotDecodedAsAnotherInputLayer"
+          }
         },
         {
           "id": "v5.0.0-1.1.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/views/AdminAuditView.tsx",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#stored text projections remain inert on administrative and managed views"
+          }
         },
         {
           "id": "v5.0.0-1.2.1",
@@ -240,17 +248,29 @@
         {
           "id": "v5.0.0-1.2.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/App.tsx",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#URL configuration rejects active schemes and renders accepted relative targets"
+          }
         },
         {
           "id": "v5.0.0-1.2.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/audit/web/AuditAdminController.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#stored text projections remain inert on administrative and managed views"
+          }
         },
         {
           "id": "v5.0.0-1.2.4",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/member/MemberRepository.java",
+            "falsifyingTest": "src/test/java/org/courtside/member/web/ParticipantMemberControllerTest.java#givenSqlSyntax_whenSearchingMembers_thenItRemainsALiteralNameFragment"
+          }
         },
         {
           "id": "v5.0.0-1.2.5",
@@ -290,7 +310,11 @@
         {
           "id": "v5.0.0-1.3.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/api/openapi.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/member/internal/PersonTextTest.java#givenFieldsUsedInMailHeaders_whenReadingTheContract_thenLineBreaksAreRefused"
+          }
         },
         {
           "id": "v5.0.0-1.3.4",
@@ -330,22 +354,35 @@
         {
           "id": "v5.0.0-1.3.11",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/api/openapi.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/member/internal/PersonTextTest.java#givenFieldsUsedInMailHeaders_whenReadingTheContract_thenLineBreaksAreRefused"
+          }
         },
         {
           "id": "v5.0.0-1.4.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "Courtside's shipped application code is Java and TypeScript running in managed-memory runtimes. It contains no native string-copy, pointer-arithmetic or manually allocated memory path to which this control's memory-safe function requirements apply."
         },
         {
           "id": "v5.0.0-1.4.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/config/BookingSlotDuration.java",
+            "falsifyingTest": "src/test/java/org/courtside/config/BookingSlotDurationTest.java#givenMinutesThatWouldOverflowTheSecondsCalculation_whenCreatingTheValue_thenTheyAreRejected"
+          }
         },
         {
           "id": "v5.0.0-1.4.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/LoginAttemptFilter.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/internal/LoginAttemptFilterTest.java#givenAuthenticationThrows_whenTheNextLoginArrives_thenCapacityWasStillReleased"
+          }
         },
         {
           "id": "v5.0.0-1.5.1",
@@ -355,7 +392,11 @@
         {
           "id": "v5.0.0-1.5.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/application.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenAClientChosenJavaType_whenChangingTheConfig_thenDeserializationRefusesIt"
+          }
         },
         {
           "id": "v5.0.0-2.1.1",
@@ -547,7 +588,8 @@
         {
           "id": "v5.0.0-4.2.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "findingReference": "docs/security-findings.md#ambiguous-http-parameters-and-message-boundaries"
         },
         {
           "id": "v5.0.0-4.3.1",
@@ -604,7 +646,11 @@
         {
           "id": "v5.0.0-5.3.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/config/internal/ClubLogo.java",
+            "falsifyingTest": "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenActiveOrMalformedContent_whenParsing_thenItIsRejectedAsAFormat"
+          }
         },
         {
           "id": "v5.0.0-5.3.2",
@@ -2044,22 +2090,35 @@
         {
           "id": "WSTG-v4.2-INPV-02",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/views/AdminAuditView.tsx",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#stored text projections remain inert on administrative and managed views"
+          }
         },
         {
           "id": "WSTG-v4.2-INPV-03",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "src/test/java/org/courtside/shared/web/UnsupportedMethodTest.java#givenAMethodOverrideHeader_whenPostingToAReadOnlyRoute_thenItCannotTurnTheRequestIntoAGet"
+          }
         },
         {
           "id": "WSTG-v4.2-INPV-04",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "findingReference": "docs/security-findings.md#ambiguous-http-parameters-and-message-boundaries"
         },
         {
           "id": "WSTG-v4.2-INPV-05",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/member/MemberRepository.java",
+            "falsifyingTest": "src/test/java/org/courtside/member/web/ParticipantMemberControllerTest.java#givenSqlSyntax_whenSearchingMembers_thenItRemainsALiteralNameFragment"
+          }
         },
         {
           "id": "WSTG-v4.2-INPV-06",
@@ -2084,52 +2143,74 @@
         {
           "id": "WSTG-v4.2-INPV-10",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/api/openapi.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/member/internal/PersonTextTest.java#givenFieldsUsedInMailHeaders_whenReadingTheContract_thenLineBreaksAreRefused"
+          }
         },
         {
           "id": "WSTG-v4.2-INPV-11",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The shipped server exposes no request-controlled source-code, include, expression or script interpreter. Courtside compiles Java ahead of startup and serves a prebuilt static TypeScript application, so a request has no server-side code-evaluation sink."
         },
         {
           "id": "WSTG-v4.2-INPV-12",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "No shipped request path invokes an operating-system command, shell, ProcessBuilder or Runtime.exec. Database setup and application behavior use Java and JDBC APIs directly, leaving no request-controlled command sink to test."
         },
         {
           "id": "WSTG-v4.2-INPV-13",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "No request value becomes a printf, MessageFormat or database format template. Format strings in the shipped source are constants; the database-provisioning formatter is startup-only and passes environment values as PostgreSQL %I or %L arguments rather than as the format string."
         },
         {
           "id": "WSTG-v4.2-INPV-14",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/views/AdminAuditView.tsx",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#stored text projections remain inert on administrative and managed views"
+          }
         },
         {
           "id": "WSTG-v4.2-INPV-15",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "findingReference": "docs/security-findings.md#ambiguous-http-parameters-and-message-boundaries"
         },
         {
           "id": "WSTG-v4.2-INPV-16",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/api/client.ts",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#session identifiers are issued only by successful login and remain confined to a host-bound cookie"
+          }
         },
         {
           "id": "WSTG-v4.2-INPV-17",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "deploy/Caddyfile",
+            "falsifyingTest": "src/test/java/org/courtside/shared/ServerTlsTransportTest.java#givenTheProductionHostBoundary_whenAnotherHostArrives_thenItIsNotForwarded"
+          }
         },
         {
           "id": "WSTG-v4.2-INPV-18",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "Courtside ships no server-side HTML template engine and accepts no user-editable template. Mail resource bundles use a bounded named-placeholder replacement to produce plain text, not an executable server template context."
         },
         {
           "id": "WSTG-v4.2-INPV-19",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "No request selects a server-side network destination. The breach-password client uses a fixed production endpoint and sends only a hash prefix; the SMTP relay and observability targets are operator startup configuration rather than request data, while configured logo links are fetched by the browser."
         },
         {
           "id": "WSTG-v4.2-SESS-01",

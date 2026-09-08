@@ -11,6 +11,23 @@ These public entries record the safe result of reading a pinned control against 
 They omit request examples, concrete identifiers and protected evidence. The catalog links the
 affected control to the heading, and the remediation issue owns the product change and retest.
 
+### Ambiguous HTTP parameters and message boundaries
+
+- State: validated design and evidence gap
+- Priority: P2
+- Controls: WSTG 4.2 `WSTG-v4.2-INPV-04`, `WSTG-v4.2-INPV-15`; ASVS 5.0.0
+  `v5.0.0-4.2.1`
+- Review: `MAN-INPUT-001`, 8 September 2026
+- Remediation: #894
+
+The application has no control-specific proof that duplicate query or form parameters are rejected
+before binding. The shipped Caddy-to-Tomcat path likewise has no raw transport test for conflicting
+message lengths, and the existing response tests do not inventory every header derived from request
+or stored values. Neighbouring method, body-size and forwarded-header checks therefore cannot prove
+that every component chooses one request boundary and one parameter value. No exploit was reproduced;
+the gap is the unverified parser contract, which remains non-passing until the boundary is defined and
+falsified end to end.
+
 ### Incomplete sensitive-data classification
 
 - State: validated design gap

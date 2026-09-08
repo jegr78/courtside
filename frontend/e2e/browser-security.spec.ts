@@ -127,7 +127,9 @@ test("session identifiers are issued only by successful login and remain confine
   expect(status.status).toBe(200);
   expect(status.cacheControl?.split(",").map((directive) => directive.trim())).toContain("no-store");
   expect(authenticatedRequests).not.toEqual([]);
+  const applicationOrigin = new URL(page.url()).origin;
   for (const request of authenticatedRequests) {
+    expect(new URL(request.url).origin).toBe(applicationOrigin);
     expect(request.url).not.toContain(session!.value);
     expect(request.body).not.toContain(session!.value);
   }

@@ -107,8 +107,30 @@ class PersonTextTest {
         assertThat(nonBlank.matcher("Mary Major").matches()).isTrue();
     }
 
+    @Test
+    void givenFieldsUsedInMailHeaders_whenReadingTheContract_thenLineBreaksAreRefused()
+            throws IOException {
+        // given
+        List<Pattern> headerInputs = List.of(
+                Pattern.compile(patternOf("PersonRequest", "firstName")),
+                Pattern.compile(patternOf("PersonRequest", "lastName")),
+                Pattern.compile(patternOf("PersonRequest", "email")),
+                Pattern.compile(patternOf("ClubConfigRequest", "clubName")));
+
+        // when / then
+        for (Pattern headerInput : headerInputs) {
+            assertThat(headerInput.matcher("safe\rBcc: another@example.org").matches()).isFalse();
+            assertThat(headerInput.matcher("safe\nBcc: another@example.org").matches()).isFalse();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static String patternOf(String property) throws IOException {
+        return patternOf("PersonRequest", property);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String patternOf(String schema, String property) throws IOException {
         Map<String, Object> document;
         try (InputStream in = PersonTextTest.class.getResourceAsStream(DOCUMENT)) {
             assertThat(in).as("the API document must be on the classpath at %s", DOCUMENT).isNotNull();
@@ -116,11 +138,11 @@ class PersonTextTest {
         }
         Map<String, Object> components = (Map<String, Object>) document.get("components");
         Map<String, Object> schemas = (Map<String, Object>) components.get("schemas");
-        Map<String, Object> personRequest = (Map<String, Object>) schemas.get("PersonRequest");
-        Map<String, Object> properties = (Map<String, Object>) personRequest.get("properties");
+        Map<String, Object> request = (Map<String, Object>) schemas.get(schema);
+        Map<String, Object> properties = (Map<String, Object>) request.get("properties");
         Map<String, Object> field = (Map<String, Object>) properties.get(property);
         String pattern = (String) field.get("pattern");
-        assertThat(pattern).as("PersonRequest.%s must carry a pattern", property).isNotNull();
+        assertThat(pattern).as("%s.%s must carry a pattern", schema, property).isNotNull();
         return pattern;
     }
 }
