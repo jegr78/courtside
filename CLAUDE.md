@@ -128,8 +128,10 @@ fails on the missing `BuildProperties` bean.
 * **Targeted runs during red/green:** `./mvnw test -Dtest=ClassName`. Before the final push, commit
   the reviewed branch and run `node tools/courtside.mjs check`; it uses the protected test-profile
   contract against `origin/main` and verifies that exact commit in a detached worktree. A `full`
-  classification runs `./mvnw clean verify`. Unknown, structural or untrusted change evidence
-  fails closed to `full`; `--full` may escalate but never reduce the selected verification.
+  classification runs the documentation gate and then `./mvnw clean verify`, both read from the
+  runner rather than from the contract so a weakened contract cannot reduce them. Unknown,
+  structural or untrusted change evidence fails closed to `full`; `--full` may escalate but never
+  reduce the selected verification.
 * **Cross-module test setup uses test fixtures.** A module exposes intent-revealing fixture
   operations from `src/test/java/org/courtside/<module>/testfixture`, and consuming integration
   tests register the required fixture explicitly with `@Import`. Fixtures return identifiers or
