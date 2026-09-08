@@ -23,10 +23,13 @@ const dataModel = repositoryFile("docs/data-model.md");
 const api = repositoryFile("src/main/resources/api/openapi.yaml");
 
 function auditOperation() {
-  const start = api.indexOf("  /api/admin/audit:");
+  const start = api.indexOf("\n  /api/admin/audit:");
   assert.notEqual(start, -1, "the API document no longer describes GET /api/admin/audit");
-  const end = api.indexOf("\n  /api/", start + 1);
-  return api.slice(start, end === -1 ? api.length : end);
+  const rest = api.slice(start + 1);
+  const terminator = rest.search(/\n {2}\S[^\n]*:$/m);
+  assert.notEqual(terminator, -1,
+    "no key follows /api/admin/audit, so its block cannot be told from the rest of the document");
+  return rest.slice(0, terminator);
 }
 
 const names = (document, types) => types.some((type) => document.includes(`\`${type}\``));
@@ -40,7 +43,8 @@ test("given the recorded payload snapshot, when it is read, then it still carrie
   () => {
     // when / then
     assert.ok(families.size >= 8,
-      `the snapshot holds only ${families.size} families, so this gate proves nothing`);
+      `the snapshot holds ${families.size} families. Fewer than eight is either a truncated file `
+      + "or a family that was deliberately removed; the documents naming it need the same edit");
   });
 
 test("given every family the log holds, when the data model describes the table, then it names each one",
@@ -66,7 +70,6 @@ test("given every family the log returns, when the API document describes the en
     }
   });
 
-// The specification once stated that bookings were not recorded while four booking events were.
 test("given the booking events the log holds, when the specification describes it, then it names one",
   () => {
     // when / then
