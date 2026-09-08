@@ -9,6 +9,9 @@ hero:
       text: What Courtside is
       link: "#what-courtside-is"
     - theme: alt
+      text: A guide for members
+      link: /en/member-guide
+    - theme: alt
       text: Source code
       link: https://github.com/jegr78/courtside
 features:
@@ -25,15 +28,13 @@ features:
 Courtside is court booking for sports clubs. Each club runs its own instance: one database, one
 container, that club's members and nobody else.
 
-## This site is being written
+## Guides
 
-Today it is the home page and nothing more. Two guides are missing, and they are the reason the
-site exists at all:
+- [**A guide for members**](/en/member-guide): signing in, finding a free court, booking, recording
+  players and guests, cancelling, choosing notifications.
 
-- a **guide for members** — booking, cancelling, adding players, notifications
-  ([issue #94](https://github.com/jegr78/courtside/issues/94))
-- a **guide for boards** — courts, rules, members, accounts, import
-  ([issue #95](https://github.com/jegr78/courtside/issues/95))
+A **guide for boards** covering courts, rules, members, accounts and import is still missing
+([issue #95](https://github.com/jegr78/courtside/issues/95)).
 
 Anyone who wants to run Courtside today, or work on it, will find the technical documents in the
 repository: the [reference deployment](https://github.com/jegr78/courtside/blob/main/deploy/README.md),
