@@ -58,6 +58,39 @@ async function browserInventory(page: import("@playwright/test").Page) {
   return { ...storage, cookies };
 }
 
+test("personal API responses remain fresh and uncacheable across the application and proxy boundary",
+  async ({ page, journeyService }) => {
+  // given
+  await login(page, "configuration-admin");
+  const personPath = "/api/admin/roster/00000000-0000-0000-0000-000000000103";
+  await journeyService.executeSql(`
+    UPDATE person SET last_name = 'BeforeCacheMutation'
+      WHERE id = '00000000-0000-0000-0000-000000000103';
+  `);
+  const readPerson = async () => page.evaluate(async (path) => {
+    const result = await fetch(path);
+    const body = await result.json() as { lastName: string };
+    return { status: result.status, cacheControl: result.headers.get("cache-control"), lastName: body.lastName };
+  }, personPath);
+
+  // when
+  const before = await readPerson();
+  await journeyService.executeSql(`
+    UPDATE person SET last_name = 'AfterCacheMutation'
+      WHERE id = '00000000-0000-0000-0000-000000000103';
+  `);
+  const after = await readPerson();
+
+  // then
+  expect(before.status).toBe(200);
+  expect(after.status).toBe(200);
+  expect(before.lastName).toBe("BeforeCacheMutation");
+  expect(after.lastName).toBe("AfterCacheMutation");
+  for (const response of [before, after]) {
+    expect(response.cacheControl?.split(",").map((directive) => directive.trim())).toContain("no-store");
+  }
+});
+
 test("stored values remain data across roles without entering browser storage or console evidence", async ({ page, journeyService }) => {
   // given
   await journeyService.executeSql(`

@@ -61,6 +61,12 @@ A manual procedure covers whole chapters, so the procedure a control links to sa
 
 That anchor is what a pass costs. `validateManualAssessmentEvidence` refuses `pass` for a control that carries no `controlEvidence`, so an outcome derived from a chapter-level template alone cannot be recorded. An automated assessment entry does not stand in for it: `v5.0.0-15.3.3` links to two of them and was still recorded blocked, because a surface-wide dynamic test is not a reading of that control. A control without an anchor can still be recorded `fail`, `not-applicable` or `blocked`; the first complete manual run had no anchors to read and recorded 146 controls as blocked, and [`manual-baseline-control-outcomes.json`](../security/manual-baseline-control-outcomes.json) names which. An anchor added since does not change what that run observed — outcomes come from runs, and the catalog says which controls an anchor is now available for.
 
+A control-specific reading that finds the product does not meet the requirement carries a
+`findingReference` instead of `controlEvidence`. It resolves to the redacted finding in
+[`docs/security-findings.md`](security-findings.md), while that finding names its remediation work.
+The closed catalog schema makes the two fields mutually exclusive. A known failure therefore cannot
+also claim the anchor required for a pass.
+
 ## Evidence and outcomes
 
 Evidence identifies the catalog and tool versions, application commit and immutable image digest where applicable, target fingerprint, selected entries, profile, timestamps and first-attempt result. The safe deployment suite retains a closed JSON record and a Markdown summary. Both contain normalized observations and scanner identifiers, never URLs, response bodies, cookies, CSRF tokens or sensitive header values.

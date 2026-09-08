@@ -566,9 +566,21 @@
               "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*#[A-Za-z0-9][A-Za-z0-9 ,._-]*$"
             }
           }
+        },
+        "findingReference": {
+          "type": "string",
+          "pattern": "^docs/security-findings\\.md#[a-z0-9]+(?:-[a-z0-9]+)*$"
         }
       },
       "allOf": [
+        {
+          "not": {
+            "required": [
+              "controlEvidence",
+              "findingReference"
+            ]
+          }
+        },
         {
           "if": {
             "properties": {
