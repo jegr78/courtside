@@ -89,10 +89,10 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
   const node = join(frontend, "node", platform === "win32" ? "node.exe" : "node");
   const directories = { repository: root, frontend };
   return tasks.map((task) => {
-    const workingDirectory = directories[task.workingDirectory];
-    if (workingDirectory === undefined) {
+    if (!Object.hasOwn(directories, task.workingDirectory)) {
       throw new Error(`${task.label} names no known working directory: ${task.workingDirectory}`);
     }
+    const workingDirectory = directories[task.workingDirectory];
     if (task.executable === "node") {
       return {
         label: task.label,
@@ -115,7 +115,8 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
       return {
         label: task.label,
         command: "cmd.exe",
-        arguments: ["/d", "/s", "/c", ["mvnw.cmd", ...task.arguments].join(" ")],
+        arguments: ["/d", "/s", "/c",
+          [`"${join(root, "mvnw.cmd")}"`, ...task.arguments].join(" ")],
         workingDirectory,
         shell: false
       };

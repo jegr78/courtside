@@ -392,7 +392,7 @@ test("given supported platforms, when resolving tasks, then commands remain shel
   assert.equal(posix[1].command, "/repo/frontend/node/node");
   assert.equal(posix[1].shell, false);
   assert.equal(windows[0].command, "cmd.exe");
-  assert.match(windows[0].arguments.at(-1), /^mvnw\.cmd /);
+  assert.match(windows[0].arguments.at(-1), /^"C:\/repo\/mvnw\.cmd" /);
   assert.equal(windows[1].command, "C:/repo/frontend/node/node.exe");
   assert.equal(windows[1].shell, false);
 
@@ -686,4 +686,36 @@ test("given a task naming a directory the runner does not know, when planning it
     // when / then
     assert.throws(() => localVerificationPlans([task], "linux", "/repo"),
       /site-install names no known working directory: site/);
+  });
+
+test("given a task naming an inherited property, when planning it, then the plan is refused too", () => {
+  // given
+  const task = {
+    label: "site-install",
+    workingDirectory: "constructor",
+    executable: "npm",
+    arguments: ["--prefix", "site", "ci"]
+  };
+
+  // when / then
+  assert.throws(() => localVerificationPlans([task], "linux", "/repo"),
+    /site-install names no known working directory: constructor/);
+});
+
+test("given the Windows maven wrapper, when planning a task, then PATH cannot decide which one runs",
+  () => {
+    // given
+    const task = {
+      label: "backend",
+      workingDirectory: "repository",
+      executable: "maven",
+      arguments: ["clean", "verify"]
+    };
+
+    // when
+    const [plan] = localVerificationPlans([task], "win32", "/repo");
+
+    // then
+    assert.equal(plan.command, "cmd.exe");
+    assert.equal(plan.arguments.at(-1), `"${join("/repo", "mvnw.cmd")}" clean verify`);
   });
