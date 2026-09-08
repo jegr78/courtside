@@ -97,7 +97,7 @@ Automated scanner output begins as a candidate. It affects a release only after 
 
 ## Scope boundary
 
-The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. The active suite adds the OpenAPI authorization matrix, authenticated ZAP scans and the pinned Schemathesis boundary suite. The destructive suite adds only the bounded resource-abuse adapter described below. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
+The safe deployment suite runs native TLS, HTTP, proxy and container checks plus the pinned ZAP passive baseline against `SECURITY`. Its native checks include representative sensitive and backup paths, unsafe methods and method-override headers, protocol and cipher negotiation, and the application image's runtime file permissions. ZAP can reach only the internal proxy network. Any scanner alert remains an untriaged candidate and makes the run incomplete. The active suite adds the OpenAPI authorization matrix, authenticated ZAP scans and the pinned Schemathesis boundary suite. The destructive suite adds only the bounded resource-abuse adapter described below. Product vulnerabilities found by a suite are fixed separately so framework changes do not conceal product changes.
 
 ## Workflow gates
 

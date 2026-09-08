@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 import {
   assertPassiveDeploymentEvidence, assertQualifiedImageEvidence, buildPassiveDeploymentEvidence, createAssessmentControl,
-  evaluatePublicResponseHeaders, normalizeZapAlerts, passiveDeploymentSummary, passiveScannerOrigin, requiredPassiveCheckIds,
-  runOwnedProcess
+  evaluateCipherPolicy, evaluateExposureResponses, evaluateMethodBoundary, evaluatePublicResponseHeaders,
+  normalizeZapAlerts, passiveDeploymentSummary, passiveScannerOrigin, requiredPassiveCheckIds, runOwnedProcess
 } from "./security-passive-deployment.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -16,14 +16,18 @@ const schema = JSON.parse(readFileSync(new URL(
   "../security/passive-deployment-evidence.schema.json", import.meta.url)));
 const digest = `sha256:${"a".repeat(64)}`;
 const observationById = {
-  "body-limit": "proxy-body-limit-enforced", "certificate-trust": "certificate-chain-and-host-valid",
+  "backup-exposure": "route-group-not-exposed", "body-limit": "proxy-body-limit-enforced",
+  "certificate-trust": "certificate-chain-and-host-valid",
   "direct-forwarded-behavior": "direct-app-distinguished-from-proxy", "forwarded-boundary": "spoofed-host-rejected",
   "header-limit": "oversized-header-rejected", "http-redirect": "http-port-not-published",
   "host-boundary": "upstream-host-canonicalized",
   "loopback-publication": "proxy-loopback-only", "management-separation": "management-internal-only",
-  "qualified-image-evidence": "covered-by-image-qualification", "runtime-hardening": "runtime-controls-present",
+  "method-override": "unsafe-and-overridden-methods-rejected",
+  "qualified-image-evidence": "covered-by-image-qualification",
+  "runtime-file-permissions": "application-files-confined", "runtime-hardening": "runtime-controls-present",
   "scanner-runtime-hardening": "scanner-runtime-controls-present",
-  "secure-cookie-delivery": "issued-cookies-secure", "tls-versions": "tls12-and-tls13-only",
+  "secure-cookie-delivery": "issued-cookies-secure", "sensitive-extension-exposure": "route-group-not-exposed",
+  "tls-ciphers": "recommended-ciphers-only", "tls-versions": "tls12-and-tls13-only",
   "transport-security": "localhost-transport-qualified-externally"
 };
 
@@ -39,6 +43,55 @@ function passingObservations() {
     return { id, layer, passed: true, outcome, observation };
   });
 }
+
+test("given sensitive extension responses, when exposure is assessed, then every representative path must be absent", () => {
+  // given
+  const absent = [404, 404, 404, 404, 404];
+
+  // when / then
+  assert.deepEqual(evaluateExposureResponses(absent), {
+    passed: true, observation: "route-group-not-exposed"
+  });
+  assert.deepEqual(evaluateExposureResponses([404, 404, 200, 404, 404]), {
+    passed: false, observation: "unexpected-route-group-response"
+  });
+});
+
+test("given backup and unreferenced responses, when exposure is assessed, then forbidden or successful discovery fails", () => {
+  // given
+  const absent = [404, 404, 404, 404, 404];
+
+  // when / then
+  assert.equal(evaluateExposureResponses(absent).passed, true);
+  assert.equal(evaluateExposureResponses([404, 403, 404, 404, 404]).passed, false);
+});
+
+test("given unsafe and overridden methods, when the boundary is assessed, then changed request semantics fail", () => {
+  // when / then
+  assert.deepEqual(evaluateMethodBoundary([405, 400, 405], [200, 200, 200]), {
+    passed: true, observation: "unsafe-and-overridden-methods-rejected"
+  });
+  assert.equal(evaluateMethodBoundary([200, 400, 405], [200, 200, 200]).passed, false);
+  assert.equal(evaluateMethodBoundary([405, 400, 405], [200, 405, 200]).passed, false);
+});
+
+test("given negotiated cipher suites, when TLS policy is assessed, then deprecated suites fail", () => {
+  // given
+  const tls12 = { connected: true, protocol: "TLSv1.2", cipher: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256" };
+  const tls13 = { connected: true, protocol: "TLSv1.3", cipher: "TLS_AES_128_GCM_SHA256" };
+
+  // when / then
+  assert.deepEqual(evaluateCipherPolicy(tls12, tls13, { connected: false }), {
+    passed: true, observation: "recommended-ciphers-only"
+  });
+  assert.deepEqual(evaluateCipherPolicy(
+    { ...tls12, cipher: "TLS_RSA_WITH_AES_128_CBC_SHA" }, tls13, { connected: false }), {
+    passed: false, observation: "cipher-policy-mismatch"
+  });
+  assert.equal(evaluateCipherPolicy(tls12, tls13, {
+    connected: true, protocol: "TLSv1.2", cipher: "TLS_RSA_WITH_AES_128_CBC_SHA"
+  }).passed, false);
+});
 
 test("given the public response boundary, when CSP or proxy disclosure is broader than intended, then it fails closed", () => {
   // given

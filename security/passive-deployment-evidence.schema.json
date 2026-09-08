@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:security:passive-deployment-evidence:v2",
+  "$id": "urn:courtside:security:passive-deployment-evidence:v3",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "testId", "targetFingerprint", "imageDigest", "layers", "checks", "zap", "requestCount", "outcome"],
   "properties": {
-    "schemaVersion": { "const": 2 },
+    "schemaVersion": { "const": 3 },
     "testId": { "const": "CSA-DEPLOY-001" },
     "targetFingerprint": { "$ref": "#/$defs/digest" },
     "imageDigest": { "type": "string", "pattern": "^(?:sha256:[a-f0-9]{64}|[^\\s@]+@sha256:[a-f0-9]{64})$" },
@@ -18,8 +18,8 @@
     },
     "checks": {
       "type": "array",
-      "minItems": 28,
-      "maxItems": 28,
+      "minItems": 33,
+      "maxItems": 33,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -133,26 +133,29 @@
       "comment-db", "comment-debug", "comment-fixme", "comment-from", "comment-later", "comment-query",
       "comment-select", "comment-todo", "comment-user", "comment-username", "comment-where", "comment-xxx"] },
     "checkId": {
-      "enum": ["body-limit", "certificate-trust", "direct-forwarded-behavior", "exposure--git-config",
+      "enum": ["backup-exposure", "body-limit", "certificate-trust", "direct-forwarded-behavior", "exposure--git-config",
         "exposure-actuator", "exposure-actuator-health", "exposure-assets-app-js-map",
         "exposure-swagger-ui-index-html", "forwarded-boundary", "header-limit", "headers-api-source",
         "headers-does-not-exist", "headers-icon-svg", "headers-login", "headers-root", "host-boundary", "http-redirect",
-        "loopback-publication", "management-separation", "method-connect", "method-trace", "method-track",
-        "qualified-image-evidence", "runtime-hardening", "scanner-runtime-hardening", "secure-cookie-delivery", "tls-versions",
+        "loopback-publication", "management-separation", "method-connect", "method-override", "method-trace", "method-track",
+        "qualified-image-evidence", "runtime-file-permissions", "runtime-hardening", "scanner-runtime-hardening",
+        "secure-cookie-delivery", "sensitive-extension-exposure", "tls-ciphers", "tls-versions",
         "transport-security"]
     },
     "observation": {
-      "enum": ["certificate-chain-and-host-valid", "certificate-validation-failed",
+      "enum": ["application-file-permissions-broader", "application-files-confined", "certificate-chain-and-host-valid",
+        "certificate-validation-failed", "cipher-policy-mismatch",
         "covered-by-image-qualification", "direct-app-distinguished-from-proxy", "direct-app-probe-failed",
         "http-port-not-published", "insecure-cookie-issued", "issued-cookies-secure",
         "localhost-transport-qualified-externally", "management-internal-only", "management-internal-unavailable",
-        "method-accepted", "method-rejected", "oversized-header-accepted", "oversized-header-rejected",
+        "method-accepted", "method-boundary-mismatch", "method-rejected", "oversized-header-accepted", "oversized-header-rejected",
         "proxy-body-limit-enforced", "proxy-body-limit-not-proven", "proxy-loopback-only",
         "proxy-publication-mismatch", "route-not-exposed", "runtime-controls-incomplete",
         "runtime-controls-present", "scanner-runtime-controls-incomplete", "scanner-runtime-controls-present",
-        "security-and-cache-headers-valid", "security-or-cache-headers-invalid",
+        "recommended-ciphers-only", "route-group-not-exposed", "security-and-cache-headers-valid", "security-or-cache-headers-invalid",
         "server-header-exposed", "spoofed-host-not-rejected", "spoofed-host-rejected", "tls-policy-mismatch",
-        "tls12-and-tls13-only", "unexpected-route-response", "upstream-host-canonicalized",
+        "tls12-and-tls13-only", "unexpected-route-group-response", "unexpected-route-response",
+        "unsafe-and-overridden-methods-rejected", "upstream-host-canonicalized",
         "upstream-host-not-canonicalized"]
     }
   }

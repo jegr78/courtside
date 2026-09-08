@@ -37,6 +37,25 @@ const securityHeaders = [
 ];
 const publicPaths = ["/", "/api/source", "/login", "/does-not-exist", "/icon.svg"];
 const exposurePaths = ["/actuator", "/actuator/health", "/swagger-ui/index.html", "/.git/config", "/assets/app.js.map"];
+const controlExposureGroups = [
+  { id: "sensitive-extension-exposure", paths: [
+    "/application.properties", "/application.yaml", "/server.config", "/Connection.inc", "/App.java"
+  ] },
+  { id: "backup-exposure", paths: [
+    "/index.html.bak", "/app.old", "/backup.zip", "/.snapshot/monthly.1/index.html", "/index.html~"
+  ] }
+];
+const methodOverrideHeaders = ["x-http-method", "x-http-method-override", "x-method-override"];
+const deprecatedProbeCiphers = ["AES128-SHA", "AES256-SHA"];
+const recommendedCiphers = new Set([
+  "TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256",
+  "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+  "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+  "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256", "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256",
+  "ECDHE-ECDSA-AES128-GCM-SHA256", "ECDHE-RSA-AES128-GCM-SHA256",
+  "ECDHE-ECDSA-AES256-GCM-SHA384", "ECDHE-RSA-AES256-GCM-SHA384",
+  "ECDHE-ECDSA-CHACHA20-POLY1305", "ECDHE-RSA-CHACHA20-POLY1305"
+]);
 const suspiciousCommentPatterns = [
   "todo", "fixme", "bug", "bugs", "xxx", "query", "db", "admin", "administrator", "user", "username",
   "select", "where", "from", "later", "debug"
@@ -44,8 +63,10 @@ const suspiciousCommentPatterns = [
 export const requiredPassiveCheckIds = Object.freeze([
   ...publicPaths.map((path) => `headers-${pathId(path)}`),
   ...exposurePaths.map((path) => `exposure-${pathId(path)}`),
+  ...controlExposureGroups.map(({ id }) => id),
   "method-trace", "method-connect", "method-track", "body-limit", "header-limit", "forwarded-boundary",
-  "host-boundary", "tls-versions", "certificate-trust", "http-redirect", "runtime-hardening", "loopback-publication",
+  "method-override", "host-boundary", "tls-versions", "tls-ciphers", "certificate-trust", "http-redirect",
+  "runtime-file-permissions", "runtime-hardening", "loopback-publication",
   "management-separation", "direct-forwarded-behavior", "scanner-runtime-hardening", "secure-cookie-delivery", "transport-security",
   "qualified-image-evidence"
 ].toSorted());
@@ -244,7 +265,7 @@ export function buildPassiveDeploymentEvidence({
   const failed = checks.some((check) => check.outcome === "failed");
   const incomplete = !failed && alerts.length > 0;
   const evidence = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     testId: "CSA-DEPLOY-001",
     targetFingerprint,
     imageDigest,
@@ -296,6 +317,24 @@ export function evaluatePublicResponseHeaders(response) {
       : response.headers.has("via") ? "proxy-implementation-disclosed"
         : passed ? "security-and-cache-headers-valid" : "security-or-cache-headers-invalid"
   };
+}
+
+export function evaluateExposureResponses(statuses) {
+  const passed = statuses.length > 0 && statuses.every((status) => status === 404);
+  return { passed, observation: passed ? "route-group-not-exposed" : "unexpected-route-group-response" };
+}
+
+export function evaluateMethodBoundary(unsafeStatuses, overrideStatuses) {
+  const passed = unsafeStatuses.length > 0 && unsafeStatuses.every((status) => [400, 405].includes(status))
+    && overrideStatuses.length > 0 && overrideStatuses.every((status) => status === 200);
+  return { passed, observation: passed ? "unsafe-and-overridden-methods-rejected" : "method-boundary-mismatch" };
+}
+
+export function evaluateCipherPolicy(tls12, tls13, deprecated) {
+  const passed = tls12.connected === true && tls12.protocol === "TLSv1.2" && recommendedCiphers.has(tls12.cipher)
+    && tls13.connected === true && tls13.protocol === "TLSv1.3" && recommendedCiphers.has(tls13.cipher)
+    && deprecated.connected === false;
+  return { passed, observation: passed ? "recommended-ciphers-only" : "cipher-policy-mismatch" };
 }
 
 export function assertPassiveDeploymentEvidence(evidence) {
@@ -392,6 +431,18 @@ export async function runPassiveDeploymentAssessment(plan, context) {
     observations.push({ id: `exposure-${pathId(path)}`, layer: "proxy", passed: response.status === 404,
       observation: response.status === 404 ? "route-not-exposed" : "unexpected-route-response" });
   }
+  for (const group of controlExposureGroups) {
+    const statuses = [];
+    for (const path of group.paths) {
+      control.beforeRequest();
+      const response = await passiveRequest(plan.target, path, { ca: context.ca, signal: control.signal,
+        timeoutMilliseconds: control.remainingMilliseconds() });
+      requestCount++;
+      statuses.push(response.status);
+    }
+    observations.push({ id: group.id, layer: "proxy", ...evaluateExposureResponses(statuses) });
+  }
+  const unsafeMethodStatuses = [];
   for (const method of ["TRACE", "CONNECT", "TRACK"]) {
     control.beforeRequest();
     const response = method === "CONNECT"
@@ -399,10 +450,21 @@ export async function runPassiveDeploymentAssessment(plan, context) {
       : await passiveRequest(plan.target, "/", { method, ca: context.ca, signal: control.signal,
         timeoutMilliseconds: control.remainingMilliseconds() });
     requestCount++;
+    unsafeMethodStatuses.push(response.status);
     observations.push({ id: `method-${method.toLowerCase()}`, layer: "proxy",
       passed: [400, 405].includes(response.status),
       observation: [400, 405].includes(response.status) ? "method-rejected" : "method-accepted" });
   }
+  const overrideStatuses = [];
+  for (const header of methodOverrideHeaders) {
+    control.beforeRequest();
+    const response = await passiveRequest(plan.target, "/api/source", { headers: { [header]: "DELETE" },
+      ca: context.ca, signal: control.signal, timeoutMilliseconds: control.remainingMilliseconds() });
+    requestCount++;
+    overrideStatuses.push(response.status);
+  }
+  observations.push({ id: "method-override", layer: "proxy",
+    ...evaluateMethodBoundary(unsafeMethodStatuses, overrideStatuses) });
   control.beforeRequest();
   const csrf = await csrfToken(plan.target, context.ca, control);
   requestCount++;
@@ -439,18 +501,26 @@ export async function runPassiveDeploymentAssessment(plan, context) {
     && hostileHost.headers.get("x-courtside-observed-host") === "localhost";
   observations.push({ id: "host-boundary", layer: "proxy", passed: hostCanonicalized,
     observation: hostCanonicalized ? "upstream-host-canonicalized" : "upstream-host-not-canonicalized" });
+  const clientCiphers = new Set(tls.getCiphers());
+  if (!deprecatedProbeCiphers.every((cipher) => clientCiphers.has(cipher.toLowerCase()))) {
+    throw new Error("The TLS client cannot execute the deprecated-cipher refusal probe");
+  }
   control.beforeRequest();
   const tlsResults = await Promise.all([
     tlsProtocol(plan.target, "TLSv1.2", "TLSv1.2", context.ca, control),
     tlsProtocol(plan.target, "TLSv1.3", "TLSv1.3", context.ca, control),
-    tlsProtocol(plan.target, "TLSv1", "TLSv1.1", context.ca, control)
+    tlsProtocol(plan.target, "TLSv1", "TLSv1.1", context.ca, control),
+    tlsProtocol(plan.target, "TLSv1.2", "TLSv1.2", context.ca, control, deprecatedProbeCiphers.join(":"))
   ]);
-  requestCount += 3;
+  requestCount += 4;
   observations.push({ id: "tls-versions", layer: "proxy",
-    passed: tlsResults[0] && tlsResults[1] && !tlsResults[2],
-    observation: tlsResults[0] && tlsResults[1] && !tlsResults[2] ? "tls12-and-tls13-only" : "tls-policy-mismatch" });
-  observations.push({ id: "certificate-trust", layer: "proxy", passed: tlsResults[0],
-    observation: tlsResults[0] ? "certificate-chain-and-host-valid" : "certificate-validation-failed" });
+    passed: tlsResults[0].connected && tlsResults[1].connected && !tlsResults[2].connected,
+    observation: tlsResults[0].connected && tlsResults[1].connected && !tlsResults[2].connected
+      ? "tls12-and-tls13-only" : "tls-policy-mismatch" });
+  observations.push({ id: "tls-ciphers", layer: "proxy",
+    ...evaluateCipherPolicy(tlsResults[0], tlsResults[1], tlsResults[3]) });
+  observations.push({ id: "certificate-trust", layer: "proxy", passed: tlsResults[0].connected,
+    observation: tlsResults[0].connected ? "certificate-chain-and-host-valid" : "certificate-validation-failed" });
   observations.push({ id: "http-redirect", layer: "host", outcome: "not-applicable",
     observation: "http-port-not-published" });
   observations.push({ id: "transport-security", layer: "host", outcome: "not-applicable",
@@ -535,18 +605,30 @@ export function passiveRequest(origin, path, options = {}) {
   });
 }
 
-function tlsProtocol(origin, minVersion, maxVersion, ca, control) {
+function tlsProtocol(origin, minVersion, maxVersion, ca, control, ciphers) {
   const target = new URL(origin);
   return new Promise((resolve, reject) => {
-    const socket = tls.connect({ host: target.hostname, port: target.port || 443, servername: target.hostname,
-      ca, minVersion, maxVersion, signal: control.signal });
+    let socket;
+    try {
+      socket = tls.connect({ host: target.hostname, port: target.port || 443, servername: target.hostname,
+        ca, minVersion, maxVersion, ciphers, signal: control.signal });
+    } catch {
+      resolve({ connected: false });
+      return;
+    }
     const timeout = setTimeout(() => socket.destroy(new Error("TLS probe timed out")), control.remainingMilliseconds());
-    socket.once("secureConnect", () => { clearTimeout(timeout); socket.destroy(); resolve(true); });
+    socket.once("secureConnect", () => {
+      clearTimeout(timeout);
+      const cipher = socket.getCipher();
+      const result = { connected: true, protocol: socket.getProtocol(), cipher: cipher.standardName ?? cipher.name };
+      socket.destroy();
+      resolve(result);
+    });
     socket.once("error", () => {
       clearTimeout(timeout);
       if (control.signal.aborted) reject(control.signal.reason instanceof Error
         ? control.signal.reason : new Error("Assessment aborted"));
-      else resolve(false);
+      else resolve({ connected: false });
     });
   });
 }
