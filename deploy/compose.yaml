@@ -16,7 +16,7 @@ services:
     environment:
       POSTGRES_DB: courtside
       POSTGRES_USER: courtside
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
     volumes:
       - db:/var/lib/postgresql/data
     healthcheck:
@@ -43,7 +43,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
       SPRING_DATASOURCE_USERNAME: courtside
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-}
       COURTSIDE_DB_LOCK_TIMEOUT: ${COURTSIDE_DB_LOCK_TIMEOUT:-5s}
       COURTSIDE_DB_TLS_MODE: ${COURTSIDE_DB_TLS_MODE:-prefer}
       COURTSIDE_COOKIE_SECURE: ${COURTSIDE_COOKIE_SECURE:-true}

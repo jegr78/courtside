@@ -105,6 +105,29 @@ class ServerTlsTransportTest {
         }
     }
 
+    @Test
+    void givenAVerifiedHop_whenTheApplicationProcessIsReplaced_thenTrustNeverFallsBack()
+            throws Exception {
+        // given
+        TestCertificate foreign = TestCertificate.issuedFor(UPSTREAM);
+        int port = application.getPort();
+        try (GenericContainer<?> proxy = proxy(served.authority(), "serve")) {
+            assertThat(get(proxy).body()).isEqualTo(MARKER);
+
+            // when
+            application.stop();
+            application = serving(new ServerTlsProperties(ServerTlsProperties.Mode.SERVE,
+                    written(foreign.certificate()), written(foreign.key())), port);
+
+            // then
+            assertThat(get(proxy).statusCode()).isEqualTo(502);
+            application.stop();
+            application = serving(new ServerTlsProperties(ServerTlsProperties.Mode.SERVE,
+                    written(served.certificate()), written(served.key())), port);
+            assertThat(get(proxy).body()).isEqualTo(MARKER);
+        }
+    }
+
     // A proxy that fell back to plaintext when it could not verify the application would answer
     // exactly as the case above does, which is why the answer is read rather than the status alone.
     @Test
@@ -125,7 +148,11 @@ class ServerTlsTransportTest {
     }
 
     private static WebServer serving(ServerTlsProperties tls) {
-        TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory(0);
+        return serving(tls, 0);
+    }
+
+    private static WebServer serving(ServerTlsProperties tls, int port) {
+        TomcatServletWebServerFactory factory = new TomcatServletWebServerFactory(port);
         ServerTls.apply(factory, tls);
         WebServer server = factory.getWebServer(servlet -> servlet
                 .addServlet("probe", new HttpServlet() {

@@ -62,6 +62,9 @@ ends the session. After signing in with the new password, remove the three
 `COURTSIDE_BOOTSTRAP_ADMIN_*` values from `.env`: once any local account exists, later starts ignore
 them and never create, reset or modify an account.
 
+The steps above deliberately use one database credential. Clubs that want to keep schema authority
+out of the application process can instead use the optional [separate database identities](#separating-database-identities).
+
 ## Verifying what you are about to run
 
 Every release is signed keylessly, so you can prove the image came out of this project's release
@@ -594,6 +597,67 @@ A certificate that expires while the instance is running is not diagnosed the wa
 at startup is. The diagnosis is written when the application starts; a pool that later fails to
 reconnect reports the driver's own error in the log.
 
+## Separating database identities
+
+The standard deployment remains supported and needs only `POSTGRES_PASSWORD`. The optional
+`compose.database-identities.yaml` overlay instead gives three processes different credentials:
+
+| Process | Authority |
+|---|---|
+| `database-setup` | Creates and reconciles the two bounded roles, installs the required PostgreSQL extension, and owns grants. It receives the database owner's credential. |
+| `database-migrate` | Owns the application schema and runs Flyway. It cannot create roles or databases. |
+| `app` | Reads and changes application rows and obtains generated values from sequences. It cannot reposition sequences or create or alter schema, roles, databases, or grants. Flyway and JDBC session schema initialization are disabled in this process. |
+
+Create three files outside the checkout, each containing exactly one password and an optional final
+line ending. Keep access as narrow as possible while ensuring that the container process can read
+its mounted file: the Courtside image runs as numeric UID `10001`, while the PostgreSQL image reads
+the owner file during initialization. On Linux, account for those container identities in the file
+owner, group, or ACL instead of relying only on the account that invokes Compose. Point
+`COURTSIDE_DB_OWNER_PASSWORD_FILE`, `COURTSIDE_DB_MIGRATION_PASSWORD_FILE`, and
+`COURTSIDE_DB_RUNTIME_PASSWORD_FILE` at them. The files are mounted read-only into only the
+processes that need them; their contents are neither Compose environment values nor image layers.
+Role names default to `courtside_owner`, `courtside_migration`, and `courtside_runtime` and may be
+changed with the corresponding `*_USERNAME` variables.
+
+For a new volume, leave `POSTGRES_PASSWORD` empty and start the overlay:
+
+```sh
+docker compose -f compose.yaml -f compose.database-identities.yaml --profile proxy up -d
+```
+
+PostgreSQL initializes the owner from its password file. Compose then waits for setup and migration
+to finish successfully before it starts the application. A missing, multiline, stale, or unreadable
+file stops the responsible one-shot process; it never makes the application fall back to the shared
+credential.
+
+To adopt the overlay on an existing standard deployment, first make a qualified backup. Set
+`COURTSIDE_DB_OWNER_USERNAME=courtside`, put the existing `POSTGRES_PASSWORD` value in the owner
+file, remove `POSTGRES_PASSWORD` from `.env`, and run the command above. Setup transfers existing
+application objects to the migration role and reconciles the runtime grants before Flyway runs.
+
+To replace a migration or runtime credential, atomically replace its host file, then recreate the
+affected one-shot processes and application:
+
+```sh
+docker compose -f compose.yaml -f compose.database-identities.yaml run --rm database-setup
+docker compose -f compose.yaml -f compose.database-identities.yaml run --rm database-migrate
+docker compose -f compose.yaml -f compose.database-identities.yaml up -d --force-recreate app
+```
+
+The old password is refused as soon as setup commits. Recreating the application is deliberate: a
+single-file bind mount otherwise keeps the inode it first saw. A database backup contains schema and
+data, not PostgreSQL roles or their passwords, so restore the archive into an already provisioned
+target and run setup again; do not restore retired credential files with it.
+
+The database TLS and identity overlays are independent. To use both, list the identity overlay
+before `compose.database-tls.yaml`; setup, migration, and runtime then use the same `verify-full`
+policy and trust anchor, while retaining separate credentials.
+
+Courtside owns these inputs, minimum grants, refusal behavior, and the one-shot setup and migration
+commands. The operator owns creation and storage of the files, rotation timing, revocation,
+destruction, database-owner recovery, and any vault or certificate infrastructure. None of those
+systems, a second approver, or this optional overlay is required for normal operation.
+
 ## Encrypting the connection between the proxy and the application
 
 By default the reverse proxy reaches the application over plain HTTP on the compose network. The
@@ -669,7 +733,13 @@ default.
 | Variable | Default | Meaning |
 |---|---|---|
 | `COURTSIDE_VERSION` | *required* | The release to run, optionally with `@sha256:…`. Pin it. |
-| `POSTGRES_PASSWORD` | *required* | Database password, used only between the containers. |
+| `POSTGRES_PASSWORD` | *required without `compose.database-identities.yaml`* | Shared database password used by the standard deployment only. Leave it empty when the identity overlay supplies file-backed credentials. |
+| `COURTSIDE_DB_OWNER_USERNAME` | `courtside_owner` | Setup role used by `compose.database-identities.yaml`. On an existing standard volume, set this to `courtside`. |
+| `COURTSIDE_DB_OWNER_PASSWORD_FILE` | *required with `compose.database-identities.yaml`* | Host path to the current database-owner password file. It is mounted only into PostgreSQL and the setup process. |
+| `COURTSIDE_DB_MIGRATION_USERNAME` | `courtside_migration` | Role used only by the one-shot Flyway process. |
+| `COURTSIDE_DB_MIGRATION_PASSWORD_FILE` | *required with `compose.database-identities.yaml`* | Host path to the migration role's password file. |
+| `COURTSIDE_DB_RUNTIME_USERNAME` | `courtside_runtime` | Bounded role used by the running application. |
+| `COURTSIDE_DB_RUNTIME_PASSWORD_FILE` | *required with `compose.database-identities.yaml`* | Host path to the runtime role's password file. |
 | `COURTSIDE_DB_LOCK_TIMEOUT` | `5s` | Maximum time a database operation waits for a conflicting row or advisory lock. A refusal is returned as a retryable `503`; increase this only after diagnosing legitimate contention. Accepted range: `1s` to `1m`. |
 | `COURTSIDE_DB_TLS_MODE` | `prefer` | What the connection to PostgreSQL guarantees: `prefer`, `disable` or `verify-full`. See *Encrypting the connection to the database*. |
 | `COURTSIDE_DB_TLS_AUTHORITY` | *required with `compose.database-tls.yaml`* | Host directory holding `authority.pem`, the certificate authority that issued the database's certificate, and nothing else. The application container reads everything in it. |

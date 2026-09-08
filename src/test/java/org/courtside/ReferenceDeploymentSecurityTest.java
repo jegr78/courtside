@@ -31,6 +31,8 @@ class ReferenceDeploymentSecurityTest {
             "(?m)^http://:80 \\{\\R(?<body>(?:.*\\R)*?)^}$");
     private static final Pattern HEADER_BLOCK = Pattern.compile(
             "(?m)^\\theader \\{\\R(?<fields>(?:\\t\\t.*\\R)*)\\t}$");
+    private static final Pattern SERVICE_BLOCK = Pattern.compile(
+            "(?ms)^  [a-zA-Z0-9_-]+:\\R(?<body>.*?)(?=^  [a-zA-Z0-9_-]+:\\R|\\z)");
 
     private static final String GHCR_RELEASE_IMAGE =
             "image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}";
@@ -121,7 +123,7 @@ class ReferenceDeploymentSecurityTest {
         // when / then
         for (Path source : sources) {
             String compose = Files.readString(source);
-            if (OWN_IMAGE_REFERENCES.stream().noneMatch(compose::contains)) {
+            if (serviceBodies(compose).stream().noneMatch(ReferenceDeploymentSecurityTest::runsApplication)) {
                 continue;
             }
             assertThat(compose)
@@ -130,6 +132,17 @@ class ReferenceDeploymentSecurityTest {
                     .contains("COURTSIDE_MAIL_FROM")
                     .contains("COURTSIDE_MAIL_REPLY_TO");
         }
+    }
+
+    private static boolean runsApplication(String service) {
+        return OWN_IMAGE_REFERENCES.stream().anyMatch(service::contains)
+                && !service.contains("command: [\"--courtside-database-");
+    }
+
+    private static List<String> serviceBodies(String compose) {
+        return SERVICE_BLOCK.matcher(compose).results()
+                .map(match -> match.group("body"))
+                .toList();
     }
 
     @Test

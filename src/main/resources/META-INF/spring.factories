@@ -1,4 +1,8 @@
-org.springframework.boot.EnvironmentPostProcessor=org.courtside.securityassessment.SecurityAssessmentEnvironmentGuard
+org.springframework.boot.EnvironmentPostProcessor=\
+  org.courtside.securityassessment.SecurityAssessmentEnvironmentGuard,\
+  org.courtside.shared.DatabaseIdentityEnvironmentPostProcessor
 org.springframework.boot.diagnostics.FailureAnalyzer=\
+  org.courtside.shared.DatabaseIdentityFailureAnalyzer,\
+  org.courtside.shared.DatabaseRuntimeIdentityFailureAnalyzer,\
   org.courtside.shared.TlsConfigurationFailureAnalyzer,\
   org.courtside.shared.DatabaseTlsHandshakeFailureAnalyzer

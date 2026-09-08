@@ -147,7 +147,7 @@ class ReferenceDeploymentDocumentationTest {
         List<String> variables = new ArrayList<>();
         for (String operatorFacing : List.of("deploy/compose.yaml",
                 "deploy/compose.database-tls.yaml", "deploy/compose.database-tls-local.yaml",
-                "deploy/compose.app-tls.yaml")) {
+                "deploy/compose.app-tls.yaml", "deploy/compose.database-identities.yaml")) {
             VARIABLE.matcher(Files.readString(Path.of(operatorFacing))).results()
                     .map(match -> match.group(1))
                     .forEach(variables::add);

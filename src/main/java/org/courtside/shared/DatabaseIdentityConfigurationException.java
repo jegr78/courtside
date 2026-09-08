@@ -1,15 +1,15 @@
 package org.courtside.shared;
 
-class TlsConfigurationException extends RuntimeException {
+class DatabaseIdentityConfigurationException extends RuntimeException {
 
     private final String action;
 
-    TlsConfigurationException(String message, String action) {
+    DatabaseIdentityConfigurationException(String message, String action) {
         super(message);
         this.action = action;
     }
 
-    TlsConfigurationException(String message, String action, Throwable cause) {
+    DatabaseIdentityConfigurationException(String message, String action, Throwable cause) {
         super(message, cause);
         this.action = action;
     }
