@@ -9,6 +9,9 @@ hero:
       text: Was Courtside ist
       link: "#was-courtside-ist"
     - theme: alt
+      text: Anleitung für Mitglieder
+      link: /member-guide
+    - theme: alt
       text: Quellcode
       link: https://github.com/jegr78/courtside
 features:
@@ -25,15 +28,13 @@ features:
 Courtside ist eine Platzbuchung für Sportvereine. Jeder Verein betreibt seine eigene Instanz: eine
 Datenbank, ein Container, die Mitglieder des Vereins und niemand sonst.
 
-## Diese Seite wird gerade geschrieben
+## Anleitungen
 
-Sie ist heute die Startseite und sonst nichts. Zwei Anleitungen fehlen und sind der Grund, aus dem
-es die Seite überhaupt gibt:
+- [**Anleitung für Mitglieder**](member-guide.md): anmelden, einen freien Platz finden, buchen,
+  Mitspieler und Gäste eintragen, absagen, Benachrichtigungen wählen.
 
-- eine **Anleitung für Mitglieder** — buchen, absagen, Mitspieler eintragen, Benachrichtigungen
-  ([Vorgang #94](https://github.com/jegr78/courtside/issues/94))
-- eine **Anleitung für Vorstände** — Plätze, Regeln, Mitglieder, Konten, Import
-  ([Vorgang #95](https://github.com/jegr78/courtside/issues/95))
+Eine **Anleitung für Vorstände** über Plätze, Regeln, Mitglieder, Konten und Import fehlt noch
+([Vorgang #95](https://github.com/jegr78/courtside/issues/95)).
 
 Wer Courtside heute betreiben oder daran mitarbeiten will, findet die technischen Unterlagen im
 Repository: die [Referenz-Installation](https://github.com/jegr78/courtside/blob/main/deploy/README.md),
