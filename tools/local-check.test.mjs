@@ -641,3 +641,49 @@ function backendPlan() {
 function localCheckPlan(changes, { forceFull = false } = {}) {
   return planTasks(classifyChanges(changes, forceFull ? ["ci:full"] : []));
 }
+
+test("given every task the contract declares, when planning commands, then each runs where it says it does",
+  () => {
+    // given
+    const contract = loadProfileContract();
+    const declared = Object.entries(contract.localTaskDefinitions)
+      .map(([label, definition]) => ({ label, ...definition }));
+
+    // when
+    const plans = localVerificationPlans(declared, "linux", "/repo");
+
+    // then
+    const expected = { repository: "/repo", frontend: join("/repo", "frontend") };
+    assert.deepEqual(
+      plans.map(({ label, workingDirectory }) => [label, workingDirectory]),
+      declared.map(({ label, workingDirectory }) => [label, expected[workingDirectory]]));
+  });
+
+test("given a site task the contract runs from the repository, when planning it, then --prefix resolves the real site",
+  () => {
+    // given
+    const contract = loadProfileContract();
+    const siteInstall = { label: "site-install", ...contract.localTaskDefinitions["site-install"] };
+
+    // when
+    const [plan] = localVerificationPlans([siteInstall], "linux", "/repo");
+
+    // then
+    assert.equal(plan.workingDirectory, "/repo");
+    assert.equal(join(plan.workingDirectory, plan.arguments.at(-2)), "/repo/site");
+  });
+
+test("given a task naming a directory the runner does not know, when planning it, then the plan is refused",
+  () => {
+    // given
+    const task = {
+      label: "site-install",
+      workingDirectory: "site",
+      executable: "npm",
+      arguments: ["--prefix", "site", "ci"]
+    };
+
+    // when / then
+    assert.throws(() => localVerificationPlans([task], "linux", "/repo"),
+      /site-install names no known working directory: site/);
+  });
