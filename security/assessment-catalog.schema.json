@@ -548,6 +548,24 @@
         "rationale": {
           "type": "string",
           "minLength": 1
+        },
+        "controlEvidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "productionPath",
+            "falsifyingTest"
+          ],
+          "properties": {
+            "productionPath": {
+              "type": "string",
+              "minLength": 1
+            },
+            "falsifyingTest": {
+              "type": "string",
+              "pattern": "^[^#]+#.+$"
+            }
+          }
         }
       },
       "allOf": [
