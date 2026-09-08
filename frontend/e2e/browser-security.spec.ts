@@ -91,6 +91,49 @@ test("personal API responses remain fresh and uncacheable across the application
   }
 });
 
+test("session identifiers are issued only by successful login and remain confined to a host-bound cookie",
+  async ({ page }) => {
+  // given
+  const authenticatedRequests: Array<{ url: string; body: string }> = [];
+  page.on("request", (request) => authenticatedRequests.push({
+    url: request.url(), body: request.postData() ?? ""
+  }));
+  await page.goto("/login");
+  expect((await page.context().cookies()).find((cookie) => cookie.name === "__Host-SESSION")).toBeUndefined();
+
+  // when
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("wrong-password");
+  await page.getByTestId("login-submit").click();
+
+  // then
+  await expect(page.getByRole("alert")).toBeVisible();
+  expect((await page.context().cookies()).find((cookie) => cookie.name === "__Host-SESSION")).toBeUndefined();
+
+  // when
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  const session = (await page.context().cookies()).find((cookie) => cookie.name === "__Host-SESSION");
+  const status = await page.evaluate(async () => {
+    const response = await fetch("/api/session");
+    return { status: response.status, cacheControl: response.headers.get("cache-control") };
+  });
+
+  // then
+  expect(new URL(page.url()).protocol).toBe("https:");
+  expect(session).toBeDefined();
+  expect(session).toMatchObject({ httpOnly: true, secure: true, sameSite: "Lax", path: "/" });
+  expect(status.status).toBe(200);
+  expect(status.cacheControl?.split(",").map((directive) => directive.trim())).toContain("no-store");
+  expect(authenticatedRequests).not.toEqual([]);
+  for (const request of authenticatedRequests) {
+    expect(request.url).not.toContain(session!.value);
+    expect(request.body).not.toContain(session!.value);
+  }
+  expect(JSON.stringify(status)).not.toContain(session!.value);
+});
+
 test("stored values remain data across roles without entering browser storage or console evidence", async ({ page, journeyService }) => {
   // given
   await journeyService.executeSql(`
