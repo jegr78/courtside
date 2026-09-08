@@ -38,6 +38,20 @@ response bodies and retained assessment evidence have stricter handling. The ref
 does not enable access logs by default, but the software cannot treat that optional operator choice
 as proof that URLs contain no personal data.
 
+### Incomplete authorization rule documentation
+
+- State: validated design gap
+- Priority: P2
+- Controls: ASVS 5.0.0 `v5.0.0-8.1.1`, `v5.0.0-8.1.2`
+- Review: `MAN-AUTHZ-001`, 8 September 2026
+- Remediation: #884
+
+`docs/design.md` defines broad role capabilities and selected ownership and field-minimisation rules.
+The active assessment also exercises an operation-role matrix and selected object substitutions.
+Neither is a complete, maintained policy for every function, resource attribute and field-level read
+or write restriction. Tool expectations cannot silently stand in for the normative authorization
+documentation these controls require.
+
 [`finding-lifecycle.schema.json`](../security/finding-lifecycle.schema.json) defines the retained run
 record. [`exceptions.schema.json`](../security/exceptions.schema.json) defines the shared policy for
 static scanner exceptions and accepted dynamic risk. Both schemas are closed. Unknown fields fail

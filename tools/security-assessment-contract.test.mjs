@@ -89,6 +89,27 @@ test("given a reviewed control with a finding, when validating it, then the refe
   assert.equal(validate(referenced), false);
 });
 
+test("given a control is not applicable, when validating it, then it cannot also claim evidence or a finding", () => {
+  // given
+  const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
+  const notApplicable = structuredClone(catalog);
+  const control = notApplicable.controlCoverage.flatMap(({ controls }) => controls)
+    .find(({ id }) => id === "WSTG-v4.2-ATHZ-01");
+  control.status = "not-applicable";
+  control.rationale = "No request-controlled value reaches a filesystem path.";
+
+  // when / then
+  assert.equal(validate(notApplicable), true, JSON.stringify(validate.errors));
+  control.findingReference = "docs/security-findings.md#incomplete-sensitive-data-classification";
+  assert.equal(validate(notApplicable), false);
+  delete control.findingReference;
+  control.controlEvidence = {
+    productionPath: "src/main/java/org/courtside/dataexchange/SnapshotUpload.java",
+    falsifyingTest: "src/test/java/org/courtside/dataexchange/SnapshotUploadTest.java#givenAnUnusableName_whenUploading_thenTheExistingFileNameRefusalStillGoverns"
+  };
+  assert.equal(validate(notApplicable), false);
+});
+
 test("given the shipped attack surface, when reading the catalog, then every actor and surface is covered", () => {
   // given
   const expectedRoles = [
@@ -606,6 +627,23 @@ test("given the data-protection controls were reviewed, when reading their dispo
   // given
   const reviewedIds = new Set([
     "v5.0.0-14.1.1", "v5.0.0-14.2.1", "v5.0.0-14.2.2", "v5.0.0-14.3.2"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+  }
+});
+
+test("given the remaining authorization controls were reviewed, when reading their dispositions, then none is left implicit", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-ATHZ-01", "v5.0.0-8.1.1", "v5.0.0-8.1.2", "v5.0.0-8.2.3", "v5.0.0-8.3.1"
   ]);
   const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
     .filter(({ id }) => reviewedIds.has(id));

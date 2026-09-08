@@ -406,6 +406,44 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.email").value("jane.major@example.org"));
     }
 
+    @ParameterizedTest(name = "[{index}] {0}")
+    @MethodSource("accountFieldsInPersonChange")
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAccountFieldsInAPersonChange_whenUpdating_thenTheFieldsAndTheWholeRequestAreRejected(
+            String field, String value) throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID account = enabledAccount(jane, "doe.jane", Role.MEMBER);
+
+        // when / then
+        mockMvc.perform(put("/api/admin/roster/{personId}", jane)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Jane","lastName":"Major","email":"jane.major@example.org","%s":%s}
+                                """.formatted(field, value))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"));
+
+        assertThat(persons.findById(jane)).get()
+                .satisfies(person -> {
+                    assertThat(person.getLastName()).isEqualTo("Doe");
+                    assertThat(person.getEmail()).isEqualTo("jane.doe@example.org");
+                });
+        assertThat(accounts.findById(account)).get()
+                .satisfies(stored -> {
+                    assertThat(stored.isEnabled()).isTrue();
+                    assertThat(stored.getRoles()).containsExactly(Role.MEMBER);
+                });
+    }
+
+    static Stream<Arguments> accountFieldsInPersonChange() {
+        return Stream.of(
+                Arguments.of("accountId", "\"00000000-0000-0000-0000-000000000000\""),
+                Arguments.of("enabled", "false"),
+                Arguments.of("roles", "[\"ADMIN\"]"));
+    }
+
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenPaddedDetails_whenChangingAPerson_thenTheyAreStoredWithoutThatPadding() throws Exception {

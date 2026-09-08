@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:security:assessment-catalog:v1",
+  "$id": "urn:courtside:security:assessment-catalog:v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,7 +17,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": 1
+      "const": 2
     },
     "catalogVersion": {
       "type": "string",
@@ -579,6 +579,26 @@
               "controlEvidence",
               "findingReference"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not-applicable"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["controlEvidence"] },
+                { "required": ["findingReference"] }
+              ]
+            }
           }
         },
         {
