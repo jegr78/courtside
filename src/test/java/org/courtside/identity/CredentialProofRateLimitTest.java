@@ -96,6 +96,35 @@ class CredentialProofRateLimitTest extends AbstractIntegrationTest {
                 .andExpect(status().isTooManyRequests());
     }
 
+    @Test
+    void givenAnAccountOnItsOneTimePassword_whenItsProofIsRefused_thenTheAddressBudgetIsUntouched()
+            throws Exception {
+        // given
+        Person newcomer = persons.save(new Person("Mary", "Major", "mary@example.org"));
+        UserAccount issued = enabled(new UserAccount(newcomer, "newcomer",
+                passwordEncoder.encode("issued-password"), Set.of(Role.MEMBER), "en"));
+        issued.requirePasswordChange();
+        accounts.save(issued);
+        MockHttpSession beforeReplacing = signIn("newcomer", "issued-password");
+        MockHttpSession victim = signIn("victim", "victim-password");
+
+        // when
+        for (int refused = 0; refused < 3; refused++) {
+            reauthenticate(beforeReplacing, "issued-password")
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+        }
+
+        // then
+        reauthenticate(victim, "wrong-password").andExpect(status().isForbidden());
+        reauthenticate(victim, "still-wrong").andExpect(status().isForbidden());
+        reauthenticate(victim, "yet-another-guess").andExpect(status().isForbidden());
+        reauthenticate(victim, "fourth-guess")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:password-verification-rate-limited"));
+    }
+
     private void account(String username, String password) {
         Person person = persons.save(new Person(username, "Member", username + "@example.org"));
         accounts.save(enabled(new UserAccount(person, username, passwordEncoder.encode(password),

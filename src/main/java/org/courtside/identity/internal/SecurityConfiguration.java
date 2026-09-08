@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -60,16 +61,14 @@ public class SecurityConfiguration {
     private static final int HASH_LENGTH_IN_BYTES = 32;
     private static final String LOGIN_PROCESSING_URL = "/api/session";
 
-    private static RequestMatcher passwordVerificationEndpoints() {
-        RequestMatcher login = loginEndpoint();
+    private static RequestMatcher credentialVerificationEndpoints() {
         RequestMatcher reauthentication = PathPatternRequestMatcher.withDefaults()
                 .matcher(HttpMethod.POST, "/api/session/reauthentication");
         RequestMatcher initialPasswordChange = PathPatternRequestMatcher.withDefaults()
                 .matcher(HttpMethod.PUT, "/api/account/initial-password");
         RequestMatcher passwordChange = PathPatternRequestMatcher.withDefaults()
                 .matcher(HttpMethod.PUT, "/api/account/password");
-        return request -> login.matches(request)
-                || reauthentication.matches(request)
+        return request -> reauthentication.matches(request)
                 || initialPasswordChange.matches(request)
                 || passwordChange.matches(request);
     }
@@ -166,7 +165,6 @@ public class SecurityConfiguration {
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
                         .requestMatchers("/api/session/logout").authenticated()
-                        .requestMatchers("/api/session/reauthentication").authenticated()
                         .requestMatchers("/api/account/initial-password").access(
                                 (authentication, context) -> new AuthorizationDecision(
                                         hasAuthority(authentication.get(),
@@ -200,10 +198,17 @@ public class SecurityConfiguration {
                             response.setStatus(HttpStatus.OK.value());
                         })
                         .failureHandler(authenticationEntryPoint::commence))
-                .addFilterBefore(new LoginAttemptFilter(loginEndpoint(), passwordVerificationEndpoints(),
+                .addFilterBefore(new LoginAttemptFilter(LoginAttemptFilter.Kind.LOGIN, loginEndpoint(),
                         loginAttemptProtection, loginVerificationCapacity, credentialVerificationCapacity,
                         loginRateLimitHandler, securityEvents, currentUser),
                         UsernamePasswordAuthenticationFilter.class)
+                // Behind authorization, so a request this account may not make never spends the
+                // budget that bounds the password verifications it may.
+                .addFilterAfter(new LoginAttemptFilter(LoginAttemptFilter.Kind.CREDENTIAL,
+                        credentialVerificationEndpoints(), loginAttemptProtection,
+                        loginVerificationCapacity, credentialVerificationCapacity,
+                        loginRateLimitHandler, securityEvents, currentUser),
+                        AuthorizationFilter.class)
                 // The default only changes the session id, which keeps the creation time the absolute
                 // lifetime counts from, so a second member on a shared browser inherits the first's.
                 .sessionManagement(session -> session

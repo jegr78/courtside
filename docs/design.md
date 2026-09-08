@@ -1648,6 +1648,8 @@ whether it is built or designed. **Designed means absent today.**
   changes use both an account-wide bucket and a source-address bucket, plus a
   verification-capacity pool isolated from sign-in. Changing an address cannot reset a stolen
   account's attempt budget, while a successful proof clears only that account's account-wide bucket.
+  Authorization decides first: a request the account may not make at all is refused before either
+  bucket is touched, so it cannot spend what bounds a password guess.
   The source bucket measures request volume and expires with its window; another account cannot
   erase it by proving a password. These requests do not take the global login lock or enter its
   observation count. A stalled breach lookup therefore cannot consume sign-in capacity, and their

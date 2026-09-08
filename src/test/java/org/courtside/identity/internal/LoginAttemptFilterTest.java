@@ -157,9 +157,9 @@ class LoginAttemptFilterTest {
         when(currentUser.accountId()).thenReturn(Optional.of(accountId));
         when(protection.registerCredentialAttempt(anyString(), anyString()))
                 .thenReturn(Optional.of(new LoginBlock("ADDRESS", Duration.ofSeconds(30))));
-        RequestMatcher noLoginEndpoint = request -> false;
-        LoginAttemptFilter filter = new LoginAttemptFilter(noLoginEndpoint, request -> true,
-                protection, capacity, capacity(1), handler, securityEvents, currentUser);
+        LoginAttemptFilter filter = new LoginAttemptFilter(LoginAttemptFilter.Kind.CREDENTIAL,
+                request -> true, protection, capacity, capacity(1), handler, securityEvents,
+                currentUser);
 
         // when
         filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), chain);
@@ -179,8 +179,8 @@ class LoginAttemptFilterTest {
 
     private LoginAttemptFilter filter(LoginVerificationCapacity loginCapacity,
                                       LoginVerificationCapacity credentialCapacity) {
-        return new LoginAttemptFilter(loginEndpoint, loginEndpoint, protection, loginCapacity,
-                credentialCapacity, handler, securityEvents, currentUser);
+        return new LoginAttemptFilter(LoginAttemptFilter.Kind.LOGIN, loginEndpoint, protection,
+                loginCapacity, credentialCapacity, handler, securityEvents, currentUser);
     }
 
     private static LoginVerificationCapacity capacity(int permits) {

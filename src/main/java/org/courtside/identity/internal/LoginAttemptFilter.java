@@ -17,8 +17,10 @@ import java.util.Optional;
 @RequiredArgsConstructor
 class LoginAttemptFilter extends OncePerRequestFilter {
 
-    private final RequestMatcher loginEndpoint;
-    private final RequestMatcher passwordVerificationEndpoint;
+    enum Kind { LOGIN, CREDENTIAL }
+
+    private final Kind kind;
+    private final RequestMatcher handledEndpoints;
     private final LoginAttemptProtection protection;
     private final LoginVerificationCapacity loginVerificationCapacity;
     private final LoginVerificationCapacity credentialVerificationCapacity;
@@ -26,15 +28,22 @@ class LoginAttemptFilter extends OncePerRequestFilter {
     private final SecurityEventLog securityEvents;
     private final CurrentUser currentUser;
 
+    // Both instances are this class, and the inherited name would let whichever ran first mark the
+    // request as filtered for the other.
+    @Override
+    protected String getAlreadyFilteredAttributeName() {
+        return getClass().getName() + "." + kind + ".FILTERED";
+    }
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !passwordVerificationEndpoint.matches(request);
+        return !handledEndpoints.matches(request);
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        boolean login = loginEndpoint.matches(request);
+        boolean login = kind == Kind.LOGIN;
         String address = request.getRemoteAddr();
         String accountId = currentUser.accountId().map(Object::toString).orElse("anonymous");
         String loginAddress = "login:" + address;

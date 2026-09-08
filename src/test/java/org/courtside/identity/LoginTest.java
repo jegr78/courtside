@@ -267,6 +267,38 @@ class LoginTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnAccountOnItsOneTimePassword_whenItProvesItselfAgain_thenTheProofIsRefused()
+            throws Exception {
+        // given
+        Person newcomer = persons.save(new Person("Mary", "Major", "mary@example.org"));
+        UserAccount account = enabled(new UserAccount(newcomer, "major.mary",
+                passwordEncoder.encode("issued-password"), Set.of(Role.MEMBER), "de"));
+        account.requirePasswordChange();
+        accounts.save(account);
+
+        MvcResult login = mockMvc.perform(post("/api/session")
+                        .param("username", "major.mary")
+                        .param("password", "issued-password")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+
+        // when / then
+        mockMvc.perform(post("/api/session/reauthentication")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"issued-password\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+
+        // Signing out is the one route this state keeps, and the refusal above must not take it.
+        mockMvc.perform(post("/api/session/logout").session(session).with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void givenTheBootstrapAdmin_whenChangingTheInitialPassword_thenTheOldPasswordStopsWorking()
             throws Exception {
         // given

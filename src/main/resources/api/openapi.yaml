@@ -2327,7 +2327,10 @@ paths:
           description: Logged in. The session cookie is set.
           headers:
             X-Courtside-Password-Change-Required:
-              description: Present and `true` when only the initial-password endpoint may be used.
+              description: |
+                Present and `true` while the account still holds a one-time password. Reading this
+                status, replacing the password and signing out are what the session can do until
+                the replacement succeeds; every other operation answers 403.
               schema: { type: boolean }
         "401":
           $ref: "#/components/responses/Unauthenticated"
@@ -2355,6 +2358,9 @@ paths:
         A successful proof is retained only in this server-side session for five minutes. Courtside
         currently supports the account password as its full proof; a later second factor extends
         this operation rather than being bypassed by sensitive operations.
+
+        An account still marked for an initial password change is refused here. Nothing the proof
+        unlocks is reachable in that state, so the proof is not either.
       security:
         - sessionCookie: []
           csrfToken: []
