@@ -16,7 +16,8 @@ export default defineConfig({
       description: "Platzbuchung für Sportvereine",
       themeConfig: {
         nav: [{ text: "Start", link: "/" },
-          { text: "Für Mitglieder", link: "/member-guide" }],
+          { text: "Für Mitglieder", link: "/member-guide" },
+          { text: "Für Vorstände", link: "/board-guide" }],
         socialLinks: [{ icon: "github", link: repository }],
         footer: {
           message: "AGPL-3.0",
@@ -34,7 +35,8 @@ export default defineConfig({
       description: "Court booking for sports clubs",
       themeConfig: {
         nav: [{ text: "Start", link: "/en/" },
-          { text: "For members", link: "/en/member-guide" }],
+          { text: "For members", link: "/en/member-guide" },
+          { text: "For boards", link: "/en/board-guide" }],
         socialLinks: [{ icon: "github", link: repository }],
         footer: {
           message: "AGPL-3.0",

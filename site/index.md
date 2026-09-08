@@ -12,6 +12,9 @@ hero:
       text: Anleitung für Mitglieder
       link: /member-guide
     - theme: alt
+      text: Anleitung für Vorstände
+      link: /board-guide
+    - theme: alt
       text: Quellcode
       link: https://github.com/jegr78/courtside
 features:
@@ -31,10 +34,9 @@ Datenbank, ein Container, die Mitglieder des Vereins und niemand sonst.
 ## Anleitungen
 
 - [**Anleitung für Mitglieder**](member-guide.md): anmelden, einen freien Platz finden, buchen,
-  Mitspieler und Gäste eintragen, absagen, Benachrichtigungen wählen.
-
-Eine **Anleitung für Vorstände** über Plätze, Regeln, Mitglieder, Konten und Import fehlt noch
-([Vorgang #95](https://github.com/jegr78/courtside/issues/95)).
+  Mitspieler und Gäste eintragen, stornieren, Benachrichtigungen wählen.
+- [**Anleitung für Vorstände**](board-guide.md): Plätze und Öffnungszeiten, Buchungskarten und
+  Regeln, Mitgliedsarten, Personen und Konten, Import und die Nachweise des Vereins.
 
 Wer Courtside heute betreiben oder daran mitarbeiten will, findet die technischen Unterlagen im
 Repository: die [Referenz-Installation](https://github.com/jegr78/courtside/blob/main/deploy/README.md),
