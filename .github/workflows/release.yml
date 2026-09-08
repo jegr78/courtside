@@ -19,6 +19,7 @@ jobs:
       contents: read
       issues: read
       security-events: write
+      vulnerability-alerts: read
     outputs:
       upgrade-origins: ${{ steps.upgrade-origins.outputs.origins }}
     steps:
