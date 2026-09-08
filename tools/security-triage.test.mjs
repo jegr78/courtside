@@ -24,6 +24,9 @@ const baselineSummary = JSON.parse(baselineSummaryBytes);
 const manualBaselineSummaryBytes = readFileSync(
   new URL("../security/manual-baseline-finding-summary.json", import.meta.url));
 const manualBaselineSummary = JSON.parse(manualBaselineSummaryBytes);
+const controlOutcomeBytes = readFileSync(
+  new URL("../security/manual-baseline-control-outcomes.json", import.meta.url));
+const controlOutcomes = JSON.parse(controlOutcomeBytes);
 const digest = `sha256:${"a".repeat(64)}`;
 
 function lifecycle(overrides = {}) {
@@ -516,4 +519,20 @@ test("given the corrected manual baseline, when reading its public proof, then n
   assert.match(baselineDocumentation, new RegExp(summaryDigest));
   assert.match(baselineDocumentation, /\| pass \| 0 \|/);
   assert.match(baselineDocumentation, /\| blocked pending control-specific evidence \| 146 \|/);
+});
+
+test("given the published per-control outcomes, when reading them, then they stay bound to the findings they came with", () => {
+  // given
+  const outcomeDigest = `sha256:${createHash("sha256").update(controlOutcomeBytes).digest("hex")}`;
+  const failed = controlOutcomes.controls.filter(({ outcome }) => outcome === "fail").map(({ id }) => id);
+  const mapped = manualBaselineSummary.findings.flatMap(({ mappings }) =>
+    [...mappings.asvs ?? [], ...mappings.wstg ?? []]);
+
+  // when / then
+  assert.equal(controlOutcomes.run.runId, manualBaselineSummary.run.runId);
+  assert.equal(`commit:${controlOutcomes.run.sourceCommit}`, manualBaselineSummary.run.subject);
+  assert.equal(controlOutcomes.run.catalogVersion, manualBaselineSummary.run.catalogVersion);
+  assert.equal(controlOutcomes.run.recordedAt, manualBaselineSummary.run.recordedAt);
+  assert.deepEqual(failed.toSorted(), [...new Set(mapped)].toSorted());
+  assert.match(baselineDocumentation, new RegExp(outcomeDigest));
 });

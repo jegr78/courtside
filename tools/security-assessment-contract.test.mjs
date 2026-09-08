@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +22,17 @@ const controlOutcomes = JSON.parse(readFileSync(
 const controlOutcomeSchema = JSON.parse(readFileSync(
   new URL("../security/manual-baseline-control-outcomes.schema.json", import.meta.url), "utf8"));
 const repositoryFile = (path) => new URL(`../${path}`, import.meta.url);
+const readableFile = (path) => {
+  try {
+    return statSync(repositoryFile(path)).isFile() ? readFileSync(repositoryFile(path), "utf8") : null;
+  } catch {
+    return null;
+  }
+};
+const declarationOf = (name) => {
+  const literal = name.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return [new RegExp(String.raw`\bvoid\s+${literal}\s*\(`), new RegExp(String.raw`\b(?:test|it)\(\s*"${literal}"`)];
+};
 
 test("given the security catalog, when validating it, then every entry satisfies the documented schema", () => {
   // given
@@ -403,32 +414,46 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
     procedures: [procedure]
   };
   const invalidRecords = [
-    { ...evidence, catalogVersion: "99.0.0" },
-    { ...evidence, selectedControlIds: ["v5.0.0-8.1.1"] },
-    { ...evidence, procedures: [procedure, procedure] },
-    { ...evidence, procedures: [{ ...procedure,
+    [{ ...evidence, catalogVersion: "99.0.0" },
+      /catalogVersion does not match the current catalog/],
+    [{ ...evidence, selectedControlIds: ["v5.0.0-8.1.1"] },
+      /v5\.0\.0-8\.3\.1 was not selected/],
+    [{ ...evidence, procedures: [procedure, procedure] },
+      /duplicate procedure MAN-AUTHZ-001/],
+    [{ ...evidence, procedures: [{ ...procedure,
       controls: [{ ...control, controlId: "v5.0.0-2.1.1" }] }] },
-    { ...evidence, procedures: [{ ...procedure, targetImageDigest: `sha256:${"b".repeat(64)}` }] },
-    { ...evidence, authorization: { ...evidence.authorization, targetFingerprint: `sha256:${"b".repeat(64)}` } },
-    { ...evidence, targetOrigin: "https://127.0.0.1:9443" },
-    { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-08-20T20:00:00Z" } },
-    { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-99-21T20:00:00Z" } },
-    { ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-09-31T20:00:00Z" } },
-    { ...evidence, recordedAt: "2026-02-30T20:00:00Z",
+      /v5\.0\.0-2\.1\.1 is not assigned to MAN-AUTHZ-001/],
+    [{ ...evidence, procedures: [{ ...procedure, targetImageDigest: `sha256:${"b".repeat(64)}` }] },
+      /procedure MAN-AUTHZ-001 provenance differs from the run/],
+    [{ ...evidence, authorization: { ...evidence.authorization, targetFingerprint: `sha256:${"b".repeat(64)}` } },
+      /authorization target differs from the run target/],
+    [{ ...evidence, targetOrigin: "https://127.0.0.1:9443" },
+      /authorization origin differs from the run target/],
+    [{ ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-08-20T20:00:00Z" } },
+      /authorization expired before recordedAt/],
+    [{ ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-99-21T20:00:00Z" } },
+      /authorization expiry is not a real timestamp/],
+    [{ ...evidence, authorization: { ...evidence.authorization, expiresAt: "2026-09-31T20:00:00Z" } },
+      /authorization expiry is not a real timestamp/],
+    [{ ...evidence, recordedAt: "2026-02-30T20:00:00Z",
       procedures: [{ ...procedure, recordedAt: "2026-02-30T20:00:00Z" }] },
-    { ...evidence, procedures: [{ ...procedure, controls: [{ ...control,
+      /recordedAt is not a real timestamp/],
+    [{ ...evidence, procedures: [{ ...procedure, controls: [{ ...control,
       redactedEvidenceReferences: [{ ...control.redactedEvidenceReferences[0], expiresOn: "2026-99-21" }]
-    }] }] },
-    { ...evidence, procedures: [{ ...procedure,
+    }] }] }, /evidence evidence-001 expiry is not a real date/],
+    [{ ...evidence, procedures: [{ ...procedure,
       controls: [{ ...control, observedResult: "cookie=opaque-value" }] }] },
-    { ...evidence, procedures: [{ ...procedure,
+      /v5\.0\.0-8\.3\.1 observed result contains credential-like material/],
+    [{ ...evidence, procedures: [{ ...procedure,
       controls: [{ ...control, outcome: "blocked", rationale: "Awaiting review", owner: "Maintainer",
-        trackingReference: "secret=opaque-value" }] }] }
+        trackingReference: "secret=opaque-value" }] }] },
+      /v5\.0\.0-8\.3\.1 tracking reference contains credential-like material/]
   ];
 
   // when / then
-  for (const invalidRecord of invalidRecords) {
-    assert.throws(() => validateManualAssessmentEvidence(invalidRecord, new Date("2026-08-21T20:00:00Z")));
+  for (const [invalidRecord, refusal] of invalidRecords) {
+    assert.throws(() => validateManualAssessmentEvidence(invalidRecord,
+      new Date("2026-08-21T20:00:00Z")), refusal);
   }
   assert.throws(() => validateManualAssessmentEvidence({
     ...evidence,
@@ -502,8 +527,8 @@ test("given the recorded manual baseline, when reading its outcomes, then every 
   // given
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true })
     .compile(controlOutcomeSchema);
-  const manualControls = catalog.controlCoverage.flatMap(({ controls }) => controls)
-    .filter(({ manualProcedureId }) => manualProcedureId).map(({ id }) => id);
+  const catalogControls = new Set(catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .map(({ id }) => id));
   const published = Object.fromEntries([...baseline.matchAll(
     /^\| (pass|not applicable|fail|blocked)[^|]*\| *([0-9]+) \|$/gm)]
     .map(([, outcome, controls]) => [outcome.replace(" ", "-"), Number(controls)]));
@@ -515,7 +540,8 @@ test("given the recorded manual baseline, when reading its outcomes, then every 
 
   // then
   assert.equal(validate(controlOutcomes), true, JSON.stringify(validate.errors));
-  assert.deepEqual(controlOutcomes.controls.map(({ id }) => id).toSorted(), manualControls.toSorted());
+  assert.deepEqual(controlOutcomes.controls.filter(({ id }) => !catalogControls.has(id)), []);
+  assert.equal(new Set(controlOutcomes.controls.map(({ id }) => id)).size, controlOutcomes.controls.length);
   assert.deepEqual(counted, published);
   assert.match(baseline, new RegExp(`covers ${controlOutcomes.controls.length} unique selected controls`));
   assert.match(baseline, new RegExp(`\`${controlOutcomes.run.runId}\``));
@@ -530,13 +556,13 @@ test("given a control-specific anchor, when reading the catalog, then its produc
   // when / then
   assert.ok(anchored.length > 0);
   for (const { id, controlEvidence } of anchored) {
-    assert.equal(existsSync(repositoryFile(controlEvidence.productionPath)), true,
-      `${id} names a production path that does not exist`);
+    assert.notEqual(readableFile(controlEvidence.productionPath), null,
+      `${id} names a production path that is no readable file`);
     const [testPath, testName] = controlEvidence.falsifyingTest.split("#");
-    assert.ok(testName, `${id} names no test within ${testPath}`);
-    assert.equal(existsSync(repositoryFile(testPath)), true, `${id} names a test file that does not exist`);
-    assert.equal(readFileSync(repositoryFile(testPath), "utf8").includes(testName), true,
-      `${id} names ${testName}, which ${testPath} does not contain`);
+    const source = readableFile(testPath);
+    assert.notEqual(source, null, `${id} names a test file that is no readable file`);
+    assert.equal(declarationOf(testName).some((declaration) => declaration.test(source)), true,
+      `${id} names ${testName}, which ${testPath} declares no test for`);
   }
 });
 

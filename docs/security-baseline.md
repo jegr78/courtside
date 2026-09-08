@@ -68,9 +68,9 @@ The manual record covers 316 unique selected controls from OWASP WSTG 4.2 and AS
 | blocked pending control-specific evidence | 146 |
 
 The per-control outcomes of this run are published, redacted to one identifier and one outcome each,
-as [`manual-baseline-control-outcomes.json`](../security/manual-baseline-control-outcomes.json). The
-protected record they derive from expires; the list of controls the next run has to work through
-does not.
+as [`manual-baseline-control-outcomes.json`](../security/manual-baseline-control-outcomes.json),
+with digest `sha256:20a8ae70f327fbc877c533ec52a4817856a79b1ce453e7df23178359faa641a1`. The protected record they derive from expires;
+the list of controls the next run has to work through does not.
 
 Publishing it is a deliberate disclosure, and a narrow one. The 59 failed controls are exactly the
 controls `manual-baseline-finding-summary.json` already maps its eleven findings to, so nothing about
