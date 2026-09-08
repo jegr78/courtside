@@ -17,6 +17,11 @@ next club to fork this can follow them.
 
 ## Before you write anything
 
+- The [wiki](https://github.com/jegr78/courtside/wiki) is the introduction: how the
+  application is put together, what the modules are, and the handful of decisions that
+  explain most of the code. It orients you before the specification becomes readable. It is
+  not part of the distribution and no build gate reads it, so where it disagrees with a file
+  below, the file wins.
 - [`README.md`](README.md) gets the application running and creates the first administrator.
 - [`docs/design.md`](docs/design.md) is the design specification: what the product is, why the
   architecture is shaped the way it is, and what section 10 promises a club board about the

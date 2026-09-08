@@ -87,13 +87,18 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
   const frontend = join(root, "frontend");
   const npmCli = join(frontend, "node", "node_modules", "npm", "bin", "npm-cli.js");
   const node = join(frontend, "node", platform === "win32" ? "node.exe" : "node");
+  const directories = { repository: root, frontend };
   return tasks.map((task) => {
+    if (!Object.hasOwn(directories, task.workingDirectory)) {
+      throw new Error(`${task.label} names no known working directory: ${task.workingDirectory}`);
+    }
+    const workingDirectory = directories[task.workingDirectory];
     if (task.executable === "node") {
       return {
         label: task.label,
         command: hostNode ?? node,
         arguments: task.arguments,
-        workingDirectory: root,
+        workingDirectory,
         shell: false
       };
     }
@@ -102,7 +107,7 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
         label: task.label,
         command: node,
         arguments: [npmCli, ...task.arguments],
-        workingDirectory: frontend,
+        workingDirectory,
         shell: false
       };
     }
@@ -110,8 +115,9 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
       return {
         label: task.label,
         command: "cmd.exe",
-        arguments: ["/d", "/s", "/c", ["mvnw.cmd", ...task.arguments].join(" ")],
-        workingDirectory: root,
+        arguments: ["/d", "/s", "/c",
+          [`"${join(root, "mvnw.cmd")}"`, ...task.arguments].join(" ")],
+        workingDirectory,
         shell: false
       };
     }
@@ -119,7 +125,7 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
       label: task.label,
       command: join(root, "mvnw"),
       arguments: task.arguments,
-      workingDirectory: root,
+      workingDirectory,
       shell: false
     };
   });

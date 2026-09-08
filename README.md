@@ -125,6 +125,10 @@ handling is the database's job and is tested as such.
 
 ## Documentation
 
+- Start here if the codebase is new to you: the
+  [wiki](https://github.com/jegr78/courtside/wiki). It is the introduction the files below
+  are not — what the modules are, and why they may not call each other freely. It orients;
+  the authority is `docs/` and the code, and the wiki ships with neither.
 - Design spec: `docs/design.md`
 - The data model: `docs/data-model.md`
 - How a release is cut: `docs/releasing.md`
