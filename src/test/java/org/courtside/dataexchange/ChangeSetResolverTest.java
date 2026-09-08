@@ -68,9 +68,8 @@ class ChangeSetResolverTest {
         // when
         ResolvedChangeSet resolved = resolve(snapshot, SnapshotMode.FULL_SNAPSHOT, emptyRoster());
 
-        // then — ownership only decides what a snapshot may take away from the club, and a creation
-        // takes nothing away, so the file writes every mapped column including the address a
-        // credential is sent to
+        // then — a creation takes nothing away from the club, so ownership does not filter it and
+        // the file writes every mapped column, the address a credential is sent to included
         assertThat(resolved.changes()).singleElement().satisfies(change -> {
             assertThat(change.kind()).isEqualTo(ResolvedChangeSet.ChangeKind.CREATE);
             assertThat(change.values())
