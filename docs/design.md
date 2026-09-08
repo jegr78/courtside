@@ -37,9 +37,13 @@ text, the values. Which services that covers is derived from the admin API rathe
 surface is covered on the day its controller is written instead of on the day somebody remembers to
 name it. A free-text field never carries its value — a create event omits it, a change event names
 it in `changedFields` (`fields` for `roster.person.corrected`) — which is what keeps section 11's
-erasure working, since the log then holds nothing personal to remove. Bookings are not included;
-they carry their own status history. Coverage is enforced by a test, not by memory: it walks the
-admin API's own controllers to the services behind them and inventories every public method of each
+erasure working, since the log then holds nothing personal to remove. Bookings reach it too. The
+writer records every event a module publishes rather than a list it keeps, so
+`booking.booking.confirmed` and its siblings land beside the configuration changes. A booking's own
+status history stays the finer record of what happened to one court slot; what the log adds is the
+account behind the change and the instant of it, beside everything else the instance recorded.
+Coverage is enforced by a test, not by memory: it walks the admin API's own controllers to the
+services behind them and inventories every public method of each
 against an event type or an explicit `none`. The log is read back through `GET /api/admin/audit`, a
 cursor-paged, administrator-only endpoint that resolves the subject and the acting account to the
 names they carry today. `ConfigurationSubjectNames` is the port interface that resolution uses: an

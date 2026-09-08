@@ -177,6 +177,17 @@ a different file than the one previewed is visible after the fact.
 no single entity — a bulk export, for instance — therefore records nothing, which
 `docs/design.md` section 11 carries as an accepted risk rather than a gap.
 
+`domain_event.event_type` is a dotted name whose first segment says which module published it, and
+the table holds two kinds of entry. Six segments are the administrative surfaces, one per thing a
+board configures: `facility.court.added`, `card.bookingCard.changed`, `config.club.changed`,
+`rules.ruleSet.changed`, `roster.person.corrected` and `dataexchange.source.described`, each with
+siblings. The other two arrive in the course of ordinary use, because the writer records every
+event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the four
+other booking entries, and `identity.account.credentialsRequested`, which is an account asking for
+its own credentials where `roster.account.credentialsRequested` is an administrator asking on
+somebody's behalf. Read the first segment as the publisher and not as a table — the `roster.`
+entries come from `member`.
+
 `message_record.kind` and `message_optout.kind` are governed by CHECK constraints that have grown
 with the product; read the constraint rather than a list here. A message somebody declined leaves no
 row at all: it did not fail, it was not sent.
