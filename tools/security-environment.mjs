@@ -315,7 +315,19 @@ export async function inspectPassiveSecurityRuntime(plan, { control, stopFile })
   environment, control, stopFile)).stdout;
   const directObserved = responseHeader(direct, "X-Courtside-Observed-Host") === "attacker.example"
     && responseHeader(direct, "X-Courtside-Observed-Scheme") === "https";
-  return { requestCount: 2, observations: [
+  const userId = (await runSecurityCommand("docker", ["exec", `${project}-app-1`, "id", "-u"],
+    environment, control, stopFile)).stdout.trim();
+  const appWritable = await runSecurityCommand("docker", ["exec", `${project}-app-1`, "sh", "-c", "test -w /app"],
+    environment, control, stopFile, [0, 1]);
+  const tempWritable = await runSecurityCommand("docker", ["exec", `${project}-app-1`, "sh", "-c", "test -w /tmp"],
+    environment, control, stopFile, [0, 1]);
+  const writablePaths = (await runSecurityCommand("docker", ["exec", `${project}-app-1`, "find", "/app", "-xdev",
+    "-perm", "/022", "-print"], environment, control, stopFile)).stdout.split(/\r?\n/)
+    .map((line) => line.trim()).filter(Boolean);
+  const filePermissions = evaluateRuntimeFilePermissions({ userId,
+    appDirectoryWritable: appWritable.code === 0, tempDirectoryWritable: tempWritable.code === 0,
+    groupOrWorldWritablePaths: writablePaths });
+  return { requestCount: 6, observations: [
     { id: "runtime-hardening", layer: "container", passed: hardened,
       observation: hardened ? "runtime-controls-present" : "runtime-controls-incomplete" },
     { id: "loopback-publication", layer: "host", passed: published.length === 1
@@ -325,8 +337,17 @@ export async function inspectPassiveSecurityRuntime(plan, { control, stopFile })
     { id: "management-separation", layer: "application", passed: management === "200",
       observation: management === "200" ? "management-internal-only" : "management-internal-unavailable" },
     { id: "direct-forwarded-behavior", layer: "application", passed: directObserved,
-      observation: directObserved ? "direct-app-distinguished-from-proxy" : "direct-app-probe-failed" }
+      observation: directObserved ? "direct-app-distinguished-from-proxy" : "direct-app-probe-failed" },
+    { id: "runtime-file-permissions", layer: "container", ...filePermissions }
   ] };
+}
+
+export function evaluateRuntimeFilePermissions({
+  userId, appDirectoryWritable, tempDirectoryWritable, groupOrWorldWritablePaths
+}) {
+  const passed = userId === "10001" && appDirectoryWritable === false && tempDirectoryWritable === true
+    && Array.isArray(groupOrWorldWritablePaths) && groupOrWorldWritablePaths.length === 0;
+  return { passed, observation: passed ? "application-files-confined" : "application-file-permissions-broader" };
 }
 
 export async function runPassiveZap(plan, stopFile, limits) {

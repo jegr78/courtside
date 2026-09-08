@@ -290,6 +290,19 @@ class ReferenceDeploymentSecurityTest {
                 .contains("{$COURTSIDE_MAIL_HOSTNAME} {");
     }
 
+    @Test
+    void givenTheProductionHostname_whenReadingCaddyfile_thenPublicCertificateAutomationRemainsEnabled()
+            throws IOException {
+        // when
+        String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
+
+        // then
+        assertThat(caddyfile)
+                .contains("{$COURTSIDE_DOMAIN} {")
+                .doesNotContain("tls internal", "tls self_signed", "issuer internal", "local_certs",
+                        "auto_https off", "auto_https disable_certs");
+    }
+
     private record PlaintextSource(String caddyfile, Pattern pattern, String redirectTarget) {
     }
 

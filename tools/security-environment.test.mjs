@@ -7,7 +7,8 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import {
   authenticatedZapDiagnostic,
-  assertSecurityIdentity, assertSecurityRecoveryOwnership, assertSecurityStartAvailable, availableLoopbackPort, recoveryEnvironment,
+  assertSecurityIdentity, assertSecurityRecoveryOwnership, assertSecurityStartAvailable, availableLoopbackPort,
+  evaluateRuntimeFilePermissions, recoveryEnvironment,
   isMissingDockerResource,
   mergeSecurityProcessEnvironment,
   prometheusMetric,
@@ -17,6 +18,21 @@ import {
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
+
+test("given the application runtime, when file permissions are inspected, then no broader actor can alter its files", () => {
+  // given
+  const confined = { userId: "10001", appDirectoryWritable: false, tempDirectoryWritable: true,
+    groupOrWorldWritablePaths: [] };
+
+  // when / then
+  assert.deepEqual(evaluateRuntimeFilePermissions(confined), {
+    passed: true, observation: "application-files-confined"
+  });
+  assert.equal(evaluateRuntimeFilePermissions({ ...confined, userId: "0" }).passed, false);
+  assert.equal(evaluateRuntimeFilePermissions({ ...confined, appDirectoryWritable: true }).passed, false);
+  assert.equal(evaluateRuntimeFilePermissions({ ...confined,
+    groupOrWorldWritablePaths: ["/app/application.class"] }).passed, false);
+});
 
 test("given scanner traffic, when reserving the canary retest, then only the remaining budget is available", () => {
   // when / then
