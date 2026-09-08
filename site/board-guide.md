@@ -112,8 +112,11 @@ Eine Karte trägt:
 * **Zählt gegen Buchungslimits** — ob eine Buchung auf dieser Karte auf die Obergrenze offener
   Buchungen des Mitglieds angerechnet wird.
 * **Gäste erlaubt** — ob ein namentlich genannter Gast einen Spielerplatz füllen darf.
-* **Im Platzplan neutral als gebucht anzeigen** — ob Fremde die Bezeichnung der Karte sehen oder nur
-  *Belegt*.
+* **Im Platzplan neutral als gebucht anzeigen** — ob der Platzplan die Bezeichnung der Karte
+  anzeigt oder ein neutrales *Belegt* mit der Zahl der Teilnehmenden. Das ist eine Entscheidung der
+  Darstellung und keine Geheimhaltung: die Schnittstelle, aus der der öffentliche Platzplan liest,
+  führt die Bezeichnung mit. Eine Karte, deren Name niemanden etwas angeht, benennen Sie besser
+  neutral.
 
 Zur Verfügbarkeit gilt dasselbe wie beim Platz: deaktivieren statt löschen.
 
@@ -187,15 +190,23 @@ Hat das Mitglied bereits ein eigenes Passwort, warnt Courtside vor dem Senden: n
 löschen das gewählte Passwort und beenden alle laufenden Sitzungen. Das ist der Weg für jemanden, der
 nicht mehr hineinkommt — und nur dafür.
 
+Gegen die eigene Verwaltung schützt das ein Konto nicht, und es wäre unehrlich, das zu verschweigen:
+wer die E-Mail-Adresse einer Person ändern darf, kann sich danach deren Zugangsdaten zustellen
+lassen. Was diesen Weg begrenzt, ist keine technische Grenze, sondern das Änderungsprotokoll — es
+führt die geänderte Adresse und die angeforderten Zugangsdaten mit Zeitpunkt und ausführender
+Person.
+
 Verlässt jemand den Verein, wird sein Konto **deaktiviert**, nicht gelöscht: die Schaltfläche
 daneben schaltet es ab und ebenso wieder an. Ein deaktiviertes Konto meldet sich nicht mehr an, und
-alles, was die Person gebucht hat, bleibt in den Auswertungen richtig.
+seine offenen Sitzungen enden sofort mit; alles, was die Person gebucht hat, bleibt in den
+Auswertungen richtig.
 
 Weiter finden Sie dort: die Sitzungen dieses Kontos beenden, alle Sitzungen der Instanz beenden
 (auch Ihre eigene), die Änderungen an dieser Person im Protokoll, und die **Auskunft über
 gespeicherte Daten**. Fragt ein Mitglied, was der Verein über es gespeichert hat, erzeugt diese
-Schaltfläche die Antwort als Datei: die Person, ihr Konto, ihre Mitgliedschaft, ihre Buchungen,
-Mitgliedsnummern aus einem Import und das Änderungsprotokoll. Über andere Personen steht nichts
+Schaltfläche die Antwort als Datei: die Person, ihr Konto, ihre Mitgliedschaft, ihre Buchungen und
+Serientermine, die Nachrichten, die an sie gingen, Mitgliedsnummern aus einem Import und das
+Änderungsprotokoll. Über andere Personen steht nichts
 darin, und dass die Auskunft erzeugt wurde, steht danach im Protokoll.
 
 Die ganze Liste lässt sich als CSV exportieren, wahlweise mit den Mitgliedsnummern einer Importquelle.
@@ -207,9 +218,11 @@ abtippt. Der Weg hat drei Schritte, und die Anwendung führt Sie durch sie hindu
 
 **Quelle beschreiben.** Eine Quelle ist die Beschreibung *einer* Mitgliederverwaltung: Bezeichnung,
 Trennzeichen und Zeichensatz des Exports, die Zuordnung der Spalten und der Kategorien zu
-Mitgliedsarten, und die Felder, die diese Quelle führt. Ein geführtes Feld überschreibt jede
-Momentaufnahme; was Sie nicht ankreuzen, gehört dem Verein und bleibt unangetastet. Ausserdem
-stellen Sie hier die Schwelle ein, ab welchem Anteil wegfallender Mitgliedschaften nachgefragt wird.
+Mitgliedsarten, und die Felder, die diese Quelle führt. **Jede Momentaufnahme überschreibt ein
+geführtes Feld**; was Sie nicht ankreuzen, gehört dem Verein und bleibt unangetastet. Bei der
+E-Mail-Adresse hat das Gewicht: an sie geht jedes Einmalpasswort, Sie verlagern mit diesem Häkchen
+also die Kontowiederherstellung Ihrer Mitglieder in das fremde System. Ausserdem stellen Sie hier
+die Schwelle ein, ab welchem Anteil wegfallender Mitgliedschaften nachgefragt wird.
 
 Zum Zuordnen der Spalten wählen Sie eine Beispieldatei aus. **Diese Datei bleibt in Ihrem Browser**
 und wird nur gelesen, um Ihnen Ihre eigenen Spalten anzubieten.
@@ -219,11 +232,17 @@ Prüfsumme, dann die Änderungsmenge nach Art getrennt — neu, geändert, Mitgl
 übersprungenen Zeilen, die möglichen Dubletten und die geteilten Postfächer. Dazu steht dort, wie
 viele Zugänge angelegt würden und warum ein Zugang gegebenenfalls ausbleibt.
 
+An der Mitgliederliste ändert eine Vorschau nichts. Sie liegt aber in der Instanz: die Datei selbst
+wird nie gespeichert, die daraus gelesene Änderungsmenge mit Namen, Adressen und Mitgliedsnummern
+schon, bis ihre Aufbewahrungsfrist abläuft. Wer nach dem Verbleib gefragt wird, sollte das wissen.
+
 Zwei Dinge muss die Vorschau von Ihnen wissen:
 
 * **Was die Datei bedeutet.** Eine *Teilliste* ändert nur, was in ihr steht; wer fehlt, bleibt
   unangetastet. Eine *vollständige Liste* ist die ganze Wahrheit dieser Quelle — wessen Zeile fehlt,
-  dessen Mitgliedschaft endet.
+  dessen Mitgliedschaft endet. Das endet nicht nur die Mitgliedschaft: das Konto verliert die
+  Mitgliedsrolle, und bleibt keine andere übrig, wird es deaktiviert und seine Sitzungen werden
+  beendet.
 * **Wer schon da ist.** Eine Momentaufnahme erkennt eine Person an ihrer Mitgliedsnummer, nie am
   Namen. Wen Sie eingetragen haben, bevor Sie diese Quelle einlesen, ist der Datei unbekannt —
   verknüpfen Sie beide von Hand, sonst legt der Import eine zweite Person an.
@@ -235,9 +254,14 @@ Einmalpasswort, und ein erstes Passwort genügt, um einen Zugang zu behalten.
 
 **Import ausführen.** Die geprüfte Änderungsmenge wird in einem Zug geschrieben. Liegt der Anteil
 endender Mitgliedschaften über Ihrer Schwelle, verlangt Courtside eine ausdrückliche Bestätigung —
-eine abgeschnittene Ausfuhr sieht genau so aus wie ein Verein, der geschrumpft ist. Ein erneutes
-Ausführen macht nichts rückgängig. Jeder Lauf steht danach mit seinem Ergebnis in der Liste der
-bisherigen Läufe.
+eine abgeschnittene Ausfuhr sieht genau so aus wie ein Verein, der geschrumpft ist. Jeder Lauf steht
+danach mit seinem Ergebnis in der Liste der bisherigen Läufe.
+
+**Ein erneutes Ausführen macht nichts rückgängig**, und ein späterer richtiger Lauf holt nicht alles
+zurück. Die Mitgliedschaften kommen wieder, die deaktivierten Konten nicht: eine Synchronisation
+schaltet ein Konto nie ein, weil ein Vorstand es aus einem Grund abgeschaltet haben kann, den keine
+Mitgliederverwaltung kennt. Wer versehentlich eine abgeschnittene Datei ausgeführt hat, aktiviert die
+Konten einzeln auf der Personenseite wieder.
 
 ## Nachweise
 

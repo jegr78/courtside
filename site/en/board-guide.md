@@ -108,8 +108,10 @@ A card carries:
 * **Counts against booking limits** — whether a booking on this card counts towards the member's
   limit of open bookings.
 * **Guests allowed** — whether a named guest may fill a player slot.
-* **Show as neutrally booked in the court plan** — whether strangers see the card's label or only
-  *Occupied*.
+* **Show as neutrally booked in the court plan** — whether the plan shows the card's label or a
+  neutral *Occupied* with the number of participants. That is a rendering choice, not secrecy: the
+  interface the public court plan reads from carries the label. A card whose name is nobody else's
+  business is better given a neutral one.
 
 Availability works as it does for a court: deactivate rather than delete.
 
@@ -180,15 +182,20 @@ If the member already chose a password, Courtside warns before sending: new cred
 password and end every session they have open. That is the route for somebody who can no longer get
 in, and only for that.
 
+It does not protect an account against your own administration, and saying otherwise would be
+dishonest: whoever may change a person's email address can then have that person's credentials sent
+to it. What bounds this is not a technical limit but the change log, which carries both the changed
+address and the requested credentials with their time and their actor.
+
 When somebody leaves the club, their account is **deactivated** rather than deleted: the button
-beside it switches the account off, and on again. A deactivated account cannot sign in, and
-everything that person booked stays right in the reports.
+beside it switches the account off, and on again. A deactivated account cannot sign in and its open
+sessions end at once; everything that person booked stays right in the reports.
 
 The same page ends this account's sessions, ends every session in the instance (yours included),
 links to this person's changes in the log, and produces the **answer to a data-access request**.
 When a member asks what the club holds about them, that button produces the answer as a file: the
-person, their account, their membership, their bookings, member numbers from an import, and the
-change log. It holds nothing about anybody else, and that the answer was produced is itself written
+person, their account, their membership, their bookings and series, the messages sent to them,
+member numbers from an import, and the change log. It holds nothing about anybody else, and that the answer was produced is itself written
 to the log.
 
 The whole list exports as CSV, optionally carrying the member numbers of an import source.
@@ -200,9 +207,11 @@ retyping it. The path has three steps and the application walks you through them
 
 **Describe the source.** A source is the description of *one* membership system: a name, the
 separator and character set of its export, the mapping of its columns and of its categories onto
-membership types, and the fields that source owns. An owned field is overwritten by every snapshot;
-what you leave unticked belongs to the club and stays untouched. Here you also set the share of
-ending memberships above which Courtside asks before executing.
+membership types, and the fields that source owns. **Every snapshot overwrites an owned field**;
+what you leave unticked belongs to the club and stays untouched. For the email address that carries
+weight: every one-time password goes there, so this tick moves your members' account recovery into
+the other system. Here you also set the share of ending memberships above which Courtside asks
+before executing.
 
 To map the columns you pick an example file. **That file stays in your browser** and is read only to
 offer you your own columns.
@@ -212,11 +221,16 @@ then the change set by kind — new, changed, membership ends — the skipped ro
 duplicates and the shared mailboxes. Beside it stands how many accounts would be opened, and why one
 would not be.
 
+A preview changes nothing about the roster. It does live in the instance, though: the file itself is
+never stored, but the change set read out of it — names, addresses, member numbers — is, until its
+retention runs out. Anyone asked where the data went should know that.
+
 Two things the preview needs from you:
 
 * **What the file means.** A *partial list* changes only what it contains; whoever is missing is left
   alone. A *complete list* is the whole truth about this source — whoever is missing has their
-  membership ended.
+  membership ended. And not only the membership: the account loses the member role, and if no other
+  role remains it is deactivated and its sessions end.
 * **Who is already there.** A snapshot recognises a person by their member number, never by their
   name. Anyone you entered before reading this source in is unknown to the file — link the two by
   hand, or the import creates a second person.
@@ -228,8 +242,12 @@ and a first password is enough to keep an account.
 
 **Run the import.** The reviewed change set is written in one transaction. If the share of ending
 memberships is above your threshold, Courtside demands an explicit confirmation — a truncated export
-looks exactly like a club that shrank. Running it again does not undo it. Every run is then listed
-with its result.
+looks exactly like a club that shrank. Every run is then listed with its result.
+
+**Running it again does not undo it**, and a later correct run does not bring everything back. The
+memberships return; the deactivated accounts do not. A synchronisation never switches an account on,
+because a board may have switched it off for a reason no membership system knows about. After
+executing a truncated file by mistake, you switch those accounts on one by one on the person page.
 
 ## Records
 
