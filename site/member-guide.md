@@ -13,8 +13,8 @@ welcher Platz belegt ist. Buchen kannst du erst, wenn du angemeldet bist.
 Der Plan zeigt eine Woche, auf einem schmalen Bildschirm einen Tag. Über *Vorherige Woche* und
 *Nächste Woche* bewegst du dich vor und zurück, *Zur aktuellen Zeit* bringt dich zum Jetzt zurück.
 Die Legende unter dem Plan erklärt die Zustände: **Frei**, **Belegt**, **Deine Buchung**,
-**Nicht verfügbar** und **Vergangen**. An einem Tag, an dem der Verein geschlossen hat, steht
-genau das statt eines Rasters.
+**Nicht verfügbar** und **Vergangen**. An einem Tag ohne Öffnungszeit steht statt des Rasters,
+dass die Anlage an diesem Tag geschlossen ist.
 
 Ob bei einer fremden Buchung die Bezeichnung ihrer Buchungsart steht oder nur *Belegt*, entscheidet
 dein Verein je Buchungsart.
@@ -25,8 +25,8 @@ Dein Konto legt der Vorstand an. Benutzername und ein Einmalpasswort kommen ansc
 E-Mail zu dir, nicht über den Vorstand: niemand dort sieht oder wählt dein erstes Passwort.
 
 Über *Anmelden* kommst du zum Formular mit Benutzername und Passwort. Wird die Anmeldung
-abgelehnt, obwohl du dich nicht vertippt hast, sind die Zugangsdaten abgelaufen oder nie
-angekommen. Dann bittest du deinen Vorstand um neue. Nach zu vielen Versuchen in kurzer Zeit sagt
+abgelehnt, obwohl du dich nicht vertippt hast, können die Zugangsdaten abgelaufen oder nie
+angekommen sein. Dann bittest du deinen Vorstand um neue. Nach zu vielen Versuchen in kurzer Zeit sagt
 Courtside das ausdrücklich und lässt dich eine Weile warten, bevor es weitergeht.
 
 ## Das Einmalpasswort ersetzen
@@ -49,7 +49,7 @@ und daraus wird der Anfang deiner Buchung. Der Dialog *Buchung anlegen* zeigt da
   Aufgabe über die Mitgliedschaft hinaus hat.
 * **Art der Buchung**. Zur Auswahl steht, was deine Rolle benutzen darf.
 * **Mitglieder**: über die Suche findest du sie und trägst sie als Mitspieler ein.
-* Unter **Mehr Angaben**: Gäste, *Was mitspielt* und eine Notiz.
+* Unter **Weitere Angaben**: Gäste, *Was mitspielt* und eine Notiz.
 
 *Jetzt buchen* legt die Buchung an. Ob ein Platz zu dieser Zeit noch frei ist, entscheidet die
 Datenbank selbst und nicht eine vorherige Prüfung, die ein gleichzeitiger Zugriff überholen könnte.
@@ -78,14 +78,14 @@ eingetragen hast. Drei Arten von Mitspielern gibt es:
 
 * **Mitglieder** suchst du über den Namen und fügst sie hinzu. Ein Mitglied kann nur einen Platz
   derselben Buchung belegen.
-* **Gäste** trägst du unter *Mehr Angaben* mit Namen ein. Erlaubt eine Buchungsart keine Gäste,
+* **Gäste** trägst du unter *Weitere Angaben* mit Namen ein. Erlaubt eine Buchungsart keine Gäste,
   sagt sie das beim Buchen.
 * ***Was mitspielt*** ist für alles, was einen Spielerplatz füllt, ohne eine Person zu sein, etwa
   ein Gerät des Vereins. Davon hat der Verein eine feste Anzahl. Ist zu deiner Zeit schon alles
   vergeben, nennt Courtside die Anzahl, die es insgesamt gibt.
 
-Wen du einträgst, wird gefragt: das eingetragene Mitglied bekommt eine E-Mail darüber. Zustimmen
-muss es nicht, und es kann sich selbst wieder austragen.
+Wen du einträgst, erfährt davon: das eingetragene Mitglied bekommt eine E-Mail. Gefragt wird es
+nicht, zustimmen muss es nicht, und es kann sich selbst wieder austragen.
 
 ## Als Mitspieler eingetragen
 
@@ -105,35 +105,38 @@ Diese Ablehnungen gibt es:
 
 | Was Courtside sagt | Was dahinter steht |
 |---|---|
-| Der Verein hat an diesem Tag geschlossen | An diesem Tag gibt es keine Öffnungszeit |
+| An diesem Tag ist die Anlage geschlossen | Der Tag hat keine Öffnungszeit |
 | Buchungen sind nur zwischen zwei Uhrzeiten möglich | Deine Zeit liegt ausserhalb der Öffnungszeit |
-| Buchungen beginnen im Zeitraster | Anfang oder Dauer passen nicht in das Raster deines Vereins |
+| Buchungen beginnen im Minuten-Raster | Der Beginn passt nicht in das Raster deines Vereins |
+| Die Buchungsdauer muss ein Vielfaches der Rasterlänge sein | Die Dauer passt nicht in dasselbe Raster |
 | Du kannst höchstens so viele Tage im Voraus buchen | Der Vorlauf ist begrenzt |
-| Eine Buchung darf höchstens so lange dauern | Die Dauer ist begrenzt |
-| Du hast bereits so viele offene Buchungen | Mehr gleichzeitig offene Buchungen sind nicht vorgesehen |
-| Du musst so lange vor Beginn absagen | Für das Absagen gilt eine Frist |
-| Eine Buchung kann nicht in der Vergangenheit beginnen | Der Zeitpunkt liegt hinter dir |
-| Das Buchen eines Platzes steht dir nicht offen | Deine Mitgliedsart darf selbst nicht buchen |
+| Eine Buchung darf höchstens so viele Minuten dauern | Die Dauer ist begrenzt |
+| Du hast bereits so viele von so vielen möglichen offenen Buchungen | Mehr gleichzeitig offene Buchungen sind nicht vorgesehen |
+| Du musst mindestens so viele Minuten vor Buchungsbeginn stornieren | Für das Stornieren gilt eine Frist |
+| Eine Buchung darf nicht in der Vergangenheit beginnen | Der Zeitpunkt liegt hinter dir |
+| Platzbuchungen sind für dich nicht freigegeben | Deine Mitgliedsart bucht nicht selbst |
 
 Wie viele Tage, wie viele Minuten, wie viele Buchungen: das steht in den Regeln deines Vereins, und
 Courtside nennt die Zahl in der Meldung selbst.
 
-## Absagen
+## Stornieren
 
 Unter *Meine Buchungen* liegen deine **bevorstehenden** und deine **vergangenen** Buchungen. Bei
-einer bevorstehenden gibt es *Absagen*. Ist die Frist deines Vereins schon verstrichen, lehnt
-Courtside die Absage ab und sagt, wie lange vorher sie möglich gewesen wäre.
+einer bevorstehenden gibt es *Stornieren*. Ist die Frist deines Vereins schon verstrichen, lehnt
+Courtside die Stornierung ab und sagt, wie viele Minuten vor Buchungsbeginn sie möglich gewesen
+wäre.
 
-Eine abgesagte Buchung gibt den Platz sofort wieder frei. Genau darum bittet dich auch die
-Erinnerungsmail vor deiner Buchung: wenn du nicht spielen kannst, sage ab, damit jemand anders
+Eine stornierte Buchung gibt den Platz sofort wieder frei. Genau darum bittet dich auch die
+Erinnerung vor deiner Buchung: wenn du nicht spielen kannst, storniere, damit jemand anders
 spielen kann.
 
 ## Serientermine
 
 Ein Serientermin ist ein Rezept: erster Termin, Uhrzeit, Dauer, Wochentage, Abstand in Wochen und
 ein Ende. Daraus entstehen ganz normale Buchungen. Angelegt werden Serien von denen, die im Verein
-eine Aufgabe darüber hinaus haben, etwa für ein Training; als Mitglied begegnest du ihnen im
-Platzplan und als Mitspieler.
+eine Aufgabe über die Mitgliedschaft hinaus haben, etwa für ein Training. Eine Serie erfasst keine
+Spieler, also wirst du in ihr auch nicht eingetragen; du begegnest ihr im Platzplan als belegte
+Zeit.
 
 Zwei Dinge sind dabei wichtig:
 
@@ -141,8 +144,8 @@ Zwei Dinge sind dabei wichtig:
   dieser Zeit schon belegt ist, entsteht dieser eine Termin gar nicht erst. Er wird beim Anlegen
   als übersprungen aufgeführt, der Rest der Serie entsteht.
 * **Ein einzelner Termin ist änderbar, ohne die Serie anzufassen.** Wer eine Serie verwaltet, wählt
-  beim Absagen und Verschieben zwischen *Nur dieser Termin*, *Dieser und alle folgenden* und
-  *Ganze Serie*. Vor dem Verschieben zeigt Courtside, welche Termine betroffen wären und welche
+  beim Stornieren und Verschieben zwischen *Nur dieser Termin*, *Dieser und folgende Termine*
+  und *Ganze Serie*. Vor dem Verschieben zeigt Courtside, welche Termine betroffen wären und welche
   davon nicht verschoben werden können, weil ihr Platz dann belegt oder nicht verfügbar ist.
 
 ## Wenn sich unter deiner Buchung etwas ändert

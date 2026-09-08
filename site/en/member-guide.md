@@ -23,8 +23,8 @@ Your board creates the account. The username and a one-time password then reach 
 than through the board: nobody there sees or chooses your first password.
 
 *Sign in* takes you to the form with username and password. If the sign-in is refused although you
-typed everything correctly, the credentials have expired or never arrived, and your board can send
-new ones. After too many attempts in a short time Courtside says exactly that and makes you wait a
+typed everything correctly, the credentials may have expired or never arrived, and your board can
+send new ones. After too many attempts in a short time Courtside says exactly that and makes you wait a
 while before trying again.
 
 ## Replacing the one-time password
@@ -80,7 +80,7 @@ are three sorts of player:
   equipment for instance. The club has a fixed number of each. If they are all taken at your time,
   Courtside names how many there are in total.
 
-Whoever you enter gets asked: the member you recorded receives an email about it. They do not have
+Whoever you enter is told, not asked: the member you recorded receives an email. They do not have
 to agree, and they can take themselves out again.
 
 ## Recorded as a co-player
@@ -101,13 +101,14 @@ These refusals exist:
 
 | What Courtside says | What lies behind it |
 |---|---|
-| The facility is closed on this day | There is no opening time on that day |
+| The facility is closed on this day | The day has no opening time |
 | Bookings are only possible between two times | Your time falls outside the opening hours |
-| Bookings start on the time grid | The start or the duration does not fit your club's grid |
+| Bookings start on the minute grid | The start does not fit your club's grid |
+| The duration must be a multiple of the grid | The duration does not fit the same grid |
 | You can book at most so many days in advance | How far ahead you may book is limited |
 | One booking may run at most so many minutes | The duration is limited |
-| You already have so many open bookings | That many bookings at once is not foreseen |
-| You must cancel at least so many minutes before | Cancelling has a deadline |
+| You already have so many of so many possible open bookings | That many at once is not foreseen |
+| You must cancel at least so many minutes before the booking starts | Cancelling has a deadline |
 | A booking cannot start in the past | The moment is behind you |
 | Booking a court is not open to you | Your membership type does not book for itself |
 
@@ -127,8 +128,8 @@ booking asks of you: if you cannot play, cancel, so that somebody else can.
 
 A series is a recipe: first appointment, time, duration, weekdays, interval in weeks and one kind
 of end. What it produces are ordinary bookings. Series are created by people who hold a role in the
-club beyond membership, for training for instance; as a member you meet them on the court plan and
-as a player.
+club beyond membership, for training for instance. A series records no players, so you are never
+entered in one; you meet it on the court plan as occupied time.
 
 Two things matter about them:
 
