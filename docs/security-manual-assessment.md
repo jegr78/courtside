@@ -41,7 +41,7 @@ require a control-specific rationale and owner and may omit evidence when none e
 requires redacted evidence and a private lifecycle candidate. Only `pass` may omit a rationale.
 
 `pass` additionally requires that the control carries `controlEvidence` in the catalog. Reading the
-chapter this procedure covers is not evidence that this control holds, so a control nobody has
+chapters this procedure covers is not evidence that this control holds, so a control nobody has
 anchored to a named production path and a falsifying test is recorded `blocked` rather than passed.
 Validation refuses the record otherwise.
 
