@@ -13,6 +13,7 @@ const Ajv = require("ajv/dist/2020").default;
 const catalog = JSON.parse(readFileSync(new URL("../security/assessment-catalog.json", import.meta.url), "utf8"));
 const schema = JSON.parse(readFileSync(new URL("../security/assessment-catalog.schema.json", import.meta.url), "utf8"));
 const contract = readFileSync(new URL("../docs/security-assessment.md", import.meta.url), "utf8");
+const findingLifecycle = readFileSync(new URL("../docs/security-findings.md", import.meta.url), "utf8");
 const manualRunbook = readFileSync(new URL("../docs/security-manual-assessment.md", import.meta.url), "utf8");
 const manualEvidenceSchema = JSON.parse(readFileSync(
   new URL("../security/manual-assessment-evidence.schema.json", import.meta.url), "utf8"));
@@ -33,6 +34,8 @@ const declarationOf = (name) => {
   const literal = name.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   return [new RegExp(String.raw`\bvoid\s+${literal}\s*\(`), new RegExp(String.raw`\b(?:test|it)\(\s*"${literal}"`)];
 };
+const findingAnchors = new Set([...findingLifecycle.matchAll(/^### (.+)$/gm)]
+  .map(([, heading]) => heading.toLowerCase().replaceAll(/[^a-z0-9 -]/g, "").replaceAll(/ +/g, "-")));
 
 test("given the security catalog, when validating it, then every entry satisfies the documented schema", () => {
   // given
@@ -64,6 +67,26 @@ test("given an unresolved catalog entry, when validation runs, then ownership an
   assert.equal(validate({ ...catalog, tests: [{ ...planned, trackingIssue: undefined }] }), false);
   assert.equal(validate(missingControlRationale), false);
   assert.equal(validate(missingControlOwner), false);
+});
+
+test("given a reviewed control with a finding, when validating it, then the reference is narrow and exclusive", () => {
+  // given
+  const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
+  const referenced = structuredClone(catalog);
+  const control = referenced.controlCoverage.flatMap(({ controls }) => controls)
+    .find(({ id }) => id === "v5.0.0-14.1.1");
+  control.findingReference = "docs/security-findings.md#incomplete-sensitive-data-classification";
+
+  // when / then
+  assert.equal(validate(referenced), true, JSON.stringify(validate.errors));
+  control.findingReference = "../protected-evidence.md#incomplete-sensitive-data-classification";
+  assert.equal(validate(referenced), false);
+  control.findingReference = "docs/security-findings.md#incomplete-sensitive-data-classification";
+  control.controlEvidence = {
+    productionPath: "docs/data-model.md",
+    falsifyingTest: "tools/data-model-documentation.test.mjs#given the documented schema, when reading migrations, then every table is named"
+  };
+  assert.equal(validate(referenced), false);
 });
 
 test("given the shipped attack surface, when reading the catalog, then every actor and surface is covered", () => {
@@ -563,6 +586,36 @@ test("given a control-specific anchor, when reading the catalog, then its produc
     assert.notEqual(source, null, `${id} names a test file that is no readable file`);
     assert.equal(declarationOf(testName).some((declaration) => declaration.test(source)), true,
       `${id} names ${testName}, which ${testPath} declares no test for`);
+  }
+});
+
+test("given a control-specific finding, when reading the catalog, then its public summary exists", () => {
+  // given
+  const findings = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ findingReference }) => findingReference);
+
+  // when / then
+  for (const { id, findingReference } of findings) {
+    const [path, anchor] = findingReference.split("#");
+    assert.equal(path, "docs/security-findings.md", `${id} names an unsupported finding document`);
+    assert.equal(findingAnchors.has(anchor), true, `${id} names no finding heading`);
+  }
+});
+
+test("given the data-protection controls were reviewed, when reading their dispositions, then none is left implicit", () => {
+  // given
+  const reviewedIds = new Set([
+    "v5.0.0-14.1.1", "v5.0.0-14.2.1", "v5.0.0-14.2.2", "v5.0.0-14.3.2"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
   }
 });
 

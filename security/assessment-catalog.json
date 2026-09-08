@@ -1310,7 +1310,8 @@
         {
           "id": "v5.0.0-14.1.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-DATA-001"
+          "manualProcedureId": "MAN-DATA-001",
+          "findingReference": "docs/security-findings.md#incomplete-sensitive-data-classification"
         },
         {
           "id": "v5.0.0-14.1.2",
@@ -1322,12 +1323,17 @@
         {
           "id": "v5.0.0-14.2.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-DATA-001"
+          "manualProcedureId": "MAN-DATA-001",
+          "findingReference": "docs/security-findings.md#personal-data-enters-request-urls"
         },
         {
           "id": "v5.0.0-14.2.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-DATA-001"
+          "manualProcedureId": "MAN-DATA-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#personal API responses remain fresh and uncacheable across the application and proxy boundary"
+          }
         },
         {
           "id": "v5.0.0-14.2.3",
@@ -1351,7 +1357,11 @@
         {
           "id": "v5.0.0-14.3.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-DATA-001"
+          "manualProcedureId": "MAN-DATA-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#personal API responses remain fresh and uncacheable across the application and proxy boundary"
+          }
         },
         {
           "id": "v5.0.0-14.3.3",
