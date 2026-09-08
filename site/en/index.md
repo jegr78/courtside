@@ -12,6 +12,9 @@ hero:
       text: A guide for members
       link: /en/member-guide
     - theme: alt
+      text: A guide for boards
+      link: /en/board-guide
+    - theme: alt
       text: Source code
       link: https://github.com/jegr78/courtside
 features:
@@ -32,9 +35,8 @@ container, that club's members and nobody else.
 
 - [**A guide for members**](member-guide.md): signing in, finding a free court, booking, recording
   players and guests, cancelling, choosing notifications.
-
-A **guide for boards** covering courts, rules, members, accounts and import is still missing
-([issue #95](https://github.com/jegr78/courtside/issues/95)).
+- [**A guide for boards**](board-guide.md): courts and opening hours, booking cards and rules,
+  membership types, people and accounts, import, and the club's own records.
 
 Anyone who wants to run Courtside today, or work on it, will find the technical documents in the
 repository: the [reference deployment](https://github.com/jegr78/courtside/blob/main/deploy/README.md),
