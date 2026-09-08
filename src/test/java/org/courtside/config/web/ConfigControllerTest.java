@@ -234,6 +234,28 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAClientChosenJavaType_whenChangingTheConfig_thenDeserializationRefusesIt()
+            throws Exception {
+        // given
+        String request = configJson("Example Tennis Club").replace("\"clubName\":",
+                "\"@class\": \"org.courtside.api.ApiClubConfigRequest\", \"clubName\":");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("@class"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.UnknownField"));
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clubName").value("Courtside"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAnAdmin_whenChangingTheConfig_thenThePublicEndpointServesTheNewValues()
             throws Exception {
         // given

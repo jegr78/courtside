@@ -18,6 +18,13 @@ class BookingSlotDurationTest {
     }
 
     @Test
+    void givenMinutesThatWouldOverflowTheSecondsCalculation_whenCreatingTheValue_thenTheyAreRejected() {
+        // when / then
+        assertThatThrownBy(() -> new BookingSlotDuration(Integer.MAX_VALUE))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void givenAValidDuration_whenCheckingTimesAndDurations_thenWholeSlotsAreRecognised() {
         // given
         BookingSlotDuration slotDuration = new BookingSlotDuration(90);
