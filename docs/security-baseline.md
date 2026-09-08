@@ -67,6 +67,11 @@ The manual record covers 316 unique selected controls from OWASP WSTG 4.2 and AS
 | fail, linked to a validated or accepted finding | 59 |
 | blocked pending control-specific evidence | 146 |
 
+The per-control outcomes of this run are published, redacted to one identifier and one outcome each,
+as [`manual-baseline-control-outcomes.json`](../security/manual-baseline-control-outcomes.json). The
+protected record they derive from expires; the list of controls the next run has to work through
+does not.
+
 The first review had assigned 158 pass outcomes from chapter-level file inventories. Independent
 review showed that those records were not control-specific and contradicted ten known gaps. None of
 those generated outcomes remains a pass: 12 map to a validated or accepted finding and the other
