@@ -27,7 +27,19 @@ class CryptographicInventoryTest {
 
     private static final Path INVENTORY = Path.of("security/cryptographic-inventory.json");
     private static final Path POLICY = Path.of("docs/cryptographic-inventory.md");
+    private static final Path CREDENTIAL_ISSUER = Path.of(
+            "src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java");
+    private static final Path BREACHED_PASSWORD_LOOKUP = Path.of(
+            "src/main/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java");
     private static final Pattern ROLE = Pattern.compile("[a-z]+(-[a-z]+)*");
+    private static final Pattern CREDENTIAL_BYTES = Pattern.compile(
+            "CREDENTIAL_BYTES\\s*=\\s*(\\d+)");
+    private static final Pattern HASH_ALGORITHM = Pattern.compile(
+            "MessageDigest\\.getInstance\\(\\\"[^\\\"]+\\\"\\)"
+                    + "|createHash\\([\\\"'][^\\\"']+[\\\"']\\)"
+                    + "|openssl\\s+dgst\\s+-[A-Za-z0-9-]+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PASSWORD_KEY_DERIVATION = Pattern.compile(
+            "(?i)PBKDF2|SecretKeyFactory|PBEKeySpec|scrypt|HKDF|deriveKey|deriveBits");
 
     private static final List<String> SURFACES = List.of("src/main/java", "src/main/resources",
             "tools", "frontend/src", "frontend/e2e", ".github/workflows", "deploy");
@@ -154,6 +166,51 @@ class CryptographicInventoryTest {
         }
     }
 
+    @Test
+    void givenProductionCryptographicUses_whenHashAlgorithmsAreScanned_thenOnlySha256AndProtocolSha1Remain()
+            throws IOException {
+        // when
+        Map<Path, Set<String>> hashAlgorithms = uses(HASH_ALGORITHM);
+        hashAlgorithms.keySet().removeIf(CryptographicInventoryTest::isTestSource);
+
+        // then
+        assertThat(hashAlgorithms).containsKey(BREACHED_PASSWORD_LOOKUP);
+        hashAlgorithms.forEach((path, algorithms) -> algorithms.forEach(algorithm -> {
+            if (path.equals(BREACHED_PASSWORD_LOOKUP)) {
+                assertThat(algorithm).isEqualToIgnoringCase(
+                        "MessageDigest.getInstance(\"SHA-1\")");
+            } else {
+                assertThat(algorithm).as("hash selected by %s", path)
+                        .matches("(?i)(MessageDigest\\.getInstance\\(\"SHA-256\"\\)"
+                                + "|createHash\\([\"']sha256[\"']\\)|openssl\\s+dgst\\s+-sha256)");
+            }
+        }));
+    }
+
+    @Test
+    void givenANonGuessableCredential_whenItsGeneratorIsRead_thenItHasAtLeast128BitsFromSecureRandom()
+            throws IOException {
+        // given
+        String source = readable(CREDENTIAL_ISSUER);
+        Matcher bytes = CREDENTIAL_BYTES.matcher(source);
+
+        // when / then
+        assertThat(bytes.find()).as("the issued credential declares its entropy bytes").isTrue();
+        assertThat(Integer.parseInt(bytes.group(1))).isGreaterThanOrEqualTo(16);
+        assertThat(source).contains("new SecureRandom()", "random.nextBytes(bytes)");
+    }
+
+    @Test
+    void givenTheShippedApplication_whenPasswordBasedKeyDerivationIsScanned_thenTheControlRemainsNotApplicable()
+            throws IOException {
+        // when
+        Map<Path, Set<String>> passwordKeyDerivation = uses(PASSWORD_KEY_DERIVATION);
+        passwordKeyDerivation.keySet().removeIf(CryptographicInventoryTest::isTestSource);
+
+        // then
+        assertThat(passwordKeyDerivation).isEmpty();
+    }
+
     private static boolean covers(JsonNode entry, Path file) {
         for (JsonNode location : entry.get("locations")) {
             if (glob(location.asText()).matches(file)) {
@@ -179,6 +236,11 @@ class CryptographicInventoryTest {
             }
         }
         return false;
+    }
+
+    private static boolean isTestSource(Path path) {
+        String name = path.getFileName().toString();
+        return name.contains(".test.") || name.contains(".spec.");
     }
 
     private static PathMatcher glob(String location) {

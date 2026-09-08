@@ -89,6 +89,21 @@ test("given a reviewed control with a finding, when validating it, then the refe
   assert.equal(validate(referenced), false);
 });
 
+test("given control evidence in a workflow, when validating its path, then only the repository workflow root is hidden", () => {
+  // given
+  const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
+  const referenced = structuredClone(catalog);
+  const control = referenced.controlCoverage.flatMap(({ controls }) => controls)
+    .find(({ id }) => id === "v5.0.0-11.3.1");
+
+  // when / then
+  assert.equal(validate(referenced), true, JSON.stringify(validate.errors));
+  for (const productionPath of [".secrets/key", "src/.hidden/key", "../outside", "/absolute/path"]) {
+    control.controlEvidence.productionPath = productionPath;
+    assert.equal(validate(referenced), false, productionPath);
+  }
+});
+
 test("given a control is not applicable, when validating it, then it cannot also claim evidence or a finding", () => {
   // given
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
@@ -662,6 +677,25 @@ test("given the communications-boundary controls were reviewed, when reading the
   const reviewedIds = new Set([
     "WSTG-v4.2-CONF-03", "WSTG-v4.2-CONF-04", "WSTG-v4.2-CONF-06", "WSTG-v4.2-CONF-09",
     "v5.0.0-12.1.2", "v5.0.0-12.2.1", "v5.0.0-12.2.2", "v5.0.0-12.3.2"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+  }
+});
+
+test("given the cryptographic-use controls were reviewed, when reading their dispositions, then none is left implicit", () => {
+  // given
+  const reviewedIds = new Set([
+    "v5.0.0-11.2.1", "v5.0.0-11.2.3", "v5.0.0-11.3.1", "v5.0.0-11.3.2",
+    "v5.0.0-11.3.3", "v5.0.0-11.4.1", "v5.0.0-11.4.2", "v5.0.0-11.4.3",
+    "v5.0.0-11.4.4", "v5.0.0-11.5.1", "v5.0.0-11.6.1"
   ]);
   const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
     .filter(({ id }) => reviewedIds.has(id));
