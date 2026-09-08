@@ -165,12 +165,14 @@ test("given a full plan, when its tasks are planned, then the documentation gate
     });
   });
 
+// Compared whole rather than by label: a runner that kept the labels and ran something else would
+// read as agreement, and the contract is the only other place these commands are written down.
 test("given the profile contract, when full is planned, then both declare the same local tasks", () => {
   // given
-  const declared = localTasksForProfiles(loadProfileContract(), ["full"]).map((task) => task.label);
+  const declared = localTasksForProfiles(loadProfileContract(), ["full"]);
 
   // when
-  const planned = planTasks({ profiles: ["full"] }).tasks.map((task) => task.label);
+  const planned = planTasks({ profiles: ["full"] }).tasks;
 
   // then
   assert.deepEqual(planned, declared);
@@ -185,7 +187,16 @@ test("given no base commit, when the protected classification fails closed, then
 
     // then
     assert.deepEqual(classified.profiles, ["full"]);
-    assert.deepEqual(classified.localTasks.map((task) => task.label), ["docs-check", "full"]);
+    assert.deepEqual(classified.localTasks, [
+      {
+        label: "docs-check", workingDirectory: "repository", executable: "node",
+        arguments: ["tools/docs-check.mjs", "--check"]
+      },
+      {
+        label: "full", workingDirectory: "repository", executable: "maven",
+        arguments: ["clean", "verify"]
+      }
+    ]);
   });
 
 test("given a reduced change, when full is requested, then the local plan only escalates", () => {
@@ -576,11 +587,9 @@ test("given protected classification fails, when planning locally, then candidat
   // then
   assert.deepEqual(record.profiles, ["full"]);
   assert.deepEqual(record.tasks, ["docs-check", "full"]);
-  const execution = localVerificationPlans([{
-    label: "full", workingDirectory: "repository", executable: "maven",
-    arguments: ["clean", "verify"]
-  }], "linux", "/repo");
-  assert.deepEqual(execution[0].arguments, ["clean", "verify"]);
+  const execution = localVerificationPlans(planTasks({ profiles: ["full"] }).tasks, "linux", "/repo");
+  assert.deepEqual(execution.map((plan) => plan.arguments),
+    [["tools/docs-check.mjs", "--check"], ["clean", "verify"]]);
 });
 
 test("given the live tree changes after pinning, when finishing, then the verified commit remains valid", async () => {
