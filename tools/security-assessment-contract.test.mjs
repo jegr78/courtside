@@ -329,7 +329,7 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
     ...control,
     controlId: "v5.0.0-8.1.1",
     outcome: "blocked",
-    rationale: "A physical review is not available in this run.",
+    rationale: "No falsifying check reads this rule yet.",
     owner: "Maintainer",
     trackingReference: "issue-1"
   };
