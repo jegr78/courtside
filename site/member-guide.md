@@ -80,9 +80,10 @@ eingetragen hast. Drei Arten von Mitspielern gibt es:
   derselben Buchung belegen.
 * **Gäste** trägst du unter *Weitere Angaben* mit Namen ein. Erlaubt eine Buchungsart keine Gäste,
   sagt sie das beim Buchen.
-* ***Was mitspielt*** ist für alles, was einen Spielerplatz füllt, ohne eine Person zu sein, etwa
-  ein Gerät des Vereins. Davon hat der Verein eine feste Anzahl. Ist zu deiner Zeit schon alles
-  vergeben, nennt Courtside die Anzahl, die es insgesamt gibt.
+* ***Was mitspielt*** ist für alles, was einen Spielplatz belegt, ohne eine Person zu sein: eine
+  Ballmaschine etwa, oder ein Aushang „Spielpartner gesucht“. Wie viele der Verein davon besitzt,
+  legt er selbst fest, und er kann es auch offen lassen. Ist zu deiner Zeit schon alles vergeben,
+  nennt Courtside die Anzahl, die es insgesamt gibt.
 
 Wen du einträgst, erfährt davon: das eingetragene Mitglied bekommt eine E-Mail. Gefragt wird es
 nicht, zustimmen muss es nicht, und es kann sich selbst wieder austragen.

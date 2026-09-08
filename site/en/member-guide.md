@@ -76,9 +76,10 @@ are three sorts of player:
 * **Members** you find by name and add. One member can occupy only one slot of the same booking.
 * **Guests** you enter by name under *More details*. If a kind of booking allows no guests, it says
   so when you book.
-* ***What plays*** covers anything that fills a player slot without being a person, a piece of club
-  equipment for instance. The club has a fixed number of each. If they are all taken at your time,
-  Courtside names how many there are in total.
+* ***What plays*** covers anything that takes a player slot without being a person: a ball machine,
+  say, or a "looking for a partner" notice. How many of them the club owns is the club's own
+  setting, and it may leave the number open. If they are all taken at your time, Courtside names
+  how many there are in total.
 
 Whoever you enter is told, not asked: the member you recorded receives an email. They do not have
 to agree, and they can take themselves out again.
