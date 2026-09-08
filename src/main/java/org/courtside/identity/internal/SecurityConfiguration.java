@@ -166,7 +166,6 @@ public class SecurityConfiguration {
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
                         .requestMatchers("/api/session/logout").authenticated()
-                        .requestMatchers("/api/session/reauthentication").authenticated()
                         .requestMatchers("/api/account/initial-password").access(
                                 (authentication, context) -> new AuthorizationDecision(
                                         hasAuthority(authentication.get(),
