@@ -95,10 +95,14 @@ test("given control evidence in a workflow, when validating its path, then only 
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
   const referenced = structuredClone(catalog);
   const control = referenced.controlCoverage.flatMap(({ controls }) => controls)
-    .find(({ id }) => id === "v5.0.0-11.3.1");
+    .find(({ controlEvidence }) => controlEvidence);
+  assert.notEqual(control, undefined, "no control carries evidence for this rule to bend");
 
   // when / then
   assert.equal(validate(referenced), true, JSON.stringify(validate.errors));
+  control.controlEvidence.productionPath = ".github/workflows/build.yml";
+  assert.equal(validate(referenced), true,
+    "the repository's own workflow root is hidden and has to stay reachable");
   for (const productionPath of [".secrets/key", "src/.hidden/key", "../outside", "/absolute/path"]) {
     control.controlEvidence.productionPath = productionPath;
     assert.equal(validate(referenced), false, productionPath);

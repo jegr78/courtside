@@ -99,42 +99,31 @@ test("given a manual baseline run, when selecting baseline, then safe and active
   assert.match(scheduled, /security-report "\$RUN_ID" --attempt 2 > build\/security-gate\/manifest-active\.json/);
   assert.match(scheduled, /security-baseline-pair\.mjs[\s\S]+manifest-safe\.json[\s\S]+manifest-active\.json/);
   assert.match(scheduled, /- id: pair[\s\S]+if: env\.PROFILE == 'baseline'/);
-  assert.match(scheduled, /- id: seal[\s\S]+if: always\(\) && \(env\.PROFILE != 'baseline' \|\| steps\.pair\.outcome == 'success'\)/);
   assert.equal((scheduled.match(/Start the disposable security target/g) ?? []).length, 1);
   assert.equal((scheduled.match(/Resolve the immutable local image digest/g) ?? []).length, 1);
-  assert.match(scheduled, /attempt-1\/evidence attempt-2\/evidence/);
   assert.match(scheduled, /--manifest build\/security-gate\/manifest-safe\.json[\s\S]+--profile safe/);
   assert.match(scheduled, /--manifest build\/security-gate\/manifest-active\.json[\s\S]+--profile active/);
 });
 
-test("given protected active evidence, when the hosted run finishes, then only its encrypted envelope is uploaded", () => {
+test("given evidence nobody can open, when the hosted run finishes, then it is not sealed at all", () => {
   // given
   const workflowPermissions = scheduled.match(/^permissions:\n(?<block>(?:  [^\n]+\n)+)/m)?.groups.block ?? "";
-  const keyInventory = JSON.parse(readFileSync(join(repository, ".github/security-evidence-key.json"), "utf8"));
 
-  // when / then
-  assert.equal(existsSync(join(repository, ".github/security-evidence-recipient.pem")), true);
-  assert.equal(existsSync(join(repository, ".github/security-evidence-key.json")), true);
-  assert.equal("certificateSha256" in keyInventory, false);
-  assert.match(scheduled, /COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256: \$\{\{ vars\.COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256 \}\}/);
-  assert.match(scheduled, /security-evidence-recipient\.mjs \.github\/security-evidence-recipient\.pem/);
-  assert.doesNotMatch(scheduled, /EXPECTED_FINGERPRINT=.*security-evidence-key\.json/);
-  assert.match(scheduled, /canaryVerifiedOn <= \$today and \$today <= \.canaryValidThrough/);
-  assert.match(scheduled, /set -o pipefail[\s\S]+tar -czf - -C[\s\S]+assessment\/attempt-1" evidence[\s\S]+\| openssl cms -encrypt -binary -aes-256-gcm/);
-  assert.match(scheduled, /openssl cms -encrypt -binary -aes-256-gcm[\s\S]+-recip \.github\/security-evidence-recipient\.pem[\s\S]+-keyopt rsa_padding_mode:oaep -keyopt rsa_oaep_md:sha256/);
-  assert.doesNotMatch(scheduled, /openssl cms -encrypt[\s\S]+\n\s+\.github\/security-evidence-recipient\.pem/);
-  assert.match(scheduled, /build\/security-gate\/protected-evidence\.cms/);
-  assert.doesNotMatch(scheduled, /build\/security-gate\/protected-evidence\.tar\.gz/);
+  // when / then — sealing to a certificate whose private key was never created writes an archive
+  // that nobody, including its stated custodian, can ever read
+  assert.equal(existsSync(join(repository, ".github/security-evidence-recipient.pem")), false);
+  assert.equal(existsSync(join(repository, ".github/security-evidence-key.json")), false);
+  for (const trace of [/openssl cms/, /protected-evidence/, /security-evidence-recipient/,
+    /canaryVerifiedOn/, /COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256/, /evidence-sealed/]) {
+    assert.doesNotMatch(scheduled, trace, `the workflow still carries ${trace}`);
+    assert.doesNotMatch(assessment, trace, `the assessment document still describes ${trace}`);
+  }
+  assert.match(scheduled, /path:[\s\S]+build\/security-gate\/manifest\*\.json[\s\S]+build\/security-gate\/summary\*\.json/);
   assert.doesNotMatch(scheduled, /path:[\s\S]+assessment\/attempt-1\/evidence/);
-  assert.match(assessment, /security evidence private\s+key/);
-  assert.match(assessment, /COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256/);
-  assert.match(assessment, /openssl cms -decrypt/);
-  assert.match(assessment, /gh attestation verify protected-evidence\.cms/);
-  assert.match(scheduled, /actions\/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8/);
-  assert.match(scheduled, /subject-path: build\/security-gate\/protected-evidence\.cms/);
-  assert.match(scheduled, /outputs:\s+evidence-sealed: \$\{\{ steps\.seal\.outputs\.sealed \}\}/);
-  assert.match(scheduled, /echo "sealed=true" >> "\$GITHUB_OUTPUT"/);
-  assert.match(scheduled, /attest-evidence:[\s\S]+needs: assessment[\s\S]+if: always\(\) && needs\.assessment\.outputs\.evidence-sealed == 'true'/);
+  assert.match(scheduled, /outputs:\s+evidence-artifact: \$\{\{ steps\.records\.outputs\.artifact-id \}\}/);
+  assert.match(scheduled, /- id: records\n\s+uses: actions\/upload-artifact@/);
+  assert.match(scheduled, /attest-evidence:[\s\S]+needs: assessment[\s\S]+if: always\(\) && needs\.assessment\.outputs\.evidence-artifact != ''/);
+  assert.match(scheduled, /subject-path: build\/security-gate\/manifest\*\.json/);
   assert.match(scheduled, /attest-evidence:[\s\S]+permissions:[\s\S]+attestations: write[\s\S]+id-token: write/);
   assert.doesNotMatch(workflowPermissions, /attestations: write|id-token: write/);
 });
