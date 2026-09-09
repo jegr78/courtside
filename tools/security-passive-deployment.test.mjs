@@ -386,6 +386,38 @@ test("given a broad-directive list of several lines, when normalizing it, then e
   assert.deepEqual(alerts[0].ruleEvidence.directives, ["default-src", "img-src", "script-src"]);
 });
 
+test("given both CSP wordings on one route, when they are merged, then the evidence names all their directives",
+  () => {
+    // given
+    const report = { site: [{ alerts: [
+      { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+        param: "Content-Security-Policy", evidence: "policy-value", otherinfo: "Broad directives:\nimg-src" }] },
+      { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+        param: "Content-Security-Policy", evidence: "base-uri 'none'",
+        otherinfo: "The directive(s): form-action is/are among the directives that do not fallback to default-src." }] }
+    ] }] };
+
+    // when
+    const alerts = normalizeZapAlerts(report);
+
+    // then
+    assert.equal(alerts.length, 1);
+    assert.deepEqual(alerts[0].ruleEvidence.directives, ["form-action", "img-src"]);
+  });
+
+test("given two alerts of another rule that disagree on one route, when they are merged, then it fails closed", () => {
+  // given — session evidence, whose token names genuinely differ between the two alerts
+  const report = { site: [{ alerts: [
+    { pluginid: "10112", riskcode: "0", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "__Host-SESSION", evidence: "__Host-SESSION", otherinfo: "cookie:__Host-SESSION" }] },
+    { pluginid: "10112", riskcode: "0", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "__Host-XSRF-TOKEN", evidence: "__Host-XSRF-TOKEN", otherinfo: "cookie:__Host-XSRF-TOKEN" }] }
+  ] }] };
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(report), /contradictory rule evidence/);
+});
+
 test("given retained evidence naming a fallback directive, when it is validated, then the check and the schema accept it",
   () => {
     // given

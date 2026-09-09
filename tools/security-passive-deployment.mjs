@@ -201,6 +201,11 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
 }
 
 function mergeRuleEvidence(existing, incoming, imageDigest, fingerprint) {
+  if (existing.kind === "policy-directive" && incoming.kind === "policy-directive"
+      && existing.headerName === incoming.headerName) {
+    return { ...existing,
+      directives: [...new Set([...existing.directives, ...incoming.directives])].toSorted() };
+  }
   if (existing.kind !== "text-pattern" || incoming.kind !== "text-pattern") {
     if (JSON.stringify(existing) !== JSON.stringify(incoming)) {
       throw new Error("ZAP produced contradictory rule evidence");
