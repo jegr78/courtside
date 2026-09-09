@@ -47,6 +47,7 @@ async function browserInventory(page: import("@playwright/test").Page) {
     return {
       localStorageKeys: Object.keys(localStorage).toSorted(),
       sessionStorageKeys: Object.keys(sessionStorage).toSorted(),
+      indexedDbNames: (await indexedDB.databases()).map(({ name }) => name ?? "").toSorted(),
       cacheRequests: cacheRequests.toSorted(),
       storageContainsSensitiveData: storageValues.some((value) =>
         sensitiveMarkers.some((marker) => value.includes(marker)))
@@ -136,6 +137,70 @@ test("session identifiers are issued only by successful login and remain confine
   expect(JSON.stringify(status)).not.toContain(session!.value);
 });
 
+test("cross-origin browser requests neither carry session authority nor expose API responses",
+  async ({ page }) => {
+  // given
+  await login(page, "configuration-admin");
+  const secureOrigin = new URL(page.url()).origin;
+  const responseProbe = await page.context().browser()!.newContext({
+    extraHTTPHeaders: { Origin: "https://attacker.test" }
+  });
+  try {
+    const probePage = await responseProbe.newPage();
+    const sessionResponse = await probePage.goto(`${secureOrigin}/api/session`);
+    expect(sessionResponse).not.toBeNull();
+    expect(sessionResponse!.status()).toBe(200);
+    expect(sessionResponse!.headers()["content-type"]).toContain("application/json");
+    expect(sessionResponse!.headers()["x-content-type-options"]).toBe("nosniff");
+    expect(sessionResponse!.headers()["access-control-allow-origin"]).toBeUndefined();
+    const scriptResponse = await probePage.goto(`${secureOrigin}/api/admin/roster?limit=1`);
+    expect(scriptResponse).not.toBeNull();
+    expect(scriptResponse!.status()).toBe(401);
+    expect(scriptResponse!.headers()["content-type"]).toContain("application/problem+json");
+    expect(scriptResponse!.headers()["x-content-type-options"]).toBe("nosniff");
+    expect(scriptResponse!.headers()["access-control-allow-origin"]).toBeUndefined();
+  } finally {
+    await responseProbe.close();
+  }
+  await page.goto("https://attacker.test");
+  const observedRequests: import("@playwright/test").Request[] = [];
+  page.on("request", (request) => observedRequests.push(request));
+
+  // when
+  const fetchResult = await page.evaluate(async (origin) => {
+    try {
+      await fetch(`${origin}/api/session`, { credentials: "include" });
+      return "exposed";
+    } catch (failure) {
+      return failure instanceof TypeError ? "blocked-by-browser" : "unexpected-failure";
+    }
+  }, secureOrigin);
+  const fetchRequest = observedRequests.find((request) =>
+    request.url() === `${secureOrigin}/api/session` && request.resourceType() === "fetch");
+
+  // then
+  expect(fetchResult).toBe("blocked-by-browser");
+  expect(fetchRequest).toBeDefined();
+  expect(await fetchRequest!.headerValue("cookie")).toBeNull();
+
+  // when
+  const scriptResult = await page.evaluate((origin) => new Promise<string>((resolve) => {
+    const script = document.createElement("script");
+    script.src = `${origin}/api/admin/roster?limit=1`;
+    script.onload = () => resolve("loaded");
+    script.onerror = () => resolve("blocked-by-browser");
+    document.head.append(script);
+  }), secureOrigin);
+  const scriptRequest = observedRequests.find((request) =>
+    request.url() === `${secureOrigin}/api/admin/roster?limit=1`
+      && request.resourceType() === "script");
+
+  // then
+  expect(scriptResult).toBe("blocked-by-browser");
+  expect(scriptRequest).toBeDefined();
+  expect(await scriptRequest!.headerValue("cookie")).toBeNull();
+});
+
 test("stored values remain data across roles without entering browser storage or console evidence", async ({ page, journeyService }) => {
   // given
   await journeyService.executeSql(`
@@ -165,6 +230,7 @@ test("stored values remain data across roles without entering browser storage or
   expect(authenticated.cacheRequests.filter((path) => path.startsWith("/api/"))).toEqual([]);
   expect(authenticated.localStorageKeys.every((key) => key === "courtside.locale")).toBe(true);
   expect(authenticated.sessionStorageKeys).toEqual([]);
+  expect(authenticated.indexedDbNames).toEqual([]);
   expect(authenticated.storageContainsSensitiveData).toBe(false);
   expect(authenticated.cookies).toContainEqual({
     name: "__Host-SESSION", httpOnly: true, secure: true, sameSite: "Lax", path: "/"
@@ -183,6 +249,7 @@ test("stored values remain data across roles without entering browser storage or
   await expect(page.getByTestId("sign-in-link").or(page.getByTestId("login-submit"))).toBeVisible();
   const postLogout = await browserInventory(page);
   expect(postLogout.cacheRequests.filter((path) => path.startsWith("/api/"))).toEqual([]);
+  expect(postLogout.indexedDbNames).toEqual([]);
   expect(postLogout.storageContainsSensitiveData).toBe(false);
   expect(consoleEvents.some(({ containsSensitiveData }) => containsSensitiveData)).toBe(false);
   await writeEvidence("browser-storage-evidence.json", {

@@ -48,6 +48,7 @@ const PINNED_BROWSER_IMAGE =
   "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e";
 // The name the certificate is issued for, so browsers reach the proxy the way a member reaches a club.
 const CLUB_HOST = "courtside.test";
+const ATTACKER_HOST = "attacker.test";
 
 // A cadence a journey never reaches, rather than "-": that switches the cleanup off, and
 // an instance is built to refuse to start when it is off.
@@ -117,6 +118,10 @@ function clubProxyConfiguration(applicationPort: number): string {
 
 https://${CLUB_HOST} {
 	reverse_proxy host.docker.internal:${applicationPort}
+}
+
+https://${ATTACKER_HOST} {
+	respond "<!doctype html><title>Cross-origin probe</title>" 200
 }
 
 http://${CLUB_HOST}:${CLUB_PLAIN_PORT} {
@@ -741,7 +746,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     clubNetwork = await new Network().start();
     clubProxy = await new GenericContainer(deployedProxyImage())
       .withNetwork(clubNetwork)
-      .withNetworkAliases(CLUB_HOST)
+      .withNetworkAliases(CLUB_HOST, ATTACKER_HOST)
       .withCopyContentToContainer([
         { content: clubProxyConfiguration(port), target: "/etc/caddy/Caddyfile" }
       ])

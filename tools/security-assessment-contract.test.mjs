@@ -751,6 +751,28 @@ test("given the parser and protocol-ambiguity controls were reviewed, when readi
   }
 });
 
+test("given the browser and physical-device controls were reviewed, when reading their dispositions, then none is left implicit", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-CLNT-01", "WSTG-v4.2-CLNT-03", "WSTG-v4.2-CLNT-06",
+    "WSTG-v4.2-CLNT-07", "WSTG-v4.2-CLNT-12", "WSTG-v4.2-CLNT-13",
+    "v5.0.0-3.2.1", "v5.0.0-3.2.2", "v5.0.0-3.3.2", "v5.0.0-3.3.4",
+    "v5.0.0-3.4.1", "v5.0.0-3.4.2", "v5.0.0-3.4.4", "v5.0.0-3.4.5",
+    "v5.0.0-3.4.6", "v5.0.0-3.5.1", "v5.0.0-3.5.2", "v5.0.0-3.5.3",
+    "v5.0.0-3.7.1"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+  }
+});
+
 test("given a manual outcome, when its control carries no control-specific evidence, then a pass is refused", () => {
   // given
   const digest = `sha256:${"a".repeat(64)}`;
