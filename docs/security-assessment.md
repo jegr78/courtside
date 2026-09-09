@@ -68,6 +68,12 @@ telemetry, mail-to-DNS and recipient delivery, and browser-to-third-party destin
 for club branding or legal links are production boundaries that the current closed inventory
 omits. The validated gap remains non-passing under #902 until the map and its contract cover them.
 
+Operational events use the configured ECS standard-output format. ECS `@timestamp` is offset-aware
+and the emitted value uses UTC, while containers share the deployment host's clock rather than
+running an independent clock service. Courtside can therefore keep timestamps unambiguous, but
+host clock synchronization is an operator responsibility and must be verified for the installation
+whose events are being assessed.
+
 ## Catalog lifecycle
 
 Every entry has a stable `CSA-<AREA>-<NUMBER>` identifier. Renaming a test does not change that identifier. An incompatible schema change increments `schemaVersion`; coverage changes increment `catalogVersion`.

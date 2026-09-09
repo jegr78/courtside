@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.4.9",
+  "catalogVersion": "1.4.10",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -1464,7 +1464,8 @@
         {
           "id": "v5.0.0-13.1.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "findingReference": "docs/security-findings.md#external-trust-boundary-map-is-incomplete"
         },
         {
           "id": "v5.0.0-13.2.1",
@@ -1479,12 +1480,17 @@
         {
           "id": "v5.0.0-13.2.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "deploy/compose.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/ReferenceDeploymentSecurityTest.java#givenTheProductionDeployment_whenReadingServiceCredentials_thenNoneHasALiteralDefault"
+          }
         },
         {
           "id": "v5.0.0-13.2.4",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "findingReference": "docs/security-findings.md#external-trust-boundary-map-is-incomplete"
         },
         {
           "id": "v5.0.0-13.2.5",
@@ -1504,27 +1510,47 @@
         {
           "id": "v5.0.0-13.4.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "Dockerfile",
+            "falsifyingTest": "src/test/java/org/courtside/ReferenceDeploymentSecurityTest.java#givenTheProductionImage_whenReadingItsCopyBoundary_thenSourceControlMetadataCannotEnterIt"
+          }
         },
         {
           "id": "v5.0.0-13.4.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "Dockerfile",
+            "falsifyingTest": "src/test/java/org/courtside/ReferenceDeploymentSecurityTest.java#givenTheProductionStartup_whenReadingItsCommands_thenNoDebugModeCanBeEnabled"
+          }
         },
         {
           "id": "v5.0.0-13.4.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/shared/web/ContainerErrorController.java",
+            "falsifyingTest": "src/test/java/org/courtside/shared/web/UnsupportedMethodTest.java#givenAStaticAssetDirectory_whenItIsRequested_thenNoDirectoryListingIsReturned"
+          }
         },
         {
           "id": "v5.0.0-13.4.4",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/shared/web/ContainerErrorController.java",
+            "falsifyingTest": "src/test/java/org/courtside/shared/web/UnsupportedMethodTest.java#givenASignedInMember_whenTheyUseAMethodTheContainerRefuses_thenTheRefusalIsATypedProblem"
+          }
         },
         {
           "id": "v5.0.0-13.4.5",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "src/test/java/org/courtside/shared/web/UnsupportedMethodTest.java#givenAMember_whenAnInternalOrMetadataPathIsRequested_thenItIsNotPublished"
+          }
         },
         {
           "id": "v5.0.0-14.1.1",
@@ -1685,12 +1711,20 @@
         {
           "id": "v5.0.0-16.2.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/shared/SecurityEventLog.java",
+            "falsifyingTest": "src/test/java/org/courtside/shared/SecurityEventLogTest.java#givenEverySupportedSecurityEvent_whenEmitted_thenItsFieldsAndSeverityMatchTheCatalogue"
+          }
         },
         {
           "id": "v5.0.0-16.2.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/application.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/ObservabilityContractTest.java#givenOperationalLogs_whenReadingTheirTimeContract_thenTimestampsRemainOffsetAware"
+          }
         },
         {
           "id": "v5.0.0-16.2.3",
@@ -1727,12 +1761,20 @@
         {
           "id": "v5.0.0-16.3.4",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/shared/SecurityEventLog.java",
+            "falsifyingTest": "src/test/java/org/courtside/shared/web/AdviceLoggingTest.java#givenUnexpectedAndSecurityControlFailures_whenTheyOccur_thenBothAreLogged"
+          }
         },
         {
           "id": "v5.0.0-16.4.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SignInFailureLog.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/AuthenticationSecurityEventTest.java#givenAnUnknownLoginIdentifier_whenItIsRefused_thenNoIdentifierOrForgedFieldIsLogged"
+          }
         },
         {
           "id": "v5.0.0-16.4.2",
@@ -1747,17 +1789,26 @@
         {
           "id": "v5.0.0-16.5.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/shared/web/SharedExceptionHandler.java",
+            "falsifyingTest": "src/test/java/org/courtside/shared/web/SharedExceptionHandlerTest.java#whenAnUncategorisedDatabaseFailureIsNotLockContention_thenItRemainsAnInternalFailure"
+          }
         },
         {
           "id": "v5.0.0-16.5.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "findingReference": "docs/security-findings.md#external-trust-boundary-map-is-incomplete"
         },
         {
           "id": "v5.0.0-16.5.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/booking/series/SeriesService.java",
+            "falsifyingTest": "src/test/java/org/courtside/booking/series/SeriesCreationOrphanRowTest.java#givenBookingCreationFailsWithAnExceptionTheLoopDoesNotHandle_whenCreating_thenNoSeriesRowSurvives"
+          }
         },
         {
           "id": "v5.0.0-17.1.1",

@@ -187,6 +187,9 @@ class SecurityEventLogTest {
 
         assertThat(event.getLevel().toString()).isEqualTo(expected.level().name());
         assertThat(event.getFormattedMessage()).isEqualTo("Security event");
+        assertThat(event.getInstant()).isNotNull();
+        assertThat(event.getLoggerName()).isEqualTo("org.courtside.security.events");
+        assertThat(event.getThreadName()).isNotBlank();
         assertThat(fields).containsExactlyInAnyOrderEntriesOf(expectedFields);
         assertThat(fields.keySet()).isSubsetOf(expected.allowedFields());
         assertThat(expected.allowedValues().keySet()).isSubsetOf(expected.allowedFields());

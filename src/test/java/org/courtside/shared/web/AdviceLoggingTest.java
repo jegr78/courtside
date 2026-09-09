@@ -8,6 +8,7 @@ import ch.qos.logback.core.read.ListAppender;
 import org.courtside.shared.CodedDomainFailure;
 import org.courtside.shared.DomainFailure;
 import org.courtside.shared.ProblemType;
+import org.courtside.shared.SecurityEventLog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,6 +69,7 @@ class AdviceLoggingTest {
 
     private final ListAppender<ILoggingEvent> domainAppender = new ListAppender<>();
     private final ListAppender<ILoggingEvent> sharedAppender = new ListAppender<>();
+    private final ListAppender<ILoggingEvent> securityAppender = new ListAppender<>();
     private Logger domainLogger;
     private Logger sharedLogger;
     private Level domainLoggerOriginalLevel;
@@ -86,6 +88,9 @@ class AdviceLoggingTest {
         sharedLogger.setLevel(Level.DEBUG);
         sharedAppender.start();
         sharedLogger.addAppender(sharedAppender);
+
+        securityAppender.start();
+        securityLogger().addAppender(securityAppender);
     }
 
     @AfterEach
@@ -94,6 +99,8 @@ class AdviceLoggingTest {
         domainLogger.setLevel(domainLoggerOriginalLevel);
         sharedLogger.detachAppender(sharedAppender);
         sharedLogger.setLevel(sharedLoggerOriginalLevel);
+        securityLogger().detachAppender(securityAppender);
+        securityAppender.stop();
     }
 
     @Test
@@ -191,6 +198,32 @@ class AdviceLoggingTest {
                     .contains("500 INTERNAL_SERVER_ERROR", "urn:courtside:error:internal-error")
                     .doesNotContain("database unavailable");
             assertThat(causeChainOf(event)).contains("database unavailable");
+        });
+    }
+
+    @Test
+    void givenUnexpectedAndSecurityControlFailures_whenTheyOccur_thenBothAreLogged() {
+        // given
+        UncategorizedSQLException unexpected = new UncategorizedSQLException(
+                "query", "select something", new SQLException("database unavailable", "XX000"));
+
+        // when
+        new SharedExceptionHandler(mock(ProblemTraceReference.class), mock(SecurityEventLog.class))
+                .handleUncategorizedDatabaseFailure(unexpected);
+        new SecurityEventLog().controlRefused(null, SecurityEventLog.ControlRefusal.CSRF);
+
+        // then
+        assertThat(sharedAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(causeChainOf(event)).contains("database unavailable");
+        });
+        assertThat(securityAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getKeyValuePairs()).extracting(pair -> pair.key + "=" + pair.value)
+                    .containsExactlyInAnyOrder(
+                            "event.code=courtside.control.refused",
+                            "event.outcome=failure",
+                            "event.reason=CSRF");
         });
     }
 
@@ -387,6 +420,10 @@ class AdviceLoggingTest {
             messages.append(proxy.getMessage()).append('\n');
         }
         return messages.toString();
+    }
+
+    private static Logger securityLogger() {
+        return (Logger) LoggerFactory.getLogger("org.courtside.security.events");
     }
 
     private static final class NotFoundFailure extends DomainFailure {

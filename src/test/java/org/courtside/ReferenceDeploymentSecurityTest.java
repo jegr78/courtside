@@ -102,6 +102,62 @@ public class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void givenTheProductionImage_whenReadingItsCopyBoundary_thenSourceControlMetadataCannotEnterIt()
+            throws IOException {
+        // when
+        List<String> copiedPaths = Files.readString(Path.of("Dockerfile")).lines()
+                .map(String::strip)
+                .filter(line -> line.startsWith("COPY "))
+                .toList();
+
+        // then
+        assertThat(copiedPaths).containsExactly(
+                "COPY ${LAYERS}/dependencies/ ./",
+                "COPY ${LAYERS}/spring-boot-loader/ ./",
+                "COPY ${LAYERS}/snapshot-dependencies/ ./",
+                "COPY ${LAYERS}/application/ ./",
+                "COPY LICENSE NOTICE ./");
+    }
+
+    @Test
+    void givenTheProductionDeployment_whenReadingServiceCredentials_thenNoneHasALiteralDefault()
+            throws IOException {
+        // given
+        Pattern credential = Pattern.compile(
+                "^\\s+[A-Z0-9_]*(?:PASSWORD|PASS|PWD|TOKEN|AUTHORIZATION|SECRET|API_KEY|CREDENTIAL):"
+                        + "\\s+(?<value>\\S.*)$");
+
+        // when
+        List<String> values = Files.readString(Path.of("deploy/compose.yaml")).lines()
+                .map(credential::matcher)
+                .filter(Matcher::matches)
+                .map(matcher -> matcher.group("value"))
+                .toList();
+
+        // then
+        assertThat(values).isNotEmpty().allSatisfy(value -> assertThat(value)
+                .matches("^\\$\\{[A-Z0-9_]+(?::[-?][^}]*)?}$")
+                .doesNotMatch(".*:-[^}]+}.*"));
+    }
+
+    @Test
+    void givenTheProductionStartup_whenReadingItsCommands_thenNoDebugModeCanBeEnabled()
+            throws IOException {
+        // when
+        String startup = Files.readString(Path.of("Dockerfile")) + "\n"
+                + Files.readString(Path.of("deploy/compose.yaml")) + "\n"
+                + Files.readString(Path.of("deploy/Caddyfile"));
+
+        // then
+        assertThat(startup)
+                .doesNotContain("-agentlib:jdwp", "-agentpath:", "-Xdebug", "-Xrunjdwp", "--debug",
+                        "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "SPRING_PROFILES_ACTIVE",
+                        "spring.profiles.active");
+        assertThat(startup.lines().map(String::strip).toList()).doesNotContain("debug");
+        assertThat(startup).doesNotContainPattern("(?m)^\\s*(?:ENV\\s+)?(?:DEBUG|debug)[:=]");
+    }
+
+    @Test
     void whenReadingComposeFile_thenApplicationPortIsBoundToLoopback() throws IOException {
         // when
         String compose = Files.readString(Path.of("deploy/compose.yaml"));

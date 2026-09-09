@@ -62,6 +62,21 @@ class ObservabilityContractTest {
     }
 
     @Test
+    void givenOperationalLogs_whenReadingTheirTimeContract_thenTimestampsRemainOffsetAware()
+            throws IOException {
+        // given
+        String configuration = Files.readString(PROJECT.resolve("src/main/resources/application.yaml"));
+        String assessment = Files.readString(PROJECT.resolve("docs/security-assessment.md"));
+
+        // when / then
+        assertThat(configuration).contains("format:\n      console: ecs");
+        assertThat(assessment).contains(
+                "ECS `@timestamp` is offset-aware",
+                "containers share the deployment host's clock",
+                "host clock synchronization is an operator responsibility");
+    }
+
+    @Test
     void whenInspectingManagementExposure_thenOnlyHealthIsPubliclyExposed() throws IOException {
         // given
         String configuration = Files.readString(PROJECT.resolve("src/main/resources/application.yaml"));
