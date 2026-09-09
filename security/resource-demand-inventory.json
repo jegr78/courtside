@@ -1,0 +1,351 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-09-09",
+  "sources": {
+    "openapi": "src/main/resources/api/openapi.yaml",
+    "scheduledFiles": [
+      "src/main/java/org/courtside/booking/internal/BookingReminderSchedule.java",
+      "src/main/java/org/courtside/dataexchange/internal/PreviewExpirySchedule.java",
+      "src/main/java/org/courtside/identity/internal/AgedSessionSweep.java",
+      "src/main/java/org/courtside/identity/internal/IdentityCleanupSchedule.java"
+    ],
+    "backgroundFiles": [
+      "src/main/java/org/courtside/booking/internal/ClosureAnnouncements.java",
+      "src/main/java/org/courtside/notification/internal/BookingMailer.java",
+      "src/main/java/org/courtside/notification/internal/CredentialMailer.java",
+      "src/main/java/org/courtside/notification/internal/DisplacementMailer.java",
+      "src/main/java/org/courtside/notification/internal/ParticipationMailer.java",
+      "src/main/java/org/courtside/notification/internal/ReminderMailer.java"
+    ],
+    "startupFiles": [
+      "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java"
+    ]
+  },
+  "classifications": [
+    {
+      "id": "ordinary-http",
+      "kind": "ordinary",
+      "rationale": "These operations perform bounded single-record work or bounded page and calendar reads; their contract limits do not grow into a separate resource-demand decision.",
+      "entryPoints": [
+        "assignMembership",
+        "changeAccountLocale",
+        "changeAccountRoles",
+        "changeAccountUsername",
+        "changeBookingCard",
+        "changeClubConfig",
+        "changeCourt",
+        "changeImportSource",
+        "changeMembershipType",
+        "changeOwnLocale",
+        "changeParticipantCard",
+        "changePerson",
+        "changeRuleSet",
+        "chooseOwnMessages",
+        "createBookingCard",
+        "createCourt",
+        "createImportSource",
+        "createMembershipType",
+        "createParticipantCard",
+        "createPerson",
+        "createRuleSet",
+        "deleteClubLogo",
+        "deleteImportSource",
+        "endAccountSessions",
+        "endOwnSession",
+        "endOwnSessions",
+        "getApiDocument",
+        "getBookingCard",
+        "getBookingEligibility",
+        "getBookingGrid",
+        "getClubConfig",
+        "getClubConfigForAdmin",
+        "getClubLogo",
+        "getCourt",
+        "getManagedAppointment",
+        "getMembershipType",
+        "getParticipantCard",
+        "getRuleSet",
+        "getSessionStatus",
+        "getSourceOffer",
+        "getWebManifest",
+        "linkExternalReference",
+        "listExternalReferences",
+        "listManagedAppointments",
+        "listOpeningHours",
+        "listOpeningHoursForAdmin",
+        "listOwnMessageChoices",
+        "listOwnParticipations",
+        "listOwnSessions",
+        "listPersonalBookings",
+        "listRuleTypes",
+        "listRules",
+        "listSupportedEncodings",
+        "logOut",
+        "readAuditLog",
+        "readImportPreview",
+        "readImportSource",
+        "readMessageLog",
+        "readPerson",
+        "removeMembership",
+        "removeOwnParticipation",
+        "removeRule",
+        "setAccountActive",
+        "setBookingCardActive",
+        "setCourtActive",
+        "setMembershipTypeActive",
+        "setParticipantCardActive",
+        "setRule",
+        "setRuleSetActive",
+        "setWeeklyOpeningHours",
+        "unlinkExternalReference"
+      ]
+    },
+    {
+      "id": "ordinary-startup",
+      "kind": "ordinary",
+      "rationale": "Bootstrap checks one database-wide existence condition and can create exactly one initial administrator; its Argon2 work is constant and startup-only.",
+      "entryPoints": ["BootstrapAdminInitializer#run"]
+    },
+    {
+      "id": "password-and-credential-work",
+      "kind": "demanding",
+      "entryPoints": [
+        "changeInitialPassword",
+        "changeOwnPassword",
+        "createAccount",
+        "logIn",
+        "reauthenticate",
+        "requestAccountCredentials"
+      ],
+      "growthDrivers": "Argon2id memory and CPU work, a bounded HIBP range response, and credential delivery work dominate these paths.",
+      "inputOrDataBound": "Passwords and account fields have contract limits; HIBP responses stop at 256 KiB and their request deadline defaults to three seconds.",
+      "concurrencyOrRateBound": "Password verification admits two concurrent operations per application instance; login addresses and credential issuance also have persisted rate windows.",
+      "executionModel": "Verification and password policy run synchronously in the request; committed credential events hand mail to the asynchronous event listener.",
+      "failureBehavior": "Capacity exhaustion returns a typed 429, HIBP unavailability refuses a new password, and a failed transaction stores no partial credential change.",
+      "consumerTimeoutBehavior": "The HIBP dependency has its own deadline. The reference proxy adds no arbitrary response deadline; a caller retry remains subject to rate and transaction rules.",
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
+        "src/main/java/org/courtside/identity/internal/LoginAttemptFilter.java",
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/identity/LoginAttemptProtectionTest.java#givenPasswordVerificationCapacityIsOccupied_whenItBecomesFree_thenLoginRecoversImmediately",
+        "src/test/java/org/courtside/identity/PasswordHashingTest.java#whenHashingAPassword_thenTheParametersAreTheOnesTheInventoryRecords"
+      ]
+    },
+    {
+      "id": "roster-import",
+      "kind": "demanding",
+      "entryPoints": ["createImportPreview", "executeImportPreview"],
+      "growthDrivers": "CSV decoding, matching and change application grow with the uploaded rows and the existing rows linked to that source.",
+      "inputOrDataBound": "The application accepts at most 8 MiB directly and the reference proxy at most 2 MiB; preview execution can touch only rows retained from that bounded upload.",
+      "concurrencyOrRateBound": "A database advisory lock serializes execution per import source; different sources may execute concurrently within the application and database resource limits.",
+      "executionModel": "Preview and execution are synchronous transactions. Execution locks its source and affected person rows in a deterministic order before applying changes.",
+      "failureBehavior": "Malformed uploads fail before a preview is stored; stale, expired or competing executions fail transactionally without a partial roster sync.",
+      "consumerTimeoutBehavior": "The reference proxy adds no response deadline. Disconnect is not a rollback promise, so the preview identity and actor binding make a later retry observable and safe.",
+      "productionPaths": [
+        "src/main/java/org/courtside/dataexchange/PreviewService.java",
+        "src/main/java/org/courtside/dataexchange/ExecutionService.java",
+        "src/main/resources/application.yaml"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnExecutedSnapshot_whenTheIdenticalFileIsUploadedAndExecutedAgain_thenNothingChanges",
+        "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnOlderPreviewOfTheSameSource_whenANewerOneIsExecuted_thenTheOlderCannotRun"
+      ]
+    },
+    {
+      "id": "booking-write",
+      "kind": "demanding",
+      "entryPoints": ["cancelBooking", "createBooking"],
+      "growthDrivers": "Availability checks and allocation writes grow with requested courts, while participant validation grows with the bounded request body.",
+      "inputOrDataBound": "One request names at most 999 distinct courts and the reference proxy caps the complete body at 2 MiB; configured slot and rule limits also apply.",
+      "concurrencyOrRateBound": "There is no request-rate gate; deterministic database locks, the five-second lock wait and deployment resource limits bound competing writers.",
+      "executionModel": "The synchronous transaction authorizes, validates rules, locks courts in order and stores one booking plus its allocations before publishing events.",
+      "failureBehavior": "A conflict or validation failure rolls back the complete booking; an idempotency key returns the original result or rejects a changed replay.",
+      "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller uncertain about the outcome can repeat the same idempotency key without creating another booking.",
+      "productionPaths": ["src/main/java/org/courtside/booking/BookingService.java"],
+      "evidence": [
+        "src/test/java/org/courtside/booking/BookingServiceTest.java#givenAnIdempotentReplay_whenCreating_thenOnlyThePersistedBookingIsCounted",
+        "src/test/java/org/courtside/booking/BookingConcurrencyTest.java#givenAnUncommittedBookingForTheSlot_whenASecondSessionBooksTheSameSlot_thenItWaitsForTheFirstAndIsRejected"
+      ]
+    },
+    {
+      "id": "tenant-scaled-reads",
+      "kind": "demanding",
+      "entryPoints": [
+        "listAllocations",
+        "listBookableCards",
+        "listBookingCards",
+        "listCourts",
+        "listCourtsForAdmin",
+        "listImportRuns",
+        "listImportSources",
+        "listMembershipTypes",
+        "listParticipantCards",
+        "listParticipantCardsForAdmin",
+        "listParticipantMembers",
+        "listRoster",
+        "listRuleSets"
+      ],
+      "growthDrivers": "Collection queries grow with courts, cards, members, import history, rule sets or one day of occupied court slots in the club database.",
+      "inputOrDataBound": "Roster pages stop at 200 and participant search at 20; one occupancy response spans one day and at most 999 courts. Several configuration and import-history lists have no row ceiling beyond tenant data.",
+      "concurrencyOrRateBound": "Read authorization and deployment resources apply, but these queries have no dedicated request-rate or concurrency gate.",
+      "executionModel": "Each operation is a synchronous read-only request; paged operations use a stable cursor while deliberately small configuration lists return together.",
+      "failureBehavior": "Invalid cursors, limits and dates return typed failures. Query failure produces no mutation and no successful partial collection response.",
+      "consumerTimeoutBehavior": "The reference proxy sets no response deadline. These reads are repeatable after a caller disconnects and carry no server-side continuation contract.",
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/BookingService.java",
+        "src/main/java/org/courtside/dataexchange/ExecutionService.java",
+        "src/main/java/org/courtside/member/RosterService.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnEmptyDay_whenLoadingThePublicGrid_thenItsQueryBudgetIsStable",
+        "src/test/java/org/courtside/member/web/RosterAdminControllerTest.java#givenMorePeopleThanTheLimit_whenListingTheRoster_thenTheCursorNamesTheLastEntry"
+      ]
+    },
+    {
+      "id": "booking-series",
+      "kind": "demanding",
+      "entryPoints": ["cancelSeries", "createSeries", "moveSeries", "previewSeries", "previewSeriesMove"],
+      "growthDrivers": "Schedule expansion, rule evaluation and row locking grow with occurrences and the distinct courts selected for a series.",
+      "inputOrDataBound": "A series expands to at most 200 occurrences, lasts at most 1,440 minutes per occurrence and names at most 999 distinct courts.",
+      "concurrencyOrRateBound": "There is no separate request-rate gate; database locks, the five-second lock wait and the application container budget bound concurrent writers.",
+      "executionModel": "Previews are synchronous reads. Create, move and cancel use transactions and acquire shared booking rows in the repository-wide order.",
+      "failureBehavior": "An over-limit schedule is rejected before calendar work; lock or rule failure rolls the transaction back and reports a typed domain or contention response.",
+      "consumerTimeoutBehavior": "The reference proxy adds no response deadline. A disconnected caller may not know the commit outcome, so mutations use their stored series identity and transactional state on retry.",
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/series/SeriesRule.java",
+        "src/main/java/org/courtside/booking/series/SeriesService.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/booking/series/SeriesPreviewTest.java#givenARuleExpandingPastTheOccurrenceLimit_whenPreviewing_thenItIsRejectedBeforeAnyCalendarQuery",
+        "src/test/java/org/courtside/booking/series/SeriesQueryBudgetTest.java#givenASeriesSize_whenMeasuringMovePreviewAndMove_thenStableRuleQueriesStayBounded"
+      ]
+    },
+    {
+      "id": "bulk-report-and-export",
+      "kind": "demanding",
+      "entryPoints": ["exportBookings", "exportPersonData", "exportRoster", "facilityUtilisation"],
+      "growthDrivers": "Roster export grows with matching members, subject access with one person's retained history, and booking export and reporting with allocations in the selected period.",
+      "inputOrDataBound": "Booking periods stop at 366 days and subject access stops at one person. Roster and retained person history have no row ceiling beyond the club's own data set.",
+      "concurrencyOrRateBound": "These administrator-only synchronous reads have no per-operation concurrency gate; container, database pool and deployment resource limits are the outer bound.",
+      "executionModel": "The application reads and renders each response synchronously; roster pagination uses pages of 200 internally before constructing one response file.",
+      "failureBehavior": "Invalid periods and encodings fail before export; a database or rendering failure returns no successful file rather than a partial application state change.",
+      "consumerTimeoutBehavior": "The reference proxy sets no shorter response timeout. Client cancellation can discard the response but is not claimed to cancel every database or rendering step.",
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/internal/FacilityUtilisationService.java",
+        "src/main/java/org/courtside/dataexchange/internal/BookingExportService.java",
+        "src/main/java/org/courtside/dataexchange/internal/RosterExportService.java",
+        "src/main/java/org/courtside/dataexchange/internal/SubjectAccessService.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenMoreThan366Days_whenReportingUtilisation_thenThePeriodLimitIsReturned",
+        "src/test/java/org/courtside/dataexchange/internal/RosterExportServiceTest.java#givenMorePeopleThanOnePageHolds_whenTheRosterIsExported_thenTheFileHoldsEveryOne"
+      ]
+    },
+    {
+      "id": "logo-normalization",
+      "kind": "demanding",
+      "entryPoints": ["uploadClubLogo"],
+      "growthDrivers": "Image decoding, normalization and hashing grow with compressed bytes and decoded pixel dimensions.",
+      "inputOrDataBound": "The parser rejects input above 1 MiB before decoding and dimensions above 2,048 by 2,048; the reference proxy caps the complete request at 2 MiB.",
+      "concurrencyOrRateBound": "Only an administrator can invoke the synchronous operation; no separate image-normalization concurrency gate exists beyond deployment resources.",
+      "executionModel": "The request decodes and normalizes one PNG or JPEG in memory, hashes it and stores the bounded result in one transaction.",
+      "failureBehavior": "Malformed, oversized or over-dimensioned images fail before configuration is replaced; active SVG content is not decoded as an accepted logo.",
+      "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A failed or abandoned request cannot leave a partially replaced logo transaction.",
+      "productionPaths": ["src/main/java/org/courtside/config/internal/ClubLogo.java"],
+      "evidence": [
+        "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenMoreThanOneMebibyte_whenParsing_thenItIsRejectedBeforeDecoding",
+        "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenAnImageAboveTheDimensionLimit_whenParsing_thenItIsRejected"
+      ]
+    },
+    {
+      "id": "administrative-impact-analysis",
+      "kind": "demanding",
+      "entryPoints": ["bookingCardImpact", "courtImpact", "openingHoursImpact"],
+      "growthDrivers": "The affected-count query grows with future allocations for the court, booking card or weekday whose configuration may change.",
+      "inputOrDataBound": "Visible identifiers are paged at 100 by the API; the accompanying affected count still spans all matching future allocations.",
+      "concurrencyOrRateBound": "These administrator-only reads have no per-operation rate gate and share the application and database resource limits.",
+      "executionModel": "Interactive impact previews synchronously execute one count and one bounded identifier page; announcement pages deliberately omit the count query.",
+      "failureBehavior": "Unknown resources and invalid page sizes return typed failures; a query failure produces no configuration mutation because impact operations are read-only.",
+      "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller that leaves loses the preview response and may safely repeat the read.",
+      "productionPaths": ["src/main/java/org/courtside/booking/internal/ImpactService.java"],
+      "evidence": [
+        "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnAnnouncementPage_whenReadingIt_thenItOmitsTheInteractiveCountQuery",
+        "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnInteractivePreview_whenReadingIt_thenItStillComputesTheAffectedCount"
+      ]
+    },
+    {
+      "id": "global-session-revocation",
+      "kind": "demanding",
+      "entryPoints": ["endAllSessions"],
+      "growthDrivers": "Revocation touches the active sessions of every account and therefore grows with the club's signed-in population.",
+      "inputOrDataBound": "Each account retains at most five concurrent sessions by default, but the administrator operation has no club-wide row ceiling.",
+      "concurrencyOrRateBound": "Only an administrator can invoke the synchronous operation; no separate per-operation rate or concurrency gate is installed.",
+      "executionModel": "One synchronous transactional database mutation revokes the stored sessions before the successful response is produced.",
+      "failureBehavior": "A database failure rolls the transaction back; the operation cannot report success with only part of the selected session state committed.",
+      "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller can repeat revocation safely because already-ended sessions stay ended.",
+      "productionPaths": ["src/main/java/org/courtside/identity/GlobalSessionAdministration.java"],
+      "evidence": ["src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenSeveralAccounts_whenAllSessionsAreEnded_thenTheCallingAdminAlsoLosesAuthority"]
+    },
+    {
+      "id": "asynchronous-notifications",
+      "kind": "demanding",
+      "entryPoints": [
+        "BookingMailer#on(BookingConfirmed)",
+        "ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)",
+        "ClosureAnnouncements#on(FacilityEvent.CourtAvailabilityChanged)",
+        "ClosureAnnouncements#on(FacilityEvent.OpeningHoursClosed)",
+        "ClosureAnnouncements#on(FacilityEvent.OpeningHoursSet)",
+        "CredentialMailer#on(CredentialsRequested)",
+        "DisplacementMailer#on(BookingDisplaced)",
+        "ParticipationMailer#on(ParticipantRecorded)",
+        "ParticipationMailer#on(ParticipantWithdrew)",
+        "ReminderMailer#on(BookingReminderDue)"
+      ],
+      "growthDrivers": "Mail work fans out with booking participants, reminders and displaced future bookings; relay latency holds worker threads during delivery.",
+      "inputOrDataBound": "A booking has at most twenty participant positions, closure discovery pages by 100, and each SMTP connect and read wait stops after ten seconds.",
+      "concurrencyOrRateBound": "Credential and booking mail use separate pools of at most four threads; closure announcements use at most two. Every queue holds 100 tasks and then applies caller-run backpressure.",
+      "executionModel": "Committed domain events enter dedicated bounded executors. Each mail handover and each closure page uses a new transaction outside the originating mutation.",
+      "failureBehavior": "Queue saturation runs work on the publishing thread instead of retaining unbounded tasks; delivery refusal or failure is recorded without undoing the committed booking change.",
+      "consumerTimeoutBehavior": "The originating HTTP response normally does not wait for asynchronous delivery. Under saturation, caller-run backpressure can extend it rather than silently drop a notification.",
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/internal/BookingConfiguration.java",
+        "src/main/java/org/courtside/booking/internal/ClosureAnnouncements.java",
+        "src/main/java/org/courtside/notification/internal/NotificationConfiguration.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/booking/internal/ClosureAnnouncementExecutorCapacityTest.java#givenTheAnnouncementExecutor_whenReadingItsCapacityPolicy_thenTheQueueIsBoundedAndSaturationUsesCallerRuns",
+        "src/test/java/org/courtside/notification/internal/NotificationExecutorCapacityTest.java#givenTheMailExecutors_whenReadingTheirCapacityPolicy_thenQueuesAreBoundedAndSaturationUsesCallerRuns"
+      ]
+    },
+    {
+      "id": "scheduled-maintenance",
+      "kind": "demanding",
+      "entryPoints": [
+        "AgedSessionSweep#deleteSessionsPastTheirLifetime",
+        "BookingReminderSchedule#remindWhatIsDue",
+        "IdentityCleanupSchedule#deleteExpiredCredentialIssues",
+        "IdentityCleanupSchedule#deleteExpiredLoginAttempts",
+        "PreviewExpirySchedule#sweepNow"
+      ],
+      "growthDrivers": "Cleanup grows with expired rows, while reminder work grows with due bookings and the messages their participants receive.",
+      "inputOrDataBound": "Retention and reminder windows bound age, not row count; a sweep can still span every expired or due row accumulated by the instance.",
+      "concurrencyOrRateBound": "Spring's default single scheduling thread serializes these methods in this application; database and mail work retain their own transaction and delivery bounds.",
+      "executionModel": "The in-process scheduler invokes each method on its configured cadence; cleanup uses transactions and reminders claim each booking before publishing events.",
+      "failureBehavior": "A failed transactional sweep rolls back and remains eligible later; a claimed reminder commits before asynchronous delivery records its own outcome.",
+      "consumerTimeoutBehavior": "There is no HTTP consumer. A delayed or failed run is retried by the next fixed-delay or cron invocation rather than by extending an arbitrary timeout.",
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/internal/BookingReminderSchedule.java",
+        "src/main/java/org/courtside/dataexchange/internal/PreviewExpirySchedule.java",
+        "src/main/java/org/courtside/identity/internal/AgedSessionSweep.java",
+        "src/main/java/org/courtside/identity/internal/IdentityCleanupSchedule.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/notification/BookingReminderTest.java#givenAReminderAlreadySent_whenTheSweepRunsAgain_thenNobodyIsRemindedTwice",
+        "src/test/java/org/courtside/dataexchange/PreviewExpiryTest.java#givenASweptPreview_whenTheSweepRunsAgain_thenThereIsNothingLeftToDrop",
+        "src/test/java/org/courtside/identity/internal/AgedSessionSweepTest.java#givenASessionPastItsLifetimeButNotIdle_whenTheSweepRuns_thenItsRowGoesAndAYoungOneStays"
+      ]
+    }
+  ]
+}

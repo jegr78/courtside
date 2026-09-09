@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://courtside.example/security/resource-demand-inventory.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "reviewedAt", "sources", "classifications"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "reviewedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["openapi", "scheduledFiles", "backgroundFiles", "startupFiles"],
+      "properties": {
+        "openapi": { "const": "src/main/resources/api/openapi.yaml" },
+        "scheduledFiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^src/main/java/.+\\.java$" }
+        },
+        "backgroundFiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^src/main/java/.+\\.java$" }
+        },
+        "startupFiles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^src/main/java/.+\\.java$" }
+        }
+      }
+    },
+    "classifications": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/ordinary" },
+          { "$ref": "#/$defs/demanding" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["id", "kind", "entryPoints"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "kind": { "enum": ["ordinary", "demanding"] },
+        "entryPoints": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "ordinary": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "entryPoints", "rationale"],
+          "properties": {
+            "id": true,
+            "kind": { "const": "ordinary" },
+            "entryPoints": true,
+            "rationale": { "type": "string", "minLength": 20 }
+          }
+        }
+      ]
+    },
+    "demanding": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "entryPoints", "growthDrivers", "inputOrDataBound",
+            "concurrencyOrRateBound", "executionModel", "failureBehavior", "consumerTimeoutBehavior",
+            "productionPaths", "evidence"],
+          "properties": {
+            "id": true,
+            "kind": { "const": "demanding" },
+            "entryPoints": true,
+            "growthDrivers": { "type": "string", "minLength": 20 },
+            "inputOrDataBound": { "type": "string", "minLength": 20 },
+            "concurrencyOrRateBound": { "type": "string", "minLength": 20 },
+            "executionModel": { "type": "string", "minLength": 20 },
+            "failureBehavior": { "type": "string", "minLength": 20 },
+            "consumerTimeoutBehavior": { "type": "string", "minLength": 20 },
+            "productionPaths": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[^#]+#[^#]+$" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -115,21 +115,6 @@ listener, outbound client or trust transition. That inventory must also state th
 for every outbound flow and the secure behavior when the dependency refuses, times out or returns
 invalid data; the current map cannot yet prove either property across the complete set.
 
-### Resource-demanding functionality inventory is incomplete
-
-- State: validated documentation gap
-- Priority: P2
-- Controls: ASVS 5.0.0 `v5.0.0-15.1.3`
-- Review: `MAN-ARCH-001`, 9 September 2026
-- Remediation: #901
-
-Courtside documents safeguards for selected expensive operations, including password hashing,
-imports and booking writes, but has no closed inventory of every time- or resource-demanding
-production operation. The documentation does not yet pair each operation with its input bound,
-concurrency or rate limit, execution model, and behavior when the caller or proxy stops waiting.
-The control remains non-passing until the inventory is derived from the production paths and its
-completeness is falsifiable.
-
 ### Safe HTTP methods lack state-invariance evidence
 
 - State: validated evidence gap

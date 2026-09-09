@@ -246,6 +246,11 @@ creates and destroys a one-job runner outside the assessment job.
 
 ## Resource abuse and recovery
 
+The maintained [resource-demand inventory](security-resource-demand.md) derives every HTTP,
+scheduled, asynchronous and production-startup entry point and classifies each one exactly once.
+Demanding operations state their data and concurrency bounds, execution and failure model, and
+caller-timeout behavior; the tooling gate refuses a new or unclassified production entry point.
+
 The destructive suite requires the exact `authorize-destructive-<run-id>` confirmation. Its pinned
 k6 container ramps gradually through the request gateway and exercises login hashing and rate
 limits, request-body rejection, competing court occupancy, duplicate delivery, participant-card
