@@ -122,19 +122,20 @@ export function normalizeZapAlerts(report, imageDigest) {
       || left.routeTemplate.localeCompare(right.routeTemplate));
 }
 
-// Every wording of this rule announces its directives after a colon and then stops being a list,
-// whether the names follow on their own lines, in one sentence, or as a comma-separated run.
+// The scanner's own templates name a directive in one of two places and otherwise name none, so an
+// alert carrying no directive is ordinary rather than unreadable.
 function cspDirectivesFrom(otherInfo) {
+  const named = new Set();
+  const [leading = ""] = otherInfo.trimStart().split(/[\s,]+/);
+  if (cspDirective.test(leading)) named.add(leading);
   for (let colon = otherInfo.indexOf(":"); colon >= 0; colon = otherInfo.indexOf(":", colon + 1)) {
-    const named = [];
     for (const token of otherInfo.slice(colon + 1).split(/[,\s]+/)) {
       if (token.length === 0) continue;
       if (!cspDirective.test(token)) break;
-      named.push(token);
+      named.add(token);
     }
-    if (named.length > 0) return [...new Set(named)].toSorted();
   }
-  return [];
+  return [...named].toSorted();
 }
 
 function alertFieldExcerpt(value) {
@@ -191,11 +192,8 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
     if (param.toLowerCase() !== "content-security-policy" || evidence.length === 0) {
       throw unsupported(`the alert does not describe the policy header: ${seen()}`);
     }
-    const directives = cspDirectivesFrom(otherInfo);
-    if (directives.length === 0) {
-      throw unsupported(`no directive name was read from otherinfo ${alertFieldExcerpt(otherInfo)}`);
-    }
-    return { kind: "policy-directive", headerName: "content-security-policy", directives };
+    return { kind: "policy-directive", headerName: "content-security-policy",
+      directives: cspDirectivesFrom(otherInfo) };
   }
   if (pluginId === "10109") {
     if (param !== "" || !evidence.includes("<script")
@@ -422,7 +420,6 @@ function retainedRuleEvidenceMatches(alert, imageDigest) {
   if (alert.pluginId === "10036") return evidence.kind === "response-header" && evidence.headerName === "server";
   if (alert.pluginId === "10055") return evidence.kind === "policy-directive"
     && evidence.headerName === "content-security-policy"
-    && evidence.directives.length > 0
     && new Set(evidence.directives).size === evidence.directives.length
     && evidence.directives.every((directive) => cspDirective.test(directive))
     && JSON.stringify(evidence.directives) === JSON.stringify(evidence.directives.toSorted());

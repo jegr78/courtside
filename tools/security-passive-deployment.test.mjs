@@ -404,6 +404,40 @@ test("given the wording a hosted 2.17 scanner produced, when normalizing it, the
     "img-src", "manifest-src", "media-src", "object-src", "script-src", "style-src", "worker-src"]);
 });
 
+const cspAlert = (otherinfo) => ({ site: [{ alerts: [
+  { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+    param: "Content-Security-Policy", evidence: "policy-value", otherinfo }] }
+] }] });
+
+test("given a wording that opens with its directive, when normalizing it, then that directive is named", () => {
+  // given — the scanner's own script-src and style-src templates put the name first
+  const alerts = normalizeZapAlerts(cspAlert("script-src includes unsafe-inline."));
+
+  // when / then
+  assert.deepEqual(alerts[0].ruleEvidence.directives, ["script-src"]);
+});
+
+test("given a wording that names no directive at all, when normalizing it, then the alert is kept without one", () => {
+  // given — the scanner reports a legacy CSP header without analysing any directive
+  const alerts = normalizeZapAlerts(cspAlert("The header X-WebKit-CSP was found on this response."
+    + " While it is a good sign that CSP is implemented to some degree the policy specified in this"
+    + " header has not been analyzed by ZAP."));
+
+  // when / then — refusing this aborted the whole assessment, though the alert is perfectly valid
+  assert.deepEqual(alerts[0].ruleEvidence,
+    { kind: "policy-directive", headerName: "content-security-policy", directives: [] });
+});
+
+test("given collected invalid characters after a colon, when normalizing them, then none becomes a directive", () => {
+  // given — the malformed-policy template collects non-ASCII characters behind a colon
+  const alerts = normalizeZapAlerts(cspAlert("A non-ASCII character was encountered while attempting"
+    + " to parse the policy, thus rendering it invalid (no further evaluation occurred)."
+    + " The following invalid characters were collected: \u00e9, \u00fc"));
+
+  // when / then
+  assert.deepEqual(alerts[0].ruleEvidence.directives, []);
+});
+
 test("given both CSP wordings on one route, when they are merged, then the evidence names all their directives",
   () => {
     // given
@@ -454,11 +488,11 @@ test("given retained evidence naming a fallback directive, when it is validated,
     assert.equal(validate(evidence), true, JSON.stringify(validate.errors));
   });
 
-test("given a CSP alert whose wording neither shape matches, when normalizing it, then the evidence fails closed", () => {
-  // given
+test("given a CSP alert about another header, when normalizing it, then the evidence fails closed", () => {
+  // given — the wording may be anything, but the header the alert describes may not
   const report = { site: [{ alerts: [
     { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
-      param: "Content-Security-Policy", evidence: "policy-value",
+      param: "X-Frame-Options", evidence: "policy-value",
       otherinfo: "A wholly new sentence ZAP has started producing." }] }
   ] }] };
 
@@ -466,17 +500,18 @@ test("given a CSP alert whose wording neither shape matches, when normalizing it
   assert.throws(() => normalizeZapAlerts(report), /unsupported rule evidence/);
 });
 
-test("given a wording no shape matches, when the evidence is refused, then the refusal says what it saw", () => {
+test("given evidence that is refused, when the refusal is read, then it says what it saw", () => {
   // given
   const report = { site: [{ alerts: [
     { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
-      param: "Content-Security-Policy", evidence: "policy-value",
+      param: "X-Frame-Options", evidence: "",
       otherinfo: "A wholly new sentence ZAP has started producing." }] }
   ] }] };
 
   // when / then — a refusal naming only the rule costs a local reproduction to diagnose
   assert.throws(() => normalizeZapAlerts(report), (error) =>
-    /no directive name was read from otherinfo/.test(error.message)
+    /does not describe the policy header/.test(error.message)
+      && error.message.includes("X-Frame-Options")
       && error.message.includes("A wholly new sentence ZAP has started producing."));
 });
 
@@ -484,12 +519,12 @@ test("given an alert field that is far too long, when it appears in a refusal, t
   // given
   const report = { site: [{ alerts: [
     { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
-      param: "Content-Security-Policy", evidence: "policy-value", otherinfo: "z".repeat(5000) }] }
+      param: "X-Frame-Options", evidence: "policy-value", otherinfo: "z".repeat(5000) }] }
   ] }] };
 
   // when / then
   assert.throws(() => normalizeZapAlerts(report), (error) =>
-    error.message.length < 400 && error.message.endsWith('...')
+    error.message.length < 600 && error.message.includes('...')
       && !error.message.includes('zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'));
 });
 
@@ -504,7 +539,7 @@ test("given an otherinfo shaped to make the sentence parser backtrack, when norm
 
     // when
     const started = performance.now();
-    assert.throws(() => normalizeZapAlerts(report), /unsupported rule evidence/);
+    assert.deepEqual(normalizeZapAlerts(report)[0].ruleEvidence.directives, []);
     const elapsed = performance.now() - started;
 
     // then — a backtracking parser needs about eleven seconds for this input, a linear one under a millisecond
