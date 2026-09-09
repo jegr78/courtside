@@ -1916,6 +1916,22 @@ whether it is built or designed. **Designed means absent today.**
   `COURTSIDE_TEST_PROFILES` forces the complete set for every pull request, with any value other
   than `admitted` or none escalating rather than reducing. It stays open because the alternative is
   a permanent shadow campaign whose cost is the full build it exists to avoid. *Built, as described.*
+- **Accepted: a control whose universal wording this architecture cannot prove is recorded, not
+  tracked.** The assessment catalog pins every ASVS 5.0.0 Level 2 requirement and every WSTG test
+  identifier, and a reading walks them against named production paths. Some of them a
+  single-tenant club instance satisfies in substance while never being able to prove the standard's
+  universal phrasing: the primitives are individually strong, and no artifact in this repository
+  demonstrates that they are strong *for every* security-bearing use, because closing that wording
+  needs an inventory, a map or a policy document rather than a change a club would notice. Such a
+  control keeps its rationale in `security/assessment-catalog.json`, beside the control, where the
+  next reader finds it. What an observer needs: the catalog, which ships with the source. What it
+  means: this project does not claim a clean sweep of either standard, and a reader comparing it
+  against one will find controls whose evidence is an argument rather than a test. What bounds it:
+  the rationale is mandatory and a build gate refuses a disposition without one, so an unprovable
+  control is visible rather than silently `implemented`; and where the remedy *is* a product change,
+  it becomes a tracked issue and ordinary work instead. It stays open because the alternative — an
+  issue per unprovable phrasing — produces a backlog nobody can close, which is deferral wearing a
+  ticket number and buys a club nothing. *Built, as described.*
 
 ### Roles
 
