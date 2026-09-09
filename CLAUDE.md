@@ -459,8 +459,8 @@ on the board is a bug in the tracker, not a gap in the board.
   remains open on the board, and includes a concrete recommendation, alternatives and the work it
   blocks. A limitation planned for remediation is work: replace `known-limit` with the appropriate
   work label and put it on the board and in its target milestone. The scheduled-run tracker owns the
-  `nightly` issues and closes them itself after seven consecutive green first attempts and a human
-  confirmation.
+  `nightly` issues: it opens one per failure class and reopens it if that class returns. It never
+  closes one. A person closes it once its cause is known and answered, writing both into the issue.
 
 ## The design specification
 

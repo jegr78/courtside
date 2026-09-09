@@ -7,7 +7,6 @@ const trackedEvents = new Set(["schedule"]);
 const failureConclusions = new Set(["failure", "cancelled", "timed_out"]);
 const primaryFailureConclusions = new Set(["failure", "timed_out"]);
 export const trackerLabel = "nightly";
-const readyMarker = "<!-- courtside-nightly-ready-for-review -->";
 
 function boundedText(value, field) {
   if (typeof value !== "string" || value.length < 1 || value.length > 120) {
@@ -133,7 +132,8 @@ export function planFailureUpdates(failures, issues, { assignee, blockingWorkflo
         `${workflowMarker(failure.workflow)}\n- Job: \`${failure.job}\`\n- Step: \`${failure.step}\`\n` +
         `- Failure class: \`${failure.failureClass}\`\n${blocked(failure, blockingWorkflow)}` +
         `\n${occurrence(failure)}\n\n` +
-        "Keep this issue open until the tracker marks seven consecutive scheduled first attempts of this workflow green and a human verifies closure.",
+        "Close this issue once its cause is known and answered, writing both into it."
+        + " The tracker reopens it if the same failure class returns.",
       labels: [trackerLabel],
       assignees: isGitHubLogin(assignee) ? [assignee] : []
     }];
@@ -147,24 +147,6 @@ export function trustedCommentText(comments) {
     .filter((comment) => comment?.user?.type === "Bot")
     .map((comment) => comment.body ?? "")
     .join("\n");
-}
-
-export function readyForReview(runs) {
-  return Array.isArray(runs) && runs.length >= 7 && runs.slice(0, 7).every((run) =>
-    run?.event === "schedule" && run.run_attempt === 1 && run.conclusion === "success");
-}
-
-export function planReadyForReview(issues, workflow) {
-  const marker = workflowMarker(workflow);
-  return issues.filter((issue) => {
-    const content = `${issue.body}\n${issue.comments}`;
-    return issue.state === "open" && content.includes(marker) &&
-      content.lastIndexOf(readyMarker) < content.lastIndexOf("<!-- courtside-nightly-occurrence:");
-  }).map((issue) => ({
-    action: "comment",
-    issueNumber: issue.number,
-    body: `${readyMarker}\nSeven consecutive scheduled first attempts passed. This issue is ready for human closure review; it remains open.`
-  }));
 }
 
 export async function applyIssuePlan(plan, request, repository = "example/courtside") {
@@ -253,9 +235,6 @@ async function main(args) {
   }
   await applyIssuePlan(planFailureUpdates(failures, issues,
     { assignee, blockingWorkflow: values["--blocking-workflow"] }), request, repository);
-  if (failures.length === 0 && readyForReview(recent)) {
-    await applyIssuePlan(planReadyForReview(issues, run.name), request, repository);
-  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

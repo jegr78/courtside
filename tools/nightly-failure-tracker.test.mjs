@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyNightlyFailures, planFailureUpdates, planReadyForReview, readyForReview,
+import { classifyNightlyFailures, planFailureUpdates,
   applyIssuePlan, bindCommitRange, isGitHubLogin, trackerLabel, trustedCommentText } from "./nightly-failure-tracker.mjs";
 
 const workflowId = 4711;
@@ -75,16 +75,6 @@ test("given a closed matching issue, when the failure recurs, then the same issu
 
   assert.equal(planned.action, "reopen");
   assert.equal(planned.issueNumber, 8);
-});
-
-test("given seven consecutive successful first attempts, when reviewing failures, then they become ready for human review", () => {
-  const successful = Array.from({ length: 7 }, (_, index) => ({
-    id: index + 1, run_attempt: 1, event: "schedule", conclusion: "success"
-  }));
-
-  assert.equal(readyForReview(successful), true);
-  assert.equal(readyForReview([...successful.slice(0, 6), { ...successful[6], conclusion: "failure" }]), false);
-  assert.equal(readyForReview([...successful.slice(0, 6), { ...successful[6], run_attempt: 2 }]), false);
 });
 
 test("given a prior green nightly, when a failure is recorded, then its main commit range is retained", () => {
@@ -217,17 +207,6 @@ test("given two failed jobs with cascades, when classified, then each job owns e
   assert.deepEqual(failures.map((failure) => failure.secondaryFailures.length), [1, 1]);
 });
 
-test("given a summoned run, when counting consecutive green nights, then only scheduled ones count", () => {
-  // given
-  const nights = Array.from({ length: 7 }, () => (
-    { event: "schedule", run_attempt: 1, conclusion: "success" }));
-
-  // when / then
-  assert.equal(readyForReview(nights), true);
-  assert.equal(readyForReview([{ event: "workflow_dispatch", run_attempt: 1, conclusion: "success" },
-    ...nights.slice(1)]), false);
-});
-
 test("given a comment somebody else wrote, when the tracker reads its own state, then it is ignored", () => {
   // given — a fingerprint is a hash over public values, so a marker can be written by anybody
   const forged = { user: { type: "User", login: "passer-by" },
@@ -260,22 +239,6 @@ test("given issues opened while only the build was watched, when it fails again,
 
   // then
   assert.equal(failure.fingerprint, "2e49949d3997447bf280779525e3fbee36308b1a2bb6e0022dc3070d4816f932");
-});
-
-test("given one workflow's green streak, when issues are marked ready, then another's stay untouched", () => {
-  // given
-  const issues = [
-    { number: 1, state: "open", comments: "",
-      body: "- Workflow: `build`\n<!-- courtside-nightly-occurrence:1:1 -->" },
-    { number: 2, state: "open", comments: "",
-      body: "- Workflow: `mail smoke`\n<!-- courtside-nightly-occurrence:2:1 -->" }
-  ];
-
-  // when
-  const plan = planReadyForReview(issues, "mail smoke");
-
-  // then
-  assert.deepEqual(plan.map((item) => item.issueNumber), [2]);
 });
 
 test("given a matrix job of a watched workflow, when an issue is opened, then it names the gate that failed", () => {

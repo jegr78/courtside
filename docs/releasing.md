@@ -83,10 +83,16 @@ fingerprint — the issues the scheduled-run tracker wrote. An issue a human ope
 night does not stop a release. Issues reporting `npm audit` are excluded by name, because those
 findings arrive from outside the repository and are tracked on their own.
 
-**The tracker never closes one of those issues itself.** After seven consecutive green first
-attempts it comments that the issue is ready for closure review and says, in as many words, that it
-remains open. Somebody has to close it. A release that seems blocked for no reason is usually
-waiting on exactly that.
+**The tracker never closes one of those issues itself.** Somebody closes it once its cause is known
+and answered, writing both into the issue. If the same failure class returns, the tracker reopens
+that issue by itself, so closing on a diagnosis costs nothing and is the safety net that makes it
+safe. A release that seems blocked for no reason is usually waiting on exactly that.
+
+The issue text used to tell its reader to wait for seven consecutive scheduled first attempts, and
+the tracker commented once they had passed. That measured elapsed quiet time rather than whether
+anybody had found the cause: for a diagnosed failure the landed fix already says more than seven
+green nights can, and at two scheduled runs a week a single lost runner pushed the window back by
+weeks. It was removed.
 
 ## What the release refuses after scanning
 
