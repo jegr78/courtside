@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.4.10",
+  "catalogVersion": "1.4.11",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -401,17 +401,20 @@
         {
           "id": "v5.0.0-2.1.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "rationale": "Courtside validates public request structures through its OpenAPI contract and records selected domain invariants in code and design documentation, but does not maintain a closed inventory of every validation rule. Completing such an inventory would document existing behavior rather than change the shipped product, so this control remains blocked without creating remediation work."
         },
         {
           "id": "v5.0.0-2.1.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "rationale": "Courtside enforces cross-field invariants at request and domain boundaries, but does not maintain a closed document mapping every related-field consistency rule to every production workflow. Producing that map would document existing behavior rather than change the shipped product, so this control remains blocked without creating remediation work."
         },
         {
           "id": "v5.0.0-2.1.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "rationale": "Courtside enforces selected per-account and global business limits through booking rules and bounded workflows, but does not maintain a closed inventory of every such limit. Completing that inventory would document existing behavior rather than change the shipped product, so this control remains blocked without creating remediation work."
         },
         {
           "id": "v5.0.0-2.2.1",
@@ -424,22 +427,38 @@
         {
           "id": "v5.0.0-2.2.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/booking/web/BookingRequestValidator.java",
+            "falsifyingTest": "src/test/java/org/courtside/booking/web/InvalidRequestSurfaceTest.java#whenTheBookingEndsBeforeItStarts_thenItIsAFieldErrorOnEndsAt"
+          }
         },
         {
           "id": "v5.0.0-2.2.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/booking/web/BookingRequestValidator.java",
+            "falsifyingTest": "src/test/java/org/courtside/booking/web/InvalidRequestSurfaceTest.java#whenTheBookingEndsBeforeItStarts_thenItIsAFieldErrorOnEndsAt"
+          }
         },
         {
           "id": "v5.0.0-2.3.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/dataexchange/ExecutionService.java",
+            "falsifyingTest": "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnotherAdministratorTookThePreview_whenExecutingIt_thenOnlyItsReviewerCanProceed"
+          }
         },
         {
           "id": "v5.0.0-2.3.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/rules/internal/MaxOpenBookingsRule.java",
+            "falsifyingTest": "src/test/java/org/courtside/rules/MaxOpenBookingsRuleTest.java#givenALimitOfTwoAndTwoOpenBookings_whenChecking_thenExceededViolation"
+          }
         },
         {
           "id": "v5.0.0-2.3.3",
@@ -1956,12 +1975,20 @@
         {
           "id": "WSTG-v4.2-BUSL-01",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/booking/web/BookingRequestValidator.java",
+            "falsifyingTest": "src/test/java/org/courtside/booking/web/InvalidRequestSurfaceTest.java#whenTheBookingEndsBeforeItStarts_thenItIsAFieldErrorOnEndsAt"
+          }
         },
         {
           "id": "WSTG-v4.2-BUSL-02",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/booking/web/BookingRequestValidator.java",
+            "falsifyingTest": "src/test/java/org/courtside/booking/web/InvalidRequestSurfaceTest.java#whenTheBookingEndsBeforeItStarts_thenItIsAFieldErrorOnEndsAt"
+          }
         },
         {
           "id": "WSTG-v4.2-BUSL-03",
@@ -1973,17 +2000,29 @@
         {
           "id": "WSTG-v4.2-BUSL-04",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/dataexchange/ExecutionService.java",
+            "falsifyingTest": "src/test/java/org/courtside/dataexchange/PreviewExpiryTest.java#givenASweptPreview_whenExecutingIt_thenItIsRefusedRatherThanRunningOnNothing"
+          }
         },
         {
           "id": "WSTG-v4.2-BUSL-05",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/rules/internal/MaxOpenBookingsRule.java",
+            "falsifyingTest": "src/test/java/org/courtside/rules/MaxOpenBookingsRuleTest.java#givenALimitOfTwoAndTwoOpenBookings_whenChecking_thenExceededViolation"
+          }
         },
         {
           "id": "WSTG-v4.2-BUSL-06",
           "status": "implemented",
-          "manualProcedureId": "MAN-BUSINESS-001"
+          "manualProcedureId": "MAN-BUSINESS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/dataexchange/ExecutionService.java",
+            "falsifyingTest": "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnExecutedPreview_whenItIsExecutedASecondTime_thenItIsRefusedAsSuperseded"
+          }
         },
         {
           "id": "WSTG-v4.2-BUSL-07",

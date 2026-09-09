@@ -3963,6 +3963,10 @@ paths:
         This operation requires a full reauthentication within the configured window, capped at
         five minutes. Missing or stale proof is answered `403` with
         `urn:courtside:error:recent-authentication-required` and changes nothing.
+
+        The account that took the preview is the only account that may execute it. Another
+        administrator receives `409` with `urn:courtside:error:import-preview-actor-mismatch` and
+        the preview remains available to its reviewer.
       security:
         - sessionCookie: []
           csrfToken: []

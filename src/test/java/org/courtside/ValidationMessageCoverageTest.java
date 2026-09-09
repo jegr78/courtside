@@ -36,7 +36,8 @@ class ValidationMessageCoverageTest {
                     "RosterCursorUnknownException", "LastAdministratorException", "AuditCursorUnknownException",
                     "ImportSourceInvalidException", "SnapshotHeaderInvalidException",
                     "SnapshotBlockedException", "SnapshotFileNameInvalidException",
-                    "ImportPreviewStaleException", "ImportPreviewSupersededException",
+                    "ImportPreviewActorMismatchException", "ImportPreviewStaleException",
+                    "ImportPreviewSupersededException",
                     "ImportPreviewExpiredException", "RemovalsNeedConfirmationException");
 
     private static final List<String> GET_CODE_DECLARING_SIMPLE_NAMES =

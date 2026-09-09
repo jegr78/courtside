@@ -58,11 +58,13 @@ public class ExecutionService {
 
     @Transactional
     public RunOutcome execute(UUID previewId, boolean confirmRemovals, UUID accountId) {
+        UUID executingAccountId = requiredAccountId(accountId);
         // The id is read as a scalar so the entity is not in the persistence context yet: a second
         // findById would answer from the identity map and gate on the state before the lock.
         sourceLock.acquire(sourceOf(previewId));
         ImportPreview preview = lockedPreview(previewId);
         Instant now = clock.instant();
+        requireSameActor(preview, executingAccountId);
         requireExecutable(preview, now);
         PreviewContent content = contentOf(preview);
         requireNobodyChangedSince(preview, content);
@@ -77,7 +79,7 @@ public class ExecutionService {
                 applied.membershipsEnded(), applied.accountsCreated(), applied.accountsDisabled(),
                 applied.rolesRemoved(),
                 content.changeSet().errors().size(), confirmRemovals, now,
-                requiredAccountId(accountId)));
+                executingAccountId));
         log.info("Executed import run {} for source {}: {} created, {} corrected, {} ended, "
                         + "{} accounts created",
                 run.getId(), preview.getSourceId(), applied.created(), applied.corrected(),
@@ -100,6 +102,12 @@ public class ExecutionService {
         if (preview.hasExpiredBy(now) || preview.getChangeSet() == null) {
             throw new ImportPreviewExpiredException("import.preview.expired",
                     Map.of("previewId", preview.getId().toString()));
+        }
+    }
+
+    private static void requireSameActor(ImportPreview preview, UUID accountId) {
+        if (!preview.getCreatedByAccountId().equals(accountId)) {
+            throw new ImportPreviewActorMismatchException("import.preview.actorMismatch", Map.of());
         }
     }
 

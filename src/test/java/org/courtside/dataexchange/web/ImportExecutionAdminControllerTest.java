@@ -160,6 +160,25 @@ class ImportExecutionAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "other-admin", roles = "ADMIN")
+    void givenAnotherAdministratorTookThePreview_whenExecutingIt_thenTheConflictIsNamed()
+            throws Exception {
+        // given
+        UUID otherPerson = identity.createPerson("Other", "Admin", "other.admin@example.org");
+        identity.createAccount(otherPerson, "other-admin", Set.of(Role.ADMIN));
+        UUID previewId = preview(TWO_MEMBERS);
+
+        // when / then
+        mockMvc.perform(execute(previewId, null))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:import-preview-actor-mismatch"))
+                .andExpect(jsonPath("$.violations[0].code")
+                        .value("import.preview.actorMismatch"));
+        assertThat(members.count()).isZero();
+    }
+
+    @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPreviewNobodyTook_whenExecuting_thenItIsReportedAsNotFound() throws Exception {
         // when / then
