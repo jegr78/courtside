@@ -1771,12 +1771,16 @@ whether it is built or designed. **Designed means absent today.**
   differs is reach, not proof: a candidate is published under its own version only, no floating tag
   follows it, and its GitHub release is marked a prerelease, so a club that pinned `latest` or a
   major line never receives one without asking for it by exact version.
-- **Security assessment evidence:** hosted assessments upload normalized public records and a CMS
-  envelope encrypted to the tracked recipient certificate. The expected certificate fingerprint
-  lives in a GitHub repository variable, outside commit history, so changing the certificate and a
-  tracked expectation together cannot make the seal pass. A missing or mismatched value blocks
-  sealing. The private key remains outside the repository, and the tracked key inventory records
-  its custodian and decrypt-canary window rather than another copy of the fingerprint. *Built.*
+- **Security assessment evidence:** hosted assessments upload their normalized public records — the
+  manifests and the gate summaries — and nothing else, with GitHub artifact attestation over them.
+  They used to seal the underlying evidence into a CMS envelope addressed to a tracked recipient
+  certificate. That is withdrawn: no private key for that certificate was ever created, so every
+  envelope it produced is unreadable and cannot be recovered. What stood between that and its
+  discovery was a pair of dates in a tracked file that the workflow compared against today's, which
+  proved the existence of a key to nobody. The accepted consequence is that evidence which cannot be
+  published in normalized form is not retained past the run. A protected channel returns only when a
+  key exists, is held by a named custodian, and is proven usable by decrypting what the workflow
+  encrypted — never by recording that somebody did. *Built.*
 - **The servlet container runs a version the platform does not manage.** Spring Boot 4.1.1 manages
   Tomcat 11.0.24, and `pom.xml` overrides that to 11.0.25 through the property Spring Boot documents
   for it. The earlier reading of this — that the advisories Apache published on 2026-08-25 reached

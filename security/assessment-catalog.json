@@ -1347,30 +1347,21 @@
         },
         {
           "id": "v5.0.0-11.3.1",
-          "status": "implemented",
+          "status": "not-applicable",
           "manualProcedureId": "MAN-CRYPTO-001",
-          "controlEvidence": {
-            "productionPath": ".github/workflows/security-assessment.yml",
-            "falsifyingTest": "tools/security-workflow.test.mjs#given protected active evidence, when the hosted run finishes, then only its encrypted envelope is uploaded"
-          }
+          "rationale": "This repository selects no encryption algorithm of its own. The one place it did was the assessment evidence envelope, withdrawn because no private key for its recipient was ever created. What encryption remains is transport encryption negotiated by Caddy, the JDK and the PostgreSQL driver, whose algorithm choice belongs to the platform and the operator rather than to this code, and which the communication controls cover."
         },
         {
           "id": "v5.0.0-11.3.2",
-          "status": "implemented",
+          "status": "not-applicable",
           "manualProcedureId": "MAN-CRYPTO-001",
-          "controlEvidence": {
-            "productionPath": ".github/workflows/security-assessment.yml",
-            "falsifyingTest": "tools/security-workflow.test.mjs#given protected active evidence, when the hosted run finishes, then only its encrypted envelope is uploaded"
-          }
+          "rationale": "This repository selects no encryption algorithm of its own. The one place it did was the assessment evidence envelope, withdrawn because no private key for its recipient was ever created. What encryption remains is transport encryption negotiated by Caddy, the JDK and the PostgreSQL driver, whose algorithm choice belongs to the platform and the operator rather than to this code, and which the communication controls cover."
         },
         {
           "id": "v5.0.0-11.3.3",
-          "status": "implemented",
+          "status": "not-applicable",
           "manualProcedureId": "MAN-CRYPTO-001",
-          "controlEvidence": {
-            "productionPath": ".github/workflows/security-assessment.yml",
-            "falsifyingTest": "tools/security-workflow.test.mjs#given protected active evidence, when the hosted run finishes, then only its encrypted envelope is uploaded"
-          }
+          "rationale": "This repository selects no encryption algorithm of its own. The one place it did was the assessment evidence envelope, withdrawn because no private key for its recipient was ever created. What encryption remains is transport encryption negotiated by Caddy, the JDK and the PostgreSQL driver, whose algorithm choice belongs to the platform and the operator rather than to this code, and which the communication controls cover."
         },
         {
           "id": "v5.0.0-11.4.1",

@@ -87,10 +87,9 @@ so plainly instead of describing a procedure this product does not perform.
 
 **Where nothing can be lost, the entry says that** rather than inventing a recovery procedure. A
 keyless release signature has no private key; a `SecureRandom` credential has no key to recover; an
-in-memory counter rebuilds itself. The one entry with real loss is the security-evidence envelope,
-whose private key lives outside this repository: losing it makes sealed evidence unreadable, and
-the decrypt canary in `.github/security-evidence-key.json` is what bounds how long that can go
-unnoticed.
+in-memory counter rebuilds itself. No entry here now carries a private key this project must keep:
+the one that did, the security-evidence envelope, was withdrawn once it emerged that its key had
+never been created and its envelopes could never be opened.
 
 ## What this file is not
 

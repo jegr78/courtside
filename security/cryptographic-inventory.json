@@ -397,13 +397,13 @@
       "algorithm": "SHA-256",
       "class": "integrity",
       "owner": "repository-maintainer",
-      "storageBoundary": "The expected value is held outside the code that checks it: a repository variable for the evidence recipient, a launch argument for a browser, an environment value for the mail peer. No digest of a production certificate is tracked in this repository.",
-      "permittedUse": "Deciding whether the party at the other end is the expected one. Unlike the content hashes above, this is a security control: a mismatch refuses the connection or blocks the seal rather than being reported.",
+      "storageBoundary": "The expected value is held outside the code that checks it: a launch argument for a browser, an environment value for the mail peer. No digest of a production certificate is tracked in this repository.",
+      "permittedUse": "Deciding whether the party at the other end is the expected one. Unlike the content hashes above, this is a security control: a mismatch refuses the connection rather than being reported.",
       "rotation": "Replacing the pinned certificate means replacing the expectation in the same change; the two are held apart on purpose, so changing only one fails closed.",
       "revocation": "Removing the expectation stops the pinned path rather than falling back to an unpinned one.",
       "recovery": "A pin that no longer matches is a refusal, not a loss: the expectation is corrected and the run repeated.",
       "retirement": "A successor digest is introduced by pinning under it before the previous expectation is removed.",
-      "evidence": "tools/security-evidence-recipient.test.mjs, deploy/mail-certificate-peer.mjs",
+      "evidence": "deploy/mail-certificate-peer.mjs",
       "detects": [
         "X509Certificate",
         "fingerprint256",
@@ -411,8 +411,6 @@
         "createHash"
       ],
       "locations": [
-        "tools/security-evidence-recipient.mjs",
-        "tools/security-evidence-recipient.test.mjs",
         "tools/courtside.mjs",
         "deploy/mail-certificate-peer.mjs",
         "frontend/e2e/global-setup.ts"
@@ -457,30 +455,6 @@
       ],
       "locations": [
         ".github/workflows/release.yml",
-        ".github/workflows/security-assessment.yml"
-      ]
-    },
-    {
-      "id": "security-evidence-envelope",
-      "purpose": "Encrypt the protected part of a security assessment so only its custodian can read it",
-      "algorithm": "CMS",
-      "parameters": {
-        "contentEncryption": "AES-256-GCM",
-        "keyEncryption": "RSA-OAEP-SHA-256"
-      },
-      "class": "confidentiality",
-      "owner": "repository-maintainer",
-      "storageBoundary": "The recipient certificate is tracked; the value it is checked against lives in a GitHub repository variable outside commit history, and the private key never enters this repository. The operational record is .github/security-evidence-key.json, which holds the custodian role and the decrypt-canary window and deliberately no second copy of that value.",
-      "permittedUse": "Sealing assessment evidence for its custodian. It is not a general-purpose encryption facility and no instance data passes through it.",
-      "rotation": "Replacing the recipient certificate means replacing the tracked certificate and the repository variable, which are separately held on purpose: changing only one blocks sealing rather than sealing to the wrong recipient.",
-      "revocation": "Removing the repository variable blocks sealing at the next run.",
-      "recovery": "A lost private key makes existing envelopes unreadable and cannot be recovered. That is bounded by the decrypt canary, which proves the key is still usable within its recorded window; a canary that cannot be verified is the signal to reseal under a new recipient.",
-      "retirement": "A successor recipient is introduced by sealing to it and letting the canary window of the previous one lapse.",
-      "evidence": ".github/security-evidence-key.json, tools/security-assessment-contract.test.mjs",
-      "detects": [
-        "openssl"
-      ],
-      "locations": [
         ".github/workflows/security-assessment.yml"
       ]
     },

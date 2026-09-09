@@ -210,54 +210,27 @@ immutable revision and the evidence artifact used for the judgment.
 Manual dispatch may select `active` for a focused retest or `baseline` for paired safe and active
 evidence. A baseline builds, qualifies and starts one immutable image, records safe as attempt 1 and
 continues with active as attempt 2 only after the safe attempt produced complete passive evidence.
-Both manifests are gated against the same image, commit and target identity, and both evidence
-directories share one encrypted envelope. The schedule always selects `safe`; active traffic is
+Both manifests are gated against the same image, commit and target identity. The schedule always selects `safe`; active traffic is
 never introduced by changing a default or cron expression.
 
-The public certificate in [`.github/security-evidence-recipient.pem`](../.github/security-evidence-recipient.pem)
-encrypts that envelope with AES-256-GCM through OpenSSL CMS. RSA-OAEP with SHA-256 wraps the
-content-encryption key; PKCS#1 v1.5 key transport is not permitted. Its security evidence private
-key is kept outside the repository. The workflow compares the certificate fingerprint with the
-`COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256` GitHub repository variable. The expected value
-therefore cannot move in the same commit as the certificate. A missing or stale variable blocks
-evidence sealing. Configure it from the checked certificate and verify the stored value:
+The assessment publishes its normalized records — the manifests and the gate summaries — and
+nothing else. It used to seal the underlying evidence directory into a CMS envelope addressed to a
+tracked recipient certificate. That envelope is gone: no private key for it was ever created, so
+every envelope it produced is unreadable and stays that way. The mechanism's only safeguard against
+exactly this was two dates in a tracked file, which the workflow compared against the current date
+and which nothing ever checked against a key.
+
+What remains is what a reader can act on. The manifests and summaries carry the candidate digest,
+the source commit, the target identity and the normalized outcome, and GitHub artifact attestation
+covers them, so their provenance is still provable:
 
 ```bash
-openssl x509 -in .github/security-evidence-recipient.pem -noout -fingerprint -sha256 \
-  | cut -d= -f2 \
-  | gh variable set COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256
-gh variable get COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256
+gh attestation verify manifest.json --repo jegr78/courtside
 ```
 
-The workflow separately validates the current decrypt-canary window against
-[the key inventory](../.github/security-evidence-key.json), then attests the encrypted envelope
-through GitHub artifact attestation. Verify that attestation before decrypting the downloaded
-envelope:
-
-```bash
-gh attestation verify protected-evidence.cms --repo jegr78/courtside
-```
-
-After verifying the attestation, compare the envelope against `protected-evidence.sha256`, then
-decrypt and extract it without writing its contents into a public workspace or log:
-
-```bash
-openssl cms -decrypt -binary -inform DER \
-  -in protected-evidence.cms \
-  -recip .github/security-evidence-recipient.pem \
-  -inkey <security-evidence-private-key.pem> \
-  -out protected-evidence.tar.gz
-tar -xzf protected-evidence.tar.gz
-```
-
-Before `canaryValidThrough`, the custodian encrypts and decrypts synthetic content with the tracked
-certificate and external private key and records the new verification window in the inventory.
-Rotation additionally requires proving that retained envelopes have either expired or been
-re-encrypted before the previous private key is retired. Merge the reviewed certificate and
-inventory update, immediately replace `COURTSIDE_SECURITY_EVIDENCE_CERTIFICATE_SHA256` with the new
-certificate's fingerprint, and run the assessment manually. The fail-closed mismatch prevents an
-envelope from being sealed during that short handover. A lost or unavailable private key blocks the
-inventory renewal and therefore the next hosted assessment.
+Evidence that cannot be published in that form is not retained past the run. Reintroducing a
+protected channel means creating and holding a key first, and proving it usable by decrypting
+something the workflow encrypted — never by recording that somebody did.
 
 The release workflow runs the complete `active` profile after both architectures qualify the
 candidate and before the security record can be assembled. The active manifest, normalized gate,

@@ -11,8 +11,6 @@
     { "path": ".github/codeql/codeql-config.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/dependabot.yml", "profiles": ["tooling"], "validators": ["tools/github-metadata.test.mjs"] },
     { "path": ".github/pull_request_template.md", "profiles": ["docs"], "validators": ["tools/docs-check.test.mjs"] },
-    { "path": ".github/security-evidence-key.json", "profiles": ["full"], "validators": [] },
-    { "path": ".github/security-evidence-recipient.pem", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/backup-restore-smoke.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/build.yml", "profiles": ["full"], "validators": [] },
     { "path": ".github/workflows/mail-smoke.yml", "profiles": ["full"], "validators": [] },
