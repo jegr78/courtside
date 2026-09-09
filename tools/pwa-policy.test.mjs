@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
 import test from "node:test";
@@ -22,6 +22,19 @@ const browserEvidenceSchema = JSON.parse(readFileSync(join(repository, "security
 const renderingContexts = JSON.parse(readFileSync(join(repository, "security/browser-rendering-contexts.json"), "utf8"));
 const documentation = readFileSync(join(repository, "docs/browser-pwa-testing.md"), "utf8");
 
+function sourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory() ? sourceFiles(path) : [path];
+  });
+}
+
+const shippedBrowserSources = [join(repository, "frontend", "index.html"),
+  ...sourceFiles(join(repository, "frontend", "src"))]
+  .filter((path) => /\.(?:html|js|jsx|ts|tsx)$/.test(path))
+  .filter((path) => !/\.(?:test|spec)\.[^.]+$|\.d\.ts$|setupTests\.ts$/.test(path))
+  .map((path) => ({ path, source: readFileSync(path, "utf8") }));
+
 test("given supported desktop browsers, when qualifying a pull request, then Chromium and WebKit run core smoke journeys", () => {
   assert.match(playwright, /name: "chromium"/);
   assert.match(playwright, /supported-browser\\\.spec\\\.ts/);
@@ -33,6 +46,19 @@ test("given supported desktop browsers, when qualifying a pull request, then Chr
   assert.match(fixtures, /project\.metadata\.plainOrigin === true/);
   assert.match(supported, /isSecureContext\)\)\.toBe\(overTls\)/);
   assert.match(supported, /typeof crypto\.randomUUID === "function"\)\)\.toBe\(overTls\)/);
+});
+
+test("given shipped browser sources, when enforcing the client technology boundary, then legacy plugin APIs stay absent", () => {
+  const legacyTechnology = new RegExp([
+    String.raw`<(?:applet|embed|object)\b`,
+    String.raw`\b(?:ActiveXObject|navigator\.plugins|document\.write)\b`,
+    String.raw`\b(?:document|React)(?:\.createElement|\[\s*["']createElement["']\s*\])`
+      + String.raw`\s*\(\s*["'](?:applet|embed|object)["']`
+  ].join("|"), "i");
+  const offenders = shippedBrowserSources
+    .filter(({ source }) => legacyTechnology.test(source))
+    .map(({ path }) => path.slice(repository.length + 1));
+  assert.deepEqual(offenders, []);
 });
 
 test("given the phone layout journey, when a pull request runs, then a device project covers it unswitched", () => {
@@ -89,6 +115,8 @@ test("given browser-controlled and stored values, when qualifying the PWA, then 
   assert.match(browserSecurity, /securitypolicyviolation/);
   assert.match(browserSecurity, /localStorage/);
   assert.match(browserSecurity, /sessionStorage/);
+  assert.match(browserSecurity, /indexedDB\.databases/);
+  assert.match(browserSecurity, /indexedDbNames\)\.toEqual\(\[\]\)/);
   assert.match(browserSecurity, /context\(\)\.cookies/);
   assert.match(browserSecurity, /caches\.keys/);
   assert.match(browserSecurity, /URL and fragment payloads/);

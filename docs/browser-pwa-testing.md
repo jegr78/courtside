@@ -19,10 +19,16 @@ that reaches the rendered PWA: club and court names, booking and participant-car
 names, roster names, managed-booking notes and guest names. It then observes the public, member,
 administrative and managed-appointment projections. Execution markers must remain untouched, the
 payload must not enter console output, and only the locale preference may appear in Web Storage.
-Retained evidence contains storage key names, cached request paths, cookie attributes, console
-event types and normalized CSP events, never storage or cookie values, response bodies or
-credentials. Security journeys disable Playwright traces and screenshots. The build uploads only
-the two evidence documents after each has passed its closed JSON Schema.
+IndexedDB remains a closed empty inventory; adding a database requires an explicit security review.
+Retained evidence contains storage key names, IndexedDB names, cached request paths, cookie
+attributes, console event types and normalized CSP events, never storage or cookie values, response
+bodies or credentials. Security journeys disable Playwright traces and screenshots. The build
+uploads only the two evidence documents after each has passed its closed JSON Schema.
+
+The shipped browser source uses no legacy plugin elements or APIs such as `applet`, `embed`,
+`object`, ActiveX, `navigator.plugins` or `document.write`. A source policy closes that boundary;
+Chromium and WebKit journeys separately prove that the maintained browser engines can execute the
+current application.
 
 The shared browser world runs Chromium and WebKit through its trusted TLS proxy. Both engines must
 accept `__Host-SESSION` and `__Host-XSRF-TOKEN`, complete login and a mutation, clear the cookies on

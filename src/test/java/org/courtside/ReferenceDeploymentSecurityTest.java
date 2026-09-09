@@ -262,6 +262,22 @@ class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void givenProductionTraffic_whenReadingEdgeHeaders_thenBrowserPoliciesAreGlobalAndExact()
+            throws IOException {
+        // given
+        String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
+
+        // when
+        List<String> headers = headerDirectives(caddyfile, PRODUCTION_SITE_BLOCK);
+
+        // then
+        assertThat(headers).contains(
+                "Strict-Transport-Security \"max-age=31536000; includeSubDomains\"",
+                "X-Content-Type-Options nosniff",
+                "Referrer-Policy strict-origin-when-cross-origin");
+    }
+
+    @Test
     void whenReadingPublicPlaintextListeners_thenOnlyKnownSafeNavigationsRedirect() throws IOException {
         // given
         String production = Files.readString(Path.of("deploy/Caddyfile"));

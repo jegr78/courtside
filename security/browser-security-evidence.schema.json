@@ -20,10 +20,11 @@
     "inventory": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["localStorageKeys", "sessionStorageKeys", "cacheRequests", "storageContainsSensitiveData", "cookies"],
+      "required": ["localStorageKeys", "sessionStorageKeys", "indexedDbNames", "cacheRequests", "storageContainsSensitiveData", "cookies"],
       "properties": {
         "localStorageKeys": { "type": "array", "items": { "const": "courtside.locale" }, "uniqueItems": true },
         "sessionStorageKeys": { "type": "array", "maxItems": 0 },
+        "indexedDbNames": { "type": "array", "maxItems": 0 },
         "cacheRequests": { "type": "array", "items": { "type": "string", "pattern": "^/(?:index\\.html|assets/[A-Za-z0-9_.-]+\\.(?:css|js))$" }, "uniqueItems": true },
         "storageContainsSensitiveData": { "const": false },
         "cookies": { "type": "array", "items": { "$ref": "#/$defs/cookie" }, "uniqueItems": true }

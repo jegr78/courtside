@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.4.5",
+  "catalogVersion": "1.4.6",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -465,12 +465,20 @@
         {
           "id": "v5.0.0-3.2.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#cross-origin browser requests neither carry session authority nor expose API responses"
+          }
         },
         {
           "id": "v5.0.0-3.2.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/views/AdminAuditView.tsx",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#stored text projections remain inert on administrative and managed views"
+          }
         },
         {
           "id": "v5.0.0-3.3.1",
@@ -483,7 +491,11 @@
         {
           "id": "v5.0.0-3.3.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#stored values remain data across roles without entering browser storage or console evidence"
+          }
         },
         {
           "id": "v5.0.0-3.3.3",
@@ -496,17 +508,29 @@
         {
           "id": "v5.0.0-3.3.4",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#session identifiers are issued only by successful login and remain confined to a host-bound cookie"
+          }
         },
         {
           "id": "v5.0.0-3.4.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "deploy/Caddyfile",
+            "falsifyingTest": "src/test/java/org/courtside/ReferenceDeploymentSecurityTest.java#givenProductionTraffic_whenReadingEdgeHeaders_thenBrowserPoliciesAreGlobalAndExact"
+          }
         },
         {
           "id": "v5.0.0-3.4.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#cross-origin browser requests neither carry session authority nor expose API responses"
+          }
         },
         {
           "id": "v5.0.0-3.4.3",
@@ -519,32 +543,47 @@
         {
           "id": "v5.0.0-3.4.4",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "deploy/Caddyfile",
+            "falsifyingTest": "src/test/java/org/courtside/ReferenceDeploymentSecurityTest.java#givenProductionTraffic_whenReadingEdgeHeaders_thenBrowserPoliciesAreGlobalAndExact"
+          }
         },
         {
           "id": "v5.0.0-3.4.5",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "deploy/Caddyfile",
+            "falsifyingTest": "src/test/java/org/courtside/ReferenceDeploymentSecurityTest.java#givenProductionTraffic_whenReadingEdgeHeaders_thenBrowserPoliciesAreGlobalAndExact"
+          }
         },
         {
           "id": "v5.0.0-3.4.6",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "findingReference": "docs/security-findings.md#proxy-generated-responses-lack-csp-frame-protection"
         },
         {
           "id": "v5.0.0-3.5.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/CsrfRefusalTest.java#whenAnAuthenticatedCallerWritesWithoutAToken_thenTheRefusalNamesAccessDenied"
+          }
         },
         {
           "id": "v5.0.0-3.5.2",
-          "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-CLIENT-001",
+          "rationale": "Courtside does not rely on a CORS preflight to protect sensitive operations. Spring Security requires a matching CSRF cookie and request header on browser writes, including requests whose media type or method would not cause a preflight."
         },
         {
           "id": "v5.0.0-3.5.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "findingReference": "docs/security-findings.md#safe-http-methods-lack-state-invariance-evidence"
         },
         {
           "id": "v5.0.0-3.5.4",
@@ -559,7 +598,11 @@
         {
           "id": "v5.0.0-3.7.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/main.tsx",
+            "falsifyingTest": "tools/pwa-policy.test.mjs#given shipped browser sources, when enforcing the client technology boundary, then legacy plugin APIs stay absent"
+          }
         },
         {
           "id": "v5.0.0-3.7.2",
@@ -1830,7 +1873,11 @@
         {
           "id": "WSTG-v4.2-CLNT-01",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/App.tsx",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#URL and fragment payloads are neither reflected nor executed by the DOM"
+          }
         },
         {
           "id": "WSTG-v4.2-CLNT-02",
@@ -1842,7 +1889,11 @@
         {
           "id": "WSTG-v4.2-CLNT-03",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/views/AdminAuditView.tsx",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#stored text projections remain inert on administrative and managed views"
+          }
         },
         {
           "id": "WSTG-v4.2-CLNT-04",
@@ -1857,12 +1908,20 @@
         {
           "id": "WSTG-v4.2-CLNT-06",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/App.tsx",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#URL configuration rejects active schemes and renders accepted relative targets"
+          }
         },
         {
           "id": "WSTG-v4.2-CLNT-07",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#cross-origin browser requests neither carry session authority nor expose API responses"
+          }
         },
         {
           "id": "WSTG-v4.2-CLNT-08",
@@ -1890,12 +1949,20 @@
         {
           "id": "WSTG-v4.2-CLNT-12",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/api/client.ts",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#stored values remain data across roles without entering browser storage or console evidence"
+          }
         },
         {
           "id": "WSTG-v4.2-CLNT-13",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#cross-origin browser requests neither carry session authority nor expose API responses"
+          }
         },
         {
           "id": "WSTG-v4.2-CONF-01",
