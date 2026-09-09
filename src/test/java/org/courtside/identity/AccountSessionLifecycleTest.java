@@ -210,16 +210,20 @@ class AccountSessionLifecycleTest extends AbstractIntegrationTest {
                         .contentType("application/json").content("{\"password\":\"wrong-password\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:reauthentication-failed"));
-        mockMvc.perform(post("/api/session/reauthentication").cookie(session).with(csrf())
-                        .contentType("application/json").content("{\"password\":\"" + PASSWORD + "\"}"))
-                .andExpect(status().isNoContent());
+        Cookie proven = mockMvc.perform(post("/api/session/reauthentication").cookie(session)
+                        .with(csrf()).contentType("application/json")
+                        .content("{\"password\":\"" + PASSWORD + "\"}"))
+                .andExpect(status().isNoContent())
+                .andReturn().getResponse().getCookie("SESSION");
+        assertThat(proven).as("a successful proof renews the identifier, so the caller carries on"
+                + " with the cookie it was handed rather than the one it presented").isNotNull();
 
         // when
-        mockMvc.perform(delete("/api/account/sessions").cookie(session).with(csrf()))
+        mockMvc.perform(delete("/api/account/sessions").cookie(proven).with(csrf()))
                 .andExpect(status().isNoContent());
 
         // then
-        mockMvc.perform(get("/api/session").cookie(session))
+        mockMvc.perform(get("/api/session").cookie(proven))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.authenticated").value(false));
     }
 

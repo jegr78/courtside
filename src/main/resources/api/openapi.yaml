@@ -2368,6 +2368,12 @@ paths:
 
         An account still marked for an initial password change is refused here. Nothing the proof
         unlocks is reachable in that state, so the proof is not either.
+
+        A successful proof also replaces the session identifier and answers with a new session
+        cookie. The identifier that was presented stops authorizing immediately, so a client that
+        manages cookies itself has to carry the replacement forward. Nothing else about the session
+        changes: the principal, the recorded browser and the moment the session was created all
+        survive, so proving again does not extend the session's absolute lifetime.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2378,7 +2384,9 @@ paths:
             schema: { $ref: "#/components/schemas/ReauthenticationRequest" }
       responses:
         "204":
-          description: The current session now carries a recent full-authentication proof.
+          description: |
+            The session now carries a recent full-authentication proof, under a replaced
+            identifier delivered in the session cookie.
         "400":
           $ref: "#/components/responses/Invalid"
         "401":

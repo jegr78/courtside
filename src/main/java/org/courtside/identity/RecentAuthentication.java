@@ -33,6 +33,14 @@ public class RecentAuthentication {
         record(request);
     }
 
+    public void renew() {
+        if (request.getSession(false) == null) {
+            throw new IllegalStateException("A session identifier cannot be renewed without a session");
+        }
+        request.changeSessionId();
+        record();
+    }
+
     public void record(HttpServletRequest authenticatedRequest) {
         authenticatedRequest.getSession(true)
                 .setAttribute(AUTHENTICATED_AT, clock.instant().toEpochMilli());

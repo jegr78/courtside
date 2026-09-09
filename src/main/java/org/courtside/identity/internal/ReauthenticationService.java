@@ -25,6 +25,6 @@ class ReauthenticationService {
                     SecurityEventLog.ControlRefusal.REAUTHENTICATION_FAILED);
             throw new ReauthenticationFailedException();
         }
-        recentAuthentication.record();
+        recentAuthentication.renew();
     }
 }
