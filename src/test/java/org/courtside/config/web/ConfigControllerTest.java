@@ -844,6 +844,38 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.supportedLocales", containsInAnyOrder("de", "en")));
     }
 
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenANewAccountCredentialBeyondAWeek_whenChangingTheConfig_thenItIsRefusedByName()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "\"newAccountCredentialHours\": 168",
+                                "\"newAccountCredentialHours\": 169"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("newAccountCredentialHours"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAPasswordResetCredentialBeyondAWeek_whenChangingTheConfig_thenItIsRefusedByName()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "\"passwordResetCredentialHours\": 24",
+                                "\"passwordResetCredentialHours\": 169"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("passwordResetCredentialHours"));
+    }
+
     private static String configJson(String clubName) {
         return """
                 {"clubName": "%s", "primaryColor": "#004f2d", "accentColor": "#c8a415",

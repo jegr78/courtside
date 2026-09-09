@@ -389,8 +389,8 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             <LocaleSelect className="form-control rounded-lg border px-3 py-3" value={config.defaultLocale} supported={supported} changed={(defaultLocale) => changeConfig({ defaultLocale })} />
           </label>
           <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
-          <TextField data-testid="new-account-credential-hours" type="number" min={1} max={8760} label={t("admin.config.newAccountCredentialHours")} value={config.newAccountCredentialHours} onChange={(event) => changeConfig({ newAccountCredentialHours: Number(event.target.value) })} />
-          <TextField data-testid="password-reset-credential-hours" type="number" min={1} max={8760} label={t("admin.config.passwordResetCredentialHours")} value={config.passwordResetCredentialHours} onChange={(event) => changeConfig({ passwordResetCredentialHours: Number(event.target.value) })} />
+          <TextField data-testid="new-account-credential-hours" type="number" min={1} max={168} label={t("admin.config.newAccountCredentialHours")} value={config.newAccountCredentialHours} onChange={(event) => changeConfig({ newAccountCredentialHours: Number(event.target.value) })} />
+          <TextField data-testid="password-reset-credential-hours" type="number" min={1} max={168} label={t("admin.config.passwordResetCredentialHours")} value={config.passwordResetCredentialHours} onChange={(event) => changeConfig({ passwordResetCredentialHours: Number(event.target.value) })} />
           <div className="grid gap-1">
             <TextField data-testid="booking-reminder-hours" type="number" min={0} max={168} label={t("admin.config.bookingReminderHours")} value={config.bookingReminderHours} onChange={(event) => changeConfig({ bookingReminderHours: Number(event.target.value) })} />
             <p className="text-muted text-sm">{t("admin.config.bookingReminderHoursHelp")}</p>
