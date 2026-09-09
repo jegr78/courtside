@@ -52,8 +52,23 @@ The four catalog states mean:
 
 - `planned`: there is an owned implementation issue, but no assessment evidence may be claimed yet;
 - `implemented`: the listed execution and evidence are available and maintained;
-- `blocked`: execution needs a missing capability or external state, with rationale and tracking issue; and
+- `blocked`: execution needs a missing capability or external state, with a rationale; and
 - `not-applicable`: the control does not apply to the shipped architecture, with a concrete rationale.
+
+**A disposition is a rationale in this catalog, not an issue in the tracker.** A reading that cannot
+anchor a control writes down what the control asks, what this architecture actually does, and why
+the two do not meet — beside the control, where the next reader finds it. It does not open an issue,
+and `blocked` does not require one.
+
+A `trackingIssue` is added only when a **product change** is what closes the gap: something a club
+would notice, that somebody will build. It names that change and it goes on the board like any other
+work. A control whose only remedy is an inventory, a map, a policy document or a restatement of
+evidence we already hold gets a rationale and nothing else. That kind of entry cannot be closed by
+building anything, so as an issue it is deferral wearing a ticket number — which the repository
+rules forbid, and which this catalog exists to make unnecessary.
+
+The distinction is the remedy, never the severity. A P2 that changes a response a member sees is an
+issue; a P2 that produces a document proving what the code already does is a rationale.
 
 An implemented entry can still be incomplete in a particular run. Catalog state describes capability; run outcome describes execution. Controls that require human judgment link to the concrete procedures in the [manual assessment runbook](security-manual-assessment.md). Their retained record is constrained by the closed [`manual-assessment-evidence.schema.json`](../security/manual-assessment-evidence.schema.json) rather than an unaudited checklist.
 
