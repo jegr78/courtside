@@ -56,6 +56,8 @@ const recommendedCiphers = new Set([
   "ECDHE-ECDSA-AES256-GCM-SHA384", "ECDHE-RSA-AES256-GCM-SHA384",
   "ECDHE-ECDSA-CHACHA20-POLY1305", "ECDHE-RSA-CHACHA20-POLY1305"
 ]);
+const cspDirective = /^[a-z][a-z-]*$/;
+const namedDirectivesLead = "directive(s):";
 const suspiciousCommentPatterns = [
   "todo", "fixme", "bug", "bugs", "xxx", "query", "db", "admin", "administrator", "user", "username",
   "select", "where", "from", "later", "debug"
@@ -121,6 +123,18 @@ export function normalizeZapAlerts(report, imageDigest) {
       || left.routeTemplate.localeCompare(right.routeTemplate));
 }
 
+// ZAP words this rule two ways: broad directives listed one per line, and a sentence naming the
+// directives that have no `default-src` fallback. Both state the same fact about the same header.
+function cspDirectivesFrom(otherInfo) {
+  const listed = [...otherInfo.matchAll(/(?:^|\n)([a-z][a-z-]*)(?=\n|$)/g)].map((match) => match[1]);
+  const opening = otherInfo.indexOf(namedDirectivesLead);
+  const closing = opening < 0 ? -1 : otherInfo.indexOf("is/are", opening);
+  const named = closing < 0 ? []
+    : otherInfo.slice(opening + namedDirectivesLead.length, closing).split(",").map((directive) => directive.trim());
+  const directives = [...new Set([...listed, ...named])];
+  return directives.every((directive) => cspDirective.test(directive)) ? directives.toSorted() : [];
+}
+
 function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest) {
   const unsupported = () => new Error(`ZAP rule ${pluginId} produced unsupported rule evidence`);
   const param = instance.param;
@@ -161,12 +175,14 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
     return { kind: "response-header", headerName: "server" };
   }
   if (pluginId === "10055") {
-    const directives = [...otherInfo.matchAll(/(?:^|\n)([a-z][a-z-]*)(?:\n|$)/g)].map((match) => match[1]);
-    if (param.toLowerCase() !== "content-security-policy" || evidence.length === 0
-        || directives.length === 0 || directives.some((directive) => directive !== "img-src")) {
+    if (param.toLowerCase() !== "content-security-policy" || evidence.length === 0) {
       throw unsupported();
     }
-    return { kind: "policy-directive", headerName: "content-security-policy", directives: [...new Set(directives)] };
+    const directives = cspDirectivesFrom(otherInfo);
+    if (directives.length === 0) {
+      throw unsupported();
+    }
+    return { kind: "policy-directive", headerName: "content-security-policy", directives };
   }
   if (pluginId === "10109") {
     if (param !== "" || !evidence.includes("<script")
@@ -190,6 +206,11 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
 }
 
 function mergeRuleEvidence(existing, incoming, imageDigest, fingerprint) {
+  if (existing.kind === "policy-directive" && incoming.kind === "policy-directive"
+      && existing.headerName === incoming.headerName) {
+    return { ...existing,
+      directives: [...new Set([...existing.directives, ...incoming.directives])].toSorted() };
+  }
   if (existing.kind !== "text-pattern" || incoming.kind !== "text-pattern") {
     if (JSON.stringify(existing) !== JSON.stringify(incoming)) {
       throw new Error("ZAP produced contradictory rule evidence");
@@ -388,7 +409,10 @@ function retainedRuleEvidenceMatches(alert, imageDigest) {
   if (alert.pluginId === "10036") return evidence.kind === "response-header" && evidence.headerName === "server";
   if (alert.pluginId === "10055") return evidence.kind === "policy-directive"
     && evidence.headerName === "content-security-policy"
-    && JSON.stringify(evidence.directives) === JSON.stringify(["img-src"]);
+    && evidence.directives.length > 0
+    && new Set(evidence.directives).size === evidence.directives.length
+    && evidence.directives.every((directive) => cspDirective.test(directive))
+    && JSON.stringify(evidence.directives) === JSON.stringify(evidence.directives.toSorted());
   if (alert.pluginId === "10109") return evidence.kind === "application-signal"
     && evidence.signal === "scripts-without-links";
   if (alert.pluginId === "10112") return evidence.kind === "session-signal"

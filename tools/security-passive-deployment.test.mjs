@@ -338,6 +338,134 @@ test("given the remaining supported passive rules, when normalizing them, then o
   assert.doesNotMatch(JSON.stringify(alerts), /policy-value|src=secret/);
 });
 
+test("given the CSP directives ZAP says do not fall back, when normalizing them, then it names them", () => {
+  // given — the shape a hosted run produced against the proxy's own deliberately narrow policy
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "base-uri 'none'; frame-ancestors 'none'",
+      otherinfo: "The directive(s): form-action is/are among the directives that do not fallback to default-src." }] }
+  ] }] };
+
+  // when
+  const alerts = normalizeZapAlerts(report);
+
+  // then
+  assert.deepEqual(alerts.map(({ ruleEvidence }) => ruleEvidence), [
+    { kind: "policy-directive", headerName: "content-security-policy", directives: ["form-action"] }
+  ]);
+  assert.doesNotMatch(JSON.stringify(alerts), /base-uri|'none'/);
+});
+
+test("given several directives in one CSP alert, when normalizing it, then they are deduplicated and ordered", () => {
+  // given
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "base-uri 'none'",
+      otherinfo: "The directive(s): form-action, base-uri, form-action is/are among the directives that do not fallback to default-src." }] }
+  ] }] };
+
+  // when
+  const alerts = normalizeZapAlerts(report);
+
+  // then
+  assert.deepEqual(alerts[0].ruleEvidence.directives, ["base-uri", "form-action"]);
+});
+
+test("given a broad-directive list of several lines, when normalizing it, then every line is named", () => {
+  // given
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "policy-value",
+      otherinfo: "Broad directives:\nimg-src\nscript-src\ndefault-src" }] }
+  ] }] };
+
+  // when
+  const alerts = normalizeZapAlerts(report);
+
+  // then
+  assert.deepEqual(alerts[0].ruleEvidence.directives, ["default-src", "img-src", "script-src"]);
+});
+
+test("given both CSP wordings on one route, when they are merged, then the evidence names all their directives",
+  () => {
+    // given
+    const report = { site: [{ alerts: [
+      { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+        param: "Content-Security-Policy", evidence: "policy-value", otherinfo: "Broad directives:\nimg-src" }] },
+      { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+        param: "Content-Security-Policy", evidence: "base-uri 'none'",
+        otherinfo: "The directive(s): form-action is/are among the directives that do not fallback to default-src." }] }
+    ] }] };
+
+    // when
+    const alerts = normalizeZapAlerts(report);
+
+    // then
+    assert.equal(alerts.length, 1);
+    assert.deepEqual(alerts[0].ruleEvidence.directives, ["form-action", "img-src"]);
+  });
+
+test("given two alerts of another rule that disagree on one route, when they are merged, then it fails closed", () => {
+  // given — session evidence, whose token names genuinely differ between the two alerts
+  const report = { site: [{ alerts: [
+    { pluginid: "10112", riskcode: "0", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "__Host-SESSION", evidence: "__Host-SESSION", otherinfo: "cookie:__Host-SESSION" }] },
+    { pluginid: "10112", riskcode: "0", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "__Host-XSRF-TOKEN", evidence: "__Host-XSRF-TOKEN", otherinfo: "cookie:__Host-XSRF-TOKEN" }] }
+  ] }] };
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(report), /contradictory rule evidence/);
+});
+
+test("given retained evidence naming a fallback directive, when it is validated, then the check and the schema accept it",
+  () => {
+    // given
+    const evidence = buildPassiveDeploymentEvidence({ targetFingerprint: digest, imageDigest: digest,
+      observations: passingObservations(), requestCount: 1,
+      zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10055", riskcode: "2", confidence: "3",
+        instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "Content-Security-Policy",
+          evidence: "base-uri 'none'; frame-ancestors 'none'",
+          otherinfo: "The directive(s): form-action is/are among the directives that do not fallback to default-src." }] }] }] }
+    });
+
+    // when / then — the recomputation and the schema each pinned img-src, so each refused this alone
+    assert.deepEqual(evidence.zap.alerts[0].ruleEvidence.directives, ["form-action"]);
+    assert.doesNotThrow(() => assertPassiveDeploymentEvidence(evidence));
+    const validate = new Ajv({ strict: true, allErrors: true }).compile(schema);
+    assert.equal(validate(evidence), true, JSON.stringify(validate.errors));
+  });
+
+test("given a CSP alert whose wording neither shape matches, when normalizing it, then the evidence fails closed", () => {
+  // given
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "policy-value",
+      otherinfo: "A wholly new sentence ZAP has started producing." }] }
+  ] }] };
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(report), /unsupported rule evidence/);
+});
+
+test("given an otherinfo shaped to make the sentence parser backtrack, when normalizing it, then it does not spin",
+  () => {
+    // given — a param and an evidence that pass every cheap check, so the parser itself is measured
+    const report = { site: [{ alerts: [
+      { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+        param: "Content-Security-Policy", evidence: "policy-value",
+        otherinfo: `The directive(s):${" ".repeat(4000)}` }] }
+    ] }] };
+
+    // when
+    const started = performance.now();
+    assert.throws(() => normalizeZapAlerts(report), /unsupported rule evidence/);
+    const elapsed = performance.now() - started;
+
+    // then — a backtracking parser needs about eleven seconds for this input, a linear one under a millisecond
+    assert.ok(elapsed < 500, `normalizing an adversarial otherinfo took ${elapsed.toFixed(0)} ms`);
+  });
+
 test("given session fields that name different tokens, when normalizing them, then the evidence fails closed", () => {
   // given
   const report = { site: [{ alerts: [{ pluginid: "10112", riskcode: "0", confidence: "2",
