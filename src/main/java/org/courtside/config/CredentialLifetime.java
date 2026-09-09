@@ -4,11 +4,12 @@ import java.time.Duration;
 
 public record CredentialLifetime(int hours) {
 
-    public static final int MAXIMUM_HOURS = 168;
+    private static final int MAXIMUM_HOURS = 168;
 
     public CredentialLifetime {
         if (!isValid(hours)) {
-            throw new IllegalArgumentException("A credential lifetime must be 1 to 168 hours");
+            throw new IllegalArgumentException(
+                    "A credential lifetime must be 1 to " + MAXIMUM_HOURS + " hours");
         }
     }
 
