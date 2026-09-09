@@ -546,6 +546,22 @@ test("given an otherinfo shaped to make the sentence parser backtrack, when norm
     assert.ok(elapsed < 500, `normalizing an adversarial otherinfo took ${elapsed.toFixed(0)} ms`);
   });
 
+test("given an otherinfo dense with colons, when normalizing it, then the directive scan stays linear", () => {
+  // given — each colon opens a directive run, so re-scanning the remainder per colon would be quadratic
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "policy-value", otherinfo: ": ".repeat(40000) }] }
+  ] }] };
+
+  // when
+  const started = performance.now();
+  assert.deepEqual(normalizeZapAlerts(report)[0].ruleEvidence.directives, []);
+  const elapsed = performance.now() - started;
+
+  // then — a per-colon rescan needs about fifteen seconds for this input, a single pass a few milliseconds
+  assert.ok(elapsed < 1000, `scanning a colon-dense otherinfo took ${elapsed.toFixed(0)} ms`);
+});
+
 test("given session fields that name different tokens, when normalizing them, then the evidence fails closed", () => {
   // given
   const report = { site: [{ alerts: [{ pluginid: "10112", riskcode: "0", confidence: "2",

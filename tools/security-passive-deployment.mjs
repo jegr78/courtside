@@ -126,14 +126,16 @@ export function normalizeZapAlerts(report, imageDigest) {
 // alert carrying no directive is ordinary rather than unreadable.
 function cspDirectivesFrom(otherInfo) {
   const named = new Set();
-  const [leading = ""] = otherInfo.trimStart().split(/[\s,]+/);
-  if (cspDirective.test(leading)) named.add(leading);
-  for (let colon = otherInfo.indexOf(":"); colon >= 0; colon = otherInfo.indexOf(":", colon + 1)) {
-    for (const token of otherInfo.slice(colon + 1).split(/[,\s]+/)) {
-      if (token.length === 0) continue;
-      if (!cspDirective.test(token)) break;
-      named.add(token);
-    }
+  let run = false;
+  let opening = true;
+  for (const token of otherInfo.split(/[,\s]+/)) {
+    if (token.length === 0) continue;
+    const colon = token.lastIndexOf(":");
+    const candidate = colon < 0 ? token : token.slice(colon + 1);
+    if ((run || opening) && cspDirective.test(candidate)) named.add(candidate);
+    else if (run) run = false;
+    if (colon >= 0) run = true;
+    opening = false;
   }
   return [...named].toSorted();
 }
