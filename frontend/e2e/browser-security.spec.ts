@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import { expect, selectJourneyDate, test } from "./fixtures";
+import { PROXY_BOUNDARY_HOST } from "./global-setup";
 
 const payload = `<img src=x onerror="globalThis.__courtsideXss='executed'">cross-role`;
 const evidenceDirectory = join(process.cwd(), "test-results", "browser-security");
@@ -35,6 +36,73 @@ async function login(page: import("@playwright/test").Page, username: string) {
   await page.getByTestId("login-submit").click();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
 }
+
+async function failedLoginFrom(page: import("@playwright/test").Page, forwardedFor: string) {
+  const csrf = (await page.context().cookies())
+    .find((cookie) => cookie.name === "XSRF-TOKEN" || cookie.name === "__Host-XSRF-TOKEN");
+  expect(csrf).toBeDefined();
+  const observed = page.waitForRequest((request) =>
+    request.url().endsWith("/api/session") && request.method() === "POST");
+  const result = await page.evaluate(async ({ forgedAddress, csrfToken }) => {
+    const response = await fetch("/api/session", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-XSRF-TOKEN": csrfToken,
+        "X-Forwarded-For": forgedAddress
+      },
+      body: new URLSearchParams({ username: "doe.jane", password: "wrong-password" })
+    });
+    const problem = await response.json() as { type: string };
+    return {
+      status: response.status,
+      type: problem.type,
+      retryAfter: response.headers.get("retry-after")
+    };
+  }, { forgedAddress: forwardedFor, csrfToken: csrf!.value });
+  expect(await (await observed).headerValue("x-forwarded-for")).toBe(forwardedFor);
+  return result;
+}
+
+test("forged forwarded addresses cannot split the login rate-limit bucket at the production proxy",
+  async ({ page, journeyService }) => {
+  // given
+  const sessionStatus = page.waitForResponse((response) =>
+    response.url().endsWith("/api/session") && response.request().method() === "GET");
+  await page.goto(`https://${PROXY_BOUNDARY_HOST}/login`);
+  expect((await sessionStatus).status()).toBe(200);
+  await expect(page.getByTestId("login-view")).toBeVisible();
+  const first = await failedLoginFrom(page, "198.51.100.21");
+  expect(first).toEqual({
+    status: 401,
+    type: "urn:courtside:error:unauthenticated",
+    retryAfter: null
+  });
+  const blocked = await journeyService.executeSql(`
+    WITH blocked AS (
+      UPDATE login_attempt_limit
+      SET blocked_until = TIMESTAMPTZ '2026-05-12 10:01:00Z'
+      WHERE scope = 'ADDRESS'
+      RETURNING attempt_count
+    )
+    SELECT attempt_count FROM blocked
+  `);
+  expect(blocked).toBe("1");
+
+  // when
+  const second = await failedLoginFrom(page, "203.0.113.47");
+
+  // then
+  expect(second).toEqual({
+    status: 429,
+    type: "urn:courtside:error:login-rate-limited",
+    retryAfter: "60"
+  });
+  expect(await journeyService.executeSql(
+    "SELECT count(*) FROM login_attempt_limit WHERE scope = 'ADDRESS'"
+  )).toBe("1");
+});
 
 async function browserInventory(page: import("@playwright/test").Page) {
   const storage = await page.evaluate(async (sensitiveMarkers: string[]) => {

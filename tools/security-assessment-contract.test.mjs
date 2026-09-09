@@ -800,6 +800,27 @@ test("given the identity and credential controls were reviewed, when reading the
   }
 });
 
+test("given the architecture and threat-boundary controls were reviewed, when reading their dispositions, then none is left implicit", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-INFO-02", "WSTG-v4.2-INFO-03", "WSTG-v4.2-INFO-04",
+    "WSTG-v4.2-INFO-05", "WSTG-v4.2-INFO-06", "WSTG-v4.2-INFO-07",
+    "WSTG-v4.2-INFO-09", "WSTG-v4.2-INFO-10", "v5.0.0-15.1.3",
+    "v5.0.0-15.2.3", "v5.0.0-15.3.3", "v5.0.0-15.3.4",
+    "v5.0.0-15.3.5", "v5.0.0-15.3.6", "v5.0.0-15.3.7"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+  }
+});
+
 test("given the shipped login defenses, when reading their documentation, then rate limits and lockout safety remain explicit", () => {
   // when / then
   assert.match(readme, /`POST \/api\/session` limits attempts by source address/);
@@ -823,7 +844,7 @@ test("given a manual outcome, when its control carries no control-specific evide
     outcome: "pass"
   };
   const anchored = { ...control, controlId: "v5.0.0-8.3.1" };
-  const automated = { ...control, controlId: "v5.0.0-15.3.3" };
+  const automated = { ...control, controlId: "v5.0.0-3.3.1" };
   const evidence = {
     schemaVersion: 2, catalogVersion: catalog.catalogVersion, runId: "manual-baseline-1",
     tester: "Maintainer", recordedAt: "2026-08-21T20:00:00Z", sourceCommit: "a".repeat(40),
@@ -858,9 +879,9 @@ test("given a manual outcome, when its control carries no control-specific evide
   const onAnAutomatedLink = {
     ...evidence,
     selectedControlIds: [automated.controlId],
-    authorization: { ...evidence.authorization, procedureIds: ["MAN-ARCH-001"] },
-    procedures: [{ ...evidence.procedures[0], procedureId: "MAN-ARCH-001", controls: [automated] }]
+    authorization: { ...evidence.authorization, procedureIds: ["MAN-CLIENT-001"] },
+    procedures: [{ ...evidence.procedures[0], procedureId: "MAN-CLIENT-001", controls: [automated] }]
   };
   assert.throws(() => validateManualAssessmentEvidence(onAnAutomatedLink, assessmentDate),
-    /v5\.0\.0-15\.3\.3 passed without control-specific evidence in the catalog/);
+    /v5\.0\.0-3\.3\.1 passed without control-specific evidence in the catalog/);
 });

@@ -1707,8 +1707,10 @@ whether it is built or designed. **Designed means absent today.**
   recognizes as secure, Spring Security also sets `Strict-Transport-Security`. Caddy repeats
   nosniff, frame denial and the referrer policy at the edge, sets HSTS independently and terminates
   TLS; `Permissions-Policy` is the only response policy here that comes only from Caddy. The CSP
-  denies every document base with `base-uri 'none'`. Caddy adds that narrow policy to every proxied
-  response as a separately enforced CSP; it does not replace the application's complete policy.
+  denies every document base with `base-uri 'none'`. Caddy adds `base-uri 'none'` and
+  `frame-ancestors 'none'` to every proxied or proxy-generated response as a separately enforced
+  CSP; it does not replace the application's complete policy. Proxy failures use a fixed response
+  body and retain the same browser security headers rather than exposing an implementation error.
   Plain HTTP redirects only safe requests for known browser routes to the configured canonical
   origin. API, management, unknown-method and state-changing requests receive a fixed `400` at the
   edge without forwarding or reflection. This routing is based on method and path, never on

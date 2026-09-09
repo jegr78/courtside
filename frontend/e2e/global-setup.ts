@@ -49,6 +49,7 @@ const PINNED_BROWSER_IMAGE =
 // The name the certificate is issued for, so browsers reach the proxy the way a member reaches a club.
 const CLUB_HOST = "courtside.test";
 const ATTACKER_HOST = "attacker.test";
+export const PROXY_BOUNDARY_HOST = "proxy-boundary.test";
 
 // A cadence a journey never reaches, rather than "-": that switches the cleanup off, and
 // an instance is built to refuse to start when it is off.
@@ -110,7 +111,32 @@ async function readProxyCertificates(proxy: StartedTestContainer, where: string)
   throw new Error(`The club proxy issued no certificate under ${where}`);
 }
 
+function deployedCaddyBlock(marker: string): string {
+  const caddyfile = readFileSync(resolve("../deploy/Caddyfile"), "utf8");
+  const start = caddyfile.indexOf(marker);
+  if (start < 0) throw new Error(`The deployment Caddyfile has no ${marker} block`);
+  const opening = start + marker.lastIndexOf("{");
+  let depth = 0;
+  for (let cursor = opening; cursor < caddyfile.length; cursor += 1) {
+    depth += caddyfile[cursor] === "{" ? 1 : caddyfile[cursor] === "}" ? -1 : 0;
+    if (depth === 0 && caddyfile[cursor] === "}") return caddyfile.slice(start, cursor + 1);
+  }
+  throw new Error(`The deployment Caddyfile does not close its ${marker} block`);
+}
+
+function replaceRequired(source: string, expected: string, replacement: string): string {
+  if (!source.includes(expected)) throw new Error(`The deployment Caddyfile no longer contains ${expected}`);
+  return source.replace(expected, replacement);
+}
+
 function clubProxyConfiguration(applicationPort: number): string {
+  const applicationHeaders = deployedCaddyBlock("(applicationHeaders) {");
+  const plaintext = replaceRequired(
+    deployedCaddyBlock("(plaintext) {"), "app:8080", `host.docker.internal:${applicationPort}`);
+  const productionSite = replaceRequired(
+    replaceRequired(deployedCaddyBlock("{$COURTSIDE_DOMAIN} {"),
+      "{$COURTSIDE_DOMAIN}", `https://${PROXY_BOUNDARY_HOST}`),
+    "import {$COURTSIDE_APP_TLS_MODE:plaintext}", "import plaintext");
   return `{
 	admin off
 	local_certs
@@ -119,6 +145,12 @@ function clubProxyConfiguration(applicationPort: number): string {
 https://${CLUB_HOST} {
 	reverse_proxy host.docker.internal:${applicationPort}
 }
+
+${applicationHeaders}
+
+${plaintext}
+
+${productionSite}
 
 https://${ATTACKER_HOST} {
 	respond "<!doctype html><title>Cross-origin probe</title>" 200
@@ -746,7 +778,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     clubNetwork = await new Network().start();
     clubProxy = await new GenericContainer(deployedProxyImage())
       .withNetwork(clubNetwork)
-      .withNetworkAliases(CLUB_HOST, ATTACKER_HOST)
+      .withNetworkAliases(CLUB_HOST, ATTACKER_HOST, PROXY_BOUNDARY_HOST)
       .withCopyContentToContainer([
         { content: clubProxyConfiguration(port), target: "/etc/caddy/Caddyfile" }
       ])

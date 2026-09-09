@@ -1,20 +1,24 @@
 package org.courtside;
 
 import org.junit.jupiter.api.Test;
+import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class ReferenceDeploymentSecurityTest {
+public class ReferenceDeploymentSecurityTest {
 
     private static final Pattern REVERSE_PROXY_BLOCK = Pattern.compile(
             "(?m)^\\treverse_proxy app:8080 \\{\\R(?<directives>(?:\\t\\t[^\\r\\n]*\\R)*)\\t}$");
@@ -172,6 +176,256 @@ class ReferenceDeploymentSecurityTest {
                 "header_up X-Forwarded-Proto {scheme}");
     }
 
+    @Test
+    void whenReadingProductionResponseBoundaries_thenServerImplementationsStayUnadvertised()
+            throws IOException {
+        // given
+        String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
+        String compose = Files.readString(Path.of("deploy/compose.yaml"));
+        List<String> productionSites = PRODUCTION_SITE_BLOCK.matcher(caddyfile).results()
+                .map(match -> match.group("body"))
+                .toList();
+
+        // when / then
+        assertThat(compose).containsPattern(
+                "image: caddy:2-alpine@sha256:[a-f0-9]{64}");
+        assertThat(productionSites).singleElement().satisfies(site -> {
+            List<List<String>> headerBlocks = HEADER_BLOCK.matcher(site).results()
+                    .map(match -> match.group("fields").lines().map(String::strip).toList())
+                    .toList();
+            assertThat(headerBlocks).singleElement().satisfies(headers -> assertThat(headers)
+                    .contains("-Server", "-Via"));
+        });
+        assertReviewedResponseDirectives();
+    }
+
+    public static void assertReviewedResponseDirectives() throws IOException {
+        String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
+        assertThat(reviewedResponseDirectives(caddyfile)).containsExactlyEntriesOf(Map.of(
+                "plaintext", List.of("reverse_proxy app:8080 {", "import applicationHeaders"),
+                "serve", List.of("reverse_proxy https://app:8080 {", "import applicationHeaders",
+                        "transport http {",
+                        "tls_trusted_ca_certs /etc/courtside/tls/app-authority/authority.pem"),
+                "production", List.of("encode zstd gzip", "request_body {", "max_size 2MB", "header {",
+                        "+Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"",
+                        "Strict-Transport-Security \"max-age=31536000; includeSubDomains\"",
+                        "X-Content-Type-Options nosniff", "X-Frame-Options DENY",
+                        "Referrer-Policy strict-origin-when-cross-origin",
+                        "Permissions-Policy \"geolocation=(), camera=(), microphone=()\"",
+                        "-Server", "-Via", "handle_errors {", "header {", "Cache-Control \"no-store\"",
+                        "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"",
+                        "Strict-Transport-Security \"max-age=31536000; includeSubDomains\"",
+                        "X-Content-Type-Options nosniff", "X-Frame-Options DENY",
+                        "Referrer-Policy strict-origin-when-cross-origin",
+                        "Permissions-Policy \"geolocation=(), camera=(), microphone=()\"",
+                        "-Server", "-Via",
+                        "respond \"Request could not be completed.\" {http.error.status_code}",
+                        "@unknownMethod {", "method QUERY", "path /api/*", "method @unknownMethod PATCH",
+                        "import {$COURTSIDE_APP_TLS_MODE:plaintext}"),
+                "plaintext-site", List.of("@mailHostname host {$COURTSIDE_MAIL_HOSTNAME}",
+                        "handle @mailHostname {", "header {", "Cache-Control \"no-store\"",
+                        "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"", "-Location", "-Server", "-Via",
+                        "respond 404", "@browserNavigation {", "host {$COURTSIDE_DOMAIN}", "method GET HEAD",
+                        "path / /courts /login /initial-password /my-bookings /my-messages /account/security /admin /admin/* /index.html /assets/* /icon.svg /manifest.webmanifest /sw.js /workbox-*.js",
+                        "handle @browserNavigation {", "header {", "Cache-Control \"no-store\"",
+                        "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"", "-Server", "-Via",
+                        "redir https://{$COURTSIDE_DOMAIN}{uri} permanent", "handle {", "header {",
+                        "Cache-Control \"no-store\"", "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"",
+                        "-Location", "-Server", "-Set-Cookie", "-Via",
+                        "respond \"Plain HTTP is not accepted.\" 400"),
+                "mail-site", List.of("header {", "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"",
+                        "-Server", "-Via", "respond 404")));
+    }
+
+    @Test
+    void whenReadingCaddyProductionDirectives_thenNestedAndSiblingBranchesCannotHide() {
+        assertThat(caddyDirectives("""
+                header {
+                    -Server
+                }
+                handle_path /debug/* {
+                    file_server
+                }
+                import plaintext
+                """))
+                .containsExactly("header {", "-Server", "handle_path /debug/* {", "file_server",
+                        "import plaintext");
+    }
+
+    private static Map<String, List<String>> reviewedResponseDirectives(String caddyfile) {
+        return Map.of(
+                "plaintext", caddyDirectives(caddyBlockBody(caddyfile, "(plaintext) {")),
+                "serve", caddyDirectives(caddyBlockBody(caddyfile, "(serve) {")),
+                "production", caddyDirectives(caddyBlockBody(caddyfile, "{$COURTSIDE_DOMAIN} {")),
+                "plaintext-site", caddyDirectives(caddyBlockBody(caddyfile, "http://:80 {")),
+                "mail-site", caddyDirectives(caddyBlockBody(caddyfile, "{$COURTSIDE_MAIL_HOSTNAME} {")));
+    }
+
+    private static String caddyBlockBody(String caddyfile, String marker) {
+        List<String> body = new ArrayList<>();
+        int depth = 0;
+        boolean found = false;
+        for (String line : caddyfile.lines().toList()) {
+            if (!found) {
+                if (!line.strip().equals(marker)) {
+                    continue;
+                }
+                found = true;
+            } else if (depth > 0) {
+                body.add(line);
+            }
+            for (char character : caddyStructure(line)) {
+                depth += character == '{' ? 1 : character == '}' ? -1 : 0;
+            }
+            if (found && depth == 0) {
+                if (!body.isEmpty()) {
+                    body.remove(body.size() - 1);
+                }
+                return String.join("\n", body);
+            }
+        }
+        throw new IllegalArgumentException("Missing or unclosed Caddy block: " + marker);
+    }
+
+    private static List<String> caddyDirectives(String blockBody) {
+        List<String> directives = new ArrayList<>();
+        int depth = 0;
+        for (String line : blockBody.lines().toList()) {
+            char[] structure = caddyStructure(line);
+            String visible = new String(structure).strip();
+            if (!visible.isBlank() && !visible.matches("}+") && !line.strip().equals("}")) {
+                directives.add(line.strip());
+            }
+            for (char character : structure) {
+                depth += character == '{' ? 1 : character == '}' ? -1 : 0;
+            }
+            assertThat(depth).as("Caddy directive depth after %s", line).isGreaterThanOrEqualTo(0);
+        }
+        assertThat(depth).as("final Caddy directive depth").isZero();
+        return directives;
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void whenReadingReferenceDeployment_thenEveryApplicationAndListenerIsInventoried()
+            throws IOException {
+        // given
+        Map<String, Object> compose = new Yaml().load(Files.readString(Path.of("deploy/compose.yaml")));
+        Map<String, Map<String, Object>> services = (Map<String, Map<String, Object>>) compose.get("services");
+
+        // when / then
+        assertThat(services.keySet()).containsExactly(
+                "db", "app", "mail", "mail-certificate", "mail-reload", "mail-plan",
+                "mail-bootstrap", "mail-configure", "mail-check", "proxy");
+        assertThat(services.entrySet().stream()
+                .filter(entry -> entry.getValue().containsKey("ports"))
+                .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey,
+                        entry -> entry.getValue().get("ports"))))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        "app", List.of("127.0.0.1:${COURTSIDE_PORT:-8080}:8080"),
+                        "mail", List.of("25:25", "127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT:-8081}:8080"),
+                        "proxy", List.of("80:80", "443:443")));
+        String architecture = Files.readString(Path.of("docs/security-assessment.md"));
+        services.keySet().forEach(service -> assertThat(architecture)
+                .as("the architecture map names service %s", service)
+                .contains("`" + service + "`"));
+        assertThat(architecture).contains(
+                "browser-to-proxy", "proxy-to-application", "application-to-database",
+                "source-to-image", "operator-to-evidence");
+        assertThat(topLevelCaddyBlocks(Files.readString(Path.of("deploy/Caddyfile")))).containsExactly(
+                        "(applicationHeaders)", "(plaintext)", "(serve)", "http://:80",
+                        "{$COURTSIDE_DOMAIN}", "{$COURTSIDE_MAIL_HOSTNAME}");
+    }
+
+    @Test
+    void whenReadingCaddyTopLevelBlocks_thenLayoutAndCommentsCannotHideAnApplication() {
+        assertThat(topLevelCaddyBlocks("""
+                {
+                    admin off
+                }
+                (applicationHeaders) {
+                    header_up X-Forwarded-For {remote_host}
+                }
+                    extra.example { # additional site
+                    respond 200
+                }
+                """)).containsExactly("(applicationHeaders)", "extra.example");
+        assertThatThrownBy(() -> topLevelCaddyBlocks("import extra.caddy"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Uninventoried top-level Caddy syntax");
+    }
+
+    private static List<String> topLevelCaddyBlocks(String caddyfile) {
+        List<String> blocks = new ArrayList<>();
+        int depth = 0;
+        for (String line : caddyfile.lines().toList()) {
+            char[] structure = caddyStructure(line);
+            int startingDepth = depth;
+            boolean containsStructuralBrace = false;
+            for (int index = 0; index < structure.length; index++) {
+                if (structure[index] == '{') {
+                    containsStructuralBrace = true;
+                    if (depth == 0) {
+                        String name = line.substring(0, index).strip();
+                        if (!name.isEmpty()) {
+                            blocks.add(name);
+                        }
+                    }
+                    depth++;
+                } else if (structure[index] == '}') {
+                    containsStructuralBrace = true;
+                    depth--;
+                }
+            }
+            assertThat(depth).as("Caddy block depth after %s", line).isGreaterThanOrEqualTo(0);
+            if (startingDepth == 0 && !containsStructuralBrace
+                    && !new String(structure).isBlank()) {
+                throw new IllegalArgumentException("Uninventoried top-level Caddy syntax: " + line.strip());
+            }
+        }
+        assertThat(depth).as("final Caddy block depth").isZero();
+        return blocks;
+    }
+
+    private static char[] caddyStructure(String line) {
+        char[] structure = line.toCharArray();
+        boolean quoted = false;
+        boolean escaped = false;
+        for (int index = 0; index < structure.length; index++) {
+            char current = structure[index];
+            if (!quoted && current == '#') {
+                Arrays.fill(structure, index, structure.length, ' ');
+                break;
+            }
+            if (current == '"' && !escaped) {
+                quoted = !quoted;
+                structure[index] = ' ';
+            } else if (quoted) {
+                structure[index] = ' ';
+            }
+            escaped = current == '\\' && !escaped;
+            if (current != '\\') {
+                escaped = false;
+            }
+        }
+        for (int start = 0; start < structure.length; start++) {
+            if (structure[start] != '{' || start + 1 >= structure.length
+                    || !(structure[start + 1] == '$' || Character.isLetter(structure[start + 1]))) {
+                continue;
+            }
+            int end = start + 2;
+            while (end < structure.length && structure[end] != '}' && !Character.isWhitespace(structure[end])) {
+                end++;
+            }
+            if (end < structure.length && structure[end] == '}') {
+                structure[start] = ' ';
+                structure[end] = ' ';
+                start = end;
+            }
+        }
+        return structure;
+    }
+
     // An upstream that imported the snippet and then added a header_up of its own would put the
     // client's value back, and an equal number of imports and upstreams would not notice.
     private static List<String> upstreamBodies(String caddyfile) {
@@ -257,7 +511,7 @@ class ReferenceDeploymentSecurityTest {
 
         // then
         assertThat(caddyfile)
-                .contains("+Content-Security-Policy \"base-uri 'none'\"")
+                .contains("+Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"")
                 .doesNotContain("Content-Security-Policy \"default-src");
     }
 
@@ -293,7 +547,7 @@ class ReferenceDeploymentSecurityTest {
             assertThat(site.group("body"))
                     .contains("method GET HEAD", "path / /courts /login", source.redirectTarget(),
                             "respond \"Plain HTTP is not accepted.\" 400",
-                            "Content-Security-Policy \"base-uri 'none'\"",
+                            "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"",
                             "-Location", "-Set-Cookie", "-Server", "-Via")
                     .doesNotContain("reverse_proxy", "{host}", "header Accept", "header User-Agent",
                             "header Sec-Fetch");
@@ -372,6 +626,7 @@ class ReferenceDeploymentSecurityTest {
 
     @Test
     void whenReadingEveryCaddyfile_thenTheSecurityHeadersAgree() throws IOException {
+        assertEveryCaddyfileFramesResponses();
         // when
         String production = Files.readString(Path.of("deploy/Caddyfile"));
         String uat = Files.readString(Path.of("deploy/Caddyfile.uat"));
@@ -387,6 +642,27 @@ class ReferenceDeploymentSecurityTest {
                         + "because HSTS is host- not port-scoped: setting it there would force every "
                         + "other localhost port in the same browser into HTTPS for the max-age duration")
                 .containsExactlyInAnyOrderElementsOf(expectedUatHeaders);
+    }
+
+    public static void assertEveryCaddyfileFramesResponses() throws IOException {
+        List<String> policies;
+        try (var deploymentFiles = Files.list(Path.of("deploy"))) {
+            policies = deploymentFiles
+                    .filter(path -> path.getFileName().toString().startsWith("Caddyfile"))
+                    .flatMap(path -> {
+                        try {
+                            return Files.readAllLines(path).stream();
+                        } catch (IOException exception) {
+                            throw new java.io.UncheckedIOException(exception);
+                        }
+                    })
+                    .map(String::strip)
+                    .filter(line -> line.startsWith("Content-Security-Policy ")
+                            || line.startsWith("+Content-Security-Policy "))
+                    .toList();
+        }
+        assertThat(policies).isNotEmpty().allSatisfy(policy -> assertThat(policy)
+                .contains("frame-ancestors 'none'"));
     }
 
     private static List<String> headerDirectives(String caddyfile, Pattern siteBlock) {

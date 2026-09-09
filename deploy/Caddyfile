@@ -37,7 +37,7 @@ http://:80 {
 	handle @mailHostname {
 		header {
 			Cache-Control "no-store"
-			Content-Security-Policy "base-uri 'none'"
+			Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 			-Location
 			-Server
 			-Via
@@ -52,7 +52,7 @@ http://:80 {
 	handle @browserNavigation {
 		header {
 			Cache-Control "no-store"
-			Content-Security-Policy "base-uri 'none'"
+			Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 			-Server
 			-Via
 		}
@@ -61,7 +61,7 @@ http://:80 {
 	handle {
 		header {
 			Cache-Control "no-store"
-			Content-Security-Policy "base-uri 'none'"
+			Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 			-Location
 			-Server
 			-Set-Cookie
@@ -79,7 +79,7 @@ http://:80 {
 	}
 
 	header {
-		+Content-Security-Policy "base-uri 'none'"
+		+Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
@@ -87,6 +87,20 @@ http://:80 {
 		Permissions-Policy "geolocation=(), camera=(), microphone=()"
 		-Server
 		-Via
+	}
+	handle_errors {
+		header {
+			Cache-Control "no-store"
+			Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy strict-origin-when-cross-origin
+			Permissions-Policy "geolocation=(), camera=(), microphone=()"
+			-Server
+			-Via
+		}
+		respond "Request could not be completed." {http.error.status_code}
 	}
 	@unknownMethod {
 		method QUERY
@@ -101,7 +115,7 @@ http://:80 {
 # here answers a browser: the block exists so that the certificate does.
 {$COURTSIDE_MAIL_HOSTNAME} {
 	header {
-		Content-Security-Policy "base-uri 'none'"
+		Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 		-Server
 		-Via
 	}

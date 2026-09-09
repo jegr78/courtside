@@ -20,7 +20,7 @@
   "scripts": {
     "generate-api": "openapi-typescript ../src/main/resources/api/openapi.yaml -o src/api/schema.d.ts",
     "dev": "npm run generate-api && vite",
-    "build": "npm run generate-api && tsc -b && vite build",
+    "build": "npm run generate-api && tsc -b && vite build && node ../tools/browser-build-policy.mjs dist",
     "lint": "npm run generate-api && eslint .",
     "lint:fix": "npm run generate-api && eslint . --fix",
     "test": "npm run test:frontend && npm run test:tools",

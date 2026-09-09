@@ -44,6 +44,30 @@ The catalog inventories the public PWA, authentication and server-side sessions,
 
 A single-tenant deployment reduces cross-club authorization paths but does not remove horizontal access between people in the same club or the need to test configuration and deployment isolation.
 
+The reference deployment maps its components explicitly. `db` is the private PostgreSQL store;
+`app` is the only Courtside application and publishes its container port on loopback only; optional
+`proxy` is the public HTTP/HTTPS boundary. The optional mail path consists of `mail`,
+`mail-certificate`, `mail-reload`, `mail-plan`, `mail-bootstrap`, `mail-configure` and `mail-check`.
+Only SMTP and the proxy's HTTP/HTTPS listeners are public; the application and mail administration
+listeners remain on loopback. The browser-to-proxy, proxy-to-application, application-to-database,
+source-to-image and operator-to-evidence transitions are the corresponding trust boundaries. A
+service or listener added to `deploy/compose.yaml` therefore changes the architecture and requires
+this map and its falsifying inventory test to change together.
+
+The production web-server fingerprint review covers successful application responses,
+upstream-generated errors, rejected hostnames, malformed requests and an unavailable upstream.
+The reference proxy removes `Server` and `Via` at every route it can process. Its explicit error
+handler also replaces proxy failures with a generic response carrying the normal browser security
+headers, so that failure does not publish Caddy or the upstream implementation. The runtime test
+checks both headers and bodies, while the production-site contract makes a newly added direct Caddy
+directive require an explicit response-class review.
+
+This map is not yet complete for outbound services. The application-to-SMTP-relay and
+application-to-HIBP calls, proxy-to-ACME certificate automation, optional application-to-OTLP
+telemetry, mail-to-DNS and recipient delivery, and browser-to-third-party destinations configured
+for club branding or legal links are production boundaries that the current closed inventory
+omits. The validated gap remains non-passing under #902 until the map and its contract cover them.
+
 ## Catalog lifecycle
 
 Every entry has a stable `CSA-<AREA>-<NUMBER>` identifier. Renaming a test does not change that identifier. An incompatible schema change increments `schemaVersion`; coverage changes increment `catalogVersion`.

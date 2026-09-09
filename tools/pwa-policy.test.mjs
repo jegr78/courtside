@@ -11,6 +11,10 @@ const Ajv2020 = frontendRequire("ajv/dist/2020").default;
 const ts = frontendRequire("typescript");
 const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
 const playwright = readFileSync(join(repository, "frontend/playwright.config.ts"), "utf8");
+const viteConfiguration = readFileSync(join(repository, "frontend/vite.config.ts"), "utf8");
+const eslintConfiguration = readFileSync(join(repository, "frontend/eslint.config.js"), "utf8");
+const typescriptConfiguration = readFileSync(join(repository, "frontend/tsconfig.app.json"), "utf8");
+const frontendPackage = JSON.parse(readFileSync(join(repository, "frontend/package.json"), "utf8"));
 const pom = readFileSync(join(repository, "pom.xml"), "utf8");
 const buildWorkflow = readFileSync(join(repository, ".github/workflows/build.yml"), "utf8");
 const stability = readFileSync(join(repository, ".github/workflows/test-stability.yml"), "utf8");
@@ -36,6 +40,14 @@ const shippedBrowserSources = [join(repository, "frontend", "index.html"),
   .filter((path) => !/\.(?:test|spec)\.[^.]+$|\.d\.ts$|setupTests\.ts$/.test(path))
   .map((path) => ({ path, source: readFileSync(path, "utf8") }));
 
+const publicFiles = sourceFiles(join(repository, "frontend", "public"));
+const metadataRouteSources = [
+  ...publicFiles,
+  ...sourceFiles(join(repository, "src", "main"))
+    .filter((path) => /\.(?:html|java|json|properties|txt|xml|ya?ml)$/.test(path)),
+  join(repository, "deploy", "Caddyfile")
+];
+
 test("given supported desktop browsers, when qualifying a pull request, then Chromium and WebKit run core smoke journeys", () => {
   assert.match(playwright, /name: "chromium"/);
   assert.match(playwright, /supported-browser\\\.spec\\\.ts/);
@@ -59,6 +71,53 @@ test("given shipped browser sources, when enforcing the client technology bounda
   const offenders = shippedBrowserSources
     .filter(({ source }) => legacyTechnology.test(source))
     .map(({ path }) => path.slice(repository.length + 1));
+  assert.deepEqual(offenders, []);
+});
+
+test("given public metadata paths, when reviewing the shipped web root, then none advertises hidden application paths", () => {
+  const metadataNames = new Set([
+    "robots.txt", "sitemap.xml", "security.txt", "humans.txt", "ads.txt",
+    "crossdomain.xml", "clientaccesspolicy.xml"
+  ]);
+  const published = metadataRouteSources
+    .filter((path) => metadataNames.has(path.slice(path.lastIndexOf("/") + 1).toLowerCase())
+      || [...metadataNames].some((name) => readFileSync(path, "utf8").includes(`/${name}`)))
+    .map((path) => path.slice(repository.length + 1));
+
+  assert.deepEqual(published, [],
+    "A web metadata file needs a control reading before it may expose paths or deployment details");
+});
+
+test("given the production browser build, when reviewing page-content leakage, then debug sources stay unpublished", () => {
+  assert.match(viteConfiguration, /build:\s*\{\s*minify:\s*["']oxc["'],\s*sourcemap:\s*false\s*\}/s);
+  assert.match(frontendPackage.scripts.build,
+    /vite build && node \.\.\/tools\/browser-build-policy\.mjs dist$/);
+  const disclosureMarkers = shippedBrowserSources
+    .filter(({ source }) => /[#@]\s*sourceMappingURL=|-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/.test(source))
+    .map(({ path }) => path.slice(repository.length + 1));
+  assert.deepEqual(disclosureMarkers, []);
+});
+
+test("given shipped browser code, when enforcing comparisons, then coercive equality stays absent", () => {
+  assert.match(typescriptConfiguration, /"strict":\s*true/);
+  assert.match(eslintConfiguration, /eqeqeq:\s*\[\s*["']error["'],\s*["']always["']\s*\]/);
+  const offenders = shippedBrowserSources.flatMap(({ path, source }) => {
+    if (!/\.(?:js|jsx|ts|tsx)$/.test(path)) return [];
+    const kind = path.endsWith(".tsx") ? ts.ScriptKind.TSX
+      : path.endsWith(".ts") ? ts.ScriptKind.TS : ts.ScriptKind.JS;
+    const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, kind);
+    const found = [];
+    function visit(node) {
+      if (ts.isBinaryExpression(node)
+          && [ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken]
+            .includes(node.operatorToken.kind)) {
+        found.push(`${path.slice(repository.length + 1)}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`);
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(file);
+    return found;
+  });
   assert.deepEqual(offenders, []);
 });
 

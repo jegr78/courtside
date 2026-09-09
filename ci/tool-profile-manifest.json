@@ -7,6 +7,8 @@
     { "path": "tools/audit-log-documentation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/audit-message-keys.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/audit-message-placeholders.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/browser-build-policy.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/browser-build-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/browser-resource-observation.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/browser-resource-observation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/courtside.mail-smoke.mjs", "profiles": ["full"], "test": false },

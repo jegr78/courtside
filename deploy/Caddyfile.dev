@@ -1,6 +1,6 @@
 :8080 {
 	header {
-		+Content-Security-Policy "base-uri 'none'"
+		+Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 		-Via
 	}
 	@unknownMethod {

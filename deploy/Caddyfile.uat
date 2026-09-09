@@ -11,7 +11,7 @@ http://:80 {
 	handle @browserNavigation {
 		header {
 			Cache-Control "no-store"
-			Content-Security-Policy "base-uri 'none'"
+			Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 			-Server
 			-Via
 		}
@@ -20,7 +20,7 @@ http://:80 {
 	handle {
 		header {
 			Cache-Control "no-store"
-			Content-Security-Policy "base-uri 'none'"
+			Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 			-Location
 			-Server
 			-Set-Cookie
@@ -39,7 +39,7 @@ https://localhost:443 {
 	}
 
 	header {
-		+Content-Security-Policy "base-uri 'none'"
+		+Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
@@ -81,7 +81,7 @@ http://:8083 {
 	}
 
 	header {
-		+Content-Security-Policy "base-uri 'none'"
+		+Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
