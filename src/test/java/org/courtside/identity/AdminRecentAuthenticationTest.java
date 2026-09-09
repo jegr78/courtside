@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.courtside.identity.AccountFixtures.enabled;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -61,12 +62,10 @@ class AdminRecentAuthenticationTest extends AbstractIntegrationTest {
                         .value("urn:courtside:error:recent-authentication-required"))
                 .andExpect(jsonPath("$.violations[0].code")
                         .value("identity.reauthentication.required"));
-        mockMvc.perform(post("/api/session/reauthentication").session(session).with(csrf())
-                        .contentType("application/json").content("{\"password\":\"admin-password\"}"))
-                .andExpect(status().isNoContent());
+        MockHttpSession proven = proveAgain(session);
 
         // when / then
-        changeRoles(session).andExpect(status().isOk())
+        changeRoles(proven).andExpect(status().isOk())
                 .andExpect(jsonPath("$.roles[0]").value("MEMBER"))
                 .andExpect(jsonPath("$.roles[1]").value("TRAINER"));
     }
@@ -141,18 +140,28 @@ class AdminRecentAuthenticationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.authenticated").value(true));
 
         // when
-        mockMvc.perform(post("/api/session/reauthentication").session(admin).with(csrf())
-                        .contentType("application/json").content("{\"password\":\"admin-password\"}"))
-                .andExpect(status().isNoContent());
+        MockHttpSession proven = proveAgain(admin);
         mockMvc.perform(delete("/api/admin/roster/{personId}/account/sessions", targetPersonId)
-                        .session(admin).with(csrf()))
+                        .session(proven).with(csrf()))
                 .andExpect(status().isNoContent());
 
         // then
         mockMvc.perform(get("/api/session").session(member)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(false));
-        mockMvc.perform(get("/api/session").session(admin)).andExpect(status().isOk())
+        mockMvc.perform(get("/api/session").session(proven)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(true));
+    }
+
+    private MockHttpSession proveAgain(MockHttpSession session) throws Exception {
+        MockHttpSession proven = (MockHttpSession) mockMvc.perform(
+                        post("/api/session/reauthentication").session(session).with(csrf())
+                                .contentType("application/json")
+                                .content("{\"password\":\"admin-password\"}"))
+                .andExpect(status().isNoContent())
+                .andReturn().getRequest().getSession(false);
+        assertThat(proven).as("a successful proof replaces the session, so the caller carries on"
+                + " with the one it was handed rather than the one it presented").isNotNull();
+        return proven;
     }
 
     private MockHttpSession signIn() throws Exception {

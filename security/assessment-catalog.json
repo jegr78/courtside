@@ -859,7 +859,10 @@
           "id": "v5.0.0-6.4.1",
           "status": "implemented",
           "manualProcedureId": "MAN-IDENTITY-001",
-          "findingReference": "docs/security-findings.md#generated-credentials-can-remain-valid-for-one-year"
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/config/CredentialLifetime.java",
+            "falsifyingTest": "src/test/java/org/courtside/config/CredentialLifetimeConstraintTest.java#whenAStoredCredentialLifetimeExceedsAWeek_thenTheDatabaseRefusesItByName"
+          }
         },
         {
           "id": "v5.0.0-6.4.2",
@@ -977,13 +980,19 @@
           "id": "v5.0.0-7.2.3",
           "status": "implemented",
           "manualProcedureId": "MAN-SESSION-001",
-          "findingReference": "docs/security-findings.md#session-token-entropy-and-reauthentication-renewal-fall-short"
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecureRandomSessionIdGenerator.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/SessionIdentifierEntropyTest.java#whenASessionIsCreated_thenItsIdentifierIsNotAVersionFourUuid"
+          }
         },
         {
           "id": "v5.0.0-7.2.4",
           "status": "implemented",
           "manualProcedureId": "MAN-SESSION-001",
-          "findingReference": "docs/security-findings.md#session-token-entropy-and-reauthentication-renewal-fall-short"
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/RecentAuthentication.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/SessionIdentifierRenewalTest.java#givenARequestHoldingASessionCopyFromBeforeTheProof_whenItSaves_thenItCannotRestoreTheEarlierIdentifier"
+          }
         },
         {
           "id": "v5.0.0-7.3.1",

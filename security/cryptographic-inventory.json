@@ -106,18 +106,25 @@
     {
       "id": "session-identifier",
       "purpose": "Name a signed-in member's session, which is what the session cookie carries",
-      "algorithm": "platform-provided",
+      "algorithm": "SecureRandom",
+      "parameters": {
+        "entropyBytes": 27,
+        "encoding": "base64url-unpadded"
+      },
       "class": "credential-protection",
       "owner": "club-operator",
-      "storageBoundary": "Spring Session generates the value and stores the session in the instance database; the identifier travels in the host-bound session cookie. This project neither generates nor formats it, which is why no parameters are recorded here.",
+      "storageBoundary": "Generated in the instance and stored in the session row the database keeps; the identifier travels in the host-bound session cookie. It reaches no log, export or screen: the member's own session list shows a truncated digest of it instead.",
       "permittedUse": "Identifying a session. It is a bearer credential: whoever holds it is signed in, which is why the cookie is HttpOnly, Secure and host-bound and why every credential change ends the sessions of that account.",
-      "rotation": "A new session is issued on sign-in, and the previous session of that account is ended. There is no separate rotation schedule.",
+      "rotation": "Replaced at each moment trust is re-established. A sign-in and a successful password proof each store a new session, and the identifier presented before it stops resolving.",
       "revocation": "Signing out, a credential change, a deactivation and the session-limit displacement each end sessions server-side, so a revoked identifier stops working rather than merely expiring.",
       "recovery": "None is needed: an ended session is replaced by signing in again.",
-      "retirement": "Follows Spring Session; a successor scheme takes effect for sessions created after it.",
-      "evidence": "src/test/java/org/courtside/identity/ConcurrentSessionLimitTest.java",
-      "detects": [],
+      "retirement": "A successor scheme takes effect for sessions created after it; sessions already stored keep the identifier they were issued.",
+      "evidence": "src/test/java/org/courtside/identity/SessionIdentifierEntropyTest.java, src/test/java/org/courtside/identity/SessionIdentifierRenewalTest.java",
+      "detects": [
+        "SecureRandom"
+      ],
       "locations": [
+        "src/main/java/org/courtside/identity/internal/SecureRandomSessionIdGenerator.java",
         "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java"
       ]
     },

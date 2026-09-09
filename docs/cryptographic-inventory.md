@@ -99,6 +99,7 @@ could be derived, and a test refuses both if either looks like it does. They rec
 lives and who holds it.
 
 It is also not a complete list of every secret an instance handles, only of the ones this project
-generates or configures. Values the framework produces — the session identifier, the CSRF token —
-have entries that say what they are and who owns their lifecycle, but no parameters, because this
-project does not choose them.
+generates or configures. A value the framework produces — the CSRF token — has an entry that says
+what it is and who owns its lifecycle, but no parameters, because this project does not choose
+them. The session identifier used to be one of those and no longer is: this project draws and
+formats it, so its entry records the parameters like any other.

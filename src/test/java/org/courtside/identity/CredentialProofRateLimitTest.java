@@ -13,6 +13,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.courtside.identity.AccountFixtures.enabled;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -86,13 +87,17 @@ class CredentialProofRateLimitTest extends AbstractIntegrationTest {
         reauthenticate(victim, "still-wrong", "192.0.2.51").andExpect(status().isForbidden());
 
         // when
-        reauthenticate(victim, "victim-password", "192.0.2.52").andExpect(status().isNoContent());
+        MockHttpSession proven = (MockHttpSession) reauthenticate(victim, "victim-password",
+                        "192.0.2.52").andExpect(status().isNoContent())
+                .andReturn().getRequest().getSession(false);
+        assertThat(proven).as("a successful proof replaces the session; the budget under test is"
+                + " the account's, which the replacement carries on spending").isNotNull();
 
         // then
-        reauthenticate(victim, "first-new-guess", "192.0.2.53").andExpect(status().isForbidden());
-        reauthenticate(victim, "second-new-guess", "192.0.2.54").andExpect(status().isForbidden());
-        reauthenticate(victim, "third-new-guess", "192.0.2.55").andExpect(status().isForbidden());
-        reauthenticate(victim, "fourth-new-guess", "192.0.2.56")
+        reauthenticate(proven, "first-new-guess", "192.0.2.53").andExpect(status().isForbidden());
+        reauthenticate(proven, "second-new-guess", "192.0.2.54").andExpect(status().isForbidden());
+        reauthenticate(proven, "third-new-guess", "192.0.2.55").andExpect(status().isForbidden());
+        reauthenticate(proven, "fourth-new-guess", "192.0.2.56")
                 .andExpect(status().isTooManyRequests());
     }
 

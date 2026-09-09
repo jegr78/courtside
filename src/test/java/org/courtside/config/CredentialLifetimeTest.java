@@ -20,13 +20,13 @@ class CredentialLifetimeTest {
         // when / then
         assertThatThrownBy(() -> new CredentialLifetime(0))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("1 to 8760");
+                .hasMessageContaining("1 to 168");
     }
 
     @Test
-    void whenAskingForALifetimeBeyondAYear_thenItIsRefused() {
+    void whenAskingForALifetimeBeyondAWeek_thenItIsRefused() {
         // when / then
-        assertThatThrownBy(() -> new CredentialLifetime(8761))
+        assertThatThrownBy(() -> new CredentialLifetime(169))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -34,8 +34,8 @@ class CredentialLifetimeTest {
     void givenTheRangeTheSchemaAllows_whenCheckingIt_thenTheEndsAreInside() {
         // when / then
         assertThat(CredentialLifetime.isValid(1)).isTrue();
-        assertThat(CredentialLifetime.isValid(8760)).isTrue();
+        assertThat(CredentialLifetime.isValid(168)).isTrue();
         assertThat(CredentialLifetime.isValid(0)).isFalse();
-        assertThat(CredentialLifetime.isValid(8761)).isFalse();
+        assertThat(CredentialLifetime.isValid(169)).isFalse();
     }
 }

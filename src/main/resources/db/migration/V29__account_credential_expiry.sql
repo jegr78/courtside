@@ -7,9 +7,9 @@ ALTER TABLE club_config
 
 ALTER TABLE club_config
     ADD CONSTRAINT club_config_new_account_credential_hours_range
-        CHECK (new_account_credential_hours BETWEEN 1 AND 8760),
+        CHECK (new_account_credential_hours BETWEEN 1 AND 168),
     ADD CONSTRAINT club_config_password_reset_credential_hours_range
-        CHECK (password_reset_credential_hours BETWEEN 1 AND 8760);
+        CHECK (password_reset_credential_hours BETWEEN 1 AND 168);
 
 ALTER TABLE club_config
     ALTER COLUMN new_account_credential_hours DROP DEFAULT,

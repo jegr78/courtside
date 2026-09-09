@@ -490,8 +490,8 @@ components:
               maxLength: 500
               pattern: "^(https://\\S+|/[^/\\\\\\s]\\S*|/)$"
               description: The configured URL used again after an uploaded logo is removed.
-            newAccountCredentialHours: { type: integer, minimum: 1, maximum: 8760 }
-            passwordResetCredentialHours: { type: integer, minimum: 1, maximum: 8760 }
+            newAccountCredentialHours: { type: integer, minimum: 1, maximum: 168 }
+            passwordResetCredentialHours: { type: integer, minimum: 1, maximum: 168 }
             bookingReminderHours: { type: integer, minimum: 0, maximum: 168 }
             noMembershipTypeRuleSetId:
               type: [string, "null"]
@@ -554,16 +554,20 @@ components:
         newAccountCredentialHours:
           type: integer
           minimum: 1
-          maximum: 8760
+          maximum: 168
           description: |
             How long the one-time password in a new member's invitation stays usable. The message
-            names the date, and sign-in enforces it.
+            names the date, and sign-in enforces it. A week is the ceiling: a credential this
+            instance generated and mailed is not a password the member chose, so it expires
+            whether or not it was ever used.
           example: 168
         passwordResetCredentialHours:
           type: integer
           minimum: 1
-          maximum: 8760
-          description: How long a password a board hands out after a reset stays usable.
+          maximum: 168
+          description: |
+            How long a password a board hands out after a reset stays usable. It shares the
+            one-week ceiling with a new account's credential, for the same reason.
           example: 24
         noMembershipTypeRuleSetId:
           type: [string, "null"]
@@ -2368,6 +2372,12 @@ paths:
 
         An account still marked for an initial password change is refused here. Nothing the proof
         unlocks is reachable in that state, so the proof is not either.
+
+        A successful proof replaces the session and answers with a new session cookie. The
+        identifier that was presented stops authorizing immediately, so a client that manages
+        cookies itself has to carry the replacement forward. The signed-in account and the browser
+        the session records travel to the replacement; its absolute lifetime starts again, the way
+        a sign-in's does.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -2378,7 +2388,9 @@ paths:
             schema: { $ref: "#/components/schemas/ReauthenticationRequest" }
       responses:
         "204":
-          description: The current session now carries a recent full-authentication proof.
+          description: |
+            A replacement session carries the recent full-authentication proof, and its
+            identifier is delivered in the session cookie.
         "400":
           $ref: "#/components/responses/Invalid"
         "401":
