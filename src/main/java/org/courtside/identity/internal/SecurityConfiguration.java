@@ -19,6 +19,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.session.config.SessionRepositoryCustomizer;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authorization.AuthorizationDecision;
@@ -262,6 +264,11 @@ public class SecurityConfiguration {
     @Bean("credentialVerificationCapacity")
     LoginVerificationCapacity credentialVerificationCapacity(LoginProtectionProperties properties) {
         return new LoginVerificationCapacity(properties);
+    }
+
+    @Bean
+    SessionRepositoryCustomizer<JdbcIndexedSessionRepository> secureRandomSessionIdentifiers() {
+        return repository -> repository.setSessionIdGenerator(new SecureRandomSessionIdGenerator());
     }
 
     @Bean
