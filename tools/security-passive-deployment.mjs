@@ -57,8 +57,6 @@ const recommendedCiphers = new Set([
   "ECDHE-ECDSA-CHACHA20-POLY1305", "ECDHE-RSA-CHACHA20-POLY1305"
 ]);
 const cspDirective = /^[a-z][a-z-]*$/;
-const namedDirectivesLead = "directive(s):";
-const listedDirectivesLead = "Broad directives:";
 const suspiciousCommentPatterns = [
   "todo", "fixme", "bug", "bugs", "xxx", "query", "db", "admin", "administrator", "user", "username",
   "select", "where", "from", "later", "debug"
@@ -124,25 +122,19 @@ export function normalizeZapAlerts(report, imageDigest) {
       || left.routeTemplate.localeCompare(right.routeTemplate));
 }
 
-// ZAP words this rule two ways: broad directives listed one per line, and a sentence naming the
-// directives that have no `default-src` fallback. Both state the same fact about the same header.
+// Every wording of this rule announces its directives after a colon and then stops being a list,
+// whether the names follow on their own lines, in one sentence, or as a comma-separated run.
 function cspDirectivesFrom(otherInfo) {
-  const listed = [];
-  const heading = otherInfo.indexOf(listedDirectivesLead);
-  if (heading >= 0) {
-    for (const line of otherInfo.slice(heading + listedDirectivesLead.length).split("\n")) {
-      const candidate = line.trim();
-      if (candidate.length === 0) continue;
-      if (!cspDirective.test(candidate)) break;
-      listed.push(candidate);
+  for (let colon = otherInfo.indexOf(":"); colon >= 0; colon = otherInfo.indexOf(":", colon + 1)) {
+    const named = [];
+    for (const token of otherInfo.slice(colon + 1).split(/[,\s]+/)) {
+      if (token.length === 0) continue;
+      if (!cspDirective.test(token)) break;
+      named.push(token);
     }
+    if (named.length > 0) return [...new Set(named)].toSorted();
   }
-  const opening = otherInfo.indexOf(namedDirectivesLead);
-  const closing = opening < 0 ? -1 : otherInfo.indexOf("is/are", opening);
-  const named = closing < 0 ? []
-    : otherInfo.slice(opening + namedDirectivesLead.length, closing).split(",").map((directive) => directive.trim());
-  const directives = [...new Set([...listed, ...named])];
-  return directives.every((directive) => cspDirective.test(directive)) ? directives.toSorted() : [];
+  return [];
 }
 
 function alertFieldExcerpt(value) {

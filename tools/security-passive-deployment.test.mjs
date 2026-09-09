@@ -386,6 +386,24 @@ test("given a broad-directive list of several lines, when normalizing it, then e
   assert.deepEqual(alerts[0].ruleEvidence.directives, ["default-src", "img-src", "script-src"]);
 });
 
+test("given the wording a hosted 2.17 scanner produced, when normalizing it, then every directive is named", () => {
+  // given — captured verbatim from a local run against the disposable target
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "policy-value",
+      otherinfo: "The following directives either allow wildcard sources (or ancestors), are not"
+        + " defined, or are overly broadly defined: script-src, style-src, img-src, connect-src,"
+        + " frame-src, font-src, media-src, object-src, manifest-src, worker-src" }] }
+  ] }] };
+
+  // when
+  const alerts = normalizeZapAlerts(report);
+
+  // then
+  assert.deepEqual(alerts[0].ruleEvidence.directives, ["connect-src", "font-src", "frame-src",
+    "img-src", "manifest-src", "media-src", "object-src", "script-src", "style-src", "worker-src"]);
+});
+
 test("given both CSP wordings on one route, when they are merged, then the evidence names all their directives",
   () => {
     // given
