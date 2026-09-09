@@ -3,6 +3,7 @@ package org.courtside.shared;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.courtside.ReferenceDeploymentSecurityTest;
 import org.courtside.TestCertificate;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -163,9 +164,16 @@ class ServerTlsTransportTest {
                             throws IOException {
                         response.setHeader("X-Probe-Forwarded-Host",
                                 String.valueOf(request.getHeader("X-Forwarded-Host")));
-                        response.getWriter().write(MARKER);
+                        response.setHeader("Server", "upstream-server");
+                        response.setHeader("Via", "upstream-via");
+                        if ("/missing".equals(request.getRequestURI())) {
+                            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                            response.getWriter().write("upstream-not-found");
+                        } else {
+                            response.getWriter().write(MARKER);
+                        }
                     }
-                }).addMapping("/probe"));
+                }).addMapping("/probe", "/missing"));
         server.start();
         return server;
     }
@@ -184,6 +192,58 @@ class ServerTlsTransportTest {
                     .doesNotContain("X-Probe-Forwarded-Host: attacker.example");
             assertThat(hostile).doesNotContain(MARKER, "X-Probe-Forwarded-Host");
         }
+    }
+
+    @Test
+    void givenEveryReviewedResponseClass_whenProductionProxyServesIt_thenServerImplementationsStayUnadvertised()
+            throws Exception {
+        // given
+        ReferenceDeploymentSecurityTest.assertReviewedResponseDirectives();
+        ReferenceDeploymentSecurityTest.assertEveryCaddyfileFramesResponses();
+        try (GenericContainer<?> available = productionHostProxy();
+             GenericContainer<?> unavailable = productionHostProxy("127.0.0.1:1")) {
+            // when
+            String success = rawGet(available, PRODUCTION_HOST, "attacker.example");
+            String missing = rawGet(available, PRODUCTION_HOST, "attacker.example", "/missing");
+            String rejectedHost = rawGet(available, "attacker.example", "attacker.example");
+            String malformed = rawRequest(available,
+                    "GET /probe HTTP/1.1\r\nHost: " + PRODUCTION_HOST + "\r\nBroken Header\r\n\r\n");
+            String failedUpstream = rawGet(unavailable, PRODUCTION_HOST, PRODUCTION_HOST);
+
+            // then
+            assertThat(success).contains("200 OK", MARKER);
+            assertThat(success).contains("frame-ancestors 'none'");
+            assertThat(missing).contains("404 Not Found", "upstream-not-found");
+            assertThat(rejectedHost).doesNotContain(MARKER);
+            assertThat(malformed).contains("400 Bad Request");
+            assertThat(failedUpstream).contains("502 Bad Gateway").doesNotContain(MARKER);
+            assertThat(failedUpstream).contains(
+                    "Cache-Control: no-store",
+                    "Content-Security-Policy: base-uri 'none'; frame-ancestors 'none'",
+                    "Strict-Transport-Security: max-age=31536000; includeSubDomains",
+                    "X-Content-Type-Options: nosniff",
+                    "X-Frame-Options: DENY");
+            assertNoServerImplementationDisclosure(success);
+            assertNoServerImplementationDisclosure(missing);
+            assertNoServerImplementationDisclosure(rejectedHost);
+            assertNoServerImplementationDisclosure(malformed);
+            assertNoServerImplementationDisclosure(failedUpstream);
+        }
+    }
+
+    private static void assertNoServerImplementationDisclosure(String response) {
+        assertThat(response)
+                .doesNotContainPattern("(?mi)^(?:Server|Via):\\s*")
+                .doesNotContainPattern("(?i)\\b(?:caddy|apache(?:\\s+tomcat)?|tomcat)\\b")
+                .doesNotContain("upstream-server", "upstream-via");
+    }
+
+    @Test
+    void givenServerProductNamesInABody_whenCheckingDisclosure_thenTheyAreDetectedWithoutAVersion() {
+        assertThatThrownBy(() -> assertNoServerImplementationDisclosure("Powered by Caddy"))
+                .isInstanceOf(AssertionError.class);
+        assertThatThrownBy(() -> assertNoServerImplementationDisclosure("Apache Tomcat/11.0.1"))
+                .isInstanceOf(AssertionError.class);
     }
 
     // The proxy dials the name the deployment's own snippet names, so only the host it resolves to
@@ -229,10 +289,17 @@ class ServerTlsTransportTest {
     }
 
     private static GenericContainer<?> productionHostProxy() throws IOException {
-        String caddyfile = "%s\n\n%s\n\n%s".formatted(
-                snippet("applicationHeaders"), dialingTheHost("plaintext", PLAIN_PORT),
+        return productionHostProxy(UPSTREAM + ":" + PLAIN_PORT);
+    }
+
+    private static GenericContainer<?> productionHostProxy(String upstream) throws IOException {
+        String caddyfile = "%s\n\n%s\n\n%s\n\n%s".formatted(
+                snippet("applicationHeaders"), snippet("plaintext").replace("app:8080", upstream),
                 productionSite().replace("{$COURTSIDE_DOMAIN}", "http://" + PRODUCTION_HOST)
-                        .replace("import {$COURTSIDE_APP_TLS_MODE:plaintext}", "import plaintext"));
+                        .replace("import {$COURTSIDE_APP_TLS_MODE:plaintext}", "import plaintext"),
+                deploymentBlock("http://:80 {")
+                        .replace("{$COURTSIDE_DOMAIN}", PRODUCTION_HOST)
+                        .replace("{$COURTSIDE_MAIL_HOSTNAME}", "mail." + PRODUCTION_HOST));
         GenericContainer<?> proxy = new GenericContainer<>(DockerImageName.parse(deployedCaddy()))
                 .withCopyToContainer(forString(caddyfile), "/etc/caddy/Caddyfile")
                 .withExposedPorts(80)
@@ -309,10 +376,14 @@ class ServerTlsTransportTest {
     }
 
     private static String productionSite() throws IOException {
+        return deploymentBlock("{$COURTSIDE_DOMAIN} {");
+    }
+
+    private static String deploymentBlock(String marker) throws IOException {
         String caddyfile = Files.readString(Path.of("deploy", "Caddyfile"));
-        int start = caddyfile.indexOf("{$COURTSIDE_DOMAIN} {");
-        assertThat(start).as("the deployment defines one production host").isNotNegative();
-        int opening = caddyfile.indexOf('{', start + "{$COURTSIDE_DOMAIN}".length());
+        int start = caddyfile.indexOf(marker);
+        assertThat(start).as("the deployment defines %s", marker).isNotNegative();
+        int opening = caddyfile.indexOf('{', start + marker.length() - 1);
         int depth = 0;
         for (int cursor = opening; cursor < caddyfile.length(); cursor++) {
             char character = caddyfile.charAt(cursor);
@@ -326,10 +397,18 @@ class ServerTlsTransportTest {
 
     private static String rawGet(GenericContainer<?> proxy, String host, String forwardedHost)
             throws IOException {
+        return rawGet(proxy, host, forwardedHost, "/probe");
+    }
+
+    private static String rawGet(GenericContainer<?> proxy, String host, String forwardedHost,
+                                 String path) throws IOException {
+        return rawRequest(proxy, "GET " + path + " HTTP/1.1\r\nHost: " + host
+                + "\r\nX-Forwarded-Host: " + forwardedHost + "\r\nConnection: close\r\n\r\n");
+    }
+
+    private static String rawRequest(GenericContainer<?> proxy, String request) throws IOException {
         try (Socket socket = new Socket(proxy.getHost(), proxy.getMappedPort(80))) {
-            socket.getOutputStream().write(("GET /probe HTTP/1.1\r\nHost: " + host
-                    + "\r\nX-Forwarded-Host: " + forwardedHost
-                    + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            socket.getOutputStream().write(request.getBytes(StandardCharsets.US_ASCII));
             return new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         }
     }

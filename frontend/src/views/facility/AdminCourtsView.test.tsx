@@ -143,18 +143,17 @@ describe("AdminCourtsView", () => {
   });
 
   // A number field takes "1e3" and "3.9" without complaint, and parseInt would read them as 1 and 3.
-  it.each(["", "0", "1000", "1e3", "3.9", "-2"])(
-    "given %s entered as a court number, when the editor is read, then it cannot be confirmed", async (entry) => {
-      // given
-      show();
-      await userEvent.click(await screen.findByTestId("edit-court-number-court-1"));
+  it("given non-integer or out-of-range court numbers, when the editor is read, then none can be confirmed", async () => {
+    // given
+    show();
+    await userEvent.click(await screen.findByTestId("edit-court-number-court-1"));
 
-      // when
+    // when / then
+    for (const entry of ["", "0", "1000", "1e3", "3.9", "-2"]) {
       fireEvent.change(screen.getByTestId("court-editor"), { target: { value: entry } });
-
-      // then
       expect(screen.getByTestId("confirm-court-edit")).toBeDisabled();
-    });
+    }
+  });
 
   it("given a number in range, when the editor is read, then it can be confirmed", async () => {
     // given

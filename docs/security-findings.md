@@ -11,6 +11,122 @@ These public entries record the safe result of reading a pinned control against 
 They omit request examples, concrete identifiers and protected evidence. The catalog links the
 affected control to the heading, and the remediation issue owns the product change and retest.
 
+### External-type and strict-comparison evidence is incomplete
+
+- State: validated evidence gap
+- Priority: P2
+- Controls: ASVS 5.0.0 `v5.0.0-15.3.5`
+- Review: `MAN-ARCH-001`, 9 September 2026
+- Remediation: #908
+
+The court editor behaviorally rejects representative coercive and out-of-range number strings, and
+the shipped TypeScript source is guarded by strict compiler and equality policies. The behavioral
+test does not cover a coercive comparison mutation elsewhere on that production path, while the
+syntax policy alone does not prove external-value behavior. The control remains non-passing until
+the relevant external-value boundaries are closed and one coherent evidence set falsifies both
+type validation and strict comparison behavior.
+
+### Request entry-point and input inventory is incomplete
+
+- State: validated evidence gap
+- Priority: P2
+- Controls: WSTG 4.2 `WSTG-v4.2-INFO-06`
+- Review: `MAN-ARCH-001`, 9 September 2026
+- Remediation: #908
+
+The API contract test compares public MVC method and path pairs with OpenAPI. It does not detect a
+new header, query or form parameter, request-body field or supported encoding added to an existing
+route, and filter-based request entry points are outside that inventory. The control remains
+non-passing until the complete request surface is derived and every non-OpenAPI boundary is
+explicitly classified.
+
+### Published web-metadata and disclosure inventory is incomplete
+
+- State: validated evidence gap
+- Priority: P2
+- Controls: WSTG 4.2 `WSTG-v4.2-INFO-03`, `WSTG-v4.2-INFO-05`
+- Review: `MAN-ARCH-001`, 9 September 2026
+- Remediation: #907
+
+The production-build policy rejects source maps, selected metadata names, key material, host paths,
+token patterns and debug markers. That useful baseline is not a closed inventory: the PWA manifest
+is intentionally published, server-side routes can bypass the Vite output, and sensitive comments,
+internal origins, environment details or unlisted credential forms can evade a marker list. Both
+controls remain non-passing until packaged and runtime resources have a bounded inventory whose
+allowed metadata and disclosure content is explicitly reviewed and falsifiable.
+
+### Correct client-address attribution is not proven
+
+- State: validated evidence gap
+- Priority: P2
+- Controls: ASVS 5.0.0 `v5.0.0-15.3.4`
+- Review: `MAN-ARCH-001`, 9 September 2026
+- Remediation: #905
+
+The browser-to-Caddy-to-Spring test proves that forged forwarded-address values cannot split one
+login rate-limit bucket. It would still pass if every request were attributed to one fixed proxy
+address, so it does not prove that distinct real peers retain their correct original addresses.
+The control remains non-passing until both distinct-peer attribution and the existing spoofing
+case are falsified through the reference proxy.
+
+### Principal workflow inventory is incomplete
+
+- State: validated architecture gap
+- Priority: P2
+- Controls: WSTG 4.2 `WSTG-v4.2-INFO-07`
+- Review: `MAN-ARCH-001`, 9 September 2026
+- Remediation: #902
+
+The application classifies mapped routes by access level, and browser tests exercise selected core
+journeys. Neither source is a closed map of principal workflows, their state transitions, or their
+alternate and failure paths. The control remains non-passing until a bounded inventory covers the
+member, booking, import, account and administration workflows and fails when an unclassified path
+is introduced.
+
+### Production artifact contains non-production seeders
+
+- State: validated artifact gap
+- Priority: P2
+- Controls: ASVS 5.0.0 `v5.0.0-15.2.3`
+- Review: `MAN-ARCH-001`, 9 September 2026
+- Remediation: #903
+
+The production JAR contains demo, performance and security-assessment seeders and their supporting
+configuration. Profiles and environment guards prevent accidental activation, but they do not
+remove sample and test-only functionality from the shipped artifact. The control remains
+non-passing until production packaging excludes those classes and resources while explicit test
+artifacts retain the isolated workflows that need them.
+
+### External trust-boundary map is incomplete
+
+- State: validated architecture gap
+- Priority: P2
+- Controls: WSTG 4.2 `WSTG-v4.2-INFO-10`
+- Review: `MAN-ARCH-001`, 9 September 2026
+- Remediation: #902
+
+The current map covers the browser, proxy, application, database, build and evidence boundaries.
+It omits application calls to SMTP, HIBP and an optional OTLP collector, certificate automation
+from the proxy to its ACME provider, mail delivery to DNS and external recipients, and configurable
+browser-to-third-party branding or legal destinations. The control remains non-passing until a
+closed inventory names those flows and a test fails for an undocumented production service,
+listener, outbound client or trust transition.
+
+### Resource-demanding functionality inventory is incomplete
+
+- State: validated documentation gap
+- Priority: P2
+- Controls: ASVS 5.0.0 `v5.0.0-15.1.3`
+- Review: `MAN-ARCH-001`, 9 September 2026
+- Remediation: #901
+
+Courtside documents safeguards for selected expensive operations, including password hashing,
+imports and booking writes, but has no closed inventory of every time- or resource-demanding
+production operation. The documentation does not yet pair each operation with its input bound,
+concurrency or rate limit, execution model, and behavior when the caller or proxy stops waiting.
+The control remains non-passing until the inventory is derived from the production paths and its
+completeness is falsifiable.
+
 ### Safe HTTP methods lack state-invariance evidence
 
 - State: validated evidence gap
@@ -25,28 +141,13 @@ effect. Courtside has no closed runtime state fingerprint for every safe-method 
 control cannot yet receive a falsifying pass anchor. The remediation must derive the complete safe
 surface and prove that valid calls preserve state; a hand-maintained method list is insufficient.
 
-### Proxy-generated responses lack CSP frame protection
-
-- State: validated configuration gap
-- Priority: P2
-- Controls: ASVS 5.0.0 `v5.0.0-3.4.6`
-- Review: `MAN-CLIENT-001`, 9 September 2026
-- Remediation: #896
-
-The application supplies `frame-ancestors 'none'` on its responses, and the reference proxy adds
-`X-Frame-Options: DENY` at the edge. Responses generated by the proxy itself receive only the
-proxy's appended `base-uri` CSP directive. They therefore do not meet the ASVS requirement to use
-`frame-ancestors` on every response without relying on the obsolete X-Frame-Options header. These
-responses contain no authenticated application functionality, which bounds the current impact, but
-the control remains non-passing until both response paths carry and test the CSP directive.
-
 ### Ambiguous HTTP parameters and message boundaries
 
 - State: validated design and evidence gap
 - Priority: P2
 - Controls: WSTG 4.2 `WSTG-v4.2-INPV-04`, `WSTG-v4.2-INPV-15`; ASVS 5.0.0
-  `v5.0.0-4.2.1`
-- Review: `MAN-INPUT-001`, 8 September 2026
+  `v5.0.0-4.2.1`, `v5.0.0-15.3.7`
+- Review: `MAN-INPUT-001`, 8 September 2026; `MAN-ARCH-001`, 9 September 2026
 - Remediation: #894
 
 The application has no control-specific proof that duplicate query or form parameters are rejected
@@ -136,7 +237,7 @@ session identifier as the reauthentication control requires.
 - Priority: P2
 - Controls: ASVS 5.0.0 `v5.0.0-6.4.1`
 - Review: `MAN-IDENTITY-001`, 9 September 2026
-- Remediation: #899
+- Remediation: #889
 
 New-account and password-reset credentials are generated from 192 random bits. Courtside's
 application database stores only their password hashes, and the credentials stop working after

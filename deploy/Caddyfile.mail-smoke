@@ -12,7 +12,7 @@
 {$COURTSIDE_MAIL_HOSTNAME} {
 	tls internal
 	header {
-		Content-Security-Policy "base-uri 'none'"
+		Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 		-Server
 		-Via
 	}

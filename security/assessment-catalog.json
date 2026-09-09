@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.4.7",
+  "catalogVersion": "1.4.9",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -562,7 +562,10 @@
           "id": "v5.0.0-3.4.6",
           "status": "implemented",
           "manualProcedureId": "MAN-CLIENT-001",
-          "findingReference": "docs/security-findings.md#proxy-generated-responses-lack-csp-frame-protection"
+          "controlEvidence": {
+            "productionPath": "deploy/Caddyfile",
+            "falsifyingTest": "src/test/java/org/courtside/shared/ServerTlsTransportTest.java#givenEveryReviewedResponseClass_whenProductionProxyServesIt_thenServerImplementationsStayUnadvertised"
+          }
         },
         {
           "id": "v5.0.0-3.5.1",
@@ -1592,7 +1595,8 @@
         {
           "id": "v5.0.0-15.1.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "findingReference": "docs/security-findings.md#resource-demanding-functionality-inventory-is-incomplete"
         },
         {
           "id": "v5.0.0-15.2.1",
@@ -1609,7 +1613,8 @@
         {
           "id": "v5.0.0-15.2.3",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "findingReference": "docs/security-findings.md#production-artifact-contains-non-production-seeders"
         },
         {
           "id": "v5.0.0-15.3.1",
@@ -1630,27 +1635,38 @@
             "CSA-ADMIN-001",
             "CSA-API-001"
           ],
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/application.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenAnUnknownProperty_whenChangingTheConfig_thenTheRequestIsRejectedWithoutMutation"
+          }
         },
         {
           "id": "v5.0.0-15.3.4",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "findingReference": "docs/security-findings.md#correct-client-address-attribution-is-not-proven"
         },
         {
           "id": "v5.0.0-15.3.5",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "findingReference": "docs/security-findings.md#external-type-and-strict-comparison-evidence-is-incomplete"
         },
         {
           "id": "v5.0.0-15.3.6",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/views/import/ImportSourceForm.tsx",
+            "falsifyingTest": "frontend/src/views/import/ImportSourceForm.test.tsx#given a column a club named __proto__, when it is mapped, then it stays a column of its own"
+          }
         },
         {
           "id": "v5.0.0-15.3.7",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "findingReference": "docs/security-findings.md#ambiguous-http-parameters-and-message-boundaries"
         },
         {
           "id": "v5.0.0-16.1.1",
@@ -2179,32 +2195,44 @@
         {
           "id": "WSTG-v4.2-INFO-02",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "controlEvidence": {
+            "productionPath": "deploy/Caddyfile",
+            "falsifyingTest": "src/test/java/org/courtside/shared/ServerTlsTransportTest.java#givenEveryReviewedResponseClass_whenProductionProxyServesIt_thenServerImplementationsStayUnadvertised"
+          }
         },
         {
           "id": "WSTG-v4.2-INFO-03",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "findingReference": "docs/security-findings.md#published-web-metadata-and-disclosure-inventory-is-incomplete"
         },
         {
           "id": "WSTG-v4.2-INFO-04",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "controlEvidence": {
+            "productionPath": "deploy/compose.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/ReferenceDeploymentSecurityTest.java#whenReadingReferenceDeployment_thenEveryApplicationAndListenerIsInventoried"
+          }
         },
         {
           "id": "WSTG-v4.2-INFO-05",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "findingReference": "docs/security-findings.md#published-web-metadata-and-disclosure-inventory-is-incomplete"
         },
         {
           "id": "WSTG-v4.2-INFO-06",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "findingReference": "docs/security-findings.md#request-entry-point-and-input-inventory-is-incomplete"
         },
         {
           "id": "WSTG-v4.2-INFO-07",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "findingReference": "docs/security-findings.md#principal-workflow-inventory-is-incomplete"
         },
         {
           "id": "WSTG-v4.2-INFO-08",
@@ -2213,13 +2241,15 @@
         },
         {
           "id": "WSTG-v4.2-INFO-09",
-          "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-ARCH-001",
+          "rationale": "The pinned WSTG 4.2 page defines no independent procedure and states that its content was merged into INFO-08."
         },
         {
           "id": "WSTG-v4.2-INFO-10",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "findingReference": "docs/security-findings.md#external-trust-boundary-map-is-incomplete"
         },
         {
           "id": "WSTG-v4.2-INPV-01",

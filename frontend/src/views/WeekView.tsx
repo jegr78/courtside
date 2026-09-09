@@ -147,7 +147,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
 
   function exceedsTheBound(minutes: number): boolean {
     const bound = eligibility?.maxBookingMinutes;
-    return bound != null && minutes > bound;
+    return bound !== undefined && bound !== null && minutes > bound;
   }
 
   const dragSpan = drag ? bookableSpan(drag.courtId, drag.anchor, drag.head) : [];

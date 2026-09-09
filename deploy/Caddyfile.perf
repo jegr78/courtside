@@ -11,7 +11,7 @@ http://:80 {
 	handle @browserNavigation {
 		header {
 			Cache-Control "no-store"
-			Content-Security-Policy "base-uri 'none'"
+			Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 			-Server
 			-Via
 		}
@@ -20,7 +20,7 @@ http://:80 {
 	handle {
 		header {
 			Cache-Control "no-store"
-			Content-Security-Policy "base-uri 'none'"
+			Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 			-Location
 			-Server
 			-Set-Cookie
@@ -35,7 +35,7 @@ https://localhost:443, https://proxy:443 {
 	encode zstd gzip
 
 	header {
-		+Content-Security-Policy "base-uri 'none'"
+		+Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
