@@ -56,7 +56,13 @@ const recommendedCiphers = new Set([
   "ECDHE-ECDSA-AES256-GCM-SHA384", "ECDHE-RSA-AES256-GCM-SHA384",
   "ECDHE-ECDSA-CHACHA20-POLY1305", "ECDHE-RSA-CHACHA20-POLY1305"
 ]);
-const cspDirective = /^[a-z][a-z-]*$/;
+const cspDirectives = new Set([
+  "base-uri", "block-all-mixed-content", "child-src", "connect-src", "default-src", "fenced-frame-src",
+  "font-src", "form-action", "frame-ancestors", "frame-src", "img-src", "manifest-src", "media-src",
+  "object-src", "prefetch-src", "referrer", "report-to", "report-uri", "require-trusted-types-for",
+  "sandbox", "script-src", "script-src-attr", "script-src-elem", "style-src", "style-src-attr",
+  "style-src-elem", "trusted-types", "upgrade-insecure-requests", "worker-src"
+]);
 const suspiciousCommentPatterns = [
   "todo", "fixme", "bug", "bugs", "xxx", "query", "db", "admin", "administrator", "user", "username",
   "select", "where", "from", "later", "debug"
@@ -132,7 +138,7 @@ function cspDirectivesFrom(otherInfo) {
     if (token.length === 0) continue;
     const colon = token.lastIndexOf(":");
     const candidate = colon < 0 ? token : token.slice(colon + 1);
-    if ((run || opening) && cspDirective.test(candidate)) named.add(candidate);
+    if ((run || opening) && cspDirectives.has(candidate)) named.add(candidate);
     else if (run) run = false;
     if (colon >= 0) run = true;
     opening = false;
@@ -158,10 +164,10 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
       + ` evidence is ${alertFieldExcerpt(evidence)}, otherinfo is ${alertFieldExcerpt(otherInfo)}`);
   }
   const seen = () => `param ${alertFieldExcerpt(param)},`
-    + ` evidence ${alertFieldExcerpt(evidence)}, otherinfo ${alertFieldExcerpt(otherInfo)}`;
+    + ` evidence of ${evidence.length} characters, otherinfo ${alertFieldExcerpt(otherInfo)}`;
   if (["10010", "10054"].includes(pluginId)) {
     if (param !== "__Host-XSRF-TOKEN" || evidence !== "Set-Cookie: __Host-XSRF-TOKEN" || otherInfo !== "") {
-      throw unsupported(`the cookie alert does not name the session cookie: ${seen()}`);
+      throw unsupported(`the cookie alert does not name the session cookie -- saw ${seen()}`);
     }
     return { kind: "cookie-attribute", cookieName: "xsrf-token",
       missingAttribute: pluginId === "10010" ? "http-only" : "same-site" };
@@ -211,7 +217,7 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
     const expectedToken = expected === "__Host-SESSION" ? "session" : expected === "__Host-XSRF-TOKEN" ? "xsrf-token" : null;
     if (!expected || evidence !== expected || tokenNames.length === 0
         || tokenNames.length !== otherInfo.split("\n").length || !tokenNames.includes(expectedToken)) {
-      throw unsupported(`the session alert does not name one known cookie: ${seen()}`);
+      throw unsupported(`the session alert does not name one known cookie -- saw ${seen()}`);
     }
     return { kind: "session-signal", tokenNames: [...new Set(tokenNames)] };
   }
@@ -423,7 +429,7 @@ function retainedRuleEvidenceMatches(alert, imageDigest) {
   if (alert.pluginId === "10055") return evidence.kind === "policy-directive"
     && evidence.headerName === "content-security-policy"
     && new Set(evidence.directives).size === evidence.directives.length
-    && evidence.directives.every((directive) => cspDirective.test(directive))
+    && evidence.directives.every((directive) => cspDirectives.has(directive))
     && JSON.stringify(evidence.directives) === JSON.stringify(evidence.directives.toSorted());
   if (alert.pluginId === "10109") return evidence.kind === "application-signal"
     && evidence.signal === "scripts-without-links";

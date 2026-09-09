@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { boundedAssessmentFailureReason } from "./security-runner.mjs";
 import {
   assertPassiveDeploymentEvidence, assertQualifiedImageEvidence, buildPassiveDeploymentEvidence, createAssessmentControl,
   evaluateCipherPolicy, evaluateExposureResponses, evaluateMethodBoundary, evaluatePublicResponseHeaders,
@@ -428,6 +429,31 @@ test("given a wording that names no directive at all, when normalizing it, then 
     { kind: "policy-directive", headerName: "content-security-policy", directives: [] });
 });
 
+test("given prose after a colon, when normalizing it, then no ordinary word becomes a directive", () => {
+  // given — an unfamiliar wording is kept rather than refused, so what it yields has to be right
+  const alerts = normalizeZapAlerts(cspAlert("Warning: the directive default-src was not set,"
+    + " so the following are unsafe: script-src img-src"));
+
+  // when / then — default-src sits in prose rather than in an announced run, so it is left out
+  assert.deepEqual(alerts[0].ruleEvidence.directives, ["img-src", "script-src"]);
+});
+
+test("given a refusal about a cookie alert, when it reaches the manifest, then redaction leaves it readable", () => {
+  // given — a reason ending in "cookie:" matches the redaction pattern and loses its whole excerpt
+  const report = { site: [{ alerts: [
+    { pluginid: "10054", riskcode: "1", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "__Host-OTHER", evidence: "Set-Cookie: __Host-OTHER", otherinfo: "" }] }
+  ] }] };
+
+  // when
+  let published = "";
+  try { normalizeZapAlerts(report); } catch (error) { published = boundedAssessmentFailureReason(error.message); }
+
+  // then
+  assert.match(published, /__Host-OTHER/);
+  assert.doesNotMatch(published, /\[REDACTED\]/);
+});
+
 test("given collected invalid characters after a colon, when normalizing them, then none becomes a directive", () => {
   // given — the malformed-policy template collects non-ASCII characters behind a colon
   const alerts = normalizeZapAlerts(cspAlert("A non-ASCII character was encountered while attempting"
@@ -542,7 +568,7 @@ test("given an otherinfo shaped to make the sentence parser backtrack, when norm
     assert.deepEqual(normalizeZapAlerts(report)[0].ruleEvidence.directives, []);
     const elapsed = performance.now() - started;
 
-    // then — a backtracking parser needs about eleven seconds for this input, a linear one under a millisecond
+    // then — the regex this replaced needed about eleven seconds for this input, a scan a fraction of one
     assert.ok(elapsed < 500, `normalizing an adversarial otherinfo took ${elapsed.toFixed(0)} ms`);
   });
 
