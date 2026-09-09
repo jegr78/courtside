@@ -96,7 +96,9 @@ the variables it is missing — and `/actuator/health/mail` reports the sending 
 administrator without ever opening it. The message names the date its password stops working, and
 sign-in enforces that date: once it has passed the credential no longer authenticates, and the
 board issues a new one. How long an invitation and a reset last is a club setting, one figure for
-each, so a board that knows its own members decides it rather than inheriting ours. The date binds
+each, so a board that knows its own members decides it rather than inheriting ours — up to a week
+each, because a credential this instance generated and mailed is not one the member chose, and it
+expires whether or not anybody used it. The date binds
 the issued credential only, so a member who has since chosen their own password keeps it. A message a
 transport failure interrupts is retried, and if the ladder is spent the event stays outstanding
 rather than being recorded as sent, so a restart republishes it instead of losing it. A recipient
@@ -1592,7 +1594,11 @@ whether it is built or designed. **Designed means absent today.**
   as an interval that never expires, is refused with them. The absolute one is counted from the creation time stored with
   the session, so restarting the application does not hand a live session a fresh lifetime,
   and signing in starts a session of its own so that a browser two members share hands the
-  second of them a full lifetime rather than what the first had left. Reaching
+  second of them a full lifetime rather than what the first had left. The identifier itself is 216
+  bits drawn from `SecureRandom` rather than a UUID's 122, and it is replaced at both moments trust
+  is re-established — a sign-in and a password proof — so one somebody else already holds stops
+  authorizing there. A proof renews the identifier without renewing the session, so proving again
+  buys no absolute lifetime. Reaching
   the absolute bound ends the session and nothing more — the request carries on without authority,
   so what needed it is refused the way every unauthenticated request is, and signing in again is not
   something an expired session stands in the way of; past the inactivity bound there is nothing left
