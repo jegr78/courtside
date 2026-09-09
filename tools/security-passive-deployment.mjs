@@ -125,7 +125,7 @@ export function normalizeZapAlerts(report, imageDigest) {
 // ZAP words this rule two ways: broad directives listed one per line, and a sentence naming the
 // directives that have no `default-src` fallback. Both state the same fact about the same header.
 function cspDirectivesFrom(otherInfo) {
-  const listed = [...otherInfo.matchAll(/(?:^|\n)([a-z][a-z-]*)(?:\n|$)/g)].map((match) => match[1]);
+  const listed = [...otherInfo.matchAll(/(?:^|\n)([a-z][a-z-]*)(?=\n|$)/g)].map((match) => match[1]);
   const sentence = /directive\(s\):\s*(.+?)\s+is\/are/.exec(otherInfo);
   const named = sentence ? sentence[1].split(",").map((directive) => directive.trim()) : [];
   const directives = [...new Set([...listed, ...named])];

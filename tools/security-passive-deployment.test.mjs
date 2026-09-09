@@ -371,6 +371,21 @@ test("given several directives in one CSP alert, when normalizing it, then they 
   assert.deepEqual(alerts[0].ruleEvidence.directives, ["base-uri", "form-action"]);
 });
 
+test("given a broad-directive list of several lines, when normalizing it, then every line is named", () => {
+  // given
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "policy-value",
+      otherinfo: "Broad directives:\nimg-src\nscript-src\ndefault-src" }] }
+  ] }] };
+
+  // when
+  const alerts = normalizeZapAlerts(report);
+
+  // then
+  assert.deepEqual(alerts[0].ruleEvidence.directives, ["default-src", "img-src", "script-src"]);
+});
+
 test("given retained evidence naming a fallback directive, when it is validated, then the check and the schema accept it",
   () => {
     // given
