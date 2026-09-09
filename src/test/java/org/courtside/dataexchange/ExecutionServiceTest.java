@@ -210,6 +210,22 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnotherAdministratorTookThePreview_whenExecutingIt_thenOnlyItsReviewerCanProceed() {
+        // given
+        UUID previewId = preview(TWO_MEMBERS, SnapshotMode.FULL_SNAPSHOT);
+        UUID otherPerson = identity.createPerson("Other", "Admin", "other.admin@example.org");
+        UUID otherActor = identity.createAccount(otherPerson, "other-admin", Set.of(Role.ADMIN));
+
+        // when / then
+        assertThatThrownBy(() -> executions.execute(previewId, false, otherActor))
+                .isInstanceOf(ImportPreviewActorMismatchException.class)
+                .extracting("code").isEqualTo("import.preview.actorMismatch");
+        assertThat(members.count()).isZero();
+
+        assertThat(executions.execute(previewId, false, actor).created()).isEqualTo(2);
+    }
+
+    @Test
     void givenAnOlderPreviewOfTheSameSource_whenANewerOneIsExecuted_thenTheOlderCannotRun() {
         // given
         UUID older = preview(TWO_MEMBERS, SnapshotMode.FULL_SNAPSHOT);

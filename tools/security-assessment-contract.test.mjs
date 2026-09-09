@@ -841,6 +841,26 @@ test("given the logging and operational controls were reviewed, when reading the
   }
 });
 
+test("given the business-logic controls were reviewed, when reading their dispositions, then none is left implicit", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-BUSL-01", "WSTG-v4.2-BUSL-02", "WSTG-v4.2-BUSL-04",
+    "WSTG-v4.2-BUSL-05", "WSTG-v4.2-BUSL-06", "v5.0.0-2.1.1",
+    "v5.0.0-2.1.2", "v5.0.0-2.1.3", "v5.0.0-2.2.2", "v5.0.0-2.2.3",
+    "v5.0.0-2.3.1", "v5.0.0-2.3.2"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.rationale !== undefined, control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+  }
+});
+
 test("given the shipped login defenses, when reading their documentation, then rate limits and lockout safety remain explicit", () => {
   // when / then
   assert.match(readme, /`POST \/api\/session` limits attempts by source address/);

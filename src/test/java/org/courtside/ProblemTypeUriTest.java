@@ -58,6 +58,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:import-person-already-linked",
             "urn:courtside:error:import-person-not-found",
             "urn:courtside:error:subject-access-person-not-found",
+            "urn:courtside:error:import-preview-actor-mismatch",
             "urn:courtside:error:import-preview-expired",
             "urn:courtside:error:import-preview-not-found",
             "urn:courtside:error:import-preview-stale",
