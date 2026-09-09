@@ -130,6 +130,21 @@ login replaces the pre-authentication identifier, but successful password reauth
 records the fresh-proof time inside the existing session. It neither replaces nor terminates that
 session identifier as the reauthentication control requires.
 
+### Generated credentials can remain valid for one year
+
+- State: validated implementation and contract gap
+- Priority: P2
+- Controls: ASVS 5.0.0 `v5.0.0-6.4.1`
+- Review: `MAN-IDENTITY-001`, 9 September 2026
+- Remediation: #899
+
+New-account and password-reset credentials are generated from 192 random bits. Courtside's
+application database stores only their password hashes, and the credentials stop working after
+their configured deadline or first permanent-password change. The configuration contract
+nevertheless permits either deadline to be 8,760 hours after
+issue. A one-year window is not the short validity period required for a generated initial
+credential, so the otherwise bounded generation and transition paths cannot establish this control.
+
 [`finding-lifecycle.schema.json`](../security/finding-lifecycle.schema.json) defines the retained run
 record. [`exceptions.schema.json`](../security/exceptions.schema.json) defines the shared policy for
 static scanner exceptions and accepted dynamic risk. Both schemas are closed. Unknown fields fail

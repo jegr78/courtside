@@ -56,13 +56,14 @@ class CredentialIssueTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenTwoAccounts_whenCredentialsAreIssued_thenTheyDifferFromEachOther() {
+    void givenTwoAccounts_whenCredentialsAreIssued_thenTheyAreIndependentPolicySizedSecrets() {
         // given / when
         String first = credentials.issueFor(accountAwaitingCredentials(), expiry()).credential();
         String second = credentials.issueFor(accountAwaitingCredentials(), expiry()).credential();
 
         // then
-        assertThat(first).isNotEqualTo(second);
+        assertThat(first).isNotEqualTo(second).hasSize(32).matches("[A-Za-z0-9_-]{32}");
+        assertThat(second).hasSize(32).matches("[A-Za-z0-9_-]{32}");
     }
 
     @Test

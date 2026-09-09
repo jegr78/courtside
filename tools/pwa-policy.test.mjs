@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const frontendRequire = createRequire(join(repository, "frontend", "package.json"));
 const Ajv2020 = frontendRequire("ajv/dist/2020").default;
+const ts = frontendRequire("typescript");
 const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
 const playwright = readFileSync(join(repository, "frontend/playwright.config.ts"), "utf8");
 const pom = readFileSync(join(repository, "pom.xml"), "utf8");
@@ -60,6 +61,82 @@ test("given shipped browser sources, when enforcing the client technology bounda
     .map(({ path }) => path.slice(repository.length + 1));
   assert.deepEqual(offenders, []);
 });
+
+test("given shipped password inputs, when enforcing browser credential handling, then every field remains masked and password-manager compatible", () => {
+  // given
+  const passwordFields = shippedBrowserSources.flatMap(({ path, source }) =>
+    jsxPasswordFields(path, source));
+
+  // when / then
+  assert.equal(passwordFields.length, 9,
+    "Every added or removed password field needs an explicit credential-handling review");
+  for (const field of passwordFields) {
+    assert.equal(field.type, "password", `${field.path}:${field.line} exposes a password as ${field.type}`);
+    assert.ok(["current-password", "new-password"].includes(field.autoComplete),
+      `${field.path}:${field.line} gives password managers no standard purpose`);
+    assert.equal(field.onPaste, false, `${field.path}:${field.line} intercepts paste`);
+  }
+  const pasteInterceptors = shippedBrowserSources
+    .filter(({ source }) => /\bonPaste(?:Capture)?\s*=|addEventListener\s*\(\s*["']paste["']/.test(source))
+    .map(({ path }) => path.slice(repository.length + 1));
+  assert.deepEqual(pasteInterceptors, []);
+});
+
+test("given shipped identity contracts, when enforcing the authentication-factor boundary, then password hints and knowledge questions stay absent", () => {
+  // given
+  const identitySources = [
+    ...sourceFiles(join(repository, "src", "main", "java", "org", "courtside", "identity")),
+    join(repository, "src", "main", "resources", "api", "openapi.yaml"),
+    ...shippedBrowserSources.map(({ path }) => path)
+  ];
+  const knowledgeChallenge = /password[\s_-]*hint|(?:security|secret)[\s_-]*(?:question|answer)|knowledge[\s_-]*based|mother(?:s|['’]s)?[\s_-]*maiden[\s_-]*name|favou?rite[\s_-]*(?:colou?r|place|teacher)|birth[\s_-]*(?:place|city)|first[\s_-]*pet[\s_-]*name|\bchallenge\b/i;
+
+  // when
+  const offenders = identitySources
+    .filter((path) => knowledgeChallenge.test(readFileSync(path, "utf8")))
+    .map((path) => path.slice(repository.length + 1));
+
+  // then
+  assert.deepEqual(offenders, []);
+});
+
+function jsxPasswordFields(path, source) {
+  if (!/\.(?:jsx|tsx)$/.test(path)) return [];
+  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const fields = [];
+  function visit(node) {
+    if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
+      const type = jsxAttribute(node, "type");
+      const name = jsxAttribute(node, "name");
+      const id = jsxAttribute(node, "id");
+      if (type === "password" || /password/i.test(`${name ?? ""} ${id ?? ""}`)) {
+        fields.push({
+          path: path.slice(repository.length + 1),
+          line: file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1,
+          type,
+          autoComplete: jsxAttribute(node, "autoComplete"),
+          onPaste: node.attributes.properties.some((attribute) =>
+            ts.isJsxAttribute(attribute) && attribute.name.text === "onPaste")
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  return fields;
+}
+
+function jsxAttribute(node, name) {
+  const attribute = node.attributes.properties.find((candidate) =>
+    ts.isJsxAttribute(candidate) && candidate.name.text === name);
+  if (!attribute || !ts.isJsxAttribute(attribute) || !attribute.initializer) return undefined;
+  if (ts.isStringLiteral(attribute.initializer)) return attribute.initializer.text;
+  if (ts.isJsxExpression(attribute.initializer)
+      && attribute.initializer.expression && ts.isStringLiteral(attribute.initializer.expression)) {
+    return attribute.initializer.expression.text;
+  }
+  return undefined;
+}
 
 test("given the phone layout journey, when a pull request runs, then a device project covers it unswitched", () => {
   // given — qualifying a browser is periodic work; whether the product lays out on a phone is a

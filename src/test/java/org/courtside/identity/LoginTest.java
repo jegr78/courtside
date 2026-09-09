@@ -13,6 +13,8 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.temporal.TemporalAccessor;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -190,6 +192,26 @@ class LoginTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnOldPermanentPassword_whenLoggingIn_thenItsAgeDoesNotExpireIt() throws Exception {
+        // given
+        assertThat(Arrays.stream(UserAccount.class.getDeclaredFields())
+                        .filter(field -> TemporalAccessor.class.isAssignableFrom(field.getType()))
+                        .map(java.lang.reflect.Field::getName))
+                .containsExactlyInAnyOrder("createdAt", "credentialsExpireAt");
+        jdbc.sql("UPDATE user_account SET created_at = TIMESTAMPTZ '2000-01-01 00:00:00Z' "
+                        + "WHERE username = :username")
+                .param("username", "doe.jane")
+                .update();
+
+        // when / then
+        mockMvc.perform(post("/api/session")
+                        .param("username", "doe.jane")
+                        .param("password", "correct-horse")
+                        .with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void givenAnAccountAwaitingApproval_whenLoggingIn_thenTheAnswerIsTheWrongPasswordAnswer()
             throws Exception {
         // given
@@ -206,7 +228,7 @@ class LoginTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenFourDifferentReasonsToRefuse_whenSigningIn_thenTheAnswersCannotBeToldApart()
+    void givenFiveDifferentReasonsToRefuse_whenSigningIn_thenTheAnswersCannotBeToldApart()
             throws Exception {
         // given
         Person pending = persons.save(new Person("Mary", "Major", "mary.major@example.org"));
@@ -225,10 +247,22 @@ class LoginTest extends AbstractIntegrationTest {
         // get says what to do about all of them
         String wrongPassword = signInFailure("doe.jane", "wrong");
         assertThat(List.of(
+                signInFailure("doe.john", "wrong"),
                 signInFailure("major.mary", "secret"),
                 signInFailure("miles.richard", "anything-at-all"),
                 signInFailure("admin.ada", "ran-out")))
                 .containsOnly(wrongPassword);
+    }
+
+    @Test
+    void givenAPlausibleUsernameForNoAccount_whenSigningIn_thenItMatchesAKnownAccountRefusal()
+            throws Exception {
+        // when
+        String known = signInFailure("doe.jane", "wrong");
+        String plausibleButUnknown = signInFailure("doe.john", "wrong");
+
+        // then
+        assertThat(plausibleButUnknown).isEqualTo(known);
     }
 
     private MockHttpSession signedInAsJane() throws Exception {

@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -44,6 +45,20 @@ class AdminAuthorizationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/admin/config"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+    }
+
+    @Test
+    void givenEveryProductRole_whenCallingAnAdminEndpoint_thenOnlyAdminIsServed() throws Exception {
+        // when / then
+        for (Role role : Role.values()) {
+            if (role != Role.ADMIN) {
+                mockMvc.perform(get("/api/admin/config").with(user("actor").roles(role.name())))
+                        .andExpect(status().isForbidden())
+                        .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+            }
+        }
+        mockMvc.perform(get("/api/admin/config").with(user("admin").roles(Role.ADMIN.name())))
+                .andExpect(status().isOk());
     }
 
     @Test

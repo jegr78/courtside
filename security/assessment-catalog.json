@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.4.6",
+  "catalogVersion": "1.4.7",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -718,7 +718,11 @@
         {
           "id": "v5.0.0-6.1.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "README.md",
+            "falsifyingTest": "tools/security-assessment-contract.test.mjs#given the shipped login defenses, when reading their documentation, then rate limits and lockout safety remain explicit"
+          }
         },
         {
           "id": "v5.0.0-6.1.2",
@@ -733,7 +737,11 @@
         {
           "id": "v5.0.0-6.2.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/api/openapi.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/identity/PermanentPasswordStrengthTest.java#givenAPasswordBelowTheProductMinimum_whenItIsChosen_thenTheFieldIsNamed"
+          }
         },
         {
           "id": "v5.0.0-6.2.2",
@@ -753,32 +761,56 @@
         {
           "id": "v5.0.0-6.2.5",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/PasswordPolicy.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/PermanentPasswordStrengthTest.java#givenAPasswordUsingOnlyPunctuation_whenItIsChosen_thenItIsAcceptedAndSignsIn"
+          }
         },
         {
           "id": "v5.0.0-6.2.6",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/views/LoginView.tsx",
+            "falsifyingTest": "tools/pwa-policy.test.mjs#given shipped password inputs, when enforcing browser credential handling, then every field remains masked and password-manager compatible"
+          }
         },
         {
           "id": "v5.0.0-6.2.7",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/views/LoginView.tsx",
+            "falsifyingTest": "tools/pwa-policy.test.mjs#given shipped password inputs, when enforcing browser credential handling, then every field remains masked and password-manager compatible"
+          }
         },
         {
           "id": "v5.0.0-6.2.8",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/PermanentPasswordService.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/PermanentPasswordChangeTest.java#givenCanonicallyEquivalentPasswords_whenOneBecomesPermanent_thenOnlyItsExactBytesSignIn"
+          }
         },
         {
           "id": "v5.0.0-6.2.9",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/PasswordPolicy.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/PermanentPasswordStrengthTest.java#givenAPassphraseOfSixtyFourCharactersOutsideAscii_whenItIsChosen_thenItIsAcceptedAndSignsIn"
+          }
         },
         {
           "id": "v5.0.0-6.2.10",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/UserAccount.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/LoginTest.java#givenAnOldPermanentPassword_whenLoggingIn_thenItsAgeDoesNotExpireIt"
+          }
         },
         {
           "id": "v5.0.0-6.2.11",
@@ -800,7 +832,11 @@
         {
           "id": "v5.0.0-6.3.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/internal/BootstrapAdminInitializerTest.java#givenAnEmptyAccountTableAndNoBootstrapValues_whenInitializing_thenStartupFailsClosed"
+          }
         },
         {
           "id": "v5.0.0-6.3.3",
@@ -819,12 +855,17 @@
         {
           "id": "v5.0.0-6.4.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "findingReference": "docs/security-findings.md#generated-credentials-can-remain-valid-for-one-year"
         },
         {
           "id": "v5.0.0-6.4.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/api/openapi.yaml",
+            "falsifyingTest": "tools/pwa-policy.test.mjs#given shipped identity contracts, when enforcing the authentication-factor boundary, then password hints and knowledge questions stay absent"
+          }
         },
         {
           "id": "v5.0.0-6.4.3",
@@ -1749,7 +1790,11 @@
         {
           "id": "WSTG-v4.2-ATHN-02",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/internal/BootstrapAdminInitializerTest.java#givenAnEmptyAccountTableAndNoBootstrapValues_whenInitializing_thenStartupFailsClosed"
+          }
         },
         {
           "id": "WSTG-v4.2-ATHN-03",
@@ -1761,7 +1806,14 @@
         {
           "id": "WSTG-v4.2-ATHN-04",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "assessmentTestIds": [
+            "CSA-AUTHZ-001"
+          ],
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "security/assessment-catalog.json#CSA-AUTHZ-001"
+          }
         },
         {
           "id": "WSTG-v4.2-ATHN-05",
@@ -1771,7 +1823,11 @@
         {
           "id": "WSTG-v4.2-ATHN-06",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "frontend/src/App.tsx",
+            "falsifyingTest": "frontend/e2e/pwa-lifecycle.spec.ts#logout and browser history cannot reveal a cached personal view"
+          }
         },
         {
           "id": "WSTG-v4.2-ATHN-07",
@@ -2074,7 +2130,14 @@
         {
           "id": "WSTG-v4.2-IDNT-01",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "assessmentTestIds": [
+            "CSA-AUTHZ-001"
+          ],
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "security/assessment-catalog.json#CSA-AUTHZ-001"
+          }
         },
         {
           "id": "WSTG-v4.2-IDNT-02",
@@ -2084,17 +2147,29 @@
         {
           "id": "WSTG-v4.2-IDNT-03",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "falsifyingTest": "src/test/java/org/courtside/member/web/RosterAdminControllerTest.java#givenAPersonWithoutAnAccount_whenMemberAndAdminProvisionIt_thenOnlyAdminCreatesTheAccount"
+          }
         },
         {
           "id": "WSTG-v4.2-IDNT-04",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/CourtsideUserDetailsService.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/LoginTest.java#givenFiveDifferentReasonsToRefuse_whenSigningIn_thenTheAnswersCannotBeToldApart"
+          }
         },
         {
           "id": "WSTG-v4.2-IDNT-05",
           "status": "implemented",
-          "manualProcedureId": "MAN-IDENTITY-001"
+          "manualProcedureId": "MAN-IDENTITY-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/CourtsideUserDetailsService.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/LoginTest.java#givenAPlausibleUsernameForNoAccount_whenSigningIn_thenItMatchesAKnownAccountRefusal"
+          }
         },
         {
           "id": "WSTG-v4.2-INFO-01",
@@ -2476,6 +2551,8 @@
       "status": "implemented",
       "standardReferences": {
         "wstg": [
+          "WSTG-v4.2-ATHN-04",
+          "WSTG-v4.2-IDNT-01",
           "WSTG-v4.2-ATHZ-02"
         ],
         "asvs": [

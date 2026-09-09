@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.text.Normalizer;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -99,6 +100,33 @@ class PermanentPasswordChangeTest extends AbstractIntegrationTest {
 
         // then
         signIn(replacement);
+    }
+
+    @Test
+    void givenCanonicallyEquivalentPasswords_whenOneBecomesPermanent_thenOnlyItsExactBytesSignIn()
+            throws Exception {
+        // given
+        String replacement = "Marmóset-Lattice-" + "vellum".repeat(20) + "-FinalZ";
+        String normalizedVariant = Normalizer.normalize(replacement, Normalizer.Form.NFD);
+        assertThat(normalizedVariant).isNotEqualTo(replacement);
+        MockHttpSession session = signIn(CURRENT);
+
+        // when
+        mockMvc.perform(put("/api/account/password").session(session).with(csrf())
+                        .contentType("application/json").content(change(CURRENT, replacement)))
+                .andExpect(status().isNoContent());
+
+        // then
+        signIn(replacement);
+        for (String changed : Set.of(normalizedVariant, replacement.toLowerCase(java.util.Locale.ROOT),
+                replacement.substring(0, replacement.length() - 7))) {
+            mockMvc.perform(post("/api/session")
+                            .param("username", "doe.jane")
+                            .param("password", changed)
+                            .with(csrf()))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+        }
     }
 
     private MockHttpSession signIn(String password) throws Exception {

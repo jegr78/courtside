@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.MAP;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -501,17 +502,23 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenAPersonWithoutAnAccount_whenCreatingOne_thenTheInstanceIssuesTheCredentialItself()
+    void givenAPersonWithoutAnAccount_whenMemberAndAdminProvisionIt_thenOnlyAdminCreatesTheAccount()
             throws Exception {
         // given
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
-        // when
+        // when / then
         mockMvc.perform(post("/api/admin/roster/{personId}/account", mary)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(accountBody("major.mary", "MEMBER", "TRAINER"))
-                        .with(csrf()))
+                        .with(csrf()).with(user("member").roles("MEMBER")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
+
+        mockMvc.perform(post("/api/admin/roster/{personId}/account", mary)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(accountBody("major.mary", "MEMBER", "TRAINER"))
+                        .with(csrf()).with(user("admin").roles("ADMIN")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.personId").value(mary.toString()))
                 .andExpect(jsonPath("$.username").value("major.mary"))
@@ -519,7 +526,6 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.roles[0]").value("MEMBER"))
                 .andExpect(jsonPath("$.roles[1]").value("TRAINER"));
 
-        // then
         assertThat(accounts.findByUsername("major.mary")).get()
                 .satisfies(account -> {
                     assertThat(account.isPasswordChangeRequired()).isTrue();

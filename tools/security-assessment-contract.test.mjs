@@ -13,6 +13,7 @@ const Ajv = require("ajv/dist/2020").default;
 const catalog = JSON.parse(readFileSync(new URL("../security/assessment-catalog.json", import.meta.url), "utf8"));
 const schema = JSON.parse(readFileSync(new URL("../security/assessment-catalog.schema.json", import.meta.url), "utf8"));
 const contract = readFileSync(new URL("../docs/security-assessment.md", import.meta.url), "utf8");
+const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
 const findingLifecycle = readFileSync(new URL("../docs/security-findings.md", import.meta.url), "utf8");
 const manualRunbook = readFileSync(new URL("../docs/security-manual-assessment.md", import.meta.url), "utf8");
 const manualEvidenceSchema = JSON.parse(readFileSync(
@@ -620,7 +621,12 @@ test("given a control-specific anchor, when reading the catalog, then its produc
     const [testPath, testName] = controlEvidence.falsifyingTest.split("#");
     const source = readableFile(testPath);
     assert.notEqual(source, null, `${id} names a test file that is no readable file`);
-    assert.equal(declarationOf(testName).some((declaration) => declaration.test(source)), true,
+    const assessment = testPath === "security/assessment-catalog.json"
+      ? catalog.tests.find(({ id: assessmentId }) => assessmentId === testName)
+      : undefined;
+    const declaredAssessment = assessment?.executionMode === "automated"
+      && Object.values(assessment.standardReferences).flat().includes(id);
+    assert.equal(declaredAssessment || declarationOf(testName).some((declaration) => declaration.test(source)), true,
       `${id} names ${testName}, which ${testPath} declares no test for`);
   }
 });
@@ -771,6 +777,36 @@ test("given the browser and physical-device controls were reviewed, when reading
       control.status === "not-applicable"].filter(Boolean);
     assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
   }
+});
+
+test("given the identity and credential controls were reviewed, when reading their dispositions, then none is left implicit", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-ATHN-02", "WSTG-v4.2-ATHN-04", "WSTG-v4.2-ATHN-06",
+    "WSTG-v4.2-IDNT-01", "WSTG-v4.2-IDNT-03", "WSTG-v4.2-IDNT-04",
+    "WSTG-v4.2-IDNT-05", "v5.0.0-6.1.1", "v5.0.0-6.2.1", "v5.0.0-6.2.5",
+    "v5.0.0-6.2.6", "v5.0.0-6.2.7", "v5.0.0-6.2.8", "v5.0.0-6.2.9",
+    "v5.0.0-6.2.10", "v5.0.0-6.3.2", "v5.0.0-6.4.1", "v5.0.0-6.4.2"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+  }
+});
+
+test("given the shipped login defenses, when reading their documentation, then rate limits and lockout safety remain explicit", () => {
+  // when / then
+  assert.match(readme, /`POST \/api\/session` limits attempts by source address/);
+  assert.match(readme, /Address counters live in PostgreSQL, survive restarts and apply across\s+application instances/);
+  assert.match(readme, /bounds simultaneous Argon2 work in each\s+application instance/);
+  assert.match(readme, /successful login\s+clears its address counter/);
+  assert.match(readme, /No username or whole instance can be locked independently/);
 });
 
 test("given a manual outcome, when its control carries no control-specific evidence, then a pass is refused", () => {
