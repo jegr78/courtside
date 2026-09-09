@@ -57,6 +57,7 @@ const recommendedCiphers = new Set([
   "ECDHE-ECDSA-CHACHA20-POLY1305", "ECDHE-RSA-CHACHA20-POLY1305"
 ]);
 const cspDirective = /^[a-z][a-z-]*$/;
+const namedDirectivesLead = "directive(s):";
 const suspiciousCommentPatterns = [
   "todo", "fixme", "bug", "bugs", "xxx", "query", "db", "admin", "administrator", "user", "username",
   "select", "where", "from", "later", "debug"
@@ -126,8 +127,10 @@ export function normalizeZapAlerts(report, imageDigest) {
 // directives that have no `default-src` fallback. Both state the same fact about the same header.
 function cspDirectivesFrom(otherInfo) {
   const listed = [...otherInfo.matchAll(/(?:^|\n)([a-z][a-z-]*)(?=\n|$)/g)].map((match) => match[1]);
-  const sentence = /directive\(s\):\s*(.+?)\s+is\/are/.exec(otherInfo);
-  const named = sentence ? sentence[1].split(",").map((directive) => directive.trim()) : [];
+  const opening = otherInfo.indexOf(namedDirectivesLead);
+  const closing = opening < 0 ? -1 : otherInfo.indexOf("is/are", opening);
+  const named = closing < 0 ? []
+    : otherInfo.slice(opening + namedDirectivesLead.length, closing).split(",").map((directive) => directive.trim());
   const directives = [...new Set([...listed, ...named])];
   return directives.every((directive) => cspDirective.test(directive)) ? directives.toSorted() : [];
 }
@@ -172,9 +175,11 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
     return { kind: "response-header", headerName: "server" };
   }
   if (pluginId === "10055") {
+    if (param.toLowerCase() !== "content-security-policy" || evidence.length === 0) {
+      throw unsupported();
+    }
     const directives = cspDirectivesFrom(otherInfo);
-    if (param.toLowerCase() !== "content-security-policy" || evidence.length === 0
-        || directives.length === 0) {
+    if (directives.length === 0) {
       throw unsupported();
     }
     return { kind: "policy-directive", headerName: "content-security-policy", directives };

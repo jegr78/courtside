@@ -448,6 +448,24 @@ test("given a CSP alert whose wording neither shape matches, when normalizing it
   assert.throws(() => normalizeZapAlerts(report), /unsupported rule evidence/);
 });
 
+test("given an otherinfo shaped to make the sentence parser backtrack, when normalizing it, then it does not spin",
+  () => {
+    // given — a param and an evidence that pass every cheap check, so the parser itself is measured
+    const report = { site: [{ alerts: [
+      { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+        param: "Content-Security-Policy", evidence: "policy-value",
+        otherinfo: `The directive(s):${" ".repeat(4000)}` }] }
+    ] }] };
+
+    // when
+    const started = performance.now();
+    assert.throws(() => normalizeZapAlerts(report), /unsupported rule evidence/);
+    const elapsed = performance.now() - started;
+
+    // then — a backtracking parser needs about eleven seconds for this input, a linear one under a millisecond
+    assert.ok(elapsed < 500, `normalizing an adversarial otherinfo took ${elapsed.toFixed(0)} ms`);
+  });
+
 test("given session fields that name different tokens, when normalizing them, then the evidence fails closed", () => {
   // given
   const report = { site: [{ alerts: [{ pluginid: "10112", riskcode: "0", confidence: "2",
