@@ -61,6 +61,32 @@ class PermanentPasswordStrengthTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.violations[0].code").value(CODE));
     }
 
+    @Test
+    void givenAPasswordBelowTheProductMinimum_whenItIsChosen_thenTheFieldIsNamed() throws Exception {
+        // when / then
+        choose("only-eleven")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("password"));
+    }
+
+    @Test
+    void givenAPasswordUsingOnlyPunctuation_whenItIsChosen_thenItIsAcceptedAndSignsIn()
+            throws Exception {
+        // given
+        String password = "!@#$%^&*()_+{}[]";
+
+        // when
+        choose(password).andExpect(status().isNoContent());
+
+        // then
+        mockMvc.perform(post("/api/session")
+                        .param("username", "major.mary")
+                        .param("password", password)
+                        .with(csrf()))
+                .andExpect(status().isOk());
+    }
+
     // The shipped list mixes case and the policy folds both sides, so a differently-cased spelling
     // of an entry has to be refused like the entry itself.
     @Test

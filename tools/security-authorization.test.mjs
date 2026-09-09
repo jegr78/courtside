@@ -91,6 +91,28 @@ test("given the OpenAPI contract, when generating authorization cases, then ever
   }
 });
 
+test("given one protected operation admits an anonymous actor, when executing the matrix, then the bypass fails the assessment", async () => {
+  // given
+  const matrix = buildOperationAuthorizationMatrix({ paths: {
+    "/api/admin/utilisation": { get: { operationId: "facilityUtilisation", security: [{}] } }
+  } });
+
+  // when
+  const results = await executeOperationMatrix(matrix, async (operation, actor) => {
+    const expected = operation.expectations[actor];
+    if (actor === "ANONYMOUS") return { status: 200 };
+    if (expected === "deny-forbidden") {
+      return { status: 403, problemType: "urn:courtside:error:access-denied" };
+    }
+    return { status: 200 };
+  });
+
+  // then
+  assert.equal(results.find(({ actor }) => actor === "ANONYMOUS").outcome, "failed");
+  assert.ok(results.filter(({ actor }) => actor !== "ANONYMOUS")
+    .every(({ outcome }) => outcome === "passed"));
+});
+
 test("given two members and an administrator, when substituting owned identifiers and fields, then state stays unchanged", async () => {
   // given
   const standaloneId = "10000000-0000-0000-0000-000000000001";

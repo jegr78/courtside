@@ -174,6 +174,26 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenOneAddressExhaustsItsBudget_whenAnotherUsesCorrectCredentials_thenOnlyTheAddressIsLimited()
+            throws Exception {
+        // given
+        Person admin = persons.save(new Person("Ada", "Admin", "admin@example.org"));
+        UserAccount account = new UserAccount(
+                admin, "admin", passwordEncoder.encode("correct-horse"), Set.of(Role.ADMIN), "de");
+        account.enable();
+        accounts.save(account);
+        failLogin("admin", "192.0.2.20");
+        failLogin("admin", "192.0.2.20");
+
+        // when / then
+        mockMvc.perform(login("admin", "correct-horse", "192.0.2.20"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:login-rate-limited"));
+        mockMvc.perform(login("admin", "correct-horse", "192.0.2.21"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void givenAFailureFollowedBySuccess_whenAnotherFailureOccurs_thenTheCountersStartAgain()
             throws Exception {
         // given
