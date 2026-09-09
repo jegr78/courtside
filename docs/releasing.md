@@ -88,10 +88,11 @@ and answered, writing both into the issue. If the same failure class returns, th
 that issue by itself, so closing on a diagnosis costs nothing and is the safety net that makes it
 safe. A release that seems blocked for no reason is usually waiting on exactly that.
 
-The tracker used to withhold closure until seven consecutive scheduled first attempts had passed.
-That measured elapsed quiet time rather than whether anybody had found the cause: for a diagnosed
-failure the landed fix already says more than seven green nights can, and at two scheduled runs a
-week a single lost runner pushed the window back by weeks. It was removed.
+The issue text used to tell its reader to wait for seven consecutive scheduled first attempts, and
+the tracker commented once they had passed. That measured elapsed quiet time rather than whether
+anybody had found the cause: for a diagnosed failure the landed fix already says more than seven
+green nights can, and at two scheduled runs a week a single lost runner pushed the window back by
+weeks. It was removed.
 
 ## What the release refuses after scanning
 

@@ -132,7 +132,8 @@ export function planFailureUpdates(failures, issues, { assignee, blockingWorkflo
         `${workflowMarker(failure.workflow)}\n- Job: \`${failure.job}\`\n- Step: \`${failure.step}\`\n` +
         `- Failure class: \`${failure.failureClass}\`\n${blocked(failure, blockingWorkflow)}` +
         `\n${occurrence(failure)}\n\n` +
-        "Close this issue once its cause is known and answered. The tracker reopens it if the same failure class returns.",
+        "Close this issue once its cause is known and answered, writing both into it."
+        + " The tracker reopens it if the same failure class returns.",
       labels: [trackerLabel],
       assignees: isGitHubLogin(assignee) ? [assignee] : []
     }];
