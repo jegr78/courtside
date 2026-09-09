@@ -445,6 +445,15 @@ describe("AdminConfigurationView", () => {
     expect(screen.queryByTestId("remove-rule-ADVANCE_WINDOW")).not.toBeInTheDocument();
   });
 
+  it("given a generated credential, when configuration loads, then neither field offers more than a week", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("new-account-credential-hours")).toHaveAttribute("max", "168");
+    expect(screen.getByTestId("password-reset-credential-hours")).toHaveAttribute("max", "168");
+  });
+
   it("given an admin, when configuration loads, then club settings and every rule type are visible", async () => {
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
