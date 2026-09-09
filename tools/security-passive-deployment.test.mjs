@@ -371,6 +371,24 @@ test("given several directives in one CSP alert, when normalizing it, then they 
   assert.deepEqual(alerts[0].ruleEvidence.directives, ["base-uri", "form-action"]);
 });
 
+test("given retained evidence naming a fallback directive, when it is validated, then the check and the schema accept it",
+  () => {
+    // given
+    const evidence = buildPassiveDeploymentEvidence({ targetFingerprint: digest, imageDigest: digest,
+      observations: passingObservations(), requestCount: 1,
+      zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10055", riskcode: "2", confidence: "3",
+        instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "Content-Security-Policy",
+          evidence: "base-uri 'none'; frame-ancestors 'none'",
+          otherinfo: "The directive(s): form-action is/are among the directives that do not fallback to default-src." }] }] }] }
+    });
+
+    // when / then — the recomputation and the schema each pinned img-src, so each refused this alone
+    assert.deepEqual(evidence.zap.alerts[0].ruleEvidence.directives, ["form-action"]);
+    assert.doesNotThrow(() => assertPassiveDeploymentEvidence(evidence));
+    const validate = new Ajv({ strict: true, allErrors: true }).compile(schema);
+    assert.equal(validate(evidence), true, JSON.stringify(validate.errors));
+  });
+
 test("given a CSP alert whose wording neither shape matches, when normalizing it, then the evidence fails closed", () => {
   // given
   const report = { site: [{ alerts: [
