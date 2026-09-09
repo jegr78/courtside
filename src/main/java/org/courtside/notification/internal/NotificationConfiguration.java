@@ -11,6 +11,7 @@ import org.springframework.mail.javamail.JavaMailSenderImpl;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
+import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(MailProperties.class)
@@ -36,6 +37,8 @@ class NotificationConfiguration {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);
         executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(100);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.setThreadNamePrefix(threadNamePrefix);
         executor.initialize();
         return executor;
