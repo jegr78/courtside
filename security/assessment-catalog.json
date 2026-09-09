@@ -991,7 +991,7 @@
           "manualProcedureId": "MAN-SESSION-001",
           "controlEvidence": {
             "productionPath": "src/main/java/org/courtside/identity/RecentAuthentication.java",
-            "falsifyingTest": "src/test/java/org/courtside/identity/SessionIdentifierRenewalTest.java#givenASignedInSession_whenReauthenticationSucceeds_thenTheEarlierIdentifierNoLongerAuthorizes"
+            "falsifyingTest": "src/test/java/org/courtside/identity/SessionIdentifierRenewalTest.java#givenARequestHoldingASessionCopyFromBeforeTheProof_whenItSaves_thenItCannotRestoreTheEarlierIdentifier"
           }
         },
         {

@@ -1597,8 +1597,12 @@ whether it is built or designed. **Designed means absent today.**
   second of them a full lifetime rather than what the first had left. The identifier itself is 216
   bits drawn from `SecureRandom` rather than a UUID's 122, and it is replaced at both moments trust
   is re-established — a sign-in and a password proof — so one somebody else already holds stops
-  authorizing there. A proof renews the identifier without renewing the session, so proving again
-  buys no absolute lifetime. Reaching
+  authorizing there. A proof replaces the whole session rather than renaming it, because every
+  request carrying a session cookie rewrites that row from its own copy, and one in flight would
+  otherwise put the retired identifier back. The principal and the recorded browser travel across,
+  and the absolute lifetime starts again exactly as a sign-in's does. That gives nothing to somebody
+  holding only a stolen cookie: the bound is on a session held without a fresh password, and whoever
+  can supply one could sign in instead. Reaching
   the absolute bound ends the session and nothing more — the request carries on without authority,
   so what needed it is refused the way every unauthenticated request is, and signing in again is not
   something an expired session stands in the way of; past the inactivity bound there is nothing left

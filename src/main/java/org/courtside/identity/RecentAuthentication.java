@@ -6,6 +6,10 @@ import org.courtside.shared.SecurityEventLog;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -33,11 +37,20 @@ public class RecentAuthentication {
         record(request);
     }
 
+    // Not changeSessionId(): that rotates inside the row, and any request in flight rewrites
+    // SESSION_ID from its own copy, restoring the identifier this replaces.
     public void renew() {
-        if (request.getSession(false) == null) {
+        HttpSession current = request.getSession(false);
+        if (current == null) {
             throw new IllegalStateException("A session identifier cannot be renewed without a session");
         }
-        request.changeSessionId();
+        Map<String, Object> carried = new LinkedHashMap<>();
+        for (String name : Collections.list(current.getAttributeNames())) {
+            carried.put(name, current.getAttribute(name));
+        }
+        current.invalidate();
+        HttpSession renewed = request.getSession(true);
+        carried.forEach(renewed::setAttribute);
         record();
     }
 

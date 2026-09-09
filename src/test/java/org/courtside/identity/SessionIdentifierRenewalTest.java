@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
@@ -39,6 +40,7 @@ class SessionIdentifierRenewalTest extends AbstractIntegrationTest {
     @Autowired private PersonRepository persons;
     @Autowired private UserAccountRepository accounts;
     @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private JdbcClient jdbc;
 
     private MockMvc mockMvc;
 
@@ -76,12 +78,10 @@ class SessionIdentifierRenewalTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenASignedInSession_whenReauthenticationSucceeds_thenTheRenewedSessionKeepsItsProofAndItsAge()
+    void givenASignedInSession_whenReauthenticationSucceeds_thenTheRenewedSessionCarriesTheProofAndTheBrowser()
             throws Exception {
         // given
         Cookie signedIn = signIn();
-        Session before = sessionRepository.findById(storedId(signedIn));
-        assertThat(before).isNotNull();
 
         // when
         Cookie renewed = reauthenticate(signedIn, PASSWORD)
@@ -94,12 +94,42 @@ class SessionIdentifierRenewalTest extends AbstractIntegrationTest {
         Session after = sessionRepository.findById(storedId(renewed));
         assertThat(after).isNotNull();
         assertThat((Long) after.getAttribute(RecentAuthentication.AUTHENTICATED_AT))
-                .as("the proof the operation grants has to travel to the identifier that replaces it")
+                .as("the proof the operation grants has to travel to the session that replaces it")
                 .isNotNull();
-        assertThat(after.getCreationTime())
-                .as("a fresh session instead of a renewed identifier would restart the absolute"
-                        + " lifetime, so repeated proof would extend a session without bound")
-                .isEqualTo(before.getCreationTime());
+        assertThat((String) after.getAttribute("courtside.browser-family"))
+                .as("the member sees this session in their own session list, so replacing the"
+                        + " session must not lose what it was signed in from")
+                .isEqualTo("FIREFOX");
+        mockMvc.perform(get("/api/session").cookie(renewed))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.username").value("doe.jane"));
+    }
+
+    @Test
+    void givenASignedInSession_whenReauthenticationSucceeds_thenItStoresANewRowRatherThanRotatingInPlace()
+            throws Exception {
+        // given
+        Cookie signedIn = signIn();
+        String earlierRow = primaryIdOf(storedId(signedIn));
+
+        // when
+        Cookie renewed = reauthenticate(signedIn, PASSWORD)
+                .andExpect(status().isNoContent())
+                .andReturn().getResponse().getCookie("SESSION");
+        assertThat(renewed).isNotNull();
+
+        // then
+        assertThat(primaryIdOf(storedId(renewed)))
+                .as("rotating inside the row leaves a request in flight able to write the retired"
+                        + " identifier back, because every such request rewrites SESSION_ID from"
+                        + " its own copy; replacing the row is what makes that write hit nothing")
+                .isNotEqualTo(earlierRow);
+    }
+
+    private String primaryIdOf(String identifier) {
+        return jdbc.sql("SELECT primary_id FROM spring_session WHERE session_id = :id")
+                .param("id", identifier).query(String.class).single();
     }
 
     @Test
@@ -123,6 +153,39 @@ class SessionIdentifierRenewalTest extends AbstractIntegrationTest {
                         + " refused proof must not put one back").isNull();
     }
 
+    @Test
+    void givenARequestHoldingASessionCopyFromBeforeTheProof_whenItSaves_thenItCannotRestoreTheEarlierIdentifier()
+            throws Exception {
+        // given
+        Cookie signedIn = signIn();
+        String earlier = storedId(signedIn);
+        Session inFlight = sessionRepository.findById(earlier);
+        assertThat(inFlight).isNotNull();
+
+        // when
+        Cookie renewed = reauthenticate(signedIn, PASSWORD)
+                .andExpect(status().isNoContent())
+                .andReturn().getResponse().getCookie("SESSION");
+        assertThat(renewed).isNotNull();
+        inFlight.setLastAccessedTime(inFlight.getLastAccessedTime().plusSeconds(1));
+        save(inFlight);
+
+        // then
+        assertThat(sessionRepository.findById(earlier))
+                .as("every request carrying a session cookie rewrites the whole row, so one in"
+                        + " flight during the proof must not write the retired identifier back")
+                .isNull();
+        mockMvc.perform(get("/api/session").cookie(signedIn))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.authenticated").value(false));
+        mockMvc.perform(get("/api/session").cookie(renewed))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.authenticated").value(true));
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void save(Session session) {
+        ((SessionRepository) sessionRepository).save(session);
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void clearProof(String identifier) {
         Session session = sessionRepository.findById(identifier);
@@ -140,6 +203,7 @@ class SessionIdentifierRenewalTest extends AbstractIntegrationTest {
 
     private Cookie signIn() throws Exception {
         Cookie session = mockMvc.perform(post("/api/session")
+                        .header("User-Agent", "Mozilla/5.0 Firefox/142.0")
                         .param("username", "doe.jane").param("password", PASSWORD).with(csrf()))
                 .andExpect(status().isOk()).andReturn().getResponse().getCookie("SESSION");
         assertThat(session).isNotNull();
