@@ -338,6 +338,51 @@ test("given the remaining supported passive rules, when normalizing them, then o
   assert.doesNotMatch(JSON.stringify(alerts), /policy-value|src=secret/);
 });
 
+test("given the CSP directives ZAP says do not fall back, when normalizing them, then it names them", () => {
+  // given — the shape a hosted run produced against the proxy's own deliberately narrow policy
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "base-uri 'none'; frame-ancestors 'none'",
+      otherinfo: "The directive(s): form-action is/are among the directives that do not fallback to default-src." }] }
+  ] }] };
+
+  // when
+  const alerts = normalizeZapAlerts(report);
+
+  // then
+  assert.deepEqual(alerts.map(({ ruleEvidence }) => ruleEvidence), [
+    { kind: "policy-directive", headerName: "content-security-policy", directives: ["form-action"] }
+  ]);
+  assert.doesNotMatch(JSON.stringify(alerts), /base-uri|'none'/);
+});
+
+test("given several directives in one CSP alert, when normalizing it, then they are deduplicated and ordered", () => {
+  // given
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "base-uri 'none'",
+      otherinfo: "The directive(s): form-action, base-uri, form-action is/are among the directives that do not fallback to default-src." }] }
+  ] }] };
+
+  // when
+  const alerts = normalizeZapAlerts(report);
+
+  // then
+  assert.deepEqual(alerts[0].ruleEvidence.directives, ["base-uri", "form-action"]);
+});
+
+test("given a CSP alert whose wording neither shape matches, when normalizing it, then the evidence fails closed", () => {
+  // given
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "policy-value",
+      otherinfo: "A wholly new sentence ZAP has started producing." }] }
+  ] }] };
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(report), /unsupported rule evidence/);
+});
+
 test("given session fields that name different tokens, when normalizing them, then the evidence fails closed", () => {
   // given
   const report = { site: [{ alerts: [{ pluginid: "10112", riskcode: "0", confidence: "2",
