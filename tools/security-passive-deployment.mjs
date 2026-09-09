@@ -58,6 +58,7 @@ const recommendedCiphers = new Set([
 ]);
 const cspDirective = /^[a-z][a-z-]*$/;
 const namedDirectivesLead = "directive(s):";
+const listedDirectivesLead = "Broad directives:";
 const suspiciousCommentPatterns = [
   "todo", "fixme", "bug", "bugs", "xxx", "query", "db", "admin", "administrator", "user", "username",
   "select", "where", "from", "later", "debug"
@@ -126,7 +127,16 @@ export function normalizeZapAlerts(report, imageDigest) {
 // ZAP words this rule two ways: broad directives listed one per line, and a sentence naming the
 // directives that have no `default-src` fallback. Both state the same fact about the same header.
 function cspDirectivesFrom(otherInfo) {
-  const listed = [...otherInfo.matchAll(/(?:^|\n)([a-z][a-z-]*)(?=\n|$)/g)].map((match) => match[1]);
+  const listed = [];
+  const heading = otherInfo.indexOf(listedDirectivesLead);
+  if (heading >= 0) {
+    for (const line of otherInfo.slice(heading + listedDirectivesLead.length).split("\n")) {
+      const candidate = line.trim();
+      if (candidate.length === 0) continue;
+      if (!cspDirective.test(candidate)) break;
+      listed.push(candidate);
+    }
+  }
   const opening = otherInfo.indexOf(namedDirectivesLead);
   const closing = opening < 0 ? -1 : otherInfo.indexOf("is/are", opening);
   const named = closing < 0 ? []
@@ -135,17 +145,28 @@ function cspDirectivesFrom(otherInfo) {
   return directives.every((directive) => cspDirective.test(directive)) ? directives.toSorted() : [];
 }
 
+function alertFieldExcerpt(value) {
+  if (typeof value !== "string") return `not text (${typeof value})`;
+  const flattened = value.replace(/\s+/g, " ").trim();
+  if (flattened.length === 0) return "empty";
+  return flattened.length <= 160 ? JSON.stringify(flattened) : `${JSON.stringify(flattened.slice(0, 157))}...`;
+}
+
 function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest) {
-  const unsupported = () => new Error(`ZAP rule ${pluginId} produced unsupported rule evidence`);
+  const unsupported = (reason) =>
+    new Error(`ZAP rule ${pluginId} produced unsupported rule evidence: ${reason}`);
   const param = instance.param;
   const evidence = instance.evidence;
   const otherInfo = instance.otherinfo;
   if (![param, evidence, otherInfo].every((value) => typeof value === "string")) {
-    throw unsupported();
+    throw unsupported(`param is ${alertFieldExcerpt(param)},`
+      + ` evidence is ${alertFieldExcerpt(evidence)}, otherinfo is ${alertFieldExcerpt(otherInfo)}`);
   }
+  const seen = () => `param ${alertFieldExcerpt(param)},`
+    + ` evidence ${alertFieldExcerpt(evidence)}, otherinfo ${alertFieldExcerpt(otherInfo)}`;
   if (["10010", "10054"].includes(pluginId)) {
     if (param !== "__Host-XSRF-TOKEN" || evidence !== "Set-Cookie: __Host-XSRF-TOKEN" || otherInfo !== "") {
-      throw unsupported();
+      throw unsupported(`the cookie alert does not name the session cookie: ${seen()}`);
     }
     return { kind: "cookie-attribute", cookieName: "xsrf-token",
       missingAttribute: pluginId === "10010" ? "http-only" : "same-site" };
@@ -170,24 +191,24 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
   }
   if (pluginId === "10036") {
     if (param !== "" || evidence.length === 0 || otherInfo !== "") {
-      throw unsupported();
+      throw unsupported(`the server-header alert has an unexpected shape: ${seen()}`);
     }
     return { kind: "response-header", headerName: "server" };
   }
   if (pluginId === "10055") {
     if (param.toLowerCase() !== "content-security-policy" || evidence.length === 0) {
-      throw unsupported();
+      throw unsupported(`the alert does not describe the policy header: ${seen()}`);
     }
     const directives = cspDirectivesFrom(otherInfo);
     if (directives.length === 0) {
-      throw unsupported();
+      throw unsupported(`no directive name was read from otherinfo ${alertFieldExcerpt(otherInfo)}`);
     }
     return { kind: "policy-directive", headerName: "content-security-policy", directives };
   }
   if (pluginId === "10109") {
     if (param !== "" || !evidence.includes("<script")
         || !otherInfo.startsWith("No links have been found while there are scripts")) {
-      throw unsupported();
+      throw unsupported(`the script alert has an unexpected shape: ${seen()}`);
     }
     return { kind: "application-signal", signal: "scripts-without-links" };
   }
@@ -198,7 +219,7 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
     const expectedToken = expected === "__Host-SESSION" ? "session" : expected === "__Host-XSRF-TOKEN" ? "xsrf-token" : null;
     if (!expected || evidence !== expected || tokenNames.length === 0
         || tokenNames.length !== otherInfo.split("\n").length || !tokenNames.includes(expectedToken)) {
-      throw unsupported();
+      throw unsupported(`the session alert does not name one known cookie: ${seen()}`);
     }
     return { kind: "session-signal", tokenNames: [...new Set(tokenNames)] };
   }

@@ -448,6 +448,33 @@ test("given a CSP alert whose wording neither shape matches, when normalizing it
   assert.throws(() => normalizeZapAlerts(report), /unsupported rule evidence/);
 });
 
+test("given a wording no shape matches, when the evidence is refused, then the refusal says what it saw", () => {
+  // given
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "policy-value",
+      otherinfo: "A wholly new sentence ZAP has started producing." }] }
+  ] }] };
+
+  // when / then — a refusal naming only the rule costs a local reproduction to diagnose
+  assert.throws(() => normalizeZapAlerts(report), (error) =>
+    /no directive name was read from otherinfo/.test(error.message)
+      && error.message.includes("A wholly new sentence ZAP has started producing."));
+});
+
+test("given an alert field that is far too long, when it appears in a refusal, then the refusal stays bounded", () => {
+  // given
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
+      param: "Content-Security-Policy", evidence: "policy-value", otherinfo: "z".repeat(5000) }] }
+  ] }] };
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(report), (error) =>
+    error.message.length < 400 && error.message.endsWith('...')
+      && !error.message.includes('zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'));
+});
+
 test("given an otherinfo shaped to make the sentence parser backtrack, when normalizing it, then it does not spin",
   () => {
     // given — a param and an evidence that pass every cheap check, so the parser itself is measured
