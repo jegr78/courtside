@@ -408,8 +408,7 @@ jobs:
             frontend/test-results/browser-diagnostics/*.json
             frontend/test-results/browser-gate-outcome.json
           if-no-files-found: warn
-          # A tracker issue may not close before seven consecutive green nights, so the
-          # diagnostics that opened it have to still be there when somebody looks.
+          # A scheduled failure is diagnosed days later, so its diagnostics outlive a pull request's.
           retention-days: ${{ github.event_name == 'schedule' && 30 || 14 }}
 
   dependency-graph:

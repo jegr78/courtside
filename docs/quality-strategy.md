@@ -145,9 +145,9 @@ not count as release evidence; only a scheduled first attempt enters that bookke
 Every workflow that runs on a schedule feeds that tracker, not the nightly build alone. The tracker
 names them, but the set is not maintained by hand: a test reads every workflow file, collects the
 ones that carry a schedule and requires the tracker to name exactly those, so a new periodic gate
-cannot join the repository without joining the tracking. Readiness for closure is counted per
-workflow over seven consecutive scheduled first attempts, which is seven nights for the build and
-correspondingly longer for a weekly or monthly gate. A recorded failure carries the tracker's own
+cannot join the repository without joining the tracking. An issue closes when somebody has found its cause and
+answered it, and the tracker reopens it if the same class returns, so nothing rests on a count of
+quiet nights. A recorded failure carries the tracker's own
 label rather than the one product defects use, and it is assigned to the repository owner where that
 owner is a user account, so a red gate reaches somebody instead of waiting in a list to be found. An
 organisation cannot be an assignee, so an instance owned by one is told by the label alone. Where the failing workflow is the one
