@@ -6,6 +6,7 @@ import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -119,6 +120,40 @@ class UnsupportedMethodTest extends AbstractIntegrationTest {
         assertThat(problem.at("/type").asString())
                 .isEqualTo("urn:courtside:error:request-rejected");
         assertThat(problem.at("/title").asString()).isEqualTo("Request rejected");
+    }
+
+    @Test
+    void givenAStaticAssetDirectory_whenItIsRequested_thenNoDirectoryListingIsReturned()
+            throws Exception {
+        // when
+        HttpResponse<String> response = send("GET", "/assets/", null);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(response.headers().firstValue("Content-Type").orElseThrow())
+                .startsWith(PROBLEM_JSON);
+        JsonNode problem = objectMapper.readTree(response.body());
+        assertThat(problem.at("/type").asString())
+                .isEqualTo("urn:courtside:error:unmapped-path");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "/actuator/prometheus,403,urn:courtside:error:access-denied",
+            "/swagger-ui/index.html,404,urn:courtside:error:unmapped-path",
+            "/.git/config,404,urn:courtside:error:unmapped-path"
+    })
+    void givenAMember_whenAnInternalOrMetadataPathIsRequested_thenItIsNotPublished(
+            String path, int expectedStatus, String expectedType) throws Exception {
+        // when
+        HttpResponse<String> response = send("GET", path, sessionCookie);
+
+        // then
+        assertThat(response.statusCode()).isEqualTo(expectedStatus);
+        assertThat(response.headers().firstValue("Content-Type").orElseThrow())
+                .startsWith(PROBLEM_JSON);
+        assertThat(objectMapper.readTree(response.body()).at("/type").asString())
+                .isEqualTo(expectedType);
     }
 
     @Test

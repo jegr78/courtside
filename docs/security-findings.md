@@ -101,7 +101,8 @@ artifacts retain the isolated workflows that need them.
 
 - State: validated architecture gap
 - Priority: P2
-- Controls: WSTG 4.2 `WSTG-v4.2-INFO-10`
+- Controls: WSTG 4.2 `WSTG-v4.2-INFO-10`; ASVS 5.0.0 `v5.0.0-13.1.1`,
+  `v5.0.0-13.2.4`, `v5.0.0-16.5.2`
 - Review: `MAN-ARCH-001`, 9 September 2026
 - Remediation: #902
 
@@ -110,7 +111,9 @@ It omits application calls to SMTP, HIBP and an optional OTLP collector, certifi
 from the proxy to its ACME provider, mail delivery to DNS and external recipients, and configurable
 browser-to-third-party branding or legal destinations. The control remains non-passing until a
 closed inventory names those flows and a test fails for an undocumented production service,
-listener, outbound client or trust transition.
+listener, outbound client or trust transition. That inventory must also state the allowed target
+for every outbound flow and the secure behavior when the dependency refuses, times out or returns
+invalid data; the current map cannot yet prove either property across the complete set.
 
 ### Resource-demanding functionality inventory is incomplete
 

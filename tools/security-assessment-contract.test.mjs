@@ -821,6 +821,26 @@ test("given the architecture and threat-boundary controls were reviewed, when re
   }
 });
 
+test("given the logging and operational controls were reviewed, when reading their dispositions, then none is left implicit", () => {
+  // given
+  const reviewedIds = new Set([
+    "v5.0.0-13.1.1", "v5.0.0-13.2.3", "v5.0.0-13.2.4", "v5.0.0-13.4.1",
+    "v5.0.0-13.4.2", "v5.0.0-13.4.3", "v5.0.0-13.4.4", "v5.0.0-13.4.5",
+    "v5.0.0-16.2.1", "v5.0.0-16.2.2", "v5.0.0-16.3.4", "v5.0.0-16.4.1",
+    "v5.0.0-16.5.1", "v5.0.0-16.5.2", "v5.0.0-16.5.3"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+  }
+});
+
 test("given the shipped login defenses, when reading their documentation, then rate limits and lockout safety remain explicit", () => {
   // when / then
   assert.match(readme, /`POST \/api\/session` limits attempts by source address/);

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { test } from "node:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runtimeComparisonRequired, securityRuntimeFiles, securityUpdateReport, semanticChanges,
@@ -33,12 +34,17 @@ test("given two runtime digests, when they are compared, then only a difference 
 // predates the file, which a shallow one is not.
 test("given a file no base can hold, when it is compared, then it reads as added and not removed", () => {
   // given
-  const probe = `tools/comparison-direction-probe-${process.pid}.json`;
+  const probe = `build/comparison-direction-probe-${process.pid}.json`;
   const location = new URL(`../${probe}`, import.meta.url);
+  mkdirSync(new URL("../build", import.meta.url), { recursive: true });
   writeFileSync(location, "{}");
 
   // when / then — swapped arguments would report the club's own rules as deleted
   try {
+    const toolProbes = execFileSync("git",
+      ["ls-files", "--others", "--exclude-standard", "tools/comparison-direction-probe-*.json"],
+      { cwd: new URL("..", import.meta.url), encoding: "utf8" }).trim();
+    assert.equal(toolProbes, "", "a test probe must not race the tracked tool inventory");
     assert.deepEqual(semanticChanges(probe, "HEAD"), { added: ["/"], removed: [], modified: [] });
   } finally {
     rmSync(location);

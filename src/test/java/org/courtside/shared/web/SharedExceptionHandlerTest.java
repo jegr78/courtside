@@ -50,6 +50,9 @@ class SharedExceptionHandlerTest {
         // then
         assertThat(problem.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
         assertThat(problem.getType().toString()).isEqualTo("urn:courtside:error:internal-error");
+        assertThat(problem.getTitle()).isEqualTo("Internal error");
+        assertThat(problem.getDetail()).isEqualTo("This request could not be completed");
+        assertThat(problem.toString()).doesNotContain("select something", "broken", "XX000");
     }
 
     // No known write path reaches this handler unclaimed.
