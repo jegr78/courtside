@@ -1493,7 +1493,13 @@ whether it is built or designed. **Designed means absent today.**
   reference deployment that no entry names fails the build, and an entry naming a file that no
   longer exists fails it too. The list separates what carries a guarantee from what does not: a
   booking fingerprint and an artefact digest are content hashes and are never evidence that
-  something was not tampered with. `docs/cryptographic-inventory.md` holds the policy and how an
+  something was not tampered with. Each entry also names the maintained implementation that computes
+  it and who decides its strength — this repository, with a number of bits, or the operator, Sigstore,
+  Stalwart or Spring Security where the choice is not ours. Everything this repository selects reaches
+  128 bits, and the number is read back out of the literal the code draws it from rather than copied
+  into the file, so a shortened credential, a narrower truncation or a smaller modulus fails the build.
+  The reference deployment's DKIM algorithms are held to the same line: two signature algorithms, both
+  over SHA-256, and no SHA-1 variant. `docs/cryptographic-inventory.md` holds the policy and how an
   algorithm or a key is replaced without silently weakening what it replaced.
 - **Whether the database connection requires a verified certificate:** *Built, and off unless an
   operator turns it on.* `courtside.database.tls.mode` is `prefer`, `disable` or `verify-full`.

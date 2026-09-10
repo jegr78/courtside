@@ -84,7 +84,7 @@ function selfSignedRelayCertificate(): { certificate: string; key: string } {
   const directory = mkdtempSync(resolve(tmpdir(), "courtside-relay-"));
   const certificatePath = resolve(directory, "cert.pem");
   const keyPath = resolve(directory, "key.pem");
-  const issued = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+  const issued = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
     "-subj", "/CN=courtside-mail-sink",
     "-addext", "subjectAltName=DNS:localhost,DNS:host.docker.internal,IP:127.0.0.1",
     "-keyout", keyPath, "-out", certificatePath]);

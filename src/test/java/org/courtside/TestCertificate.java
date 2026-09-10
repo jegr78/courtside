@@ -48,10 +48,10 @@ public record TestCertificate(String certificate, String key, String authority) 
             Files.writeString(directory.resolve("index.txt"), "");
             Files.writeString(directory.resolve("serial"), "01\n");
             Files.writeString(directory.resolve("authority.cnf"), authorityConfiguration(name));
-            openssl(directory, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+            openssl(directory, "req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
                     "-subj", "/CN=courtside-authority-under-test",
                     "-keyout", "authority.key", "-out", "authority.pem");
-            openssl(directory, "req", "-new", "-newkey", "rsa:2048", "-nodes", "-subj", SUBJECT,
+            openssl(directory, "req", "-new", "-newkey", "rsa:3072", "-nodes", "-subj", SUBJECT,
                     "-keyout", "key.pem", "-out", "request.pem");
             // `openssl req -x509` learned to backdate only in OpenSSL 3.5, and the runners this
             // build uses ship 3.0, where `openssl ca` is the one command that issues into the past.

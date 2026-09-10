@@ -17,9 +17,9 @@ function openssl(arguments_) {
 }
 
 function certificates() {
-  openssl(["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj",
+  openssl(["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1", "-subj",
     "/CN=Courtside test CA", "-keyout", "ca.key", "-out", "ca.crt"]);
-  openssl(["req", "-newkey", "rsa:2048", "-nodes", "-subj", "/CN=mail.example.test",
+  openssl(["req", "-newkey", "rsa:3072", "-nodes", "-subj", "/CN=mail.example.test",
     "-keyout", "server.key", "-out", "server.csr"]);
   writeFileSync(join(directory, "extensions"), "subjectAltName=DNS:mail.example.test\n");
   openssl(["x509", "-req", "-in", "server.csr", "-CA", "ca.crt", "-CAkey", "ca.key",

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.5.1",
+  "catalogVersion": "1.5.2",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -1429,7 +1429,10 @@
           "id": "v5.0.0-11.2.1",
           "status": "implemented",
           "manualProcedureId": "MAN-CRYPTO-001",
-          "findingReference": "docs/security-findings.md#incomplete-cryptographic-implementation-and-strength-policy"
+          "controlEvidence": {
+            "productionPath": "security/cryptographic-inventory.json",
+            "falsifyingTest": "src/test/java/org/courtside/CryptographicStrengthTest.java#whenTheNamedImplementationsAreExercised_thenEachOneIsTheProviderTheInventoryClaims"
+          }
         },
         {
           "id": "v5.0.0-11.2.2",
@@ -1440,7 +1443,10 @@
           "id": "v5.0.0-11.2.3",
           "status": "implemented",
           "manualProcedureId": "MAN-CRYPTO-001",
-          "findingReference": "docs/security-findings.md#incomplete-cryptographic-implementation-and-strength-policy"
+          "controlEvidence": {
+            "productionPath": "security/cryptographic-inventory.json",
+            "falsifyingTest": "src/test/java/org/courtside/CryptographicStrengthTest.java#whenTheStrengthBearingSourceIsRead_thenTheRecordedBitsAreTheOnesItDraws"
+          }
         },
         {
           "id": "v5.0.0-11.3.1",
@@ -1482,7 +1488,10 @@
           "id": "v5.0.0-11.4.3",
           "status": "implemented",
           "manualProcedureId": "MAN-CRYPTO-001",
-          "findingReference": "docs/security-findings.md#incomplete-cryptographic-implementation-and-strength-policy"
+          "controlEvidence": {
+            "productionPath": "deploy/mail/base.ndjson",
+            "falsifyingTest": "src/test/java/org/courtside/CryptographicStrengthTest.java#givenEverySignatureAndIntegrityPath_whenItsHashIsRead_thenItIsCollisionResistant"
+          }
         },
         {
           "id": "v5.0.0-11.4.4",
@@ -1503,7 +1512,10 @@
           "id": "v5.0.0-11.6.1",
           "status": "implemented",
           "manualProcedureId": "MAN-CRYPTO-001",
-          "findingReference": "docs/security-findings.md#incomplete-cryptographic-implementation-and-strength-policy"
+          "controlEvidence": {
+            "productionPath": "security/cryptographic-inventory.json",
+            "falsifyingTest": "src/test/java/org/courtside/CryptographicStrengthTest.java#givenEveryGeneratedKeyPair_whenItsParametersAreRead_thenTheyMeetThePolicy"
+          }
         },
         {
           "id": "v5.0.0-12.1.1",
