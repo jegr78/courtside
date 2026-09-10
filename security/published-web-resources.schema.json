@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:published-web-resources:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "buildResources", "servedResources", "anonymousStaticPaths",
+    "absentMetadata", "reviewedOrigins", "reviewedComments", "credentialPatterns",
+    "disclosureMarkers"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "buildResources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "pattern", "class", "purpose"],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" },
+          "pattern": { "type": "string", "minLength": 1 },
+          "class": { "enum": ["html", "script", "stylesheet", "font", "image", "text"] },
+          "purpose": { "$ref": "#/$defs/purpose" }
+        }
+      }
+    },
+    "servedResources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "mediaType", "keys", "reviewedValues", "purpose"],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" },
+          "path": { "type": "string", "pattern": "^/[A-Za-z0-9._/-]*$" },
+          "mediaType": { "type": "string", "minLength": 1 },
+          "keys": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+          "reviewedValues": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "purpose": { "$ref": "#/$defs/purpose" }
+        }
+      }
+    },
+    "anonymousStaticPaths": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^/[A-Za-z0-9._*/-]*$" }
+    },
+    "absentMetadata": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$" }
+    },
+    "reviewedOrigins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["host", "purpose"],
+        "properties": {
+          "host": { "type": "string", "pattern": "^[A-Za-z0-9.-]+(?::[0-9]+)?$" },
+          "purpose": { "$ref": "#/$defs/purpose" }
+        }
+      }
+    },
+    "reviewedComments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "purpose"],
+        "properties": {
+          "text": { "type": "string", "minLength": 1 },
+          "purpose": { "$ref": "#/$defs/purpose" }
+        }
+      }
+    },
+    "credentialPatterns": { "$ref": "#/$defs/patternSet" },
+    "disclosureMarkers": { "$ref": "#/$defs/patternSet" }
+  },
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$" },
+    "purpose": { "type": "string", "minLength": 20, "maxLength": 400 },
+    "patternSet": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "pattern", "specimen", "purpose"],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" },
+          "pattern": { "type": "string", "minLength": 1 },
+          "specimen": { "type": "string", "minLength": 1 },
+          "purpose": { "$ref": "#/$defs/purpose" }
+        }
+      }
+    }
+  }
+}

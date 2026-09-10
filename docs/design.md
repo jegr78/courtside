@@ -1749,6 +1749,18 @@ whether it is built or designed. **Designed means absent today.**
   the rest of the secure-context APIs from a plain-HTTP origin that is not `localhost`, so no such
   API may sit on the path of a booking. `crypto.getRandomValues` is one that carries no such
   condition and is what the booking form draws its idempotency key from. *Built.*
+- **What a browser may fetch from this instance, in one list:** every resource the build ships and
+  every address the server answers without a session is recorded in
+  `security/published-web-resources.json`. *Built.* A file the frontend build produces that no entry
+  names fails the build, and so does a comment, an absolute origin or a credential form that no entry
+  reviewed — the shipped bundle carries no comment at all today, which is what makes an appearing one
+  a decision rather than noise. The built output and the served surface are two different producers:
+  the manifest a club's home screen reads is generated from the configuration and never exists as a
+  file, so the same list also fixes which addresses answer anonymously, which properties they
+  disclose, and that the rules, the reference proxy and the routes the shell owns still name the same
+  set. `.well-known` is empty and stays empty: this product publishes no `robots.txt`, `security.txt`
+  or sitemap, and each of those names is asserted to answer with a demand for a session rather than
+  with content.
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the build submits the tree Maven resolves so its alerts
   reach the transitive Java dependencies a POM does not name — the graph carried the declared ones
@@ -1939,7 +1951,8 @@ whether it is built or designed. **Designed means absent today.**
   bounds it: the reference deployment has no filesystem document root at all — Caddy only reverse
   proxies and serves no file of its own, the application's static content is the frontend build
   inside the published image, and its container runs read-only — so a leftover file would have to
-  be a committed file, visible in review before it ships. It stays open because closing it means
+  be a committed file, and the published-web-resources inventory above refuses one that reaches the
+  browser build. It stays open because closing it means
   either refusing those patterns at the edge, which changes what the reference deployment serves,
   or giving the passive profile a session, which is the one thing that profile is defined not to
   have. *Built, as described.*

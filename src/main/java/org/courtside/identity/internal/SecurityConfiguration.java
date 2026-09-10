@@ -163,7 +163,8 @@ public class SecurityConfiguration {
                                 "/admin/audit",
                                 "/admin/messages",
                                 "/index.html",
-                                "/assets/**", "/icon.svg", "/manifest.webmanifest", "/sw.js",
+                                "/assets/**", "/font-licenses.txt", "/icon.svg",
+                                "/manifest.webmanifest", "/sw.js",
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
                         .requestMatchers("/api/session/logout").authenticated()

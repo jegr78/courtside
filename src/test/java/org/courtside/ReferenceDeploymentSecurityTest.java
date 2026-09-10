@@ -282,7 +282,7 @@ public class ReferenceDeploymentSecurityTest {
                         "handle @mailHostname {", "header {", "Cache-Control \"no-store\"",
                         "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"", "-Location", "-Server", "-Via",
                         "respond 404", "@browserNavigation {", "host {$COURTSIDE_DOMAIN}", "method GET HEAD",
-                        "path / /courts /login /initial-password /my-bookings /my-messages /account/security /admin /admin/* /index.html /assets/* /icon.svg /manifest.webmanifest /sw.js /workbox-*.js",
+                        "path / /courts /login /initial-password /my-bookings /my-messages /account/security /admin /admin/* /index.html /assets/* /font-licenses.txt /icon.svg /manifest.webmanifest /sw.js /workbox-*.js",
                         "handle @browserNavigation {", "header {", "Cache-Control \"no-store\"",
                         "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"", "-Server", "-Via",
                         "redir https://{$COURTSIDE_DOMAIN}{uri} permanent", "handle {", "header {",

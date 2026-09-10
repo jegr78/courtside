@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "buildResources": [
+    {
+      "id": "application-shell",
+      "pattern": "^index\\.html$",
+      "class": "html",
+      "purpose": "The single document the browser loads; every other build resource is reached from it."
+    },
+    {
+      "id": "application-script",
+      "pattern": "^assets/[A-Za-z0-9._-]+\\.js$",
+      "class": "script",
+      "purpose": "The bundled application and the helper that registers the service worker."
+    },
+    {
+      "id": "application-stylesheet",
+      "pattern": "^assets/[A-Za-z0-9._-]+\\.css$",
+      "class": "stylesheet",
+      "purpose": "The bundled styles, including the font faces the shell declares."
+    },
+    {
+      "id": "web-font",
+      "pattern": "^assets/[A-Za-z0-9._-]+\\.woff2$",
+      "class": "font",
+      "purpose": "The typefaces the instance serves itself so that no browser reaches a font host."
+    },
+    {
+      "id": "font-attribution",
+      "pattern": "^font-licenses\\.txt$",
+      "class": "text",
+      "purpose": "The licence texts the bundled typefaces require to travel with them, which is why the path is readable without a session."
+    },
+    {
+      "id": "application-icon",
+      "pattern": "^icon\\.svg$",
+      "class": "image",
+      "purpose": "The installable application's fallback icon, used when a club configures no logo."
+    },
+    {
+      "id": "service-worker",
+      "pattern": "^sw\\.js$",
+      "class": "script",
+      "purpose": "The generated service worker and its precache manifest."
+    },
+    {
+      "id": "service-worker-runtime",
+      "pattern": "^workbox-[A-Za-z0-9_-]+\\.js$",
+      "class": "script",
+      "purpose": "The runtime the generated service worker imports."
+    }
+  ],
+  "servedResources": [
+    {
+      "id": "web-manifest",
+      "path": "/manifest.webmanifest",
+      "mediaType": "application/manifest+json",
+      "keys": ["background_color", "display", "icons", "name", "short_name", "start_url", "theme_color"],
+      "reviewedValues": { "display": ["standalone"], "start_url": ["/"] },
+      "purpose": "The installable application's club-specific metadata, generated from the configuration rather than built, so the Vite output cannot carry it."
+    },
+    {
+      "id": "health-probe",
+      "path": "/actuator/health",
+      "mediaType": "application/vnd.spring-boot.actuator.v3+json",
+      "keys": ["groups", "status"],
+      "reviewedValues": { "groups": ["liveness", "mail", "readiness"] },
+      "purpose": "The aggregate readiness a container runtime and an uptime check read. Details stay off this response; the group names are the only structure it discloses."
+    }
+  ],
+  "anonymousStaticPaths": [
+    "/assets/**",
+    "/font-licenses.txt",
+    "/icon.svg",
+    "/index.html",
+    "/sw.js",
+    "/workbox-*.js"
+  ],
+  "absentMetadata": [
+    "ads.txt",
+    "clientaccesspolicy.xml",
+    "crossdomain.xml",
+    "humans.txt",
+    "robots.txt",
+    "security.txt",
+    "sitemap.xml",
+    ".well-known/change-password",
+    ".well-known/security.txt"
+  ],
+  "reviewedOrigins": [
+    {
+      "host": "www.w3.org",
+      "purpose": "The XML namespace names the renderer passes to createElementNS for SVG, MathML and xlink attributes, and the one the icon declares."
+    },
+    {
+      "host": "react.dev",
+      "purpose": "The prefix of the error-decoder link a production React build puts into a thrown message."
+    },
+    {
+      "host": "reactrouter.com",
+      "purpose": "A documentation link inside a router assertion message."
+    },
+    {
+      "host": "react.i18next.com",
+      "purpose": "A documentation link inside a translation-hook assertion message."
+    },
+    {
+      "host": "bit.ly",
+      "purpose": "The shortened documentation link the precache runtime writes to the console when an entry carries no revision."
+    },
+    {
+      "host": "github.com",
+      "purpose": "The typeface projects the bundled licence texts attribute."
+    },
+    {
+      "host": "scripts.sil.org",
+      "purpose": "The Open Font License the bundled licence texts cite."
+    },
+    {
+      "host": "localhost",
+      "purpose": "The base a router falls back to when it constructs a URL and the document has no usable origin. It is a parser base, never a request target."
+    }
+  ],
+  "reviewedComments": [],
+  "credentialPatterns": [
+    {
+      "id": "private-key-block",
+      "pattern": "-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----",
+      "specimen": "-----BEGIN EC PRIVATE KEY-----",
+      "purpose": "A key the deployment generates could reach the build through an environment file that a bundler inlines."
+    },
+    {
+      "id": "aws-access-key-id",
+      "pattern": "\\bAKIA[0-9A-Z]{16}\\b",
+      "specimen": "AKIAQRSTUVWXYZ234567",
+      "purpose": "The one long-lived cloud credential form with a fixed prefix, and the one a backup target would introduce."
+    },
+    {
+      "id": "github-personal-access-token",
+      "pattern": "\\bghp_[A-Za-z0-9]{20,}\\b",
+      "specimen": "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+      "purpose": "The token a release or documentation workflow holds, which is the credential closest to this build's own tooling."
+    }
+  ],
+  "disclosureMarkers": [
+    {
+      "id": "source-map-reference",
+      "pattern": "[#@]\\s*sourceMappingURL=",
+      "specimen": "//# sourceMappingURL=app.js.map",
+      "purpose": "A reference that names an original source file even when the map itself is absent."
+    },
+    {
+      "id": "unfinished-work-marker",
+      "pattern": "\\b(?:TODO|FIXME|XXX)\\b",
+      "specimen": "TODO",
+      "purpose": "A note that tells a reader which part of the application its authors consider unfinished."
+    },
+    {
+      "id": "build-host-path",
+      "pattern": "(?:file:\\/\\/\\/(?:Users|home|workspace)\\/|[A-Za-z]:\\\\Users\\\\)",
+      "specimen": "file:///Users/example/courtside/src/main.tsx",
+      "purpose": "The directory layout of the machine that produced the build."
+    }
+  ]
+}

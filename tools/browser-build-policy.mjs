@@ -1,12 +1,23 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const forbiddenMetadata = new Set([
-  "ads.txt", "clientaccesspolicy.xml", "crossdomain.xml", "humans.txt", "robots.txt",
-  "security.txt", "sitemap.xml"
-]);
-const forbiddenText = /[#@]\s*sourceMappingURL=|-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----|\b(?:TODO|FIXME|XXX)\b|(?:file:\/\/\/(?:Users|home|workspace)\/|[A-Za-z]:\\Users\\)|\bAKIA[0-9A-Z]{16}\b|\bghp_[A-Za-z0-9]{20,}\b/;
+const require = createRequire(new URL("../frontend/package.json", import.meta.url));
+const { parse } = require("acorn");
+
+const inventory = JSON.parse(readFileSync(
+  new URL("../security/published-web-resources.json", import.meta.url), "utf8"));
+const reviewedResources = inventory.buildResources.map(({ pattern, class: kind }) =>
+  ({ expression: new RegExp(pattern), kind }));
+const reviewedOrigins = new Set(inventory.reviewedOrigins.map(({ host }) => host));
+const reviewedComments = new Set(inventory.reviewedComments.map(({ text }) => text));
+const absentMetadata = new Set(inventory.absentMetadata.map((name) => name.toLowerCase()));
+const forbiddenText = [...inventory.credentialPatterns, ...inventory.disclosureMarkers]
+  .map(({ id, pattern }) => ({ id, expression: new RegExp(pattern) }));
+const origin = /https?:\/\/([A-Za-z0-9.-]+(?::[0-9]+)?)/g;
+const markup = /<!--([\s\S]*?)-->/g;
+const styleComment = /\/\*([\s\S]*?)\*\//g;
 
 function filesBelow(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -28,10 +39,29 @@ export function browserBuildResource(path, root) {
   return relative(root, path).replaceAll("\\", "/");
 }
 
-function isReviewedResource(path) {
-  if (["font-licenses.txt", "icon.svg", "index.html", "sw.js"].includes(path)) return true;
-  if (/^workbox-[A-Za-z0-9_-]+\.js$/.test(path)) return true;
-  return /^assets\/[A-Za-z0-9._-]+\.(?:css|js|woff2)$/.test(path);
+export function browserBuildClass(resource) {
+  return reviewedResources.find(({ expression }) => expression.test(resource))?.kind;
+}
+
+export function browserBuildComments(resource, source) {
+  if (resource.endsWith(".js")) {
+    const comments = [];
+    for (const sourceType of ["module", "script"]) {
+      try {
+        parse(source, { ecmaVersion: "latest", sourceType, onComment: comments, allowHashBang: true });
+        return comments.map(({ value }) => value.trim());
+      } catch {
+        comments.length = 0;
+      }
+    }
+    throw new Error(`The browser build ships ${resource}, which no parser reads as JavaScript`);
+  }
+  const expression = resource.endsWith(".css") ? styleComment : markup;
+  return [...source.matchAll(expression)].map(([, text]) => text.trim());
+}
+
+export function browserBuildOrigins(source) {
+  return [...source.matchAll(origin)].map(([, host]) => host);
 }
 
 export function verifyBrowserBuild(directory) {
@@ -42,14 +72,27 @@ export function verifyBrowserBuild(directory) {
   const files = filesBelow(root);
   const maps = files.filter((path) => path.endsWith(".map"));
   if (maps.length > 0) throw new Error("The browser build contains source maps");
-  const resources = files.map((path) => browserBuildResource(path, root));
-  const unreviewed = resources.filter((path) => !isReviewedResource(path));
-  if (unreviewed.length > 0) throw new Error("The browser build contains an unreviewed public resource");
-  const metadata = files.filter((path) => forbiddenMetadata.has(browserBuildFileName(path).toLowerCase()));
+  const metadata = files.filter((path) => absentMetadata.has(browserBuildFileName(path).toLowerCase())
+    || absentMetadata.has(browserBuildResource(path, root).toLowerCase()));
   if (metadata.length > 0) throw new Error("The browser build contains an unreviewed metadata resource");
   for (const path of files) {
-    if (forbiddenText.test(readFileSync(path, "utf8"))) {
-      throw new Error("The browser build contains debug, host-path or secret material");
+    const resource = browserBuildResource(path, root);
+    const kind = browserBuildClass(resource);
+    if (kind === undefined) throw new Error("The browser build contains an unreviewed public resource");
+    const source = readFileSync(path, "utf8");
+    const marker = forbiddenText.find(({ expression }) => expression.test(source));
+    if (marker !== undefined) {
+      throw new Error(`The browser build contains ${marker.id} material in ${resource}`);
+    }
+    if (kind === "font") continue;
+    const unreviewedComment = browserBuildComments(resource, source)
+      .find((text) => !reviewedComments.has(text));
+    if (unreviewedComment !== undefined) {
+      throw new Error(`The browser build ships an unreviewed comment in ${resource}`);
+    }
+    const unreviewedOrigin = browserBuildOrigins(source).find((host) => !reviewedOrigins.has(host));
+    if (unreviewedOrigin !== undefined) {
+      throw new Error(`The browser build names the unreviewed origin ${unreviewedOrigin} in ${resource}`);
     }
   }
 }

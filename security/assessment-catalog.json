@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.5.2",
+  "catalogVersion": "1.5.3",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -2441,7 +2441,10 @@
           "id": "WSTG-v4.2-INFO-03",
           "status": "implemented",
           "manualProcedureId": "MAN-ARCH-001",
-          "findingReference": "docs/security-findings.md#published-web-metadata-and-disclosure-inventory-is-incomplete"
+          "controlEvidence": {
+            "productionPath": "security/published-web-resources.json",
+            "falsifyingTest": "src/test/java/org/courtside/PublishedWebSurfaceTest.java#givenEveryPathTheRulesExpose_whenItIsRequestedWithoutASession_thenOnlyTheInventoriedOnesAnswer"
+          }
         },
         {
           "id": "WSTG-v4.2-INFO-04",
@@ -2456,7 +2459,10 @@
           "id": "WSTG-v4.2-INFO-05",
           "status": "implemented",
           "manualProcedureId": "MAN-ARCH-001",
-          "findingReference": "docs/security-findings.md#published-web-metadata-and-disclosure-inventory-is-incomplete"
+          "controlEvidence": {
+            "productionPath": "tools/browser-build-policy.mjs",
+            "falsifyingTest": "tools/browser-build-policy.test.mjs#given shipped markup, styles and scripts, when reading their comments, then an unreviewed one is refused"
+          }
         },
         {
           "id": "WSTG-v4.2-INFO-06",
