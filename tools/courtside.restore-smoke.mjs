@@ -54,7 +54,15 @@ function createMailCertificate(directory) {
   run("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
     "-subj", "/CN=mail", "-addext", "subjectAltName=DNS:mail",
     "-keyout", key, "-out", join(directory, "cert.pem")]);
-  chmodSync(key, 0o644);
+  chmodSync(key, 0o600);
+}
+
+export function createMailCertificateDirectory(parent = tmpdir()) {
+  return mkdtempSync(join(parent, "courtside-restore-mail-"));
+}
+
+export function currentHostIdentity(runtime = process) {
+  return `${runtime.getuid?.() ?? 0}:${runtime.getgid?.() ?? 0}`;
 }
 
 function psql(project, environment, args, options = {}) {
@@ -347,7 +355,7 @@ async function execute() {
   const project = `courtside-restore-${runId}`;
   const build = join(root, "build", "database-restore", runId);
   const privateDirectory = mkdtempSync(join(tmpdir(), "courtside-restore-"));
-  const mailCertificateDirectory = mkdtempSync(join(tmpdir(), "courtside-restore-mail-"));
+  const mailCertificateDirectory = createMailCertificateDirectory();
   const applicationDumpPath = join(privateDirectory, "application.dump");
   const legacyDumpPath = join(privateDirectory, "legacy.dump");
   const password = newBootstrapPassword();
@@ -356,7 +364,8 @@ async function execute() {
   const environment = {
     COURTSIDE_RESTORE_IMAGE: image,
     COURTSIDE_RESTORE_ADMIN_PASSWORD: password,
-    COURTSIDE_RESTORE_MAIL_CERT_DIR: mailCertificateDirectory
+    COURTSIDE_RESTORE_MAIL_CERT_DIR: mailCertificateDirectory,
+    COURTSIDE_RESTORE_MAIL_USER: currentHostIdentity()
   };
   const startedAt = Date.now();
   mkdirSync(build, { recursive: true });

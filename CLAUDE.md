@@ -421,6 +421,13 @@ enough to need.
 * **A branch gets a whole-branch review before its final verification and push.** Every batch of
   work so far has had its most serious findings surface there rather than in the per-task reviews.
 
+* **A scheduled regression is not a changed runtime path's first execution.** When a change touches
+  behavior exercised only by a scheduled or manually dispatched workflow, run its direct local
+  entry point and the workflow's `workflow_dispatch` against the branch before merge. Record both
+  in the pull request. The hosted run is required where runner permissions, filesystem semantics or
+  hosted services are part of the behavior; a green developer-machine run does not substitute for
+  it. Every scheduled workflow therefore retains a manual dispatch path.
+
 ## The tracker
 
 The project board [Courtside](https://github.com/users/jegr78/projects/2) is the overview. Every

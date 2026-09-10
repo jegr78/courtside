@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
   applicationStateTables,
-  columnsAddedSinceTheFixture
+  columnsAddedSinceTheFixture,
+  createMailCertificateDirectory,
+  currentHostIdentity
 } from "./courtside.restore-smoke.mjs";
 
 function source(path) {
@@ -118,13 +122,40 @@ test("given a restored application database, when the image starts, then the wri
 test("given private database archives, when mail TLS is configured, then the mail container cannot read the archives", () => {
   // given
   const runner = source("./courtside.restore-smoke.mjs");
+  const restoreCompose = source("../deploy/compose.restore.yaml");
 
   // when / then
   assert.match(runner, /privateDirectory = mkdtempSync\(join\(tmpdir\(\), "courtside-restore-"\)\)/);
-  assert.match(runner,
-    /mailCertificateDirectory = mkdtempSync\(join\(tmpdir\(\), "courtside-restore-mail-"\)\)/);
+  assert.match(runner, /mailCertificateDirectory = createMailCertificateDirectory\(\)/);
+  assert.match(runner, /chmodSync\(key, 0o600\)/);
   assert.match(runner, /COURTSIDE_RESTORE_MAIL_CERT_DIR: mailCertificateDirectory/);
+  assert.match(runner, /COURTSIDE_RESTORE_MAIL_USER: currentHostIdentity\(\)/);
   assert.doesNotMatch(runner, /COURTSIDE_RESTORE_MAIL_CERT_DIR: privateDirectory/);
+  assert.match(restoreCompose, /user: \$\{COURTSIDE_RESTORE_MAIL_USER\}/);
+});
+
+test("given a capability-free mail container, when its certificate directory is prepared, then it is traversable",
+  { skip: process.platform === "win32" }, () => {
+    // given
+    const parent = mkdtempSync(join(tmpdir(), "courtside-restore-mode-"));
+
+    try {
+      // when
+      const privateDirectory = mkdtempSync(join(parent, "courtside-restore-"));
+      const mailCertificateDirectory = createMailCertificateDirectory(parent);
+
+      // then
+      assert.equal(statSync(privateDirectory).mode & 0o777, 0o700);
+      assert.equal(statSync(mailCertificateDirectory).mode & 0o777, 0o700);
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+test("given different Docker hosts, when the mail identity is selected, then it follows POSIX ownership or Docker Desktop", () => {
+  // when / then
+  assert.equal(currentHostIdentity({ getuid: () => 1001, getgid: () => 121 }), "1001:121");
+  assert.equal(currentHostIdentity({}), "0:0");
 });
 
 test("given operator documentation, when backup and restore are followed, then both use the qualified archive format", () => {

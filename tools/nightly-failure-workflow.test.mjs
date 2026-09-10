@@ -21,12 +21,25 @@ function scheduledWorkflowNames() {
     .sort();
 }
 
+function scheduledWorkflows() {
+  return readdirSync(directory)
+    .filter((entry) => entry.endsWith(".yml") || entry.endsWith(".yaml"))
+    .map((entry) => ({ entry, definition: yaml.load(readFileSync(new URL(entry, directory), "utf8")) }))
+    .filter(({ definition }) => definition?.on?.schedule);
+}
+
 test("given a workflow that runs on a schedule, when tracking is wired, then it is watched like the build", () => {
   // given / when
   const watched = [...tracker.on.workflow_run.workflows].sort();
 
   // then
   assert.deepEqual(watched, scheduledWorkflowNames());
+});
+
+test("given a workflow that runs on a schedule, when its runtime changes, then it can be qualified on demand", () => {
+  for (const { entry, definition } of scheduledWorkflows()) {
+    assert.ok(definition.on.workflow_dispatch !== undefined, `${entry} cannot be dispatched before its next schedule`);
+  }
 });
 
 test("given a completed run, when tracking it, then only scheduled first-attempt evidence is fetched", () => {

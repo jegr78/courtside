@@ -28,3 +28,7 @@ renders its risk and automation-gap tables.
 
 - [ ] The OpenAPI and generated contract are unchanged, or the contract change is described.
 - [ ] Published migrations and environment variables are unchanged, or the compatibility impact is described.
+
+## Periodic workflow evidence
+
+- [ ] Scheduled or periodic-only runtime paths are unchanged, or the direct local command and hosted branch run are linked above.

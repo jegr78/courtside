@@ -161,6 +161,14 @@ first failed or timed-out step is the primary class, and later failures remain c
 occurrence. A cancelled job is one job-level occurrence rather than one issue per cancelled or
 cleanup step.
 
+A scheduled regression is not the first execution of a changed periodic-only runtime path. Every
+scheduled workflow remains manually dispatchable. Before such a change merges, its direct local
+entry point and a hosted branch dispatch both exercise the changed path; the pull request records
+the command and run. The local execution proves the repository-controlled behavior, while the
+hosted execution covers runner permissions, filesystem semantics and services that a developer
+machine cannot faithfully stand in for. The later schedule then detects regressions instead of
+discovering whether the change ever worked in its target environment.
+
 ### Release checklist
 
 - [ ] Identify the candidate commit and immutable image digest.
