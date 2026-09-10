@@ -46,6 +46,8 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
 
     private static final String PROBLEM = "application/problem+json";
 
+    private static final String UNMAPPED = "urn:courtside:error:unmapped-path";
+
     private static final String ERROR_DISPATCH = "/error";
 
     private static final String WELL_KNOWN = "/.well-known";
@@ -111,9 +113,17 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
                 .collect(Collectors.toCollection(TreeSet::new));
 
         // when / then
-        assertThat(reachable).allSatisfy(path -> assertThat(problemType(path))
-                .describedAs("%s is published, so it is not answered with a demand for a session", path)
-                .isNotEqualTo(UNAUTHENTICATED));
+        assertThat(reachable).allSatisfy(path -> {
+            HttpResponse<String> response = fetch(path);
+            assertThat(response.statusCode())
+                    .describedAs("%s is published, so it is answered rather than demanded a session for", path)
+                    .isIn(200, 404);
+            if (response.statusCode() == 404) {
+                assertThat(problemType(path))
+                        .describedAs("%s is published, and an absent build only leaves it unmapped", path)
+                        .isEqualTo(UNMAPPED);
+            }
+        });
         assertThat(inventoryStrings("absentMetadata")).allSatisfy(name -> assertThat(problemType("/" + name))
                 .describedAs("%s is a metadata resource this product does not publish", name)
                 .isEqualTo(UNAUTHENTICATED));

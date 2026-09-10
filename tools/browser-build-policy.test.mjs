@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { browserBuildFileName, browserBuildOrigins, browserBuildResource, verifyBrowserBuild } from "./browser-build-policy.mjs";
+import { browserBuildFileName, browserBuildInventoryGaps, browserBuildOrigins, browserBuildResource,
+  verifyBrowserBuild } from "./browser-build-policy.mjs";
 
 const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const frontend = join(repository, "frontend");
@@ -139,4 +140,6 @@ test("given production browser sources, when building the web root, then metadat
 
   // then
   verifyBrowserBuild(output);
+  assert.deepEqual(browserBuildInventoryGaps(output), [],
+    "an entry the build no longer produces is a review the inventory still claims to have had");
 });

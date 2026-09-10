@@ -64,6 +64,14 @@ export function browserBuildOrigins(source) {
   return [...source.matchAll(origin)].map(([, host]) => host);
 }
 
+export function browserBuildInventoryGaps(directory) {
+  const root = resolve(directory);
+  const resources = filesBelow(root).map((path) => browserBuildResource(path, root));
+  return inventory.buildResources
+    .filter(({ pattern }) => !resources.some((resource) => new RegExp(pattern).test(resource)))
+    .map(({ id }) => id);
+}
+
 export function verifyBrowserBuild(directory) {
   const root = resolve(directory);
   if (!existsSync(root) || !statSync(root).isDirectory() || !existsSync(resolve(root, "index.html"))) {
