@@ -8,6 +8,13 @@ const catalog = JSON.parse(readFileSync(new URL("../security/assessment-catalog.
 const findingSummary = JSON.parse(readFileSync(
   new URL("../security/manual-baseline-finding-summary.json", import.meta.url), "utf8"));
 const findings = findingsByControl(findingSummary);
+const readSource = (path) => {
+  try {
+    return readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+  } catch {
+    return null;
+  }
+};
 
 const runInput = () => ({
   catalog,
@@ -24,6 +31,7 @@ const runInput = () => ({
     application: { imageDigest: `sha256:${"2".repeat(64)}`, commit: "45d7919eb6f23d32278e5fb47d8c57f91e3b2c84" }
   },
   verification: { workflow: "build", runId: "34458782775", conclusion: "success" },
+  readSource,
   unanchoredTrackingReference: "#929",
   evidenceExpiresOn: "2026-10-10",
   authorizationExpiresAt: "2026-09-17T12:00:00Z"
@@ -34,11 +42,13 @@ const controlWith = (properties) => ({ id: "v5.0.0-1.1.1", status: "implemented"
 
 test("given a control-specific anchor, when reading the control, then the run records a pass", () => {
   // given
-  const control = controlWith({ controlEvidence: { productionPath: "src/main/java/A.java",
-    falsifyingTest: "src/test/java/ATest.java#whenX_thenY" } });
+  const control = controlWith({ controlEvidence: {
+    productionPath: "src/main/java/org/courtside/dataexchange/internal/SnapshotParser.java",
+    falsifyingTest: "src/test/java/org/courtside/dataexchange/SnapshotParserTest.java"
+      + "#givenPercentEncodedText_whenParsing_thenItIsNotDecodedAsAnotherInputLayer" } });
 
   // when
-  const reading = readControl(control, findings);
+  const reading = readControl(control, findings, readSource);
 
   // then
   assert.equal(reading.outcome, "pass");
@@ -50,7 +60,7 @@ test("given a control the catalog leaves unanchored, when reading it, then the r
   const control = controlWith({});
 
   // when
-  const reading = readControl(control, findings);
+  const reading = readControl(control, findings, readSource);
 
   // then
   assert.equal(reading.outcome, "blocked");
@@ -62,7 +72,7 @@ test("given a control a tracked lifecycle finding maps, when reading it, then th
   const control = controlWith({ id: "WSTG-v4.2-ATHN-07", manualProcedureId: "MAN-IDENTITY-001" });
 
   // when
-  const reading = readControl(control, findings);
+  const reading = readControl(control, findings, readSource);
 
   // then
   assert.equal(reading.outcome, "fail");
@@ -78,7 +88,7 @@ test("given a control mapped by two findings, when reading it, then the recorded
   const fingerprints = findings.get("v5.0.0-3.4.3").map(({ fingerprint }) => fingerprint);
 
   // when
-  const reading = readControl(control, findings);
+  const reading = readControl(control, findings, readSource);
 
   // then
   assert.equal(fingerprints.length, 2);
@@ -91,7 +101,7 @@ test("given a control the catalog rules out, when reading it, then the run recor
     manualProcedureId: "MAN-AUTHZ-001", rationale: "No request-controlled filesystem path exists." });
 
   // when
-  const reading = readControl(control, findings);
+  const reading = readControl(control, findings, readSource);
 
   // then
   assert.equal(reading.outcome, "not-applicable");
@@ -104,7 +114,7 @@ test("given a control read to a documented finding, when reading it, then the ru
     findingReference: "docs/security-findings.md#incomplete-authorization-rule-documentation" });
 
   // when
-  const reading = readControl(control, findings);
+  const reading = readControl(control, findings, readSource);
 
   // then
   assert.equal(reading.outcome, "blocked");
@@ -115,11 +125,93 @@ test("given a control read to a documented finding, when reading it, then the ru
 test("given an anchor a lifecycle finding contradicts, when reading the control, then the run refuses to decide", () => {
   // given
   const control = controlWith({ id: "WSTG-v4.2-ATHN-07", manualProcedureId: "MAN-IDENTITY-001",
-    controlEvidence: { productionPath: "src/main/java/A.java", falsifyingTest: "src/test/java/ATest.java#whenX_thenY" } });
+    controlEvidence: {
+      productionPath: "src/main/java/org/courtside/dataexchange/internal/SnapshotParser.java",
+      falsifyingTest: "src/test/java/org/courtside/dataexchange/SnapshotParserTest.java"
+        + "#givenPercentEncodedText_whenParsing_thenItIsNotDecodedAsAnotherInputLayer" } });
 
   // when / then
-  assert.throws(() => readControl(control, findings),
+  assert.throws(() => readControl(control, findings, readSource),
     /WSTG-v4.2-ATHN-07 carries both a control anchor and an open lifecycle finding/);
+});
+
+test("given an anchor the assessed commit does not carry, when reading the control, then no pass is recorded", () => {
+  // given
+  const control = controlWith({ controlEvidence: { productionPath: "src/main/java/Absent.java",
+    falsifyingTest: "src/test/java/org/courtside/dataexchange/SnapshotParserTest.java#whenX_thenY" } });
+
+  // when / then
+  assert.throws(() => readControl(control, findings, readSource),
+    /names the production path src\/main\/java\/Absent\.java, which the assessed commit does not carry/);
+});
+
+test("given a test file without the test the anchor names, when reading the control, then no pass is recorded", () => {
+  // given
+  const control = controlWith({ controlEvidence: {
+    productionPath: "src/main/java/org/courtside/dataexchange/internal/SnapshotParser.java",
+    falsifyingTest: "src/test/java/org/courtside/dataexchange/SnapshotParserTest.java#whenNobodyWroteThis_thenNothing" } });
+
+  // when / then
+  assert.throws(() => readControl(control, findings, readSource),
+    /which does not contain it at the assessed commit/);
+});
+
+test("given a verification that did not succeed, when building the run, then it records nothing", () => {
+  // given
+  const input = runInput();
+
+  // when / then
+  assert.throws(() => buildAnchoredRun({ ...input,
+    verification: { ...input.verification, conclusion: "failure" } }),
+    /concluded failure, so no control anchor it executed can be read as a pass/);
+});
+
+test("given a finding a passed retest closed, when reading the control, then it is not read as failing", () => {
+  // given
+  const closed = structuredClone(findingSummary);
+  for (const finding of closed.findings) finding.state = "retest-passed";
+
+  // when
+  const reading = readControl(controlWith({ id: "WSTG-v4.2-ATHN-07",
+    manualProcedureId: "MAN-IDENTITY-001" }), findingsByControl(closed), readSource);
+
+  // then
+  assert.equal(reading.outcome, "blocked");
+  assert.equal(reading.disposition, "unanchored");
+});
+
+test("given a fix awaiting its retest, when reading the control, then it is blocked rather than failed", () => {
+  // given
+  const pending = structuredClone(findingSummary);
+  for (const finding of pending.findings) finding.state = "fixed";
+
+  // when
+  const reading = readControl(controlWith({ id: "WSTG-v4.2-ATHN-07",
+    manualProcedureId: "MAN-IDENTITY-001" }), findingsByControl(pending), readSource);
+
+  // then
+  assert.equal(reading.outcome, "blocked");
+  assert.equal(reading.disposition, "lifecycle-finding");
+  assert.match(reading.rationale, /awaiting its retest/);
+});
+
+test("given an anchor pointing outside the repository, when reading the control, then no pass is recorded", () => {
+  // given
+  const control = controlWith({ controlEvidence: { productionPath: "../../etc/hosts",
+    falsifyingTest: "src/test/java/org/courtside/dataexchange/SnapshotParserTest.java#whenX_thenY" } });
+
+  // when / then
+  assert.throws(() => readControl(control, findings, readSource), /names a path that leaves the repository/);
+});
+
+test("given two controls whose retained readings would share a name, when building the run, then it refuses", () => {
+  // given
+  const colliding = { schemaVersion: 1, catalogVersion: catalog.catalogVersion, controlCoverage: [{
+    controls: [controlWith({ id: "v5.0.0-1.1.1" }), controlWith({ id: "V5.0.0-1.1.1" })] }] };
+
+  // when / then
+  assert.throws(() => buildAnchoredRun({ ...runInput(), catalog: colliding }),
+    /share one retained reading identifier/);
 });
 
 test("given the current catalog, when building the run, then every selected control carries exactly one outcome", () => {

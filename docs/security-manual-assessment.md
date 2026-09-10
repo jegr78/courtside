@@ -48,7 +48,7 @@ Validation refuses the record otherwise.
 ### Reading the anchors an earlier run left behind
 
 ```bash
-node tools/security-anchored-control-run.mjs <manifest.json> <record-id> <build-run-id> <tracking-reference> <output-directory>
+node tools/security-anchored-control-run.mjs <manifest.json> <record-id> <build-run-id> <conclusion> <tracking-reference> <output-directory>
 ```
 
 The command derives one disposition per selected control from what the catalog and the tracked
@@ -59,8 +59,10 @@ and a control the catalog rules out becomes `not-applicable`. A control none of 
 `blocked`, never an outcome whose source nobody can follow. A control carrying both an anchor and an
 open lifecycle finding is two answers to one question, and the command refuses to pick one.
 
-It writes the protected record, one retained reading per control and the redacted per-control
-outcomes. It is a reading, not a substitute for the procedures: it performs no procedure step and
+It resolves every anchor before it records a pass: the production path has to exist at the assessed
+commit, the named test has to be in the file the anchor names, and the verification whose conclusion
+the run is given has to have succeeded. It writes the protected record, one retained reading per
+control and the redacted per-control outcomes. It is a reading, not a substitute for the procedures: it performs no procedure step and
 sends no request, and a record it produces says so beside its counts.
 
 ## Authorization and profile boundary

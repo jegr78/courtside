@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { readFileSync } from "node:fs";
+
+const failingStates = new Set(["validated", "remediation-in-progress", "accepted-risk"]);
 
 export function findingsByControl(findingSummary) {
   const byControl = new Map();
@@ -14,22 +15,41 @@ export function findingsByControl(findingSummary) {
   return byControl;
 }
 
-export function readControl(control, findings) {
-  const mapped = findings.get(control.id) ?? [];
-  if (control.controlEvidence && mapped.length > 0) {
+export function readControl(control, findings, resolve) {
+  const open = (findings.get(control.id) ?? [])
+    .filter(({ state }) => state !== "retest-passed")
+    .toSorted((left, right) => left.fingerprint < right.fingerprint ? -1 : 1);
+  if (control.controlEvidence && open.length > 0) {
     throw new Error(`${control.id} carries both a control anchor and an open lifecycle finding`);
   }
   if (control.controlEvidence) {
+    const { productionPath, falsifyingTest } = control.controlEvidence;
+    const [testFile, testName] = falsifyingTest.split("#");
+    if ([productionPath, testFile].some((path) => path.split("/").includes(".."))) {
+      throw new Error(`${control.id} names a path that leaves the repository`);
+    }
+    if (resolve(productionPath) === null) {
+      throw new Error(`${control.id} names the production path ${productionPath}, which the assessed commit `
+        + "does not carry");
+    }
+    if (!(resolve(testFile) ?? "").includes(testName)) {
+      throw new Error(`${control.id} names ${testName} in ${testFile}, which does not contain it at the `
+        + "assessed commit");
+    }
     return { outcome: "pass", disposition: "control-evidence", ...control.controlEvidence };
   }
-  if (mapped.length > 0) {
-    const finding = mapped.toSorted((left, right) =>
-      left.fingerprint < right.fingerprint ? -1 : 1)[0];
-    return { outcome: "fail", disposition: "lifecycle-finding", findingFingerprint: finding.fingerprint,
-      findingState: finding.state, findingPriority: finding.priority,
+  if (open.length > 0) {
+    const finding = open[0];
+    const failing = failingStates.has(finding.state);
+    return { outcome: failing ? "fail" : "blocked", disposition: "lifecycle-finding",
+      findingFingerprint: finding.fingerprint, findingState: finding.state,
+      findingPriority: finding.priority,
+      ...failing ? {} : { trackingReference: finding.fingerprint },
       rationale: `Finding ${finding.fingerprint} maps ${control.id} and is recorded ${finding.state} at `
-        + `priority ${finding.priority}. No retest is recorded against it, so the run reads the control as `
-        + "still failing." };
+        + `priority ${finding.priority}. `
+        + (failing
+          ? "No passed retest has moved it out of that state, so the run reads the control as still failing."
+          : "A fix awaiting its retest leaves the control undecided rather than remediated.") };
   }
   if (control.findingReference) {
     return { outcome: "blocked", disposition: "finding-document",
@@ -140,6 +160,10 @@ const readingDocument = (control, reading, input) => ({
 const evidenceId = (controlId) => `reading-${controlId.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}`;
 
 export function buildAnchoredRun(input) {
+  if (input.verification.conclusion !== "success") {
+    throw new Error(`Verification run ${input.verification.runId} concluded `
+      + `${input.verification.conclusion}, so no control anchor it executed can be read as a pass`);
+  }
   const findings = findingsByControl(input.findingSummary);
   const selected = input.catalog.controlCoverage.flatMap(({ controls }) => controls)
     .filter(({ manualProcedureId }) => manualProcedureId)
@@ -147,7 +171,7 @@ export function buildAnchoredRun(input) {
   const readings = [];
   const outcomes = new Map();
   for (const control of selected) {
-    const reading = readControl(control, findings);
+    const reading = readControl(control, findings, input.readSource);
     const document = readingDocument(control, reading, input);
     const digest = `sha256:${createHash("sha256").update(JSON.stringify(document)).digest("hex")}`;
     readings.push({ id: evidenceId(control.id), controlId: control.id, digest, document });
@@ -170,6 +194,9 @@ export function buildAnchoredRun(input) {
       ...reading.outcome !== "blocked" ? {} : {
         trackingReference: reading.trackingReference ?? input.unanchoredTrackingReference }
     });
+  }
+  if (new Set(readings.map(({ id }) => id)).size !== readings.length) {
+    throw new Error("Two selected controls share one retained reading identifier");
   }
   const procedureIds = [...new Set(selected.map(({ manualProcedureId }) => manualProcedureId))].toSorted();
   const prerequisites = [
@@ -230,10 +257,11 @@ const writeProtected = (path, value) => {
 };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [manifestPath, runId, verificationRunId, trackingReference, outputDirectory] = process.argv.slice(2);
-  if (process.argv.length !== 7) {
+  const [manifestPath, runId, verificationRunId, verificationConclusion, trackingReference,
+    outputDirectory] = process.argv.slice(2);
+  if (process.argv.length !== 8) {
     process.stderr.write("Usage: security-anchored-control-run.mjs <manifest.json> <run-id> "
-      + "<verification-run-id> <tracking-reference> <output-directory>\n");
+      + "<verification-run-id> <verification-conclusion> <tracking-reference> <output-directory>\n");
     process.exitCode = 1;
   } else {
     const repository = new URL("..", import.meta.url);
@@ -250,7 +278,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       tester: "Repository maintainer",
       owner: "Repository maintainer",
       manifest,
-      verification: { workflow: "build", runId: verificationRunId, conclusion: "success" },
+      verification: { workflow: "build", runId: verificationRunId, conclusion: verificationConclusion },
+      readSource: (path) => {
+        try {
+          return readFileSync(new URL(path, repository), "utf8");
+        } catch {
+          return null;
+        }
+      },
       unanchoredTrackingReference: trackingReference,
       evidenceExpiresOn: day(30),
       authorizationExpiresAt: `${day(7)}T00:00:00Z`

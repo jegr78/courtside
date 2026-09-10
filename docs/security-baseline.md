@@ -122,8 +122,8 @@ from automated evidence. They remain separately owned release activities.
 This run reads what the control anchors make readable. It is not a second walk through the runbook:
 the eleven procedure readings recorded under #881 put one production path and one falsifying test on
 106 controls, a finding reference on 24 and a not-applicable rationale on 13, and this run records
-the outcome each of those dispositions supports. It sent no request to its target beyond the
-identity qualification below. An internal review does not replace an independent penetration test,
+the outcome each of those dispositions supports. The reading itself sends no request; the safe run
+below is what produced the target identity it binds to. An internal review does not replace an independent penetration test,
 and reading a checked-in disposition is a weaker observation than performing the procedure.
 
 - Source commit: `45d7919eb6f23d32278e5fb47d8c57f91e3b2c84`
@@ -133,7 +133,7 @@ and reading a checked-in disposition is a weaker observation than performing the
 - Manual record: `manual-anchored-20260910`
 - Executing verification: [build run 34458782775](https://github.com/jegr78/courtside/actions/runs/34458782775)
 - Retained evidence digest:
-  `sha256:48abafc80317fdfae4e992012d31d183bf58cfa1ac931b4358541b4a7770e6f6`
+  `sha256:783df27994f4faff19d6d58631ac246abade6b229b9b5130226e0dcfc7d46a98`
 
 The record covers the same 316 unique selected controls:
 
@@ -146,13 +146,16 @@ The record covers the same 316 unique selected controls:
 
 Its per-control outcomes are published, redacted to one identifier and one outcome each, as
 [`manual-anchored-control-outcomes.json`](../security/manual-anchored-control-outcomes.json), with
-digest `sha256:ca3af55d0f8c2082ab4fc275c5ff4eb3d5e09b8424ab6a18cf739030deb5c61e`. The record of
+digest `sha256:5f669de5c2db5e1f8dd4413c2091bee971956554a190df2060c8c6cfb0377dbe`. The record of
 `manual-baseline-20260906` above is unchanged; the two runs observed different things and neither
 replaces the other.
 
-A pass names its own production path, its own test and the run that executed it. The evidence
-contract already refuses a pass for a control with no anchor, so the 106 are exactly the controls
-somebody read one at a time. `docs/security-assessment.md` states what that anchor costs.
+A pass names its own production path, its own test and the run that executed it, and the reading
+resolves all three before recording it: the path has to exist at the assessed commit, the test has
+to be in the file the anchor names, and the executing verification has to have concluded
+successfully. The evidence contract refuses a pass for a control with no anchor at all, so the 106
+are exactly the controls somebody read one at a time. `docs/security-assessment.md` states what that
+anchor costs.
 
 The 138 blocked controls are three separate situations:
 
@@ -177,18 +180,19 @@ Two statements in the retained record are declarations rather than observations,
 deliberate. The record declares profile `active` in a disposable `SECURITY` environment because five
 of the eleven executed procedures require that authorization ceiling; the run used none of it. Every
 retained per-control reading carries the classification `restricted-security-evidence` because the
-evidence schema defines exactly one, so the label states how the file is retained — mode `0600`, not
-committed, expiring — rather than that its content is sensitive.
+evidence schema defines exactly one. That label states how the file is retained, at mode `0600`,
+uncommitted and expiring, rather than that its content is sensitive.
 
 Reproduce the run by qualifying one immutable image, preparing one `SECURITY` target and reading the
-manifest that binds them:
+manifest that binds them. The safe run exists to produce that manifest: the reading takes the target
+identity from it and no verdict, and this one stopped at `incomplete` on the alert #930 describes.
 
 ```bash
 node tools/courtside.uat-smoke.mjs --confirm courtside-uat
 node tools/courtside.mjs security <RUN_ID> <IMAGE_DIGEST>
 node tools/courtside.mjs security-run <RUN_ID> safe --qualification build/uat-smoke/qualification.json
 node tools/security-anchored-control-run.mjs \
-  build/security/<RUN_ID>/assessment/attempt-1/manifest.json <RECORD_ID> <BUILD_RUN_ID> '#929' \
+  build/security/<RUN_ID>/assessment/attempt-1/manifest.json <RECORD_ID> <BUILD_RUN_ID> success '#929' \
   build/security/<RECORD_ID>
 node tools/security-manual-assessment.mjs build/security/<RECORD_ID>/evidence.json
 node tools/courtside.mjs security-cleanup <RUN_ID>
