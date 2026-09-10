@@ -48,6 +48,8 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
 
     private static final String ERROR_DISPATCH = "/error";
 
+    private static final String WELL_KNOWN = "/.well-known";
+
     private static final String API = "/api";
 
     private static final String MANAGEMENT = "/actuator";
@@ -84,11 +86,10 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
         Set<String> staticPaths = inventoryStrings("anonymousStaticPaths");
 
         // when
-        Set<String> shellRoutes = shellRoutes();
+        Set<String> browserSurface = union(union(shellRoutes(), staticPaths), servedPaths(false));
         List<String> proxied = List.of(proxiedPaths());
 
         // then
-        Set<String> browserSurface = union(union(shellRoutes, staticPaths), servedPaths(false));
         assertThat(permitted).describedAs(
                 "the rules permit the shell routes, the built resources and the generated metadata, "
                         + "and nothing besides")
@@ -168,7 +169,7 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
                 .isEqualTo(servedPaths(true));
         assertThat(Stream.concat(controllerPaths.stream(), shellRoutes().stream()))
                 .describedAs("nothing answers under the well-known prefix")
-                .noneMatch(path -> path.startsWith("/.well-known"));
+                .noneMatch(path -> path.startsWith(WELL_KNOWN));
     }
 
     private Set<String> shellRoutes() {

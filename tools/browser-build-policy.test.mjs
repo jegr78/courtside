@@ -111,6 +111,19 @@ test("given shipped resources, when reading the origins they name, then an unrev
   }));
 });
 
+test("given the packaged application, when reading how the web root reaches it, then the checked build is the packaged one", () => {
+  // given
+  const pom = readFileSync(join(repository, "pom.xml"), "utf8");
+  const execution = pom.slice(pom.indexOf("<id>copy-web-client</id>"), pom.indexOf("</plugin>",
+    pom.indexOf("<id>copy-web-client</id>")));
+
+  // when / then
+  assert.match(execution, /<outputDirectory>\$\{project\.build\.outputDirectory}\/static<\/outputDirectory>/);
+  assert.match(execution, /<directory>\$\{project\.basedir}\/frontend\/dist<\/directory>/);
+  assert.match(execution, /<filtering>false<\/filtering>/,
+    "a filtered copy would put something into the image that the policy never read");
+});
+
 test("given production browser sources, when building the web root, then metadata and debug artifacts stay absent", async (context) => {
   // given
   const output = mkdtempSync(join(tmpdir(), "courtside-production-browser-build-"));
