@@ -249,7 +249,7 @@
       "strength": {
         "decidedBy": "repository",
         "bits": 128,
-        "basis": "A 128-bit truncation of SHA-256 over a session identifier that itself carries 216 random bits. There is no dictionary to invert, and the handle is only ever compared."
+        "basis": "The second-preimage resistance of a 128-bit truncation of SHA-256, over a session identifier that itself carries 216 random bits, so there is no dictionary to invert. The truncation leaves only 64 bits against a collision, and that is not the property this use depends on: the handle selects one of an account's own sessions, and its input is a value the caller never chooses."
       },
       "class": "pseudonymisation",
       "owner": "club-operator",
