@@ -129,14 +129,15 @@ function replaceRequired(source: string, expected: string, replacement: string):
   return source.replace(expected, replacement);
 }
 
-const SECOND_PEER_LOGIN = `(async () => {
+const SECOND_PEER_LOGIN = `const NO_TOKEN = "The club proxy served no cross-site request token";
+(async () => {
   const origin = "https://${PROXY_BOUNDARY_HOST}";
   const forwarded = process.argv[1];
   const session = await fetch(origin + "/api/session");
   const token = session.headers.getSetCookie()
     .map((cookie) => cookie.split(";")[0].split("="))
     .find(([name]) => name.endsWith("XSRF-TOKEN"));
-  if (!token) throw new Error("The club proxy served no cross-site request token");
+  if (!token) throw new Error(NO_TOKEN);
   const response = await fetch(origin + "/api/session", {
     method: "POST",
     headers: {
@@ -151,7 +152,8 @@ const SECOND_PEER_LOGIN = `(async () => {
   const problem = await response.json();
   process.stdout.write(JSON.stringify({ status: response.status, type: problem.type }));
 })().catch((error) => {
-  process.stderr.write(String(error && error.message));
+  process.stderr.write(error && error.message === NO_TOKEN
+    ? NO_TOKEN : "The club proxy did not answer the second peer");
   process.exitCode = 1;
 });
 `;
@@ -976,7 +978,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         const peer = await startSecondPeer();
         const attempt = await peer.exec(["node", "-e", SECOND_PEER_LOGIN, forwardedFor]);
         if (attempt.exitCode !== 0) {
-          throw new Error("The second peer could not complete a login through the club proxy");
+          throw new Error(`The second peer could not complete a login: ${attempt.stderr.trim()}`);
         }
         return JSON.parse(attempt.stdout) as PeerLoginAttempt;
       },
