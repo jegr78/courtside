@@ -129,6 +129,37 @@ function replaceRequired(source: string, expected: string, replacement: string):
   return source.replace(expected, replacement);
 }
 
+const SECOND_PEER_LOGIN = `(async () => {
+  const origin = "https://${PROXY_BOUNDARY_HOST}";
+  const forwarded = process.argv[1];
+  const session = await fetch(origin + "/api/session");
+  const token = session.headers.getSetCookie()
+    .map((cookie) => cookie.split(";")[0].split("="))
+    .find(([name]) => name.endsWith("XSRF-TOKEN"));
+  if (!token) throw new Error("The club proxy served no cross-site request token");
+  const response = await fetch(origin + "/api/session", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      cookie: token.join("="),
+      "x-xsrf-token": token[1],
+      forwarded: "for=" + forwarded,
+      "x-forwarded-for": forwarded
+    },
+    body: new URLSearchParams({ username: "doe.jane", password: "wrong-password" }).toString()
+  });
+  const problem = await response.json();
+  process.stdout.write(JSON.stringify({ status: response.status, type: problem.type }));
+})().catch((error) => {
+  process.stderr.write(String(error && error.message));
+  process.exitCode = 1;
+});
+`;
+
+function loginSubject(address: string): string {
+  return createHash("sha256").update(`login:${address}`, "utf8").digest("hex");
+}
+
 function clubProxyConfiguration(applicationPort: number): string {
   const applicationHeaders = deployedCaddyBlock("(applicationHeaders) {");
   const plaintext = replaceRequired(
@@ -326,6 +357,16 @@ function dayAfterInBerlin(instant: string): string {
 
 export const journeyDate = dayAfterInBerlin(journeyInstant);
 
+export interface PeerLoginSubjects {
+  browser: string;
+  secondPeer: string;
+}
+
+export interface PeerLoginAttempt {
+  status: number;
+  type: string;
+}
+
 export interface JourneyService {
   baseURL: string;
   plainBaseURL: string;
@@ -337,6 +378,8 @@ export interface JourneyService {
     failedTest?: FailedTest): Promise<BrowserDiagnostics>;
   recordBrowserTest(browserName: string, projectName: string, testPosition: number,
     phase: "start" | "end"): Promise<void>;
+  peerLoginSubjects(browserName: string): Promise<PeerLoginSubjects>;
+  failedLoginFromSecondPeer(forwardedFor: string): Promise<PeerLoginAttempt>;
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string, signal?: AbortSignal): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): Promise<void>;
@@ -612,12 +655,14 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   let clubNetwork: StartedNetwork | undefined;
   let clubProxy: StartedTestContainer | undefined;
   let mailSink: StartedTestContainer | undefined;
+  let secondPeer: StartedTestContainer | undefined;
   const stopContainers = async () => {
     await completeCleanup([
       () => completeCleanup([...browserServers.keys()].map((browserName) => () => stopBrowser(browserName))),
       async () => {
         if (clubNetwork) await removeOwnedBrowserContainers(journeyId, clubNetwork.getId(), dockerText);
       },
+      async () => { await secondPeer?.stop(); },
       async () => { await clubProxy?.stop(); },
       async () => { await mailSink?.stop(); },
       async () => { await postgres?.stop(); },
@@ -790,6 +835,21 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     const rootCertificate = await readProxyCertificates(clubProxy, CADDY_LOCAL_AUTHORITY);
     const servedKeys = publicKeyFingerprints(
       rootCertificate + await readProxyCertificates(clubProxy, CADDY_ISSUED_CERTIFICATES));
+    // The peer needs a TLS client rather than a browser, and the pinned browser image is the only
+    // image this harness already vouches for.
+    const startSecondPeer = async (): Promise<StartedTestContainer> => {
+      secondPeer ??= await new GenericContainer(PINNED_BROWSER_IMAGE)
+        .withNetwork(clubNetwork!)
+        .withCopyContentToContainer([
+          { content: rootCertificate, target: "/etc/courtside/club-authority.pem" }
+        ])
+        .withEnvironment({ NODE_EXTRA_CA_CERTS: "/etc/courtside/club-authority.pem" })
+        .withCommand(["node", "-e",
+          "console.log('second peer ready'); setInterval(() => {}, 1 << 30);"])
+        .withWaitStrategy(Wait.forLogMessage(/second peer ready/))
+        .start();
+      return secondPeer;
+    };
     const startPinnedBrowser = async (browserName: string): Promise<string> => {
       const running = browserServers.get(browserName);
       if (running) {
@@ -897,6 +957,23 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         const usage = await dockerJson(["stats", "--no-stream", "--format", "{{json .}}", browser.container.getId()]);
         browserLifecycle.sample(browserName, projectName, testPosition, phase, browserResourceUsage(usage), new Date().toISOString());
         retainBrowserLifecycle();
+      },
+      peerLoginSubjects: async (browserName) => {
+        const browser = browserServers.get(browserName);
+        if (!browser) throw new Error(`No pinned ${browserName} browser exists`);
+        const network = clubNetwork!.getName();
+        return {
+          browser: loginSubject(browser.container.getIpAddress(network)),
+          secondPeer: loginSubject((await startSecondPeer()).getIpAddress(network))
+        };
+      },
+      failedLoginFromSecondPeer: async (forwardedFor) => {
+        const peer = await startSecondPeer();
+        const attempt = await peer.exec(["node", "-e", SECOND_PEER_LOGIN, forwardedFor]);
+        if (attempt.exitCode !== 0) {
+          throw new Error(`The second peer could not reach the club proxy: ${attempt.stderr}`);
+        }
+        return JSON.parse(attempt.stdout) as PeerLoginAttempt;
       },
       executeSql,
       holdDatabaseLock,
