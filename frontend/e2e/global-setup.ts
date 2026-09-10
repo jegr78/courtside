@@ -142,7 +142,7 @@ const SECOND_PEER_LOGIN = `(async () => {
     headers: {
       "content-type": "application/x-www-form-urlencoded",
       cookie: token.join("="),
-      "x-xsrf-token": token[1],
+      "x-xsrf-token": token.slice(1).join("="),
       forwarded: "for=" + forwarded,
       "x-forwarded-for": forwarded
     },
@@ -656,6 +656,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   let clubProxy: StartedTestContainer | undefined;
   let mailSink: StartedTestContainer | undefined;
   let secondPeer: StartedTestContainer | undefined;
+  let startingSecondPeer: Promise<StartedTestContainer> | undefined;
   const stopContainers = async () => {
     await completeCleanup([
       () => completeCleanup([...browserServers.keys()].map((browserName) => () => stopBrowser(browserName))),
@@ -837,8 +838,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       rootCertificate + await readProxyCertificates(clubProxy, CADDY_ISSUED_CERTIFICATES));
     // The peer needs a TLS client rather than a browser, and the pinned browser image is the only
     // image this harness already vouches for.
-    const startSecondPeer = async (): Promise<StartedTestContainer> => {
-      secondPeer ??= await new GenericContainer(PINNED_BROWSER_IMAGE)
+    const startSecondPeer = (): Promise<StartedTestContainer> => {
+      startingSecondPeer ??= new GenericContainer(PINNED_BROWSER_IMAGE)
         .withNetwork(clubNetwork!)
         .withCopyContentToContainer([
           { content: rootCertificate, target: "/etc/courtside/club-authority.pem" }
@@ -847,8 +848,12 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         .withCommand(["node", "-e",
           "console.log('second peer ready'); setInterval(() => {}, 1 << 30);"])
         .withWaitStrategy(Wait.forLogMessage(/second peer ready/))
-        .start();
-      return secondPeer;
+        .start()
+        .then((container) => {
+          secondPeer = container;
+          return container;
+        });
+      return startingSecondPeer;
     };
     const startPinnedBrowser = async (browserName: string): Promise<string> => {
       const running = browserServers.get(browserName);
