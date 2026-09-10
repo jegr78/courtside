@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.5.0",
+  "catalogVersion": "1.5.1",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -626,7 +626,10 @@
           "id": "v5.0.0-3.5.3",
           "status": "implemented",
           "manualProcedureId": "MAN-CLIENT-001",
-          "findingReference": "docs/security-findings.md#safe-http-methods-lack-state-invariance-evidence"
+          "controlEvidence": {
+            "productionPath": "src/main/resources/api/openapi.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/SafeMethodStateInvarianceTest.java#whenEverySafeMethodOperationIsInvoked_thenNoPersistentStateChanges"
+          }
         },
         {
           "id": "v5.0.0-3.5.4",

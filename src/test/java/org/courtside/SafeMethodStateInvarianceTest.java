@@ -74,9 +74,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     private static final String TODAY = "2026-05-12";
 
-    // Two columns, not the session table: a safe method that revoked somebody's session would be
-    // exactly the sensitive functionality this control is about, and exempting the table would
-    // cover it. Only the clock the container touches on every request is exempt.
+    // Columns and not the session table, so a safe method that revoked a session still fails.
     private static final Map<String, String> EXEMPT_COLUMNS = Map.of(
             "spring_session.last_access_time", "the container stamps it on every request, safe or not",
             "spring_session.expiry_time", "it is the last access above plus the inactive interval");
@@ -308,8 +306,6 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                 .collect(TreeSet::new, TreeSet::add, TreeSet::addAll);
     }
 
-    // One statement rather than one per table: a probe answers in milliseconds and the fingerprint
-    // is taken twice around each of them.
     private Map<String, String> stateFingerprint() {
         String query = digestSelects().reduce((left, right) -> left + " UNION ALL " + right).orElseThrow();
         Map<String, String> fingerprint = new LinkedHashMap<>();
