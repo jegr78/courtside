@@ -115,20 +115,6 @@ listener, outbound client or trust transition. That inventory must also state th
 for every outbound flow and the secure behavior when the dependency refuses, times out or returns
 invalid data; the current map cannot yet prove either property across the complete set.
 
-### Safe HTTP methods lack state-invariance evidence
-
-- State: validated evidence gap
-- Priority: P2
-- Controls: ASVS 5.0.0 `v5.0.0-3.5.3`
-- Review: `MAN-CLIENT-001`, 9 September 2026
-- Remediation: #897
-
-The OpenAPI contract names the current `GET`, `HEAD` and `OPTIONS` surface, but a verb inventory
-would remain green if one of those implementations acquired a persistent or security-relevant side
-effect. Courtside has no closed runtime state fingerprint for every safe-method operation, so this
-control cannot yet receive a falsifying pass anchor. The remediation must derive the complete safe
-surface and prove that valid calls preserve state; a hand-maintained method list is insufficient.
-
 ### Ambiguous HTTP parameters and message boundaries
 
 - State: validated design and evidence gap
