@@ -289,6 +289,33 @@ test("given the bounded passive suite, when every check passes, then its evidenc
   });
 });
 
+test("given passing checks and scanner alerts, when the run finishes, then the reason names the triage", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));
+  const plan = buildSecurityPlan(input({
+    profile: "safe",
+    authorization: undefined,
+    tools: [
+      { id: "target-identity", version: "1.0.0", testIds: [] },
+      { id: "passive-deployment", version: "1.0.0", testIds: ["CSA-DEPLOY-001"] }
+    ],
+    selectedTests: ["CSA-DEPLOY-001"],
+    catalogTests: [{ id: "CSA-DEPLOY-001", status: "implemented", profile: "safe" }]
+  }));
+
+  // when
+  const manifest = await executeSecurityPlan(plan, {
+    root,
+    verifyTarget: async () => input({ profile: "safe", authorization: undefined }),
+    runPassiveAssessment: async () => ({ outcome: "incomplete", requestCount: 48,
+      zap: { alerts: [{ pluginId: "10055" }, { pluginId: "10112" }] } })
+  });
+
+  // then — no check failed, so saying they did not pass would send triage after the wrong thing
+  assert.equal(manifest.outcome, "incomplete");
+  assert.equal(manifest.reason, "Passive deployment left 2 scanner alerts for triage");
+});
+
 test("given the bounded active suites, when every attack check passes, then their evidence governs the outcome", async () => {
   // given
   const root = mkdtempSync(join(tmpdir(), "courtside-security-run-"));

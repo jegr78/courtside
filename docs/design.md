@@ -1904,11 +1904,11 @@ whether it is built or designed. **Designed means absent today.**
   or reopens one. Where the workflow carries the required check, the issue says that the failure
   blocks every open pull request. The issue is assigned to the repository owner, whose account
   already owns the repository publicly. What an observer needs: nothing, an issue list is readable
-  by anybody. What it does not say: the finding, its severity and the code it concerns stay in the run's retained
-  evidence. On a public repository that evidence is not privileged — any GitHub account can read the
-  run and download its artefacts, not only somebody with access to this repository — and of the four
-  files the assessment retains, only `protected-evidence.cms` is encrypted to a recipient
-  certificate; the manifest and the summary are uploaded in the clear. The issue says a gate is red, not why. Part of this was
+  by anybody. What it does not say: the finding, its severity and the code it concerns stay in the
+  run's retained evidence. On a public repository that evidence is not privileged — any GitHub
+  account can read the run and download its artefacts, not only somebody with access to this
+  repository — and everything the assessment retains, the manifests and the summaries, is
+  uploaded in the clear. The issue says a gate is red, not why. Part of this was
   already true, because the required build's `security` job is visible on every pull request; what
   changed is that a scheduled security run now says so on its own rather than only to whoever opens
   the Actions tab. It stays open because the alternative is the defect the tracker exists to

@@ -150,7 +150,10 @@ export async function executeSecurityPlan(plan, runtime = {}) {
       manifest.toolResults.push({ id: "passive-deployment", version: plan.tools[1].version,
         outcome: evidence.outcome });
       manifest.outcome = evidence.outcome;
-      manifest.reason = evidence.outcome === "passed" ? null : "Passive deployment security checks did not pass";
+      manifest.reason = evidence.outcome === "passed" ? null
+        : evidence.outcome === "incomplete"
+          ? `Passive deployment left ${evidence.zap.alerts.length} scanner alerts for triage`
+          : "Passive deployment security checks did not pass";
       manifest.usage = { requests: evidence.requestCount, generatedDataMegabytes: 0,
         evidenceBytes: directoryBytes(paths.evidence) };
       assertUsage(manifest.usage, plan.budgets);
