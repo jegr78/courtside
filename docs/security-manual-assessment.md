@@ -59,9 +59,12 @@ and a control the catalog rules out becomes `not-applicable`. A control none of 
 `blocked`, never an outcome whose source nobody can follow. A control carrying both an anchor and an
 open lifecycle finding is two answers to one question, and the command refuses to pick one.
 
-It resolves every anchor before it records a pass: the production path has to exist at the assessed
-commit, the named test has to be in the file the anchor names, and the verification whose conclusion
-the run is given has to have succeeded. It writes the protected record, one retained reading per
+It resolves every anchor before it records a pass, reading both files with `git show` at the commit
+the record names rather than out of the checkout it runs in: the production path has to exist there,
+the named test has to be declared in the file the anchor names, and the path has to be one the
+catalog schema admits. It also refuses to record anything unless the caller states that the
+executing verification succeeded, which is a statement the operator supplies rather than one the
+command fetches. It writes the protected record, one retained reading per
 control and the redacted per-control outcomes. It is a reading, not a substitute for the procedures: it performs no procedure step and
 sends no request, and a record it produces says so beside its counts.
 

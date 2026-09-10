@@ -150,12 +150,15 @@ digest `sha256:5f669de5c2db5e1f8dd4413c2091bee971956554a190df2060c8c6cfb0377dbe`
 `manual-baseline-20260906` above is unchanged; the two runs observed different things and neither
 replaces the other.
 
-A pass names its own production path, its own test and the run that executed it, and the reading
-resolves all three before recording it: the path has to exist at the assessed commit, the test has
-to be in the file the anchor names, and the executing verification has to have concluded
-successfully. The evidence contract refuses a pass for a control with no anchor at all, so the 106
-are exactly the controls somebody read one at a time. `docs/security-assessment.md` states what that
-anchor costs.
+A pass names its own production path, its own test and the verification that executed it, and the
+reading resolves what it can before recording it. It reads both files with `git show` at the commit
+the record names, rather than out of whatever checkout it runs in; it requires the named test to be
+declared in the file the anchor names, by the same match the contract test uses; and it refuses to
+record anything at all unless the caller states that the executing verification succeeded. That last
+one is a statement the operator supplies and the reader can check at the link above, not something
+the reading fetches. The evidence contract refuses a pass for a control with no anchor at all, so
+the passes are exactly the controls somebody read one at a time. `docs/security-assessment.md`
+states what that anchor costs.
 
 The blocked controls are two separate situations:
 
@@ -180,12 +183,15 @@ reads them as still failing. A finding that is fixed without a retest record lea
 incomplete by the rule in [`security-findings.md`](security-findings.md); recording the controls as
 anything else would hide that.
 
-Two statements in the retained record are declarations rather than observations, and both are
+Three statements in the retained record are declarations rather than observations, and all three are
 deliberate. The record declares profile `active` in a disposable `SECURITY` environment because five
 of the eleven executed procedures require that authorization ceiling; the run used none of it. Every
 retained per-control reading carries the classification `restricted-security-evidence` because the
 evidence schema defines exactly one. That label states how the file is retained, at mode `0600`,
-uncommitted and expiring, rather than that its content is sensitive.
+uncommitted and expiring, rather than that its content is sensitive. And the authorization block is
+built from the same assessment manifest the contract then checks it against, so its cross-checks are
+self-consistent rather than independent: they show that the record did not drift from its own target,
+not that somebody else authorised that target.
 
 Reproduce the run by qualifying one immutable image, preparing one `SECURITY` target and reading the
 manifest that binds them. The safe run exists to produce that manifest: the reading takes the target
