@@ -123,3 +123,32 @@ test("given the PR title workflow gains code execution or a floating action, whe
   assert.throws(() => validatePullRequestTitleWorkflow(executable));
   assert.throws(() => validatePullRequestTitleWorkflow(floating));
 });
+
+export function validateCodeOwners(source) {
+  const rules = source.split("\n").map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"))
+    .map((line) => line.split(/\s+/));
+  assert.ok(rules.every(([, ...owners]) => owners.length > 0 && owners.every((o) => o.startsWith("@"))),
+    "every CODEOWNERS rule names at least one owner");
+  const owned = (path) => rules.some(([pattern]) => path.startsWith(pattern));
+  assert.ok(owned("security/"), "security/ has no code owner");
+  assert.ok(owned(".github/workflows/"), ".github/workflows/ has no code owner");
+}
+
+test("given the code owners, when validating them, then the security record and the workflows are owned", () => {
+  // given — a record under security/ can move the assessment gate to passed, so it never lands unread
+  const source = readFileSync(new URL("../.github/CODEOWNERS", import.meta.url), "utf8");
+
+  // when / then
+  validateCodeOwners(source);
+});
+
+test("given code owners that leave the security record unowned, when validating them, then it fails closed", () => {
+  // given
+  const withoutSecurity = ".github/workflows/ @someone\n";
+  const withoutOwner = "security/\n.github/workflows/ @someone\n";
+
+  // when / then
+  assert.throws(() => validateCodeOwners(withoutSecurity), /security\/ has no code owner/);
+  assert.throws(() => validateCodeOwners(withoutOwner), /at least one owner/);
+});

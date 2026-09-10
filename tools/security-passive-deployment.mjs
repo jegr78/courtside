@@ -330,7 +330,7 @@ export function buildPassiveDeploymentEvidence({
   const failed = checks.some((check) => check.outcome === "failed");
   const incomplete = !failed && alerts.some((alert) => alert.state === "candidate");
   const evidence = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     testId: "CSA-DEPLOY-001",
     targetFingerprint,
     imageDigest,
@@ -422,13 +422,15 @@ export function alertDiscriminator(ruleEvidence) {
   }
   if (kind === "session-signal") return { kind, tokenNames: ruleEvidence.tokenNames };
   if (kind === "application-signal") return { kind, signal: ruleEvidence.signal };
-  return { kind, headerName: ruleEvidence.headerName };
+  if (kind === "response-header") return { kind, headerName: ruleEvidence.headerName };
+  throw new Error(`No passive alert discriminator reads ${kind} evidence`);
 }
 
 function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).toSorted().join(",")}]`;
   if (value && typeof value === "object") {
-    return `{${Object.keys(value).toSorted().map((key) => `${key}:${canonical(value[key])}`).join(",")}}`;
+    return `{${Object.keys(value).toSorted()
+      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
   }
   return JSON.stringify(value);
 }
@@ -439,6 +441,7 @@ export function recordCovers(record, alert) {
     && record.pluginId === alert.pluginId && record.method === alert.method
     && record.routeTemplate === alert.routeTemplate
     && record.riskCode === alert.riskCode && record.confidence === alert.confidence
+    && record.count === alert.count
     && record.scannerVersion === zapVersion
     && canonical(record.observed) === canonical(alertDiscriminator(alert.ruleEvidence));
 }
@@ -448,12 +451,13 @@ export function resolveAlertAgainst(records, acceptances, alert, today) {
   if (!record) return { state: "candidate" };
   if (record.state !== "accepted-risk") {
     return { state: record.state, disposition: {
-      rationale: record.rationale, actor: record.actor,
-      classifiedAt: record.classifiedAt, reference: record.reference } };
+      rationale: redactSecurityText(record.rationale), actor: redactSecurityText(record.actor),
+      classifiedAt: record.classifiedAt, reference: redactSecurityText(record.reference) } };
   }
   const acceptance = acceptances.get(record.acceptanceId);
   if (!acceptance || acceptance.fingerprint !== alert.fingerprint
-      || !validAssessmentDate(today) || acceptance.expiresOn < today) {
+      || !validAssessmentDate(today) || !validAssessmentDate(acceptance.expiresOn)
+      || acceptance.expiresOn < today) {
     return { state: "candidate" };
   }
   return { state: "accepted-risk", acceptance: { id: acceptance.id, expiresOn: acceptance.expiresOn } };
@@ -467,15 +471,16 @@ function resolvedAlertState(alert, today) {
 // the day is bounded below by the records the alert was resolved against.
 function recordedSince(alert) {
   const days = [
-    alertDispositions.find(({ fingerprint }) => fingerprint === alert.fingerprint)?.classifiedAt,
+    alertDispositions.find((entry) => recordCovers(entry, alert))?.classifiedAt,
     alert.acceptance ? alertAcceptances.get(alert.acceptance.id)?.acceptedAt : undefined
   ].map((value) => value?.slice(0, 10) ?? "");
   return days.toSorted().at(-1);
 }
 
 function validAssessmentDate(value) {
-  return typeof value === "string" && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)
-    && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value);
+  if (typeof value !== "string" || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
 }
 
 export function assertPassiveDeploymentEvidence(evidence) {
@@ -503,6 +508,11 @@ export function assertPassiveDeploymentEvidence(evidence) {
       throw new Error("The passive assessment evidence was read before the record it relies on");
     }
     fingerprints.add(alert.fingerprint);
+  }
+  const failed = evidence.checks.some((check) => check.outcome === "failed");
+  const derived = failed ? "failed" : openCandidateCount(evidence) > 0 ? "incomplete" : "passed";
+  if (evidence.outcome !== derived) {
+    throw new Error("The passive assessment evidence claims an outcome its own checks and alerts do not");
   }
 }
 

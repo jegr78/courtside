@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:security:passive-deployment-evidence:v3",
+  "$id": "urn:courtside:security:passive-deployment-evidence:v4",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "testId", "targetFingerprint", "imageDigest", "layers", "checks", "zap", "requestCount", "readOn", "outcome"],
   "properties": {
-    "schemaVersion": { "const": 3 },
+    "schemaVersion": { "const": 4 },
     "testId": { "const": "CSA-DEPLOY-001" },
     "targetFingerprint": { "$ref": "#/$defs/digest" },
     "imageDigest": { "type": "string", "pattern": "^(?:sha256:[a-f0-9]{64}|[^\\s@]+@sha256:[a-f0-9]{64})$" },
@@ -94,10 +94,10 @@
       "type": "object", "additionalProperties": false,
       "required": ["rationale", "actor", "classifiedAt", "reference"],
       "properties": {
-        "rationale": { "type": "string", "minLength": 1 },
-        "actor": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "actor": { "type": "string", "minLength": 1, "maxLength": 100 },
         "classifiedAt": { "$ref": "#/$defs/timestamp" },
-        "reference": { "type": "string", "minLength": 1 }
+        "reference": { "type": "string", "minLength": 1, "maxLength": 200 }
       }
     },
     "acceptance": {

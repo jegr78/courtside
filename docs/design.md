@@ -1897,6 +1897,20 @@ whether it is built or designed. **Designed means absent today.**
   starts them by hand, and not before. It stays open because closing it means either a full active
   assessment on every pull request that touches the application, which is most of them, or a second
   scheduled run whose cost nobody has weighed yet. *Built, as described.*
+- **Accepted: a checked-in record decides which scanner alerts stop blocking.** The passive
+  assessment cannot tell a finding from a scanner's ordinary observation, so an alert holds the run
+  at `incomplete` until a record in `security/passive-alert-dispositions.json` covers it. Twelve do
+  today: eleven dismissals and one that names the unexpired acceptance in
+  `security/exceptions.json`. What an observer needs: nothing, both files ship with the source and
+  the published evidence repeats the reason beside every alert it dismissed. What it does not say:
+  whether the reasoning is right — that is a review of the record, and a code owner is required on
+  `security/` so no such record lands unread. What bounds it: a record covers an alert only when
+  the rule, method, route template, risk, confidence, occurrence count, pinned scanner version and
+  rule-specific observation all match, and the fingerprint it names is recomputed from its own rule
+  and route; a louder alert, a second occurrence or a scanner bump therefore leaves the run
+  incomplete rather than inheriting a dismissal. It stays open because the alternative is a gate
+  that can never go green while a scanner reports anything at all, which is the state this
+  assessment was in until now. *Built, as described.*
 - **Accepted: the leftover-file probes measure anonymous exposure only.** The passive assessment
   requests ten representative paths — five with a sensitive extension, five that look like a backup
   or an editor leftover — without a session, and the application authenticates before it routes, so
