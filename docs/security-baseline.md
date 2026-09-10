@@ -119,34 +119,35 @@ from automated evidence. They remain separately owned release activities.
 
 ## Manual control reading manual-anchored-20260910
 
-This run reads what the control anchors make readable. It is not a second walk through the runbook:
-the eleven procedure readings recorded under #881 put one production path and one falsifying test on
-106 controls, a finding reference on 24 and a not-applicable rationale on 13, and this run records
-the outcome each of those dispositions supports. The reading itself sends no request; the safe run
-below is what produced the target identity it binds to. An internal review does not replace an independent penetration test,
-and reading a checked-in disposition is a weaker observation than performing the procedure.
+This run reads what the catalog's control dispositions make readable. It is not a second walk through
+the runbook: 113 controls carry one production path and one falsifying test, 117 carry a
+control-specific not-applicable rationale, 24 name a documented finding, and this run records the
+outcome each of those dispositions supports. The reading itself sends no request; the safe run below
+is what produced the target identity it binds to. An internal review does not replace an independent
+penetration test, and reading a checked-in disposition is a weaker observation than performing the
+procedure.
 
-- Source commit: `45d7919eb6f23d32278e5fb47d8c57f91e3b2c84`
-- Application image: `sha256:b4c7e5c041b5d6692126ace05a973258abb44cbb431d3d59f5f4a8b40230cf09`
-- Target fingerprint: `sha256:2fd52bb1f427105cc9eb2feea28c89e03943f4a4ad949f00368afea7bc7c4aeb`
-- Catalog: `1.4.12`
+- Source commit: `ac366be40f79686f9ff7076721b2fbd3bf7cd508`
+- Application image: `sha256:b8b9083f64b3ae4e652c1d905b3a72da1255a127844ac2ee6fd33be5f4d169d0`
+- Target fingerprint: `sha256:14d7b6c9ffc46d8cdb938a5c9632f004595a10adbbdbe0bb11661c093d20263b`
+- Catalog: `1.5.0`
 - Manual record: `manual-anchored-20260910`
-- Executing verification: [build run 34458782775](https://github.com/jegr78/courtside/actions/runs/34458782775)
+- Executing verification: `courtside.mjs check` over [`e7d535d6`](https://github.com/jegr78/courtside/commit/e7d535d6942859dbebb04e03382eeb5c2251bd55), profile `full`, outcome `passed`
 - Retained evidence digest:
-  `sha256:783df27994f4faff19d6d58631ac246abade6b229b9b5130226e0dcfc7d46a98`
+  `sha256:f2accbf2c02167d31706efe422bab72ab6c4fd56fc97a68df3448156293eb105`
 
 The record covers the same 316 unique selected controls:
 
 | Outcome | Controls |
 | --- | ---: |
-| pass | 106 |
-| not applicable, with rationale | 13 |
+| pass | 113 |
+| not applicable, with rationale | 117 |
 | fail, linked to a validated or accepted finding | 59 |
-| blocked pending control-specific evidence | 138 |
+| blocked pending control-specific evidence | 27 |
 
 Its per-control outcomes are published, redacted to one identifier and one outcome each, as
 [`manual-anchored-control-outcomes.json`](../security/manual-anchored-control-outcomes.json), with
-digest `sha256:5f669de5c2db5e1f8dd4413c2091bee971956554a190df2060c8c6cfb0377dbe`. The record of
+digest `sha256:876130fccf59f60f92e1bcb9926ceb4d51015bcd9fe76293e90f116ce60e671f`. The record of
 `manual-baseline-20260906` above is unchanged; the two runs observed different things and neither
 replaces the other.
 
