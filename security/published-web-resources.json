@@ -162,19 +162,31 @@
     {
       "id": "private-key-block",
       "pattern": "-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----",
-      "specimen": "-----BEGIN EC PRIVATE KEY-----",
+      "specimen": [
+        "-----BEGIN ",
+        "EC PRIVATE",
+        " KEY-----"
+      ],
       "purpose": "A key the deployment generates could reach the build through an environment file that a bundler inlines."
     },
     {
       "id": "aws-access-key-id",
       "pattern": "\\bAKIA[0-9A-Z]{16}\\b",
-      "specimen": "AKIAQRSTUVWXYZ234567",
+      "specimen": [
+        "AKIA",
+        "QRSTUVWXYZ",
+        "234567"
+      ],
       "purpose": "The one long-lived cloud credential form with a fixed prefix, and the one a backup target would introduce."
     },
     {
       "id": "github-personal-access-token",
       "pattern": "\\bghp_[A-Za-z0-9]{20,}\\b",
-      "specimen": "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+      "specimen": [
+        "ghp_",
+        "abcdefghijklmnopqrst",
+        "uvwxyz0123456789"
+      ],
       "purpose": "The token a release or documentation workflow holds, which is the credential closest to this build's own tooling."
     }
   ],
@@ -182,19 +194,28 @@
     {
       "id": "source-map-reference",
       "pattern": "[#@]\\s*sourceMappingURL=",
-      "specimen": "//# sourceMappingURL=app.js.map",
+      "specimen": [
+        "//# source",
+        "MappingURL=app.js.map"
+      ],
       "purpose": "A reference that names an original source file even when the map itself is absent."
     },
     {
       "id": "unfinished-work-marker",
       "pattern": "\\b(?:TODO|FIXME|XXX)\\b",
-      "specimen": "TODO",
+      "specimen": [
+        "TO",
+        "DO"
+      ],
       "purpose": "A note that tells a reader which part of the application its authors consider unfinished."
     },
     {
       "id": "build-host-path",
       "pattern": "(?:file:\\/\\/\\/(?:Users|home|workspace)\\/|[A-Za-z]:\\\\Users\\\\)",
-      "specimen": "file:///Users/example/courtside/src/main.tsx",
+      "specimen": [
+        "file:///Users/",
+        "example/courtside/src/main.tsx"
+      ],
       "purpose": "The directory layout of the machine that produced the build."
     }
   ]

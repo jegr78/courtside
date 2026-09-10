@@ -111,7 +111,9 @@
         "properties": {
           "id": { "$ref": "#/$defs/identifier" },
           "pattern": { "type": "string", "minLength": 1 },
-          "specimen": { "type": "string", "minLength": 1 },
+          "specimen": {
+            "type": "array", "minItems": 2, "items": { "type": "string", "minLength": 1 }
+          },
           "purpose": { "$ref": "#/$defs/purpose" }
         }
       }

@@ -159,9 +159,11 @@ test("given every declared credential and disclosure pattern, when its specimen 
 
   // when / then
   for (const { id, specimen } of declared) {
-    assert.throws(() => verifyBrowserBuild(build({ "assets/planted.js": specimen })),
+    assert.throws(() => verifyBrowserBuild(build({ "assets/planted.js": specimen.join("") })),
       new RegExp(`contains ${id} material in assets/planted.js`),
       `${id} no longer recognises the specimen its justification names`);
+    assert.ok(specimen.length > 1,
+      "a specimen is written in pieces so that no tracked file carries a credential-shaped string");
   }
 });
 
