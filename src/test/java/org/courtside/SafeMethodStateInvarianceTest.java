@@ -52,6 +52,7 @@ import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Map.entry;
@@ -73,10 +74,12 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     private static final String TODAY = "2026-05-12";
 
-    // Every request the servlet container serves writes the caller's own session row, whatever its
-    // method: that is the session store working, not a read acquiring a side effect.
-    private static final Map<String, String> EXEMPT_TABLES = Map.of(
-            "spring_session", "the container records this caller's last access time on every request");
+    // Two columns, not the session table: a safe method that revoked somebody's session would be
+    // exactly the sensitive functionality this control is about, and exempting the table would
+    // cover it. Only the clock the container touches on every request is exempt.
+    private static final Map<String, String> EXEMPT_COLUMNS = Map.of(
+            "spring_session.last_access_time", "the container stamps it on every request, safe or not",
+            "spring_session.expiry_time", "it is the last access above plus the inactive interval");
 
     private record Probe(String identifier, String query, int expectedStatus) {
     }
@@ -233,22 +236,24 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void everyExemptTableExists() {
+    void everyExemptColumnExists() {
         // when
-        List<String> tables = publicTables(jdbc);
+        Set<String> columns = columnsOfEveryTable().entrySet().stream()
+                .flatMap(table -> table.getValue().stream().map(column -> table.getKey() + "." + column))
+                .collect(TreeSet::new, TreeSet::add, TreeSet::addAll);
 
         // then
-        assertThat(tables)
-                .as("an exempt table that no longer exists is an exemption nobody reads any more,"
-                        + " and it would silently cover the table that replaced it.")
-                .containsAll(EXEMPT_TABLES.keySet());
+        assertThat(columns)
+                .as("an exempt column that no longer exists is an exemption nobody reads any more,"
+                        + " and it would silently cover whatever replaced it.")
+                .containsAll(EXEMPT_COLUMNS.keySet());
     }
 
     @Test
     void whenEverySafeMethodOperationIsInvoked_thenNoPersistentStateChanges() throws Exception {
         // given
         List<String> failures = new ArrayList<>();
-        Set<String> exemptTablesThatMoved = new TreeSet<>();
+        Set<String> exemptColumnsThatMoved = new TreeSet<>();
 
         // when
         for (Map.Entry<String, Probe> probe : new TreeSet<>(PROBES.keySet()).stream()
@@ -273,15 +278,15 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             }
             Map<String, String> after = stateFingerprint();
             failures.addAll(changedTables(probe.getKey(), before, after));
-            exemptTablesThatMoved.addAll(movedAmong(EXEMPT_TABLES.keySet(), before, after));
+            exemptColumnsThatMoved.addAll(movedAmong(EXEMPT_COLUMNS.keySet(), before, after));
         }
 
         // then
-        assertThat(exemptTablesThatMoved)
-                .as("an exemption is earned by a table that actually moves under a safe method."
+        assertThat(exemptColumnsThatMoved)
+                .as("an exemption is earned by a column that actually moves under a safe method."
                         + " One that never moves is a blanket nobody checked, and it would cover a"
                         + " write that appears there later.")
-                .isEqualTo(new TreeSet<>(EXEMPT_TABLES.keySet()));
+                .isEqualTo(new TreeSet<>(EXEMPT_COLUMNS.keySet()));
         assertThat(failures)
                 .as("a safe method must leave persistent state exactly as it found it. Every entry"
                         + " below names an operation that wrote, or a probe that never reached its"
@@ -291,33 +296,68 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     private List<String> changedTables(String path, Map<String, String> before, Map<String, String> after) {
         return before.keySet().stream()
-                .filter(table -> !EXEMPT_TABLES.containsKey(table))
+                .filter(table -> !EXEMPT_COLUMNS.containsKey(table))
                 .filter(table -> !before.get(table).equals(after.get(table)))
                 .map(table -> "GET " + path + " changed table " + table)
                 .toList();
     }
 
-    private Set<String> movedAmong(Set<String> tables, Map<String, String> before, Map<String, String> after) {
-        return tables.stream()
-                .filter(table -> !before.get(table).equals(after.get(table)))
+    private Set<String> movedAmong(Set<String> keys, Map<String, String> before, Map<String, String> after) {
+        return keys.stream()
+                .filter(key -> !before.get(key).equals(after.get(key)))
                 .collect(TreeSet::new, TreeSet::add, TreeSet::addAll);
     }
 
+    // One statement rather than one per table: a probe answers in milliseconds and the fingerprint
+    // is taken twice around each of them.
     private Map<String, String> stateFingerprint() {
-        List<String> tables = publicTables(jdbc);
-        String query = tables.stream()
-                .map(table -> "SELECT '" + table + "' AS table_name,"
-                        + " coalesce(md5(string_agg(row_digest, ',' ORDER BY row_digest)), '') AS state"
-                        + " FROM (SELECT md5(row_of_table::text) AS row_digest"
-                        + " FROM public." + table + " AS row_of_table) AS digests")
-                .reduce((left, right) -> left + " UNION ALL " + right)
-                .orElseThrow();
+        String query = digestSelects().reduce((left, right) -> left + " UNION ALL " + right).orElseThrow();
         Map<String, String> fingerprint = new LinkedHashMap<>();
         jdbc.sql(query)
-                .query((result, row) -> entry(result.getString("table_name"), result.getString("state")))
+                .query((result, row) -> entry(result.getString("state_of"), result.getString("state")))
                 .list()
                 .forEach(row -> fingerprint.put(row.getKey(), row.getValue()));
         return fingerprint;
+    }
+
+    private Stream<String> digestSelects() {
+        Map<String, List<String>> columns = columnsOfEveryTable();
+        Stream<String> tables = columns.entrySet().stream().map(table -> {
+            List<String> observed = table.getValue().stream()
+                    .filter(column -> !EXEMPT_COLUMNS.containsKey(table.getKey() + "." + column))
+                    .toList();
+            assertThat(observed)
+                    .as("every column of %s is exempt, which fingerprints nothing at all", table.getKey())
+                    .isNotEmpty();
+            return digestOf(table.getKey(), "ROW(" + quoted(observed) + ")", table.getKey());
+        });
+        Stream<String> exempt = EXEMPT_COLUMNS.keySet().stream()
+                .map(key -> digestOf(key.substring(0, key.indexOf('.')),
+                        "\"" + key.substring(key.indexOf('.') + 1) + "\"", key));
+        return Stream.concat(tables, exempt);
+    }
+
+    private String digestOf(String table, String expression, String name) {
+        return "SELECT '" + name + "' AS state_of,"
+                + " coalesce(md5(string_agg(digest, ',' ORDER BY digest)), '') AS state"
+                + " FROM (SELECT md5(" + expression + "::text) AS digest FROM public.\"" + table
+                + "\") AS digests";
+    }
+
+    private String quoted(List<String> columns) {
+        return columns.stream().map(column -> "\"" + column + "\"")
+                .reduce((left, right) -> left + ", " + right).orElseThrow();
+    }
+
+    private Map<String, List<String>> columnsOfEveryTable() {
+        Map<String, List<String>> columns = new LinkedHashMap<>();
+        publicTables(jdbc).forEach(table -> columns.put(table, jdbc.sql("""
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = :table
+                        ORDER BY column_name
+                        """).param("table", table).query(String.class).list()));
+        return columns;
     }
 
     private String requestUri(String path, Probe probe) {
