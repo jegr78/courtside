@@ -31,6 +31,22 @@ test("given combined reduced profiles, when resolving coverage, then jobs and ta
   assert.equal(new Set(tasks.map((task) => task.label)).size, tasks.length);
 });
 
+test("given the tooling task, when resolving its npm script, then it runs the repository tool tests", () => {
+  // given
+  const contract = loadProfileContract();
+  const frontendPackage = JSON.parse(readFileSync(
+    new URL("../frontend/package.json", import.meta.url), "utf8"));
+
+  // when
+  const toolingTask = contract.localTaskDefinitions["tooling-test"];
+
+  // then
+  assert.equal(toolingTask.workingDirectory, "frontend");
+  assert.equal(toolingTask.executable, "npm");
+  assert.deepEqual(toolingTask.arguments, ["run", "test:tools"]);
+  assert.equal(frontendPackage.scripts["test:tools"], "node ../tools/tool-tests.mjs");
+});
+
 test("given a tree the tool policies read, when its profile is selected, then the tooling job runs", () => {
   // given — tests under tools/ read docs/, src/ and frontend/, and a path selects exactly one
   // reduced profile, so the profile has to carry the job or the policy never runs for the change
