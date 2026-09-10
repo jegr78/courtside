@@ -48,7 +48,7 @@ test("given a control-specific anchor, when reading the control, then the run re
       + "#givenPercentEncodedText_whenParsing_thenItIsNotDecodedAsAnotherInputLayer" } });
 
   // when
-  const reading = readControl(control, findings, readSource);
+  const reading = readControl(control, findings, readSource, catalog);
 
   // then
   assert.equal(reading.outcome, "pass");
@@ -60,7 +60,7 @@ test("given a control the catalog leaves unanchored, when reading it, then the r
   const control = controlWith({});
 
   // when
-  const reading = readControl(control, findings, readSource);
+  const reading = readControl(control, findings, readSource, catalog);
 
   // then
   assert.equal(reading.outcome, "blocked");
@@ -72,7 +72,7 @@ test("given a control a tracked lifecycle finding maps, when reading it, then th
   const control = controlWith({ id: "WSTG-v4.2-ATHN-07", manualProcedureId: "MAN-IDENTITY-001" });
 
   // when
-  const reading = readControl(control, findings, readSource);
+  const reading = readControl(control, findings, readSource, catalog);
 
   // then
   assert.equal(reading.outcome, "fail");
@@ -88,7 +88,7 @@ test("given a control mapped by two findings, when reading it, then the recorded
   const fingerprints = findings.get("v5.0.0-3.4.3").map(({ fingerprint }) => fingerprint);
 
   // when
-  const reading = readControl(control, findings, readSource);
+  const reading = readControl(control, findings, readSource, catalog);
 
   // then
   assert.equal(fingerprints.length, 2);
@@ -101,7 +101,7 @@ test("given a control the catalog rules out, when reading it, then the run recor
     manualProcedureId: "MAN-AUTHZ-001", rationale: "No request-controlled filesystem path exists." });
 
   // when
-  const reading = readControl(control, findings, readSource);
+  const reading = readControl(control, findings, readSource, catalog);
 
   // then
   assert.equal(reading.outcome, "not-applicable");
@@ -114,7 +114,7 @@ test("given a control read to a documented finding, when reading it, then the ru
     findingReference: "docs/security-findings.md#incomplete-authorization-rule-documentation" });
 
   // when
-  const reading = readControl(control, findings, readSource);
+  const reading = readControl(control, findings, readSource, catalog);
 
   // then
   assert.equal(reading.outcome, "blocked");
@@ -131,7 +131,7 @@ test("given an anchor a lifecycle finding contradicts, when reading the control,
         + "#givenPercentEncodedText_whenParsing_thenItIsNotDecodedAsAnotherInputLayer" } });
 
   // when / then
-  assert.throws(() => readControl(control, findings, readSource),
+  assert.throws(() => readControl(control, findings, readSource, catalog),
     /WSTG-v4.2-ATHN-07 carries both a control anchor and an open lifecycle finding/);
 });
 
@@ -141,7 +141,7 @@ test("given an anchor the assessed commit does not carry, when reading the contr
     falsifyingTest: "src/test/java/org/courtside/dataexchange/SnapshotParserTest.java#whenX_thenY" } });
 
   // when / then
-  assert.throws(() => readControl(control, findings, readSource),
+  assert.throws(() => readControl(control, findings, readSource, catalog),
     /names the production path src\/main\/java\/Absent\.java, which the assessed commit does not carry/);
 });
 
@@ -152,8 +152,8 @@ test("given a test file without the test the anchor names, when reading the cont
     falsifyingTest: "src/test/java/org/courtside/dataexchange/SnapshotParserTest.java#whenNobodyWroteThis_thenNothing" } });
 
   // when / then
-  assert.throws(() => readControl(control, findings, readSource),
-    /which does not contain it at the assessed commit/);
+  assert.throws(() => readControl(control, findings, readSource, catalog),
+    /which declares no such test at the assessed commit/);
 });
 
 test("given a verification that did not succeed, when building the run, then it records nothing", () => {
@@ -173,11 +173,12 @@ test("given a finding a passed retest closed, when reading the control, then it 
 
   // when
   const reading = readControl(controlWith({ id: "WSTG-v4.2-ATHN-07",
-    manualProcedureId: "MAN-IDENTITY-001" }), findingsByControl(closed), readSource);
+    manualProcedureId: "MAN-IDENTITY-001" }), findingsByControl(closed), readSource, catalog);
 
   // then
   assert.equal(reading.outcome, "blocked");
-  assert.equal(reading.disposition, "unanchored");
+  assert.equal(reading.disposition, "retested-finding");
+  assert.match(reading.rationale, /passed its retest/);
 });
 
 test("given a fix awaiting its retest, when reading the control, then it is blocked rather than failed", () => {
@@ -187,7 +188,7 @@ test("given a fix awaiting its retest, when reading the control, then it is bloc
 
   // when
   const reading = readControl(controlWith({ id: "WSTG-v4.2-ATHN-07",
-    manualProcedureId: "MAN-IDENTITY-001" }), findingsByControl(pending), readSource);
+    manualProcedureId: "MAN-IDENTITY-001" }), findingsByControl(pending), readSource, catalog);
 
   // then
   assert.equal(reading.outcome, "blocked");
@@ -201,7 +202,7 @@ test("given an anchor pointing outside the repository, when reading the control,
     falsifyingTest: "src/test/java/org/courtside/dataexchange/SnapshotParserTest.java#whenX_thenY" } });
 
   // when / then
-  assert.throws(() => readControl(control, findings, readSource), /names a path that leaves the repository/);
+  assert.throws(() => readControl(control, findings, readSource, catalog), /names a path the catalog may not carry/);
 });
 
 test("given two controls whose retained readings would share a name, when building the run, then it refuses", () => {

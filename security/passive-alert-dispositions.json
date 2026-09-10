@@ -8,7 +8,6 @@
       "routeTemplate": "/",
       "riskCode": 1,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "cookie-attribute",
@@ -28,7 +27,6 @@
       "routeTemplate": "/assets/{asset}",
       "riskCode": 1,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "cookie-attribute",
@@ -48,7 +46,6 @@
       "routeTemplate": "/manifest.webmanifest",
       "riskCode": 1,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "cookie-attribute",
@@ -68,7 +65,6 @@
       "routeTemplate": "/robots.txt",
       "riskCode": 1,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "cookie-attribute",
@@ -88,7 +84,6 @@
       "routeTemplate": "/sitemap.xml",
       "riskCode": 1,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "cookie-attribute",
@@ -108,7 +103,6 @@
       "routeTemplate": "/assets/{asset}",
       "riskCode": 0,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "text-pattern",
@@ -129,7 +123,6 @@
       "routeTemplate": "/",
       "riskCode": 2,
       "confidence": 3,
-      "count": 5,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "policy-directive",
@@ -146,6 +139,12 @@
           "script-src",
           "style-src",
           "worker-src"
+        ],
+        "templates": [
+          "nofallback",
+          "scriptsrc.unsafe",
+          "stylesrc.unsafe",
+          "wildcard"
         ]
       },
       "state": "accepted-risk",
@@ -162,7 +161,6 @@
       "routeTemplate": "/",
       "riskCode": 0,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "application-signal",
@@ -181,7 +179,6 @@
       "routeTemplate": "/",
       "riskCode": 0,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "session-signal",
@@ -202,7 +199,6 @@
       "routeTemplate": "/manifest.webmanifest",
       "riskCode": 0,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "session-signal",
@@ -223,7 +219,6 @@
       "routeTemplate": "/robots.txt",
       "riskCode": 0,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "session-signal",
@@ -245,7 +240,6 @@
       "routeTemplate": "/sitemap.xml",
       "riskCode": 0,
       "confidence": 2,
-      "count": 1,
       "scannerVersion": "2.17.0",
       "observed": {
         "kind": "session-signal",

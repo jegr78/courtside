@@ -254,7 +254,10 @@ The lifecycle result uses the assessment outcomes from
 - A passive scanner alert is untriaged until a record in
   [`passive-alert-dispositions.json`](../security/passive-alert-dispositions.json) covers it. A
   fingerprint alone does not: the record also names the risk, the confidence, the pinned scanner
-  version and what the rule concluded, and all of them have to match the alert in hand.
+  version and what the rule concluded, and all of them have to match the alert in hand. What the
+  rule concluded is the rule's own reading, not a count of it: for the policy rule that is every
+  wording the pinned scanner emitted, so a wording naming no directive still moves the observation
+  the record has to match.
 - A validated or in-progress finding makes the run `failed`.
 - A fix awaiting retest makes the run `incomplete`.
 - A passed retest, reproducible false positive or duplicate does not block the run.

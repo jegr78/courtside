@@ -1905,10 +1905,11 @@ whether it is built or designed. **Designed means absent today.**
   the published evidence repeats the reason beside every alert it dismissed. What it does not say:
   whether the reasoning is right — that is a review of the record, and a code owner is required on
   `security/` so no such record lands unread. What bounds it: a record covers an alert only when
-  the rule, method, route template, risk, confidence, occurrence count, pinned scanner version and
-  rule-specific observation all match, and the fingerprint it names is recomputed from its own rule
-  and route; a louder alert, a second occurrence or a scanner bump therefore leaves the run
-  incomplete rather than inheriting a dismissal. It stays open because the alternative is a gate
+  the rule, method, route template, risk, confidence, pinned scanner version and rule-specific
+  observation all match, and the fingerprint it names is recomputed from its own rule and route; a
+  louder alert, a wording the record never read or a scanner bump therefore leaves the run
+  incomplete rather than inheriting a dismissal. How often the rule fired is not part of that
+  identity, because a route template stands for however many URLs the crawl reached. It stays open because the alternative is a gate
   that can never go green while a scanner reports anything at all, which is the state this
   assessment was in until now. *Built, as described.*
 - **Accepted: the leftover-file probes measure anonymous exposure only.** The passive assessment

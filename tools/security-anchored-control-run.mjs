@@ -1,9 +1,23 @@
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
 const failingStates = new Set(["validated", "remediation-in-progress", "accepted-risk"]);
+const repositoryPath = /^(?:[A-Za-z0-9][A-Za-z0-9._-]*|\.github)(\/[A-Za-z0-9][A-Za-z0-9._-]*)*$/;
+const severity = new Map([["validated", 0], ["remediation-in-progress", 1], ["fixed", 2], ["accepted-risk", 3]]);
+
+const declares = (source, name) => {
+  const literal = name.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(String.raw`\bvoid\s+${literal}\s*\(`).test(source)
+    || new RegExp(String.raw`\b(?:test|it)\(\s*"${literal}"`).test(source);
+};
+
+const bySeverity = (left, right) =>
+  (severity.get(left.state) ?? 9) - (severity.get(right.state) ?? 9)
+  || left.priority.localeCompare(right.priority)
+  || left.fingerprint.localeCompare(right.fingerprint);
 
 export function findingsByControl(findingSummary) {
   const byControl = new Map();
@@ -15,25 +29,33 @@ export function findingsByControl(findingSummary) {
   return byControl;
 }
 
-export function readControl(control, findings, resolve) {
-  const open = (findings.get(control.id) ?? [])
-    .filter(({ state }) => state !== "retest-passed")
-    .toSorted((left, right) => left.fingerprint < right.fingerprint ? -1 : 1);
+const declaresAssessment = (catalog, control, testPath, testName) => {
+  if (testPath !== "security/assessment-catalog.json") return false;
+  const assessment = catalog.tests.find(({ id }) => id === testName);
+  return assessment?.executionMode === "automated"
+    && Object.values(assessment.standardReferences).flat().includes(control.id);
+};
+
+export function readControl(control, findings, resolve, catalog) {
+  const mapped = (findings.get(control.id) ?? []).toSorted(bySeverity);
+  const open = mapped.filter(({ state }) => state !== "retest-passed");
+  const retested = mapped.length > 0 && open.length === 0;
   if (control.controlEvidence && open.length > 0) {
     throw new Error(`${control.id} carries both a control anchor and an open lifecycle finding`);
   }
   if (control.controlEvidence) {
     const { productionPath, falsifyingTest } = control.controlEvidence;
     const [testFile, testName] = falsifyingTest.split("#");
-    if ([productionPath, testFile].some((path) => path.split("/").includes(".."))) {
-      throw new Error(`${control.id} names a path that leaves the repository`);
+    if (![productionPath, testFile].every((path) => repositoryPath.test(path))) {
+      throw new Error(`${control.id} names a path the catalog may not carry`);
     }
     if (resolve(productionPath) === null) {
       throw new Error(`${control.id} names the production path ${productionPath}, which the assessed commit `
         + "does not carry");
     }
-    if (!(resolve(testFile) ?? "").includes(testName)) {
-      throw new Error(`${control.id} names ${testName} in ${testFile}, which does not contain it at the `
+    if (!declaresAssessment(catalog, control, testFile, testName)
+        && !declares(resolve(testFile) ?? "", testName)) {
+      throw new Error(`${control.id} names ${testName} in ${testFile}, which declares no such test at the `
         + "assessed commit");
     }
     return { outcome: "pass", disposition: "control-evidence", ...control.controlEvidence };
@@ -44,12 +66,23 @@ export function readControl(control, findings, resolve) {
     return { outcome: failing ? "fail" : "blocked", disposition: "lifecycle-finding",
       findingFingerprint: finding.fingerprint, findingState: finding.state,
       findingPriority: finding.priority,
+      findingFingerprints: open.map(({ fingerprint }) => fingerprint),
       ...failing ? {} : { trackingReference: finding.fingerprint },
       rationale: `Finding ${finding.fingerprint} maps ${control.id} and is recorded ${finding.state} at `
-        + `priority ${finding.priority}. `
+        + `priority ${finding.priority}${open.length > 1 ? `, ahead of ${open.length - 1} further mapped `
+          + "finding it outranks" : ""}. `
         + (failing
-          ? "No passed retest has moved it out of that state, so the run reads the control as still failing."
+          ? `The summary records no state a passed retest would have produced, so the run reads the control `
+            + "as still failing."
           : "A fix awaiting its retest leaves the control undecided rather than remediated.") };
+  }
+  if (retested) {
+    return { outcome: "blocked", disposition: "retested-finding",
+      findingFingerprints: mapped.map(({ fingerprint }) => fingerprint),
+      trackingReference: mapped[0].fingerprint,
+      rationale: `Every lifecycle finding mapping ${control.id} passed its retest, and the catalog carries no `
+        + "anchor, no rationale and no finding reference, so nothing tracked states what the control "
+        + "requires of this application." };
   }
   if (control.findingReference) {
     return { outcome: "blocked", disposition: "finding-document",
@@ -171,7 +204,7 @@ export function buildAnchoredRun(input) {
   const readings = [];
   const outcomes = new Map();
   for (const control of selected) {
-    const reading = readControl(control, findings, input.readSource);
+    const reading = readControl(control, findings, input.readSource, input.catalog);
     const document = readingDocument(control, reading, input);
     const digest = `sha256:${createHash("sha256").update(JSON.stringify(document)).digest("hex")}`;
     readings.push({ id: evidenceId(control.id), controlId: control.id, digest, document });
@@ -280,11 +313,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       manifest,
       verification: { workflow: "build", runId: verificationRunId, conclusion: verificationConclusion },
       readSource: (path) => {
-        try {
-          return readFileSync(new URL(path, repository), "utf8");
-        } catch {
-          return null;
-        }
+        const shown = spawnSync("git", ["-C", fileURLToPath(repository), "show",
+          `${manifest.application.commit}:${path}`], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+        return shown.status === 0 ? shown.stdout : null;
       },
       unanchoredTrackingReference: trackingReference,
       evidenceExpiresOn: day(30),
