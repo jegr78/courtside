@@ -1897,6 +1897,21 @@ whether it is built or designed. **Designed means absent today.**
   starts them by hand, and not before. It stays open because closing it means either a full active
   assessment on every pull request that touches the application, which is most of them, or a second
   scheduled run whose cost nobody has weighed yet. *Built, as described.*
+- **Accepted: the leftover-file probes measure anonymous exposure only.** The passive assessment
+  requests ten representative paths — five with a sensitive extension, five that look like a backup
+  or an editor leftover — without a session, and the application authenticates before it routes, so
+  all ten answer `401` whether or not a file of that name exists. That order is the stronger
+  behaviour, because no status distinguishes a leftover file from a path that never existed; its
+  consequence is that the check proves nothing is served to an anonymous caller and cannot prove
+  that nothing is served at all. What an observer needs: nothing, the paths and the rule are in the
+  source. What it does not say: what an authenticated member would receive from such a path. What
+  bounds it: the reference deployment has no filesystem document root at all — Caddy only reverse
+  proxies and serves no file of its own, the application's static content is the frontend build
+  inside the published image, and its container runs read-only — so a leftover file would have to
+  be a committed file, visible in review before it ships. It stays open because closing it means
+  either refusing those patterns at the edge, which changes what the reference deployment serves,
+  or giving the passive profile a session, which is the one thing that profile is defined not to
+  have. *Built, as described.*
 - **Accepted: a red scheduled gate names itself in a public issue.** The failure tracker watches
   every workflow that runs on a schedule, so a red `security assessment` opens an issue in this
   repository — which is public — naming the workflow, the job, its primary failed step, the commit

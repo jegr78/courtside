@@ -194,9 +194,8 @@ candidates awaiting triage.
 [`security-assessment.yml`](../.github/workflows/security-assessment.yml) runs the bounded `safe`
 profile weekly and on manual dispatch. It builds and qualifies one local candidate, resolves its
 immutable Docker image ID and runs the assessment once. The artifact retains the redacted gate
-record and run manifest plus a CMS-encrypted envelope of the protected normalized evidence for 14
-days. Missing scanners, missing evidence and incomplete outcomes fail the job; they are never
-normalized as a clean run.
+record and the run manifest for 14 days, and nothing else. Missing scanners, missing evidence and
+incomplete outcomes fail the job; they are never normalized as a clean run.
 
 ASVS 15.1.1 and ASVS 15.2.1 are retested by matching the original Dependabot discovery history
 against npm and Trivy summaries bound to the immutable 40-character commit revision under

@@ -130,6 +130,12 @@ export function normalizeZapAlerts(report, imageDigest) {
       || left.routeTemplate.localeCompare(right.routeTemplate));
 }
 
+function withoutTrailingPunctuation(token) {
+  let end = token.length;
+  while (end > 0 && (token[end - 1] === "." || token[end - 1] === ";")) end--;
+  return token.slice(0, end);
+}
+
 // The scanner's own templates name a directive in one of two places and otherwise name none, so an
 // alert carrying no directive is ordinary rather than unreadable.
 function cspDirectivesFrom(otherInfo) {
@@ -142,7 +148,7 @@ function cspDirectivesFrom(otherInfo) {
   for (const token of otherInfo.split(/[,\s]+/)) {
     if (token.length === 0) continue;
     const colon = token.lastIndexOf(":");
-    const candidate = (colon < 0 ? token : token.slice(colon + 1)).replace(/[.;]+$/, "");
+    const candidate = withoutTrailingPunctuation(colon < 0 ? token : token.slice(colon + 1));
     if ((run || opening) && cspDirectives.has(candidate)) named.add(candidate);
     else if (run) run = false;
     if (colon >= 0) run = true;
@@ -375,7 +381,7 @@ export function evaluatePublicResponseHeaders(response) {
 // These paths reach the application, where authentication precedes routing, so the answer comes
 // before anything decides whether a file of that name exists.
 export function evaluateExposureResponses(statuses) {
-  const passed = statuses.length > 0 && statuses.every((status) => [401, 403, 404].includes(status));
+  const passed = statuses.length > 0 && statuses.every((status) => status === 401 || status === 404);
   return { passed, observation: passed ? "route-group-not-exposed" : "unexpected-route-group-response" };
 }
 
