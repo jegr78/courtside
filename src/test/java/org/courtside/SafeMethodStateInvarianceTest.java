@@ -1,9 +1,8 @@
 package org.courtside;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.dataexchange.CanonicalField;
+import org.courtside.dataexchange.ExecutionService;
 import org.courtside.dataexchange.PreviewService;
 import org.courtside.dataexchange.ImportSourceService;
 import org.courtside.dataexchange.SnapshotMode;
@@ -11,6 +10,7 @@ import org.courtside.dataexchange.SnapshotUpload;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
@@ -43,6 +43,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -51,17 +52,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import({IdentityTestFixture.class, FacilityTestFixture.class, BookingTestFixture.class})
+@Import({IdentityTestFixture.class, FacilityTestFixture.class, BookingTestFixture.class,
+        MemberTestFixture.class})
 class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     private static final String DOCUMENT = "/api/openapi.yaml";
@@ -76,10 +76,20 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     private static final String TODAY = "2026-05-12";
 
+    private static final Instant BOOKED_FROM = Instant.parse("2026-05-12T16:00:00Z");
+
+    private static final Instant BOOKED_UNTIL = Instant.parse("2026-05-12T17:00:00Z");
+
+    private static final String ANOTHER_USERNAME = "john.roe";
+
+    private static final String SESSION_TABLE = "spring_session";
+
+    private static final String ANOTHER_PRINCIPAL = "spring_session of another principal";
+
     // Columns and not the session table, so a safe method that revoked a session still fails.
     private static final Map<String, String> EXEMPT_COLUMNS = Map.of(
-            "spring_session.last_access_time", "the container stamps it on every request, safe or not",
-            "spring_session.expiry_time", "it is the last access above plus the inactive interval");
+            SESSION_TABLE + ".last_access_time", "the container stamps it on every request, safe or not",
+            SESSION_TABLE + ".expiry_time", "it is the last access above plus the inactive interval");
 
     private static final int ANSWERED = 200;
 
@@ -112,7 +122,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/public/config/logo", read()),
             entry("/api/public/booking-cards", read()),
             entry("/api/public/participant-cards", read()),
-            entry("/api/public/participant-members", read("query=Doe")),
+            entry("/api/public/participant-members", read("query=Miles")),
             entry("/api/bookings", read("date=" + TODAY)),
             entry("/api/bookings/eligibility", read()),
             entry("/api/my/bookings", read()),
@@ -182,11 +192,14 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     @Autowired
     private PreviewService previews;
 
-    private final ObjectMapper json = new ObjectMapper();
+    @Autowired
+    private ExecutionService executions;
 
-    private final CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
+    @Autowired
+    private MemberTestFixture members;
 
-    private final HttpClient httpClient = HttpClient.newBuilder().cookieHandler(cookies).build();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL)).build();
 
     private final Map<String, String> identifiers = new HashMap<>();
 
@@ -194,20 +207,21 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
         UUID personId = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         UUID accountId = identity.createEnabledAccount(
                 personId, USERNAME, passwordEncoder.encode(PASSWORD), Set.of(Role.values()));
+        holdASessionForAnotherAccount();
+        askForCredentialsSoTheMessageLogHasAnEntry();
         signIn();
 
         UUID courtId = facility.createCourt(1, "Court 1");
         for (DayOfWeek day : DayOfWeek.values()) {
             facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
-        String bookingCardId = firstIdOf("/api/admin/booking-cards",
-                card -> card.get("guestAllowed").asBoolean());
+        String bookingCardId = seededId("SELECT id FROM booking_card WHERE guest_allowed ORDER BY label");
         UUID bookingId = bookings.createBookingWithGuest(courtId, UUID.fromString(bookingCardId),
-                new TimeSlot(Instant.parse("2026-05-12T16:00:00Z"), Instant.parse("2026-05-12T17:00:00Z")),
-                personId, Set.of(Role.values()), "John Roe");
+                new TimeSlot(BOOKED_FROM, BOOKED_UNTIL), accountId, personId, Set.of(Role.values()),
+                null, "John Roe");
         uploadClubLogo();
 
-        String membershipTypeId = firstIdOf("/api/admin/membership-types");
+        String membershipTypeId = seededId("SELECT id FROM membership_type ORDER BY name");
         UUID sourceId = importSources.create("roster-system", "Membership system", ",", "UTF-8",
                 Map.of("Member number", CanonicalField.EXTERNAL_ID,
                         "First name", CanonicalField.FIRST_NAME,
@@ -218,19 +232,52 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
         UUID previewId = previews.create(sourceId, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
                 new SnapshotUpload("roster.csv", "text/csv", """
                         Member number,First name,Last name,Email
-                        4711,Mary,Major,mary.major@example.org
+                        4711,Jane,Doe,jane.doe@example.org
+                        """.getBytes(StandardCharsets.UTF_8)), accountId).previewId();
+        executions.execute(previewId, false, accountId);
+        UUID reviewedPreviewId = previews.create(sourceId, SnapshotMode.FULL_SNAPSHOT, "UTF-8",
+                new SnapshotUpload("roster.csv", "text/csv", """
+                        Member number,First name,Last name,Email
+                        4711,Jane,Doe,jane.doe@example.org
+                        4712,John,Roe,john.roe@example.org
                         """.getBytes(StandardCharsets.UTF_8)), accountId).previewId();
 
         identifiers.put("courtId", courtId.toString());
         identifiers.put("personId", personId.toString());
         identifiers.put("bookingId", bookingId.toString());
         identifiers.put("bookingCardId", bookingCardId);
-        identifiers.put("participantCardId", firstIdOf("/api/admin/participant-cards"));
+        identifiers.put("participantCardId", seededId("SELECT id FROM participant_card ORDER BY label"));
         identifiers.put("membershipTypeId", membershipTypeId);
-        identifiers.put("ruleSetId", firstIdOf("/api/admin/rule-sets"));
+        identifiers.put("ruleSetId", seededId("SELECT id FROM rule_set ORDER BY name"));
         identifiers.put("importSourceId", sourceId.toString());
-        identifiers.put("importPreviewId", previewId.toString());
-        identifiers.put("weekday", DayOfWeek.MONDAY.name());
+        identifiers.put("importPreviewId", reviewedPreviewId.toString());
+        identifiers.put("weekday", BOOKED_FROM.atZone(ZoneOffset.UTC).getDayOfWeek().name());
+    }
+
+    private int sessionsOfAnotherPrincipal() {
+        return jdbc.sql("SELECT count(*) FROM public.spring_session"
+                        + " WHERE principal_name IS DISTINCT FROM :caller")
+                .param("caller", USERNAME).query(Integer.class).single();
+    }
+
+    private String seededId(String query) {
+        return jdbc.sql(query + " LIMIT 1").query(String.class).single();
+    }
+
+    // The caller's own session row moves on every request; another account's must not, and without
+    // a second one the exemption could not tell the two apart.
+    private void holdASessionForAnotherAccount() throws Exception {
+        UUID canaryPersonId = identity.createPerson("John", "Roe", "john.roe@example.org");
+        identity.createEnabledAccount(canaryPersonId, ANOTHER_USERNAME,
+                passwordEncoder.encode(PASSWORD), Set.of(Role.MEMBER));
+        signIn(HttpClient.newBuilder().cookieHandler(
+                new CookieManager(null, CookiePolicy.ACCEPT_ALL)).build(), ANOTHER_USERNAME);
+    }
+
+    private void askForCredentialsSoTheMessageLogHasAnEntry() {
+        UUID recipient = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.createEnabledAccount(recipient, "mary.major", Set.of(Role.MEMBER));
+        members.requestAccountCredentials(recipient);
     }
 
     @Test
@@ -265,6 +312,10 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     void whenEverySafeMethodOperationIsInvoked_thenNoPersistentStateChanges() throws Exception {
         // given
         prepareTheClubAndSignIn();
+        assertThat(sessionsOfAnotherPrincipal())
+                .as("without a second signed-in account the exempt columns cannot tell the caller's"
+                        + " own session row from somebody else's, and the digest below reads nothing")
+                .isEqualTo(1);
         List<String> failures = new ArrayList<>();
         Set<String> exemptColumnsThatMoved = new TreeSet<>();
 
@@ -339,23 +390,34 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             assertThat(observed)
                     .as("every column of %s is exempt, which fingerprints nothing at all", table.getKey())
                     .isNotEmpty();
-            return digestOf(table.getKey(), "ROW(" + quoted(observed) + ")", table.getKey());
+            return digestOf(table.getKey(), "ROW(" + quoted(observed) + ")", table.getKey(), "");
         });
         Stream<String> exempt = EXEMPT_COLUMNS.keySet().stream()
                 .map(key -> digestOf(key.substring(0, key.indexOf('.')),
-                        "\"" + key.substring(key.indexOf('.') + 1) + "\"", key));
-        return Stream.concat(tables, exempt);
+                        identifier(key.substring(key.indexOf('.') + 1)), key, ""));
+        Stream<String> otherSessions = Stream.of(digestOf(SESSION_TABLE,
+                "ROW(" + quoted(columns.get(SESSION_TABLE)) + ")", ANOTHER_PRINCIPAL,
+                "principal_name IS DISTINCT FROM " + literal(USERNAME)));
+        return Stream.concat(Stream.concat(tables, exempt), otherSessions);
     }
 
-    private String digestOf(String table, String expression, String name) {
-        return "SELECT '" + name + "' AS state_of,"
+    private String digestOf(String table, String expression, String name, String where) {
+        return "SELECT " + literal(name) + " AS state_of,"
                 + " coalesce(md5(string_agg(digest, ',' ORDER BY digest)), '') AS state"
-                + " FROM (SELECT md5(" + expression + "::text) AS digest FROM public.\"" + table
-                + "\") AS digests";
+                + " FROM (SELECT md5(" + expression + "::text) AS digest FROM public."
+                + identifier(table) + (where.isEmpty() ? "" : " WHERE " + where) + ") AS digests";
+    }
+
+    private String identifier(String name) {
+        return "\"" + name.replace("\"", "\"\"") + "\"";
+    }
+
+    private String literal(String value) {
+        return "'" + value.replace("'", "''") + "'";
     }
 
     private String quoted(List<String> columns) {
-        return columns.stream().map(column -> "\"" + column + "\"")
+        return columns.stream().map(this::identifier)
                 .reduce((left, right) -> left + ", " + right).orElseThrow();
     }
 
@@ -393,22 +455,6 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                 .build(), HttpResponse.BodyHandlers.ofByteArray());
     }
 
-    private String firstIdOf(String path) throws Exception {
-        return firstIdOf(path, row -> true);
-    }
-
-    private String firstIdOf(String path, Predicate<JsonNode> usable) throws Exception {
-        HttpResponse<byte[]> response = send("GET", path);
-        assertThat(response.statusCode()).as(path).isEqualTo(200);
-        JsonNode body = json.readTree(response.body());
-        assertThat(body.isArray()).as("%s answered no list to probe with", path).isTrue();
-        return StreamSupport.stream(body.spliterator(), false)
-                .filter(usable)
-                .findFirst()
-                .map(row -> row.get("id").asText())
-                .orElseThrow(() -> new IllegalStateException(path + " answered no usable row to probe with"));
-    }
-
     private void uploadClubLogo() throws Exception {
         String boundary = "courtside-" + UUID.randomUUID();
         ByteArrayOutputStream body = new ByteArrayOutputStream();
@@ -434,19 +480,27 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     }
 
     private void signIn() throws Exception {
+        signIn(httpClient, USERNAME);
+    }
+
+    private void signIn(HttpClient client, String username) throws Exception {
         URI session = URI.create(baseUrl() + "/api/session");
-        httpClient.send(HttpRequest.newBuilder(session).GET().build(), HttpResponse.BodyHandlers.discarding());
-        String form = "username=" + USERNAME + "&password=" + PASSWORD;
-        HttpResponse<String> response = httpClient.send(HttpRequest.newBuilder(session)
+        client.send(HttpRequest.newBuilder(session).GET().build(), HttpResponse.BodyHandlers.discarding());
+        String form = "username=" + username + "&password=" + PASSWORD;
+        HttpResponse<String> response = client.send(HttpRequest.newBuilder(session)
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("X-XSRF-TOKEN", csrfToken())
+                .header("X-XSRF-TOKEN", csrfToken(client))
                 .POST(HttpRequest.BodyPublishers.ofString(form))
                 .build(), HttpResponse.BodyHandlers.ofString());
         assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
     }
 
     private String csrfToken() {
-        return cookies.getCookieStore().getCookies().stream()
+        return csrfToken(httpClient);
+    }
+
+    private String csrfToken(HttpClient client) {
+        return ((CookieManager) client.cookieHandler().orElseThrow()).getCookieStore().getCookies().stream()
                 .filter(cookie -> cookie.getName().equals("XSRF-TOKEN"))
                 .map(HttpCookie::getValue)
                 .map(value -> URLDecoder.decode(value, StandardCharsets.UTF_8))
