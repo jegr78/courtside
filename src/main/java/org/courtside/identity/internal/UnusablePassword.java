@@ -11,7 +11,7 @@ import java.util.Base64;
 @Component
 class UnusablePassword {
 
-    static final int PLAINTEXT_BYTES = 32;
+    private static final int PLAINTEXT_BYTES = 32;
 
     private final String hash;
 

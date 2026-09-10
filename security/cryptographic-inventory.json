@@ -432,7 +432,7 @@
     {
       "id": "harness-random-fixture",
       "purpose": "Give a verification run values nothing else uses, such as a scratch database name, a throwaway password or a correlation id",
-      "algorithm": "SecureRandom",
+      "algorithm": "CSPRNG",
       "implementation": "node-crypto",
       "strength": {
         "decidedBy": "repository",
