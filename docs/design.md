@@ -1759,8 +1759,11 @@ whether it is built or designed. **Designed means absent today.**
   is what makes an appearing one a decision rather than noise. The built output and the served
   surface are two different producers: the manifest a club's home screen reads is generated from the
   configuration and never exists as a file, so the same list also fixes which addresses answer
-  anonymously, which properties they disclose, and that the rules, the reference proxy and the routes
-  the shell owns still name the same set. `.well-known` is empty and stays empty: this product
+  anonymously, which properties they disclose, and that the rules, the routes the shell owns and the
+  paths the reference proxy redirects from plain HTTP still name the same set. One address is
+  conditional and the list says so: the metrics scrape answers anonymously wherever
+  `courtside.performance.telemetry-enabled` is set, which the reference deployment never does and the
+  performance and assessment profiles do. `.well-known` is empty and stays empty: this product
   publishes no `robots.txt`, `security.txt` or sitemap, and each of those names is asserted to answer
   with a demand for a session rather than with content.
 - **What that list does not catch.** *Accepted, and bounded by review.* It reads the text a build

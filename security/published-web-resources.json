@@ -55,19 +55,53 @@
       "id": "web-manifest",
       "path": "/manifest.webmanifest",
       "mediaType": "application/manifest+json",
-      "keys": ["background_color", "display", "icons", "name", "short_name", "start_url", "theme_color"],
-      "reviewedValues": { "display": ["standalone"], "start_url": ["/"] },
-      "configuredKeys": ["icons"],
+      "keys": [
+        "background_color",
+        "display",
+        "icons",
+        "name",
+        "short_name",
+        "start_url",
+        "theme_color"
+      ],
+      "reviewedValues": {
+        "display": [
+          "standalone"
+        ],
+        "start_url": [
+          "/"
+        ]
+      },
+      "configuredKeys": [
+        "icons"
+      ],
       "purpose": "The installable application's club-specific metadata, generated from the configuration rather than built, so the Vite output cannot carry it."
     },
     {
       "id": "health-probe",
       "path": "/actuator/health",
       "mediaType": "application/vnd.spring-boot.actuator.v3+json",
-      "keys": ["groups", "status"],
-      "reviewedValues": { "groups": ["liveness", "mail", "readiness"] },
+      "keys": [
+        "groups",
+        "status"
+      ],
+      "reviewedValues": {
+        "groups": [
+          "liveness",
+          "mail",
+          "readiness"
+        ]
+      },
       "configuredKeys": [],
       "purpose": "The aggregate readiness a container runtime and an uptime check read. Details stay off this response; the group names are the only structure it discloses."
+    }
+  ],
+  "conditionalResources": [
+    {
+      "id": "metrics-scrape",
+      "path": "/actuator/prometheus",
+      "condition": "management.prometheus.metrics.export.enabled and management.endpoints.web.exposure.include and courtside.performance.telemetry-enabled",
+      "purpose": "The scrape endpoint a metrics collector reads. Three switches have to agree before it answers, and the permit is the third, so it is anonymous wherever they do. The reference deployment sets none. The performance profile sets all three and moves the management port; the assessment profile sets all three, but its proxy answers every /actuator path with 404 over internal networks only."
     }
   ],
   "anonymousStaticPaths": [

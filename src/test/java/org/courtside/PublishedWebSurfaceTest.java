@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PublishedWebSurfaceTest extends AbstractIntegrationTest {
 
-    private static final Path INVENTORY = Path.of("security/published-web-resources.json");
+    private static final Path INVENTORY_FILE = Path.of("security/published-web-resources.json");
 
     private static final Path RULES =
             Path.of("src/main/java/org/courtside/identity/internal/SecurityConfiguration.java");
@@ -64,6 +64,8 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
     private static final Pattern NAVIGATION = Pattern.compile("\\n\\s*path ([^\\n]+)\\n");
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private static final JsonNode INVENTORY = MAPPER.readTree(read(INVENTORY_FILE));
 
     private final HttpClient anonymous = HttpClient.newHttpClient();
 
@@ -96,10 +98,11 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
                         + "and nothing besides")
                 .isEqualTo(browserSurface);
         assertThat(browserSurface).allSatisfy(path -> assertThat(proxied)
-                .describedAs("%s reaches the application through the proxy", path)
+                .describedAs("the proxy redirects %s to HTTPS rather than refusing it as plain HTTP", path)
                 .anySatisfy(pattern -> assertThat(matches(pattern, path)).isTrue()));
         assertThat(proxied).allSatisfy(pattern -> assertThat(browserSurface)
-                .describedAs("the proxy pattern %s still names something this application serves", pattern)
+                .describedAs("the proxy redirect pattern %s still names something this application serves",
+                        pattern)
                 .anySatisfy(path -> assertThat(matches(pattern, path)).isTrue()));
     }
 
@@ -147,6 +150,11 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
             assertThat(new TreeSet<>(body.propertyNames()))
                     .describedAs("%s discloses the reviewed properties and no others", path)
                     .isEqualTo(new TreeSet<>(strings(resource.get("keys"))));
+            assertThat(strings(resource.get("configuredKeys")))
+                    .describedAs("%s leaves a club-configured property unchecked, so it names fewer "
+                            + "than all of them", path)
+                    .isSubsetOf(strings(resource.get("keys")))
+                    .hasSizeLessThan(resource.get("keys").size());
             resource.get("reviewedValues").properties().forEach(reviewed ->
                     assertThat(values(body.path(reviewed.getKey())))
                             .describedAs("%s carries reviewed values for %s", path, reviewed.getKey())
@@ -178,6 +186,16 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
         assertThat(new TreeSet<>(actuatorEndpoints.getAllPaths()))
                 .describedAs("the exposed management endpoints are the inventoried ones")
                 .isEqualTo(servedPaths(true));
+        assertThat(INVENTORY.get("conditionalResources").values()).allSatisfy(conditional -> {
+            String path = conditional.get("path").asString();
+            assertThat(actuatorEndpoints.getAllPaths())
+                    .describedAs("%s answers only where %s is set", path,
+                            conditional.get("condition").asString())
+                    .doesNotContain(path);
+            assertThat(problemType(path))
+                    .describedAs("%s stays behind a session while its condition is unset", path)
+                    .isEqualTo(UNAUTHENTICATED);
+        });
         assertThat(Stream.concat(controllerPaths.stream(), shellRoutes().stream()))
                 .describedAs("nothing answers under the well-known prefix")
                 .noneMatch(path -> path.startsWith(WELL_KNOWN));
@@ -219,7 +237,7 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
 
     private List<Pattern> disclosingPatterns() {
         return Stream.of("credentialPatterns", "disclosureMarkers")
-                .flatMap(property -> inventory().get(property).values().stream())
+                .flatMap(property -> INVENTORY.get(property).values().stream())
                 .map(declared -> Pattern.compile(declared.get("pattern").asString()))
                 .toList();
     }
@@ -238,15 +256,11 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
     }
 
     private List<JsonNode> servedResources() {
-        return inventory().get("servedResources").values().stream().toList();
+        return INVENTORY.get("servedResources").values().stream().toList();
     }
 
     private Set<String> inventoryStrings(String property) {
-        return new TreeSet<>(strings(inventory().get(property)));
-    }
-
-    private JsonNode inventory() {
-        return MAPPER.readTree(read(INVENTORY));
+        return new TreeSet<>(strings(INVENTORY.get(property)));
     }
 
     private static List<String> strings(JsonNode node) {

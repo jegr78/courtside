@@ -3,7 +3,8 @@
   "$id": "urn:courtside:security:published-web-resources:v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "buildResources", "servedResources", "anonymousStaticPaths",
+  "required": ["schemaVersion", "buildResources", "servedResources", "conditionalResources",
+    "anonymousStaticPaths",
     "absentMetadata", "reviewedOrigins", "reviewedComments", "credentialPatterns",
     "disclosureMarkers"],
   "properties": {
@@ -46,6 +47,20 @@
         }
       }
     },
+    "conditionalResources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "condition", "purpose"],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" },
+          "path": { "type": "string", "pattern": "^/[A-Za-z0-9._/-]*$" },
+          "condition": { "type": "string", "minLength": 1 },
+          "purpose": { "$ref": "#/$defs/purpose" }
+        }
+      }
+    },
     "anonymousStaticPaths": {
       "type": "array",
       "minItems": 1,
@@ -63,7 +78,7 @@
         "additionalProperties": false,
         "required": ["host", "purpose"],
         "properties": {
-          "host": { "type": "string", "pattern": "^[A-Za-z0-9.-]+(?::[0-9]+)?$" },
+          "host": { "type": "string", "pattern": "^[A-Za-z0-9.-]+$" },
           "purpose": { "$ref": "#/$defs/purpose" }
         }
       }

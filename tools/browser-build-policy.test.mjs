@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { browserBuildFileName, browserBuildInventoryGaps, browserBuildOrigins, browserBuildResource,
-  verifyBrowserBuild } from "./browser-build-policy.mjs";
+import { browserBuildComments, browserBuildFileName, browserBuildInventoryGaps, browserBuildMarkupComments,
+  browserBuildOrigins, browserBuildResource, verifyBrowserBuild } from "./browser-build-policy.mjs";
 
 const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const frontend = join(repository, "frontend");
@@ -64,6 +64,61 @@ test("given a production browser build, when inspecting its files, then only inv
   assert.throws(() => verifyBrowserBuild(build({
     "assets/app.mjs": "console.log('Courtside')"
   })), /unreviewed public resource/);
+});
+
+test("given every form an origin is written in, when the extractor reads it, then the host it names is the host a browser dials", () => {
+  // given
+  const corpus = [
+    ["fetch('https://plain.example/a')", ["plain.example"]],
+    ["fetch('HTTPS://UPPER.EXAMPLE/a')", ["upper.example"]],
+    ["new WebSocket('wss://socket.example/s')", ["socket.example"]],
+    ["fetch('https://reviewed.example@real.example/a')", ["real.example"]],
+    ["fetch('https://reviewed.example:secret@real.example/a')", ["real.example"]],
+    ["var l='https://first.example/a,https://second.example/b'", ["first.example", "second.example"]],
+    ["var l='https://first.example/a;https://second.example/b'", ["first.example", "second.example"]],
+    ["var l=['https://first.example/a','https://second.example/b']", ["first.example", "second.example"]],
+    ["var l={a:'https://first.example/a',b:'https://second.example/b'}", ["first.example", "second.example"]],
+    ["fetch(\"https:\\/\\/escaped.example\\/a\")", ["escaped.example"]],
+    ["<script src=\"//relative.example/a.js\"></script>", ["relative.example"]],
+    ["<script src=\"//reviewed.example@real.example/a.js\"></script>", ["real.example"]],
+    ["<script src=\"//intranet/a.js\"></script>", ["intranet"]],
+    ["<image href=\"&#47;&#47;entity.example/x.png\"/>", ["entity.example"]],
+    ["<svg xmlns=\"http://www.w3.org/2000/svg\">", ["www.w3.org"]],
+    ["var s='a//b'", []],
+    ["const pattern=/\\/\\/*/", []],
+    ["const ratio=6//2", []]
+  ];
+
+  // when / then
+  for (const [source, expected] of corpus) {
+    assert.deepEqual(browserBuildOrigins(source), expected,
+      `the extractor reads ${source} as ${expected.join(", ") || "no origin"}`);
+  }
+});
+
+test("given every form a comment is written in, when the extractor reads it, then nothing it hides stays unread", () => {
+  // given
+  const corpus = [
+    ["<!-- plain -->", ["plain"]],
+    ["<!-- bang --!>", ["bang"]],
+    ["<!-->", [""]],
+    ["<!--->", [""]],
+    ["<p>a</p><!-- unterminated", ["unterminated"]],
+    ["<!-- one --><!-- two -->", ["one", "two"]],
+    ["<p>none</p>", []]
+  ];
+
+  // when / then
+  for (const [source, expected] of corpus) {
+    assert.deepEqual(browserBuildMarkupComments(source), expected,
+      `the extractor reads ${source} as ${expected.length} comment(s)`);
+  }
+  assert.deepEqual(browserBuildComments("index.html",
+    "<script type=\"application/json\">{\"a\":1}</script>"), [],
+    "a data block is not JavaScript and no parser is asked to read it as such");
+  assert.deepEqual(browserBuildComments("index.html",
+    "<script type=\"module\">/* inlined */</script>"), ["inlined"]);
+  assert.deepEqual(browserBuildComments("index.html", "<script>/* untyped */</script>"), ["untyped"]);
 });
 
 test("given the published-web-resource inventory, when it is read, then its own schema still binds it", () => {
