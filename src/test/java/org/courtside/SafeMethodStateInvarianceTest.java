@@ -13,7 +13,6 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -79,19 +78,21 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             "spring_session.last_access_time", "the container stamps it on every request, safe or not",
             "spring_session.expiry_time", "it is the last access above plus the inactive interval");
 
-    private record Probe(String identifier, String query, int expectedStatus) {
+    private static final int ANSWERED = 200;
+
+    private record Probe(String identifier, String query) {
     }
 
     private static Probe read() {
-        return new Probe("", "", 200);
+        return new Probe("", "");
     }
 
     private static Probe read(String query) {
-        return new Probe("", query, 200);
+        return new Probe("", query);
     }
 
     private static Probe read(String identifier, String query) {
-        return new Probe(identifier, query, 200);
+        return new Probe(identifier, query);
     }
 
     private static final Map<String, Probe> PROBES = Map.ofEntries(
@@ -176,8 +177,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     private final Map<String, String> identifiers = new HashMap<>();
 
-    @BeforeEach
-    void prepareTheClubAndSignIn() throws Exception {
+    private void prepareTheClubAndSignIn() throws Exception {
         UUID personId = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
         UUID accountId = identity.createEnabledAccount(
                 personId, USERNAME, passwordEncoder.encode(PASSWORD), Set.of(Role.values()));
@@ -221,7 +221,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void everySafeMethodOperationInTheContractHasAStateInvarianceProbe() {
+    void whenTheContractIsRead_thenEverySafeMethodOperationHasAStateInvarianceProbe() {
         // when
         TreeSet<String> documented = documentedSafeOperations();
 
@@ -234,7 +234,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void everyExemptColumnExists() {
+    void whenTheSchemaIsRead_thenEveryExemptColumnStillExists() {
         // when
         Set<String> columns = columnsOfEveryTable().entrySet().stream()
                 .flatMap(table -> table.getValue().stream().map(column -> table.getKey() + "." + column))
@@ -250,6 +250,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     @Test
     void whenEverySafeMethodOperationIsInvoked_thenNoPersistentStateChanges() throws Exception {
         // given
+        prepareTheClubAndSignIn();
         List<String> failures = new ArrayList<>();
         Set<String> exemptColumnsThatMoved = new TreeSet<>();
 
@@ -259,10 +260,9 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             String uri = requestUri(probe.getKey(), probe.getValue());
             Map<String, String> before = stateFingerprint();
             HttpResponse<byte[]> read = send("GET", uri);
-            if (read.statusCode() != probe.getValue().expectedStatus()) {
+            if (read.statusCode() != ANSWERED) {
                 failures.add("GET " + uri + " answered " + read.statusCode() + " instead of "
-                        + probe.getValue().expectedStatus() + ": "
-                        + new String(read.body(), StandardCharsets.UTF_8));
+                        + ANSWERED + ": " + new String(read.body(), StandardCharsets.UTF_8));
                 continue;
             }
             HttpResponse<byte[]> head = send("HEAD", uri);
@@ -271,11 +271,11 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                         + " where GET answered " + read.statusCode());
             }
             HttpResponse<byte[]> options = send("OPTIONS", uri);
-            if (options.statusCode() != 200) {
+            if (options.statusCode() != ANSWERED) {
                 failures.add("OPTIONS " + uri + " answered " + options.statusCode());
             }
             Map<String, String> after = stateFingerprint();
-            failures.addAll(changedTables(probe.getKey(), before, after));
+            failures.addAll(changedState(probe.getKey(), before, after));
             exemptColumnsThatMoved.addAll(movedAmong(EXEMPT_COLUMNS.keySet(), before, after));
         }
 
@@ -292,11 +292,11 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                 .isEmpty();
     }
 
-    private List<String> changedTables(String path, Map<String, String> before, Map<String, String> after) {
+    private List<String> changedState(String path, Map<String, String> before, Map<String, String> after) {
         return before.keySet().stream()
-                .filter(table -> !EXEMPT_COLUMNS.containsKey(table))
-                .filter(table -> !before.get(table).equals(after.get(table)))
-                .map(table -> "GET " + path + " changed table " + table)
+                .filter(state -> !EXEMPT_COLUMNS.containsKey(state))
+                .filter(state -> !before.get(state).equals(after.get(state)))
+                .map(state -> "a safe method on " + path + " changed " + state)
                 .toList();
     }
 
