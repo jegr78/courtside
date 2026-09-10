@@ -452,7 +452,8 @@ function resolvedAlertState(alert, today) {
 // the day is bounded below by the records the alert was resolved against.
 function recordedSince(alert) {
   const disposition = alert.disposition?.classifiedAt?.slice(0, 10) ?? "";
-  const acceptance = alert.acceptance ? alertAcceptances.get(alert.acceptance.id)?.acceptedAt ?? "" : "";
+  const acceptance = alert.acceptance
+    ? alertAcceptances.get(alert.acceptance.id)?.acceptedAt?.slice(0, 10) ?? "" : "";
   return disposition > acceptance ? disposition : acceptance;
 }
 
