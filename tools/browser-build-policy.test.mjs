@@ -119,6 +119,10 @@ test("given every form a comment is written in, when the extractor reads it, the
   assert.deepEqual(browserBuildComments("index.html",
     "<script type=\"module\">/* inlined */</script>"), ["inlined"]);
   assert.deepEqual(browserBuildComments("index.html", "<script>/* untyped */</script>"), ["untyped"]);
+  assert.deepEqual(browserBuildComments("index.html", "<script>/* junk end tag */</script\tbar>"),
+    ["junk end tag"], "a browser closes an end tag that carries whitespace or attributes, so this does");
+  assert.deepEqual(browserBuildComments("index.html", "<style>/* junk end tag */</style bar>"),
+    ["junk end tag"]);
 });
 
 test("given the published-web-resource inventory, when it is read, then its own schema still binds it", () => {
