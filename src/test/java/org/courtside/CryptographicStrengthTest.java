@@ -63,8 +63,17 @@ class CryptographicStrengthTest {
     private static final List<String> SURFACES = List.of("src/main/java", "src/main/resources",
             "src/test/java", "tools", "frontend/src", "frontend/e2e", ".github/workflows", "deploy");
 
-    private static final Pattern GENERATED_KEY = Pattern.compile(
-            "-newkey\"?,?\\s*\"?(rsa:\\d+|ec)|ec_paramgen_curve:(P-\\d+)");
+    private static final Pattern KEY_GENERATION = Pattern.compile(
+            "-newkey|genrsa|genpkey|generateKeyPair|KeyPairGenerator");
+    private static final Pattern KEY_PARAMETERS = Pattern.compile(
+            "-newkey\"?,?\\s*\"?(rsa:\\d+|ec)|ec_paramgen_curve:(P-\\d+)"
+                    + "|rsa_keygen_bits:(\\d+)|modulusLength\"?\\s*:\\s*(\\d+)");
+
+    // These two describe cryptography rather than perform it, and their own patterns name what they
+    // are looking for. docs/cryptographic-inventory.md skips documentation for the same reason.
+    private static final Set<Path> POLICY = Set.of(
+            Path.of("src/test/java/org/courtside/CryptographicInventoryTest.java"),
+            Path.of("src/test/java/org/courtside/CryptographicStrengthTest.java"));
     private static final Pattern HARNESS_DRAW = Pattern.compile("randomBytes\\((\\d+)\\)");
     private static final Pattern ARGON2_PARAMETERS = Pattern.compile("m=(\\d+),t=(\\d+),p=(\\d+)");
 
@@ -212,13 +221,17 @@ class CryptographicStrengthTest {
     void givenEveryGeneratedKeyPair_whenItsParametersAreRead_thenTheyMeetThePolicy()
             throws IOException {
         // when
-        Map<Path, Set<String>> generated = matches(GENERATED_KEY);
+        Map<Path, Set<String>> generating = matches(KEY_GENERATION);
+        Map<Path, Set<String>> parameters = matches(KEY_PARAMETERS);
 
         // then
-        assertThat(generated).as("this rule proves nothing unless a key pair is generated somewhere")
+        assertThat(generating).as("this rule proves nothing unless a key pair is generated somewhere")
                 .isNotEmpty();
+        assertThat(generating.keySet())
+                .as("a key pair whose parameters this policy cannot read is one nobody decided")
+                .isSubsetOf(parameters.keySet());
         int weakest = Integer.MAX_VALUE;
-        for (Map.Entry<Path, Set<String>> file : generated.entrySet()) {
+        for (Map.Entry<Path, Set<String>> file : parameters.entrySet()) {
             for (String specification : file.getValue()) {
                 int bits = strengthOf(specification);
                 assertThat(bits).as("%s generates %s", file.getKey(), specification)
@@ -288,16 +301,30 @@ class CryptographicStrengthTest {
 
     private static Set<String> enabledDkimAlgorithms() throws IOException {
         Set<String> enabled = new TreeSet<>();
-        JsonNode line = new ObjectMapper().readTree(Files.readString(MAIL_CONFIGURATION,
-                StandardCharsets.UTF_8).lines().findFirst().orElseThrow());
-        JsonNode algorithms = line.get("value").properties().iterator().next().getValue()
-                .get("dkimManagement").get("algorithms");
-        algorithms.propertyNames().forEach(name -> {
-            if (algorithms.get(name).asBoolean()) {
-                enabled.add(name);
+        List<JsonNode> managed = new ArrayList<>();
+        ObjectMapper mapper = new ObjectMapper();
+        for (String line : Files.readAllLines(MAIL_CONFIGURATION, StandardCharsets.UTF_8)) {
+            if (!line.isBlank()) {
+                collect(mapper.readTree(line), managed);
             }
-        });
+        }
+        assertThat(managed).as("the reference deployment manages DKIM for at least one domain")
+                .isNotEmpty();
+        for (JsonNode algorithms : managed) {
+            algorithms.propertyNames().forEach(name -> {
+                if (algorithms.get(name).asBoolean()) {
+                    enabled.add(name);
+                }
+            });
+        }
         return enabled;
+    }
+
+    private static void collect(JsonNode node, List<JsonNode> managed) {
+        if (node.has("dkimManagement") && node.get("dkimManagement").has("algorithms")) {
+            managed.add(node.get("dkimManagement").get("algorithms"));
+        }
+        node.values().forEach(child -> collect(child, managed));
     }
 
     private static int smallest(Pattern pattern) throws IOException {
@@ -356,6 +383,9 @@ class CryptographicStrengthTest {
         for (String surface : SURFACES) {
             try (Stream<Path> files = Files.walk(Path.of(surface))) {
                 for (Path file : files.filter(Files::isRegularFile).toList()) {
+                    if (POLICY.contains(file)) {
+                        continue;
+                    }
                     Set<String> tokens = new TreeSet<>();
                     Matcher matcher = pattern.matcher(read(file));
                     while (matcher.find()) {
