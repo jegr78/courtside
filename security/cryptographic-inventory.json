@@ -437,7 +437,7 @@
       "strength": {
         "decidedBy": "repository",
         "bits": 32,
-        "basis": "The smallest draw is four bytes for a run identifier, which only has to be unique inside one run. Where the harness needs a throwaway credential it draws eighteen or twenty-four bytes, and nothing an instance holds depends on either."
+        "basis": "The smallest draw is four bytes for a run identifier, which only has to be unique inside one run. That minimum covers names, not secrets: where the harness draws a credential of its own it draws at least sixteen bytes, and a separate rule holds it there."
       },
       "class": "identifier",
       "owner": "repository-maintainer",

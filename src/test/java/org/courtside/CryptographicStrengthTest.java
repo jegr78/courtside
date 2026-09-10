@@ -11,8 +11,11 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -26,17 +29,20 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CryptographicStrengthTest {
 
     private static final Path INVENTORY = Path.of("security/cryptographic-inventory.json");
-    private static final Path MAIL_CONFIGURATION = Path.of("deploy/mail/base.ndjson");
+    private static final Path COMPOSE = Path.of("deploy/compose.yaml");
+    private static final Path MAIL_PLANS = Path.of("deploy/mail");
 
     private static final int POLICY_BITS = 128;
     private static final int BITS_PER_BYTE = 8;
+
+    // How far a key parameter may sit from the call that generates the key, in characters.
+    private static final int WITHIN_THE_CALL = 200;
 
     // An identifier answers to uniqueness rather than to secrecy, which is why the minimum below
     // does not reach it. docs/cryptographic-inventory.md says what the classes separate.
@@ -59,23 +65,34 @@ class CryptographicStrengthTest {
     private static final String RUNTIME_MODULE = "java.base";
 
     private static final Set<String> COLLISION_RESISTANT = Set.of("SHA-256", "SHA-384", "SHA-512");
+    private static final Set<String> SIGNS_OR_VERIFIES = Set.of("signing", "integrity");
 
-    private static final List<String> SURFACES = List.of("src/main/java", "src/main/resources",
-            "src/test/java", "tools", "frontend/src", "frontend/e2e", ".github/workflows", "deploy");
+    private static final Set<String> NOT_SOURCE = Set.of(".git", "node_modules", "target", "build",
+            "dist", "coverage", "playwright-report", "test-results", "node");
 
-    private static final Pattern KEY_GENERATION = Pattern.compile(
-            "-newkey|genrsa|genpkey|generateKeyPair|KeyPairGenerator");
-    private static final Pattern KEY_PARAMETERS = Pattern.compile(
-            "-newkey\"?,?\\s*\"?(rsa:\\d+|ec)|ec_paramgen_curve:(P-\\d+)"
-                    + "|rsa_keygen_bits:(\\d+)|modulusLength\"?\\s*:\\s*(\\d+)");
+    // Prose about generating a key is not a generated key, and the shipped password list carries a
+    // hundred thousand words that no rule here is about.
+    private static final String DOCUMENTATION = ".md";
+    private static final Path DATA = Path.of("src/main/resources/security/common-passwords.txt");
 
-    // These two describe cryptography rather than perform it, and their own patterns name what they
-    // are looking for. docs/cryptographic-inventory.md skips documentation for the same reason.
+    // Both carry the patterns below as literals, so a scan that read them would find its own words.
+    // Neither generates a key or draws a random value.
     private static final Set<Path> POLICY = Set.of(
             Path.of("src/test/java/org/courtside/CryptographicInventoryTest.java"),
             Path.of("src/test/java/org/courtside/CryptographicStrengthTest.java"));
+
+    private static final Pattern KEY_GENERATION = Pattern.compile(
+            "-newkey|genrsa|genpkey|ecparam|ssh-keygen|generateKeyPair|KeyPairGenerator"
+                    + "|subtle\\.generateKey");
+    private static final Pattern KEY_PARAMETERS = Pattern.compile(
+            "-newkey\"?,?\\s*\"?(rsa:\\d+)|ec_paramgen_curve:(P-\\d+)"
+                    + "|namedCurve\"?\\s*:\\s*\"(P-\\d+)\"|rsa_keygen_bits:(\\d+)"
+                    + "|modulusLength\"?\\s*:\\s*(\\d+)|-b\\s+(\\d+)");
     private static final Pattern HARNESS_DRAW = Pattern.compile("randomBytes\\((\\d+)\\)");
+    private static final Pattern HARNESS_CREDENTIAL = Pattern.compile(
+            "(?i)password\\s*=\\s*randomBytes\\((\\d+)\\)");
     private static final Pattern ARGON2_PARAMETERS = Pattern.compile("m=(\\d+),t=(\\d+),p=(\\d+)");
+    private static final Pattern APPLIED_PLAN = Pattern.compile("/plan/([A-Za-z0-9_.-]+\\.ndjson)");
 
     private record Literal(String entry, Path source, Pattern pattern) { }
 
@@ -97,6 +114,8 @@ class CryptographicStrengthTest {
                     Pattern.compile("copyOf\\(digest,\\s*(\\d+)\\)")),
             new Literal("idempotency-key", Path.of("frontend/src/api/idempotency.ts"),
                     Pattern.compile("Uint8Array\\((\\d+)\\)")));
+
+    private static Map<Path, String> scanned;
 
     @Test
     void givenEveryEntry_whenItsImplementationIsRead_thenItNamesAMaintainedProvider()
@@ -186,6 +205,14 @@ class CryptographicStrengthTest {
         assertThat(bitsOf("harness-random-fixture"))
                 .as("the harness records its smallest draw")
                 .isEqualTo(smallest(HARNESS_DRAW) * BITS_PER_BYTE);
+        Map<String, Integer> credentials = drawn(HARNESS_CREDENTIAL);
+        assertThat(credentials)
+                .as("a harness that generates no credential of its own would prove nothing here")
+                .isNotEmpty();
+        credentials.forEach((where, bytes) -> assertThat(bytes * BITS_PER_BYTE)
+                .as("%s draws a credential, which reaches the policy whatever else the harness draws"
+                        + " for a name", where)
+                .isGreaterThanOrEqualTo(POLICY_BITS));
     }
 
     @Test
@@ -194,14 +221,16 @@ class CryptographicStrengthTest {
         // given
         Set<String> dkim = enabledDkimAlgorithms();
 
-        // when / then
-        assertThat(dkim)
-                .as("the reference deployment signs with these and with no SHA-1 variant")
+        // when
+        List<JsonNode> signing = entries().stream()
+                .filter(entry -> SIGNS_OR_VERIFIES.contains(entry.get("class").asText())).toList();
+
+        // then
+        assertThat(dkim).as("the reference deployment signs with these and with no SHA-1 variant")
                 .containsExactlyInAnyOrder("Dkim1Ed25519Sha256", "Dkim1RsaSha256");
-        for (JsonNode entry : entries()) {
-            if (!Set.of("signing", "integrity").contains(entry.get("class").asText())) {
-                continue;
-            }
+        assertThat(signing).as("this rule proves nothing unless something here signs or verifies")
+                .isNotEmpty();
+        for (JsonNode entry : signing) {
             if ("repository".equals(entry.get("strength").get("decidedBy").asText())) {
                 assertThat(entry.get("algorithm").asText())
                         .as("%s signs or verifies here, so it names a collision-resistant hash",
@@ -221,27 +250,39 @@ class CryptographicStrengthTest {
     void givenEveryGeneratedKeyPair_whenItsParametersAreRead_thenTheyMeetThePolicy()
             throws IOException {
         // when
-        Map<Path, Set<String>> generating = matches(KEY_GENERATION);
-        Map<Path, Set<String>> parameters = matches(KEY_PARAMETERS);
+        Map<String, Integer> generated = generatedKeyPairs();
 
         // then
-        assertThat(generating).as("this rule proves nothing unless a key pair is generated somewhere")
+        assertThat(generated).as("this rule proves nothing unless a key pair is generated somewhere")
                 .isNotEmpty();
-        assertThat(generating.keySet())
-                .as("a key pair whose parameters this policy cannot read is one nobody decided")
-                .isSubsetOf(parameters.keySet());
-        int weakest = Integer.MAX_VALUE;
-        for (Map.Entry<Path, Set<String>> file : parameters.entrySet()) {
-            for (String specification : file.getValue()) {
-                int bits = strengthOf(specification);
-                assertThat(bits).as("%s generates %s", file.getKey(), specification)
-                        .isGreaterThanOrEqualTo(POLICY_BITS);
-                weakest = Math.min(weakest, bits);
-            }
-        }
+        generated.forEach((where, bits) -> assertThat(bits).as("%s", where)
+                .isGreaterThanOrEqualTo(POLICY_BITS));
         assertThat(bitsOf("harness-test-certificate"))
                 .as("the harness certificate records the weakest key pair a run generates")
-                .isEqualTo(weakest);
+                .isEqualTo(generated.values().stream().min(Integer::compare).orElseThrow());
+    }
+
+    private static Map<String, Integer> generatedKeyPairs() throws IOException {
+        Map<String, Integer> rated = new TreeMap<>();
+        for (Map.Entry<Path, String> file : sources().entrySet()) {
+            Matcher generation = KEY_GENERATION.matcher(file.getValue());
+            while (generation.find()) {
+                String call = file.getValue().substring(generation.start(), Math.min(
+                        generation.start() + WITHIN_THE_CALL, file.getValue().length()));
+                Matcher parameter = KEY_PARAMETERS.matcher(call);
+                String where = where(file, generation) + " generates a key pair with "
+                        + generation.group();
+                assertThat(parameter.find())
+                        .as("%s, and names no parameter this policy can read", where).isTrue();
+                rated.put(where + " " + captured(parameter), strengthOf(captured(parameter)));
+            }
+        }
+        return rated;
+    }
+
+    private static String where(Map.Entry<Path, String> file, Matcher found) {
+        return file.getKey() + ":" + (1 + file.getValue().substring(0, found.start()).chars()
+                .filter(character -> character == '\n').count());
     }
 
     private static String providerModuleOf(String algorithm) throws NoSuchAlgorithmException {
@@ -280,13 +321,11 @@ class CryptographicStrengthTest {
 
     // NIST SP 800-57 part 1, table 2: what a modulus or a curve is worth in bits of security.
     private static int strengthOf(String specification) {
-        if (!specification.startsWith("P-") && !specification.startsWith("rsa:")) {
-            return 0;
-        }
         if (specification.startsWith("P-")) {
             return Integer.parseInt(specification.substring(2)) / 2;
         }
-        int modulus = Integer.parseInt(specification.substring("rsa:".length()));
+        int modulus = Integer.parseInt(specification.startsWith("rsa:")
+                ? specification.substring("rsa:".length()) : specification);
         if (modulus >= 15360) {
             return 256;
         }
@@ -300,17 +339,28 @@ class CryptographicStrengthTest {
     }
 
     private static Set<String> enabledDkimAlgorithms() throws IOException {
-        Set<String> enabled = new TreeSet<>();
+        Set<String> plans = new TreeSet<>();
+        Matcher applied = APPLIED_PLAN.matcher(read(COMPOSE));
+        while (applied.find()) {
+            plans.add(applied.group(1));
+        }
+        assertThat(plans).as("the reference deployment applies at least one mail plan").isNotEmpty();
         List<JsonNode> managed = new ArrayList<>();
         ObjectMapper mapper = new ObjectMapper();
-        for (String line : Files.readAllLines(MAIL_CONFIGURATION, StandardCharsets.UTF_8)) {
-            if (!line.isBlank()) {
-                collect(mapper.readTree(line), managed);
+        for (String plan : plans) {
+            for (String line : Files.readAllLines(MAIL_PLANS.resolve(plan), StandardCharsets.UTF_8)) {
+                if (!line.isBlank()) {
+                    collect(mapper.readTree(line), managed);
+                }
             }
         }
         assertThat(managed).as("the reference deployment manages DKIM for at least one domain")
                 .isNotEmpty();
+        Set<String> enabled = new TreeSet<>();
         for (JsonNode algorithms : managed) {
+            assertThat(algorithms.isObject())
+                    .as("a domain manages DKIM without an algorithm set this policy can read")
+                    .isTrue();
             algorithms.propertyNames().forEach(name -> {
                 if (algorithms.get(name).asBoolean()) {
                     enabled.add(name);
@@ -321,28 +371,44 @@ class CryptographicStrengthTest {
     }
 
     private static void collect(JsonNode node, List<JsonNode> managed) {
-        if (node.has("dkimManagement") && node.get("dkimManagement").has("algorithms")) {
-            managed.add(node.get("dkimManagement").get("algorithms"));
+        if (node.has("dkimManagement")) {
+            managed.add(node.get("dkimManagement").path("algorithms"));
         }
         node.values().forEach(child -> collect(child, managed));
     }
 
     private static int smallest(Pattern pattern) throws IOException {
-        int smallest = Integer.MAX_VALUE;
-        for (Set<String> found : matches(pattern).values()) {
-            for (String draw : found) {
-                smallest = Math.min(smallest, Integer.parseInt(draw));
+        return drawn(pattern).values().stream().min(Integer::compare).orElseThrow();
+    }
+
+    private static Map<String, Integer> drawn(Pattern pattern) throws IOException {
+        Map<String, Integer> draws = new TreeMap<>();
+        for (Map.Entry<Path, String> file : sources().entrySet()) {
+            Matcher found = pattern.matcher(file.getValue());
+            while (found.find()) {
+                draws.put(where(file, found), Integer.parseInt(found.group(1)));
             }
         }
-        return smallest;
+        return draws;
     }
 
     private static int bitsOf(String id) throws IOException {
-        return entry(id).get("strength").get("bits").asInt();
+        JsonNode strength = entry(id).get("strength");
+        assertThat(strength.propertyNames()).as("%s states the bits it draws", id).contains("bits");
+        return strength.get("bits").asInt();
     }
 
     private static String basisOf(String id) throws IOException {
         return entry(id).get("strength").get("basis").asText();
+    }
+
+    private static String captured(Matcher matcher) {
+        for (int group = 1; group <= matcher.groupCount(); group++) {
+            if (matcher.group(group) != null) {
+                return matcher.group(group);
+            }
+        }
+        return matcher.group();
     }
 
     private static List<String> locationsOf(JsonNode entry) {
@@ -365,38 +431,34 @@ class CryptographicStrengthTest {
         return entries;
     }
 
-    private static String captured(Matcher matcher) {
-        for (int group = 1; group <= matcher.groupCount(); group++) {
-            if (matcher.group(group) != null) {
-                return matcher.group(group);
-            }
-        }
-        return matcher.group();
-    }
-
     private static String read(Path file) throws IOException {
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }
 
-    private static Map<Path, Set<String>> matches(Pattern pattern) throws IOException {
-        Map<Path, Set<String>> found = new TreeMap<>();
-        for (String surface : SURFACES) {
-            try (Stream<Path> files = Files.walk(Path.of(surface))) {
-                for (Path file : files.filter(Files::isRegularFile).toList()) {
-                    if (POLICY.contains(file)) {
-                        continue;
-                    }
-                    Set<String> tokens = new TreeSet<>();
-                    Matcher matcher = pattern.matcher(read(file));
-                    while (matcher.find()) {
-                        tokens.add(captured(matcher));
-                    }
-                    if (!tokens.isEmpty()) {
-                        found.put(file, tokens);
-                    }
-                }
-            }
+    private static synchronized Map<Path, String> sources() throws IOException {
+        if (scanned != null) {
+            return scanned;
         }
-        return found;
+        Map<Path, String> sources = new TreeMap<>();
+        Files.walkFileTree(Path.of("."), new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes ignored) {
+                return NOT_SOURCE.contains(directory.getFileName().toString())
+                        ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes ignored)
+                    throws IOException {
+                Path named = file.normalize();
+                if (!named.toString().endsWith(DOCUMENTATION) && !named.equals(DATA)
+                        && !POLICY.contains(named)) {
+                    sources.put(named, read(named));
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        scanned = sources;
+        return scanned;
     }
 }
