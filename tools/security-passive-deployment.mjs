@@ -10,6 +10,12 @@ import { redactSecurityText } from "./security-runner.mjs";
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const evidenceSchema = JSON.parse(readFileSync(new URL(
   "../security/passive-deployment-evidence.schema.json", import.meta.url)));
+const alertDispositions = new Map(JSON.parse(readFileSync(new URL(
+  "../security/passive-alert-dispositions.json", import.meta.url))).dispositions
+  .map((entry) => [entry.fingerprint, entry]));
+const alertAcceptances = new Map(JSON.parse(readFileSync(new URL(
+  "../security/exceptions.json", import.meta.url))).riskAcceptances
+  .map((entry) => [entry.fingerprint, entry]));
 // Compiled on first use: security-environment.mjs imports this module, and that one loads on a
 // checkout where the validator has not been installed yet.
 let compiled;
@@ -305,7 +311,8 @@ export function assertQualifiedImageEvidence(qualification, imageDigest, imageAr
 }
 
 export function buildPassiveDeploymentEvidence({
-  targetFingerprint, imageDigest, observations, zapReport, requestCount
+  targetFingerprint, imageDigest, observations, zapReport, requestCount,
+  today = new Date().toISOString().slice(0, 10)
 }) {
   if (!Number.isInteger(requestCount) || requestCount < 1 || requestCount > 1000) {
     throw new Error("The passive assessment request budget was exceeded");
@@ -318,9 +325,10 @@ export function buildPassiveDeploymentEvidence({
       || JSON.stringify(checkIds) !== JSON.stringify(requiredPassiveCheckIds)) {
     throw new Error("The passive assessment evidence is missing required checks");
   }
-  const alerts = normalizeZapAlerts(zapReport, imageDigest);
+  const alerts = normalizeZapAlerts(zapReport, imageDigest)
+    .map((alert) => ({ ...alert, ...resolvedAlertState(alert.fingerprint, today) }));
   const failed = checks.some((check) => check.outcome === "failed");
-  const incomplete = !failed && alerts.length > 0;
+  const incomplete = !failed && alerts.some((alert) => alert.state === "candidate");
   const evidence = {
     schemaVersion: 3,
     testId: "CSA-DEPLOY-001",
@@ -330,6 +338,7 @@ export function buildPassiveDeploymentEvidence({
     checks,
     zap: { image: zapImage, version: zapReport.version, status: "completed", alerts },
     requestCount,
+    readOn: today,
     outcome: failed ? "failed" : incomplete ? "incomplete" : "passed"
   };
   assertPassiveDeploymentEvidence(evidence);
@@ -398,6 +407,22 @@ export function evaluateCipherPolicy(tls12, tls13, deprecated) {
   return { passed, observation: passed ? "recommended-ciphers-only" : "cipher-policy-mismatch" };
 }
 
+// A scanner alert is only resolved by a record somebody wrote down: a disposition beside the
+// fingerprint, or an acceptance that has not expired on the day the run reads it.
+function resolvedAlertState(fingerprint, today) {
+  const disposition = alertDispositions.get(fingerprint);
+  if (disposition) {
+    return { state: disposition.state, disposition: {
+      rationale: disposition.rationale, actor: disposition.actor,
+      classifiedAt: disposition.classifiedAt, reference: disposition.reference } };
+  }
+  const acceptance = alertAcceptances.get(fingerprint);
+  if (acceptance && acceptance.expiresOn >= today) {
+    return { state: "accepted-risk", acceptance: { id: acceptance.id, expiresOn: acceptance.expiresOn } };
+  }
+  return { state: "candidate" };
+}
+
 export function assertPassiveDeploymentEvidence(evidence) {
   if (!validateEvidence(evidence)) {
     throw new Error(`The passive assessment evidence is invalid: ${JSON.stringify(validateEvidence.errors)}`);
@@ -412,6 +437,12 @@ export function assertPassiveDeploymentEvidence(evidence) {
     }
     if (fingerprints.has(alert.fingerprint)) {
       throw new Error("The passive assessment evidence contains a duplicate alert fingerprint");
+    }
+    const recorded = resolvedAlertState(alert.fingerprint, evidence.readOn);
+    if (alert.state !== recorded.state
+        || JSON.stringify(alert.disposition) !== JSON.stringify(recorded.disposition)
+        || JSON.stringify(alert.acceptance) !== JSON.stringify(recorded.acceptance)) {
+      throw new Error("The passive assessment evidence contains an unrecorded alert disposition");
     }
     fingerprints.add(alert.fingerprint);
   }

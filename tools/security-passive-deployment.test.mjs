@@ -661,6 +661,101 @@ test("given retained evidence naming no directive, when it is validated, then th
     assert.equal(validate(evidence), true, JSON.stringify(validate.errors));
   });
 
+const dispositions = JSON.parse(readFileSync(new URL(
+  "../security/passive-alert-dispositions.json", import.meta.url)));
+const acceptances = JSON.parse(readFileSync(new URL(
+  "../security/exceptions.json", import.meta.url))).riskAcceptances;
+
+const cookieAlert = (route) => ({ pluginid: "10010", riskcode: "1", confidence: "2",
+  instances: [{ uri: `${passiveScannerOrigin}${route}`, method: "GET", param: "__Host-XSRF-TOKEN",
+    evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] });
+
+const evidenceFor = (alerts, today) => buildPassiveDeploymentEvidence({
+  targetFingerprint: digest, imageDigest: digest, observations: passingObservations(), requestCount: 1,
+  zapReport: { version: "2.17.0", site: [{ alerts }] }, today });
+
+test("given an alert a recorded disposition covers, when building evidence, then no candidate remains", () => {
+  // given — the run against the disposable target raises this on the site root every time
+  const alerts = [cookieAlert("/")];
+
+  // when
+  const evidence = evidenceFor(alerts);
+
+  // then
+  assert.equal(evidence.zap.alerts[0].state, "false-positive");
+  assert.match(evidence.zap.alerts[0].disposition.rationale, /double-submit/);
+  assert.equal(evidence.outcome, "passed");
+});
+
+test("given an alert nothing has classified, when building evidence, then the run stays incomplete", () => {
+  // given — a rule on a route no disposition names is the case the mechanism exists for
+  const alerts = [cookieAlert("/font-licenses.txt")];
+
+  // when
+  const evidence = evidenceFor(alerts);
+
+  // then
+  assert.equal(evidence.zap.alerts[0].state, "candidate");
+  assert.equal(evidence.outcome, "incomplete");
+});
+
+test("given an alert an unexpired acceptance covers, when building evidence, then the run passes", () => {
+  // given — the CSP alert on the site root is the accepted remote-logo risk, not a false positive
+  const alerts = [{ pluginid: "10055", riskcode: "2", confidence: "3", instances: [{
+    uri: `${passiveScannerOrigin}/`, method: "GET", param: "Content-Security-Policy",
+    evidence: "base-uri 'none'; frame-ancestors 'none'",
+    otherinfo: "The directive(s): form-action is/are among the directives that do not fallback to default-src." }] }];
+
+  // when
+  const evidence = evidenceFor(alerts, "2026-09-10");
+
+  // then
+  assert.equal(evidence.zap.alerts[0].state, "accepted-risk");
+  assert.equal(evidence.zap.alerts[0].acceptance.id, "remote-https-club-logo-2026");
+  assert.equal(evidence.outcome, "passed");
+});
+
+test("given the acceptance has expired, when building evidence, then its alert is an open candidate again", () => {
+  // given — the same alert, read on a day past the recorded expiry
+  const alerts = [{ pluginid: "10055", riskcode: "2", confidence: "3", instances: [{
+    uri: `${passiveScannerOrigin}/`, method: "GET", param: "Content-Security-Policy",
+    evidence: "base-uri 'none'; frame-ancestors 'none'",
+    otherinfo: "The directive(s): form-action is/are among the directives that do not fallback to default-src." }] }];
+
+  // when
+  const evidence = evidenceFor(alerts, "2027-01-01");
+
+  // then — an expiry that quietly kept passing would be the whole point of the date missed
+  assert.equal(evidence.zap.alerts[0].state, "candidate");
+  assert.equal(evidence.outcome, "incomplete");
+});
+
+test("given evidence claiming a disposition nothing recorded, when it is validated, then it fails closed", () => {
+  // given
+  const evidence = evidenceFor([cookieAlert("/font-licenses.txt")]);
+  evidence.zap.alerts[0].state = "false-positive";
+  evidence.zap.alerts[0].disposition = { rationale: "looks fine", actor: "nobody",
+    classifiedAt: "2026-09-10T00:00:00.000Z", reference: "none" };
+
+  // when / then
+  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /disposition/);
+});
+
+test("given the recorded dispositions, when they are read, then each names a rationale, an actor and a source",
+  () => {
+    // given
+    const validate = new Ajv({ strict: true, allErrors: true }).compile(JSON.parse(readFileSync(
+      new URL("../security/passive-alert-dispositions.schema.json", import.meta.url))));
+
+    // when / then
+    assert.equal(validate(dispositions), true, JSON.stringify(validate.errors));
+    assert.ok(dispositions.dispositions.length > 0);
+    assert.equal(new Set(dispositions.dispositions.map(({ fingerprint }) => fingerprint)).size,
+      dispositions.dispositions.length);
+    assert.ok(acceptances.every(({ fingerprint }) =>
+      !dispositions.dispositions.some((entry) => entry.fingerprint === fingerprint)));
+  });
+
 test("given a CSP alert about another header, when normalizing it, then the evidence fails closed", () => {
   // given — the wording may be anything, but the header the alert describes may not
   const report = { site: [{ alerts: [
@@ -819,13 +914,14 @@ test("given contradictory ratings for one candidate, when normalizing alerts, th
 });
 
 test("given an untriaged ZAP candidate, when building evidence, then the assessment is incomplete", () => {
-  // when
+  // when — the same rule on a route no disposition names, so nothing has classified this one
   const evidence = buildPassiveDeploymentEvidence({
     targetFingerprint: digest, imageDigest: digest,
     observations: passingObservations(),
     zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10010", riskcode: "1",
-      confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "__Host-XSRF-TOKEN",
-        evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] }] }] }, requestCount: 1
+      confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/font-licenses.txt`, method: "GET",
+        param: "__Host-XSRF-TOKEN", evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] }] }] },
+    requestCount: 1
   });
 
   // then

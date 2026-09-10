@@ -3,18 +3,45 @@
   "$id": "urn:courtside:security:passive-deployment-evidence:v3",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "testId", "targetFingerprint", "imageDigest", "layers", "checks", "zap", "requestCount", "outcome"],
+  "required": [
+    "schemaVersion",
+    "testId",
+    "targetFingerprint",
+    "imageDigest",
+    "layers",
+    "checks",
+    "zap",
+    "requestCount",
+    "outcome",
+    "readOn"
+  ],
   "properties": {
-    "schemaVersion": { "const": 3 },
-    "testId": { "const": "CSA-DEPLOY-001" },
-    "targetFingerprint": { "$ref": "#/$defs/digest" },
-    "imageDigest": { "type": "string", "pattern": "^(?:sha256:[a-f0-9]{64}|[^\\s@]+@sha256:[a-f0-9]{64})$" },
+    "schemaVersion": {
+      "const": 3
+    },
+    "testId": {
+      "const": "CSA-DEPLOY-001"
+    },
+    "targetFingerprint": {
+      "$ref": "#/$defs/digest"
+    },
+    "imageDigest": {
+      "type": "string",
+      "pattern": "^(?:sha256:[a-f0-9]{64}|[^\\s@]+@sha256:[a-f0-9]{64})$"
+    },
     "layers": {
       "type": "array",
       "uniqueItems": true,
       "minItems": 4,
       "maxItems": 4,
-      "items": { "enum": ["application", "proxy", "container", "host"] }
+      "items": {
+        "enum": [
+          "application",
+          "proxy",
+          "container",
+          "host"
+        ]
+      }
     },
     "checks": {
       "type": "array",
@@ -23,140 +50,551 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "layer", "outcome", "observation"],
+        "required": [
+          "id",
+          "layer",
+          "outcome",
+          "observation"
+        ],
         "properties": {
-          "id": { "$ref": "#/$defs/checkId" },
-          "layer": { "enum": ["application", "proxy", "container", "host"] },
-          "outcome": { "enum": ["passed", "failed", "not-applicable"] },
-          "observation": { "$ref": "#/$defs/observation" }
+          "id": {
+            "$ref": "#/$defs/checkId"
+          },
+          "layer": {
+            "enum": [
+              "application",
+              "proxy",
+              "container",
+              "host"
+            ]
+          },
+          "outcome": {
+            "enum": [
+              "passed",
+              "failed",
+              "not-applicable"
+            ]
+          },
+          "observation": {
+            "$ref": "#/$defs/observation"
+          }
         }
       }
     },
     "zap": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["image", "version", "status", "alerts"],
+      "required": [
+        "image",
+        "version",
+        "status",
+        "alerts"
+      ],
       "properties": {
-        "image": { "type": "string", "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$" },
-        "version": { "const": "2.17.0" },
-        "status": { "enum": ["completed", "failed"] },
+        "image": {
+          "type": "string",
+          "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$"
+        },
+        "version": {
+          "const": "2.17.0"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed"
+          ]
+        },
         "alerts": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["pluginId", "riskCode", "confidence", "method", "routeTemplate", "fingerprint", "count", "ruleEvidence"],
+            "required": [
+              "pluginId",
+              "riskCode",
+              "confidence",
+              "method",
+              "routeTemplate",
+              "fingerprint",
+              "count",
+              "ruleEvidence",
+              "state"
+            ],
             "properties": {
-              "pluginId": { "type": "string", "pattern": "^[0-9]+$" },
-              "riskCode": { "type": "integer", "minimum": 0, "maximum": 3 },
-              "confidence": { "type": "integer", "minimum": 0, "maximum": 4 },
-              "method": { "enum": ["GET", "HEAD"] },
-              "routeTemplate": {
-                "enum": ["/", "/api/source", "/login", "/does-not-exist", "/icon.svg", "/font-licenses.txt",
-                  "/manifest.webmanifest", "/registerSW.js", "/robots.txt", "/sitemap.xml", "/sw.js", "/assets/{asset}",
-                  "/workbox-{asset}.js"]
+              "pluginId": {
+                "type": "string",
+                "pattern": "^[0-9]+$"
               },
-              "fingerprint": { "$ref": "#/$defs/digest" },
-              "count": { "type": "integer", "minimum": 1 },
-              "ruleEvidence": { "$ref": "#/$defs/ruleEvidence" }
-            }
+              "riskCode": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              },
+              "confidence": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4
+              },
+              "method": {
+                "enum": [
+                  "GET",
+                  "HEAD"
+                ]
+              },
+              "routeTemplate": {
+                "enum": [
+                  "/",
+                  "/api/source",
+                  "/login",
+                  "/does-not-exist",
+                  "/icon.svg",
+                  "/font-licenses.txt",
+                  "/manifest.webmanifest",
+                  "/registerSW.js",
+                  "/robots.txt",
+                  "/sitemap.xml",
+                  "/sw.js",
+                  "/assets/{asset}",
+                  "/workbox-{asset}.js"
+                ]
+              },
+              "fingerprint": {
+                "$ref": "#/$defs/digest"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "ruleEvidence": {
+                "$ref": "#/$defs/ruleEvidence"
+              },
+              "state": {
+                "enum": [
+                  "candidate",
+                  "false-positive",
+                  "duplicate",
+                  "accepted-risk"
+                ]
+              },
+              "disposition": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "rationale",
+                  "actor",
+                  "classifiedAt",
+                  "reference"
+                ],
+                "properties": {
+                  "rationale": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "actor": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "classifiedAt": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{3})?Z$"
+                  },
+                  "reference": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "acceptance": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "expiresOn"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{5,63}$"
+                  },
+                  "expiresOn": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                  }
+                }
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "state": {
+                      "enum": [
+                        "false-positive",
+                        "duplicate"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "disposition": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "rationale",
+                        "actor",
+                        "classifiedAt",
+                        "reference"
+                      ],
+                      "properties": {
+                        "rationale": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "actor": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "classifiedAt": {
+                          "type": "string",
+                          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{3})?Z$"
+                        },
+                        "reference": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "disposition"
+                  ]
+                },
+                "else": {
+                  "properties": {
+                    "disposition": false
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "state": {
+                      "const": "accepted-risk"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "acceptance": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "expiresOn"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9][a-z0-9-]{5,63}$"
+                        },
+                        "expiresOn": {
+                          "type": "string",
+                          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "acceptance"
+                  ]
+                },
+                "else": {
+                  "properties": {
+                    "acceptance": false
+                  }
+                }
+              }
+            ]
           }
         }
       }
     },
-    "requestCount": { "type": "integer", "minimum": 1, "maximum": 1000 },
-    "outcome": { "enum": ["passed", "failed", "incomplete"] }
+    "requestCount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "outcome": {
+      "enum": [
+        "passed",
+        "failed",
+        "incomplete"
+      ]
+    },
+    "readOn": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    }
   },
   "$defs": {
-    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
     "ruleEvidence": {
       "oneOf": [
         {
-          "type": "object", "additionalProperties": false,
-          "required": ["kind", "cookieName", "missingAttribute"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "cookieName",
+            "missingAttribute"
+          ],
           "properties": {
-            "kind": { "const": "cookie-attribute" }, "cookieName": { "const": "xsrf-token" },
-            "missingAttribute": { "enum": ["http-only", "same-site"] }
+            "kind": {
+              "const": "cookie-attribute"
+            },
+            "cookieName": {
+              "const": "xsrf-token"
+            },
+            "missingAttribute": {
+              "enum": [
+                "http-only",
+                "same-site"
+              ]
+            }
           }
         },
         {
-          "type": "object", "additionalProperties": false,
-          "required": ["kind", "matches"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "matches"
+          ],
           "properties": {
-            "kind": { "const": "text-pattern" },
+            "kind": {
+              "const": "text-pattern"
+            },
             "matches": {
-              "type": "array", "minItems": 1, "uniqueItems": true,
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
               "items": {
-                "type": "object", "additionalProperties": false,
-                "required": ["patternId", "resourceDigest", "occurrenceCount", "locationDigest"],
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "patternId",
+                  "resourceDigest",
+                  "occurrenceCount",
+                  "locationDigest"
+                ],
                 "properties": {
-                  "patternId": { "$ref": "#/$defs/textPatternId" },
-                  "resourceDigest": { "$ref": "#/$defs/digest" },
-                  "occurrenceCount": { "type": "integer", "minimum": 1 },
-                  "locationDigest": { "$ref": "#/$defs/digest" }
+                  "patternId": {
+                    "$ref": "#/$defs/textPatternId"
+                  },
+                  "resourceDigest": {
+                    "$ref": "#/$defs/digest"
+                  },
+                  "occurrenceCount": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "locationDigest": {
+                    "$ref": "#/$defs/digest"
+                  }
                 }
               }
             }
           }
         },
         {
-          "type": "object", "additionalProperties": false,
-          "required": ["kind", "headerName"],
-          "properties": { "kind": { "const": "response-header" }, "headerName": { "const": "server" } }
-        },
-        {
-          "type": "object", "additionalProperties": false,
-          "required": ["kind", "headerName", "directives"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "headerName"
+          ],
           "properties": {
-            "kind": { "const": "policy-directive" },
-            "headerName": { "const": "content-security-policy" },
-            "directives": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z-]*$" } }
+            "kind": {
+              "const": "response-header"
+            },
+            "headerName": {
+              "const": "server"
+            }
           }
         },
         {
-          "type": "object", "additionalProperties": false,
-          "required": ["kind", "signal"],
-          "properties": { "kind": { "const": "application-signal" }, "signal": { "const": "scripts-without-links" } }
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "headerName",
+            "directives"
+          ],
+          "properties": {
+            "kind": {
+              "const": "policy-directive"
+            },
+            "headerName": {
+              "const": "content-security-policy"
+            },
+            "directives": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z][a-z-]*$"
+              }
+            }
+          }
         },
         {
-          "type": "object", "additionalProperties": false,
-          "required": ["kind", "tokenNames"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "signal"
+          ],
           "properties": {
-            "kind": { "const": "session-signal" },
-            "tokenNames": { "type": "array", "minItems": 1, "uniqueItems": true,
-              "items": { "enum": ["session", "xsrf-token"] } }
+            "kind": {
+              "const": "application-signal"
+            },
+            "signal": {
+              "const": "scripts-without-links"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "tokenNames"
+          ],
+          "properties": {
+            "kind": {
+              "const": "session-signal"
+            },
+            "tokenNames": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "session",
+                  "xsrf-token"
+                ]
+              }
+            }
           }
         }
       ]
     },
-    "textPatternId": { "enum": ["comment-admin", "comment-administrator", "comment-bug", "comment-bugs",
-      "comment-db", "comment-debug", "comment-fixme", "comment-from", "comment-later", "comment-query",
-      "comment-select", "comment-todo", "comment-user", "comment-username", "comment-where", "comment-xxx"] },
+    "textPatternId": {
+      "enum": [
+        "comment-admin",
+        "comment-administrator",
+        "comment-bug",
+        "comment-bugs",
+        "comment-db",
+        "comment-debug",
+        "comment-fixme",
+        "comment-from",
+        "comment-later",
+        "comment-query",
+        "comment-select",
+        "comment-todo",
+        "comment-user",
+        "comment-username",
+        "comment-where",
+        "comment-xxx"
+      ]
+    },
     "checkId": {
-      "enum": ["backup-exposure", "body-limit", "certificate-trust", "direct-forwarded-behavior", "exposure--git-config",
-        "exposure-actuator", "exposure-actuator-health", "exposure-assets-app-js-map",
-        "exposure-swagger-ui-index-html", "forwarded-boundary", "header-limit", "headers-api-source",
-        "headers-does-not-exist", "headers-icon-svg", "headers-login", "headers-root", "host-boundary", "http-redirect",
-        "loopback-publication", "management-separation", "method-connect", "method-override", "method-trace", "method-track",
-        "qualified-image-evidence", "runtime-file-permissions", "runtime-hardening", "scanner-runtime-hardening",
-        "secure-cookie-delivery", "sensitive-extension-exposure", "tls-ciphers", "tls-versions",
-        "transport-security"]
+      "enum": [
+        "backup-exposure",
+        "body-limit",
+        "certificate-trust",
+        "direct-forwarded-behavior",
+        "exposure--git-config",
+        "exposure-actuator",
+        "exposure-actuator-health",
+        "exposure-assets-app-js-map",
+        "exposure-swagger-ui-index-html",
+        "forwarded-boundary",
+        "header-limit",
+        "headers-api-source",
+        "headers-does-not-exist",
+        "headers-icon-svg",
+        "headers-login",
+        "headers-root",
+        "host-boundary",
+        "http-redirect",
+        "loopback-publication",
+        "management-separation",
+        "method-connect",
+        "method-override",
+        "method-trace",
+        "method-track",
+        "qualified-image-evidence",
+        "runtime-file-permissions",
+        "runtime-hardening",
+        "scanner-runtime-hardening",
+        "secure-cookie-delivery",
+        "sensitive-extension-exposure",
+        "tls-ciphers",
+        "tls-versions",
+        "transport-security"
+      ]
     },
     "observation": {
-      "enum": ["application-file-permissions-broader", "application-files-confined", "certificate-chain-and-host-valid",
-        "certificate-validation-failed", "cipher-policy-mismatch",
-        "covered-by-image-qualification", "direct-app-distinguished-from-proxy", "direct-app-probe-failed",
-        "http-port-not-published", "insecure-cookie-issued", "issued-cookies-secure",
-        "localhost-transport-qualified-externally", "management-internal-only", "management-internal-unavailable",
-        "method-accepted", "method-boundary-mismatch", "method-rejected", "oversized-header-accepted", "oversized-header-rejected",
-        "proxy-body-limit-enforced", "proxy-body-limit-not-proven", "proxy-loopback-only",
-        "proxy-publication-mismatch", "route-not-exposed", "runtime-controls-incomplete",
-        "runtime-controls-present", "scanner-runtime-controls-incomplete", "scanner-runtime-controls-present",
-        "recommended-ciphers-only", "route-group-not-exposed", "security-and-cache-headers-valid", "security-or-cache-headers-invalid",
-        "server-header-exposed", "spoofed-host-not-rejected", "spoofed-host-rejected", "tls-policy-mismatch",
-        "tls12-and-tls13-only", "unexpected-route-group-response", "unexpected-route-response",
-        "unsafe-and-overridden-methods-rejected", "upstream-host-canonicalized",
-        "upstream-host-not-canonicalized"]
+      "enum": [
+        "application-file-permissions-broader",
+        "application-files-confined",
+        "certificate-chain-and-host-valid",
+        "certificate-validation-failed",
+        "cipher-policy-mismatch",
+        "covered-by-image-qualification",
+        "direct-app-distinguished-from-proxy",
+        "direct-app-probe-failed",
+        "http-port-not-published",
+        "insecure-cookie-issued",
+        "issued-cookies-secure",
+        "localhost-transport-qualified-externally",
+        "management-internal-only",
+        "management-internal-unavailable",
+        "method-accepted",
+        "method-boundary-mismatch",
+        "method-rejected",
+        "oversized-header-accepted",
+        "oversized-header-rejected",
+        "proxy-body-limit-enforced",
+        "proxy-body-limit-not-proven",
+        "proxy-loopback-only",
+        "proxy-publication-mismatch",
+        "route-not-exposed",
+        "runtime-controls-incomplete",
+        "runtime-controls-present",
+        "scanner-runtime-controls-incomplete",
+        "scanner-runtime-controls-present",
+        "recommended-ciphers-only",
+        "route-group-not-exposed",
+        "security-and-cache-headers-valid",
+        "security-or-cache-headers-invalid",
+        "server-header-exposed",
+        "spoofed-host-not-rejected",
+        "spoofed-host-rejected",
+        "tls-policy-mismatch",
+        "tls12-and-tls13-only",
+        "unexpected-route-group-response",
+        "unexpected-route-response",
+        "unsafe-and-overridden-methods-rejected",
+        "upstream-host-canonicalized",
+        "upstream-host-not-canonicalized"
+      ]
     }
   }
 }
