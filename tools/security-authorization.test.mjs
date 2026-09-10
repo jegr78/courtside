@@ -470,7 +470,7 @@ function oversizedProbe() {
 
 async function startSilentlyClosingServer() {
   const directory = mkdtempSync(join(tmpdir(), "courtside-authorization-"));
-  const created = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+  const created = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
     "-keyout", "key.pem", "-out", "cert.pem", "-subj", "/CN=localhost",
     "-addext", "subjectAltName=DNS:localhost"], { cwd: directory, encoding: "utf8" });
   if (created.status !== 0) throw new Error(`openssl could not create a test certificate: ${created.stderr}`);

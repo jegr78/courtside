@@ -218,7 +218,9 @@ the category procedure is incomplete.
 - Prerequisites: configuration, dependency evidence and synthetic credentials; no production secrets.
 - Steps: read `security/cryptographic-inventory.json`, which lists every encryption, hashing,
   randomness, signing and trust-store use and is kept complete by `CryptographicInventoryTest`;
-  verify its algorithm, parameter and key-lifecycle choices against `docs/cryptographic-inventory.md`;
+  verify its algorithm, parameter, implementation, strength and key-lifecycle choices against
+  `docs/cryptographic-inventory.md`, whose implementation and strength rules `CryptographicStrengthTest`
+  binds to the literals the code draws from;
   inspect failure and rotation paths and ensure logs and evidence never receive secret material.
 - Expected secure outcome: approved primitives protect the intended property, keys and credentials
   have explicit lifecycles, and failure does not downgrade protection.

@@ -51,7 +51,7 @@ function compose(project, environment, args, options = {}) {
 
 function createMailCertificate(directory) {
   const key = join(directory, "key.pem");
-  run("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+  run("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
     "-subj", "/CN=mail", "-addext", "subjectAltName=DNS:mail",
     "-keyout", key, "-out", join(directory, "cert.pem")]);
   chmodSync(key, 0o600);

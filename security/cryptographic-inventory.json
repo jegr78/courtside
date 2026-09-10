@@ -12,6 +12,12 @@
         "saltBytes": 16,
         "hashBytes": 32
       },
+      "implementation": "bouncy-castle",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 256,
+        "basis": "The encoder writes a 32-byte Argon2id output over a 16-byte salt, and Bouncy Castle computes it. What makes guessing expensive is the cost above rather than the output length."
+      },
       "class": "credential-protection",
       "owner": "club-operator",
       "storageBoundary": "The instance database, in user_account.password_hash. The salt and the parameters travel inside the encoding; there is no separate key.",
@@ -44,6 +50,12 @@
         "entropyBytes": 24,
         "encoding": "base64url-unpadded"
       },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 192,
+        "basis": "Twenty-four bytes drawn from SecureRandom, so the credential a member is mailed is exactly as hard to guess as the bytes behind it."
+      },
       "class": "credential-protection",
       "owner": "club-operator",
       "storageBoundary": "Generated in memory, mailed to the member, and kept only as its Argon2id hash. The plaintext is never written to the database, a log or an administrative screen.",
@@ -65,7 +77,14 @@
       "purpose": "Give an account with no credential a hash that no input can match, so an absent password is not an empty one",
       "algorithm": "argon2id",
       "parameters": {
-        "source": "UUIDv4"
+        "entropyBytes": 32,
+        "encoding": "base64url-unpadded"
+      },
+      "implementation": "bouncy-castle",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 256,
+        "basis": "Thirty-two bytes drawn from SecureRandom, encoded, hashed and then dropped. Nothing keeps the plaintext, so no input matches the stored hash."
       },
       "class": "credential-protection",
       "owner": "club-operator",
@@ -77,7 +96,7 @@
       "retirement": "Replaced with the password-hashing entry it shares an algorithm with.",
       "evidence": "src/test/java/org/courtside/identity/internal/UnusablePasswordTest.java",
       "detects": [
-        "randomUUID"
+        "SecureRandom"
       ],
       "locations": [
         "src/main/java/org/courtside/identity/internal/UnusablePassword.java"
@@ -87,6 +106,12 @@
       "id": "entity-identifier",
       "purpose": "Give a stored row an identifier that names it without describing anybody",
       "algorithm": "UUIDv4",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 122,
+        "basis": "The 122 random bits a version-4 UUID draws. An identifier only has to be unique and no authorisation rests on one being hard to guess, so the 128-bit minimum does not reach it."
+      },
       "class": "identifier",
       "owner": "club-operator",
       "storageBoundary": "The instance database, as the primary key of the row it names, and the public API, which addresses rows by it.",
@@ -111,6 +136,12 @@
         "entropyBytes": 27,
         "encoding": "base64url-unpadded"
       },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 216,
+        "basis": "Twenty-seven bytes drawn from SecureRandom, the width the session table stores."
+      },
       "class": "credential-protection",
       "owner": "club-operator",
       "storageBoundary": "Generated in the instance and stored in the session row the database keeps; the identifier travels in the host-bound session cookie. It reaches no log, export or screen: the member's own session list shows a truncated digest of it instead.",
@@ -132,6 +163,11 @@
       "id": "csrf-token",
       "purpose": "Prove that a state-changing request came from this application's own pages",
       "algorithm": "platform-provided",
+      "implementation": "spring-security",
+      "strength": {
+        "decidedBy": "spring-security",
+        "basis": "Spring Security's cookie repository issues a version-4 UUID, 122 random bits. This project chooses neither the format nor the source, so it records what the framework produces instead of a number of its own."
+      },
       "class": "credential-protection",
       "owner": "club-operator",
       "storageBoundary": "Spring Security generates the value and places it in a cookie the frontend reads and echoes in a header. Nothing is stored server-side and this project does not generate the value.",
@@ -150,6 +186,12 @@
       "id": "login-attempt-subject",
       "purpose": "Count failed sign-ins per client address, and instance-wide, without keeping the address in the counter",
       "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output. The digest keeps a username out of the table that counts failed sign-ins; it is not offered as protection against somebody who already guesses the username."
+      },
       "class": "pseudonymisation",
       "owner": "club-operator",
       "storageBoundary": "The instance database, as login_attempt_limit.subject_hash, where it is part of the primary key. It is written on every counted attempt and removed by the retention sweep that clears expired windows.",
@@ -173,6 +215,11 @@
       "parameters": {
         "disclosedHexCharacters": 5,
         "protocol": "Have I Been Pwned range API"
+      },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "have-i-been-pwned",
+        "basis": "The range protocol defines SHA-1, and the first five hex characters are all that leaves the instance. Nothing here rests on the digest's collision or preimage resistance, so the signature and integrity minimums do not reach it."
       },
       "class": "pseudonymisation",
       "owner": "club-operator",
@@ -198,6 +245,12 @@
         "outputBytes": 16,
         "encoding": "base64url-unpadded"
       },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The second-preimage resistance of a 128-bit truncation of SHA-256, over a session identifier that itself carries 216 random bits, so there is no dictionary to invert. The truncation leaves only 64 bits against a collision, and that is not the property this use depends on: the handle selects one of an account's own sessions, and its input is a value the caller never chooses."
+      },
       "class": "pseudonymisation",
       "owner": "club-operator",
       "storageBoundary": "Computed from the high-entropy session identifier in application memory and returned by the authenticated account-session API. The handle is not stored separately.",
@@ -218,6 +271,12 @@
       "id": "booking-request-fingerprint",
       "purpose": "Recognise a repeated booking request so a retry does not create a second booking",
       "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output. The fingerprint recognises a repeated request and protects nothing."
+      },
       "class": "content-hash",
       "owner": "club-operator",
       "storageBoundary": "The instance database, beside the booking it identifies.",
@@ -238,6 +297,12 @@
       "id": "club-logo-digest",
       "purpose": "Name the stored club logo so a browser can be told whether its copy is current",
       "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output. The digest is an ETag, so a collision would serve a stale image and nothing more."
+      },
       "class": "content-hash",
       "owner": "club-operator",
       "storageBoundary": "The instance database, and the ETag it becomes.",
@@ -258,6 +323,12 @@
       "id": "person-fingerprint",
       "purpose": "Match an imported row against a person already on the roster",
       "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output, over the fields an import compares."
+      },
       "class": "content-hash",
       "owner": "club-operator",
       "storageBoundary": "The instance database, on the imported reference.",
@@ -278,6 +349,12 @@
       "id": "security-assessment-dataset-digest",
       "purpose": "Name the seeded assessment dataset so a report says which data it was produced against",
       "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output, which names the dataset a run read."
+      },
       "class": "content-hash",
       "owner": "club-operator",
       "storageBoundary": "Computed at runtime from a constant in the image; nothing is stored.",
@@ -301,6 +378,12 @@
       "parameters": {
         "entropyBytes": 16
       },
+      "implementation": "web-crypto",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "Sixteen bytes drawn from the browser's Web Crypto. The key has to be unique across every client at once, because a repeat would suppress a booking somebody meant to make."
+      },
       "class": "identifier",
       "owner": "club-operator",
       "storageBoundary": "The browser, for the life of one submission.",
@@ -323,6 +406,12 @@
       "id": "harness-content-digest",
       "purpose": "Name an artefact, a configuration or a report the verification harness produced, so two runs can be compared",
       "algorithm": "SHA-256",
+      "implementation": "node-crypto",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output, over the artefacts a verification run compares."
+      },
       "class": "content-hash",
       "owner": "repository-maintainer",
       "storageBoundary": "Build output and workflow artefacts. Nothing reaches an instance.",
@@ -343,7 +432,13 @@
     {
       "id": "harness-random-fixture",
       "purpose": "Give a verification run values nothing else uses, such as a scratch database name, a throwaway password or a correlation id",
-      "algorithm": "SecureRandom",
+      "algorithm": "CSPRNG",
+      "implementation": "node-crypto",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 32,
+        "basis": "The smallest draw is four bytes for a run identifier, which only has to be unique inside one run. That minimum covers names, not secrets: where the harness draws a credential of its own it draws at least sixteen bytes, and a separate rule holds it there."
+      },
       "class": "identifier",
       "owner": "repository-maintainer",
       "storageBoundary": "The lifetime of one verification run. Nothing is written to a tracked file and nothing reaches an instance.",
@@ -366,7 +461,13 @@
     {
       "id": "harness-test-certificate",
       "purpose": "Generate the throwaway certificates and key pairs a verification run needs to exercise a TLS path",
-      "algorithm": "RSA-2048",
+      "algorithm": "RSA-3072",
+      "implementation": "openssl",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "RSA-3072, the smallest modulus NIST rates at 128 bits. Each certificate lives for one run."
+      },
       "class": "credential-protection",
       "owner": "repository-maintainer",
       "storageBoundary": "A temporary directory for the life of one run, and never a tracked file. Every certificate is self-signed, valid for a day, and issued to a name under a reserved example domain.",
@@ -395,6 +496,12 @@
       "id": "certificate-pinning",
       "purpose": "Recognise one expected certificate by its digest instead of trusting whoever a certificate authority vouched for",
       "algorithm": "SHA-256",
+      "implementation": "node-crypto",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output. A second certificate carrying the same digest is what the pin would have to be fooled by, and that is the property SHA-256 supplies."
+      },
       "class": "integrity",
       "owner": "repository-maintainer",
       "storageBoundary": "The expected value is held outside the code that checks it: a launch argument for a browser, an environment value for the mail peer. No digest of a production certificate is tracked in this repository.",
@@ -420,6 +527,11 @@
       "id": "release-image-signature",
       "purpose": "Let anybody verify that a published image was built by this repository's release workflow",
       "algorithm": "cosign-keyless",
+      "implementation": "sigstore",
+      "strength": {
+        "decidedBy": "sigstore",
+        "basis": "Sigstore issues the ephemeral key and chooses the signature hash. The workflow pins cosign by digest and verifies the signature it produced rather than selecting its parameters."
+      },
       "class": "signing",
       "owner": "repository-maintainer",
       "storageBoundary": "No long-lived private key exists. Sigstore issues a short-lived certificate against the workflow's OIDC identity and records the signature in a public transparency log.",
@@ -441,6 +553,11 @@
       "id": "build-attestation",
       "purpose": "Publish where an image came from and what it contains, signed by the workflow that built it",
       "algorithm": "sigstore-attestation",
+      "implementation": "sigstore",
+      "strength": {
+        "decidedBy": "sigstore",
+        "basis": "The same keyless identity signs the attestation, so Sigstore chooses the key and the hash. The workflow pins the attestation actions by digest and verifies what they published."
+      },
       "class": "signing",
       "owner": "repository-maintainer",
       "storageBoundary": "Same keyless identity as the release signature; the attestation is pushed to the registry beside the image.",
@@ -462,6 +579,11 @@
       "id": "public-tls",
       "purpose": "Encrypt and authenticate what a member's browser sends to the instance",
       "algorithm": "TLS",
+      "implementation": "caddy",
+      "strength": {
+        "decidedBy": "club-operator",
+        "basis": "The proxy obtains the certificate itself for a club's own domain and negotiates the suite with each browser, so this repository selects neither the key nor the cipher. What a running instance actually offers is read by the passive assessment rather than claimed here."
+      },
       "class": "transport",
       "owner": "club-operator",
       "storageBoundary": "The reverse proxy's own storage. For a club's own domain the proxy obtains the certificate itself and Courtside never sees the key. The verification profiles are different and say so: they run the proxy with an internal certificate authority, so a local root and its leaf keys exist inside those containers for the life of a run.",
@@ -482,6 +604,11 @@
       "id": "mail-transport",
       "purpose": "Encrypt and authenticate the connection an instance hands its outgoing messages to",
       "algorithm": "STARTTLS",
+      "implementation": "stalwart",
+      "strength": {
+        "decidedBy": "stalwart",
+        "basis": "The relay and the receiving server negotiate the suite, and the relay's certificate is the operator's. This repository decides only that the connection must use STARTTLS; whether the relay's certificate is checked is an operator switch that defaults to checking it."
+      },
       "class": "transport",
       "owner": "club-operator",
       "storageBoundary": "The relay's certificate, read by the instance. In the reference deployment the proxy's certificate pair for the mail hostname is copied into a volume the mail container reads, so that deployment does hold a private key on the operator's own host; nothing is copied out of it and no key is tracked in this repository.",
@@ -507,6 +634,11 @@
       "id": "mail-dkim",
       "purpose": "Sign outgoing mail so a receiving server can tell it came from the club's domain",
       "algorithm": "DKIM",
+      "implementation": "stalwart",
+      "strength": {
+        "decidedBy": "stalwart",
+        "basis": "Stalwart generates the keys and chooses the RSA modulus; its automatic management exposes no key-size setting. What the reference deployment does decide is the algorithm set, and it enables Dkim1Ed25519Sha256 and Dkim1RsaSha256 with no SHA-1 variant."
+      },
       "class": "signing",
       "owner": "club-operator",
       "storageBoundary": "The mail container's volume in the reference deployment, where the container generates the key itself. The public half is a DNS record the operator publishes. No key is tracked in this repository.",
@@ -532,6 +664,11 @@
       "id": "postgres-transport",
       "purpose": "Carry the instance's database traffic, which includes session rows, password hashes and the hashed login subjects",
       "algorithm": "TLS, when an operator requires it; the driver's own opportunistic default otherwise",
+      "implementation": "postgresql-jdbc",
+      "strength": {
+        "decidedBy": "club-operator",
+        "basis": "The driver and the server negotiate the suite, and the authority an operator configures is theirs. This repository decides only which mode an instance runs in."
+      },
       "class": "transport",
       "owner": "club-operator",
       "storageBoundary": "The connection between the application container and the database container, and the operator's own authority file where one is configured. Courtside reads that file and holds no material of its own; the reference deployment ships no certificate and defaults to the driver's opportunistic mode, which encrypts when the database offers it and verifies nothing.",
@@ -564,6 +701,11 @@
       "id": "application-transport",
       "purpose": "Carry what the reverse proxy forwards to the application, which includes the session cookie and a password on its way in",
       "algorithm": "TLS, when an operator turns it on; plain HTTP on the compose network otherwise",
+      "implementation": "caddy",
+      "strength": {
+        "decidedBy": "club-operator",
+        "basis": "The proxy and the application negotiate the suite over the operator's own certificate pair. This repository decides only whether the hop is encrypted at all."
+      },
       "class": "transport",
       "owner": "club-operator",
       "storageBoundary": "The connection between the proxy container and the application container, and the operator's own certificate, key and authority files where they are configured. Courtside reads them and holds no material of its own; the reference deployment ships none and defaults to plain HTTP on a network private to the compose project.",
