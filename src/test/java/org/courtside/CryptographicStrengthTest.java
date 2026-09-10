@@ -105,20 +105,17 @@ class CryptographicStrengthTest {
     @Test
     void whenTheNamedImplementationsAreExercised_thenEachOneIsTheProviderTheInventoryClaims()
             throws IOException, NoSuchAlgorithmException {
-        // given
-        assertThat(providerModuleOf("SHA-256")).isEqualTo(RUNTIME_MODULE);
-        assertThat(providerModuleOf("SHA-1")).isEqualTo(RUNTIME_MODULE);
-        assertThat(new SecureRandom().getProvider().getClass().getModule().getName())
-                .isEqualTo(RUNTIME_MODULE);
-        assertThat(UUID.randomUUID().version()).isEqualTo(4);
-
         // when
-        assertThat(bouncyCastleRecomputes()).as("Bouncy Castle recomputes the shipped Argon2id hash")
-                .isTrue();
-        assertThat(UUID.fromString(csrfToken()).version())
-                .as("Spring Security issues the CSRF token as a version-4 UUID").isEqualTo(4);
+        List<String> providers = List.of(providerModuleOf("SHA-256"), providerModuleOf("SHA-1"),
+                new SecureRandom().getProvider().getClass().getModule().getName());
 
         // then
+        assertThat(providers).as("the JDK's own digests and randomness answer for java-runtime")
+                .containsOnly(RUNTIME_MODULE);
+        assertThat(UUID.randomUUID().version()).as("the JDK draws a version-4 UUID").isEqualTo(4);
+        assertThat(UUID.fromString(csrfToken()).version())
+                .as("Spring Security issues the CSRF token as a version-4 UUID").isEqualTo(4);
+        bouncyCastleRecomputesTheShippedHash();
         for (JsonNode entry : entries()) {
             Set<String> exercised = EXERCISED.get(entry.get("implementation").asText());
             if (exercised == null) {
@@ -186,12 +183,12 @@ class CryptographicStrengthTest {
     void givenEverySignatureAndIntegrityPath_whenItsHashIsRead_thenItIsCollisionResistant()
             throws IOException {
         // given
-        Set<String> signing = enabledDkimAlgorithms();
+        Set<String> dkim = enabledDkimAlgorithms();
 
         // when / then
-        assertThat(signing)
+        assertThat(dkim)
                 .as("the reference deployment signs with these and with no SHA-1 variant")
-                .containsExactly("Dkim1Ed25519Sha256", "Dkim1RsaSha256");
+                .containsExactlyInAnyOrder("Dkim1Ed25519Sha256", "Dkim1RsaSha256");
         for (JsonNode entry : entries()) {
             if (!Set.of("signing", "integrity").contains(entry.get("class").asText())) {
                 continue;
@@ -203,8 +200,9 @@ class CryptographicStrengthTest {
                         .isIn(COLLISION_RESISTANT);
             }
         }
-        for (String algorithm : signing) {
-            assertThat(basisOf("mail-dkim"))
+        String recorded = basisOf("mail-dkim");
+        for (String algorithm : dkim) {
+            assertThat(recorded)
                     .as("the DKIM entry names every algorithm the reference deployment enables")
                     .contains(algorithm);
         }
@@ -242,7 +240,7 @@ class CryptographicStrengthTest {
                 .generateToken(new MockHttpServletRequest()).getToken();
     }
 
-    private static boolean bouncyCastleRecomputes() throws IOException {
+    private static void bouncyCastleRecomputesTheShippedHash() throws IOException {
         JsonNode chosen = entry("password-hashing").get("parameters");
         String password = "correct horse battery staple";
         String encoded = new Argon2PasswordEncoder(chosen.get("saltBytes").asInt(),
@@ -251,9 +249,7 @@ class CryptographicStrengthTest {
                 .encode(password);
         String[] fields = encoded.split("\\$");
         Matcher cost = ARGON2_PARAMETERS.matcher(fields[3]);
-        if (!cost.find()) {
-            return false;
-        }
+        assertThat(cost.find()).as("the shipped encoding names the cost it was written at").isTrue();
         Argon2BytesGenerator generator = new Argon2BytesGenerator();
         generator.init(new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
                 .withVersion(Argon2Parameters.ARGON2_VERSION_13)
@@ -264,11 +260,16 @@ class CryptographicStrengthTest {
                 .build());
         byte[] recomputed = new byte[chosen.get("hashBytes").asInt()];
         generator.generateBytes(password.getBytes(StandardCharsets.UTF_8), recomputed);
-        return MessageDigest.isEqual(recomputed, Base64.getDecoder().decode(fields[5]));
+        assertThat(recomputed)
+                .as("Bouncy Castle recomputes the Argon2id hash the shipped encoder writes")
+                .isEqualTo(Base64.getDecoder().decode(fields[5]));
     }
 
     // NIST SP 800-57 part 1, table 2: what a modulus or a curve is worth in bits of security.
     private static int strengthOf(String specification) {
+        if (!specification.startsWith("P-") && !specification.startsWith("rsa:")) {
+            return 0;
+        }
         if (specification.startsWith("P-")) {
             return Integer.parseInt(specification.substring(2)) / 2;
         }
@@ -303,10 +304,7 @@ class CryptographicStrengthTest {
         int smallest = Integer.MAX_VALUE;
         for (Set<String> found : matches(pattern).values()) {
             for (String draw : found) {
-                Matcher digits = Pattern.compile("(\\d+)").matcher(draw);
-                if (digits.find()) {
-                    smallest = Math.min(smallest, Integer.parseInt(digits.group(1)));
-                }
+                smallest = Math.min(smallest, Integer.parseInt(draw));
             }
         }
         return smallest;
@@ -340,6 +338,15 @@ class CryptographicStrengthTest {
         return entries;
     }
 
+    private static String captured(Matcher matcher) {
+        for (int group = 1; group <= matcher.groupCount(); group++) {
+            if (matcher.group(group) != null) {
+                return matcher.group(group);
+            }
+        }
+        return matcher.group();
+    }
+
     private static String read(Path file) throws IOException {
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }
@@ -352,7 +359,7 @@ class CryptographicStrengthTest {
                     Set<String> tokens = new TreeSet<>();
                     Matcher matcher = pattern.matcher(read(file));
                     while (matcher.find()) {
-                        tokens.add(matcher.group(matcher.group(1) == null ? 2 : 1));
+                        tokens.add(captured(matcher));
                     }
                     if (!tokens.isEmpty()) {
                         found.put(file, tokens);
