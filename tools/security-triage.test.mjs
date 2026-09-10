@@ -27,6 +27,11 @@ const manualBaselineSummary = JSON.parse(manualBaselineSummaryBytes);
 const controlOutcomeBytes = readFileSync(
   new URL("../security/manual-baseline-control-outcomes.json", import.meta.url));
 const controlOutcomes = JSON.parse(controlOutcomeBytes);
+const anchoredOutcomeBytes = readFileSync(
+  new URL("../security/manual-anchored-control-outcomes.json", import.meta.url));
+const anchoredOutcomes = JSON.parse(anchoredOutcomeBytes);
+const assessmentCatalog = JSON.parse(readFileSync(
+  new URL("../security/assessment-catalog.json", import.meta.url), "utf8"));
 const digest = `sha256:${"a".repeat(64)}`;
 
 function lifecycle(overrides = {}) {
@@ -489,7 +494,6 @@ test("given the passive baseline acceptance, when reading its public proof, then
   assert.match(baselineDocumentation, /316 unique selected controls/);
   assert.match(baselineDocumentation, /ten unique unresolved findings/);
   assert.match(baselineDocumentation, /146 are explicitly blocked under #804/);
-  assert.doesNotMatch(baselineDocumentation, /\| pass \| (?!0 \|)/);
   assert.match(baselineDocumentation, /does not replace an independent penetration test/);
   assert.match(baselineDocumentation,
     /Paired run: `assessment-34004691464-1` \(safe attempt 1, active attempt 2\)/);
@@ -519,6 +523,24 @@ test("given the corrected manual baseline, when reading its public proof, then n
   assert.match(baselineDocumentation, new RegExp(summaryDigest));
   assert.match(baselineDocumentation, /\| pass \| 0 \|/);
   assert.match(baselineDocumentation, /\| blocked pending control-specific evidence \| 146 \|/);
+});
+
+test("given the anchored control reading, when reading its published record, then every pass names an anchor", () => {
+  // given
+  const outcomeDigest = `sha256:${createHash("sha256").update(anchoredOutcomeBytes).digest("hex")}`;
+  const anchored = new Set(assessmentCatalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ controlEvidence }) => controlEvidence).map(({ id }) => id));
+  const passed = anchoredOutcomes.controls.filter(({ outcome }) => outcome === "pass").map(({ id }) => id);
+
+  // when / then
+  assert.equal(anchoredOutcomes.run.runId, "manual-anchored-20260910");
+  assert.equal(anchoredOutcomes.run.catalogVersion, assessmentCatalog.catalogVersion);
+  assert.deepEqual(passed.toSorted(), [...anchored].toSorted());
+  assert.equal(passed.length > 0, true);
+  assert.match(baselineDocumentation, new RegExp(outcomeDigest));
+  assert.match(baselineDocumentation, new RegExp(`\\| pass \\| ${passed.length} \\|`));
+  assert.equal(controlOutcomes.run.runId === anchoredOutcomes.run.runId, false);
+  assert.equal(controlOutcomes.controls.some(({ outcome }) => outcome === "pass"), false);
 });
 
 test("given the published per-control outcomes, when reading them, then they stay bound to the findings they came with", () => {

@@ -21,6 +21,8 @@ const manualEvidenceSchema = JSON.parse(readFileSync(
 const baseline = readFileSync(new URL("../docs/security-baseline.md", import.meta.url), "utf8");
 const controlOutcomes = JSON.parse(readFileSync(
   new URL("../security/manual-baseline-control-outcomes.json", import.meta.url), "utf8"));
+const publishedRecords = ["manual-baseline-control-outcomes.json", "manual-anchored-control-outcomes.json"]
+  .map((file) => [file, JSON.parse(readFileSync(new URL(`../security/${file}`, import.meta.url), "utf8"))]);
 const controlOutcomeSchema = JSON.parse(readFileSync(
   new URL("../security/manual-baseline-control-outcomes.schema.json", import.meta.url), "utf8"));
 const repositoryFile = (path) => new URL(`../${path}`, import.meta.url);
@@ -587,29 +589,34 @@ test("given an active-only procedure, when safe or production execution is claim
   }), false);
 });
 
-test("given the recorded manual baseline, when reading its outcomes, then every published count names its controls", () => {
+test("given every recorded manual run, when reading its outcomes, then its own published count names its controls", () => {
   // given
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true })
     .compile(controlOutcomeSchema);
   const catalogControls = new Set(catalog.controlCoverage.flatMap(({ controls }) => controls)
     .map(({ id }) => id));
-  const published = Object.fromEntries([...baseline.matchAll(
-    /^\| (pass|not applicable|fail|blocked)[^|]*\| *([0-9]+) \|$/gm)]
-    .map(([, outcome, controls]) => [outcome.replace(" ", "-"), Number(controls)]));
+  const sections = baseline.split(/^## /m);
 
-  // when
-  const counted = controlOutcomes.controls.reduce((total, { outcome }) =>
-    ({ ...total, [outcome]: total[outcome] + 1 }),
-    { pass: 0, fail: 0, "not-applicable": 0, blocked: 0 });
+  // when / then
+  assert.equal(publishedRecords.length, 2);
+  for (const [file, record] of publishedRecords) {
+    const section = sections.find((candidate) => candidate.includes(file));
+    const published = Object.fromEntries([...section.matchAll(
+      /^\| (pass|not applicable|fail|blocked)[^|]*\| *([0-9]+) \|$/gm)]
+      .map(([, outcome, controls]) => [outcome.replace(" ", "-"), Number(controls)]));
+    const counted = record.controls.reduce((total, { outcome }) =>
+      ({ ...total, [outcome]: total[outcome] + 1 }),
+      { pass: 0, fail: 0, "not-applicable": 0, blocked: 0 });
 
-  // then
-  assert.equal(validate(controlOutcomes), true, JSON.stringify(validate.errors));
-  assert.deepEqual(controlOutcomes.controls.filter(({ id }) => !catalogControls.has(id)), []);
-  assert.equal(new Set(controlOutcomes.controls.map(({ id }) => id)).size, controlOutcomes.controls.length);
-  assert.deepEqual(counted, published);
-  assert.match(baseline, new RegExp(`covers ${controlOutcomes.controls.length} unique selected controls`));
-  assert.match(baseline, new RegExp(`\`${controlOutcomes.run.runId}\``));
-  assert.match(baseline, new RegExp(`\`${controlOutcomes.run.sourceCommit}\``));
+    assert.equal(validate(record), true, `${file}: ${JSON.stringify(validate.errors)}`);
+    assert.deepEqual(record.controls.filter(({ id }) => !catalogControls.has(id)), [], file);
+    assert.equal(new Set(record.controls.map(({ id }) => id)).size, record.controls.length, file);
+    assert.deepEqual(counted, published, file);
+    assert.match(section, new RegExp(`${record.controls.length} unique selected controls`));
+    assert.match(baseline, new RegExp(`\`${record.run.runId}\``));
+    assert.match(baseline, new RegExp(`\`${record.run.sourceCommit}\``));
+  }
+  assert.equal(new Set(publishedRecords.map(([, record]) => record.run.runId)).size, 2);
 });
 
 test("given a control-specific anchor, when reading the catalog, then its production path and falsifying test exist", () => {

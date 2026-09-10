@@ -1,6 +1,7 @@
 # Internal security assessment baseline
 
-Status: baseline execution completed; manual evidence remains incomplete as of 6 September 2026.
+Status: baseline execution completed; the manual controls were read again against their catalog
+anchors on 10 September 2026, and 138 of the 316 selected controls remain blocked.
 
 This is the redacted record of an internal OWASP-oriented assessment. It does not declare the
 application secure and does not replace an independent penetration test.
@@ -116,6 +117,83 @@ Administrative multi-factor authentication remains explicitly blocked by #69. De
 resource-abuse tests, physical-device checks and independent external testing were not inferred
 from automated evidence. They remain separately owned release activities.
 
+## Manual control reading manual-anchored-20260910
+
+This run reads what the control anchors make readable. It is not a second walk through the runbook:
+the eleven procedure readings recorded under #881 put one production path and one falsifying test on
+106 controls, a finding reference on 24 and a not-applicable rationale on 13, and this run records
+the outcome each of those dispositions supports. It sent no request to its target beyond the
+identity qualification below. An internal review does not replace an independent penetration test,
+and reading a checked-in disposition is a weaker observation than performing the procedure.
+
+- Source commit: `45d7919eb6f23d32278e5fb47d8c57f91e3b2c84`
+- Application image: `sha256:b4c7e5c041b5d6692126ace05a973258abb44cbb431d3d59f5f4a8b40230cf09`
+- Target fingerprint: `sha256:2fd52bb1f427105cc9eb2feea28c89e03943f4a4ad949f00368afea7bc7c4aeb`
+- Catalog: `1.4.12`
+- Manual record: `manual-anchored-20260910`
+- Executing verification: [build run 34458782775](https://github.com/jegr78/courtside/actions/runs/34458782775)
+- Retained evidence digest:
+  `sha256:48abafc80317fdfae4e992012d31d183bf58cfa1ac931b4358541b4a7770e6f6`
+
+The record covers the same 316 unique selected controls:
+
+| Outcome | Controls |
+| --- | ---: |
+| pass | 106 |
+| not applicable, with rationale | 13 |
+| fail, linked to a validated or accepted finding | 59 |
+| blocked pending control-specific evidence | 138 |
+
+Its per-control outcomes are published, redacted to one identifier and one outcome each, as
+[`manual-anchored-control-outcomes.json`](../security/manual-anchored-control-outcomes.json), with
+digest `sha256:ca3af55d0f8c2082ab4fc275c5ff4eb3d5e09b8424ab6a18cf739030deb5c61e`. The record of
+`manual-baseline-20260906` above is unchanged; the two runs observed different things and neither
+replaces the other.
+
+A pass names its own production path, its own test and the run that executed it. The evidence
+contract already refuses a pass for a control with no anchor, so the 106 are exactly the controls
+somebody read one at a time. `docs/security-assessment.md` states what that anchor costs.
+
+The 138 blocked controls are three separate situations:
+
+- 111 have no tracked disposition at all. Run `manual-baseline-20260906` recorded them
+  `not-applicable`, and the rationale for that decision lived only in its protected record, which
+  this repository does not hold and which expires on 6 October 2026. #929 works through them.
+- 24 were read to a documented finding in [`security-findings.md`](security-findings.md). Those
+  findings carry no lifecycle fingerprint, and the evidence contract requires one before a control
+  may be recorded as a failure of the run, so the reading is recorded as blocked against the finding
+  it produced. Their remediation is tracked under #826.
+- 3 carry a control-specific rationale in the catalog saying the control asks for an inventory the
+  product does not maintain. Completing it would document existing behaviour rather than change the
+  shipped product.
+
+The 59 failed controls are the ones `manual-baseline-finding-summary.json` maps its eleven findings
+to. Their remediation issues are closed, and none of the eleven carries a passed retest, so the run
+reads them as still failing. A finding that is fixed without a retest record leaves the assessment
+incomplete by the rule in [`security-findings.md`](security-findings.md); recording the controls as
+anything else would hide that.
+
+Two statements in the retained record are declarations rather than observations, and both are
+deliberate. The record declares profile `active` in a disposable `SECURITY` environment because five
+of the eleven executed procedures require that authorization ceiling; the run used none of it. Every
+retained per-control reading carries the classification `restricted-security-evidence` because the
+evidence schema defines exactly one, so the label states how the file is retained — mode `0600`, not
+committed, expiring — rather than that its content is sensitive.
+
+Reproduce the run by qualifying one immutable image, preparing one `SECURITY` target and reading the
+manifest that binds them:
+
+```bash
+node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+node tools/courtside.mjs security <RUN_ID> <IMAGE_DIGEST>
+node tools/courtside.mjs security-run <RUN_ID> safe --qualification build/uat-smoke/qualification.json
+node tools/security-anchored-control-run.mjs \
+  build/security/<RUN_ID>/assessment/attempt-1/manifest.json <RECORD_ID> <BUILD_RUN_ID> '#929' \
+  build/security/<RECORD_ID>
+node tools/security-manual-assessment.mjs build/security/<RECORD_ID>/evidence.json
+node tools/courtside.mjs security-cleanup <RUN_ID>
+```
+
 ## Failed attempt and reproducibility
 
 The first hosted attempt, [run 34002456549](https://github.com/jegr78/courtside/actions/runs/34002456549),
@@ -139,7 +217,8 @@ and proved the retained timestamp and report-digest binding.
 - The control-specific manual checklist, destructive procedures and independent assessment remain
   explicit release activities. Active tests never target production.
 - Release gating must not pass with an untriaged observation or an unresolved P0/P1 finding.
-  It also cannot use the manual baseline as positive evidence while #804 controls remain blocked.
+  It also cannot use a manual record as positive evidence for a control that record leaves blocked,
+  and 138 of the 316 selected controls are blocked in the most recent one.
   Accepted risks require a rationale, compensating control and expiry.
 
 ## Reproduction
