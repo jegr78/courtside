@@ -10,12 +10,11 @@ import { redactSecurityText } from "./security-runner.mjs";
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const evidenceSchema = JSON.parse(readFileSync(new URL(
   "../security/passive-deployment-evidence.schema.json", import.meta.url)));
-const alertDispositions = new Map(JSON.parse(readFileSync(new URL(
-  "../security/passive-alert-dispositions.json", import.meta.url))).dispositions
-  .map((entry) => [entry.fingerprint, entry]));
+const alertDispositions = JSON.parse(readFileSync(new URL(
+  "../security/passive-alert-dispositions.json", import.meta.url))).dispositions;
 const alertAcceptances = new Map(JSON.parse(readFileSync(new URL(
   "../security/exceptions.json", import.meta.url))).riskAcceptances
-  .map((entry) => [entry.fingerprint, entry]));
+  .map((entry) => [entry.id, entry]));
 // Compiled on first use: security-environment.mjs imports this module, and that one loads on a
 // checkout where the validator has not been installed yet.
 let compiled;
@@ -276,7 +275,7 @@ function mergeRuleEvidence(existing, incoming, imageDigest, fingerprint) {
   return { kind: "text-pattern", matches };
 }
 
-function passiveAlertFingerprint(pluginId, method, routeTemplate) {
+export function passiveAlertFingerprint(pluginId, method, routeTemplate) {
   const identity = [pluginId, `${method} ${routeTemplate}`, "response", "passive-web"]
     .map((value) => value.toLowerCase()).join("\0");
   return `sha256:${createHash("sha256").update(identity).digest("hex")}`;
@@ -325,8 +324,9 @@ export function buildPassiveDeploymentEvidence({
       || JSON.stringify(checkIds) !== JSON.stringify(requiredPassiveCheckIds)) {
     throw new Error("The passive assessment evidence is missing required checks");
   }
+  if (!validAssessmentDate(today)) throw new Error("The passive assessment was given no readable day");
   const alerts = normalizeZapAlerts(zapReport, imageDigest)
-    .map((alert) => ({ ...alert, ...resolvedAlertState(alert.fingerprint, today) }));
+    .map((alert) => ({ ...alert, ...resolvedAlertState(alert, today) }));
   const failed = checks.some((check) => check.outcome === "failed");
   const incomplete = !failed && alerts.some((alert) => alert.state === "candidate");
   const evidence = {
@@ -407,20 +407,58 @@ export function evaluateCipherPolicy(tls12, tls13, deprecated) {
   return { passed, observation: passed ? "recommended-ciphers-only" : "cipher-policy-mismatch" };
 }
 
-// A scanner alert is only resolved by a record somebody wrote down: a disposition beside the
-// fingerprint, or an acceptance that has not expired on the day the run reads it.
-function resolvedAlertState(fingerprint, today) {
-  const disposition = alertDispositions.get(fingerprint);
-  if (disposition) {
-    return { state: disposition.state, disposition: {
-      rationale: disposition.rationale, actor: disposition.actor,
-      classifiedAt: disposition.classifiedAt, reference: disposition.reference } };
+// The fingerprint names a rule on a route and nothing else, so a record that matched on it alone
+// would also cover a louder alert the same rule raises there tomorrow.
+export function alertDiscriminator(ruleEvidence) {
+  const kind = ruleEvidence.kind;
+  if (kind === "cookie-attribute") {
+    return { kind, cookieName: ruleEvidence.cookieName, missingAttribute: ruleEvidence.missingAttribute };
   }
-  const acceptance = alertAcceptances.get(fingerprint);
-  if (acceptance && acceptance.expiresOn >= today) {
-    return { state: "accepted-risk", acceptance: { id: acceptance.id, expiresOn: acceptance.expiresOn } };
+  if (kind === "text-pattern") {
+    return { kind, patternIds: [...new Set(ruleEvidence.matches.map(({ patternId }) => patternId))].toSorted() };
   }
-  return { state: "candidate" };
+  if (kind === "policy-directive") {
+    return { kind, headerName: ruleEvidence.headerName, directives: ruleEvidence.directives };
+  }
+  if (kind === "session-signal") return { kind, tokenNames: ruleEvidence.tokenNames };
+  if (kind === "application-signal") return { kind, signal: ruleEvidence.signal };
+  return { kind, headerName: ruleEvidence.headerName };
+}
+
+export function recordCovers(record, alert) {
+  return record.fingerprint === alert.fingerprint
+    && record.fingerprint === passiveAlertFingerprint(record.pluginId, record.method, record.routeTemplate)
+    && record.pluginId === alert.pluginId && record.method === alert.method
+    && record.routeTemplate === alert.routeTemplate
+    && record.riskCode === alert.riskCode && record.confidence === alert.confidence
+    && record.scannerVersion === zapVersion
+    && JSON.stringify(record.observed) === JSON.stringify(alertDiscriminator(alert.ruleEvidence));
+}
+
+function resolvedAlertState(alert, today) {
+  const record = alertDispositions.find((entry) => recordCovers(entry, alert));
+  if (!record) return { state: "candidate" };
+  if (record.state !== "accepted-risk") {
+    return { state: record.state, disposition: {
+      rationale: record.rationale, actor: record.actor,
+      classifiedAt: record.classifiedAt, reference: record.reference } };
+  }
+  const acceptance = alertAcceptances.get(record.acceptanceId);
+  if (!acceptance || !validAssessmentDate(today) || acceptance.expiresOn < today) return { state: "candidate" };
+  return { state: "accepted-risk", acceptance: { id: acceptance.id, expiresOn: acceptance.expiresOn } };
+}
+
+// Back-dating the day would keep an expired acceptance alive and stay consistent with itself, so
+// the day is bounded below by the records the alert was resolved against.
+function recordedSince(alert) {
+  const disposition = alert.disposition?.classifiedAt?.slice(0, 10) ?? "";
+  const acceptance = alert.acceptance ? alertAcceptances.get(alert.acceptance.id)?.acceptedAt ?? "" : "";
+  return disposition > acceptance ? disposition : acceptance;
+}
+
+function validAssessmentDate(value) {
+  return typeof value === "string" && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)
+    && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value);
 }
 
 export function assertPassiveDeploymentEvidence(evidence) {
@@ -438,11 +476,14 @@ export function assertPassiveDeploymentEvidence(evidence) {
     if (fingerprints.has(alert.fingerprint)) {
       throw new Error("The passive assessment evidence contains a duplicate alert fingerprint");
     }
-    const recorded = resolvedAlertState(alert.fingerprint, evidence.readOn);
+    const recorded = resolvedAlertState(alert, evidence.readOn);
     if (alert.state !== recorded.state
         || JSON.stringify(alert.disposition) !== JSON.stringify(recorded.disposition)
         || JSON.stringify(alert.acceptance) !== JSON.stringify(recorded.acceptance)) {
       throw new Error("The passive assessment evidence contains an unrecorded alert disposition");
+    }
+    if (recordedSince(alert) > evidence.readOn) {
+      throw new Error("The passive assessment evidence was read before the record it relies on");
     }
     fingerprints.add(alert.fingerprint);
   }
@@ -662,8 +703,12 @@ export function passiveDeploymentSummary(evidence) {
     + `Target fingerprint: ${evidence.targetFingerprint}\n\n`
     + `Application image: ${evidence.imageDigest}\n\n`
     + `Requests: ${evidence.requestCount}\n\n`
-    + `ZAP candidates: ${evidence.zap.alerts.length}\n\n`
+    + `ZAP candidates: ${openCandidateCount(evidence)} of ${evidence.zap.alerts.length} alerts\n\n`
     + `| Check | Layer | Outcome | Observation |\n| --- | --- | --- | --- |\n${checks}\n`;
+}
+
+export function openCandidateCount(evidence) {
+  return evidence.zap.alerts.filter(({ state }) => state === "candidate").length;
 }
 
 export function passiveEvidenceDigest(evidence) {

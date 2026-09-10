@@ -1,63 +1,44 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://courtside.example.org/schema/passive-alert-dispositions.json",
+  "$id": "urn:courtside:security:passive-alert-dispositions:v1",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "dispositions"
-  ],
+  "required": ["schemaVersion", "dispositions"],
   "properties": {
-    "schemaVersion": {
-      "const": 1
-    },
+    "schemaVersion": { "const": 1 },
     "dispositions": {
       "type": "array",
       "items": {
-        "$ref": "#/$defs/disposition"
-      }
-    }
-  },
-  "$defs": {
-    "nonEmpty": {
-      "type": "string",
-      "minLength": 1
-    },
-    "disposition": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "fingerprint",
-        "state",
-        "rationale",
-        "actor",
-        "classifiedAt",
-        "reference"
-      ],
-      "properties": {
-        "fingerprint": {
-          "type": "string",
-          "pattern": "^sha256:[a-f0-9]{64}$"
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fingerprint", "pluginId", "method", "routeTemplate", "riskCode", "confidence",
+          "scannerVersion", "observed", "state", "rationale", "actor", "classifiedAt", "reference"],
+        "properties": {
+          "fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "pluginId": { "type": "string", "pattern": "^[0-9]+$" },
+          "method": { "enum": ["GET", "HEAD"] },
+          "routeTemplate": { "type": "string", "minLength": 1 },
+          "riskCode": { "type": "integer", "minimum": 0, "maximum": 3 },
+          "confidence": { "type": "integer", "minimum": 0, "maximum": 4 },
+          "scannerVersion": { "const": "2.17.0" },
+          "observed": { "type": "object", "required": ["kind"], "properties": { "kind": { "type": "string" } } },
+          "state": { "enum": ["false-positive", "duplicate", "accepted-risk"] },
+          "acceptanceId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,63}$" },
+          "rationale": { "type": "string", "minLength": 1 },
+          "actor": { "type": "string", "minLength": 1 },
+          "classifiedAt": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{3})?Z$"
+          },
+          "reference": { "type": "string", "minLength": 1 }
         },
-        "state": {
-          "enum": [
-            "false-positive",
-            "duplicate"
-          ]
-        },
-        "rationale": {
-          "$ref": "#/$defs/nonEmpty"
-        },
-        "actor": {
-          "$ref": "#/$defs/nonEmpty"
-        },
-        "classifiedAt": {
-          "type": "string",
-          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{3})?Z$"
-        },
-        "reference": {
-          "$ref": "#/$defs/nonEmpty"
-        }
+        "allOf": [
+          {
+            "if": { "properties": { "state": { "const": "accepted-risk" } } },
+            "then": { "properties": { "acceptanceId": { "type": "string" } }, "required": ["acceptanceId"] },
+            "else": { "properties": { "acceptanceId": false } }
+          }
+        ]
       }
     }
   }

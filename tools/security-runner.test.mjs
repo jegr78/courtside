@@ -308,10 +308,11 @@ test("given passing checks and scanner alerts, when the run finishes, then the r
     root,
     verifyTarget: async () => input({ profile: "safe", authorization: undefined }),
     runPassiveAssessment: async () => ({ outcome: "incomplete", requestCount: 48,
-      zap: { alerts: [{ pluginId: "10055" }, { pluginId: "10112" }] } })
+      zap: { alerts: [{ pluginId: "10055", state: "candidate" }, { pluginId: "10112", state: "candidate" },
+        { pluginId: "10010", state: "false-positive" }] } })
   });
 
-  // then — no check failed, so saying they did not pass would send triage after the wrong thing
+  // then — the third alert is resolved, so counting every alert would send triage after the wrong number
   assert.equal(manifest.outcome, "incomplete");
   assert.equal(manifest.reason, "Passive deployment left 2 scanner alerts for triage");
 });
