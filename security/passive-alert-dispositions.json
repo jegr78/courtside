@@ -111,7 +111,7 @@
         ]
       },
       "state": "false-positive",
-      "rationale": "The rule matched the standalone word query in the built bundle, where it is a request parameter name the roster and participant searches send. There is no comment at that position in the minified code, and no credential or statement is disclosed.",
+      "rationale": "The rule matched the standalone word query in a built asset, where it is the request parameter the roster and participant searches send, and ZAP read a minified line as a comment. This record covers that one pattern and no other: a second pattern, in this asset or any other, is not covered and leaves the run incomplete.",
       "actor": "maintainer",
       "classifiedAt": "2026-09-10T07:02:37.000Z",
       "reference": "security/passive-baseline-finding-summary.json"
@@ -142,7 +142,7 @@
         ]
       },
       "state": "accepted-risk",
-      "rationale": "The proxy adds a deliberately narrow second policy, and the rule lists the directives of the application's own policy that do not fall back to default-src. A browser enforces both independently, and the narrow policy widens nothing.",
+      "rationale": "The proxy adds a deliberately narrow second policy, and the rule lists the directives of the application's own policy that do not fall back to default-src. The rule buckets undefined and wildcard sources into one sentence, so it is the headers check on this route, not this record, that would catch a directive turning into a wildcard.",
       "actor": "maintainer",
       "classifiedAt": "2026-09-10T07:02:37.000Z",
       "reference": "security/exceptions.json",

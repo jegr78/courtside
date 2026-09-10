@@ -425,6 +425,14 @@ export function alertDiscriminator(ruleEvidence) {
   return { kind, headerName: ruleEvidence.headerName };
 }
 
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).toSorted().join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).toSorted().map((key) => `${key}:${canonical(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 export function recordCovers(record, alert) {
   return record.fingerprint === alert.fingerprint
     && record.fingerprint === passiveAlertFingerprint(record.pluginId, record.method, record.routeTemplate)
@@ -432,29 +440,37 @@ export function recordCovers(record, alert) {
     && record.routeTemplate === alert.routeTemplate
     && record.riskCode === alert.riskCode && record.confidence === alert.confidence
     && record.scannerVersion === zapVersion
-    && JSON.stringify(record.observed) === JSON.stringify(alertDiscriminator(alert.ruleEvidence));
+    && canonical(record.observed) === canonical(alertDiscriminator(alert.ruleEvidence));
 }
 
-function resolvedAlertState(alert, today) {
-  const record = alertDispositions.find((entry) => recordCovers(entry, alert));
+export function resolveAlertAgainst(records, acceptances, alert, today) {
+  const record = records.find((entry) => recordCovers(entry, alert));
   if (!record) return { state: "candidate" };
   if (record.state !== "accepted-risk") {
     return { state: record.state, disposition: {
       rationale: record.rationale, actor: record.actor,
       classifiedAt: record.classifiedAt, reference: record.reference } };
   }
-  const acceptance = alertAcceptances.get(record.acceptanceId);
-  if (!acceptance || !validAssessmentDate(today) || acceptance.expiresOn < today) return { state: "candidate" };
+  const acceptance = acceptances.get(record.acceptanceId);
+  if (!acceptance || acceptance.fingerprint !== alert.fingerprint
+      || !validAssessmentDate(today) || acceptance.expiresOn < today) {
+    return { state: "candidate" };
+  }
   return { state: "accepted-risk", acceptance: { id: acceptance.id, expiresOn: acceptance.expiresOn } };
+}
+
+function resolvedAlertState(alert, today) {
+  return resolveAlertAgainst(alertDispositions, alertAcceptances, alert, today);
 }
 
 // Back-dating the day would keep an expired acceptance alive and stay consistent with itself, so
 // the day is bounded below by the records the alert was resolved against.
 function recordedSince(alert) {
-  const disposition = alert.disposition?.classifiedAt?.slice(0, 10) ?? "";
-  const acceptance = alert.acceptance
-    ? alertAcceptances.get(alert.acceptance.id)?.acceptedAt?.slice(0, 10) ?? "" : "";
-  return disposition > acceptance ? disposition : acceptance;
+  const days = [
+    alertDispositions.find(({ fingerprint }) => fingerprint === alert.fingerprint)?.classifiedAt,
+    alert.acceptance ? alertAcceptances.get(alert.acceptance.id)?.acceptedAt : undefined
+  ].map((value) => value?.slice(0, 10) ?? "");
+  return days.toSorted().at(-1);
 }
 
 function validAssessmentDate(value) {

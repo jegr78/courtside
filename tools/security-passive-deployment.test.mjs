@@ -8,7 +8,8 @@ import { boundedAssessmentFailureReason } from "./security-runner.mjs";
 import {
   assertPassiveDeploymentEvidence, assertQualifiedImageEvidence, buildPassiveDeploymentEvidence, createAssessmentControl,
   evaluateCipherPolicy, evaluateExposureResponses, evaluateMethodBoundary, evaluatePublicResponseHeaders,
-  normalizeZapAlerts, openCandidateCount, passiveAlertFingerprint, passiveDeploymentSummary, recordCovers,
+  normalizeZapAlerts, openCandidateCount, passiveAlertFingerprint, passiveDeploymentSummary,
+  recordCovers, resolveAlertAgainst,
   passiveScannerOrigin, requiredPassiveCheckIds, runOwnedProcess, zapVersion
 } from "./security-passive-deployment.mjs";
 
@@ -815,7 +816,7 @@ test("given resolved alerts beside an open one, when the summary is written, the
     assert.match(passiveDeploymentSummary(evidence), /ZAP candidates: 1 of 2 alerts/);
   });
 
-test("given evidence claiming a disposition nothing recorded, when it is validated, then it fails closed", () => {
+test("given evidence claiming a state nothing recorded, when it is validated, then it fails closed", () => {
   // given
   const evidence = evidenceFor([cookieAlert("/font-licenses.txt")]);
   evidence.zap.alerts[0].state = "false-positive";
@@ -823,7 +824,79 @@ test("given evidence claiming a disposition nothing recorded, when it is validat
     classifiedAt: "2026-09-10T00:00:00.000Z", reference: "none" };
 
   // when / then
-  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /disposition/);
+  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /unrecorded alert disposition/);
+});
+
+test("given evidence rewording a disposition it did record, when it is validated, then it fails closed", () => {
+  // given — the state is the one the record gives, and only the reason beside it was rewritten
+  const evidence = evidenceFor([cookieAlert("/")]);
+  assert.equal(evidence.zap.alerts[0].state, "false-positive");
+  evidence.zap.alerts[0].disposition = { ...evidence.zap.alerts[0].disposition, rationale: "trust me" };
+
+  // when / then
+  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /unrecorded alert disposition/);
+});
+
+test("given evidence rewording an acceptance it did record, when it is validated, then it fails closed", () => {
+  // given — the acceptance the evidence publishes has to be the one the record resolved it against
+  const evidence = evidenceFor([policyAlert(acceptedDirectives)], "2026-09-10");
+  assert.equal(evidence.zap.alerts[0].state, "accepted-risk");
+  evidence.zap.alerts[0].acceptance = { ...evidence.zap.alerts[0].acceptance, expiresOn: "2099-12-31" };
+
+  // when / then
+  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /unrecorded alert disposition/);
+});
+
+const acceptedRecord = () => dispositions.dispositions.find(({ state }) => state === "accepted-risk");
+const acceptedAlert = (overrides = {}) => {
+  const record = acceptedRecord();
+  return { pluginId: record.pluginId, method: record.method, routeTemplate: record.routeTemplate,
+    riskCode: record.riskCode, confidence: record.confidence, fingerprint: record.fingerprint,
+    ruleEvidence: { kind: "policy-directive", headerName: record.observed.headerName,
+      directives: record.observed.directives }, ...overrides };
+};
+const acceptanceMap = () => new Map(acceptances.map((entry) => [entry.id, entry]));
+
+test("given the rule reports a different confidence, when it is matched, then the record covers nothing", () => {
+  // given — a rule that grows more certain about the same route is saying something new
+  const record = acceptedRecord();
+
+  // when / then
+  assert.equal(recordCovers(record, acceptedAlert()), true);
+  assert.equal(recordCovers(record, acceptedAlert({ confidence: record.confidence + 1 })), false);
+});
+
+test("given a record naming an acceptance nobody wrote, when it is resolved, then the alert stays open", () => {
+  // given — the record names the acceptance rather than restating it, so the acceptance has to exist
+  const record = { ...acceptedRecord(), acceptanceId: "no-such-acceptance-2026" };
+
+  // when
+  const resolved = resolveAlertAgainst([record], acceptanceMap(), acceptedAlert(), "2026-09-10");
+
+  // then
+  assert.deepEqual(resolved, { state: "candidate" });
+});
+
+test("given an acceptance written about another alert, when it is resolved, then the alert stays open", () => {
+  // given — an acceptance carries the fingerprint it was written for, and it has to be this one
+  const foreign = acceptances.map((entry) => ({ ...entry, fingerprint: `sha256:${"b".repeat(64)}` }));
+
+  // when
+  const resolved = resolveAlertAgainst([acceptedRecord()], new Map(foreign.map((e) => [e.id, e])),
+    acceptedAlert(), "2026-09-10");
+
+  // then
+  assert.deepEqual(resolved, { state: "candidate" });
+});
+
+test("given a record written in another key order, when it is matched, then it still covers its alert", () => {
+  // given — a reformatter must not turn every resolution into a candidate without saying so
+  const record = acceptedRecord();
+  const reordered = { ...record, observed: { directives: [...record.observed.directives].toReversed(),
+    kind: record.observed.kind, headerName: record.observed.headerName } };
+
+  // when / then
+  assert.equal(recordCovers(reordered, acceptedAlert()), true);
 });
 
 test("given the recorded dispositions, when they are read, then each names a rationale, an actor and a source",
@@ -845,9 +918,9 @@ test("given the recorded dispositions, when they are read, then each names a rat
         assert.ok(acceptances.some(({ id }) => id === entry.acceptanceId),
           `${entry.acceptanceId} is named by a record and written down nowhere`);
       } else {
-        assert.ok(baselineCandidates.some(({ fingerprint, state }) =>
-          fingerprint === entry.fingerprint && state === entry.state),
-        `${entry.fingerprint} is dismissed by a record the triage summary does not carry`);
+        const carried = baselineCandidates.find(({ fingerprint }) => fingerprint === entry.fingerprint);
+        assert.ok(carried === undefined || carried.state === entry.state,
+          `${entry.fingerprint} is dismissed against a triage summary that classified it ${carried?.state}`);
       }
     }
   });

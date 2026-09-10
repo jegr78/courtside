@@ -251,6 +251,10 @@ The lifecycle result uses the assessment outcomes from
 
 - An untriaged candidate makes the run `incomplete`. It does not become a release-blocking finding
   until reproducible validation succeeds.
+- A passive scanner alert is untriaged until a record in
+  [`passive-alert-dispositions.json`](../security/passive-alert-dispositions.json) covers it. A
+  fingerprint alone does not: the record also names the risk, the confidence, the pinned scanner
+  version and what the rule concluded, and all of them have to match the alert in hand.
 - A validated or in-progress finding makes the run `failed`.
 - A fix awaiting retest makes the run `incomplete`.
 - A passed retest, reproducible false positive or duplicate does not block the run.
