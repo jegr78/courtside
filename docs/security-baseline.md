@@ -153,10 +153,10 @@ replaces the other.
 A pass names its own production path, its own test and the verification that executed it, and the
 reading resolves what it can before recording it. It reads both files with `git show` at the commit
 the record names, rather than out of whatever checkout it runs in; it requires the named test to be
-declared in the file the anchor names, by the same match the contract test uses; and it refuses to
-record anything at all unless the caller states that the executing verification succeeded. That last
-one is a statement the operator supplies and the reader can check at the link above, not something
-the reading fetches. The evidence contract refuses a pass for a control with no anchor at all, so
+declared in the file the anchor names, by the same match the contract test uses; and it reads the
+verification's own record rather than a word about it, refusing to record anything at all unless
+that record says `passed` and the commit it ran over differs from the assessed commit in no file an
+anchor names. The evidence contract refuses a pass for a control with no anchor at all, so
 the passes are exactly the controls somebody read one at a time. `docs/security-assessment.md`
 states what that anchor costs.
 
@@ -201,8 +201,9 @@ identity from it and no verdict.
 node tools/courtside.uat-smoke.mjs --confirm courtside-uat
 node tools/courtside.mjs security <RUN_ID> <IMAGE_DIGEST>
 node tools/courtside.mjs security-run <RUN_ID> safe --qualification build/uat-smoke/qualification.json
+node tools/courtside.mjs check
 node tools/security-anchored-control-run.mjs \
-  build/security/<RUN_ID>/assessment/attempt-1/manifest.json <RECORD_ID> <VERIFICATION_ID> success '#923' \
+  build/security/<RUN_ID>/assessment/attempt-1/manifest.json <RECORD_ID> build/local-check/result.json '#923' \
   build/security/<RECORD_ID>
 node tools/security-manual-assessment.mjs build/security/<RECORD_ID>/evidence.json
 node tools/courtside.mjs security-cleanup <RUN_ID>

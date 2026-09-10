@@ -48,7 +48,7 @@ Validation refuses the record otherwise.
 ### Reading the anchors an earlier run left behind
 
 ```bash
-node tools/security-anchored-control-run.mjs <manifest.json> <record-id> <build-run-id> <conclusion> <tracking-reference> <output-directory>
+node tools/security-anchored-control-run.mjs <manifest.json> <record-id> <verification-result.json> <tracking-reference> <output-directory>
 ```
 
 The command derives one disposition per selected control from what the catalog and the tracked
@@ -62,9 +62,8 @@ open lifecycle finding is two answers to one question, and the command refuses t
 It resolves every anchor before it records a pass, reading both files with `git show` at the commit
 the record names rather than out of the checkout it runs in: the production path has to exist there,
 the named test has to be declared in the file the anchor names, and the path has to be one the
-catalog schema admits. It also refuses to record anything unless the caller states that the
-executing verification succeeded, which is a statement the operator supplies rather than one the
-command fetches. It writes the protected record, one retained reading per
+catalog schema admits. It also reads the verification's own record: `build/local-check/result.json` has to say `passed`,
+and the commit it ran over may not differ from the assessed commit in any file an anchor names. It writes the protected record, one retained reading per
 control and the redacted per-control outcomes. It is a reading, not a substitute for the procedures: it performs no procedure step and
 sends no request, and a record it produces says so beside its counts.
 

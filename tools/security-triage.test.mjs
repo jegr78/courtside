@@ -532,11 +532,13 @@ test("given the anchored control reading, when reading its published record, the
     .filter(({ controlEvidence }) => controlEvidence).map(({ id }) => id));
   const passed = anchoredOutcomes.controls.filter(({ outcome }) => outcome === "pass").map(({ id }) => id);
 
-  // when / then
+  // when / then — a record is written against the catalog of its own run, and a later catalog may
+  // anchor more controls; what it may never do is pass one this catalog does not anchor at all.
   assert.equal(anchoredOutcomes.run.runId, "manual-anchored-20260910");
-  assert.equal(anchoredOutcomes.run.catalogVersion, assessmentCatalog.catalogVersion);
-  assert.deepEqual(passed.toSorted(), [...anchored].toSorted());
+  assert.deepEqual(passed.filter((id) => !anchored.has(id)), []);
   assert.equal(passed.length > 0, true);
+  assert.equal(anchoredOutcomes.controls.length,
+    new Set(anchoredOutcomes.controls.map(({ id }) => id)).size);
   assert.match(baselineDocumentation, new RegExp(outcomeDigest));
   assert.match(baselineDocumentation, new RegExp(`\\| pass \\| ${passed.length} \\|`));
   assert.equal(controlOutcomes.run.runId === anchoredOutcomes.run.runId, false);

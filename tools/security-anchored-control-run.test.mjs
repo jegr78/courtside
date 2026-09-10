@@ -30,7 +30,9 @@ const runInput = () => ({
     environment: "SECURITY",
     application: { imageDigest: `sha256:${"2".repeat(64)}`, commit: "45d7919eb6f23d32278e5fb47d8c57f91e3b2c84" }
   },
-  verification: { workflow: "build", runId: "34458782775", conclusion: "success" },
+  verification: { workflow: "courtside.mjs check", runId: "34458782775",
+    commit: "45d7919eb6f23d32278e5fb47d8c57f91e3b2c84", conclusion: "success" },
+  changedBetween: () => [],
   readSource,
   unanchoredTrackingReference: "#923",
   evidenceExpiresOn: "2026-10-10",
@@ -154,6 +156,19 @@ test("given a test file without the test the anchor names, when reading the cont
   // when / then
   assert.throws(() => readControl(control, findings, readSource, catalog),
     /which declares no such test at the assessed commit/);
+});
+
+test("given a verification that ran over a different anchored file, when building the run, then it refuses", () => {
+  // given
+  const input = runInput();
+
+  // when / then
+  assert.throws(() => buildAnchoredRun({ ...input,
+    changedBetween: () => ["docs/security-baseline.md",
+      "src/main/java/org/courtside/dataexchange/internal/SnapshotParser.java"] }),
+    /differs from the assessed commit in 1 anchored file\(s\), starting with src\/main\/java/);
+  assert.doesNotThrow(() => buildAnchoredRun({ ...input,
+    changedBetween: () => ["docs/security-baseline.md", "docs/data-model.md"] }));
 });
 
 test("given a verification that did not succeed, when building the run, then it records nothing", () => {

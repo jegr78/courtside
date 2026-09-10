@@ -194,8 +194,19 @@ const evidenceId = (controlId) => `reading-${controlId.toLowerCase().replaceAll(
 
 export function buildAnchoredRun(input) {
   if (input.verification.conclusion !== "success") {
-    throw new Error(`Verification run ${input.verification.runId} concluded `
+    throw new Error(`Verification ${input.verification.runId} concluded `
       + `${input.verification.conclusion}, so no control anchor it executed can be read as a pass`);
+  }
+  const drifted = (input.changedBetween ?? (() => []))(input.manifest.application.commit,
+    input.verification.commit);
+  const anchoredPaths = new Set(input.catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ controlEvidence }) => controlEvidence)
+    .flatMap(({ controlEvidence }) => [controlEvidence.productionPath,
+      controlEvidence.falsifyingTest.split("#")[0]]));
+  const moved = drifted.filter((path) => anchoredPaths.has(path));
+  if (moved.length > 0) {
+    throw new Error(`The verification ran over ${input.verification.commit}, which differs from the `
+      + `assessed commit in ${moved.length} anchored file(s), starting with ${moved.toSorted()[0]}`);
   }
   const findings = findingsByControl(input.findingSummary);
   const selected = input.catalog.controlCoverage.flatMap(({ controls }) => controls)
@@ -290,15 +301,17 @@ const writeProtected = (path, value) => {
 };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const [manifestPath, runId, verificationRunId, verificationConclusion, trackingReference,
-    outputDirectory] = process.argv.slice(2);
-  if (process.argv.length !== 8) {
+  const [manifestPath, runId, verificationPath, trackingReference, outputDirectory] = process.argv.slice(2);
+  if (process.argv.length !== 7) {
     process.stderr.write("Usage: security-anchored-control-run.mjs <manifest.json> <run-id> "
-      + "<verification-run-id> <verification-conclusion> <tracking-reference> <output-directory>\n");
+      + "<verification-result.json> <tracking-reference> <output-directory>\n");
     process.exitCode = 1;
   } else {
     const repository = new URL("..", import.meta.url);
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const verified = JSON.parse(readFileSync(verificationPath, "utf8"));
+    const git = (...args) => spawnSync("git", ["-C", fileURLToPath(repository), ...args],
+      { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
     const recordedAt = `${new Date().toISOString().slice(0, 19)}Z`;
     const day = (offset) => new Date(Date.parse(recordedAt) + offset * 86400000).toISOString().slice(0, 10);
     const { evidence, readings, controlOutcomes } = buildAnchoredRun({
@@ -311,10 +324,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       tester: "Repository maintainer",
       owner: "Repository maintainer",
       manifest,
-      verification: { workflow: "build", runId: verificationRunId, conclusion: verificationConclusion },
+      verification: { workflow: "courtside.mjs check", runId: verified.headCommit,
+        commit: verified.headCommit,
+        conclusion: verified.outcome === "passed" ? "success" : verified.outcome },
+      changedBetween: (from, to) => {
+        const diff = git("diff", "--name-only", `${from}..${to}`);
+        if (diff.status !== 0) throw new Error("the assessed and verified commits could not be compared");
+        return diff.stdout.split("\n").filter(Boolean);
+      },
       readSource: (path) => {
-        const shown = spawnSync("git", ["-C", fileURLToPath(repository), "show",
-          `${manifest.application.commit}:${path}`], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+        const shown = git("show", `${manifest.application.commit}:${path}`);
         return shown.status === 0 ? shown.stdout : null;
       },
       unanchoredTrackingReference: trackingReference,
