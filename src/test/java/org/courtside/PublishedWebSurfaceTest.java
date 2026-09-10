@@ -9,6 +9,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.web.servlet.handler.SimpleUrlHandlerMapping;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -40,7 +41,7 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
 
     private static final Path PROXY = Path.of("deploy/Caddyfile");
 
-    private static final String SHELL = "/index.html";
+    private static final String PERMITTED = ".permitAll()";
 
     private static final String UNAUTHENTICATED = "urn:courtside:error:unauthenticated";
 
@@ -61,8 +62,6 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
     private static final Pattern LITERAL = Pattern.compile("\"(/[^\"]*)\"");
 
     private static final Pattern NAVIGATION = Pattern.compile("\\n\\s*path ([^\\n]+)\\n");
-
-    private static final Pattern ORIGIN = Pattern.compile("https?://([A-Za-z0-9.-]+(?::[0-9]+)?)");
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -135,7 +134,7 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
     @Test
     void givenEveryServedMetadataResource_whenItIsRead_thenItsContentStaysInsideTheReviewedContract() {
         // given
-        Set<String> origins = servedOrigins();
+        List<Pattern> disclosing = disclosingPatterns();
 
         // when / then
         assertThat(servedResources()).allSatisfy(resource -> {
@@ -152,9 +151,11 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
                     assertThat(values(body.path(reviewed.getKey())))
                             .describedAs("%s carries reviewed values for %s", path, reviewed.getKey())
                             .isSubsetOf(strings(reviewed.getValue())));
-            assertThat(hosts(response.body()))
-                    .describedAs("%s names no origin outside the reviewed set", path)
-                    .isSubsetOf(origins);
+            String decided = withoutConfiguredValues(response.body(), resource);
+            assertThat(disclosing)
+                    .describedAs("%s discloses nothing the build policy would refuse in a shipped file, "
+                            + "apart from what a club configured", path)
+                    .noneMatch(pattern -> pattern.matcher(decided).find());
         });
     }
 
@@ -194,14 +195,16 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
 
     private Set<String> permittedPaths() {
         String source = read(RULES);
-        int shell = source.indexOf('"' + SHELL + '"');
-        int opening = source.lastIndexOf("requestMatchers(", shell);
-        int closing = source.indexOf(".permitAll()", shell);
-        Matcher matcher = LITERAL.matcher(source.substring(opening, closing));
         Set<String> permitted = new TreeSet<>();
-        while (matcher.find()) {
-            permitted.add(matcher.group(1));
+        for (int closing = source.indexOf(PERMITTED); closing >= 0;
+                closing = source.indexOf(PERMITTED, closing + PERMITTED.length())) {
+            int opening = source.lastIndexOf("Matchers(", closing);
+            Matcher matcher = LITERAL.matcher(source.substring(opening, closing));
+            while (matcher.find()) {
+                permitted.add(matcher.group(1));
+            }
         }
+        permitted.removeIf(path -> path.startsWith(API) || path.startsWith(MANAGEMENT));
         return permitted;
     }
 
@@ -214,10 +217,17 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
         return matcher.group(1).trim().split("\\s+");
     }
 
-    private Set<String> servedOrigins() {
-        return inventory().get("reviewedOrigins").values().stream()
-                .map(origin -> origin.get("host").asString())
-                .collect(Collectors.toCollection(TreeSet::new));
+    private List<Pattern> disclosingPatterns() {
+        return Stream.of("credentialPatterns", "disclosureMarkers")
+                .flatMap(property -> inventory().get(property).values().stream())
+                .map(declared -> Pattern.compile(declared.get("pattern").asString()))
+                .toList();
+    }
+
+    private static String withoutConfiguredValues(String body, JsonNode resource) {
+        JsonNode remaining = MAPPER.readTree(body);
+        strings(resource.get("configuredKeys")).forEach(((ObjectNode) remaining)::remove);
+        return remaining.toString();
     }
 
     private Set<String> servedPaths(boolean management) {
@@ -245,15 +255,6 @@ class PublishedWebSurfaceTest extends AbstractIntegrationTest {
 
     private static List<String> values(JsonNode node) {
         return node.isArray() ? strings(node) : List.of(node.asString());
-    }
-
-    private static Set<String> hosts(String body) {
-        Matcher matcher = ORIGIN.matcher(body);
-        Set<String> found = new TreeSet<>();
-        while (matcher.find()) {
-            found.add(matcher.group(1));
-        }
-        return found;
     }
 
     private static Set<String> union(Set<String> first, Set<String> second) {

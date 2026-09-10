@@ -57,6 +57,7 @@
       "mediaType": "application/manifest+json",
       "keys": ["background_color", "display", "icons", "name", "short_name", "start_url", "theme_color"],
       "reviewedValues": { "display": ["standalone"], "start_url": ["/"] },
+      "configuredKeys": ["icons"],
       "purpose": "The installable application's club-specific metadata, generated from the configuration rather than built, so the Vite output cannot carry it."
     },
     {
@@ -65,6 +66,7 @@
       "mediaType": "application/vnd.spring-boot.actuator.v3+json",
       "keys": ["groups", "status"],
       "reviewedValues": { "groups": ["liveness", "mail", "readiness"] },
+      "configuredKeys": [],
       "purpose": "The aggregate readiness a container runtime and an uptime check read. Details stay off this response; the group names are the only structure it discloses."
     }
   ],
