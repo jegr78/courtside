@@ -32,7 +32,7 @@ const runInput = () => ({
   },
   verification: { workflow: "build", runId: "34458782775", conclusion: "success" },
   readSource,
-  unanchoredTrackingReference: "#929",
+  unanchoredTrackingReference: "#923",
   evidenceExpiresOn: "2026-10-10",
   authorizationExpiresAt: "2026-09-17T12:00:00Z"
 });
@@ -287,12 +287,12 @@ test("given the built run, when reading a control observation, then it names tha
   const { evidence } = buildAnchoredRun(runInput());
   const outcomes = evidence.procedures.flatMap(({ controls }) => controls);
   const anchored = outcomes.find(({ controlId }) => controlId === "v5.0.0-1.1.1");
-  const unanchored = outcomes.find(({ controlId }) => controlId === "WSTG-v4.2-APIT-01");
+  const ruledOut = outcomes.find(({ controlId }) => controlId === "WSTG-v4.2-APIT-01");
 
   // then
   assert.match(anchored.observedResult, /SnapshotParser\.java/);
   assert.match(anchored.observedResult, /givenPercentEncodedText_whenParsing_thenItIsNotDecodedAsAnotherInputLayer/);
   assert.equal(new Set(outcomes.map(({ observedResult }) => observedResult)).size > 200, true);
-  assert.equal(unanchored.outcome, "blocked");
-  assert.equal(unanchored.trackingReference, "#929");
+  assert.equal(ruledOut.outcome, "not-applicable");
+  assert.match(ruledOut.rationale, /GraphQL/);
 });

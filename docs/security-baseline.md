@@ -157,11 +157,8 @@ successfully. The evidence contract refuses a pass for a control with no anchor 
 are exactly the controls somebody read one at a time. `docs/security-assessment.md` states what that
 anchor costs.
 
-The 138 blocked controls are three separate situations:
+The blocked controls are two separate situations:
 
-- 111 have no tracked disposition at all. Run `manual-baseline-20260906` recorded them
-  `not-applicable`, and the rationale for that decision lived only in its protected record, which
-  this repository does not hold and which expires on 6 October 2026. #929 works through them.
 - 24 were read to a documented finding in [`security-findings.md`](security-findings.md). Those
   findings carry no lifecycle fingerprint, and the evidence contract requires one before a control
   may be recorded as a failure of the run, so the reading is recorded as blocked against the finding
@@ -169,6 +166,13 @@ The 138 blocked controls are three separate situations:
 - 3 carry a control-specific rationale in the catalog saying the control asks for an inventory the
   product does not maintain. Completing it would document existing behaviour rather than change the
   shipped product.
+
+The 111 controls run `manual-baseline-20260906` recorded `not-applicable` carried no tracked
+rationale at all: that decision lived only in its protected record, which this repository does not
+hold and which expires on 6 October 2026. Each of them now carries its own catalog disposition,
+written against the fact that decides it rather than against the chapter its procedure covers, and
+the per-procedure tests in `security-assessment-contract.test.mjs` require every one of the 111 to
+keep exactly one.
 
 The 59 failed controls are the ones `manual-baseline-finding-summary.json` maps its eleven findings
 to. Their remediation issues are closed, and none of the eleven carries a passed retest, so the run
@@ -185,14 +189,14 @@ uncommitted and expiring, rather than that its content is sensitive.
 
 Reproduce the run by qualifying one immutable image, preparing one `SECURITY` target and reading the
 manifest that binds them. The safe run exists to produce that manifest: the reading takes the target
-identity from it and no verdict, and this one stopped at `incomplete` on the alert #930 describes.
+identity from it and no verdict.
 
 ```bash
 node tools/courtside.uat-smoke.mjs --confirm courtside-uat
 node tools/courtside.mjs security <RUN_ID> <IMAGE_DIGEST>
 node tools/courtside.mjs security-run <RUN_ID> safe --qualification build/uat-smoke/qualification.json
 node tools/security-anchored-control-run.mjs \
-  build/security/<RUN_ID>/assessment/attempt-1/manifest.json <RECORD_ID> <BUILD_RUN_ID> success '#929' \
+  build/security/<RUN_ID>/assessment/attempt-1/manifest.json <RECORD_ID> <VERIFICATION_ID> success '#923' \
   build/security/<RECORD_ID>
 node tools/security-manual-assessment.mjs build/security/<RECORD_ID>/evidence.json
 node tools/courtside.mjs security-cleanup <RUN_ID>

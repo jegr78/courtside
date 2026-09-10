@@ -27,7 +27,9 @@ class InterpreterSurfaceTest {
             "a memcache client", List.of("MemcachedClient", "net.spy.memcached"),
             "a LaTeX processor", List.of("pdflatex", "shell-escape"),
             "a dynamic expression", List.of("SpelExpressionParser", "ScriptEngineManager",
-                    "javax.script", "GroovyShell")));
+                    "javax.script", "GroovyShell"),
+            "an archive extractor", List.of("ZipInputStream", "GZIPInputStream", "ZipFile",
+                    "InflaterInputStream", "CompressorStreamFactory", "ArchiveStreamFactory")));
 
     private static final Pattern COMPILED_PATTERN = Pattern.compile("Pattern\\.compile\\(\\s*");
 

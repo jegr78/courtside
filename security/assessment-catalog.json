@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.4.12",
+  "catalogVersion": "1.5.0",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -304,8 +304,9 @@
         },
         {
           "id": "v5.0.0-1.3.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that untrusted HTML from a WYSIWYG editor or similar is sanitized by a known library. Courtside accepts no HTML from anybody: it ships no rich-text editor, carries no HTML sanitizer dependency, and its frontend renders every club-entered value as React text, using neither dangerouslySetInnerHTML nor innerHTML anywhere in frontend/src."
         },
         {
           "id": "v5.0.0-1.3.2",
@@ -325,22 +326,32 @@
         {
           "id": "v5.0.0-1.3.4",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/config/internal/ClubLogo.java",
+            "falsifyingTest": "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenActiveOrMalformedContent_whenParsing_thenItIsRejectedAsAFormat"
+          }
         },
         {
           "id": "v5.0.0-1.3.5",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that user-supplied scriptable or expression template content such as Markdown, CSS or XSL stylesheets is sanitized or disabled. Courtside accepts none: it renders no Markdown and carries no Markdown, BBCode or XSL dependency, and the only club-entered value that reaches a stylesheet is the club colour, which the API document constrains to a hex literal and HexColorPatternTest keeps constrained in all three of its copies."
         },
         {
           "id": "v5.0.0-1.3.6",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
+            "falsifyingTest": "src/test/java/org/courtside/OutboundRequestSurfaceTest.java#whenReadingEveryOutboundClient_thenOnlyTheConfiguredBreachEndpointIsReached"
+          }
         },
         {
           "id": "v5.0.0-1.3.7",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that templates are not built from untrusted input. Courtside builds none: its message templates come from the shipped i18n bundles, MailTemplates substitutes named placeholders into that fixed text rather than compiling anything a request supplied, and there is no server-side template engine on the classpath at all."
         },
         {
           "id": "v5.0.0-1.3.8",
@@ -356,8 +367,9 @@
         },
         {
           "id": "v5.0.0-1.3.10",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that format strings which could resolve unexpectedly are sanitized before processing. No format string in Courtside comes from a request: every log statement uses the parameterized {} form this repository requires, and the String.format calls in src/main/java take literals written here with the request value as an argument rather than as the pattern."
         },
         {
           "id": "v5.0.0-1.3.11",
@@ -618,13 +630,15 @@
         },
         {
           "id": "v5.0.0-3.5.4",
-          "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-CLIENT-001",
+          "rationale": "The control asks that separate applications sit on different hostnames so the same-origin policy and host-scoped cookies separate them. Courtside is one application on one hostname per club: the reference deployment serves the single-page application, its assets and the API from that one origin, and there is no second application on it to be separated from."
         },
         {
           "id": "v5.0.0-3.5.5",
-          "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-CLIENT-001",
+          "rationale": "The control asks that messages received over postMessage are discarded when the origin is untrusted or the syntax is invalid. Courtside registers no message listener in frontend/src, so no such message reaches application code. The service worker vite-plugin-pwa generates accepts only the browser's own client messages, which the browser already restricts to this instance's origin."
         },
         {
           "id": "v5.0.0-3.7.1",
@@ -637,8 +651,9 @@
         },
         {
           "id": "v5.0.0-3.7.2",
-          "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-CLIENT-001",
+          "rationale": "The control asks that an automatic redirect to a hostname the application does not control happens only to an allowlisted destination. Courtside redirects to no other hostname: its only application-initiated navigation is the fixed same-origin path /login, and its server issues no redirect built from a request value."
         },
         {
           "id": "v5.0.0-4.1.1",
@@ -720,8 +735,9 @@
         },
         {
           "id": "v5.0.0-5.2.3",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that a compressed file is checked against a maximum uncompressed size and file count before it is expanded. Courtside expands nothing: a roster snapshot is uploaded as delimited text with a declared encoding and separator, and the shipped application constructs no archive or decompression stream at all. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "v5.0.0-5.3.1",
@@ -734,18 +750,27 @@
         },
         {
           "id": "v5.0.0-5.3.2",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that file paths for file operations are built from internally generated or trusted data rather than from a submitted filename. Courtside builds no path from an upload: a club logo and a roster snapshot are read as in-memory bytes, the logo is stored as a column beside its canonical media type and digest, and every name a download carries is built by ExportAdminController from the export kind and the date, never from anything a club typed."
         },
         {
           "id": "v5.0.0-5.4.1",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/dataexchange/web/ExportAdminController.java",
+            "falsifyingTest": "src/test/java/org/courtside/dataexchange/web/ExportAdminControllerTest.java#givenARosterToTakeOut_whenItIsExported_thenTheAnswerIsAFileTheBrowserSaves"
+          }
         },
         {
           "id": "v5.0.0-5.4.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "manualProcedureId": "MAN-INPUT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/dataexchange/web/ExportAdminController.java",
+            "falsifyingTest": "src/test/java/org/courtside/dataexchange/web/ExportAdminControllerTest.java#givenARosterToTakeOut_whenItIsExported_thenTheAnswerIsAFileTheBrowserSaves"
+          }
         },
         {
           "id": "v5.0.0-5.4.3",
@@ -2151,13 +2176,18 @@
         },
         {
           "id": "WSTG-v4.2-CLNT-04",
-          "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-CLIENT-001",
+          "rationale": "The test looks for a redirect whose destination comes from a request parameter, so an attacker can send a member somewhere else through the application's own link. The shipped frontend performs one navigation of its own, window.location.assign(\"/login\") in ApplicationErrorView, to a fixed same-origin path with no value from the request in it, and offers no redirect parameter anywhere."
         },
         {
           "id": "WSTG-v4.2-CLNT-05",
           "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "manualProcedureId": "MAN-CLIENT-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/api/openapi.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/HexColorPatternTest.java#whenReadingEveryHexColorPatternCopy_thenTheyAllAgreeWithBookingCardsColorCheck"
+          }
         },
         {
           "id": "WSTG-v4.2-CLNT-06",
@@ -2199,8 +2229,9 @@
         },
         {
           "id": "WSTG-v4.2-CLNT-11",
-          "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-CLIENT-001",
+          "rationale": "The test exercises web messaging: an origin-checked postMessage channel between documents. Courtside opens none. Neither frontend/src nor frontend/public sends or receives a postMessage, it embeds no third-party frame, and its own documents never talk to one another."
         },
         {
           "id": "WSTG-v4.2-CLNT-12",
@@ -2288,8 +2319,9 @@
         },
         {
           "id": "WSTG-v4.2-CONF-10",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The test looks for a DNS record pointing at a service that no longer claims that name, so somebody else can claim it. What names an instance and where its records point is the club's own DNS, which this repository neither ships nor controls; the artefact carries no hostname of its own and the reference deployment binds whatever name the operator gives it."
         },
         {
           "id": "WSTG-v4.2-CONF-11",
