@@ -454,6 +454,61 @@ test("given a refusal about a cookie alert, when it reaches the manifest, then r
   assert.doesNotMatch(published, /\[REDACTED\]/);
 });
 
+test("given a directive list without a heading, when normalizing it, then every line is named", () => {
+  // given — the wildcard template lists the directives on their own lines and announces none of them
+  const alerts = normalizeZapAlerts(cspAlert("script-src\nimg-src\ndefault-src"));
+
+  // when / then
+  assert.deepEqual(alerts[0].ruleEvidence.directives, ["default-src", "img-src", "script-src"]);
+});
+
+test("given an unknown name at the head of an announced run, when normalizing it, then the run yields nothing",
+  () => {
+    // given — a wording that announces something other than directives must not have its words collected
+    const alerts = normalizeZapAlerts(cspAlert("The following were seen: nonsense img-src"));
+
+    // when / then
+    assert.deepEqual(alerts[0].ruleEvidence.directives, []);
+  });
+
+test("given an announced run closed by a full stop, when normalizing it, then its last directive is named", () => {
+  // given — the fallback template ends its list with a full stop, and plugin-types is one of the ten
+  const alerts = normalizeZapAlerts(cspAlert("The directive(s): plugin-types, style-src, img-src."
+    + " is/are among the directives that do not fallback to default-src."));
+
+  // when / then — img-src carries the sentence's full stop and is a directive nonetheless
+  assert.deepEqual(alerts[0].ruleEvidence.directives, ["img-src", "plugin-types", "style-src"]);
+});
+
+test("given a refusal about the session alert, when it reaches the manifest, then redaction leaves it readable",
+  () => {
+    // given — the cookie names live in the alert's own text, which the redaction removes wholesale
+    const report = { site: [{ alerts: [
+      { pluginid: "10112", riskcode: "0", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`,
+        method: "GET", param: "__Host-SESSION", evidence: "__Host-SESSION",
+        otherinfo: "cookie:__Host-SESSION\ncookie:__Host-OTHER" }] }
+    ] }] };
+
+    // when
+    let published = "";
+    try { normalizeZapAlerts(report); } catch (error) { published = boundedAssessmentFailureReason(error.message); }
+
+    // then — what it read is stated as counts, so no excerpt is left for the redaction to eat
+    assert.match(published, /read 1 known of 2 cookie lines/);
+    assert.doesNotMatch(published, /\[REDACTED\]/);
+  });
+
+test("given a non-textual evidence field, when normalizing the alert, then the refusal names its type", () => {
+  // given — quoting a field that is not text would have printed its JSON rather than saying what it is
+  const report = { site: [{ alerts: [
+    { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`,
+      method: "GET", param: "Content-Security-Policy", evidence: 42, otherinfo: "img-src" }] }
+  ] }] };
+
+  // when / then
+  assert.throws(() => normalizeZapAlerts(report), /evidence is not text \(number\)/);
+});
+
 test("given collected invalid characters after a colon, when normalizing them, then none becomes a directive", () => {
   // given — the malformed-policy template collects non-ASCII characters behind a colon
   const alerts = normalizeZapAlerts(cspAlert("A non-ASCII character was encountered while attempting"

@@ -5,6 +5,7 @@ import https from "node:https";
 import { join } from "node:path";
 import tls from "node:tls";
 import { createRequire } from "node:module";
+import { redactSecurityText } from "./security-runner.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const evidenceSchema = JSON.parse(readFileSync(new URL(
@@ -59,7 +60,8 @@ const recommendedCiphers = new Set([
 const cspDirectives = new Set([
   "base-uri", "block-all-mixed-content", "child-src", "connect-src", "default-src", "fenced-frame-src",
   "font-src", "form-action", "frame-ancestors", "frame-src", "img-src", "manifest-src", "media-src",
-  "object-src", "prefetch-src", "referrer", "report-to", "report-uri", "require-trusted-types-for",
+  "navigate-to", "object-src", "plugin-types", "prefetch-src", "referrer", "report-to", "report-uri",
+  "require-sri-for", "require-trusted-types-for",
   "sandbox", "script-src", "script-src-attr", "script-src-elem", "style-src", "style-src-attr",
   "style-src-elem", "trusted-types", "upgrade-insecure-requests", "worker-src"
 ]);
@@ -132,12 +134,15 @@ export function normalizeZapAlerts(report, imageDigest) {
 // alert carrying no directive is ordinary rather than unreadable.
 function cspDirectivesFrom(otherInfo) {
   const named = new Set();
+  for (const line of otherInfo.split("\n")) {
+    if (cspDirectives.has(line.trim())) named.add(line.trim());
+  }
   let run = false;
   let opening = true;
   for (const token of otherInfo.split(/[,\s]+/)) {
     if (token.length === 0) continue;
     const colon = token.lastIndexOf(":");
-    const candidate = colon < 0 ? token : token.slice(colon + 1);
+    const candidate = (colon < 0 ? token : token.slice(colon + 1)).replace(/[.;]+$/, "");
     if ((run || opening) && cspDirectives.has(candidate)) named.add(candidate);
     else if (run) run = false;
     if (colon >= 0) run = true;
@@ -148,9 +153,13 @@ function cspDirectivesFrom(otherInfo) {
 
 function alertFieldExcerpt(value) {
   if (typeof value !== "string") return `not text (${typeof value})`;
-  const flattened = value.replace(/\s+/g, " ").trim();
+  const flattened = redactSecurityText(value.replace(/\s+/g, " ")).trim();
   if (flattened.length === 0) return "empty";
   return flattened.length <= 160 ? JSON.stringify(flattened) : `${JSON.stringify(flattened.slice(0, 157))}...`;
+}
+
+function evidenceShape(value) {
+  return typeof value === "string" ? `of ${value.length} characters` : `not text (${typeof value})`;
 }
 
 function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest) {
@@ -161,10 +170,10 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
   const otherInfo = instance.otherinfo;
   if (![param, evidence, otherInfo].every((value) => typeof value === "string")) {
     throw unsupported(`param is ${alertFieldExcerpt(param)},`
-      + ` evidence is ${alertFieldExcerpt(evidence)}, otherinfo is ${alertFieldExcerpt(otherInfo)}`);
+      + ` evidence is ${evidenceShape(evidence)}, otherinfo is ${alertFieldExcerpt(otherInfo)}`);
   }
   const seen = () => `param ${alertFieldExcerpt(param)},`
-    + ` evidence of ${evidence.length} characters, otherinfo ${alertFieldExcerpt(otherInfo)}`;
+    + ` evidence ${evidenceShape(evidence)}, otherinfo ${alertFieldExcerpt(otherInfo)}`;
   if (["10010", "10054"].includes(pluginId)) {
     if (param !== "__Host-XSRF-TOKEN" || evidence !== "Set-Cookie: __Host-XSRF-TOKEN" || otherInfo !== "") {
       throw unsupported(`the cookie alert does not name the session cookie -- saw ${seen()}`);
@@ -217,7 +226,9 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
     const expectedToken = expected === "__Host-SESSION" ? "session" : expected === "__Host-XSRF-TOKEN" ? "xsrf-token" : null;
     if (!expected || evidence !== expected || tokenNames.length === 0
         || tokenNames.length !== otherInfo.split("\n").length || !tokenNames.includes(expectedToken)) {
-      throw unsupported(`the session alert does not name one known cookie -- saw ${seen()}`);
+      throw unsupported(`the session alert read ${tokenNames.length} known of`
+        + ` ${otherInfo.split("\n").length} cookie lines, expected ${JSON.stringify(expectedToken)}`
+        + ` -- saw param ${alertFieldExcerpt(param)}, evidence ${evidenceShape(evidence)}`);
     }
     return { kind: "session-signal", tokenNames: [...new Set(tokenNames)] };
   }
