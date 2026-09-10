@@ -5,6 +5,7 @@ import { checkRiskRegister } from "./risk-register.mjs";
 
 const strategy = readFileSync(new URL("../docs/quality-strategy.md", import.meta.url), "utf8");
 const pullRequestTemplate = readFileSync(new URL("../.github/pull_request_template.md", import.meta.url), "utf8");
+const instructions = readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8");
 
 test("given the quality strategy, when reviewing product risks, then the generated register is current", () => {
   // when / then
@@ -59,4 +60,12 @@ test("given no admission step, when reading the strategy, then failing closed an
   assert.match(strategy, /`COURTSIDE_TEST_PROFILES` forces the complete job set/i);
   assert.match(strategy, /a typo escalates rather than silently\s+reducing/i);
   assert.match(strategy, /is the immediate rollback/i);
+});
+
+test("given a periodic-only runtime path changes, when finalising it, then local and hosted evidence precede merge", () => {
+  // when / then
+  assert.match(strategy, /scheduled regression is not the first execution/i);
+  assert.match(instructions, /direct local\s+entry point/i);
+  assert.match(instructions, /workflow's `workflow_dispatch` against the branch before merge/i);
+  assert.match(pullRequestTemplate, /scheduled or periodic-only runtime[\s\S]*local[\s\S]*hosted branch run/i);
 });
