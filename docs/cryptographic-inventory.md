@@ -30,7 +30,8 @@ writes, and Spring Security has to issue the CSRF token this project does not ge
 `repository` or the party that decides instead, and `basis` says in prose what the number or the
 boundary means.
 
-Where this repository decides, the entry states `bits` and they have to reach 128. The number is not
+Where this repository decides, the entry states `bits`, and unless it is an identifier they have to
+reach 128. The number is not
 taken on trust: where a literal in the code determines it — the bytes a generator draws, the
 truncation a digest is cut to, the modulus a key pair is generated with — the test reads that
 literal and recomputes. Raising or lowering the literal without moving the entry fails the build,
@@ -48,8 +49,10 @@ names them and says what is known.
 
 `class` `identifier` is the one class the 128-bit minimum does not reach, because an identifier
 answers to uniqueness rather than to secrecy. Its entries still state their bits and still say what
-the bits buy. Moving an entry that protects something into that class to escape the minimum fails
-the build the moment the implementation probe reads it.
+the bits buy. Where a literal in the code determines those bits, moving an entry into that class to
+escape the minimum changes nothing, because the recomputation still reads what the code draws.
+Where no literal does, the class is what a reader has to weigh, and moving one is a change to the
+entry that the diff shows.
 
 `owner` is a role, never a person. Two exist: `club-operator` for anything an instance holds, and
 `repository-maintainer` for anything this repository holds.
