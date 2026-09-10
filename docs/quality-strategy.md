@@ -145,16 +145,21 @@ not count as release evidence; only a scheduled first attempt enters that bookke
 Every workflow that runs on a schedule feeds that tracker, not the nightly build alone. The tracker
 names them, but the set is not maintained by hand: a test reads every workflow file, collects the
 ones that carry a schedule and requires the tracker to name exactly those, so a new periodic gate
-cannot join the repository without joining the tracking. An issue closes when somebody has found
-its cause and answered it, and the tracker reopens it if the same class returns, so nothing rests
-on a count of quiet nights. A recorded failure carries the tracker's own label rather than the one
-product defects use, and it is assigned to the repository owner where that owner is a user account,
-so a red gate reaches somebody instead of waiting in a list to be found. An organisation cannot be
-an assignee, so an instance owned by one is told by the label alone. Where the failing workflow is
-the one behind the required check, the issue says so, because every open pull request inherits that
-failure until it is fixed. Each failed job owns at most one issue. Its first failed or timed-out
-step is the primary class, and later failures remain context on the same occurrence. A cancelled
-job is one job-level occurrence rather than one issue per cancelled or cleanup step.
+cannot join the repository without joining the tracking. An issue is an incident record, not a
+reliability counter. It closes when somebody records its cause, its answer and evidence for the
+affected check. A repository change carries its targeted test or runtime proof; a GitHub permission
+or hosted-runner correction needs a real run of that check; an external outage may close on evidence
+that establishes the external cause. A later, unrelated failure elsewhere in the workflow neither
+invalidates that proof nor keeps the incident open. The tracker reopens the issue if the same class
+returns, so nothing rests on a count of quiet nights. A recorded failure carries the tracker's own
+label rather than the one product defects use, and it is assigned to the repository owner where that
+owner is a user account, so a red gate reaches somebody instead of waiting in a list to be found. An
+organisation cannot be an assignee, so an instance owned by one is told by the label alone. Where
+the failing workflow is the one behind the required check, the issue says so, because every open
+pull request inherits that failure until it is fixed. Each failed job owns at most one issue. Its
+first failed or timed-out step is the primary class, and later failures remain context on the same
+occurrence. A cancelled job is one job-level occurrence rather than one issue per cancelled or
+cleanup step.
 
 ### Release checklist
 

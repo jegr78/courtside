@@ -83,10 +83,14 @@ fingerprint — the issues the scheduled-run tracker wrote. An issue a human ope
 night does not stop a release. Issues reporting `npm audit` are excluded by name, because those
 findings arrive from outside the repository and are tracked on their own.
 
-**The tracker never closes one of those issues itself.** Somebody closes it once its cause is known
-and answered, writing both into the issue. If the same failure class returns, the tracker reopens
-that issue by itself, so closing on a diagnosis costs nothing and is the safety net that makes it
-safe. A release that seems blocked for no reason is usually waiting on exactly that.
+**The tracker never closes one of those issues itself.** Somebody closes it after recording its
+cause, its answer and evidence for the affected check. A repository change carries its targeted
+test or runtime proof. A correction that only GitHub can exercise, such as job permissions, needs a
+real run of that check. An external outage may close once its logs establish that cause. A later,
+unrelated failure elsewhere in the workflow does not keep the incident open. If the same failure
+class returns, the tracker reopens the issue by itself, so closing on a diagnosis costs nothing and
+is the safety net that makes it safe. A release that seems blocked for no reason is usually waiting
+on exactly that.
 
 The issue text used to tell its reader to wait for seven consecutive scheduled first attempts, and
 the tracker commented once they had passed. That measured elapsed quiet time rather than whether

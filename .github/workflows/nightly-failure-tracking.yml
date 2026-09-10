@@ -39,12 +39,15 @@ jobs:
           RUN_ID: ${{ github.event.workflow_run.id }}
           WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
         run: |
+          set -o pipefail
           mkdir -p build/nightly-tracker
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/1" \
             > build/nightly-tracker/run.json
           gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/attempts/1/jobs?per_page=100" \
             --slurp | jq '{jobs: map(.jobs[]) }' > build/nightly-tracker/jobs.json
-          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs?event=schedule&status=completed&per_page=7" \
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs?event=schedule&status=success&per_page=100" \
+            --slurp | jq '{workflow_runs: map(.workflow_runs[]) }' \
             > build/nightly-tracker/recent.json
       - name: Ensure the tracker owns a label of its own
         continue-on-error: true

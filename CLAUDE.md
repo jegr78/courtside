@@ -466,7 +466,10 @@ on the board is a bug in the tracker, not a gap in the board.
   blocks. A limitation planned for remediation is work: replace `known-limit` with the appropriate
   work label and put it on the board and in its target milestone. The scheduled-run tracker owns the
   `nightly` issues: it opens one per failure class and reopens it if that class returns. It never
-  closes one. A person closes it once its cause is known and answered, writing both into the issue.
+  closes one. A person closes it after recording its cause, its answer and evidence for the affected
+  check. A correction that only GitHub can exercise needs a real run of that check; an external
+  outage may close once its logs establish the cause. An unrelated failure elsewhere in the same
+  workflow does not keep the incident open.
 
 ## The design specification
 

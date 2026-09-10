@@ -43,6 +43,18 @@ test("given evidence of a workflow other than the build, when it is read, then i
   assert.match(workflow, /--workflow-id "\$WORKFLOW_ID"/);
 });
 
+test("given more than seven failed runs, when binding the commit range, then successful history remains reachable", () => {
+  assert.match(workflow, /event=schedule&status=success&per_page=100/);
+  assert.match(workflow,
+    /gh api --paginate \\\n\s+"repos\/\$\{GITHUB_REPOSITORY\}\/actions\/workflows\/\$\{WORKFLOW_ID\}\/runs\?event=schedule&status=success&per_page=100"/);
+  assert.match(workflow, /workflow_runs: map\(\.workflow_runs\[\]\)/);
+  assert.doesNotMatch(workflow, /per_page=7/);
+});
+
+test("given paginated evidence pipelines, when an API read fails, then jq cannot hide that failure", () => {
+  assert.match(workflow, /Read immutable first-attempt evidence[\s\S]*?run: \|\n\s+set -o pipefail/);
+});
+
 test("given a second job added to the tracker, when a fork run completes, then it refuses the event too", () => {
   // given — the non-schedule path is closed by a condition, and a job added without it would open it again
   const refusesForeignEvents = /github\.event\.workflow_run\.event == 'schedule'/;

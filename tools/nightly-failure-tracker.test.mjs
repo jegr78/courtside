@@ -86,6 +86,19 @@ test("given a prior green nightly, when a failure is recorded, then its main com
   assert.match(planned.body, new RegExp(`${"b".repeat(40)}\\.\\.${"a".repeat(40)}`));
 });
 
+test("given a new nightly incident, when its lifecycle is written, then proof stays scoped to its cause", () => {
+  // given
+  const [failure] = classifyNightlyFailures({ ...run, run_attempt: 1 }, jobs, workflowId);
+
+  // when
+  const [planned] = planFailureUpdates([failure], []);
+
+  // then
+  assert.match(planned.body, /Record the cause, its answer and evidence for the affected check/);
+  assert.match(planned.body, /An unrelated failure elsewhere in the workflow does not keep this incident open/);
+  assert.doesNotMatch(planned.body, /consecutive|streak|quiet nights/i);
+});
+
 test("given the GitHub API rejects a write, when applying the plan, then the tracker fails closed", async () => {
   await assert.rejects(
     applyIssuePlan([{ action: "create", title: "title", body: "body", labels: ["nightly-failure"] }],
