@@ -65,7 +65,7 @@ public abstract class AbstractIntegrationTest {
                 + " SELECT * FROM " + BASELINE_SCHEMA + "." + table).update());
     }
 
-    private static List<String> publicTables(JdbcClient jdbc) {
+    protected static List<String> publicTables(JdbcClient jdbc) {
         return jdbc.sql("""
                         SELECT tablename
                         FROM pg_tables
