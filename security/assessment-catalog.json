@@ -2154,7 +2154,7 @@
           "manualProcedureId": "MAN-COMMS-001",
           "controlEvidence": {
             "productionPath": "tools/security-passive-deployment.mjs",
-            "falsifyingTest": "tools/security-passive-deployment.test.mjs#given backup and unreferenced responses, when exposure is assessed, then forbidden or successful discovery fails"
+            "falsifyingTest": "tools/security-passive-deployment.test.mjs#given backup and unreferenced responses, when exposure is assessed, then only a served one fails"
           }
         },
         {

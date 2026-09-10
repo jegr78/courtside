@@ -5,6 +5,7 @@ import https from "node:https";
 import { join } from "node:path";
 import tls from "node:tls";
 import { createRequire } from "node:module";
+import { redactSecurityText } from "./security-runner.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const evidenceSchema = JSON.parse(readFileSync(new URL(
@@ -56,8 +57,14 @@ const recommendedCiphers = new Set([
   "ECDHE-ECDSA-AES256-GCM-SHA384", "ECDHE-RSA-AES256-GCM-SHA384",
   "ECDHE-ECDSA-CHACHA20-POLY1305", "ECDHE-RSA-CHACHA20-POLY1305"
 ]);
-const cspDirective = /^[a-z][a-z-]*$/;
-const namedDirectivesLead = "directive(s):";
+const cspDirectives = new Set([
+  "base-uri", "block-all-mixed-content", "child-src", "connect-src", "default-src", "fenced-frame-src",
+  "font-src", "form-action", "frame-ancestors", "frame-src", "img-src", "manifest-src", "media-src",
+  "navigate-to", "object-src", "plugin-types", "prefetch-src", "referrer", "report-to", "report-uri",
+  "require-sri-for", "require-trusted-types-for",
+  "sandbox", "script-src", "script-src-attr", "script-src-elem", "style-src", "style-src-attr",
+  "style-src-elem", "trusted-types", "upgrade-insecure-requests", "worker-src"
+]);
 const suspiciousCommentPatterns = [
   "todo", "fixme", "bug", "bugs", "xxx", "query", "db", "admin", "administrator", "user", "username",
   "select", "where", "from", "later", "debug"
@@ -123,29 +130,59 @@ export function normalizeZapAlerts(report, imageDigest) {
       || left.routeTemplate.localeCompare(right.routeTemplate));
 }
 
-// ZAP words this rule two ways: broad directives listed one per line, and a sentence naming the
-// directives that have no `default-src` fallback. Both state the same fact about the same header.
+function withoutTrailingPunctuation(token) {
+  let end = token.length;
+  while (end > 0 && (token[end - 1] === "." || token[end - 1] === ";")) end--;
+  return token.slice(0, end);
+}
+
+// The scanner's own templates name a directive in one of two places and otherwise name none, so an
+// alert carrying no directive is ordinary rather than unreadable.
 function cspDirectivesFrom(otherInfo) {
-  const listed = [...otherInfo.matchAll(/(?:^|\n)([a-z][a-z-]*)(?=\n|$)/g)].map((match) => match[1]);
-  const opening = otherInfo.indexOf(namedDirectivesLead);
-  const closing = opening < 0 ? -1 : otherInfo.indexOf("is/are", opening);
-  const named = closing < 0 ? []
-    : otherInfo.slice(opening + namedDirectivesLead.length, closing).split(",").map((directive) => directive.trim());
-  const directives = [...new Set([...listed, ...named])];
-  return directives.every((directive) => cspDirective.test(directive)) ? directives.toSorted() : [];
+  const named = new Set();
+  for (const line of otherInfo.split("\n")) {
+    if (cspDirectives.has(line.trim())) named.add(line.trim());
+  }
+  let run = false;
+  let opening = true;
+  for (const token of otherInfo.split(/[,\s]+/)) {
+    if (token.length === 0) continue;
+    const colon = token.lastIndexOf(":");
+    const candidate = withoutTrailingPunctuation(colon < 0 ? token : token.slice(colon + 1));
+    if ((run || opening) && cspDirectives.has(candidate)) named.add(candidate);
+    else if (run) run = false;
+    if (colon >= 0) run = true;
+    opening = false;
+  }
+  return [...named].toSorted();
+}
+
+function alertFieldExcerpt(value) {
+  if (typeof value !== "string") return `not text (${typeof value})`;
+  const flattened = redactSecurityText(value.replace(/\s+/g, " ")).trim();
+  if (flattened.length === 0) return "empty";
+  return flattened.length <= 160 ? JSON.stringify(flattened) : `${JSON.stringify(flattened.slice(0, 157))}...`;
+}
+
+function evidenceShape(value) {
+  return typeof value === "string" ? `of ${value.length} characters` : `not text (${typeof value})`;
 }
 
 function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest) {
-  const unsupported = () => new Error(`ZAP rule ${pluginId} produced unsupported rule evidence`);
+  const unsupported = (reason) =>
+    new Error(`ZAP rule ${pluginId} produced unsupported rule evidence: ${reason}`);
   const param = instance.param;
   const evidence = instance.evidence;
   const otherInfo = instance.otherinfo;
   if (![param, evidence, otherInfo].every((value) => typeof value === "string")) {
-    throw unsupported();
+    throw unsupported(`param is ${alertFieldExcerpt(param)},`
+      + ` evidence is ${evidenceShape(evidence)}, otherinfo is ${alertFieldExcerpt(otherInfo)}`);
   }
+  const seen = () => `param ${alertFieldExcerpt(param)},`
+    + ` evidence ${evidenceShape(evidence)}, otherinfo ${alertFieldExcerpt(otherInfo)}`;
   if (["10010", "10054"].includes(pluginId)) {
     if (param !== "__Host-XSRF-TOKEN" || evidence !== "Set-Cookie: __Host-XSRF-TOKEN" || otherInfo !== "") {
-      throw unsupported();
+      throw unsupported(`the cookie alert does not name the session cookie -- saw ${seen()}`);
     }
     return { kind: "cookie-attribute", cookieName: "xsrf-token",
       missingAttribute: pluginId === "10010" ? "http-only" : "same-site" };
@@ -170,24 +207,21 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
   }
   if (pluginId === "10036") {
     if (param !== "" || evidence.length === 0 || otherInfo !== "") {
-      throw unsupported();
+      throw unsupported(`the server-header alert has an unexpected shape: ${seen()}`);
     }
     return { kind: "response-header", headerName: "server" };
   }
   if (pluginId === "10055") {
     if (param.toLowerCase() !== "content-security-policy" || evidence.length === 0) {
-      throw unsupported();
+      throw unsupported(`the alert does not describe the policy header: ${seen()}`);
     }
-    const directives = cspDirectivesFrom(otherInfo);
-    if (directives.length === 0) {
-      throw unsupported();
-    }
-    return { kind: "policy-directive", headerName: "content-security-policy", directives };
+    return { kind: "policy-directive", headerName: "content-security-policy",
+      directives: cspDirectivesFrom(otherInfo) };
   }
   if (pluginId === "10109") {
     if (param !== "" || !evidence.includes("<script")
         || !otherInfo.startsWith("No links have been found while there are scripts")) {
-      throw unsupported();
+      throw unsupported(`the script alert has an unexpected shape: ${seen()}`);
     }
     return { kind: "application-signal", signal: "scripts-without-links" };
   }
@@ -198,7 +232,9 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
     const expectedToken = expected === "__Host-SESSION" ? "session" : expected === "__Host-XSRF-TOKEN" ? "xsrf-token" : null;
     if (!expected || evidence !== expected || tokenNames.length === 0
         || tokenNames.length !== otherInfo.split("\n").length || !tokenNames.includes(expectedToken)) {
-      throw unsupported();
+      throw unsupported(`the session alert read ${tokenNames.length} known of`
+        + ` ${otherInfo.split("\n").length} cookie lines, expected ${JSON.stringify(expectedToken)}`
+        + ` -- saw param ${alertFieldExcerpt(param)}, evidence ${evidenceShape(evidence)}`);
     }
     return { kind: "session-signal", tokenNames: [...new Set(tokenNames)] };
   }
@@ -314,16 +350,18 @@ export function evaluatePublicResponseHeaders(response) {
   const policies = contentSecurityPolicy.split(/,\s*(?=[a-z][a-z-]*\s)/i)
     .map((policy) => policy.split(";").map((directive) => directive.trim()).filter(Boolean)
       .map((directive) => directive.split(/\s+/).map((part) => part.toLowerCase())));
+  const matchesExpected = ([name, ...sources]) => {
+    const expectedSources = expectedDirectives.get(name);
+    return expectedSources !== undefined && sources.length === expectedSources.length
+      && expectedSources.every((source) => sources.includes(source));
+  };
   const expectedPolicy = (directives) => directives.length === expectedDirectives.size
     && new Set(directives.map(([name]) => name)).size === expectedDirectives.size
-    && directives.every(([name, ...sources]) => {
-      const expectedSources = expectedDirectives.get(name);
-      return expectedSources !== undefined && sources.length === expectedSources.length
-        && expectedSources.every((source) => sources.includes(source));
-    });
-  const basePolicy = (directives) => JSON.stringify(directives) === JSON.stringify([["base-uri", "'none'"]]);
+    && directives.every(matchesExpected);
+  // A browser enforces every policy separately, so the proxy's own may only restate directives the
+  // application already sets, with the sources it sets them to.
   const cspValid = policies.some(expectedPolicy)
-    && policies.every((policy) => expectedPolicy(policy) || basePolicy(policy));
+    && policies.every((policy) => policy.length > 0 && policy.every(matchesExpected));
   const passed = securityHeaders.every((header) => response.headers.has(header))
     && response.headers.get("x-content-type-options") === "nosniff"
     && response.headers.get("x-frame-options") === "DENY"
@@ -340,8 +378,10 @@ export function evaluatePublicResponseHeaders(response) {
   };
 }
 
+// These paths reach the application, where authentication precedes routing, so the answer comes
+// before anything decides whether a file of that name exists.
 export function evaluateExposureResponses(statuses) {
-  const passed = statuses.length > 0 && statuses.every((status) => status === 404);
+  const passed = statuses.length > 0 && statuses.every((status) => status === 401 || status === 404);
   return { passed, observation: passed ? "route-group-not-exposed" : "unexpected-route-group-response" };
 }
 
@@ -409,9 +449,8 @@ function retainedRuleEvidenceMatches(alert, imageDigest) {
   if (alert.pluginId === "10036") return evidence.kind === "response-header" && evidence.headerName === "server";
   if (alert.pluginId === "10055") return evidence.kind === "policy-directive"
     && evidence.headerName === "content-security-policy"
-    && evidence.directives.length > 0
     && new Set(evidence.directives).size === evidence.directives.length
-    && evidence.directives.every((directive) => cspDirective.test(directive))
+    && evidence.directives.every((directive) => cspDirectives.has(directive))
     && JSON.stringify(evidence.directives) === JSON.stringify(evidence.directives.toSorted());
   if (alert.pluginId === "10109") return evidence.kind === "application-signal"
     && evidence.signal === "scripts-without-links";

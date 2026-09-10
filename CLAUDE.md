@@ -132,6 +132,12 @@ fails on the missing `BuildProperties` bean.
   runner rather than from the contract so a weakened contract cannot reduce them. Unknown,
   structural or untrusted change evidence fails closed to `full`; `--full` may escalate but never
   reduce the selected verification.
+* **A change to the scanner normalizers is unverified until the assessment has run.**
+  `tools/security-passive-deployment.mjs` reads what ZAP emits, and a unit test over it can only
+  assert wordings somebody has already observed — so it is structurally unable to show that the
+  parser handles the scanner's real output. `docs/security-environment.md` describes the local run
+  and it works on a developer machine: run it after the fix, not only before. A branch that could
+  not run it says so in its pull request body instead of claiming the hosted behaviour changes.
 * **Cross-module test setup uses test fixtures.** A module exposes intent-revealing fixture
   operations from `src/test/java/org/courtside/<module>/testfixture`, and consuming integration
   tests register the required fixture explicitly with `@Import`. Fixtures return identifiers or
