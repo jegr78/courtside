@@ -1135,8 +1135,9 @@
         },
         {
           "id": "v5.0.0-8.4.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-AUTHZ-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-AUTHZ-001",
+          "rationale": "This control asks a multi-tenant application for cross-tenant controls. Courtside is single-tenant by design: one club, one instance, one database, with no tenant discriminator on any row and no operation that can name another tenant. There is no second tenant for an operation to affect."
         },
         {
           "id": "v5.0.0-9.1.1",
@@ -1505,7 +1506,11 @@
         {
           "id": "v5.0.0-13.2.5",
           "status": "implemented",
-          "manualProcedureId": "MAN-OPS-001"
+          "manualProcedureId": "MAN-OPS-001",
+          "controlEvidence": {
+            "productionPath": "src/main/resources/application.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/OutboundRequestSurfaceTest.java#whenReadingEveryOutboundClient_thenOnlyTheConfiguredBreachEndpointIsReached"
+          }
         },
         {
           "id": "v5.0.0-13.3.1",
@@ -1674,7 +1679,11 @@
         {
           "id": "v5.0.0-15.3.2",
           "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "manualProcedureId": "MAN-ARCH-001",
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
+            "falsifyingTest": "src/test/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookupTest.java#givenTheRangeServiceAnswersWithARedirect_whenAPasswordIsChecked_thenItIsNotFollowed"
+          }
         },
         {
           "id": "v5.0.0-15.3.3",
@@ -2211,8 +2220,9 @@
         },
         {
           "id": "WSTG-v4.2-CRYP-02",
-          "status": "implemented",
-          "manualProcedureId": "MAN-CRYPTO-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-CRYPTO-001",
+          "rationale": "A padding oracle needs a padded block cipher that decrypts attacker-supplied ciphertext and answers differently for a padding error than for a content error. The shipped application decrypts no such ciphertext: security/cryptographic-inventory.json, which CryptographicInventoryTest keeps complete against the source, records hashing, random generation, signing and transport security only, and no CBC-mode or otherwise padded decryption anywhere in src/main."
         },
         {
           "id": "WSTG-v4.2-CRYP-03",
@@ -2282,8 +2292,9 @@
         },
         {
           "id": "WSTG-v4.2-INFO-01",
-          "status": "implemented",
-          "manualProcedureId": "MAN-ARCH-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-ARCH-001",
+          "rationale": "This control reconnoitres what third-party search engines have already indexed about one deployed site. Courtside ships an artefact, not a site: every club runs its own instance under its own domain, and the repository has no canonical public deployment for an index to hold. The metadata the shipped artefact itself publishes is a property of the build and is reviewed under WSTG-v4.2-INFO-03 and WSTG-v4.2-INFO-05 instead."
         },
         {
           "id": "WSTG-v4.2-INFO-02",
