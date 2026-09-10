@@ -344,16 +344,18 @@ export function evaluatePublicResponseHeaders(response) {
   const policies = contentSecurityPolicy.split(/,\s*(?=[a-z][a-z-]*\s)/i)
     .map((policy) => policy.split(";").map((directive) => directive.trim()).filter(Boolean)
       .map((directive) => directive.split(/\s+/).map((part) => part.toLowerCase())));
+  const matchesExpected = ([name, ...sources]) => {
+    const expectedSources = expectedDirectives.get(name);
+    return expectedSources !== undefined && sources.length === expectedSources.length
+      && expectedSources.every((source) => sources.includes(source));
+  };
   const expectedPolicy = (directives) => directives.length === expectedDirectives.size
     && new Set(directives.map(([name]) => name)).size === expectedDirectives.size
-    && directives.every(([name, ...sources]) => {
-      const expectedSources = expectedDirectives.get(name);
-      return expectedSources !== undefined && sources.length === expectedSources.length
-        && expectedSources.every((source) => sources.includes(source));
-    });
-  const basePolicy = (directives) => JSON.stringify(directives) === JSON.stringify([["base-uri", "'none'"]]);
+    && directives.every(matchesExpected);
+  // A browser enforces every policy separately, so the proxy's own may only restate directives the
+  // application already sets, with the sources it sets them to.
   const cspValid = policies.some(expectedPolicy)
-    && policies.every((policy) => expectedPolicy(policy) || basePolicy(policy));
+    && policies.every((policy) => policy.length > 0 && policy.every(matchesExpected));
   const passed = securityHeaders.every((header) => response.headers.has(header))
     && response.headers.get("x-content-type-options") === "nosniff"
     && response.headers.get("x-frame-options") === "DENY"

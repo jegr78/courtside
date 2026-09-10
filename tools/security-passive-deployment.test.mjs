@@ -112,8 +112,14 @@ test("given the public response boundary, when CSP or proxy disclosure is broade
   });
   assert.deepEqual(evaluatePublicResponseHeaders({ ...response,
     headers: new Map([...headers, ["content-security-policy",
-      `${headers.get("content-security-policy")}, base-uri 'none'`]])
+      `${headers.get("content-security-policy")}, base-uri 'none'; frame-ancestors 'none'`]])
   }), { passed: true, observation: "security-and-cache-headers-valid" });
+  for (const proxyPolicy of ["frame-ancestors 'self'", "report-uri /csp", "base-uri 'none'; img-src *"]) {
+    assert.deepEqual(evaluatePublicResponseHeaders({ ...response,
+      headers: new Map([...headers, ["content-security-policy",
+        `${headers.get("content-security-policy")}, ${proxyPolicy}`]])
+    }), { passed: false, observation: "security-or-cache-headers-invalid" });
+  }
   assert.deepEqual(evaluatePublicResponseHeaders({ ...response,
     headers: new Map([...headers, ["via", "1.1 Caddy"]])
   }), { passed: false, observation: "proxy-implementation-disclosed" });
