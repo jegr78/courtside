@@ -274,28 +274,33 @@
         },
         {
           "id": "v5.0.0-1.2.5",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks for parameterized operating-system calls or contextual command-line encoding. The shipped application starts no operating-system process at all: it constructs no ProcessBuilder and calls no Runtime.getRuntime, so no request value ever reaches a command line. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "v5.0.0-1.2.6",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks for protection against LDAP injection. The shipped application binds to no directory: it carries no JNDI directory context, no LdapContext and no LDAP client, and accounts live in its own PostgreSQL schema. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "v5.0.0-1.2.7",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks for query parameterization or precompiled queries against XPath injection. The shipped application evaluates no XPath: it constructs no XPathFactory and reads no XML document at all. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "v5.0.0-1.2.8",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that a LaTeX processor is configured without --shell-escape and behind a command allowlist. Courtside runs no LaTeX processor and generates no typeset documents; its exports are CSV written by commons-csv. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "v5.0.0-1.2.9",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that special characters in regular expressions are escaped so they are not misread as metacharacters. Every Pattern.compile in src/main/java takes a string literal written in this repository, so no request value ever decides what a metacharacter means. InterpreterSurfaceTest#whenReadingEveryCompiledPattern_thenItsSourceIsALiteralAndNotARequest goes red for a pattern built from anything else."
         },
         {
           "id": "v5.0.0-1.3.1",
@@ -304,8 +309,9 @@
         },
         {
           "id": "v5.0.0-1.3.2",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that eval and other dynamic code execution such as Spring Expression Language are avoided. The shipped application evaluates no expression language: it carries no SpelExpressionParser, no javax.script engine and no scripting shell, and its rule engine evaluates declarative rows rather than expressions. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "v5.0.0-1.3.3",
@@ -338,13 +344,15 @@
         },
         {
           "id": "v5.0.0-1.3.8",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that untrusted input is sanitized before use in JNDI queries and that JNDI is configured safely. The shipped application performs no JNDI lookup: it carries no InitialContext and no javax.naming use, and its only datasource is configured by Spring Boot properties. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "v5.0.0-1.3.9",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that content is sanitized before it is sent to memcache. Courtside runs no memcache: it carries no memcached client, and the only caches it keeps are in-process maps holding hash-prefix ranges. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "v5.0.0-1.3.10",
@@ -386,8 +394,9 @@
         },
         {
           "id": "v5.0.0-1.5.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that XML parsers are configured restrictively so external entities cannot be resolved. The shipped application parses no XML: it constructs no DocumentBuilder, SAXParser, XMLInputFactory, TransformerFactory or XmlMapper, and its request and response bodies are JSON generated from the OpenAPI document. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "v5.0.0-1.5.2",
@@ -658,33 +667,39 @@
         },
         {
           "id": "v5.0.0-4.3.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks for a query allowlist, depth limiting, amount limiting or cost analysis against expensive nested GraphQL queries. Courtside serves no GraphQL and no other client-composed query language; every operation is a fixed REST route declared in the OpenAPI document."
         },
         {
           "id": "v5.0.0-4.3.2",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that GraphQL introspection is disabled in production. Courtside ships no GraphQL schema and no introspection endpoint to disable."
         },
         {
           "id": "v5.0.0-4.4.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that WebSocket connections use WSS. Courtside opens no WebSocket: neither src/main/java nor frontend/src constructs one, and the browser talks to the instance over HTTPS requests only."
         },
         {
           "id": "v5.0.0-4.4.2",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that the Origin header is checked against an allowlist during the WebSocket handshake. Courtside performs no WebSocket handshake, so there is no upgrade request whose origin could be trusted."
         },
         {
           "id": "v5.0.0-4.4.3",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that a dedicated WebSocket token meets the session-management requirements where standard session management cannot be used. Courtside has no WebSocket channel and therefore issues no token beside its ordinary session cookie."
         },
         {
           "id": "v5.0.0-4.4.4",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The control asks that a dedicated WebSocket token is obtained through the already authenticated HTTPS session when a session transitions to a WebSocket channel. No session in Courtside ever makes that transition, because no WebSocket channel exists."
         },
         {
           "id": "v5.0.0-5.1.1",
@@ -974,8 +989,9 @@
         },
         {
           "id": "v5.0.0-7.1.3",
-          "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-SESSION-001",
+          "rationale": "The control asks that every system creating and managing sessions in a federated identity ecosystem is documented together with the controls coordinating their lifetimes. Courtside participates in no federation: it creates every session itself, ends every session itself, and integrates no single sign-on system."
         },
         {
           "id": "v5.0.0-7.2.1",
@@ -1074,8 +1090,9 @@
         },
         {
           "id": "v5.0.0-7.6.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-SESSION-001",
+          "rationale": "The control asks that session lifetime and termination between relying parties and identity providers behave as documented, with re-authentication when the maximum time since the identity provider's authentication event is reached. Courtside is neither a relying party nor an identity provider and holds no external authentication event to age."
         },
         {
           "id": "v5.0.0-7.6.2",
@@ -1141,38 +1158,45 @@
         },
         {
           "id": "v5.0.0-9.1.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-SESSION-001",
+          "rationale": "The control asks that a self-contained token is validated by its signature or MAC before its contents are trusted. Courtside issues no self-contained token: its sessions are Spring Session JDBC rows in the instance's own PostgreSQL database, and the cookie carries an opaque identifier that names a row rather than any content to tamper with."
         },
         {
           "id": "v5.0.0-9.1.2",
-          "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-SESSION-001",
+          "rationale": "The control asks for an algorithm allowlist that excludes 'None' when creating and verifying self-contained tokens. Courtside creates no such token and verifies none, so no algorithm field reaches any decision it makes."
         },
         {
           "id": "v5.0.0-9.1.3",
-          "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-SESSION-001",
+          "rationale": "The control asks that key material validating self-contained tokens comes from pre-configured trusted sources rather than from headers such as jku, x5u or jwk. Courtside validates no token and reads no JWS header; a session identifier is looked up in its own database."
         },
         {
           "id": "v5.0.0-9.2.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-SESSION-001",
+          "rationale": "The control asks that a token's nbf and exp validity span is verified. Courtside's session validity is a column on the stored session row that the server owns, not a claim the client presents."
         },
         {
           "id": "v5.0.0-9.2.2",
-          "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-SESSION-001",
+          "rationale": "The control asks that a service checks a token's type and intended purpose before accepting its contents. Courtside accepts one credential shape, an opaque session identifier resolved against its own session store, so there is no second token type it could confuse with the first."
         },
         {
           "id": "v5.0.0-9.2.3",
-          "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-SESSION-001",
+          "rationale": "The control asks that a service only accepts tokens whose audience names it. A Courtside session row exists only in the instance that created it and is unusable anywhere else, so there is no audience claim to restrict."
         },
         {
           "id": "v5.0.0-9.2.4",
-          "status": "implemented",
-          "manualProcedureId": "MAN-SESSION-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-SESSION-001",
+          "rationale": "The control asks that an issuer signing for several audiences restricts each token to its intended audience. Courtside issues no signed token and serves one club per instance, so no token can be presented to an audience it was not made for."
         },
         {
           "id": "v5.0.0-10.1.1",
@@ -1427,8 +1451,9 @@
         },
         {
           "id": "v5.0.0-12.1.3",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The control asks that mTLS client certificates are shown to be trusted before their identity is used for authentication or authorization. Courtside authenticates no client by certificate: the public boundary terminates TLS server-side only, and identity comes from the session cookie."
         },
         {
           "id": "v5.0.0-12.2.1",
@@ -1834,38 +1859,45 @@
         },
         {
           "id": "v5.0.0-17.1.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The control asks that a TURN service refuses IP addresses reserved for special purposes. Courtside ships no TURN service and relays no NAT traversal traffic."
         },
         {
           "id": "v5.0.0-17.2.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The control asks that a DTLS certificate key is managed under the documented key-management policy. Courtside runs no media server and holds no DTLS certificate; every key it does hold is recorded in security/cryptographic-inventory.json."
         },
         {
           "id": "v5.0.0-17.2.2",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The control asks that a media server supports approved DTLS cipher suites and a secure DTLS-SRTP protection profile. Courtside runs no media server and negotiates no DTLS."
         },
         {
           "id": "v5.0.0-17.2.3",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The control asks that SRTP authentication is checked at the media server so RTP injection cannot insert media. Courtside carries no real-time media path in which a stream could be injected."
         },
         {
           "id": "v5.0.0-17.2.4",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The control asks that a media server keeps processing when it meets malformed SRTP packets. Courtside receives no SRTP packets, because it runs no media server."
         },
         {
           "id": "v5.0.0-17.3.1",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The control asks that a signaling server rate-limits so it keeps serving legitimate messages during a flood. Courtside runs no WebRTC signaling server; its rate limiting protects sign-in and booking routes and is assessed under those controls."
         },
         {
           "id": "v5.0.0-17.3.2",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The control asks that a signaling server survives malformed signaling messages. Courtside processes no signaling messages, because it establishes no peer connections."
         }
       ]
     },
@@ -1877,8 +1909,9 @@
       "controls": [
         {
           "id": "WSTG-v4.2-APIT-01",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The test exercises a GraphQL endpoint: introspection, batching, aliasing and query depth. Courtside exposes no GraphQL endpoint. Its public surface is the REST contract in src/main/resources/api/openapi.yaml, and ApiContractCoverageTest requires every shipped route to be declared there, so a GraphQL endpoint could not appear unannounced."
         },
         {
           "id": "WSTG-v4.2-ATHN-01",
@@ -2099,8 +2132,9 @@
         },
         {
           "id": "WSTG-v4.2-CLNT-08",
-          "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-CLIENT-001",
+          "rationale": "The test exercises Flash content for cross-site flashing through FlashVars and unsafe ActionScript. Courtside ships no Flash object, no SWF asset and no Flash player dependency; its client is a React single-page application."
         },
         {
           "id": "WSTG-v4.2-CLNT-09",
@@ -2112,8 +2146,9 @@
         },
         {
           "id": "WSTG-v4.2-CLNT-10",
-          "status": "implemented",
-          "manualProcedureId": "MAN-CLIENT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-CLIENT-001",
+          "rationale": "The test exercises a WebSocket endpoint's origin handling, authentication and message integrity. The shipped frontend constructs no WebSocket and the application exposes no upgrade route."
         },
         {
           "id": "WSTG-v4.2-CLNT-11",
@@ -2191,8 +2226,9 @@
         },
         {
           "id": "WSTG-v4.2-CONF-08",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The test reads a rich-internet-application cross-domain policy such as crossdomain.xml or clientaccesspolicy.xml and checks how permissive it is. Courtside publishes neither file, and the reference deployment serves only the built application, its assets and the API."
         },
         {
           "id": "WSTG-v4.2-CONF-09",
@@ -2210,8 +2246,9 @@
         },
         {
           "id": "WSTG-v4.2-CONF-11",
-          "status": "implemented",
-          "manualProcedureId": "MAN-COMMS-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-COMMS-001",
+          "rationale": "The test reads cloud storage buckets for permissive access control. Courtside stores everything it owns in the instance's own PostgreSQL database and on its own filesystem; the reference deployment provisions no object storage and the application holds no cloud storage credential."
         },
         {
           "id": "WSTG-v4.2-CRYP-01",
@@ -2398,23 +2435,27 @@
         },
         {
           "id": "WSTG-v4.2-INPV-06",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The test injects LDAP filter syntax into a parameter a directory query builds. Courtside issues no directory query: no LDAP or JNDI directory client exists in src/main/java, and authentication reads its own account table. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "WSTG-v4.2-INPV-07",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The test injects XML into a document the application parses or emits. Courtside parses and emits no XML on any request path: its API is JSON generated from the OpenAPI document and its exports are CSV. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "WSTG-v4.2-INPV-08",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The test injects server-side include directives into content a web server expands before serving it. The reference deployment serves the built single-page application and its static assets through Caddy, which has no server-side include directive and is configured with none; the application server returns JSON and CSV and expands nothing."
         },
         {
           "id": "WSTG-v4.2-INPV-09",
-          "status": "implemented",
-          "manualProcedureId": "MAN-INPUT-001"
+          "status": "not-applicable",
+          "manualProcedureId": "MAN-INPUT-001",
+          "rationale": "The test injects XPath syntax into a parameter an XPath query builds. Courtside evaluates no XPath expression and reads no XML document from which one could be selected. InterpreterSurfaceTest#whenReadingTheShippedSource_thenNoInterpreterIsThereForAnInjectionToReach goes red the moment one appears in src/main/java."
         },
         {
           "id": "WSTG-v4.2-INPV-10",
