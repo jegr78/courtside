@@ -8,7 +8,9 @@ import { boundedAssessmentFailureReason } from "./security-runner.mjs";
 import {
   assertPassiveDeploymentEvidence, assertQualifiedImageEvidence, buildPassiveDeploymentEvidence, createAssessmentControl,
   evaluateCipherPolicy, evaluateExposureResponses, evaluateMethodBoundary, evaluatePublicResponseHeaders,
-  normalizeZapAlerts, passiveDeploymentSummary, passiveScannerOrigin, requiredPassiveCheckIds, runOwnedProcess
+  normalizeZapAlerts, openCandidateCount, passiveAlertFingerprint, passiveDeploymentSummary,
+  alertDiscriminator, recordCovers, resolveAlertAgainst,
+  passiveScannerOrigin, requiredPassiveCheckIds, runOwnedProcess, zapVersion
 } from "./security-passive-deployment.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -661,6 +663,376 @@ test("given retained evidence naming no directive, when it is validated, then th
     assert.equal(validate(evidence), true, JSON.stringify(validate.errors));
   });
 
+const dispositions = JSON.parse(readFileSync(new URL(
+  "../security/passive-alert-dispositions.json", import.meta.url)));
+const acceptances = JSON.parse(readFileSync(new URL(
+  "../security/exceptions.json", import.meta.url))).riskAcceptances;
+const baselineCandidates = JSON.parse(readFileSync(new URL(
+  "../security/passive-baseline-finding-summary.json", import.meta.url))).candidates;
+
+const cookieAlert = (route) => ({ pluginid: "10010", riskcode: "1", confidence: "2",
+  instances: [{ uri: `${passiveScannerOrigin}${route}`, method: "GET", param: "__Host-XSRF-TOKEN",
+    evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] });
+
+const evidenceFor = (alerts, today) => buildPassiveDeploymentEvidence({
+  targetFingerprint: digest, imageDigest: digest, observations: passingObservations(), requestCount: 1,
+  zapReport: { version: "2.17.0", site: [{ alerts }] }, today });
+
+test("given an alert a recorded disposition covers, when building evidence, then no candidate remains", () => {
+  // given — the run against the disposable target raises this on the site root every time
+  const alerts = [cookieAlert("/")];
+
+  // when
+  const evidence = evidenceFor(alerts);
+
+  // then
+  assert.equal(evidence.zap.alerts[0].state, "false-positive");
+  assert.match(evidence.zap.alerts[0].disposition.rationale, /double-submit/);
+  assert.equal(evidence.outcome, "passed");
+});
+
+test("given an alert nothing has classified, when building evidence, then the run stays incomplete", () => {
+  // given — a rule on a route no disposition names is the case the mechanism exists for
+  const alerts = [cookieAlert("/font-licenses.txt")];
+
+  // when
+  const evidence = evidenceFor(alerts);
+
+  // then
+  assert.equal(evidence.zap.alerts[0].state, "candidate");
+  assert.equal(evidence.outcome, "incomplete");
+});
+
+const acceptedDirectives = ["connect-src", "font-src", "form-action", "frame-src", "img-src",
+  "manifest-src", "media-src", "object-src", "script-src", "style-src", "worker-src"];
+const acceptedOccurrences = 5;
+const policyAlert = (directives, riskcode = "2", occurrences = acceptedOccurrences) => ({
+  pluginid: "10055", riskcode, confidence: "3",
+  instances: Array.from({ length: occurrences }, () => ({ uri: `${passiveScannerOrigin}/`, method: "GET",
+    param: "Content-Security-Policy", evidence: "base-uri 'none'; frame-ancestors 'none'",
+    otherinfo: `The following directives either allow wildcard sources (or ancestors), are not defined,`
+      + ` or are overly broadly defined:\n${directives.join("\n")}` })) });
+
+test("given an alert an unexpired acceptance covers, when building evidence, then the run passes", () => {
+  // given — the CSP alert on the site root is the accepted remote-logo risk, not a false positive
+  const alerts = [policyAlert(acceptedDirectives)];
+
+  // when
+  const evidence = evidenceFor(alerts, "2026-09-10");
+
+  // then
+  assert.equal(evidence.zap.alerts[0].state, "accepted-risk");
+  assert.equal(evidence.zap.alerts[0].acceptance.id, "remote-https-club-logo-2026");
+  assert.equal(evidence.outcome, "passed");
+});
+
+test("given the acceptance has expired, when building evidence, then its alert is an open candidate again", () => {
+  // given — the same alert, read on a day past the recorded expiry
+  const alerts = [policyAlert(acceptedDirectives)];
+
+  // when
+  const evidence = evidenceFor(alerts, "2027-01-01");
+
+  // then — an expiry that quietly kept passing would be the whole point of the date missed
+  assert.equal(evidence.zap.alerts[0].state, "candidate");
+  assert.equal(evidence.outcome, "incomplete");
+});
+
+test("given the same rule reports a louder risk, when building evidence, then the record stops covering it", () => {
+  // given — a fingerprint names a rule and a route, so risk has to be compared beside it
+  const alerts = [policyAlert(acceptedDirectives, "3")];
+
+  // when
+  const evidence = evidenceFor(alerts, "2026-09-10");
+
+  // then
+  assert.equal(evidence.zap.alerts[0].state, "candidate");
+  assert.equal(evidence.outcome, "incomplete");
+});
+
+test("given the same rule reports something else, when building evidence, then the record stops covering it",
+  () => {
+    // given — a leaked comment in a rebuilt asset carries the fingerprint of the disposed one
+    const alerts = [{ pluginid: "10027", riskcode: "0", confidence: "2", instances: [{
+      uri: `${passiveScannerOrigin}/assets/index-a1b2c3.js`, method: "GET", param: "", evidence: "select",
+      otherinfo: "The following pattern was used: \\bSELECT\\b and it matched secret-like text." }] }];
+
+    // when
+    const evidence = evidenceFor(alerts, "2026-09-10");
+
+    // then — the disposed alert on this route matched the word query, and this one does not
+    assert.equal(evidence.zap.alerts[0].state, "candidate");
+    assert.equal(evidence.outcome, "incomplete");
+  });
+
+test("given a scanner other than the one a record names, when it is matched, then it covers nothing", () => {
+  // given — a bump of the pinned image changes what a rule reports, so a record does not carry over
+  const record = dispositions.dispositions[0];
+  const alert = { pluginId: record.pluginId, method: record.method, routeTemplate: record.routeTemplate,
+    riskCode: record.riskCode, confidence: record.confidence, count: record.count,
+    fingerprint: record.fingerprint,
+    ruleEvidence: { kind: "cookie-attribute", cookieName: "xsrf-token", missingAttribute: "http-only" } };
+
+  // when / then
+  assert.equal(recordCovers(record, alert), true);
+  assert.equal(recordCovers({ ...record, scannerVersion: "2.16.0" }, alert), false);
+  assert.ok(dispositions.dispositions.every((entry) => entry.scannerVersion === zapVersion));
+});
+
+test("given an alert no record covers, when it is validated, then no record bounds the day it was read",
+  () => {
+    // given — a louder variant shares the fingerprint of a record that does not cover it
+    const readBeforeTheRecord = "2026-09-01";
+
+    // when / then — bounding by the fingerprint would reject this and blame a back-dated clock
+    assert.doesNotThrow(() => evidenceFor([policyAlert(acceptedDirectives, "3")], readBeforeTheRecord));
+    assert.equal(evidenceFor([policyAlert(acceptedDirectives, "3")], readBeforeTheRecord)
+      .zap.alerts[0].state, "candidate");
+  });
+
+test("given a record whose own rule and route miss its fingerprint, when it is matched, then it covers nothing",
+  () => {
+    // given — the fingerprint is a hash, so a record could name one its own three fields do not produce
+    const record = dispositions.dispositions[0];
+    const alert = { pluginId: record.pluginId, method: record.method, routeTemplate: record.routeTemplate,
+      riskCode: record.riskCode, confidence: record.confidence, count: record.count,
+    fingerprint: record.fingerprint,
+      ruleEvidence: { kind: "cookie-attribute", cookieName: "xsrf-token", missingAttribute: "http-only" } };
+
+    // when / then — the alert still carries that fingerprint, so only the recomputation catches this
+    assert.equal(recordCovers({ ...record, pluginId: "10054" }, { ...alert, pluginId: "10054" }), false);
+    assert.equal(recordCovers({ ...record, routeTemplate: "/login" }, { ...alert, routeTemplate: "/login" }),
+      false);
+  });
+
+test("given a back-dated evidence file, when it is validated, then its own day cannot revive an expiry", () => {
+  // given — an artefact claiming it was read before the acceptance was written
+  const evidence = evidenceFor([policyAlert(acceptedDirectives)], "2026-09-10");
+  evidence.readOn = "2020-01-01";
+
+  // when / then — the record it used is newer than the day it claims, which no clock can produce
+  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /read before the record it relies on/);
+});
+
+test("given a day no calendar has, when building evidence, then the assessment refuses to read one", () => {
+  // when / then
+  assert.throws(() => evidenceFor([policyAlert(acceptedDirectives)], "2026-02-31"), /no readable day/);
+  assert.throws(() => evidenceFor([policyAlert(acceptedDirectives)], "2026-9-10"), /no readable day/);
+});
+
+test("given resolved alerts beside an open one, when the summary is written, then it counts only the open one",
+  () => {
+    // given
+    const evidence = evidenceFor([policyAlert(acceptedDirectives), cookieAlert("/font-licenses.txt")],
+      "2026-09-10");
+
+    // when / then — alerts.length was the candidate count until a record could resolve one
+    assert.equal(openCandidateCount(evidence), 1);
+    assert.match(passiveDeploymentSummary(evidence), /ZAP candidates: 1 of 2 alerts/);
+  });
+
+test("given evidence claiming a state nothing recorded, when it is validated, then it fails closed", () => {
+  // given
+  const evidence = evidenceFor([cookieAlert("/font-licenses.txt")]);
+  evidence.zap.alerts[0].state = "false-positive";
+  evidence.zap.alerts[0].disposition = { rationale: "looks fine", actor: "nobody",
+    classifiedAt: "2026-09-10T00:00:00.000Z", reference: "none" };
+
+  // when / then
+  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /unrecorded alert disposition/);
+});
+
+test("given evidence rewording a disposition it did record, when it is validated, then it fails closed", () => {
+  // given — the state is the one the record gives, and only the reason beside it was rewritten
+  const evidence = evidenceFor([cookieAlert("/")]);
+  assert.equal(evidence.zap.alerts[0].state, "false-positive");
+  evidence.zap.alerts[0].disposition = { ...evidence.zap.alerts[0].disposition, rationale: "trust me" };
+
+  // when / then
+  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /unrecorded alert disposition/);
+});
+
+test("given evidence rewording an acceptance it did record, when it is validated, then it fails closed", () => {
+  // given — the acceptance the evidence publishes has to be the one the record resolved it against
+  const evidence = evidenceFor([policyAlert(acceptedDirectives)], "2026-09-10");
+  assert.equal(evidence.zap.alerts[0].state, "accepted-risk");
+  evidence.zap.alerts[0].acceptance = { ...evidence.zap.alerts[0].acceptance, expiresOn: "2099-12-31" };
+
+  // when / then
+  assert.throws(() => assertPassiveDeploymentEvidence(evidence), /unrecorded alert disposition/);
+});
+
+const acceptedRecord = () => dispositions.dispositions.find(({ state }) => state === "accepted-risk");
+const acceptedAlert = (overrides = {}) => {
+  const record = acceptedRecord();
+  return { pluginId: record.pluginId, method: record.method, routeTemplate: record.routeTemplate,
+    riskCode: record.riskCode, confidence: record.confidence, count: record.count,
+    fingerprint: record.fingerprint,
+    ruleEvidence: { kind: "policy-directive", headerName: record.observed.headerName,
+      directives: record.observed.directives }, ...overrides };
+};
+const acceptanceMap = () => new Map(acceptances.map((entry) => [entry.id, entry]));
+
+test("given the rule reports a different confidence, when it is matched, then the record covers nothing", () => {
+  // given — a rule that grows more certain about the same route is saying something new
+  const record = acceptedRecord();
+
+  // when / then
+  assert.equal(recordCovers(record, acceptedAlert()), true);
+  assert.equal(recordCovers(record, acceptedAlert({ confidence: record.confidence + 1 })), false);
+});
+
+test("given a record naming an acceptance nobody wrote, when it is resolved, then the alert stays open", () => {
+  // given — the record names the acceptance rather than restating it, so the acceptance has to exist
+  const record = { ...acceptedRecord(), acceptanceId: "no-such-acceptance-2026" };
+
+  // when
+  const resolved = resolveAlertAgainst([record], acceptanceMap(), acceptedAlert(), "2026-09-10");
+
+  // then
+  assert.deepEqual(resolved, { state: "candidate" });
+});
+
+test("given an acceptance written about another alert, when it is resolved, then the alert stays open", () => {
+  // given — an acceptance carries the fingerprint it was written for, and it has to be this one
+  const foreign = acceptances.map((entry) => ({ ...entry, fingerprint: `sha256:${"b".repeat(64)}` }));
+
+  // when
+  const resolved = resolveAlertAgainst([acceptedRecord()], new Map(foreign.map((e) => [e.id, e])),
+    acceptedAlert(), "2026-09-10");
+
+  // then
+  assert.deepEqual(resolved, { state: "candidate" });
+});
+
+test("given a record written in another key order, when it is matched, then it still covers its alert", () => {
+  // given — a reformatter must not turn every resolution into a candidate without saying so
+  const record = acceptedRecord();
+  const reordered = { ...record, observed: { directives: [...record.observed.directives].toReversed(),
+    kind: record.observed.kind, headerName: record.observed.headerName } };
+
+  // when / then
+  assert.equal(recordCovers(reordered, acceptedAlert()), true);
+});
+
+test("given one more occurrence than the record names, when it is matched, then the record covers nothing",
+  () => {
+    // given — the scanner merges every wording of one rule on one route, so a sixth is invisible in the
+    // directive union and visible only in the count
+    const record = acceptedRecord();
+
+    // when / then
+    assert.equal(recordCovers(record, acceptedAlert()), true);
+    assert.equal(recordCovers(record, acceptedAlert({ count: record.count + 1 })), false);
+  });
+
+test("given a second wording merged into an accepted alert, when building evidence, then it stays open", () => {
+  // given — a legacy CSP header ZAP does not analyse names no directive, so the union does not move
+  const alerts = [policyAlert(acceptedDirectives), { pluginid: "10055", riskcode: "2", confidence: "3",
+    instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "Content-Security-Policy",
+      evidence: "base-uri 'none'; frame-ancestors 'none'",
+      otherinfo: "The header X-WebKit-CSP was found on this response." }] }];
+
+  // when
+  const evidence = evidenceFor(alerts, "2026-09-10");
+
+  // then
+  assert.deepEqual(evidence.zap.alerts[0].ruleEvidence.directives, acceptedDirectives);
+  assert.equal(evidence.zap.alerts[0].state, "candidate");
+  assert.equal(evidence.outcome, "incomplete");
+});
+
+test("given a second asset matching the same pattern, when building evidence, then the alert stays open", () => {
+  // given — one instance carries the pattern sentence and the other inherits it from the alert level
+  const alerts = [{ pluginid: "10027", riskcode: "0", confidence: "2",
+    otherinfo: "The following pattern was used: \\bQUERY\\b and matched omitted text.",
+    instances: [
+      { uri: `${passiveScannerOrigin}/assets/index-a1b2c3.js`, method: "GET", param: "", evidence: "query",
+        otherinfo: "The following pattern was used: \\bQUERY\\b" },
+      { uri: `${passiveScannerOrigin}/assets/index-d4e5f6.js`, method: "GET", param: "", evidence: "query",
+        otherinfo: "scanner-specific summary" }
+    ] }];
+
+  // when
+  const evidence = evidenceFor(alerts, "2026-09-10");
+
+  // then — the pattern set is unchanged and only the count says a second asset appeared
+  assert.deepEqual(evidence.zap.alerts[0].ruleEvidence.matches.map(({ patternId }) => patternId),
+    ["comment-query", "comment-query"]);
+  assert.equal(evidence.zap.alerts[0].count, 2);
+  assert.equal(evidence.zap.alerts[0].state, "candidate");
+  assert.equal(evidence.outcome, "incomplete");
+});
+
+test("given rule evidence no discriminator reads, when it is discriminated, then it refuses to guess", () => {
+  // given — a seventh evidence kind would otherwise be told apart by its kind alone
+  const unknown = { kind: "future-signal", headerName: "server", loudness: "high" };
+
+  // when / then
+  assert.throws(() => alertDiscriminator(unknown), /No passive alert discriminator reads/);
+  assert.deepEqual(alertDiscriminator({ kind: "response-header", headerName: "server" }),
+    { kind: "response-header", headerName: "server" });
+});
+
+test("given an expiry no calendar has, when it is resolved, then the acceptance stops covering", () => {
+  // given — the day is validated as a calendar day and the expiry it is compared against was not
+  const impossible = acceptances.map((entry) => ({ ...entry, expiresOn: "2026-13-01" }));
+
+  // when
+  const resolved = resolveAlertAgainst([acceptedRecord()], new Map(impossible.map((e) => [e.id, e])),
+    acceptedAlert(), "2026-09-10");
+
+  // then — a month that does not exist sorts after every real day of the year
+  assert.deepEqual(resolved, { state: "candidate" });
+});
+
+test("given a key shaped like a pair, when the record is matched, then it cannot impersonate one", () => {
+  // given — canonical() interpolated keys raw, so one key could read as a key and a value
+  const record = acceptedRecord();
+  const forged = { ...record, observed: { [`headerName:"content-security-policy",kind`]: "policy-directive",
+    directives: record.observed.directives } };
+
+  // when / then
+  assert.equal(recordCovers(forged, acceptedAlert()), false);
+});
+
+test("given an evidence file claiming a verdict its alerts deny, when it is validated, then it fails closed",
+  () => {
+    // given
+    const evidence = evidenceFor([cookieAlert("/font-licenses.txt")]);
+    assert.equal(evidence.outcome, "incomplete");
+    evidence.outcome = "passed";
+
+    // when / then
+    assert.throws(() => assertPassiveDeploymentEvidence(evidence), /outcome its own checks and alerts do not/);
+  });
+
+test("given the recorded dispositions, when they are read, then each names a rationale, an actor and a source",
+  () => {
+    // given
+    const validate = new Ajv({ strict: true, allErrors: true }).compile(JSON.parse(readFileSync(
+      new URL("../security/passive-alert-dispositions.schema.json", import.meta.url))));
+
+    // when / then
+    assert.equal(validate(dispositions), true, JSON.stringify(validate.errors));
+    assert.ok(dispositions.dispositions.length > 0);
+    assert.equal(new Set(dispositions.dispositions.map(({ fingerprint }) => fingerprint)).size,
+      dispositions.dispositions.length);
+    for (const entry of dispositions.dispositions) {
+      assert.equal(entry.fingerprint,
+        passiveAlertFingerprint(entry.pluginId, entry.method, entry.routeTemplate),
+        `${entry.pluginId} ${entry.routeTemplate} names a fingerprint its own rule and route do not produce`);
+      if (entry.state === "accepted-risk") {
+        assert.ok(acceptances.some(({ id }) => id === entry.acceptanceId),
+          `${entry.acceptanceId} is named by a record and written down nowhere`);
+      } else {
+        const carried = baselineCandidates.find(({ fingerprint }) => fingerprint === entry.fingerprint);
+        assert.ok(carried === undefined || carried.state === entry.state,
+          `${entry.fingerprint} is dismissed against a triage summary that classified it ${carried?.state}`);
+      }
+    }
+  });
+
 test("given a CSP alert about another header, when normalizing it, then the evidence fails closed", () => {
   // given — the wording may be anything, but the header the alert describes may not
   const report = { site: [{ alerts: [
@@ -819,13 +1191,14 @@ test("given contradictory ratings for one candidate, when normalizing alerts, th
 });
 
 test("given an untriaged ZAP candidate, when building evidence, then the assessment is incomplete", () => {
-  // when
+  // when — the same rule on a route no disposition names, so nothing has classified this one
   const evidence = buildPassiveDeploymentEvidence({
     targetFingerprint: digest, imageDigest: digest,
     observations: passingObservations(),
     zapReport: { version: "2.17.0", site: [{ alerts: [{ pluginid: "10010", riskcode: "1",
-      confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET", param: "__Host-XSRF-TOKEN",
-        evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] }] }] }, requestCount: 1
+      confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/font-licenses.txt`, method: "GET",
+        param: "__Host-XSRF-TOKEN", evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] }] }] },
+    requestCount: 1
   });
 
   // then

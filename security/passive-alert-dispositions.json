@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "dispositions": [
+    {
+      "fingerprint": "sha256:72d463ad328d30debba156877a337ed12dfe24bdc80618cd7a55a5770d04cb5c",
+      "pluginId": "10010",
+      "method": "GET",
+      "routeTemplate": "/",
+      "riskCode": 1,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "cookie-attribute",
+        "cookieName": "xsrf-token",
+        "missingAttribute": "http-only"
+      },
+      "state": "false-positive",
+      "rationale": "The double-submit CSRF token is readable by design: the browser has to read it and return it as the X-XSRF-TOKEN request header, which is why SecurityConfiguration builds the repository with CookieCsrfTokenRepository.withHttpOnlyFalse. The session cookie issued beside it does carry HttpOnly, and an alert naming that cookie is refused rather than read.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    },
+    {
+      "fingerprint": "sha256:9c73255b8d13ec2a6f513d36bcee03e22d02e36b993ea6c0c87c2db632265a59",
+      "pluginId": "10010",
+      "method": "GET",
+      "routeTemplate": "/assets/{asset}",
+      "riskCode": 1,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "cookie-attribute",
+        "cookieName": "xsrf-token",
+        "missingAttribute": "http-only"
+      },
+      "state": "false-positive",
+      "rationale": "The double-submit CSRF token is readable by design: the browser has to read it and return it as the X-XSRF-TOKEN request header, which is why SecurityConfiguration builds the repository with CookieCsrfTokenRepository.withHttpOnlyFalse. The session cookie issued beside it does carry HttpOnly, and an alert naming that cookie is refused rather than read.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    },
+    {
+      "fingerprint": "sha256:b9e12358e2e013416507e4b258f3e43f334a9523bc2837d4100b351af8309efa",
+      "pluginId": "10010",
+      "method": "GET",
+      "routeTemplate": "/manifest.webmanifest",
+      "riskCode": 1,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "cookie-attribute",
+        "cookieName": "xsrf-token",
+        "missingAttribute": "http-only"
+      },
+      "state": "false-positive",
+      "rationale": "The double-submit CSRF token is readable by design: the browser has to read it and return it as the X-XSRF-TOKEN request header, which is why SecurityConfiguration builds the repository with CookieCsrfTokenRepository.withHttpOnlyFalse. The session cookie issued beside it does carry HttpOnly, and an alert naming that cookie is refused rather than read.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    },
+    {
+      "fingerprint": "sha256:5f2e3bdd3862370b5dddcba7c097d6f318c9f4fdcea99d9cec5f84bc78b74164",
+      "pluginId": "10010",
+      "method": "GET",
+      "routeTemplate": "/robots.txt",
+      "riskCode": 1,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "cookie-attribute",
+        "cookieName": "xsrf-token",
+        "missingAttribute": "http-only"
+      },
+      "state": "false-positive",
+      "rationale": "The double-submit CSRF token is readable by design: the browser has to read it and return it as the X-XSRF-TOKEN request header, which is why SecurityConfiguration builds the repository with CookieCsrfTokenRepository.withHttpOnlyFalse. The session cookie issued beside it does carry HttpOnly, and an alert naming that cookie is refused rather than read.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    },
+    {
+      "fingerprint": "sha256:cd72fbb0d93d406d3346215bf2c8852e1be8be15f2ac98c8dc2bce1bd4a0cd6e",
+      "pluginId": "10010",
+      "method": "GET",
+      "routeTemplate": "/sitemap.xml",
+      "riskCode": 1,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "cookie-attribute",
+        "cookieName": "xsrf-token",
+        "missingAttribute": "http-only"
+      },
+      "state": "false-positive",
+      "rationale": "The double-submit CSRF token is readable by design: the browser has to read it and return it as the X-XSRF-TOKEN request header, which is why SecurityConfiguration builds the repository with CookieCsrfTokenRepository.withHttpOnlyFalse. The session cookie issued beside it does carry HttpOnly, and an alert naming that cookie is refused rather than read.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    },
+    {
+      "fingerprint": "sha256:6744ae243ecc24def5606740af614410a70a72e0569fd5dec781f41a7b9d77d6",
+      "pluginId": "10027",
+      "method": "GET",
+      "routeTemplate": "/assets/{asset}",
+      "riskCode": 0,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "text-pattern",
+        "patternIds": [
+          "comment-query"
+        ]
+      },
+      "state": "false-positive",
+      "rationale": "The rule matched the standalone word query in a built asset, where it is the request parameter the roster and participant searches send, and ZAP read a minified line as a comment. This record covers that one pattern in that one occurrence: a second pattern, or the same pattern in a second asset, moves the count and leaves the run incomplete.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    },
+    {
+      "fingerprint": "sha256:971c33107d4bf2efa1ba8cf7eccee04bc287bea807d095b46f782e87e37ca6e2",
+      "pluginId": "10055",
+      "method": "GET",
+      "routeTemplate": "/",
+      "riskCode": 2,
+      "confidence": 3,
+      "count": 5,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "policy-directive",
+        "headerName": "content-security-policy",
+        "directives": [
+          "connect-src",
+          "font-src",
+          "form-action",
+          "frame-src",
+          "img-src",
+          "manifest-src",
+          "media-src",
+          "object-src",
+          "script-src",
+          "style-src",
+          "worker-src"
+        ]
+      },
+      "state": "accepted-risk",
+      "rationale": "The proxy adds a deliberately narrow second policy, and the rule lists the directives of the application's own policy that do not fall back to default-src. The rule buckets undefined and wildcard sources into one sentence, so it is the headers check on this route, not this record, that would catch a directive turning into a wildcard.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/exceptions.json",
+      "acceptanceId": "remote-https-club-logo-2026"
+    },
+    {
+      "fingerprint": "sha256:19e44d60d9d6f5c78367509375d51e70fcc8f6bfe12e2e274e9a7c08818a9ed0",
+      "pluginId": "10109",
+      "method": "GET",
+      "routeTemplate": "/",
+      "riskCode": 0,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "application-signal",
+        "signal": "scripts-without-links"
+      },
+      "state": "false-positive",
+      "rationale": "The rule reports that the response is a script-driven application without navigable links, which is what a single-page application is.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    },
+    {
+      "fingerprint": "sha256:7ab39a7d7cecf5f588ba44d03ea2a5be158f42dcbcec59708c5332fd1dbfec68",
+      "pluginId": "10112",
+      "method": "GET",
+      "routeTemplate": "/",
+      "riskCode": 0,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "session-signal",
+        "tokenNames": [
+          "xsrf-token"
+        ]
+      },
+      "state": "false-positive",
+      "rationale": "The rule reports that the response sets a recognised session cookie. Every route that reaches the application answers an unauthenticated request with a problem detail and a fresh session, including the two paths this instance does not serve at all.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    },
+    {
+      "fingerprint": "sha256:2176e227ce4a272db3b56df72f808aac6e9b51b386cc21379b19caae9d749fbf",
+      "pluginId": "10112",
+      "method": "GET",
+      "routeTemplate": "/manifest.webmanifest",
+      "riskCode": 0,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "session-signal",
+        "tokenNames": [
+          "xsrf-token"
+        ]
+      },
+      "state": "false-positive",
+      "rationale": "The rule reports that the response sets a recognised session cookie. Every route that reaches the application answers an unauthenticated request with a problem detail and a fresh session, including the two paths this instance does not serve at all.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    },
+    {
+      "fingerprint": "sha256:a4fd238ee4d552bc1381e2c9b399f36036e8ae16ff499bf58ada5beb776cb20e",
+      "pluginId": "10112",
+      "method": "GET",
+      "routeTemplate": "/robots.txt",
+      "riskCode": 0,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "session-signal",
+        "tokenNames": [
+          "session",
+          "xsrf-token"
+        ]
+      },
+      "state": "false-positive",
+      "rationale": "The rule reports that the response sets a recognised session cookie. Every route that reaches the application answers an unauthenticated request with a problem detail and a fresh session, including the two paths this instance does not serve at all.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    },
+    {
+      "fingerprint": "sha256:e9d569b4fa31f833c4bddbb2da00b4ef14f66b1e02718f2ee40dc51342e1573b",
+      "pluginId": "10112",
+      "method": "GET",
+      "routeTemplate": "/sitemap.xml",
+      "riskCode": 0,
+      "confidence": 2,
+      "count": 1,
+      "scannerVersion": "2.17.0",
+      "observed": {
+        "kind": "session-signal",
+        "tokenNames": [
+          "session",
+          "xsrf-token"
+        ]
+      },
+      "state": "false-positive",
+      "rationale": "The rule reports that the response sets a recognised session cookie. Every route that reaches the application answers an unauthenticated request with a problem detail and a fresh session, including the two paths this instance does not serve at all.",
+      "actor": "maintainer",
+      "classifiedAt": "2026-09-10T07:02:37.000Z",
+      "reference": "security/passive-baseline-finding-summary.json"
+    }
+  ]
+}

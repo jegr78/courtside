@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { test } from "node:test";
+import { openCandidateCount } from "./security-passive-deployment.mjs";
 import {
   boundedAssessmentFailureReason,
   authorizeSecurityProfile, buildSecurityPlan, executeSecurityPlan, fingerprintSecurityTarget, recoverSecurityRun,
@@ -308,12 +309,17 @@ test("given passing checks and scanner alerts, when the run finishes, then the r
     root,
     verifyTarget: async () => input({ profile: "safe", authorization: undefined }),
     runPassiveAssessment: async () => ({ outcome: "incomplete", requestCount: 48,
-      zap: { alerts: [{ pluginId: "10055" }, { pluginId: "10112" }] } })
+      zap: { alerts: [{ pluginId: "10055", state: "candidate" }, { pluginId: "10112", state: "candidate" },
+        { pluginId: "10010", state: "false-positive" }] } })
   });
 
-  // then — no check failed, so saying they did not pass would send triage after the wrong thing
+  // then — the third alert is resolved, so counting every alert would send triage after the wrong number
   assert.equal(manifest.outcome, "incomplete");
   assert.equal(manifest.reason, "Passive deployment left 2 scanner alerts for triage");
+  assert.equal(openCandidateCount({ zap: { alerts: [
+    { pluginId: "10055", state: "candidate" }, { pluginId: "10112", state: "candidate" },
+    { pluginId: "10010", state: "false-positive" }
+  ] } }), 2, "the runner counts what the passive summary counts, and the two cannot import each other");
 });
 
 test("given the bounded active suites, when every attack check passes, then their evidence governs the outcome", async () => {

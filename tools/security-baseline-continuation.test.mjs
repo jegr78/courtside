@@ -8,11 +8,11 @@ const completeSafeManifest = {
   attempt: 1,
   tools: [
     { id: "target-identity", version: "1.0.0" },
-    { id: "passive-deployment", version: "1.3.0" }
+    { id: "passive-deployment", version: "1.4.0" }
   ],
   toolResults: [
     { id: "target-identity", version: "1.0.0", outcome: "passed" },
-    { id: "passive-deployment", version: "1.3.0", outcome: "incomplete" }
+    { id: "passive-deployment", version: "1.4.0", outcome: "incomplete" }
   ],
   usage: { requests: 30, generatedDataMegabytes: 0, evidenceBytes: 1200 }
 };

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:passive-alert-dispositions:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "dispositions"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "dispositions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fingerprint", "pluginId", "method", "routeTemplate", "riskCode", "confidence",
+          "count", "scannerVersion", "observed", "state", "rationale", "actor", "classifiedAt", "reference"],
+        "properties": {
+          "fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "pluginId": { "type": "string", "pattern": "^[0-9]+$" },
+          "method": { "enum": ["GET", "HEAD"] },
+          "routeTemplate": { "type": "string", "minLength": 1 },
+          "riskCode": { "type": "integer", "minimum": 0, "maximum": 3 },
+          "confidence": { "type": "integer", "minimum": 0, "maximum": 4 },
+          "count": { "type": "integer", "minimum": 1 },
+          "scannerVersion": { "const": "2.17.0" },
+          "observed": { "type": "object", "required": ["kind"], "properties": { "kind": { "type": "string" } } },
+          "state": { "enum": ["false-positive", "duplicate", "accepted-risk"] },
+          "acceptanceId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,63}$" },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "actor": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "classifiedAt": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{3})?Z$"
+          },
+          "reference": { "type": "string", "minLength": 1, "maxLength": 200 }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "state": { "const": "accepted-risk" } } },
+            "then": { "properties": { "acceptanceId": { "type": "string" } }, "required": ["acceptanceId"] },
+            "else": { "properties": { "acceptanceId": false } }
+          }
+        ]
+      }
+    }
+  }
+}

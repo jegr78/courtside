@@ -44,6 +44,11 @@ regression. Its redacted
 [`passive-baseline-finding-summary.json`](../security/passive-baseline-finding-summary.json) has
 digest `sha256:62e07b38ecc6e1b998abad9abe2b66197b3c97e849f84410d81be0179bf40790`.
 
+That triage was a record no run could read. The eleven classifications now live beside their
+fingerprints in [`passive-alert-dispositions.json`](../security/passive-alert-dispositions.json),
+each with the reason it is not a finding, and the twelfth resolves through its unexpired acceptance,
+so a repeat of this run reaches `passed` instead of stopping at `incomplete` a second time.
+
 The harmless authenticated-scanner canary completed the full lifecycle in the isolated target:
 detected, validated, remediation in progress, fixed, and independently retested without the seeded
 header. The retest used a separate closed ZAP plan and required the protected route's actual `401`

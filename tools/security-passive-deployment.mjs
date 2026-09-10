@@ -10,6 +10,11 @@ import { redactSecurityText } from "./security-runner.mjs";
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const evidenceSchema = JSON.parse(readFileSync(new URL(
   "../security/passive-deployment-evidence.schema.json", import.meta.url)));
+const alertDispositions = JSON.parse(readFileSync(new URL(
+  "../security/passive-alert-dispositions.json", import.meta.url))).dispositions;
+const alertAcceptances = new Map(JSON.parse(readFileSync(new URL(
+  "../security/exceptions.json", import.meta.url))).riskAcceptances
+  .map((entry) => [entry.id, entry]));
 // Compiled on first use: security-environment.mjs imports this module, and that one loads on a
 // checkout where the validator has not been installed yet.
 let compiled;
@@ -270,7 +275,7 @@ function mergeRuleEvidence(existing, incoming, imageDigest, fingerprint) {
   return { kind: "text-pattern", matches };
 }
 
-function passiveAlertFingerprint(pluginId, method, routeTemplate) {
+export function passiveAlertFingerprint(pluginId, method, routeTemplate) {
   const identity = [pluginId, `${method} ${routeTemplate}`, "response", "passive-web"]
     .map((value) => value.toLowerCase()).join("\0");
   return `sha256:${createHash("sha256").update(identity).digest("hex")}`;
@@ -305,7 +310,8 @@ export function assertQualifiedImageEvidence(qualification, imageDigest, imageAr
 }
 
 export function buildPassiveDeploymentEvidence({
-  targetFingerprint, imageDigest, observations, zapReport, requestCount
+  targetFingerprint, imageDigest, observations, zapReport, requestCount,
+  today = new Date().toISOString().slice(0, 10)
 }) {
   if (!Number.isInteger(requestCount) || requestCount < 1 || requestCount > 1000) {
     throw new Error("The passive assessment request budget was exceeded");
@@ -318,11 +324,13 @@ export function buildPassiveDeploymentEvidence({
       || JSON.stringify(checkIds) !== JSON.stringify(requiredPassiveCheckIds)) {
     throw new Error("The passive assessment evidence is missing required checks");
   }
-  const alerts = normalizeZapAlerts(zapReport, imageDigest);
+  if (!validAssessmentDate(today)) throw new Error("The passive assessment was given no readable day");
+  const alerts = normalizeZapAlerts(zapReport, imageDigest)
+    .map((alert) => ({ ...alert, ...resolvedAlertState(alert, today) }));
   const failed = checks.some((check) => check.outcome === "failed");
-  const incomplete = !failed && alerts.length > 0;
+  const incomplete = !failed && alerts.some((alert) => alert.state === "candidate");
   const evidence = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     testId: "CSA-DEPLOY-001",
     targetFingerprint,
     imageDigest,
@@ -330,6 +338,7 @@ export function buildPassiveDeploymentEvidence({
     checks,
     zap: { image: zapImage, version: zapReport.version, status: "completed", alerts },
     requestCount,
+    readOn: today,
     outcome: failed ? "failed" : incomplete ? "incomplete" : "passed"
   };
   assertPassiveDeploymentEvidence(evidence);
@@ -398,6 +407,82 @@ export function evaluateCipherPolicy(tls12, tls13, deprecated) {
   return { passed, observation: passed ? "recommended-ciphers-only" : "cipher-policy-mismatch" };
 }
 
+// The fingerprint names a rule on a route and nothing else, so a record that matched on it alone
+// would also cover a louder alert the same rule raises there tomorrow.
+export function alertDiscriminator(ruleEvidence) {
+  const kind = ruleEvidence.kind;
+  if (kind === "cookie-attribute") {
+    return { kind, cookieName: ruleEvidence.cookieName, missingAttribute: ruleEvidence.missingAttribute };
+  }
+  if (kind === "text-pattern") {
+    return { kind, patternIds: [...new Set(ruleEvidence.matches.map(({ patternId }) => patternId))].toSorted() };
+  }
+  if (kind === "policy-directive") {
+    return { kind, headerName: ruleEvidence.headerName, directives: ruleEvidence.directives };
+  }
+  if (kind === "session-signal") return { kind, tokenNames: ruleEvidence.tokenNames };
+  if (kind === "application-signal") return { kind, signal: ruleEvidence.signal };
+  if (kind === "response-header") return { kind, headerName: ruleEvidence.headerName };
+  throw new Error(`No passive alert discriminator reads ${kind} evidence`);
+}
+
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).toSorted().join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).toSorted()
+      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export function recordCovers(record, alert) {
+  return record.fingerprint === alert.fingerprint
+    && record.fingerprint === passiveAlertFingerprint(record.pluginId, record.method, record.routeTemplate)
+    && record.pluginId === alert.pluginId && record.method === alert.method
+    && record.routeTemplate === alert.routeTemplate
+    && record.riskCode === alert.riskCode && record.confidence === alert.confidence
+    && record.count === alert.count
+    && record.scannerVersion === zapVersion
+    && canonical(record.observed) === canonical(alertDiscriminator(alert.ruleEvidence));
+}
+
+export function resolveAlertAgainst(records, acceptances, alert, today) {
+  const record = records.find((entry) => recordCovers(entry, alert));
+  if (!record) return { state: "candidate" };
+  if (record.state !== "accepted-risk") {
+    return { state: record.state, disposition: {
+      rationale: redactSecurityText(record.rationale), actor: redactSecurityText(record.actor),
+      classifiedAt: record.classifiedAt, reference: redactSecurityText(record.reference) } };
+  }
+  const acceptance = acceptances.get(record.acceptanceId);
+  if (!acceptance || acceptance.fingerprint !== alert.fingerprint
+      || !validAssessmentDate(today) || !validAssessmentDate(acceptance.expiresOn)
+      || acceptance.expiresOn < today) {
+    return { state: "candidate" };
+  }
+  return { state: "accepted-risk", acceptance: { id: acceptance.id, expiresOn: acceptance.expiresOn } };
+}
+
+function resolvedAlertState(alert, today) {
+  return resolveAlertAgainst(alertDispositions, alertAcceptances, alert, today);
+}
+
+// Back-dating the day would keep an expired acceptance alive and stay consistent with itself, so
+// the day is bounded below by the records the alert was resolved against.
+function recordedSince(alert) {
+  const days = [
+    alertDispositions.find((entry) => recordCovers(entry, alert))?.classifiedAt,
+    alert.acceptance ? alertAcceptances.get(alert.acceptance.id)?.acceptedAt : undefined
+  ].map((value) => value?.slice(0, 10) ?? "");
+  return days.toSorted().at(-1);
+}
+
+function validAssessmentDate(value) {
+  if (typeof value !== "string" || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
+}
+
 export function assertPassiveDeploymentEvidence(evidence) {
   if (!validateEvidence(evidence)) {
     throw new Error(`The passive assessment evidence is invalid: ${JSON.stringify(validateEvidence.errors)}`);
@@ -413,7 +498,21 @@ export function assertPassiveDeploymentEvidence(evidence) {
     if (fingerprints.has(alert.fingerprint)) {
       throw new Error("The passive assessment evidence contains a duplicate alert fingerprint");
     }
+    const recorded = resolvedAlertState(alert, evidence.readOn);
+    if (alert.state !== recorded.state
+        || JSON.stringify(alert.disposition) !== JSON.stringify(recorded.disposition)
+        || JSON.stringify(alert.acceptance) !== JSON.stringify(recorded.acceptance)) {
+      throw new Error("The passive assessment evidence contains an unrecorded alert disposition");
+    }
+    if (recordedSince(alert) > evidence.readOn) {
+      throw new Error("The passive assessment evidence was read before the record it relies on");
+    }
     fingerprints.add(alert.fingerprint);
+  }
+  const failed = evidence.checks.some((check) => check.outcome === "failed");
+  const derived = failed ? "failed" : openCandidateCount(evidence) > 0 ? "incomplete" : "passed";
+  if (evidence.outcome !== derived) {
+    throw new Error("The passive assessment evidence claims an outcome its own checks and alerts do not");
   }
 }
 
@@ -631,8 +730,12 @@ export function passiveDeploymentSummary(evidence) {
     + `Target fingerprint: ${evidence.targetFingerprint}\n\n`
     + `Application image: ${evidence.imageDigest}\n\n`
     + `Requests: ${evidence.requestCount}\n\n`
-    + `ZAP candidates: ${evidence.zap.alerts.length}\n\n`
+    + `ZAP candidates: ${openCandidateCount(evidence)} of ${evidence.zap.alerts.length} alerts\n\n`
     + `| Check | Layer | Outcome | Observation |\n| --- | --- | --- | --- |\n${checks}\n`;
+}
+
+export function openCandidateCount(evidence) {
+  return evidence.zap.alerts.filter(({ state }) => state === "candidate").length;
 }
 
 export function passiveEvidenceDigest(evidence) {
