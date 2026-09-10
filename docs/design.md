@@ -1696,10 +1696,11 @@ whether it is built or designed. **Designed means absent today.**
   club running without the reference proxy loses nothing: the application is what answers. *Built.*
 - **A safe method changes nothing.** *Built.* This is what makes CSRF's exemption of `GET`, `HEAD`
   and `OPTIONS` sound, so it is measured rather than assumed: every operation the contract declares
-  is called against a running instance with a digest of every database column taken before and
-  after. The two columns the container stamps with the caller's own last access time are the only
-  exemption, so a read that revoked a session, sent a message or recorded an audit entry fails the
-  build — as does a new safe operation nothing probes.
+  and every path the management exposure lets out is called against a running instance, with a
+  digest of every database column taken before and after. The two columns the container stamps with
+  the caller's own last access time are the only exemption, so a read that revoked a session, sent
+  a message or recorded an audit entry fails the build — as does a new safe operation nothing
+  probes.
 - **Uploads carry a documented type boundary, and the content is what decides it.** *Built.* Two
   endpoints accept a file. A roster snapshot is read as CSV: the name must end in `.csv` or `.txt`,
   the declared part type must be one a browser actually sends for such a file — `text/csv`,
