@@ -141,6 +141,25 @@ function withoutTrailingPunctuation(token) {
   return token.slice(0, end);
 }
 
+const cspTemplateMarkers = [
+  ["malformed", "a non-ascii character was encountered"],
+  ["nofallback", "do not fallback to default-src"],
+  ["scriptsrc.unsafe.eval", "script-src includes unsafe-eval"],
+  ["scriptsrc.unsafe.hashes", "script-src includes unsafe-hashes"],
+  ["scriptsrc.unsafe", "script-src includes unsafe-inline"],
+  ["stylesrc.unsafe.hashes", "style-src includes unsafe-hashes"],
+  ["stylesrc.unsafe", "style-src includes unsafe-inline"],
+  ["wildcard", "allow wildcard sources"],
+  ["xcsp", "the header x-content-security-policy was found"],
+  ["xwkcsp", "the header x-webkit-csp was found"]
+];
+
+function cspTemplatesFrom(otherInfo) {
+  const flattened = otherInfo.replace(/\s+/g, " ").toLowerCase().trim();
+  const named = cspTemplateMarkers.filter(([, marker]) => flattened.includes(marker)).map(([id]) => id);
+  return named.length > 0 ? named : [`unrecognised-${sha256(flattened).replace("sha256:", "").slice(0, 12)}`];
+}
+
 // The scanner's own templates name a directive in one of two places and otherwise name none, so an
 // alert carrying no directive is ordinary rather than unreadable.
 function cspDirectivesFrom(otherInfo) {
@@ -221,7 +240,7 @@ function passiveRuleEvidence(pluginId, alert, instance, fingerprint, imageDigest
       throw unsupported(`the alert does not describe the policy header: ${seen()}`);
     }
     return { kind: "policy-directive", headerName: "content-security-policy",
-      directives: cspDirectivesFrom(otherInfo) };
+      directives: cspDirectivesFrom(otherInfo), templates: cspTemplatesFrom(otherInfo) };
   }
   if (pluginId === "10109") {
     if (param !== "" || !evidence.includes("<script")
@@ -250,7 +269,8 @@ function mergeRuleEvidence(existing, incoming, imageDigest, fingerprint) {
   if (existing.kind === "policy-directive" && incoming.kind === "policy-directive"
       && existing.headerName === incoming.headerName) {
     return { ...existing,
-      directives: [...new Set([...existing.directives, ...incoming.directives])].toSorted() };
+      directives: [...new Set([...existing.directives, ...incoming.directives])].toSorted(),
+      templates: [...new Set([...existing.templates, ...incoming.templates])].toSorted() };
   }
   if (existing.kind !== "text-pattern" || incoming.kind !== "text-pattern") {
     if (JSON.stringify(existing) !== JSON.stringify(incoming)) {
@@ -418,7 +438,8 @@ export function alertDiscriminator(ruleEvidence) {
     return { kind, patternIds: [...new Set(ruleEvidence.matches.map(({ patternId }) => patternId))].toSorted() };
   }
   if (kind === "policy-directive") {
-    return { kind, headerName: ruleEvidence.headerName, directives: ruleEvidence.directives };
+    return { kind, headerName: ruleEvidence.headerName, directives: ruleEvidence.directives,
+      templates: ruleEvidence.templates };
   }
   if (kind === "session-signal") return { kind, tokenNames: ruleEvidence.tokenNames };
   if (kind === "application-signal") return { kind, signal: ruleEvidence.signal };
@@ -441,7 +462,6 @@ export function recordCovers(record, alert) {
     && record.pluginId === alert.pluginId && record.method === alert.method
     && record.routeTemplate === alert.routeTemplate
     && record.riskCode === alert.riskCode && record.confidence === alert.confidence
-    && record.count === alert.count
     && record.scannerVersion === zapVersion
     && canonical(record.observed) === canonical(alertDiscriminator(alert.ruleEvidence));
 }

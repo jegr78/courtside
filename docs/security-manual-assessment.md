@@ -45,6 +45,28 @@ chapters this procedure covers is not evidence that this control holds, so a con
 anchored to a named production path and a falsifying test is recorded `blocked` rather than passed.
 Validation refuses the record otherwise.
 
+### Reading the anchors an earlier run left behind
+
+```bash
+node tools/security-anchored-control-run.mjs <manifest.json> <record-id> <verification-result.json> <tracking-reference> <output-directory>
+```
+
+The command derives one disposition per selected control from what the catalog and the tracked
+finding records already say, and binds the record to the target the assessment manifest names. A
+`controlEvidence` anchor becomes `pass`, a lifecycle finding becomes `fail` carrying that
+fingerprint, a finding-document reference or a control-specific catalog rationale becomes `blocked`,
+and a control the catalog rules out becomes `not-applicable`. A control none of them names becomes
+`blocked`, never an outcome whose source nobody can follow. A control carrying both an anchor and an
+open lifecycle finding is two answers to one question, and the command refuses to pick one.
+
+It resolves every anchor before it records a pass, reading both files with `git show` at the commit
+the record names rather than out of the checkout it runs in: the production path has to exist there,
+the named test has to be declared in the file the anchor names, and the path has to be one the
+catalog schema admits. It also reads the verification's own record: `build/local-check/result.json` has to say `passed`,
+and the commit it ran over may not differ from the assessed commit in any file an anchor names. It writes the protected record, one retained reading per
+control and the redacted per-control outcomes. It is a reading, not a substitute for the procedures: it performs no procedure step and
+sends no request, and a record it produces says so beside its counts.
+
 ## Authorization and profile boundary
 
 Start with `safe`. It permits bounded passive checks against SECURITY, UAT or an explicitly

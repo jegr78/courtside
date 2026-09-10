@@ -145,11 +145,12 @@
         },
         {
           "type": "object", "additionalProperties": false,
-          "required": ["kind", "headerName", "directives"],
+          "required": ["kind", "headerName", "directives", "templates"],
           "properties": {
             "kind": { "const": "policy-directive" },
             "headerName": { "const": "content-security-policy" },
-            "directives": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z-]*$" } }
+            "directives": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z-]*$" } },
+            "templates": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^(?:malformed|nofallback|scriptsrc\\.unsafe(?:\\.eval|\\.hashes)?|stylesrc\\.unsafe(?:\\.hashes)?|wildcard|xcsp|xwkcsp|unrecognised-[0-9a-f]{12})$" } }
           }
         },
         {

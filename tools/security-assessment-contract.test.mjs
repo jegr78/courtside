@@ -21,6 +21,8 @@ const manualEvidenceSchema = JSON.parse(readFileSync(
 const baseline = readFileSync(new URL("../docs/security-baseline.md", import.meta.url), "utf8");
 const controlOutcomes = JSON.parse(readFileSync(
   new URL("../security/manual-baseline-control-outcomes.json", import.meta.url), "utf8"));
+const publishedRecords = ["manual-baseline-control-outcomes.json", "manual-anchored-control-outcomes.json"]
+  .map((file) => [file, JSON.parse(readFileSync(new URL(`../security/${file}`, import.meta.url), "utf8"))]);
 const controlOutcomeSchema = JSON.parse(readFileSync(
   new URL("../security/manual-baseline-control-outcomes.schema.json", import.meta.url), "utf8"));
 const repositoryFile = (path) => new URL(`../${path}`, import.meta.url);
@@ -587,29 +589,241 @@ test("given an active-only procedure, when safe or production execution is claim
   }), false);
 });
 
-test("given the recorded manual baseline, when reading its outcomes, then every published count names its controls", () => {
+test("given every recorded manual run, when reading its outcomes, then its own published count names its controls", () => {
   // given
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true })
     .compile(controlOutcomeSchema);
   const catalogControls = new Set(catalog.controlCoverage.flatMap(({ controls }) => controls)
     .map(({ id }) => id));
-  const published = Object.fromEntries([...baseline.matchAll(
-    /^\| (pass|not applicable|fail|blocked)[^|]*\| *([0-9]+) \|$/gm)]
-    .map(([, outcome, controls]) => [outcome.replace(" ", "-"), Number(controls)]));
+  const sections = baseline.split(/^## /m);
 
-  // when
-  const counted = controlOutcomes.controls.reduce((total, { outcome }) =>
-    ({ ...total, [outcome]: total[outcome] + 1 }),
-    { pass: 0, fail: 0, "not-applicable": 0, blocked: 0 });
+  // when / then
+  assert.equal(publishedRecords.length, 2);
+  for (const [file, record] of publishedRecords) {
+    const section = sections.find((candidate) => candidate.includes(file));
+    const published = Object.fromEntries([...section.matchAll(
+      /^\| (pass|not applicable|fail|blocked)[^|]*\| *([0-9]+) \|$/gm)]
+      .map(([, outcome, controls]) => [outcome.replace(" ", "-"), Number(controls)]));
+    const counted = record.controls.reduce((total, { outcome }) =>
+      ({ ...total, [outcome]: total[outcome] + 1 }),
+      { pass: 0, fail: 0, "not-applicable": 0, blocked: 0 });
 
-  // then
-  assert.equal(validate(controlOutcomes), true, JSON.stringify(validate.errors));
-  assert.deepEqual(controlOutcomes.controls.filter(({ id }) => !catalogControls.has(id)), []);
-  assert.equal(new Set(controlOutcomes.controls.map(({ id }) => id)).size, controlOutcomes.controls.length);
-  assert.deepEqual(counted, published);
-  assert.match(baseline, new RegExp(`covers ${controlOutcomes.controls.length} unique selected controls`));
-  assert.match(baseline, new RegExp(`\`${controlOutcomes.run.runId}\``));
-  assert.match(baseline, new RegExp(`\`${controlOutcomes.run.sourceCommit}\``));
+    assert.equal(validate(record), true, `${file}: ${JSON.stringify(validate.errors)}`);
+    assert.deepEqual(record.controls.filter(({ id }) => !catalogControls.has(id)), [], file);
+    assert.equal(new Set(record.controls.map(({ id }) => id)).size, record.controls.length, file);
+    assert.deepEqual(counted, published, file);
+    assert.match(section, new RegExp(`${record.controls.length} unique selected controls`));
+    assert.match(baseline, new RegExp(`\`${record.run.runId}\``));
+    assert.match(baseline, new RegExp(`\`${record.run.sourceCommit}\``));
+  }
+  assert.equal(new Set(publishedRecords.map(([, record]) => record.run.runId)).size, 2);
+});
+
+test("given the architecture controls the first run never anchored, when reading their dispositions, then each names one", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-INFO-01", "v5.0.0-15.3.2"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+    if (control.status === "not-applicable") {
+      assert.equal(typeof control.rationale === "string" && control.rationale.length > 120, true,
+        `${control.id} carries no control-specific rationale`);
+    }
+  }
+});
+
+test("given the remaining authorization controls the first run never anchored, when reading their dispositions, then each names one", () => {
+  // given
+  const reviewedIds = new Set([
+    "v5.0.0-8.4.1"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+    if (control.status === "not-applicable") {
+      assert.equal(typeof control.rationale === "string" && control.rationale.length > 120, true,
+        `${control.id} carries no control-specific rationale`);
+    }
+  }
+});
+
+test("given the browser and client controls the first run never anchored, when reading their dispositions, then each names one", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-CLNT-04", "WSTG-v4.2-CLNT-05", "WSTG-v4.2-CLNT-08", "WSTG-v4.2-CLNT-10",
+    "WSTG-v4.2-CLNT-11", "v5.0.0-3.5.4", "v5.0.0-3.5.5", "v5.0.0-3.7.2"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+    if (control.status === "not-applicable") {
+      assert.equal(typeof control.rationale === "string" && control.rationale.length > 120, true,
+        `${control.id} carries no control-specific rationale`);
+    }
+  }
+});
+
+test("given the deployment-boundary controls the first run never anchored, when reading their dispositions, then each names one", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-CONF-08", "WSTG-v4.2-CONF-10", "WSTG-v4.2-CONF-11", "v5.0.0-12.1.3",
+    "v5.0.0-17.1.1", "v5.0.0-17.2.1", "v5.0.0-17.2.2", "v5.0.0-17.2.3", "v5.0.0-17.2.4",
+    "v5.0.0-17.3.1", "v5.0.0-17.3.2"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+    if (control.status === "not-applicable") {
+      assert.equal(typeof control.rationale === "string" && control.rationale.length > 120, true,
+        `${control.id} carries no control-specific rationale`);
+    }
+  }
+});
+
+test("given the cryptographic controls the first run never anchored, when reading their dispositions, then each names one", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-CRYP-02"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+    if (control.status === "not-applicable") {
+      assert.equal(typeof control.rationale === "string" && control.rationale.length > 120, true,
+        `${control.id} carries no control-specific rationale`);
+    }
+  }
+});
+
+test("given the identity and credential controls the first run never anchored, when reading their dispositions, then each names one", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-ATHN-05", "WSTG-v4.2-ATHN-08", "WSTG-v4.2-ATHN-10", "WSTG-v4.2-IDNT-02",
+    "v5.0.0-10.1.1", "v5.0.0-10.1.2", "v5.0.0-10.2.1", "v5.0.0-10.2.2", "v5.0.0-10.3.1",
+    "v5.0.0-10.3.2", "v5.0.0-10.3.3", "v5.0.0-10.3.4", "v5.0.0-10.4.1", "v5.0.0-10.4.10",
+    "v5.0.0-10.4.11", "v5.0.0-10.4.2", "v5.0.0-10.4.3", "v5.0.0-10.4.4", "v5.0.0-10.4.5",
+    "v5.0.0-10.4.6", "v5.0.0-10.4.7", "v5.0.0-10.4.8", "v5.0.0-10.4.9", "v5.0.0-10.5.1",
+    "v5.0.0-10.5.2", "v5.0.0-10.5.3", "v5.0.0-10.5.4", "v5.0.0-10.5.5", "v5.0.0-10.6.1",
+    "v5.0.0-10.6.2", "v5.0.0-10.7.1", "v5.0.0-10.7.2", "v5.0.0-10.7.3", "v5.0.0-6.1.3",
+    "v5.0.0-6.3.4", "v5.0.0-6.4.4", "v5.0.0-6.5.1", "v5.0.0-6.5.2", "v5.0.0-6.5.3", "v5.0.0-6.5.4",
+    "v5.0.0-6.5.5", "v5.0.0-6.6.1", "v5.0.0-6.6.2", "v5.0.0-6.6.3", "v5.0.0-6.8.1", "v5.0.0-6.8.2",
+    "v5.0.0-6.8.3", "v5.0.0-6.8.4"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+    if (control.status === "not-applicable") {
+      assert.equal(typeof control.rationale === "string" && control.rationale.length > 120, true,
+        `${control.id} carries no control-specific rationale`);
+    }
+  }
+});
+
+test("given the parser and protocol controls the first run never anchored, when reading their dispositions, then each names one", () => {
+  // given
+  const reviewedIds = new Set([
+    "WSTG-v4.2-APIT-01", "WSTG-v4.2-INPV-06", "WSTG-v4.2-INPV-07", "WSTG-v4.2-INPV-08",
+    "WSTG-v4.2-INPV-09", "v5.0.0-1.2.5", "v5.0.0-1.2.6", "v5.0.0-1.2.7", "v5.0.0-1.2.8",
+    "v5.0.0-1.2.9", "v5.0.0-1.3.1", "v5.0.0-1.3.10", "v5.0.0-1.3.2", "v5.0.0-1.3.4",
+    "v5.0.0-1.3.5", "v5.0.0-1.3.6", "v5.0.0-1.3.7", "v5.0.0-1.3.8", "v5.0.0-1.3.9", "v5.0.0-1.5.1",
+    "v5.0.0-4.3.1", "v5.0.0-4.3.2", "v5.0.0-4.4.1", "v5.0.0-4.4.2", "v5.0.0-4.4.3", "v5.0.0-4.4.4",
+    "v5.0.0-5.2.3", "v5.0.0-5.3.2", "v5.0.0-5.4.1", "v5.0.0-5.4.2"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+    if (control.status === "not-applicable") {
+      assert.equal(typeof control.rationale === "string" && control.rationale.length > 120, true,
+        `${control.id} carries no control-specific rationale`);
+    }
+  }
+});
+
+test("given the operational-access controls the first run never anchored, when reading their dispositions, then each names one", () => {
+  // given
+  const reviewedIds = new Set([
+    "v5.0.0-13.2.5"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+    if (control.status === "not-applicable") {
+      assert.equal(typeof control.rationale === "string" && control.rationale.length > 120, true,
+        `${control.id} carries no control-specific rationale`);
+    }
+  }
+});
+
+test("given the session and token controls the first run never anchored, when reading their dispositions, then each names one", () => {
+  // given
+  const reviewedIds = new Set([
+    "v5.0.0-7.1.3", "v5.0.0-7.6.1", "v5.0.0-9.1.1", "v5.0.0-9.1.2", "v5.0.0-9.1.3", "v5.0.0-9.2.1",
+    "v5.0.0-9.2.2", "v5.0.0-9.2.3", "v5.0.0-9.2.4"
+  ]);
+  const reviewed = catalog.controlCoverage.flatMap(({ controls }) => controls)
+    .filter(({ id }) => reviewedIds.has(id));
+
+  // when / then
+  assert.equal(reviewed.length, reviewedIds.size);
+  for (const control of reviewed) {
+    const dispositions = [control.controlEvidence !== undefined, control.findingReference !== undefined,
+      control.status === "not-applicable"].filter(Boolean);
+    assert.equal(dispositions.length, 1, `${control.id} has no single review disposition`);
+    if (control.status === "not-applicable") {
+      assert.equal(typeof control.rationale === "string" && control.rationale.length > 120, true,
+        `${control.id} carries no control-specific rationale`);
+    }
+  }
 });
 
 test("given a control-specific anchor, when reading the catalog, then its production path and falsifying test exist", () => {

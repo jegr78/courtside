@@ -202,6 +202,35 @@ class HaveIBeenPwnedPasswordLookupTest {
         }
     }
 
+    @Test
+    void givenTheRangeServiceAnswersWithARedirect_whenAPasswordIsChecked_thenItIsNotFollowed()
+            throws Exception {
+        // given
+        AtomicReference<String> reached = new AtomicReference<>();
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/range", exchange -> {
+            exchange.getResponseHeaders().add("Location", "/elsewhere/A94A8");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        server.createContext("/elsewhere", exchange -> {
+            reached.set(exchange.getRequestURI().getPath());
+            byte[] bytes = "FE5CCB19BA61C4C0873D391E987982FBBD3:42\r\n".getBytes(StandardCharsets.US_ASCII);
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        server.start();
+        HaveIBeenPwnedPasswordLookup lookup = new HaveIBeenPwnedPasswordLookup(
+                URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/range/"),
+                Duration.ofSeconds(1), 10, Duration.ofHours(1), fixedClock());
+
+        // when / then
+        assertThatThrownBy(() -> lookup.isBreached("test"))
+                .isInstanceOf(BreachedPasswordCheckUnavailableException.class);
+        assertThat(reached.get()).isNull();
+    }
+
     private HaveIBeenPwnedPasswordLookup lookup(Response response) throws IOException {
         return lookup(response, fixedClock(), 10, Duration.ofHours(1));
     }

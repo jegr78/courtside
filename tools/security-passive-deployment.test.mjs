@@ -330,7 +330,9 @@ test("given the remaining supported passive rules, when normalizing them, then o
     { pluginid: "10054", riskcode: "1", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
       param: "__Host-XSRF-TOKEN", evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] },
     { pluginid: "10055", riskcode: "2", confidence: "3", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
-      param: "Content-Security-Policy", evidence: "policy-value", otherinfo: "Broad directives:\nimg-src" }] },
+      param: "Content-Security-Policy", evidence: "policy-value",
+      otherinfo: "The following directives either allow wildcard sources (or ancestors), are not"
+        + " defined, or are overly broadly defined:\nimg-src" }] },
     { pluginid: "10109", riskcode: "0", confidence: "2", instances: [{ uri: `${passiveScannerOrigin}/`, method: "GET",
       param: "", evidence: "<script src=secret>",
       otherinfo: "No links have been found while there are scripts, indicating a modern application." }] },
@@ -344,7 +346,8 @@ test("given the remaining supported passive rules, when normalizing them, then o
   // then
   assert.deepEqual(alerts.map(({ ruleEvidence }) => ruleEvidence), [
     { kind: "cookie-attribute", cookieName: "xsrf-token", missingAttribute: "same-site" },
-    { kind: "policy-directive", headerName: "content-security-policy", directives: ["img-src"] },
+    { kind: "policy-directive", headerName: "content-security-policy", directives: ["img-src"],
+      templates: ["wildcard"] },
     { kind: "application-signal", signal: "scripts-without-links" },
     { kind: "session-signal", tokenNames: ["session", "xsrf-token"] }
   ]);
@@ -364,7 +367,8 @@ test("given the CSP directives ZAP says do not fall back, when normalizing them,
 
   // then
   assert.deepEqual(alerts.map(({ ruleEvidence }) => ruleEvidence), [
-    { kind: "policy-directive", headerName: "content-security-policy", directives: ["form-action"] }
+    { kind: "policy-directive", headerName: "content-security-policy", directives: ["form-action"],
+      templates: ["nofallback"] }
   ]);
   assert.doesNotMatch(JSON.stringify(alerts), /base-uri|'none'/);
 });
@@ -487,7 +491,21 @@ test("given a wording that names no directive at all, when normalizing it, then 
 
   // then — refusing this aborted the whole assessment, though the alert is perfectly valid
   assert.deepEqual(alerts[0].ruleEvidence,
-    { kind: "policy-directive", headerName: "content-security-policy", directives: [] });
+    { kind: "policy-directive", headerName: "content-security-policy", directives: [],
+      templates: ["xwkcsp"] });
+});
+
+test("given a wording no pinned template explains, when normalizing it, then it still gets its own name", () => {
+  // given — a scanner that grows an eleventh wording must not merge into the ten this record reads
+  const first = normalizeZapAlerts(cspAlert("A wording the pinned scanner never emitted."));
+  const second = normalizeZapAlerts(cspAlert("A different wording the pinned scanner never emitted."));
+  const repeated = normalizeZapAlerts(cspAlert("A wording the pinned scanner never emitted."));
+
+  // then
+  assert.match(first[0].ruleEvidence.templates[0], /^unrecognised-[0-9a-f]{12}$/);
+  assert.equal(first[0].ruleEvidence.templates.length, 1);
+  assert.deepEqual(repeated[0].ruleEvidence.templates, first[0].ruleEvidence.templates);
+  assert.notDeepEqual(second[0].ruleEvidence.templates, first[0].ruleEvidence.templates);
 });
 
 test("given a name before an announced run, when normalizing it, then only the announced run is read", () => {
@@ -706,12 +724,20 @@ test("given an alert nothing has classified, when building evidence, then the ru
 const acceptedDirectives = ["connect-src", "font-src", "form-action", "frame-src", "img-src",
   "manifest-src", "media-src", "object-src", "script-src", "style-src", "worker-src"];
 const acceptedOccurrences = 5;
+const acceptedWordings = [
+  (directives) => `The following directives either allow wildcard sources (or ancestors), are not defined,`
+    + ` or are overly broadly defined:\n${directives.join("\n")}`,
+  (directives) => `The directive(s): ${directives.join(", ")} is/are among the directives that do not`
+    + " fallback to default-src.",
+  () => "script-src includes unsafe-inline.",
+  () => "style-src includes unsafe-inline."
+];
 const policyAlert = (directives, riskcode = "2", occurrences = acceptedOccurrences) => ({
   pluginid: "10055", riskcode, confidence: "3",
-  instances: Array.from({ length: occurrences }, () => ({ uri: `${passiveScannerOrigin}/`, method: "GET",
+  instances: Array.from({ length: occurrences }, (unused, index) => ({
+    uri: `${passiveScannerOrigin}/`, method: "GET",
     param: "Content-Security-Policy", evidence: "base-uri 'none'; frame-ancestors 'none'",
-    otherinfo: `The following directives either allow wildcard sources (or ancestors), are not defined,`
-      + ` or are overly broadly defined:\n${directives.join("\n")}` })) });
+    otherinfo: acceptedWordings[Math.min(index, acceptedWordings.length - 1)](directives) })) });
 
 test("given an alert an unexpired acceptance covers, when building evidence, then the run passes", () => {
   // given — the CSP alert on the site root is the accepted remote-logo risk, not a false positive
@@ -769,7 +795,7 @@ test("given a scanner other than the one a record names, when it is matched, the
   // given — a bump of the pinned image changes what a rule reports, so a record does not carry over
   const record = dispositions.dispositions[0];
   const alert = { pluginId: record.pluginId, method: record.method, routeTemplate: record.routeTemplate,
-    riskCode: record.riskCode, confidence: record.confidence, count: record.count,
+    riskCode: record.riskCode, confidence: record.confidence, count: 1,
     fingerprint: record.fingerprint,
     ruleEvidence: { kind: "cookie-attribute", cookieName: "xsrf-token", missingAttribute: "http-only" } };
 
@@ -795,8 +821,8 @@ test("given a record whose own rule and route miss its fingerprint, when it is m
     // given — the fingerprint is a hash, so a record could name one its own three fields do not produce
     const record = dispositions.dispositions[0];
     const alert = { pluginId: record.pluginId, method: record.method, routeTemplate: record.routeTemplate,
-      riskCode: record.riskCode, confidence: record.confidence, count: record.count,
-    fingerprint: record.fingerprint,
+      riskCode: record.riskCode, confidence: record.confidence, count: 1,
+      fingerprint: record.fingerprint,
       ruleEvidence: { kind: "cookie-attribute", cookieName: "xsrf-token", missingAttribute: "http-only" } };
 
     // when / then — the alert still carries that fingerprint, so only the recomputation catches this
@@ -866,10 +892,10 @@ const acceptedRecord = () => dispositions.dispositions.find(({ state }) => state
 const acceptedAlert = (overrides = {}) => {
   const record = acceptedRecord();
   return { pluginId: record.pluginId, method: record.method, routeTemplate: record.routeTemplate,
-    riskCode: record.riskCode, confidence: record.confidence, count: record.count,
+    riskCode: record.riskCode, confidence: record.confidence, count: 1,
     fingerprint: record.fingerprint,
     ruleEvidence: { kind: "policy-directive", headerName: record.observed.headerName,
-      directives: record.observed.directives }, ...overrides };
+      directives: record.observed.directives, templates: record.observed.templates }, ...overrides };
 };
 const acceptanceMap = () => new Map(acceptances.map((entry) => [entry.id, entry]));
 
@@ -909,22 +935,35 @@ test("given a record written in another key order, when it is matched, then it s
   // given — a reformatter must not turn every resolution into a candidate without saying so
   const record = acceptedRecord();
   const reordered = { ...record, observed: { directives: [...record.observed.directives].toReversed(),
+    templates: [...record.observed.templates].toReversed(),
     kind: record.observed.kind, headerName: record.observed.headerName } };
 
   // when / then
   assert.equal(recordCovers(reordered, acceptedAlert()), true);
 });
 
-test("given one more occurrence than the record names, when it is matched, then the record covers nothing",
+test("given one more occurrence than the record saw, when it is matched, then the record still covers it",
   () => {
-    // given — the scanner merges every wording of one rule on one route, so a sixth is invisible in the
-    // directive union and visible only in the count
+    // given — how many URLs a route template stands for is a property of the crawl, not of the finding
     const record = acceptedRecord();
 
     // when / then
     assert.equal(recordCovers(record, acceptedAlert()), true);
-    assert.equal(recordCovers(record, acceptedAlert({ count: record.count + 1 })), false);
+    assert.equal(recordCovers(record, acceptedAlert({ count: 7 })), true);
   });
+
+test("given a policy wording the record never saw, when it is matched, then the record covers nothing", () => {
+  // given — the scanner merges every wording of one rule on one route, and a template naming no
+  // directive leaves the union unmoved
+  const record = acceptedRecord();
+  const widened = acceptedAlert({ count: 7, ruleEvidence: { kind: "policy-directive",
+    headerName: record.observed.headerName, directives: record.observed.directives,
+    templates: [...record.observed.templates, "xwkcsp"].toSorted() } });
+
+  // when / then
+  assert.equal(recordCovers(record, acceptedAlert({ count: 7 })), true);
+  assert.equal(recordCovers(record, widened), false);
+});
 
 test("given a second wording merged into an accepted alert, when building evidence, then it stays open", () => {
   // given — a legacy CSP header ZAP does not analyse names no directive, so the union does not move
@@ -956,12 +995,12 @@ test("given a second asset matching the same pattern, when building evidence, th
   // when
   const evidence = evidenceFor(alerts, "2026-09-10");
 
-  // then — the pattern set is unchanged and only the count says a second asset appeared
+  // then — the pattern set is unchanged, so the record that read this pattern still resolves it
   assert.deepEqual(evidence.zap.alerts[0].ruleEvidence.matches.map(({ patternId }) => patternId),
     ["comment-query", "comment-query"]);
   assert.equal(evidence.zap.alerts[0].count, 2);
-  assert.equal(evidence.zap.alerts[0].state, "candidate");
-  assert.equal(evidence.outcome, "incomplete");
+  assert.equal(evidence.zap.alerts[0].state, "false-positive");
+  assert.equal(evidence.outcome, "passed");
 });
 
 test("given rule evidence no discriminator reads, when it is discriminated, then it refuses to guess", () => {

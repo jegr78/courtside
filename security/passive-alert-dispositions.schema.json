@@ -12,7 +12,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": ["fingerprint", "pluginId", "method", "routeTemplate", "riskCode", "confidence",
-          "count", "scannerVersion", "observed", "state", "rationale", "actor", "classifiedAt", "reference"],
+          "scannerVersion", "observed", "state", "rationale", "actor", "classifiedAt", "reference"],
         "properties": {
           "fingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
           "pluginId": { "type": "string", "pattern": "^[0-9]+$" },
@@ -20,7 +20,6 @@
           "routeTemplate": { "type": "string", "minLength": 1 },
           "riskCode": { "type": "integer", "minimum": 0, "maximum": 3 },
           "confidence": { "type": "integer", "minimum": 0, "maximum": 4 },
-          "count": { "type": "integer", "minimum": 1 },
           "scannerVersion": { "const": "2.17.0" },
           "observed": { "type": "object", "required": ["kind"], "properties": { "kind": { "type": "string" } } },
           "state": { "enum": ["false-positive", "duplicate", "accepted-risk"] },
