@@ -58,13 +58,15 @@ test("given sensitive extension responses, when exposure is assessed, then every
   });
 });
 
-test("given backup and unreferenced responses, when exposure is assessed, then forbidden or successful discovery fails", () => {
-  // given
-  const absent = [404, 404, 404, 404, 404];
+test("given backup and unreferenced responses, when exposure is assessed, then only a served one fails", () => {
+  // given — the deployment answers every one of these 401, because it authenticates before it routes
+  const refused = [401, 401, 401, 401, 401];
 
   // when / then
-  assert.equal(evaluateExposureResponses(absent).passed, true);
-  assert.equal(evaluateExposureResponses([404, 403, 404, 404, 404]).passed, false);
+  assert.equal(evaluateExposureResponses(refused).passed, true);
+  assert.equal(evaluateExposureResponses([401, 403, 404, 401, 401]).passed, true);
+  assert.equal(evaluateExposureResponses([401, 401, 301, 401, 401]).passed, false);
+  assert.equal(evaluateExposureResponses([401, 401, 500, 401, 401]).passed, false);
 });
 
 test("given unsafe and overridden methods, when the boundary is assessed, then changed request semantics fail", () => {

@@ -372,8 +372,10 @@ export function evaluatePublicResponseHeaders(response) {
   };
 }
 
+// These paths reach the application, where authentication precedes routing, so the answer comes
+// before anything decides whether a file of that name exists.
 export function evaluateExposureResponses(statuses) {
-  const passed = statuses.length > 0 && statuses.every((status) => status === 404);
+  const passed = statuses.length > 0 && statuses.every((status) => [401, 403, 404].includes(status));
   return { passed, observation: passed ? "route-group-not-exposed" : "unexpected-route-group-response" };
 }
 
