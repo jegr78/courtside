@@ -75,9 +75,8 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     // Every request the servlet container serves writes the caller's own session row, whatever its
     // method: that is the session store working, not a read acquiring a side effect.
-    private static final Map<String, String> SESSION_TABLES = Map.of(
-            "spring_session", "the container records this caller's last access time on every request",
-            "spring_session_attributes", "the attributes of the row above travel with it");
+    private static final Map<String, String> EXEMPT_TABLES = Map.of(
+            "spring_session", "the container records this caller's last access time on every request");
 
     private record Probe(String identifier, String query, int expectedStatus) {
     }
@@ -234,21 +233,22 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void everyTableTheProbesIgnoreExists() {
+    void everyExemptTableExists() {
         // when
         List<String> tables = publicTables(jdbc);
 
         // then
         assertThat(tables)
-                .as("an ignored table that no longer exists is an exemption nobody reads any more,"
+                .as("an exempt table that no longer exists is an exemption nobody reads any more,"
                         + " and it would silently cover the table that replaced it.")
-                .containsAll(SESSION_TABLES.keySet());
+                .containsAll(EXEMPT_TABLES.keySet());
     }
 
     @Test
     void whenEverySafeMethodOperationIsInvoked_thenNoPersistentStateChanges() throws Exception {
         // given
         List<String> failures = new ArrayList<>();
+        Set<String> exemptTablesThatMoved = new TreeSet<>();
 
         // when
         for (Map.Entry<String, Probe> probe : new TreeSet<>(PROBES.keySet()).stream()
@@ -271,10 +271,17 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             if (options.statusCode() != 200) {
                 failures.add("OPTIONS " + uri + " answered " + options.statusCode());
             }
-            failures.addAll(changedTables(probe.getKey(), before, stateFingerprint()));
+            Map<String, String> after = stateFingerprint();
+            failures.addAll(changedTables(probe.getKey(), before, after));
+            exemptTablesThatMoved.addAll(movedAmong(EXEMPT_TABLES.keySet(), before, after));
         }
 
         // then
+        assertThat(exemptTablesThatMoved)
+                .as("an exemption is earned by a table that actually moves under a safe method."
+                        + " One that never moves is a blanket nobody checked, and it would cover a"
+                        + " write that appears there later.")
+                .isEqualTo(new TreeSet<>(EXEMPT_TABLES.keySet()));
         assertThat(failures)
                 .as("a safe method must leave persistent state exactly as it found it. Every entry"
                         + " below names an operation that wrote, or a probe that never reached its"
@@ -284,10 +291,16 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     private List<String> changedTables(String path, Map<String, String> before, Map<String, String> after) {
         return before.keySet().stream()
-                .filter(table -> !SESSION_TABLES.containsKey(table))
+                .filter(table -> !EXEMPT_TABLES.containsKey(table))
                 .filter(table -> !before.get(table).equals(after.get(table)))
                 .map(table -> "GET " + path + " changed table " + table)
                 .toList();
+    }
+
+    private Set<String> movedAmong(Set<String> tables, Map<String, String> before, Map<String, String> after) {
+        return tables.stream()
+                .filter(table -> !before.get(table).equals(after.get(table)))
+                .collect(TreeSet::new, TreeSet::add, TreeSet::addAll);
     }
 
     private Map<String, String> stateFingerprint() {
