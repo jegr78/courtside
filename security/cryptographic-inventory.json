@@ -190,7 +190,7 @@
       "strength": {
         "decidedBy": "repository",
         "bits": 128,
-        "basis": "The collision resistance of SHA-256's 256-bit output. The digest keeps a username out of an in-memory counter; it is not offered as protection against somebody who already guesses the username."
+        "basis": "The collision resistance of SHA-256's 256-bit output. The digest keeps a username out of the table that counts failed sign-ins; it is not offered as protection against somebody who already guesses the username."
       },
       "class": "pseudonymisation",
       "owner": "club-operator",
@@ -607,7 +607,7 @@
       "implementation": "stalwart",
       "strength": {
         "decidedBy": "stalwart",
-        "basis": "The relay and the receiving server negotiate the suite, and the relay's certificate is the operator's. This repository decides only that the connection must be encrypted and verified."
+        "basis": "The relay and the receiving server negotiate the suite, and the relay's certificate is the operator's. This repository decides only that the connection must use STARTTLS; whether the relay's certificate is checked is an operator switch that defaults to checking it."
       },
       "class": "transport",
       "owner": "club-operator",
