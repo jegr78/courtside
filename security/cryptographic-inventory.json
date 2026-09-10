@@ -582,7 +582,7 @@
       "implementation": "caddy",
       "strength": {
         "decidedBy": "club-operator",
-        "basis": "The operator's certificate authority issues the key and the proxy negotiates the suite with each browser, so this repository selects neither. What a running instance actually offers is read by the passive assessment rather than claimed here."
+        "basis": "The proxy obtains the certificate itself for a club's own domain and negotiates the suite with each browser, so this repository selects neither the key nor the cipher. What a running instance actually offers is read by the passive assessment rather than claimed here."
       },
       "class": "transport",
       "owner": "club-operator",
