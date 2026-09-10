@@ -131,8 +131,11 @@ the category procedure is incomplete.
 
 - Prerequisites: current design, deployment manifests, OpenAPI document, module model and threat model.
 - Steps: trace each trust boundary and sensitive data flow from browser to storage; compare the
-  deployed components, roles and external dependencies with the documented model; challenge every
-  implicit trust decision and record an owner for each security control.
+  deployed components, roles and external dependencies with the documented model; read
+  `security/published-web-resources.json` against what the frontend build produces and what the
+  running instance answers without a session, and challenge every metadata resource, comment,
+  absolute origin and credential pattern it reviews; challenge every implicit trust decision and
+  record an owner for each security control.
 - Expected secure outcome: the shipped architecture has no undocumented trust boundary, privileged
   flow or control owner, and deviations are explicit findings rather than assumptions.
 

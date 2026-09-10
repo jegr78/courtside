@@ -40,21 +40,6 @@ route, and filter-based request entry points are outside that inventory. The con
 non-passing until the complete request surface is derived and every non-OpenAPI boundary is
 explicitly classified.
 
-### Published web-metadata and disclosure inventory is incomplete
-
-- State: validated evidence gap
-- Priority: P2
-- Controls: WSTG 4.2 `WSTG-v4.2-INFO-03`, `WSTG-v4.2-INFO-05`
-- Review: `MAN-ARCH-001`, 9 September 2026
-- Remediation: #907
-
-The production-build policy rejects source maps, selected metadata names, key material, host paths,
-token patterns and debug markers. That useful baseline is not a closed inventory: the PWA manifest
-is intentionally published, server-side routes can bypass the Vite output, and sensitive comments,
-internal origins, environment details or unlisted credential forms can evade a marker list. Both
-controls remain non-passing until packaged and runtime resources have a bounded inventory whose
-allowed metadata and disclosure content is explicitly reviewed and falsifiable.
-
 ### Correct client-address attribution is not proven
 
 - State: validated evidence gap
