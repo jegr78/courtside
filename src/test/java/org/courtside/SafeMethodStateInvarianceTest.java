@@ -15,6 +15,9 @@ import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuate.endpoint.EndpointId;
+import org.springframework.boot.actuate.endpoint.web.PathMappedEndpoints;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpointGroups;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
@@ -143,13 +146,23 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/admin/impact/opening-hours/{day}", read("weekday", "")),
             entry("/api/admin/reports/facility-utilisation", read("from=2026-05-01&to=2026-05-31")),
             entry("/api/admin/messages", read()),
-            entry("/api/admin/audit", read()));
+            entry("/api/admin/audit", read()),
+            entry("/actuator/health", read()),
+            entry("/actuator/health/liveness", read()),
+            entry("/actuator/health/readiness", read()),
+            entry("/actuator/health/mail", read()));
 
     @LocalServerPort
     private int port;
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private PathMappedEndpoints actuator;
+
+    @Autowired
+    private HealthEndpointGroups healthGroups;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -223,14 +236,15 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     @Test
     void whenTheContractIsRead_thenEverySafeMethodOperationHasAStateInvarianceProbe() {
         // when
-        TreeSet<String> documented = documentedSafeOperations();
+        TreeSet<String> shipped = documentedSafeOperations();
+        shipped.addAll(exposedActuatorPaths());
 
         // then
         assertThat(new TreeSet<>(PROBES.keySet()))
                 .as("a safe-method operation without a probe is an unproven read: nothing would"
                         + " notice if it started writing. Add it to PROBES, with a request that"
                         + " answers successfully.")
-                .isEqualTo(documented);
+                .isEqualTo(shipped);
     }
 
     @Test
@@ -442,6 +456,17 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     private String baseUrl() {
         return "http://127.0.0.1:" + port;
+    }
+
+    // The document describes /api and the manifest; what a club also serves is whatever the
+    // management exposure lets out, which is configuration rather than contract.
+    private Set<String> exposedActuatorPaths() {
+        Set<String> paths = new TreeSet<>(actuator.getAllPaths());
+        String health = actuator.getPath(EndpointId.of("health"));
+        if (health != null) {
+            healthGroups.getNames().forEach(group -> paths.add(health + "/" + group));
+        }
+        return paths;
     }
 
     @SuppressWarnings("unchecked")
