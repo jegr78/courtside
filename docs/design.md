@@ -1656,8 +1656,12 @@ whether it is built or designed. **Designed means absent today.**
   older than five minutes. Password replacement also verifies the current password and ends every
   session. *Built.*
 - **CSRF:** on, double-submit cookie. *Built.*
-- **Brute force:** rate limiting before password verification. *Built.* Source-address counters
-  absorb concentrated attacks, while a two-per-instance concurrency guard bounds simultaneous
+- **Brute force:** rate limiting before password verification. *Built.* The source address a
+  counter is kept under is the one the reference proxy asserts in `X-Forwarded-For`, replacing
+  whatever a client sent; the application trusts that header, so an instance must not be reachable
+  except through its proxy. The reference deployment publishes the application only on the host's
+  loopback interface, which bounds the forgery to a process already on the host. Source-address
+  counters absorb concentrated attacks, while a two-per-instance concurrency guard bounds simultaneous
   Argon2 work on the reference deployment's two CPUs and 1 GiB application container. Capacity is
   released as soon as a verification ends; an attempt arriving while both slots are occupied gets
   the typed `429` with `Retry-After: 1`, not a renewable cooldown. The default is configurable and

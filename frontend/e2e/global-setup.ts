@@ -971,7 +971,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         const peer = await startSecondPeer();
         const attempt = await peer.exec(["node", "-e", SECOND_PEER_LOGIN, forwardedFor]);
         if (attempt.exitCode !== 0) {
-          throw new Error(`The second peer could not reach the club proxy: ${attempt.stderr}`);
+          throw new Error("The second peer could not complete a login through the club proxy");
         }
         return JSON.parse(attempt.stdout) as PeerLoginAttempt;
       },

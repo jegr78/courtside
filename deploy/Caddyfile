@@ -2,13 +2,12 @@
 	auto_https disable_redirects
 }
 
+# Caddy applies header deletions after the sets, whatever the line order, so a name set below
+# must not be deleted above: the deletion would take the value this proxy just asserted.
 (applicationHeaders) {
 	header_up -Forwarded
-	header_up -X-Forwarded-For
-	header_up -X-Forwarded-Host
 	header_up -X-Forwarded-Port
 	header_up -X-Forwarded-Prefix
-	header_up -X-Forwarded-Proto
 	header_up -X-Forwarded-Ssl
 	header_up X-Forwarded-For {remote_host}
 	header_up X-Forwarded-Host {host}

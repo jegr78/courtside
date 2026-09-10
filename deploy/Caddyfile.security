@@ -32,12 +32,8 @@
 	respond @forwardedInput 421
 	reverse_proxy app:8080 {
 		header_up Host localhost
-		header_up -Forwarded
-		header_up -X-Forwarded-For
-		header_up -X-Forwarded-Host
 		header_up -X-Forwarded-Port
 		header_up -X-Forwarded-Prefix
-		header_up -X-Forwarded-Proto
 		header_up -X-Forwarded-Ssl
 		header_up Forwarded "for={remote_host};host=localhost;proto={scheme}"
 		header_up X-Forwarded-For {remote_host}
@@ -53,12 +49,8 @@ https://localhost, https://attacker.example {
 		rewrite * /actuator/health
 		reverse_proxy app:8080 {
 			header_up Host localhost
-			header_up -Forwarded
-			header_up -X-Forwarded-For
-			header_up -X-Forwarded-Host
 			header_up -X-Forwarded-Port
 			header_up -X-Forwarded-Prefix
-			header_up -X-Forwarded-Proto
 			header_up -X-Forwarded-Ssl
 			header_up Forwarded "for={remote_host};host=localhost;proto=https"
 			header_up X-Forwarded-For {remote_host}
@@ -71,12 +63,8 @@ https://localhost, https://attacker.example {
 		rewrite * /actuator/mappings
 		reverse_proxy app:8080 {
 			header_up Host localhost
-			header_up -Forwarded
-			header_up -X-Forwarded-For
-			header_up -X-Forwarded-Host
 			header_up -X-Forwarded-Port
 			header_up -X-Forwarded-Prefix
-			header_up -X-Forwarded-Proto
 			header_up -X-Forwarded-Ssl
 			header_up Forwarded "for={remote_host};host=localhost;proto=https"
 			header_up X-Forwarded-For {remote_host}

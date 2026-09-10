@@ -9,6 +9,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -35,6 +38,9 @@ public class ReferenceDeploymentSecurityTest {
             "(?m)^http://:80 \\{\\R(?<body>(?:.*\\R)*?)^}$");
     private static final Pattern HEADER_BLOCK = Pattern.compile(
             "(?m)^\\theader \\{\\R(?<fields>(?:\\t\\t.*\\R)*)\\t}$");
+    private static final Pattern HEADER_DELETION = Pattern.compile("\\s*header_up\\s+-(?<name>\\S+)\\s*");
+    private static final Pattern HEADER_ASSIGNMENT = Pattern.compile(
+            "\\s*header_up\\s+(?<name>[A-Za-z][^\\s+]*)\\s+\\S.*");
     private static final Pattern SERVICE_BLOCK = Pattern.compile(
             "(?ms)^  [a-zA-Z0-9_-]+:\\R(?<body>.*?)(?=^  [a-zA-Z0-9_-]+:\\R|\\z)");
 
@@ -221,11 +227,8 @@ public class ReferenceDeploymentSecurityTest {
         });
         assertThat(headers.group("directives").lines().map(String::strip).toList()).containsExactly(
                 "header_up -Forwarded",
-                "header_up -X-Forwarded-For",
-                "header_up -X-Forwarded-Host",
                 "header_up -X-Forwarded-Port",
                 "header_up -X-Forwarded-Prefix",
-                "header_up -X-Forwarded-Proto",
                 "header_up -X-Forwarded-Ssl",
                 "header_up X-Forwarded-For {remote_host}",
                 "header_up X-Forwarded-Host {host}",
@@ -394,6 +397,75 @@ public class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void whenReadingEveryCaddyfile_thenNoUpstreamDeletesAHeaderItAlsoAsserts() throws IOException {
+        // given
+        List<Path> caddyfiles;
+        try (Stream<Path> deployment = Files.list(Path.of("deploy"))) {
+            caddyfiles = deployment.filter(path -> path.getFileName().toString().startsWith("Caddyfile"))
+                    .sorted().toList();
+        }
+
+        // when / then
+        assertThat(caddyfiles).hasSizeGreaterThan(1).allSatisfy(path ->
+                assertThat(selfCancellingHeaders(Files.readString(path)))
+                        .as("%s deletes a header the same upstream asserts", path)
+                        .isEmpty());
+    }
+
+    @Test
+    void whenAnUpstreamDeletesAHeaderItAsserts_thenTheScanNamesIt() {
+        // when / then
+        assertThat(selfCancellingHeaders("""
+                reverse_proxy app:8080 {
+                \theader_up -Forwarded
+                \theader_up -X-Forwarded-For
+                \theader_up X-Forwarded-For {remote_host}
+                }
+                """)).containsExactly("x-forwarded-for");
+        assertThat(selfCancellingHeaders("""
+                reverse_proxy app:8080 {
+                \theader_up -Forwarded
+                \theader_up X-Forwarded-For {remote_host}
+                }
+                sibling.example {
+                \theader_up -X-Forwarded-For
+                }
+                """)).isEmpty();
+    }
+
+    private static Set<String> selfCancellingHeaders(String caddyfile) {
+        Map<Integer, Set<String>> deleted = new HashMap<>();
+        Map<Integer, Set<String>> asserted = new HashMap<>();
+        List<Integer> open = new ArrayList<>();
+        int blocks = 0;
+        for (String line : caddyfile.lines().toList()) {
+            Integer block = open.isEmpty() ? null : open.getLast();
+            Matcher deletion = HEADER_DELETION.matcher(line);
+            if (deletion.matches()) {
+                deleted.computeIfAbsent(block, key -> new LinkedHashSet<>())
+                        .add(deletion.group("name").toLowerCase(Locale.ROOT));
+            }
+            Matcher assignment = HEADER_ASSIGNMENT.matcher(line);
+            if (assignment.matches()) {
+                asserted.computeIfAbsent(block, key -> new LinkedHashSet<>())
+                        .add(assignment.group("name").toLowerCase(Locale.ROOT));
+            }
+            for (char character : caddyStructure(line)) {
+                if (character == '{') {
+                    open.add(++blocks);
+                } else if (character == '}' && !open.isEmpty()) {
+                    open.removeLast();
+                }
+            }
+        }
+        Set<String> cancelled = new LinkedHashSet<>();
+        deleted.forEach((block, names) -> names.stream()
+                .filter(name -> asserted.getOrDefault(block, Set.of()).contains(name))
+                .forEach(cancelled::add));
+        return cancelled;
+    }
+
+    @Test
     void whenReadingCaddyTopLevelBlocks_thenLayoutAndCommentsCannotHideAnApplication() {
         assertThat(topLevelCaddyBlocks("""
                 {
@@ -514,12 +586,8 @@ public class ReferenceDeploymentSecurityTest {
         assertThat(securityProxy.find()).isTrue();
         assertThat(securityProxy.group("directives").lines().map(String::strip).toList())
                 .containsExactly("header_up Host localhost",
-                        "header_up -Forwarded",
-                        "header_up -X-Forwarded-For",
-                        "header_up -X-Forwarded-Host",
                         "header_up -X-Forwarded-Port",
                         "header_up -X-Forwarded-Prefix",
-                        "header_up -X-Forwarded-Proto",
                         "header_up -X-Forwarded-Ssl",
                         "header_up Forwarded \"for={remote_host};host=localhost;proto={scheme}\"",
                         "header_up X-Forwarded-For {remote_host}",
