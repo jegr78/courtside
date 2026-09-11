@@ -176,6 +176,30 @@ class AmbiguousParameterTest extends AbstractIntegrationTest {
         assertThat(detail(answer)).contains("file");
     }
 
+    // The front guard steps over a multipart request altogether, so the query string it carries has
+    // to be read by the one behind the authorization decision or by nobody.
+    @Test
+    void givenAMultipartUploadWhoseQueryRepeatsAName_whenItIsSent_thenTheQueryIsReadToo()
+            throws Exception {
+        // given
+        signIn(USERNAME);
+        String boundary = "courtsideboundary";
+        String body = part(boundary, "file", "one.png") + "--" + boundary + "--\r\n";
+
+        // when
+        HttpResponse<String> answer = httpClient.send(HttpRequest.newBuilder(
+                        URI.create(baseUrl() + "/api/admin/config/logo?scale=1&scale=2"))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .header("X-XSRF-TOKEN", csrfToken())
+                .PUT(HttpRequest.BodyPublishers.ofString(body))
+                .build(), HttpResponse.BodyHandlers.ofString());
+
+        // then
+        assertThat(answer.statusCode()).isEqualTo(400);
+        assertThat(type(answer)).isEqualTo(AMBIGUOUS);
+        assertThat(detail(answer)).contains("scale");
+    }
+
     private static String part(String boundary, String name, String filename) {
         return "--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + name
                 + "\"; filename=\"" + filename + "\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n";
