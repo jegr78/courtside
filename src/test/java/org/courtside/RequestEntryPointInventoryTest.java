@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.yaml.snakeyaml.Yaml;
@@ -49,10 +50,16 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
 
     private static final Path SOURCE_ROOT = Path.of("src/main/java");
 
+    // A wrapper and a multipart request are the same request under a longer name, and the
+    // connector's own Request reaches the valve before any dispatch this application could answer.
     private static final Pattern CARRIES_THE_REQUEST = Pattern.compile(
-            "\\b(HttpServletRequest|ServletRequest|NativeWebRequest|WebRequest|RequestContextHolder)\\b");
+            "\\b(?:HttpServletRequest|ServletRequest|HttpServletRequestWrapper|ServletRequestWrapper"
+                    + "|MultipartHttpServletRequest|StandardMultipartHttpServletRequest"
+                    + "|NativeWebRequest|WebRequest|ServletWebRequest|RequestContextHolder)\\b"
+                    + "|\\bcatalina\\.connector\\.Request\\b");
 
-    private static final Pattern READ = Pattern.compile("\\.((?:get|is)[A-Za-z]+)\\(\\s*(?:\"([^\"]*)\")?");
+    private static final Pattern READ = Pattern.compile(
+            "(?:\\.|::)((?:get|is)[A-Za-z]+)(?:\\s*\\(\\s*\"([^\"]*)\")?");
 
     private static final Pattern DECLARES_A_FILTER = Pattern.compile(
             "(?:implements|extends)\\s+(?:\\w+\\.)*(?:Filter|HttpFilter|OncePerRequestFilter"
@@ -106,6 +113,10 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                     new Boundary("the session the request already carries, and the Accept-Language"
                             + " header, which chooses a language and never a right",
                             List.of("getLocale", "getSession"))),
+            Map.entry("org/courtside/shared/web/ProblemDetailErrorReportValve.java",
+                    new Boundary("nothing of the request itself: it answers a target the connector"
+                            + " refused before any dispatch, and writes rather than reads",
+                            List.of())),
             Map.entry("org/courtside/shared/web/ContainerErrorController.java",
                     new Boundary("the attributes the servlet container sets on an error dispatch,"
                             + " which no client can write", List.of("getAttribute"))));
@@ -140,6 +151,26 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             Map.entry("CompositeFilterChainProxy", "delegates into the security chain above"),
             Map.entry("SessionRepositoryFilter", "resolves the session cookie to a stored session"));
 
+    private static final Map<String, String> REVIEWED_HANDLER_MAPPINGS = Map.of(
+            "RequestMappingHandlerMapping",
+            "the annotated handlers, whose every bound input this inventory compares",
+            "SimpleUrlHandlerMapping",
+            "the shell routes and the built resources, which forward and bind nothing;"
+                    + " security/published-web-resources.json is their inventory",
+            "WebMvcEndpointHandlerMapping",
+            "the exposed actuator endpoints, which are health alone and read no request value",
+            "AdditionalHealthEndpointPathsWebMvcHandlerMapping",
+            "the health endpoint under its management-group addresses, none of which are exposed",
+            "ControllerEndpointHandlerMapping", "no controller endpoint is registered",
+            "RouterFunctionMapping", "no router function is registered",
+            "BeanNameUrlHandlerMapping", "no controller is published under a bean name",
+            "WelcomePageHandlerMapping",
+            "the index the shell serves at the root, which binds nothing",
+            "WelcomePageNotAcceptableHandlerMapping",
+            "the answer when that index is not acceptable, which binds nothing");
+
+    private static final Set<String> REVIEWED_UNBOUND_PARAMETERS = Set.of("HttpServletRequest");
+
     private static final Set<String> SUPPORTED_ENCODINGS = Set.of(
             "application/json", "application/x-www-form-urlencoded", "multipart/form-data");
 
@@ -154,6 +185,9 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
 
     @Autowired
     private Map<String, Filter> filterBeans;
+
+    @Autowired
+    private Map<String, HandlerMapping> handlerMappings;
 
     @Test
     void whenTheApplicationBindsARequestInput_thenTheDocumentDeclaresTheSameOne() {
@@ -170,6 +204,43 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                         + " promise the application does not keep.",
                         "src/main/resources/api/openapi.yaml")
                 .containsExactlyInAnyOrderElementsOf(declared);
+    }
+
+    @Test
+    void whenEveryHandlerMappingIsRead_thenTheInventoryCoversOrClassifiesIt() {
+        // when
+        TreeSet<String> present = handlerMappings.values().stream()
+                .map(mapping -> mapping.getClass().getSimpleName())
+                .collect(Collectors.toCollection(TreeSet::new));
+
+        // then
+        assertThat(present).as("a handler mapping exists to be classified").isNotEmpty();
+        assertThat(present)
+                .as("the input comparison reads one mapping, so another one that answers addresses"
+                        + " is a surface it does not cover and has to say what it binds.")
+                .containsExactlyInAnyOrderElementsOf(REVIEWED_HANDLER_MAPPINGS.keySet());
+        assertThat(REVIEWED_HANDLER_MAPPINGS.values()).allSatisfy(classification ->
+                assertThat(classification).isNotBlank());
+    }
+
+    @Test
+    void whenAHandlerTakesAParameter_thenItBindsAnInputOrAReviewedValue() {
+        // when
+        TreeSet<String> unbound = new TreeSet<>();
+        mappings.getHandlerMethods().values().forEach(handler -> {
+            for (MethodParameter parameter : handler.getMethodParameters()) {
+                if (input(parameter, false).isEmpty()) {
+                    unbound.add(parameter.getParameterType().getSimpleName());
+                }
+            }
+        });
+
+        // then
+        assertThat(unbound)
+                .as("the comparison reads the binding annotations, so a parameter Spring resolves"
+                        + " some other way is an input it cannot see. A new one has to be a"
+                        + " deliberate choice rather than a gap.")
+                .containsExactlyInAnyOrderElementsOf(REVIEWED_UNBOUND_PARAMETERS);
     }
 
     @Test

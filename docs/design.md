@@ -1802,31 +1802,43 @@ whether it is built or designed. **Designed means absent today.**
   configured, which section 8 already accounts for, and a value a board chose is not a review this
   list can hold. What bounds the rest: everything in the build is a committed file, visible in
   review before it ships.
-- **What the application reads out of a request, in one list:** every input a handler binds is
-  compared with the input the OpenAPI document declares, in both directions and per operation, so a
-  header, query, path or form parameter, a request body or a supported encoding on either side alone
-  fails the build. *Built.* Three things sit outside that contract and are therefore inventoried by
-  name: every filter that can see a request, derived at once from the running filter beans, from
-  every security chain and from the classes `src/main` declares, because one of them exists only
-  where `courtside.environment` is `SECURITY` and no ordinary context carries it; every class that
-  holds the servlet request, scanned for the reads it performs with the vocabulary taken from the
-  servlet interfaces rather than from a list, each read classified by the external value it names;
-  and the login, which a filter serves rather than a handler, whose form fields are read off the
-  running filter and compared with the form the document declares. What a club is being asked to
-  trust here is that the answer to "what can be sent to this instance" is derived rather than
-  remembered.
+- **What the application reads out of a request, in one list:** every input the annotated handlers
+  bind is compared with the input the OpenAPI document declares, in both directions and per
+  operation, so a header, query, path or form parameter, a request body or a supported encoding on
+  either side alone fails the build, and a handler parameter Spring resolves some other way fails
+  until it is a recorded decision. *Built.* The framework registers further handler mappings — the
+  shell routes, the built resources, the exposed actuator endpoint — and each is classified by what
+  it binds rather than left unmentioned; none of them reads a request value, and
+  `security/published-web-resources.json` is the inventory of the addresses they answer. Three
+  things sit outside the document contract and are therefore inventoried by name: every filter that
+  can see a request, derived at once from the running filter beans, from every security chain and
+  from the classes `src/main` declares, because one of them exists only where
+  `courtside.environment` is `SECURITY` and no ordinary context carries it; every class under
+  `src/main/java` that names a servlet request type, scanned for the reads it performs with the
+  method vocabulary taken from the servlet interfaces rather than from a list, each read classified
+  by the external value it names; and the login, which a filter serves rather than a handler, whose
+  form fields are read off the running filter and compared with the form the document declares. The
+  filters, the mappings and the login are read off the running application; the direct reads are a
+  text scan of the sources, which is why a contributor who hides one is a matter for the diff and
+  not for this list.
 - **A field is the type the document declares.** *Built.* The reader used to reinterpret a scalar of
   another JSON shape, so `"3"` reached an integer field, `1` reached a boolean one and `7` reached a
   string, while a boolean for the same integer was already refused. A foreign shape for an integer, a
-  boolean or a string is now refused as `validation.TypeMismatch` on the field, which is the answer
-  the neighbouring shapes already gave. A date-time took a second correction, because the `java.time`
-  readers take a number as an epoch of their own choosing and the coercion configuration does not
-  reach them: `1700000000000` for a `date-time` was read as the year 55840 rather than refused, and a
-  number for any of those types is now refused by name.
-- **The browser reads external values too, and each one is named.** *Built.* The stored appearance
-  and language, the address and its fragment, the query, the route parameters, the navigation state a
-  previous page set and the readable CSRF cookie are inventoried by file, and every entry names the
-  behavior test that measures what the boundary does with a value it did not expect. The strict
+  boolean, a number or a string is now refused as `validation.TypeMismatch` on the field, which is
+  the answer the neighbouring shapes already gave, and JSON has no fifth scalar shape to forget. A
+  date and a time took a second correction, because the `java.time` readers take a number as an
+  epoch of their own choosing and an array as the components of a date, neither of which the
+  coercion configuration reaches: `1700000000000` for a `date-time` was read as the year 55840 and
+  `[8, 0]` for a wall-clock time as eight o'clock, where the document declares a string for both.
+  Such a field now reads text and nothing else.
+- **The browser reads external values too, and each one this repository writes is named.** *Built.*
+  Across `frontend/src`, excluding the harness the suite imports and the bundle never does, the
+  stored appearance and language, the address and its fragment, the query, the route parameters, the
+  reported window width, the navigation state a previous page set and the readable CSRF cookie are
+  inventoried by file, and every entry names the behavior test that measures what the boundary does
+  with a value it did not expect. The generated service worker is not among them: it is Workbox
+  output rather than source this repository reviews, and it answers from the cache rather than from
+  a value it reads. The strict
   compiler and the equality rule the lint enforces are policy over the shipped text and are recorded
   as such: replacing one `=== true` with `Boolean(...)` leaves both of them green and turns the
   behavior test red, which is why the inventory binds to behavior and not to either of them.

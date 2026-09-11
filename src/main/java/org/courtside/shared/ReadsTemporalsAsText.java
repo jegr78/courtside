@@ -11,16 +11,18 @@ import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.deser.ValueDeserializerModifier;
 import tools.jackson.databind.module.SimpleModule;
 
+import tools.jackson.databind.type.LogicalType;
+
 import java.time.temporal.Temporal;
 import java.util.Set;
 
-// The java.time readers take a number as an epoch of their own choosing, which the coercion
-// configuration does not reach, so 1700000000000 for a date-time read as the year 55840.
+// The java.time readers take a number as an epoch and an array as the components of a date, neither
+// of which the coercion configuration reaches, so 1700000000000 read as the year 55840.
 @Component
-class RejectsNumericTemporals extends SimpleModule {
+class ReadsTemporalsAsText extends SimpleModule {
 
-    RejectsNumericTemporals() {
-        super("courtside-textual-instants");
+    ReadsTemporalsAsText() {
+        super("courtside-textual-temporals");
         setDeserializerModifier(new ValueDeserializerModifier() {
             @Override
             public ValueDeserializer<?> modifyDeserializer(DeserializationConfig config,
@@ -28,20 +30,20 @@ class RejectsNumericTemporals extends SimpleModule {
                 if (!Temporal.class.isAssignableFrom(beanDescription.getBeanClass())) {
                     return deserializer;
                 }
-                return new ReadsOnlyText(deserializer, beanDescription.getBeanClass());
+                return new OnlyFromText(deserializer, beanDescription.getBeanClass());
             }
         });
     }
 
-    private static final class ReadsOnlyText extends ValueDeserializer<Object> {
+    private static final class OnlyFromText extends ValueDeserializer<Object> {
 
-        private static final Set<JsonToken> NUMERIC =
-                Set.of(JsonToken.VALUE_NUMBER_INT, JsonToken.VALUE_NUMBER_FLOAT);
+        private static final Set<JsonToken> TEXT =
+                Set.of(JsonToken.VALUE_STRING, JsonToken.VALUE_NULL);
 
         private final ValueDeserializer<?> delegate;
         private final Class<?> temporal;
 
-        private ReadsOnlyText(ValueDeserializer<?> delegate, Class<?> temporal) {
+        private OnlyFromText(ValueDeserializer<?> delegate, Class<?> temporal) {
             this.delegate = delegate;
             this.temporal = temporal;
         }
@@ -54,12 +56,27 @@ class RejectsNumericTemporals extends SimpleModule {
         @Override
         public ValueDeserializer<?> createContextual(
                 DeserializationContext context, BeanProperty property) {
-            return new ReadsOnlyText(delegate.createContextual(context, property), temporal);
+            return new OnlyFromText(delegate.createContextual(context, property), temporal);
+        }
+
+        @Override
+        public Object getNullValue(DeserializationContext context) {
+            return delegate.getNullValue(context);
+        }
+
+        @Override
+        public Class<?> handledType() {
+            return delegate.handledType();
+        }
+
+        @Override
+        public LogicalType logicalType() {
+            return delegate.logicalType();
         }
 
         @Override
         public Object deserialize(JsonParser parser, DeserializationContext context) {
-            if (NUMERIC.contains(parser.currentToken())) {
+            if (!TEXT.contains(parser.currentToken())) {
                 return context.handleUnexpectedToken(context.constructType(temporal), parser);
             }
             return delegate.deserialize(parser, context);

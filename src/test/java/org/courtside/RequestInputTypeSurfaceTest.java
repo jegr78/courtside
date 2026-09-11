@@ -1,6 +1,7 @@
 package org.courtside;
 
 import org.courtside.api.ApiCreateBookingRequest;
+import org.courtside.api.ApiMembershipRequest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,10 +21,12 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -92,6 +95,40 @@ class RequestInputTypeSurfaceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAComponentArrayForAWallClockTime_whenSettingTheOpeningHours_thenTheTypeIsRefused()
+            throws Exception {
+        // when / then
+        refusedAsATypeMismatch(openingHours("[8,0]"), "days[0].opensAt");
+    }
+
+    @Test
+    void givenAComponentArrayForADate_whenReadingAMembershipRequest_thenTheTypeIsRefused() {
+        // when / then
+        assertThatThrownBy(() -> mapper.readValue(
+                "{\"membershipTypeId\":\"11111111-1111-1111-1111-111111111111\","
+                        + "\"startedOn\":[2026,1,1]}", ApiMembershipRequest.class))
+                .isInstanceOf(DatabindException.class)
+                .hasMessageContaining("java.time.LocalDate")
+                .hasMessageContaining("startedOn");
+    }
+
+    @Test
+    void givenANumberForAWeekdayName_whenSettingTheOpeningHours_thenTheValueIsRefused()
+            throws Exception {
+        // when / then
+        weekday("2").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(content().string(containsString("dayOfWeek")));
+    }
+
+    @Test
+    void givenAWeekdayNameTheDocumentDeclares_whenSettingTheOpeningHours_thenItIsAccepted()
+            throws Exception {
+        // when / then
+        weekday("\"MONDAY\"").andExpect(status().isOk());
+    }
+
+    @Test
     void givenTheWallClockTimesTheDocumentDeclares_whenSettingTheOpeningHours_thenTheyAreAccepted()
             throws Exception {
         // when / then
@@ -139,6 +176,19 @@ class RequestInputTypeSurfaceTest extends AbstractIntegrationTest {
         return "{\"courtIds\":[\"11111111-1111-1111-1111-111111111111\"],"
                 + "\"cardId\":\"22222222-2222-2222-2222-222222222222\",\"startsAt\":" + startsAt
                 + ",\"endsAt\":\"2026-01-01T10:00:00Z\"}";
+    }
+
+    private ResultActions weekday(String monday) throws Exception {
+        StringBuilder days = new StringBuilder();
+        for (java.time.DayOfWeek day : java.time.DayOfWeek.values()) {
+            days.append(days.isEmpty() ? "" : ",")
+                    .append("{\"dayOfWeek\":")
+                    .append(day == java.time.DayOfWeek.MONDAY ? monday : "\"" + day.name() + "\"")
+                    .append(",\"opensAt\":\"08:00\",\"closesAt\":\"22:00\"}");
+        }
+        return mockMvc.perform(put("/api/admin/opening-hours")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"days\":[" + days + "]}").with(csrf()));
     }
 
     private ResultActions openingHours(Object opensAt) throws Exception {

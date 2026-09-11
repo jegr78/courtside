@@ -9,7 +9,7 @@ const frontend = join(repository, "frontend");
 
 // A query string this application builds is a request it sends, so new URLSearchParams({...}) in
 // api/client.ts carries no external value and is deliberately not one of these.
-const NAMED_READ = /\b(localStorage|sessionStorage|useParams|useSearchParams|useLocation|document\.cookie|document\.referrer|window\.name|history\.state)\b/g;
+const NAMED_READ = /\b(localStorage|sessionStorage|useParams|useSearchParams|useLocation|matchMedia|document\.cookie|document\.referrer|window\.name|history\.state)\b/g;
 const LOCATION_READ = /\b(?:window\.)?location\.(?:protocol|href|search|hash|pathname|origin|assign|reload)/g;
 
 const BOUNDARIES = {
@@ -27,6 +27,11 @@ const BOUNDARIES = {
     value: "the scheme the page was served over",
     classification: "chooses between the host-bound and the unprefixed cookie name",
     test: "src/api/client.test.ts#given an HTTPS host-bound CSRF cookie and a legacy collision, when logging out, then only the host-bound token is used"
+  },
+  "src/components/AdminNavigation.tsx matchMedia": {
+    value: "the width the browser reports",
+    classification: "decides whether the destinations start folded, and never which ones exist",
+    test: "src/components/AdminNavigation.test.tsx#given a window narrower than the breakpoint, when the navigation is shown, then it stays folded"
   },
   "src/components/AdminNavigation.tsx useLocation": {
     value: "the address the browser is on",
@@ -97,9 +102,11 @@ function sourceFiles(directory) {
   });
 }
 
+// src/test holds the harness the suite imports and the bundle never does.
 const shipped = sourceFiles(join(frontend, "src"))
   .filter((path) => /\.(?:js|jsx|ts|tsx)$/.test(path))
-  .filter((path) => !/\.(?:test|spec)\.[^.]+$|\.d\.ts$|setupTests\.ts$/.test(path));
+  .filter((path) => !/\.(?:test|spec)\.[^.]+$|\.d\.ts$|setupTests\.ts$/.test(path))
+  .filter((path) => !/(?:^|[\\/])src[\\/]test[\\/]/.test(path));
 
 function readsOf(path) {
   const found = new Set();

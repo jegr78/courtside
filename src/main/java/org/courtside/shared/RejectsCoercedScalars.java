@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 // The document declares a type per field, so a value of another JSON shape is a request the
-// contract does not describe rather than one the reader may reinterpret.
+// contract does not describe; JSON has four scalar shapes and each refuses the other three.
 @Component
 class RejectsCoercedScalars implements JsonMapperBuilderCustomizer {
 
@@ -22,6 +22,8 @@ class RejectsCoercedScalars implements JsonMapperBuilderCustomizer {
             List.of(CoercionInputShape.String, CoercionInputShape.Float, CoercionInputShape.Boolean),
             LogicalType.Boolean,
             List.of(CoercionInputShape.String, CoercionInputShape.Integer, CoercionInputShape.Float),
+            LogicalType.Float,
+            List.of(CoercionInputShape.String, CoercionInputShape.Integer, CoercionInputShape.Boolean),
             LogicalType.Textual,
             List.of(CoercionInputShape.Integer, CoercionInputShape.Float, CoercionInputShape.Boolean));
 

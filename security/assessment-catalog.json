@@ -2478,7 +2478,7 @@
           "status": "implemented",
           "manualProcedureId": "MAN-ARCH-001",
           "controlEvidence": {
-            "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+            "productionPath": "src/main/resources/api/openapi.yaml",
             "falsifyingTest": "src/test/java/org/courtside/RequestEntryPointInventoryTest.java#whenTheApplicationBindsARequestInput_thenTheDocumentDeclaresTheSameOne"
           }
         },
