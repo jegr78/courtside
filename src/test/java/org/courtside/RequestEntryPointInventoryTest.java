@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -105,8 +106,9 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                     new Boundary("the session the request already carries, beside the session cookie"
                             + " the document declares as a security scheme", List.of("getSession"))),
             Map.entry("org/courtside/identity/internal/LoginAttemptFilter.java",
-                    new Boundary("the peer address the rate limit counts, which the reverse proxy"
-                            + " described by deploy/README.md is required to supply",
+                    new Boundary("the peer address the rate limit counts, which is whatever"
+                            + " ForwardedHeaderFilter read out of X-Forwarded-For, so the reverse"
+                            + " proxy deploy/README.md requires is what makes it the peer's",
                             List.of("getRemoteAddr"))),
             Map.entry("org/courtside/identity/internal/ProblemDetailAccessDeniedHandler.java",
                     new Boundary("nothing of the request itself", List.of())),
@@ -132,8 +134,9 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                             + " refused before any dispatch, and writes rather than reads",
                             List.of())),
             Map.entry("org/courtside/shared/web/ContainerErrorController.java",
-                    new Boundary("the attributes the servlet container sets on an error dispatch,"
-                            + " which no client can write", List.of("getAttribute"))));
+                    new Boundary("the attributes the servlet container sets on an error dispatch;"
+                            + " the address among them is the one the client asked for, echoed into"
+                            + " the problem instance and nowhere else", List.of("getAttribute"))));
 
     private static final Map<String, String> REVIEWED_FILTERS = Map.ofEntries(
             Map.entry("DisableEncodeUrlFilter", "refuses a session id in a URL"),
@@ -158,6 +161,11 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             Map.entry("SessionManagementFilter", "applies the session policy"),
             Map.entry("ExceptionTranslationFilter", "turns a refusal into the problem answer"),
             Map.entry("AuthorizationFilter", "decides the request against the authorization rules"),
+            Map.entry("ForwardedHeaderFilter",
+                    "rewrites the scheme, the host and the peer address from Forwarded and"
+                            + " X-Forwarded-* before any filter below reads them, so the reverse"
+                            + " proxy deploy/README.md requires is what those values come from"),
+            Map.entry("ServerHttpObservationFilter", "records a metric per request and reads none"),
             Map.entry("OrderedCharacterEncodingFilter", "fixes the encoding a request body is read with"),
             Map.entry("OrderedFormContentFilter",
                     "reads a form body on a method the servlet API would not"),
@@ -184,7 +192,13 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             "BeanNameUrlHandlerMapping",
             registersNothing("no controller is published under a bean name"));
 
-    private static final Set<String> REVIEWED_UNBOUND_PARAMETERS = Set.of("HttpServletRequest");
+    private static final Map<String, String> REVIEWED_UNBOUND_PARAMETERS = Map.of(
+            "HttpServletRequest", "the error dispatch, whose reads this inventory carries under"
+                    + " ContainerErrorController");
+
+    private static final Map<String, String> OPERATIONS_NO_HANDLER_SERVES = Map.of(
+            "post /api/session", "the form login, whose fields the login guard below compares",
+            "post /api/session/logout", "the logout, which carries no input of its own");
 
     private static final Set<String> SUPPORTED_ENCODINGS = Set.of(
             "application/json", "application/x-www-form-urlencoded", "multipart/form-data");
@@ -204,6 +218,9 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
     @Autowired
     private Map<String, HandlerMapping> handlerMappings;
 
+    @Autowired
+    private Map<String, FilterRegistrationBean<?>> filterRegistrations;
+
     @Test
     void whenTheApplicationBindsARequestInput_thenTheDocumentDeclaresTheSameOne() {
         // when
@@ -212,6 +229,10 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
 
         // then
         assertThat(bound).as("a request input exists to be compared").isNotEmpty();
+        assertThat(unserved)
+                .as("an operation no handler serves drops out of this comparison, so a new one has"
+                        + " to name where its inputs are read instead.")
+                .containsExactlyInAnyOrderElementsOf(OPERATIONS_NO_HANDLER_SERVES.keySet());
         assertThat(bound)
                 .as("an input the application binds but %s does not declare is a request surface"
                         + " nobody reviewed, including one on an address the document does not"
@@ -267,7 +288,9 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                 .as("the comparison reads the binding annotations, so a parameter Spring resolves"
                         + " some other way is an input it cannot see. A new one has to be a"
                         + " deliberate choice rather than a gap.")
-                .containsExactlyInAnyOrderElementsOf(REVIEWED_UNBOUND_PARAMETERS);
+                .containsExactlyInAnyOrderElementsOf(REVIEWED_UNBOUND_PARAMETERS.keySet());
+        assertThat(REVIEWED_UNBOUND_PARAMETERS.values()).allSatisfy(reason ->
+                assertThat(reason).isNotBlank());
     }
 
     @Test
@@ -296,6 +319,9 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
         TreeSet<String> present = filterBeans.values().stream()
                 .map(filter -> filter.getClass().getSimpleName())
                 .collect(Collectors.toCollection(TreeSet::new));
+        filterRegistrations.values().stream()
+                .map(registration -> registration.getFilter().getClass().getSimpleName())
+                .forEach(present::add);
         securityFilters.getFilterChains().stream()
                 .flatMap(chain -> chain.getFilters().stream())
                 .map(filter -> filter.getClass().getSimpleName())
@@ -369,6 +395,8 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
         return bound;
     }
 
+    private final TreeSet<String> unserved = new TreeSet<>();
+
     private TreeSet<String> declaredInputs() {
         TreeSet<String> declared = new TreeSet<>();
         Set<String> served = new TreeSet<>();
@@ -377,6 +405,7 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                         .forEach(method -> served.add(method + " " + path))));
         paths().forEach((path, item) -> operations(item).forEach((method, operation) -> {
             if (!served.contains(method + " " + path)) {
+                unserved.add(method + " " + path);
                 return;
             }
             String prefix = method.toUpperCase() + " " + path + " ";

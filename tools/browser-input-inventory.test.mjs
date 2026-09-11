@@ -142,7 +142,9 @@ test("given an inventoried browser boundary, when its evidence is read, then a b
     assert.ok(value.length > 0 && classification.length > 0, `${boundary} states no classification`);
     const [path, name] = evidence.split("#");
     const file = join(frontend, path);
-    if (!existsSync(file) || !readFileSync(file, "utf8").includes(`it("${name}"`)) {
+    const declares = existsSync(file) && readFileSync(file, "utf8").split("\n")
+      .some((line) => !/^\s*(?:\/\/|\*|\/\*)/.test(line) && line.includes(`it("${name}"`));
+    if (!declares) {
       missing.push(evidence);
     }
   }
