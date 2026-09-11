@@ -1658,32 +1658,32 @@ whether it is built or designed. **Designed means absent today.**
 - **CSRF:** on, double-submit cookie. *Built.*
 - **Brute force:** rate limiting before password verification. *Built.* The source address a
   counter is kept under is the one the reference proxy asserts in `X-Forwarded-For`, replacing
-  whatever a client sent; the application trusts that header, so an instance must not be reachable
-  except through its proxy. The reference deployment publishes the application only on the host's
-  loopback interface, which bounds the forgery to a process already on the host. Source-address
-  counters absorb concentrated attacks, while a two-per-instance concurrency guard bounds simultaneous
-  Argon2 work on the reference deployment's two CPUs and 1 GiB application container. Capacity is
-  released as soon as a verification ends; an attempt arriving while both slots are occupied gets
-  the typed `429` with `Retry-After: 1`, not a renewable cooldown. The default is configurable and
-  invalid values fail startup. There is deliberately no username or instance-wide lockout: an
-  anonymous attacker could renew either one indefinitely. Success clears its address counter,
-  while `Retry-After` tells a client when its address cooldown ends. A credential or account-status
-  refusal is logged with the account id where one exists, and an address limit writes one line when
-  it closes; neither contains the username, the address or a name. PostgreSQL also counts admitted
-  attempts in a global one-minute observation
-  window. At 100 attempts it increments `courtside.login.distributed.thresholds` and writes one
-  privacy-safe warning, but changes neither login decisions nor health. A repeated distributed
-  attacker can still keep both verification slots busy; operators should investigate the metric and
-  restrict abusive sources at the reverse proxy or network edge. Reauthentication and password
-  changes use both an account-wide bucket and a source-address bucket, plus a
-  verification-capacity pool isolated from sign-in. Changing an address cannot reset a stolen
-  account's attempt budget, while a successful proof clears only that account's account-wide bucket.
-  Authorization decides first: a request the account may not make at all is refused before either
-  bucket is touched, so it cannot spend what bounds a password guess.
-  The source bucket measures request volume and expires with its window; another account cannot
-  erase it by proving a password. These requests do not take the global login lock or enter its
-  observation count. A stalled breach lookup therefore cannot consume sign-in capacity, and their
-  typed `429` names password verification rather than login.
+  whatever a client sent; the application trusts that header, so an instance must not be
+  reachable except through its proxy. The reference deployment publishes the application only on
+  the host's loopback interface, which bounds the forgery to a process already on the host.
+  Source-address counters absorb concentrated attacks, while a two-per-instance concurrency guard
+  bounds simultaneous Argon2 work on the reference deployment's two CPUs and 1 GiB application
+  container. Capacity is released as soon as a verification ends; an attempt arriving while both
+  slots are occupied gets the typed `429` with `Retry-After: 1`, not a renewable cooldown. The
+  default is configurable and invalid values fail startup. There is deliberately no username or
+  instance-wide lockout: an anonymous attacker could renew either one indefinitely. Success
+  clears its address counter, while `Retry-After` tells a client when its address cooldown ends.
+  A credential or account-status refusal is logged with the account id where one exists, and an
+  address limit writes one line when it closes; neither contains the username, the address or a
+  name. PostgreSQL also counts admitted attempts in a global one-minute observation window. At
+  100 attempts it increments `courtside.login.distributed.thresholds` and writes one privacy-safe
+  warning, but changes neither login decisions nor health. A repeated distributed attacker can
+  still keep both verification slots busy; operators should investigate the metric and restrict
+  abusive sources at the reverse proxy or network edge. Reauthentication and password changes use
+  both an account-wide bucket and a source-address bucket, plus a verification-capacity pool
+  isolated from sign-in. Changing an address cannot reset a stolen account's attempt budget,
+  while a successful proof clears only that account's account-wide bucket. Authorization decides
+  first: a request the account may not make at all is refused before either bucket is touched, so
+  it cannot spend what bounds a password guess. The source bucket measures request volume and
+  expires with its window; another account cannot erase it by proving a password. These requests
+  do not take the global login lock or enter its observation count. A stalled breach lookup
+  therefore cannot consume sign-in capacity, and their typed `429` names password verification
+  rather than login.
 - **Credential issuing:** limited per account over a configurable window, counted in PostgreSQL.
   *Built.* The account is the unit because the account is what the abuse targets: somebody holding a
   board member's session filling one member's mailbox with credentials that each invalidate the

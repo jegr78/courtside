@@ -1,17 +1,25 @@
 package org.courtside;
 
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.OutputFrame;
+import org.testcontainers.containers.output.ToStringConsumer;
+import org.testcontainers.containers.startupcheck.OneShotStartupCheckStrategy;
+import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.MountableFile;
 import org.yaml.snakeyaml.Yaml;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -42,16 +50,11 @@ public class ReferenceDeploymentSecurityTest {
             "x-forwarded-host", "x-forwarded-port", "x-forwarded-prefix", "x-forwarded-proto",
             "x-forwarded-ssl");
     private static final Map<String, Boolean> APPLICATION_UPSTREAMS = Map.of(
-            "app:8080", true, "https://app:8080", true, "host.docker.internal:8080", true,
-            "api-ui:8080", false);
-    private static final Pattern UPSTREAM_DESTINATION = Pattern.compile(
-            "^reverse_proxy\\s+(?<destination>\\S+)");
-    private static final Pattern SNIPPET_NAME = Pattern.compile("^\\((?<name>[A-Za-z_][A-Za-z0-9_]*)\\)");
-    private static final Pattern SNIPPET_IMPORT = Pattern.compile(
-            "\\s*import\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*");
-    private static final Pattern HEADER_DELETION = Pattern.compile("\\s*header_up\\s+-(?<name>\\S+)\\s*");
-    private static final Pattern HEADER_ASSIGNMENT = Pattern.compile(
-            "\\s*header_up\\s+(?<name>[A-Za-z][^\\s+]*)\\s+\\S.*");
+            "app:8080", true, "host.docker.internal:8080", true, "api-ui:8080", false);
+    private static final List<String> TLS_MODES = List.of("plaintext", "serve");
+    private static final String CLIENT_HEADER_PLACEHOLDER = "{http.request.header.";
+    private static final Pattern CADDY_IMAGE = Pattern.compile(
+            "caddy(?::[\\w.-]+)?@sha256:[a-f0-9]{64}");
     private static final Pattern SERVICE_BLOCK = Pattern.compile(
             "(?ms)^  [a-zA-Z0-9_-]+:\\R(?<body>.*?)(?=^  [a-zA-Z0-9_-]+:\\R|\\z)");
 
@@ -408,145 +411,103 @@ public class ReferenceDeploymentSecurityTest {
     }
 
     @Test
-    void whenReadingEveryCaddyfile_thenNoUpstreamDeletesAHeaderItAlsoAsserts() throws IOException {
-        // when / then
-        assertThat(deploymentCaddyfiles()).hasSizeGreaterThan(1).allSatisfy(path ->
-                assertThat(caddyUpstreams(Files.readString(path)))
-                        .as("%s deletes a header the same upstream asserts", path)
-                        .allSatisfy(upstream -> assertThat(upstream.deleted())
-                                .doesNotContainAnyElementsOf(upstream.asserted())));
-    }
-
-    @Test
-    void whenReadingEveryCaddyfile_thenEveryApplicationUpstreamReplacesEveryForwardedHeader()
+    void whenEveryDeploymentIsAdapted_thenEveryApplicationUpstreamAssertsItsOwnForwardedHeaders()
             throws IOException {
+        // given
+        List<AdaptedUpstream> upstreams = adaptedUpstreams();
+
         // when / then
-        assertThat(deploymentCaddyfiles()).hasSizeGreaterThan(1).allSatisfy(path ->
-                assertThat(caddyUpstreams(Files.readString(path))).allSatisfy(upstream -> {
-                    assertThat(APPLICATION_UPSTREAMS).as("%s proxies to the uninventoried %s",
-                            path, upstream.destination()).containsKey(upstream.destination());
-                    if (Boolean.TRUE.equals(APPLICATION_UPSTREAMS.get(upstream.destination()))) {
-                        Set<String> replaced = new LinkedHashSet<>(upstream.deleted());
-                        replaced.addAll(upstream.asserted());
-                        assertThat(replaced).as("%s forwards a client value to %s",
-                                path, upstream.destination()).containsAll(FORWARDED_HEADERS);
-                    }
-                }));
+        assertThat(upstreams).hasSizeGreaterThan(6).allSatisfy(upstream -> {
+            assertThat(APPLICATION_UPSTREAMS).as("%s dials the uninventoried %s",
+                    upstream.origin(), upstream.dial()).containsKey(upstream.dial());
+            if (!Boolean.TRUE.equals(APPLICATION_UPSTREAMS.get(upstream.dial()))) {
+                return;
+            }
+            Set<String> contradicted = new LinkedHashSet<>(upstream.asserted().keySet());
+            contradicted.retainAll(upstream.deleted());
+            assertThat(contradicted).as("%s both asserts and deletes a header, so Caddy's own "
+                    + "operation order decides which wins", upstream.origin()).isEmpty();
+            Set<String> handled = new LinkedHashSet<>(upstream.deleted());
+            handled.addAll(upstream.asserted().keySet());
+            assertThat(handled).as("%s forwards a client value to the application", upstream.origin())
+                    .containsAll(FORWARDED_HEADERS);
+            assertThat(upstream.asserted()).allSatisfy((name, value) ->
+                    assertThat(value).as("%s asserts %s from what the client sent",
+                            upstream.origin(), name).doesNotContain(CLIENT_HEADER_PLACEHOLDER));
+        });
     }
 
-    @Test
-    void whenAnUpstreamHidesItsForwardedHandling_thenTheScanStillReadsIt() {
-        // given
-        String cancelling = """
-                reverse_proxy app:8080 {
-                \theader_up -X-Forwarded-For  # kept for safety
-                \theader_up X-Forwarded-For {remote_host}
-                }
-                """;
-        String imported = """
-                (applicationHeaders) {
-                \theader_up X-Forwarded-For {remote_host}
-                }
-                (plaintext) {
-                \treverse_proxy app:8080 {
-                \t\theader_up -X-Forwarded-For
-                \t\timport applicationHeaders
-                \t}
-                }
-                """;
-        String sibling = """
-                reverse_proxy app:8080 {
-                \theader_up X-Forwarded-For {remote_host}
-                }
-                other.example {
-                \theader_up -X-Forwarded-For
-                }
-                """;
+    private record AdaptedUpstream(String origin, String dial, Map<String, String> asserted,
+                                   Set<String> deleted) {}
 
-        // when / then
-        assertThat(caddyUpstreams(cancelling)).singleElement().satisfies(upstream -> {
-            assertThat(upstream.destination()).isEqualTo("app:8080");
-            assertThat(upstream.deleted()).contains("x-forwarded-for");
-            assertThat(upstream.asserted()).contains("x-forwarded-for");
-        });
-        assertThat(caddyUpstreams(imported)).singleElement().satisfies(upstream ->
-                assertThat(upstream.asserted()).contains("x-forwarded-for"));
-        assertThat(caddyUpstreams(sibling)).singleElement().satisfies(upstream ->
-                assertThat(upstream.deleted()).isEmpty());
+    private static List<AdaptedUpstream> adaptedUpstreams() throws IOException {
+        List<AdaptedUpstream> upstreams = new ArrayList<>();
+        for (Path caddyfile : deploymentCaddyfiles()) {
+            for (String mode : TLS_MODES) {
+                readUpstreams(caddyfile.getFileName() + "@" + mode,
+                        adapted(caddyfile, mode), upstreams);
+            }
+        }
+        return upstreams;
+    }
+
+    private static void readUpstreams(String origin, JsonNode node, List<AdaptedUpstream> upstreams) {
+        if (node.isArray()) {
+            node.values().forEach(element -> readUpstreams(origin, element, upstreams));
+            return;
+        }
+        if (!node.isObject()) {
+            return;
+        }
+        if ("reverse_proxy".equals(node.path("handler").asString(""))) {
+            JsonNode request = node.path("headers").path("request");
+            Map<String, String> asserted = new LinkedHashMap<>();
+            request.path("set").properties().forEach(field -> asserted.put(
+                    field.getKey().toLowerCase(Locale.ROOT), field.getValue().toString()));
+            Set<String> deleted = new LinkedHashSet<>();
+            request.path("delete").values()
+                    .forEach(name -> deleted.add(name.asString("").toLowerCase(Locale.ROOT)));
+            node.path("upstreams").values().forEach(entry -> upstreams.add(new AdaptedUpstream(
+                    origin, entry.path("dial").asString(""), asserted, deleted)));
+        }
+        node.values().forEach(child -> readUpstreams(origin, child, upstreams));
+    }
+
+    // Caddy applies its own header operations in an order the file does not show, and it rewrites
+    // every shorthand the Caddyfile allows, so the adapted configuration is what this reads.
+    private static JsonNode adapted(Path caddyfile, String tlsMode) throws IOException {
+        ToStringConsumer configuration = new ToStringConsumer();
+        try (GenericContainer<?> adapter = new GenericContainer<>(DockerImageName.parse(deployedCaddy()))
+                .withCopyToContainer(MountableFile.forHostPath(caddyfile), "/etc/caddy/Caddyfile")
+                .withEnv("COURTSIDE_DOMAIN", "https://club.example")
+                .withEnv("COURTSIDE_MAIL_HOSTNAME", "mail.club.example")
+                .withEnv("COURTSIDE_APP_TLS_MODE", tlsMode)
+                .withCommand("caddy", "adapt", "--config", "/etc/caddy/Caddyfile")
+                .withStartupCheckStrategy(new OneShotStartupCheckStrategy())
+                .withLogConsumer(frame -> {
+                    if (frame.getType() == OutputFrame.OutputType.STDOUT) {
+                        configuration.accept(frame);
+                    }
+                })) {
+            adapter.start();
+        }
+        String json = configuration.toUtf8String();
+        assertThat(json).as("Caddy adapts %s under %s", caddyfile, tlsMode).startsWith("{");
+        return new ObjectMapper().readTree(json);
+    }
+
+    private static String deployedCaddy() throws IOException {
+        Matcher image = CADDY_IMAGE.matcher(Files.readString(Path.of("deploy", "compose.yaml")));
+        assertThat(image.find()).as("the deployment pins a Caddy image").isTrue();
+        return image.group();
     }
 
     private static List<Path> deploymentCaddyfiles() throws IOException {
-        try (Stream<Path> deployment = Files.list(Path.of("deploy"))) {
-            return deployment.filter(path -> path.getFileName().toString().startsWith("Caddyfile"))
+        try (Stream<Path> deployment = Files.walk(Path.of("deploy"))) {
+            return deployment.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().startsWith("Caddyfile"))
                     .sorted().toList();
         }
-    }
-
-    private record CaddyBlock(String destination, String snippet, Set<String> deleted,
-                              Set<String> asserted, List<String> imported) {
-        private CaddyBlock(String opening) {
-            this(upstreamDestination(opening), snippetName(opening),
-                    new LinkedHashSet<>(), new LinkedHashSet<>(), new ArrayList<>());
-        }
-    }
-
-    private record CaddyUpstream(String destination, Set<String> deleted, Set<String> asserted) {}
-
-    private static String upstreamDestination(String opening) {
-        Matcher upstream = UPSTREAM_DESTINATION.matcher(opening);
-        return upstream.find() ? upstream.group("destination") : null;
-    }
-
-    private static String snippetName(String opening) {
-        Matcher snippet = SNIPPET_NAME.matcher(opening);
-        return snippet.find() ? snippet.group("name") : null;
-    }
-
-    private static List<CaddyUpstream> caddyUpstreams(String caddyfile) {
-        List<CaddyBlock> blocks = new ArrayList<>();
-        List<CaddyBlock> open = new ArrayList<>();
-        for (String line : caddyfile.lines().toList()) {
-            String directive = new String(caddyStructure(line)).strip();
-            CaddyBlock block = open.isEmpty() ? null : open.getLast();
-            if (block != null) {
-                Matcher deletion = HEADER_DELETION.matcher(directive);
-                if (deletion.matches()) block.deleted().add(deletion.group("name").toLowerCase(Locale.ROOT));
-                Matcher assignment = HEADER_ASSIGNMENT.matcher(directive);
-                if (assignment.matches()) block.asserted().add(assignment.group("name").toLowerCase(Locale.ROOT));
-                Matcher imported = SNIPPET_IMPORT.matcher(directive);
-                if (imported.matches()) block.imported().add(imported.group("name"));
-            }
-            for (char character : caddyStructure(line)) {
-                if (character == '{') {
-                    CaddyBlock opened = new CaddyBlock(directive);
-                    blocks.add(opened);
-                    open.add(opened);
-                } else if (character == '}' && !open.isEmpty()) {
-                    open.removeLast();
-                }
-            }
-        }
-        Map<String, CaddyBlock> snippets = new HashMap<>();
-        blocks.stream().filter(block -> block.snippet() != null)
-                .forEach(block -> snippets.put(block.snippet(), block));
-        return blocks.stream().filter(block -> block.destination() != null)
-                .map(block -> resolve(block, snippets))
-                .toList();
-    }
-
-    private static CaddyUpstream resolve(CaddyBlock upstream, Map<String, CaddyBlock> snippets) {
-        Set<String> deleted = new LinkedHashSet<>();
-        Set<String> asserted = new LinkedHashSet<>();
-        List<CaddyBlock> pending = new ArrayList<>(List.of(upstream));
-        Set<String> visited = new LinkedHashSet<>();
-        while (!pending.isEmpty()) {
-            CaddyBlock block = pending.removeLast();
-            deleted.addAll(block.deleted());
-            asserted.addAll(block.asserted());
-            block.imported().stream().filter(visited::add).map(snippets::get)
-                    .filter(java.util.Objects::nonNull).forEach(pending::add);
-        }
-        return new CaddyUpstream(upstream.destination(), deleted, asserted);
     }
 
     @Test

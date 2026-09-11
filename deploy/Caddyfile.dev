@@ -1,3 +1,15 @@
+# This listener answers every Host, so the forwarded host and port are the published ones rather
+# than whatever a client sent; compose.dev.yaml publishes it on 127.0.0.1:8082.
+(developmentHeaders) {
+	header_up -Forwarded
+	header_up -X-Forwarded-Prefix
+	header_up -X-Forwarded-Ssl
+	header_up X-Forwarded-For {remote_host}
+	header_up X-Forwarded-Host localhost:8082
+	header_up X-Forwarded-Port 8082
+	header_up X-Forwarded-Proto {scheme}
+}
+
 :8080 {
 	header {
 		+Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
@@ -10,18 +22,14 @@
 	method @unknownMethod PATCH
 
 	handle /api-ui* {
-		reverse_proxy api-ui:8080
+		reverse_proxy api-ui:8080 {
+			import developmentHeaders
+		}
 	}
 
 	handle /api/* {
 		reverse_proxy host.docker.internal:8080 {
-			header_up -Forwarded
-			header_up -X-Forwarded-Port
-			header_up -X-Forwarded-Prefix
-			header_up -X-Forwarded-Ssl
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Host {host}
-			header_up X-Forwarded-Proto {scheme}
+			import developmentHeaders
 		}
 	}
 
