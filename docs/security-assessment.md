@@ -177,7 +177,12 @@ step builds and removes an image tag of its own, so the fixture image the base b
 never retagged. The seeder is idempotent, so where the base's own description already seeds, the
 step verifies the dataset against the candidate's expectation instead of writing it. That
 verification is the one check the pair's fixture fingerprint cannot make, because the fingerprint
-reads the dataset's properties file and not the code that writes it. The workflow
+reads the dataset's properties file and not the code that writes it. It also moves where the base
+leg's data comes from. The worktree ordering above keeps the previous toolchain's judgement
+independent, and that is a claim about the tools rather than about the fixture: from this change
+onwards the dataset both toolchains meet is written by the candidate's seeder, and only the
+properties file that seeder reads is fingerprinted. A branch that changed how the dataset is written
+would therefore change both legs at once, which the whole-branch review is what stands behind. The workflow
 uses the comparator from the protected base revision whenever the two are byte-identical, so a
 branch that changes the comparator is judged by its own and the whole-branch review is what stands
 behind that. It computes both

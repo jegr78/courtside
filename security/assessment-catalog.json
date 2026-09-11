@@ -1778,7 +1778,7 @@
           "manualProcedureId": "MAN-ARCH-001",
           "controlEvidence": {
             "productionPath": "pom.xml",
-            "falsifyingTest": "src/test/java/org/courtside/NonProductionProfileTest.java#whenTheProductionSourcesAreRead_thenOnlyReviewedInstrumentationIsGatedToAnEnvironment"
+            "falsifyingTest": "src/test/java/org/courtside/ProductionArtifactIT.java#givenTheFixtureArtifact_whenTheProductionArtifactIsRead_thenItCarriesNoFixtureFile"
           }
         },
         {

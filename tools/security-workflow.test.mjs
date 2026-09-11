@@ -25,16 +25,17 @@ function jobsStartingASecurityTarget() {
       .map(([name, job]) => ({ file, name, job })));
 }
 
-// The seeder image adds the compiled fixture classes, which only a Maven build produces, so a job
-// that pulls a published candidate has to be handed them instead.
+// The seeder image adds the compiled fixture classes, which only a Maven build produces, whether the
+// job runs one itself, reaches one through courtside.uat-smoke.mjs, or is handed the artifact.
 test("given every job that starts a security target, when it runs, then the fixture classes are there", () => {
   // given
   const starters = jobsStartingASecurityTarget();
 
   // when
-  const unsupplied = starters.filter(({ job }) => !(job.steps ?? []).some((step) =>
-    /\.\/mvnw\b/.test(step.run ?? "")
-    || (step.uses ?? "").startsWith("actions/download-artifact@") && step.with?.name === "assessment-fixtures"));
+  const unsupplied = starters.filter(({ job }) => !(buildsWithMaven(job)
+    || commandLines(job).some((line) => line.includes("courtside.uat-smoke.mjs"))
+    || (job.steps ?? []).some((step) =>
+      (step.uses ?? "").startsWith("actions/download-artifact@") && step.with?.name === "assessment-fixtures")));
 
   // then
   assert.ok(starters.length >= 2, "no workflow starts a security target");
@@ -49,9 +50,15 @@ function assessedWorktrees(job) {
     [...(step.run ?? "").matchAll(/git worktree add[^\n]*?"([^"\n]+)"/g)].map(([, path]) => path));
 }
 
-function mavenInvocations(job, path) {
-  return (job.steps ?? []).flatMap((step) => (step.run ?? "").replace(/\\\n\s*/g, " ").split("\n"))
-    .filter((line) => /mvnw/.test(line) && line.includes(`${path}/pom.xml`));
+function commandLines(job) {
+  return (job.steps ?? []).flatMap((step) => (step.run ?? "").replace(/\\\n\s*/g, " ").split("\n"));
+}
+
+// A plugin goal such as install-node-and-npm compiles nothing, so the goal decides, not the command.
+function buildsWithMaven(job, pom = null) {
+  return commandLines(job).some((line) => /mvnw/.test(line)
+    && (pom === null || line.includes(pom))
+    && line.split(/\s+/).some((token) => LIFECYCLE_GOALS.includes(token)));
 }
 
 // The second worktree runs its own tooling, and that tooling now stages fixture classes out of the
@@ -62,8 +69,7 @@ test("given a job that assesses from a second worktree, when it starts that targ
 
   // when
   const unpackaged = starters.flatMap(({ file, name, job }) => assessedWorktrees(job)
-    .filter((path) => !mavenInvocations(job, path)
-      .some((line) => line.split(/\s+/).some((token) => LIFECYCLE_GOALS.includes(token))))
+    .filter((path) => !buildsWithMaven(job, `${path}/pom.xml`))
     .map((path) => `${file}:${name}:${path}`));
 
   // then
@@ -83,6 +89,8 @@ test("given a job that assesses from a second worktree, when it starts that targ
     && !(job.steps ?? []).some((step) => /courtside\.mjs security-seed\s/.test(step.run ?? "")));
 
   // then
+  assert.ok(starters.some(({ job }) => assessedWorktrees(job).length > 0),
+    "no job assesses a target from a second worktree");
   assert.deepEqual(unseeded.map(({ file, name }) => `${file}:${name}`), []);
 });
 

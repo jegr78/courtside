@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -23,7 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 // from the list that decides what a club receives.
 class NonProductionProfileTest {
 
-    private static final Pattern PROFILE = Pattern.compile("@(?:\\w+\\.)*Profile\\(\"(?!!)");
+    private static final Pattern PROFILE =
+            Pattern.compile("@(?:\\w+\\.)*Profile\\(\\s*(?:value\\s*=\\s*)?\\{?\\s*\"(?!!)");
     private static final Pattern CONDITION = Pattern.compile("@(?:\\w+\\.)*Conditional\\w*");
     private static final String ENVIRONMENT = "courtside.environment";
     private static final Pattern EXCLUDED_PACKAGE = Pattern.compile("(org/courtside/[a-z]+)/\\*\\*");
@@ -65,11 +67,36 @@ class NonProductionProfileTest {
                         named("plugin", "artifactId", "maven-jar-plugin", packaging)), "exclude"));
     }
 
+    static boolean declaresANonProductionGate(String text) {
+        return PROFILE.matcher(text).find()
+                || CONDITION.matcher(text).find() && text.contains(ENVIRONMENT);
+    }
+
+    @Test
+    void givenEveryFormAGateIsWritten_whenTheRuleReadsIt_thenItAgreesWithTheIntent() {
+        // given
+        List<Map.Entry<String, Boolean>> forms = List.of(
+                Map.entry("@Profile(\"demo\")", true),
+                Map.entry("@Profile({\"demo\"})", true),
+                Map.entry("@Profile(value = \"demo\")", true),
+                Map.entry("@Profile(value = {\"demo\"})", true),
+                Map.entry("@org.springframework.context.annotation.Profile(\"demo\")", true),
+                Map.entry("@Profile(\"!demo\")", false),
+                Map.entry("@Profile({\"!demo\"})", false),
+                Map.entry("@ConditionalOnProperty(name = \"courtside.environment\", havingValue = \"SECURITY\")",
+                        true),
+                Map.entry("@ConditionalOnProperty(name = \"courtside.mail.relay-enabled\")", false),
+                Map.entry("class OrdinaryService { }", false));
+
+        // when / then
+        assertThat(forms).allSatisfy(form ->
+                assertThat(declaresANonProductionGate(form.getKey())).as(form.getKey())
+                        .isEqualTo(form.getValue()));
+    }
+
     private static boolean selectsAnEnvironment(String source) {
         try {
-            String text = Files.readString(Path.of(source));
-            return PROFILE.matcher(text).find()
-                    || CONDITION.matcher(text).find() && text.contains(ENVIRONMENT);
+            return declaresANonProductionGate(Files.readString(Path.of(source)));
         } catch (IOException failure) {
             throw new IllegalStateException(source, failure);
         }

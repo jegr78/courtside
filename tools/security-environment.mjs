@@ -46,6 +46,13 @@ export function securitySeedImageTag(runId) {
   return `courtside:security-seed-${runId}`;
 }
 
+// Compose reads only the names its own file interpolates, and any other key of the recorded file
+// would reach the docker child as PATH or DOCKER_HOST and decide which executable runs.
+function interpolatedSecurityNames() {
+  return new Set([...readFileSync(composeFile, "utf8").matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)/g)]
+    .map(([, name]) => name));
+}
+
 export function securitySeedPlan(runId, image, recorded) {
   if (recorded.COURTSIDE_SECURITY_RUN_ID !== runId) {
     throw new Error("The recorded environment belongs to a different security run");
@@ -53,10 +60,13 @@ export function securitySeedPlan(runId, image, recorded) {
   if (recorded.COURTSIDE_SECURITY_IMAGE !== image) {
     throw new Error("The recorded environment assesses a different candidate image");
   }
+  const interpolated = interpolatedSecurityNames();
   return {
     command: "docker",
     args: [...securityComposeArgs(runId), "run", "--rm", "--no-deps", "-T", "seeder"],
-    environment: { ...recorded, COURTSIDE_SECURITY_FIXTURES_IMAGE: securitySeedImageTag(runId) }
+    environment: Object.fromEntries([...Object.entries(recorded),
+      ["COURTSIDE_SECURITY_FIXTURES_IMAGE", securitySeedImageTag(runId)]]
+      .filter(([name]) => interpolated.has(name)))
   };
 }
 
@@ -244,11 +254,17 @@ export function fixtureImageBase({ RepoDigests: digests = [], RepoTags: tags = [
   return reference;
 }
 
-export function assertFixtureImageDerivation(candidateLayers, fixtureLayers) {
-  if (!Array.isArray(candidateLayers) || candidateLayers.length === 0
-      || !Array.isArray(fixtureLayers) || fixtureLayers.length !== candidateLayers.length + 1
-      || candidateLayers.some((layer, index) => fixtureLayers[index] !== layer)) {
+export function assertFixtureImageDerivation(candidate, fixtures) {
+  const layers = candidate?.RootFS?.Layers;
+  const fixtureLayers = fixtures?.RootFS?.Layers;
+  if (!Array.isArray(layers) || layers.length === 0
+      || !Array.isArray(fixtureLayers) || fixtureLayers.length !== layers.length + 1
+      || layers.some((layer, index) => fixtureLayers[index] !== layer)) {
     throw new Error("The security seeder is not the candidate carrying its fixture classes");
+  }
+  if (["Entrypoint", "Cmd", "User"].some((field) => JSON.stringify(candidate.Config?.[field] ?? null)
+      !== JSON.stringify(fixtures.Config?.[field] ?? null))) {
+    throw new Error("The security seeder does not run the candidate's own entry point");
   }
 }
 
@@ -258,14 +274,24 @@ function buildSecurityFixturesImage(runId, image, tag = securityFixturesImageTag
   stageFixtureClasses();
   const plan = fixtureImagePlan(tag, fixtureImageBase(inspectImage(image)));
   execute(plan.command, plan.args);
-  assertFixtureImageDerivation(inspectImage(image).RootFS.Layers, inspectImage(tag).RootFS.Layers);
+  assertFixtureImageDerivation(inspectImage(image), inspectImage(tag));
 }
 
 export function seedSecurityEnvironment(runId, image, stateFile) {
-  const plan = securitySeedPlan(runId, image, JSON.parse(readFileSync(resolve(stateFile), "utf8")));
+  const recorded = JSON.parse(readFileSync(resolve(stateFile), "utf8"));
+  const plan = securitySeedPlan(runId, image, recorded);
+  const resources = securityProjectResources(runId);
+  if (resources.length === 0) {
+    throw new Error("No security environment of this run is running");
+  }
+  assertSecurityRecoveryOwnership(resources, {
+    runId,
+    seedFingerprint: recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+    instanceFingerprint: recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
+  });
   const tag = plan.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE;
-  buildSecurityFixturesImage(runId, image, tag);
   try {
+    buildSecurityFixturesImage(runId, image, tag);
     execute(plan.command, plan.args, { ...process.env, ...plan.environment });
   } finally {
     removeSecurityImage(tag);

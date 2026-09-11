@@ -70,20 +70,44 @@ test("given a candidate image, when choosing what a build can start from, then a
     /carries no reference a build can start from/);
 });
 
+function inspected(layers, configuration = {}) {
+  return {
+    RootFS: { Layers: layers },
+    Config: { Entrypoint: ["/entry.sh"], Cmd: null, User: "10001:10001", ...configuration }
+  };
+}
+
 test("given a built seeder image, when it is not the candidate plus its classes, then the run is refused", () => {
   // given
   const candidate = ["sha256:one", "sha256:two"];
 
   // when / then
-  assertFixtureImageDerivation(candidate, [...candidate, "sha256:fixtures"]);
-  assert.throws(() => assertFixtureImageDerivation(candidate, candidate),
+  assertFixtureImageDerivation(inspected(candidate), inspected([...candidate, "sha256:fixtures"]));
+  assert.throws(() => assertFixtureImageDerivation(inspected(candidate), inspected(candidate)),
     /not the candidate carrying its fixture classes/);
-  assert.throws(() => assertFixtureImageDerivation(candidate, ["sha256:one", "sha256:other", "sha256:fixtures"]),
+  assert.throws(() => assertFixtureImageDerivation(inspected(candidate),
+    inspected(["sha256:one", "sha256:other", "sha256:fixtures"])),
     /not the candidate carrying its fixture classes/);
-  assert.throws(() => assertFixtureImageDerivation(candidate, [...candidate, "sha256:fixtures", "sha256:more"]),
+  assert.throws(() => assertFixtureImageDerivation(inspected(candidate),
+    inspected([...candidate, "sha256:fixtures", "sha256:more"])),
     /not the candidate carrying its fixture classes/);
-  assert.throws(() => assertFixtureImageDerivation([], ["sha256:fixtures"]),
+  assert.throws(() => assertFixtureImageDerivation(inspected([]), inspected(["sha256:fixtures"])),
     /not the candidate carrying its fixture classes/);
+});
+
+// The base is resolved through a mutable local tag, so identical layers alone would also accept an
+// image that merely shares them and starts something else.
+test("given a built seeder image, when it starts something other than the candidate, then the run is refused", () => {
+  // given
+  const candidate = ["sha256:one", "sha256:two"];
+  const fixtures = [...candidate, "sha256:fixtures"];
+
+  // when / then
+  for (const configuration of [{ Entrypoint: ["/other.sh"] }, { Cmd: ["--serve"] }, { User: "0:0" }]) {
+    assert.throws(() => assertFixtureImageDerivation(inspected(candidate), inspected(fixtures, configuration)),
+      /does not run the candidate's own entry point/,
+      `a changed ${Object.keys(configuration)[0]} was accepted`);
+  }
 });
 
 test("given a security run, when building its seeder, then the image is layered over the candidate itself", () => {
@@ -561,4 +585,24 @@ test("given an environment recorded for another run or image, when the candidate
     /belongs to a different security run/);
   assert.throws(() => securitySeedPlan("compare-base-1-1", `sha256:${"d".repeat(64)}`, recorded),
     /assesses a different candidate/);
+});
+
+test("given a recorded environment, when the candidate seeds it, then only what compose reads is handed on", () => {
+  // given
+  const recorded = recordedEnvironment({
+    COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES: "5",
+    PATH: "/tmp/attacker",
+    DOCKER_HOST: "tcp://attacker.invalid:2375"
+  });
+
+  // when
+  const plan = securitySeedPlan("compare-base-1-1", recorded.COURTSIDE_SECURITY_IMAGE, recorded);
+
+  // then
+  assert.equal(plan.environment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES, "5",
+    "compose refuses to interpolate its own required name");
+  for (const name of ["PATH", "DOCKER_HOST"]) {
+    assert.equal(name in plan.environment, false,
+      `${name} from the recorded file would decide which executable the docker call runs`);
+  }
 });

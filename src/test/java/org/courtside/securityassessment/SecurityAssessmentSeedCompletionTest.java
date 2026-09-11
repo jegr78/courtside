@@ -19,6 +19,15 @@ class SecurityAssessmentSeedCompletionTest {
     }
 
     @Test
+    void givenASeedOnlyRunOutsideTheAssessment_whenCreatingContext_thenNothingEndsTheProcess() {
+        // when / then
+        new ApplicationContextRunner()
+                .withPropertyValues("courtside.security-assessment.seed-only=true")
+                .withUserConfiguration(SecurityAssessmentSeedCompletion.class)
+                .run(context -> assertThat(context).doesNotHaveBean(SecurityAssessmentSeedCompletion.class));
+    }
+
+    @Test
     void givenASeedOnlyRun_whenCreatingContext_thenTheProcessEndsAfterSeeding() {
         // when / then
         contextRunner.withPropertyValues("courtside.security-assessment.seed-only=true").run(context ->

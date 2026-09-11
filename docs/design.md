@@ -1709,7 +1709,12 @@ whether it is built or designed. **Designed means absent today.**
   which is what lets the passive suite prove the proxy canonicalises them; only the application can
   answer that, so it cannot move into the fixture artifact the seeders left for. It is bound to
   `COURTSIDE_ENVIRONMENT=SECURITY`, and because that variable is an operator's to set, a club could
-  switch it on. What an observer then gains is two response headers repeating the host and scheme
+  switch it on. What used to stand in the way was the `security` profile the filter was bound to
+  instead: activating that profile brought an environment guard which refused to start unless the
+  deployment confirmed a disposable database, a run identifier, a matching dataset fingerprint, a
+  password of at least sixteen characters and the Compose-local `courtside_security` schema. That
+  guard left the artifact with the seeders, so nothing now refuses a deployment that sets the
+  designation. What an observer then gains is two response headers repeating the host and scheme
   that same client just sent — no request body, no session, no header it did not write itself. The
   designation itself is already public through `GET /api/source` and the build identity panel, so
   switching it does not disclose anything the response did not already carry, though the frontend's
