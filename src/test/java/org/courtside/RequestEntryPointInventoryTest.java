@@ -54,6 +54,10 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
 
     private static final Pattern READ = Pattern.compile("\\.((?:get|is)[A-Za-z]+)\\(\\s*(?:\"([^\"]*)\")?");
 
+    private static final Pattern DECLARES_A_FILTER = Pattern.compile(
+            "(?:implements|extends)\\s+(?:\\w+\\.)*(?:Filter|HttpFilter|OncePerRequestFilter"
+                    + "|GenericFilterBean)\\b|\\bdoFilterInternal\\s*\\(|\\bpublic\\s+void\\s+doFilter\\s*\\(");
+
     private static final Set<String> SERVLET_READS =
             Stream.of(HttpServletRequest.class.getMethods(), ServletRequest.class.getMethods())
                     .flatMap(Arrays::stream)
@@ -363,8 +367,7 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
 
     private static boolean declaresAFilter(Path source) {
         try {
-            String text = Files.readString(source);
-            return text.contains("doFilterInternal(") || text.contains("public void doFilter(");
+            return DECLARES_A_FILTER.matcher(Files.readString(source)).find();
         } catch (Exception failure) {
             throw new IllegalStateException(failure);
         }
