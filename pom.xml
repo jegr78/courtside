@@ -373,6 +373,26 @@
                 <version>${maven-antrun-plugin.version}</version>
                 <executions>
                     <execution>
+                        <id>record-excluded-fixtures</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <fileset id="courtside.fixtures" dir="${fixtures.classes}"/>
+                                <pathconvert property="courtside.excluded.fixtures"
+                                             refid="courtside.fixtures" pathsep="${line.separator}">
+                                    <globmapper from="${fixtures.classes}/*" to="*" handledirsep="true"/>
+                                </pathconvert>
+                                <mkdir dir="${project.build.outputDirectory}/META-INF"/>
+                                <echo file="${project.build.outputDirectory}/META-INF/courtside-excluded-fixtures.txt"
+                                      message="${courtside.excluded.fixtures}${line.separator}"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>record-source-commit</id>
                         <phase>generate-resources</phase>
                         <goals>
                             <goal>run</goal>

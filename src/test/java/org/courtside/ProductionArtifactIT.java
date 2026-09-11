@@ -16,6 +16,7 @@ import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // Surefire runs before either artifact exists, so the integration phase is the only place that can
@@ -25,6 +26,7 @@ class ProductionArtifactIT {
     private static final String PACKAGED_CLASSES = "BOOT-INF/classes/";
     private static final String SHARED_REGISTRATION = "META-INF/spring.factories";
     private static final String MANIFEST = "META-INF/MANIFEST.MF";
+    private static final String EXCLUSION_RECORD = "META-INF/courtside-excluded-fixtures.txt";
 
     @Test
     void givenTheFixtureArtifact_whenTheProductionArtifactIsRead_thenItCarriesNoFixtureFile()
@@ -39,7 +41,8 @@ class ProductionArtifactIT {
         assertThat(fixtures).as("the fixture artifact carries nothing").isNotEmpty();
         assertThat(fixtures).as("the fixture artifact carries no class")
                 .anyMatch(file -> file.endsWith(".class"));
-        assertThat(fixtures.stream().filter(production::contains).toList())
+        assertThat(fixtures.stream().filter(file -> !file.equals(SHARED_REGISTRATION))
+                .filter(production::contains).toList())
                 .as("the production artifact still ships fixture files").isEmpty();
     }
 
@@ -57,6 +60,30 @@ class ProductionArtifactIT {
         assertThat(compiled.stream()
                 .filter(file -> production.contains(file) == fixtures.contains(file)).toList())
                 .as("a compiled file is in both artifacts or in neither").isEmpty();
+    }
+
+    @Test
+    void givenTheFixtureArtifact_whenTheExclusionRecordIsRead_thenItNamesEveryFixtureFile()
+            throws IOException {
+        // given
+        Set<String> fixtures = fixtureContent();
+
+        // when
+        Set<String> recorded = recordedExclusions();
+
+        // then
+        assertThat(recorded).as("the production artifact records no exclusion")
+                .containsExactlyInAnyOrderElementsOf(fixtures);
+    }
+
+    private static Set<String> recordedExclusions() throws IOException {
+        try (JarFile jar = new JarFile(productionArtifact().toFile());
+             InputStream source = jar.getInputStream(jar.getEntry(EXCLUSION_RECORD))) {
+            return new java.io.BufferedReader(new java.io.InputStreamReader(source, UTF_8)).lines()
+                    .map(String::trim)
+                    .filter(line -> !line.isEmpty())
+                    .collect(Collectors.toCollection(TreeSet::new));
+        }
     }
 
     @Test
@@ -113,7 +140,7 @@ class ProductionArtifactIT {
             return jar.stream()
                     .filter(entry -> !entry.isDirectory())
                     .map(entry -> entry.getName())
-                    .filter(name -> !name.equals(MANIFEST) && !name.equals(SHARED_REGISTRATION))
+                    .filter(name -> !name.equals(MANIFEST))
                     .collect(Collectors.toCollection(TreeSet::new));
         }
     }
