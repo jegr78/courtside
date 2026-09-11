@@ -1863,11 +1863,12 @@ whether it is built or designed. **Designed means absent today.**
   measured rather than assumed: a logo uploaded with two parts named `file` reached the handler. The
   repeated part is now refused too, but behind the authorization decision, because reading the parts
   parses the upload and no unauthenticated caller had that work done for them before.
-- **One request means one message.** *Built.* Twelve ambiguously framed messages, beside two
-  unambiguous controls — two lengths that agree and two that disagree, a length beside a chunked body, a chunked body named twice and
-  named with a companion encoding, an encoding neither hop implements, a chunk size that is not a
-  number, a bare newline ending the request line, a carriage return inside a header value, a second
-  host, a space before a header colon — are sent as raw bytes both straight at the connector and
+- **One request means one message.** *Built.* Thirteen ambiguously framed messages, beside one that
+  is not — among them two lengths that agree and two that disagree, a length beside a chunked body,
+  a chunked body named twice and named with a companion encoding, an encoding neither hop
+  implements, a chunk size that is not a number, a bare newline ending the request line, a carriage
+  return inside a header value, a second host, a space before a header colon — are sent as raw bytes
+  both straight at the connector and
   through the reference proxy, which is started from `deploy/Caddyfile` with the upstream address as
   the only substitution. Every one of them is answered exactly once at both hops, which is the
   property a smuggled second request would have to break. Each hop's status and the identity of

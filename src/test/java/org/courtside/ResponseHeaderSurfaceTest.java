@@ -26,6 +26,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -147,7 +148,7 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
         // then
         assertThat(answer).startsWith("HTTP/1.1 400")
                 .contains("urn:courtside:error:request-rejected");
-        assertThat(headerNames(answer)).doesNotContain(INJECTED.toLowerCase());
+        assertThat(headerNames(answer)).doesNotContain(INJECTED.toLowerCase(Locale.ROOT));
         assertThat(responses(answer)).isEqualTo(1);
     }
 
@@ -196,7 +197,7 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
         // then
         assertThat(answer.statusCode()).isEqualTo(400);
         assertThat(answer.body()).contains("urn:courtside:error:validation-failed");
-        assertThat(answer.headers().map()).doesNotContainKey(INJECTED.toLowerCase());
+        assertThat(answer.headers().map()).doesNotContainKey(INJECTED.toLowerCase(Locale.ROOT));
     }
 
     // The contract refuses the value above, and the escape the controller applies is the reason a
@@ -292,7 +293,7 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
     private static Set<String> headerNames(String answer) {
         return answer.lines().takeWhile(line -> !line.isBlank())
                 .filter(line -> line.contains(":"))
-                .map(line -> line.substring(0, line.indexOf(':')).toLowerCase())
+                .map(line -> line.substring(0, line.indexOf(':')).toLowerCase(Locale.ROOT))
                 .collect(Collectors.toCollection(TreeSet::new));
     }
 

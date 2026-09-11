@@ -89,6 +89,7 @@ class AmbiguousParameterTest extends AbstractIntegrationTest {
         assertThat(ambiguous.statusCode()).isEqualTo(400);
         assertThat(type(ambiguous)).isEqualTo(AMBIGUOUS);
         assertThat(unambiguous.statusCode()).isEqualTo(404);
+        assertThat(type(unambiguous)).isEqualTo("urn:courtside:error:series-not-found");
     }
 
     @Test
@@ -103,7 +104,7 @@ class AmbiguousParameterTest extends AbstractIntegrationTest {
         // then
         assertThat(answer.statusCode()).isEqualTo(400);
         assertThat(type(answer)).isEqualTo(AMBIGUOUS);
-        assertThat(send("GET", "/api/my/bookings").statusCode()).isEqualTo(401);
+        assertNoSessionWasEstablished();
     }
 
     // getParameterMap reads the query string and the form body as one map, so a name that appears
@@ -121,7 +122,7 @@ class AmbiguousParameterTest extends AbstractIntegrationTest {
         // then
         assertThat(answer.statusCode()).isEqualTo(400);
         assertThat(type(answer)).isEqualTo(AMBIGUOUS);
-        assertThat(send("GET", "/api/my/bookings").statusCode()).isEqualTo(401);
+        assertNoSessionWasEstablished();
     }
 
     @Test
@@ -178,6 +179,12 @@ class AmbiguousParameterTest extends AbstractIntegrationTest {
     private static String part(String boundary, String name, String filename) {
         return "--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + name
                 + "\"; filename=\"" + filename + "\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n";
+    }
+
+    private void assertNoSessionWasEstablished() throws Exception {
+        HttpResponse<String> answer = send("GET", "/api/my/bookings");
+        assertThat(answer.statusCode()).isEqualTo(401);
+        assertThat(type(answer)).isEqualTo("urn:courtside:error:unauthenticated");
     }
 
     private void signIn(String username) throws Exception {

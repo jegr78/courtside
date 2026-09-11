@@ -8,8 +8,8 @@ import jakarta.servlet.http.Part;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -37,9 +37,7 @@ class RejectsRepeatedParts extends OncePerRequestFilter {
     }
 
     private static boolean carriesMultipart(HttpServletRequest request) {
-        String contentType = request.getContentType();
-        return contentType != null && contentType.toLowerCase()
-                .startsWith(MediaType.MULTIPART_FORM_DATA_VALUE);
+        return StringUtils.startsWithIgnoreCase(request.getContentType(), "multipart/");
     }
 
     // A body this filter cannot read is a body the resolver below reports on, and its answer says
