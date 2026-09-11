@@ -89,7 +89,7 @@ class AmbiguousParameterTest extends AbstractIntegrationTest {
         assertThat(ambiguous.statusCode()).isEqualTo(400);
         assertThat(type(ambiguous)).isEqualTo(AMBIGUOUS);
         assertThat(unambiguous.statusCode()).isEqualTo(404);
-        assertThat(type(unambiguous)).isEqualTo("urn:courtside:error:series-not-found");
+        assertThat(type(unambiguous)).isEqualTo("urn:courtside:error:booking-not-found");
     }
 
     @Test
