@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.5.6",
+  "catalogVersion": "1.5.7",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -681,7 +681,10 @@
           "id": "v5.0.0-4.2.1",
           "status": "implemented",
           "manualProcedureId": "MAN-INPUT-001",
-          "findingReference": "docs/security-findings.md#ambiguous-http-parameters-and-message-boundaries"
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/shared/web/RejectsRepeatedParameters.java",
+            "falsifyingTest": "src/test/java/org/courtside/AmbiguousParameterTest.java#givenAQueryParameterNamedTwice_whenASeriesIsCancelled_thenNoHandlerEverSawTheRequest"
+          }
         },
         {
           "id": "v5.0.0-4.3.1",
@@ -1841,7 +1844,10 @@
           "id": "v5.0.0-15.3.7",
           "status": "implemented",
           "manualProcedureId": "MAN-ARCH-001",
-          "findingReference": "docs/security-findings.md#ambiguous-http-parameters-and-message-boundaries"
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/dataexchange/web/ExternalReferenceAdminController.java",
+            "falsifyingTest": "src/test/java/org/courtside/ResponseHeaderSurfaceTest.java#whenEveryResponseHeaderThisApplicationWritesIsRead_thenTheInventoryNamesItsSource"
+          }
         },
         {
           "id": "v5.0.0-16.1.1",
@@ -2535,7 +2541,10 @@
           "id": "WSTG-v4.2-INPV-04",
           "status": "implemented",
           "manualProcedureId": "MAN-INPUT-001",
-          "findingReference": "docs/security-findings.md#ambiguous-http-parameters-and-message-boundaries"
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/shared/web/RejectsRepeatedParameters.java",
+            "falsifyingTest": "src/test/java/org/courtside/AmbiguousParameterTest.java#givenAFormParameterNamedTwice_whenSigningIn_thenNoSessionIsEstablished"
+          }
         },
         {
           "id": "WSTG-v4.2-INPV-05",
@@ -2610,7 +2619,10 @@
           "id": "WSTG-v4.2-INPV-15",
           "status": "implemented",
           "manualProcedureId": "MAN-INPUT-001",
-          "findingReference": "docs/security-findings.md#ambiguous-http-parameters-and-message-boundaries"
+          "controlEvidence": {
+            "productionPath": "deploy/Caddyfile",
+            "falsifyingTest": "src/test/java/org/courtside/shared/web/MessageBoundaryAgreementTest.java#givenAnAmbiguouslyFramedMessage_whenBothHopsReadIt_thenNeitherAnswersTwice"
+          }
         },
         {
           "id": "WSTG-v4.2-INPV-16",

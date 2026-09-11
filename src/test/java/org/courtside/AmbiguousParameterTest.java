@@ -150,6 +150,36 @@ class AmbiguousParameterTest extends AbstractIntegrationTest {
         assertThat(type(answer)).isEqualTo(AMBIGUOUS);
     }
 
+    // The parameter map holds nothing of a multipart body, so the part that repeats a name is read
+    // behind the authorization decision rather than in front of it.
+    @Test
+    void givenAMultipartPartNamedTwice_whenALogoIsUploaded_thenNoHandlerChoosesBetweenThem()
+            throws Exception {
+        // given
+        signIn(USERNAME);
+        String boundary = "courtsideboundary";
+        String body = part(boundary, "file", "one.png") + part(boundary, "file", "two.png")
+                + "--" + boundary + "--\r\n";
+
+        // when
+        HttpResponse<String> answer = httpClient.send(HttpRequest.newBuilder(
+                        URI.create(baseUrl() + "/api/admin/config/logo"))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .header("X-XSRF-TOKEN", csrfToken())
+                .PUT(HttpRequest.BodyPublishers.ofString(body))
+                .build(), HttpResponse.BodyHandlers.ofString());
+
+        // then
+        assertThat(answer.statusCode()).isEqualTo(400);
+        assertThat(type(answer)).isEqualTo(AMBIGUOUS);
+        assertThat(detail(answer)).contains("file");
+    }
+
+    private static String part(String boundary, String name, String filename) {
+        return "--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + name
+                + "\"; filename=\"" + filename + "\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n";
+    }
+
     private void signIn(String username) throws Exception {
         primeTheCsrfToken();
         assertThat(postForm("username=" + username + "&password=" + PASSWORD).statusCode())
