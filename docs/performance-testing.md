@@ -107,10 +107,11 @@ node tools/courtside.mjs perf-reset courtside-perf
 ```
 
 `perf` verifies the source, builds the local image, and starts PostgreSQL 17, the application, a
-Mailpit relay, and a dedicated Caddy boundary. The application is available at `https://localhost:9443`; its local CA
-is intentionally disposable. The CLI generates one shared password, stores it only in the ignored
-`build/perf-environment.json` with owner-only permissions where supported, and creates the accounts
-`member0001` through `member1000`. Account `member1000` is reserved for contention workloads.
+Mailpit relay, and a dedicated Caddy boundary. The application is available at
+`https://localhost:9443`; its local CA is intentionally disposable. The CLI generates one shared
+password, stores it only in the ignored `build/perf-environment.json` with owner-only permissions
+where supported, and creates the accounts `member0001` through `member1000`. Account `member1000`
+is reserved for contention workloads.
 
 ### What a run pays for mail
 
@@ -122,10 +123,10 @@ queue is full the handover time is inside the request, so where mail goes is par
 The environment therefore runs a Mailpit relay on the `backend` network and points the application
 at it over STARTTLS, with a certificate the CLI issues per start into the ignored
 `build/perf-mail`, valid for 30 days so that a stack left standing between runs does not outlive
-it. Handover succeeds in milliseconds and the message is kept in the relay's memory
-and never delivered anywhere. **A load run measures an instance whose relay accepts**, which is
-what a club with a working mail server sees; it does not measure an instance that skips mail, and
-it does not measure one whose relay is refusing.
+it. Handover succeeds in milliseconds and the message is kept in the relay's memory and never
+delivered anywhere. **A load run measures an instance whose relay accepts**, which is what a club
+with a working mail server sees; it does not measure an instance that skips mail, and it does not
+measure one whose relay is refusing.
 
 That last case is not hypothetical. The environment previously pointed at `mail.invalid`, a name
 RFC 2606 reserves so that it never resolves. Every message then walked the whole retry ladder --
