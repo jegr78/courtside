@@ -16,9 +16,8 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
-// The parameter map holds a multipart body's parts for nobody, so the repeated name a form can
-// still carry is read here -- behind the authorization decision, because reading it parses the
-// upload, and no unauthenticated caller had that work done for them before.
+// A multipart body's parts reach no parameter map, so the repeated name a form can still carry is
+// read behind the authorization decision, because reading it parses an upload nobody parsed before.
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE - 1)
 @RequiredArgsConstructor
