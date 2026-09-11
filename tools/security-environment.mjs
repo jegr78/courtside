@@ -45,12 +45,10 @@ export function securityFixturesImagePlan(runId, image) {
   return fixtureImagePlan(securityFixturesImageTag(runId), image);
 }
 
-export function securityEnvironment(runId, image, fixturesImage,
-    password = randomBytes(24).toString("base64url"), httpsPort = 0) {
-  for (const candidate of [image, fixturesImage]) {
-    if (!/^(?:sha256:[a-f0-9]{64}|[^\s@]+@sha256:[a-f0-9]{64})$/.test(candidate)) {
-      throw new Error("The security candidate must be selected by immutable image digest");
-    }
+export function securityEnvironment(runId, image, password = randomBytes(24).toString("base64url"),
+    httpsPort = 0) {
+  if (!/^(?:sha256:[a-f0-9]{64}|[^\s@]+@sha256:[a-f0-9]{64})$/.test(image)) {
+    throw new Error("The security candidate must be selected by immutable image digest");
   }
   const seed = readFileSync(join(root, "src/main/resources/security-assessment-dataset.properties"));
   const seedFingerprint = `sha256:${createHash("sha256").update(seed).digest("hex")}`;
@@ -58,7 +56,7 @@ export function securityEnvironment(runId, image, fixturesImage,
   return {
     COURTSIDE_SECURITY_RUN_ID: runId,
     COURTSIDE_SECURITY_IMAGE: image,
-    COURTSIDE_SECURITY_FIXTURES_IMAGE: fixturesImage,
+    COURTSIDE_SECURITY_FIXTURES_IMAGE: securityFixturesImageTag(runId),
     COURTSIDE_SECURITY_HTTPS_PORT: String(httpsPort),
     COURTSIDE_SECURITY_SHARED_PASSWORD: password,
     COURTSIDE_SECURITY_SEED_FINGERPRINT: seedFingerprint,
@@ -109,8 +107,7 @@ export function securityAssessmentReservationArgs(environment, attempt) {
 
 export function recoveryEnvironment(runId, seedFingerprint) {
   return {
-    ...securityEnvironment(runId, `sha256:${"0".repeat(64)}`, `sha256:${"0".repeat(64)}`,
-      "recovery-placeholder", 1),
+    ...securityEnvironment(runId, `sha256:${"0".repeat(64)}`, "recovery-placeholder", 1),
     ...(seedFingerprint ? { COURTSIDE_SECURITY_SEED_FINGERPRINT: seedFingerprint } : {})
   };
 }
@@ -198,12 +195,13 @@ function writeIdentity(runId, identity) {
 export async function startSecurityEnvironment(runId, image) {
   assertSecurityStartAvailable(securityProjectResources(runId), existsSync(securityStateFile(runId)),
     existsSync(securityIdentityFile(runId)));
-  let environment = securityEnvironment(runId, image, buildSecurityFixturesImage(runId, image),
-    randomBytes(24).toString("base64url"), await availableLoopbackPort());
+  let environment = securityEnvironment(runId, image, randomBytes(24).toString("base64url"),
+    await availableLoopbackPort());
   for (let attempt = 1; attempt <= 3; attempt++) {
     reserveSecurityEnvironment(environment);
     writeState(runId, environment);
     try {
+      buildSecurityFixturesImage(runId, image);
       execute("docker", [...securityComposeArgs(runId), "up", "-d", "--wait"],
         { ...process.env, ...environment });
       break;
@@ -243,11 +241,10 @@ export function assertFixtureImageDerivation(candidateLayers, fixtureLayers) {
 // from the candidate rather than named beside it; a bare image ID is not a reference a build accepts.
 function buildSecurityFixturesImage(runId, image) {
   stageFixtureClasses();
-  const tag = securityFixturesImageTag(runId);
   const plan = securityFixturesImagePlan(runId, fixtureImageBase(inspectImage(image)));
   execute(plan.command, plan.args);
-  assertFixtureImageDerivation(inspectImage(image).RootFS.Layers, inspectImage(tag).RootFS.Layers);
-  return inspectImage(tag).Id;
+  assertFixtureImageDerivation(inspectImage(image).RootFS.Layers,
+    inspectImage(securityFixturesImageTag(runId)).RootFS.Layers);
 }
 
 function inspectImage(reference) {

@@ -871,9 +871,10 @@ function startPerformance(options) {
     `${JSON.stringify({ password, dbPort: options.dbPort, telemetry: options.telemetry }, null, 2)}\n`);
   runInteractive(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
   extractApplicationLayers();
-  runInteractive(performanceImagePlans()[0]);
+  const [productionImage, fixtureImage] = performanceImagePlans();
+  runInteractive(productionImage);
   stageFixtureClasses();
-  runInteractive(performanceImagePlans()[1]);
+  runInteractive(fixtureImage);
   runInteractive({
     command: "docker",
     args: [...perfComposeArgs(options.dbPort, options.telemetry), "up", "-d", "--wait", "--force-recreate",

@@ -103,6 +103,10 @@ class ProductionArtifactIT {
         Set<String> fixtures = fixtureContent();
 
         // then
+        assertThat(content(productionArtifact()))
+                .as("the fixture overlay would shadow the production registrations")
+                .contains(SHARED_REGISTRATION)
+                .doesNotContain(PACKAGED_CLASSES + SHARED_REGISTRATION);
         assertThat(productionFactories).as("the production artifact registers no factory").isNotEmpty();
         assertThat(fixtureFactories).as("the fixture artifact registers no factory").isNotEmpty();
         assertThat(missing(productionFactories, production))

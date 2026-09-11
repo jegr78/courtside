@@ -176,12 +176,11 @@ test("given a path-like run identity, when resolving private state, then it cann
 test("given a security run, when deriving its identity, then secrets and seed identity are generated", () => {
   // when
   const image = `sha256:${"b".repeat(64)}`;
-  const fixtures = `sha256:${"c".repeat(64)}`;
-  const environment = securityEnvironment("run-0001", image, fixtures, "synthetic-password-value", 23456);
+  const environment = securityEnvironment("run-0001", image, "synthetic-password-value", 23456);
 
   // then
   assert.equal(environment.COURTSIDE_SECURITY_IMAGE, image);
-  assert.equal(environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, fixtures);
+  assert.equal(environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, "courtside:security-fixtures-run-0001");
   assert.equal(environment.COURTSIDE_SECURITY_SHARED_PASSWORD, "synthetic-password-value");
   assert.equal(environment.COURTSIDE_SECURITY_HTTPS_PORT, "23456");
   assert.equal(environment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES, "5");
@@ -206,7 +205,7 @@ test("given a ready security environment, when reporting startup, then its crede
 
 test("given a mismatched target, when verifying identity, then active use is rejected", () => {
   // given
-  const expected = securityEnvironment("run-0001", `sha256:${"b".repeat(64)}`, `sha256:${"c".repeat(64)}`, "synthetic-password-value");
+  const expected = securityEnvironment("run-0001", `sha256:${"b".repeat(64)}`, "synthetic-password-value");
 
   // when / then
   assert.throws(() => assertSecurityIdentity({
@@ -223,7 +222,7 @@ test("given a mismatched target, when verifying identity, then active use is rej
 
 test("given a different running image, when verifying identity, then active use is rejected", () => {
   // given
-  const expected = securityEnvironment("run-0001", `sha256:${"b".repeat(64)}`, `sha256:${"c".repeat(64)}`, "synthetic-password-value");
+  const expected = securityEnvironment("run-0001", `sha256:${"b".repeat(64)}`, "synthetic-password-value");
 
   // when / then
   assert.throws(() => assertSecurityIdentity({
@@ -240,14 +239,11 @@ test("given a different running image, when verifying identity, then active use 
 
 test("given a mutable image tag, when preparing a security run, then startup is rejected", () => {
   // when / then
-  assert.throws(() => securityEnvironment("run-0001", "courtside:latest", `sha256:${"c".repeat(64)}`),
-    /immutable image digest/);
+  assert.throws(() => securityEnvironment("run-0001", "courtside:latest"), /immutable image digest/);
   assert.throws(
-    () => securityEnvironment("run-0001", `invalid @sha256:${"b".repeat(64)}`, `sha256:${"c".repeat(64)}`),
+    () => securityEnvironment("run-0001", `invalid @sha256:${"b".repeat(64)}`),
     /immutable image digest/,
   );
-  assert.throws(() => securityEnvironment("run-0001", `sha256:${"b".repeat(64)}`, "courtside:fixtures"),
-    /immutable image digest/);
 });
 
 test("given parallel workspaces, when reserving loopback ports, then the operating system chooses usable ports", async () => {
@@ -276,7 +272,7 @@ test("given lost private state, when preparing recovery, then Compose interpolat
   // then
   assert.equal(environment.COURTSIDE_SECURITY_RUN_ID, "run-0001");
   assert.match(environment.COURTSIDE_SECURITY_IMAGE, /^sha256:[a-f0-9]{64}$/);
-  assert.match(environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, "courtside:security-fixtures-run-0001");
   assert.match(environment.COURTSIDE_SECURITY_SEED_FINGERPRINT, /^sha256:[a-f0-9]{64}$/);
   assert.ok(environment.COURTSIDE_SECURITY_SHARED_PASSWORD.length >= 16);
 });
@@ -320,7 +316,7 @@ test("given an existing run identity, when starting an environment, then no reso
 
 test("given a new run instance, when reserving it, then Docker create is globally atomic", () => {
   // given
-  const environment = securityEnvironment("run-0001", `sha256:${"b".repeat(64)}`, `sha256:${"c".repeat(64)}`);
+  const environment = securityEnvironment("run-0001", `sha256:${"b".repeat(64)}`);
 
   // when
   const args = securityReservationArgs(environment);
@@ -333,7 +329,7 @@ test("given a new run instance, when reserving it, then Docker create is globall
 
 test("given parallel attempts for one run, when reserving scanner access, then only one global name can exist", () => {
   // given
-  const environment = securityEnvironment("run-0001", `sha256:${"b".repeat(64)}`, `sha256:${"c".repeat(64)}`);
+  const environment = securityEnvironment("run-0001", `sha256:${"b".repeat(64)}`);
 
   // when
   const first = securityAssessmentReservationArgs(environment, 1);

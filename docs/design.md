@@ -30,10 +30,11 @@ assessment runs against — and each refuses to start unless its environment gua
 database it is about to fill is the disposable one it names (`courtside_dev` for `demo`,
 `courtside_perf` for `performance`, `courtside_security` for `securityassessment`), not whatever the
 deployment happens to point at. None of the three reaches a club: packaging writes them to a
-separate fixture artifact, the production image build fails if one of their files returns, and the
-environments that need them run an image with those classes layered over the production one — the
-security assessment goes further and seeds from a one-shot container so that the target it scans is
-the production image itself. The `reporting` and `integration` modules of section 3 are designed
+separate fixture artifact and the production image build fails if one of their files returns. A
+developer's demo run starts from the compiled classes rather than from that image; the performance
+environment runs an image with the fixture classes layered over the production one; and the security
+assessment seeds from a one-shot container built the same way, so the target it scans is the
+production image itself. The `reporting` and `integration` modules of section 3 are designed
 and not built. `audit` is built: every configuration change made through the admin API — facility,
 cards, config, rule sets, the roster and the import configuration — is recorded in the append-only
 `domain_event` table before the commit that makes it: actor, time, entity, and, except for free
@@ -1703,6 +1704,18 @@ whether it is built or designed. **Designed means absent today.**
   an explicit absolute HTTP or HTTPS `COURTSIDE_SOURCE_URL` without embedded credentials, so a fork
   cannot silently offer the upstream source instead of the code it runs or expose a source-host
   credential through this public response.
+- **The shipped artifact still carries one piece of assessment instrumentation.** *Accepted, not
+  closed.* A filter answers every request with the host and scheme the application itself observed,
+  which is what lets the passive suite prove the proxy canonicalises them; only the application can
+  answer that, so it cannot move into the fixture artifact the seeders left for. It is bound to
+  `COURTSIDE_ENVIRONMENT=SECURITY`, and because that variable is an operator's to set, a club could
+  switch it on. What an observer then gains is two response headers repeating the host and scheme
+  that same client just sent — no request body, no session, no header it did not write itself. The
+  designation itself is already public through `GET /api/source` and the build identity panel, so
+  switching it does not disclose anything the response did not already carry, though the frontend's
+  banner marks only `UAT` and `PERFORMANCE` and would stay silent. `NonProductionProfileTest` bounds
+  the residue: this is the only shipped source allowed to exist for a non-production environment,
+  and a second one fails the build by name.
 - **Unsupported HTTP methods** are rejected without a server error, and which layer rejects them is
   fixed. The reference proxy answers `TRACE`, `CONNECT` and `TRACK` itself with 405 and forwards
   nothing else it does not relay. Every other method reaches the application, which answers 405 with

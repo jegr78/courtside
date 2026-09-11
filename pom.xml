@@ -373,6 +373,18 @@
                 <version>${maven-antrun-plugin.version}</version>
                 <executions>
                     <execution>
+                        <id>clear-staged-fixtures</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <delete dir="${fixtures.classes}"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>record-excluded-fixtures</id>
                         <phase>prepare-package</phase>
                         <goals>
