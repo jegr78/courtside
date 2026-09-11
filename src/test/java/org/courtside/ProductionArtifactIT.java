@@ -75,7 +75,7 @@ class ProductionArtifactIT {
         Set<String> recorded = recordedExclusions();
 
         // then
-        assertThat(recorded).as("the production artifact records no exclusion")
+        assertThat(recorded).as("the exclusion record and the fixture artifact disagree")
                 .containsExactlyInAnyOrderElementsOf(fixtures);
     }
 
