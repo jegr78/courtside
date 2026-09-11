@@ -46,6 +46,10 @@ class PerformanceDataSeeder implements ApplicationRunner {
     static final int MEMBER_COUNT = 1_000;
     static final int COURT_COUNT = 8;
     static final int BOOKING_COUNT = 224;
+
+    // A slot that has started and not ended is neither booked nor imported, and the two slot times
+    // are far enough apart that at most one of them is ever under way, so one court set may be short.
+    static final int SEEDED_BOOKING_FLOOR = BOOKING_COUNT - COURT_COUNT;
     static final String MARKER_USERNAME = "member0001";
     static final String CONTENTION_USERNAME = "member1000";
     private static final UUID ACTIVE_MEMBERSHIP_TYPE =
@@ -91,7 +95,7 @@ class PerformanceDataSeeder implements ApplicationRunner {
 
     private void requireCompleteSeed() {
         if (accounts.count() != MEMBER_COUNT + 1L || members.count() != MEMBER_COUNT
-                || facility.allCourts().size() != COURT_COUNT || bookings.count() < BOOKING_COUNT
+                || facility.allCourts().size() != COURT_COUNT || bookings.count() < SEEDED_BOOKING_FLOOR
                 || accounts.findByUsername(CONTENTION_USERNAME).isEmpty()) {
             throw new IllegalStateException("The performance dataset is incomplete; run perf-reset to recreate it");
         }

@@ -499,17 +499,25 @@ export function lifecyclePlan(command, options = {}) {
     return { command: "docker", args: [...uatComposeArgs(), "exec", "db", "psql", "-U", "courtside", "courtside"] };
   }
   if (command === "perf-stop") {
-    return { command: "docker", args: [...perfComposeArgs(false, true), "stop"] };
+    return {
+      command: "docker", args: [...perfComposeArgs(false, true), "stop"],
+      environment: { ...process.env, ...performanceRelaySettings() }
+    };
   }
   if (command === "perf-logs") {
     return {
       command: "docker",
       args: [...perfComposeArgs(false, true), "logs",
-        ...(options.noFollow ? ["--no-color"] : ["--follow"])]
+        ...(options.noFollow ? ["--no-color"] : ["--follow"])],
+      environment: { ...process.env, ...performanceRelaySettings() }
     };
   }
   if (command === "perf-db-shell") {
-    return { command: "docker", args: [...perfComposeArgs(), "exec", "db", "psql", "-U", "courtside", "courtside_perf"] };
+    return {
+      command: "docker",
+      args: [...perfComposeArgs(), "exec", "db", "psql", "-U", "courtside", "courtside_perf"],
+      environment: { ...process.env, ...performanceRelaySettings() }
+    };
   }
   throw new Error(`No lifecycle plan for ${command}`);
 }
@@ -907,11 +915,18 @@ function startPerformance(options) {
 // The stack outlives this command -- perf-run is pointed at it afterwards -- so the certificate
 // lives beside the other build output rather than in a directory the process removes on exit, and
 // the name is fixed so a restart replaces it instead of leaving the last one behind.
+// Stopping, reading or removing the stack interpolates the same compose file, and a variable it
+// leaves undefined is an error rather than an empty string, so every plan names these -- issuing a
+// certificate is the starting command's job alone.
+export function performanceRelaySettings(directory = perfMailDirectory) {
+  return { COURTSIDE_PERF_MAIL_CERT_DIR: directory, COURTSIDE_PERF_MAIL_USER: currentHostIdentity() };
+}
+
 export function performanceRelayCertificate(directory = perfMailDirectory) {
   rmSync(directory, { recursive: true, force: true });
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   createMailCertificate(directory);
-  return { COURTSIDE_PERF_MAIL_CERT_DIR: directory, COURTSIDE_PERF_MAIL_USER: currentHostIdentity() };
+  return performanceRelaySettings(directory);
 }
 
 export function performanceImagePlans() {
@@ -954,7 +969,10 @@ function readPerformanceState() {
 }
 
 export function perfResetPlan() {
-  return { command: "docker", args: [...perfComposeArgs(false, true), "down", "--volumes", "--remove-orphans"] };
+  return {
+    command: "docker", args: [...perfComposeArgs(false, true), "down", "--volumes", "--remove-orphans"],
+    environment: { ...process.env, ...performanceRelaySettings() }
+  };
 }
 
 export function containerUserArguments(platform = process.platform) {

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { EventEmitter } from "node:events";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -12,7 +14,8 @@ import {
   superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
-  performanceImagePlans, performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
+  performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
+  funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
   resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference, repositoryFromRemote,
   validateNode, validatePublicAddress
 } from "./courtside.mjs";
@@ -357,6 +360,53 @@ test("given the performance documentation, when a run is read, then it states wh
   assert.match(documentation, /mail/i, "the documentation never mentions mail");
   assert.match(documentation, /mailpit/i, "the documentation does not name the relay the run measures against");
   assert.match(compose, /axllent\/mailpit/);
+});
+
+// Every one of these interpolates the same compose file, and Compose treats a variable the file
+// requires and the environment omits as an error rather than as an empty string.
+test("given a performance command other than the start, when it is planned, then it still defines the relay", () => {
+  // given
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8");
+  const required = [...compose.matchAll(/\$\{(COURTSIDE_PERF_MAIL_[A-Z_]+):\?/g)].map((match) => match[1]);
+
+  // when
+  const plans = [lifecyclePlan("perf-stop", {}), lifecyclePlan("perf-logs", {}),
+    lifecyclePlan("perf-db-shell", {}), perfResetPlan()];
+
+  // then
+  assert.ok(required.length > 0, "the compose file requires no relay variable at all");
+  for (const plan of plans) {
+    for (const name of required) {
+      assert.ok(plan.environment?.[name], `${plan.args.at(-1)} leaves ${name} undefined`);
+    }
+  }
+});
+
+// Issuing it is the starting command's job: a stop that wrote a new certificate would replace the
+// one the running relay is serving.
+test("given the performance relay certificate, when it is issued, then it is owner-only and replaces the last one", {
+  skip: process.platform === "win32"
+}, () => {
+  // given
+  const parent = mkdtempSync(join(tmpdir(), "courtside-perf-mail-"));
+  const directory = join(parent, "perf-mail");
+
+  try {
+    // when
+    const first = performanceRelayCertificate(directory);
+    writeFileSync(join(directory, "stale.pem"), "x");
+    const second = performanceRelayCertificate(directory);
+
+    // then
+    assert.deepEqual(first, second);
+    assert.deepEqual(first, performanceRelaySettings(directory));
+    assert.equal(existsSync(join(directory, "stale.pem")), false, "a restart kept the last issue");
+    assert.equal(statSync(directory).mode & 0o777, 0o700);
+    assert.equal(statSync(join(directory, "key.pem")).mode & 0o777, 0o600);
+    assert.ok(existsSync(join(directory, "cert.pem")));
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
 });
 
 test("given automated performance startup, when suppressing credentials, then the password is absent from output", () => {

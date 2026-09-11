@@ -104,6 +104,44 @@ class PerformanceDataSeederTest {
         verify(bookings, never()).save(any());
     }
 
+    // A seed made while a slot was under way creates one court set fewer, and the environment is
+    // started again far more often than it is created.
+    @Test
+    void givenASeedMadeWhileASlotWasUnderWay_whenStartingAgain_thenTheDatasetCountsAsComplete() {
+        // given
+        PersonRepository persons = mock(PersonRepository.class);
+        UserAccountRepository accounts = mock(UserAccountRepository.class);
+        MemberRepository members = mock(MemberRepository.class);
+        FacilityService facility = mock(FacilityService.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        when(accounts.existsByUsername(PerformanceDataSeeder.MARKER_USERNAME)).thenReturn(true);
+        when(accounts.count()).thenReturn(PerformanceDataSeeder.MEMBER_COUNT + 1L);
+        when(members.count()).thenReturn((long) PerformanceDataSeeder.MEMBER_COUNT);
+        java.util.Optional<org.courtside.identity.UserAccount> contender =
+                java.util.Optional.of(mock(org.courtside.identity.UserAccount.class));
+        when(accounts.findByUsername(PerformanceDataSeeder.CONTENTION_USERNAME)).thenReturn(contender);
+        List<Court> seeded = courts(PerformanceDataSeeder.COURT_COUNT);
+        when(facility.allCourts()).thenReturn(seeded);
+        when(bookings.count()).thenReturn(
+                PerformanceDataSeeder.BOOKING_COUNT - (long) PerformanceDataSeeder.COURT_COUNT);
+        PerformanceDataSeeder seeder = new PerformanceDataSeeder(
+                GERMAN_CLUB, persons, accounts, members, facility, mock(BookingService.class),
+                mock(HistoricalBookingImporter.class), bookings, mock(PasswordEncoder.class),
+                new PerformanceProperties(true, "performance-password"), Clock.systemUTC(),
+                () -> java.time.ZoneId.of("Europe/Berlin"));
+
+        // when / then
+        seeder.run(new DefaultApplicationArguments(new String[0]));
+    }
+
+    private List<Court> courts(int count) {
+        List<Court> all = new java.util.ArrayList<>();
+        for (int number = 1; number <= count; number++) {
+            all.add(court(number));
+        }
+        return all;
+    }
+
     @Test
     void givenASlotAlreadyUnderWay_whenSeedingPerformanceData_thenItIsNeitherBookedNorImported() throws Exception {
         // given
