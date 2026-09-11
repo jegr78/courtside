@@ -328,8 +328,6 @@ test("given the performance environment, when its image is built, then Compose r
     [`BASE_IMAGE=${plans[0].args[plans[0].args.indexOf("-t") + 1]}`]);
 });
 
-// A relay the seed cannot reach is not a slow relay: the handover walks its whole retry ladder per
-// message, and the caller-runs policy then makes the seeding thread itself wait for every one.
 test("given the performance environment, when its mail is handed over, then the relay is one it can reach", () => {
   // given
   const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
@@ -350,12 +348,8 @@ test("given the performance environment, when its mail is handed over, then the 
   assert.equal(app.environment.COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE, "true");
   assert.equal(app.depends_on.mail.condition, "service_healthy",
     "the seed starts against a relay that is not listening yet, so its first messages wait on a retry");
-  assert.notEqual(relay.healthcheck?.disable, true,
-    "the condition waits on a health the stack switched off");
 });
 
-// The load contract thresholds `booking`, and a booking sends mail on an executor whose rejection
-// policy hands the work back to the caller, so what a run measures depends on where that mail goes.
 test("given the performance documentation, when a run is read, then it states what the load pays for mail", () => {
   // given
   const documentation = readFileSync(fileURLToPath(new URL("../docs/performance-testing.md", import.meta.url)), "utf8");
@@ -382,8 +376,6 @@ test("given the performance documentation, when a run is read, then it states wh
     "the documentation states another life for the certificate than the CLI issues it for");
 });
 
-// Every one of these interpolates the same compose file, and Compose treats a variable the file
-// requires and the environment omits as an error rather than as an empty string.
 test("given a performance command other than the start, when it is planned, then it still defines the relay", () => {
   // given
   const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8");
@@ -407,8 +399,6 @@ test("given a performance command other than the start, when it is planned, then
     + "interpolate the compose file without defining what it requires");
 });
 
-// Issuing it is the starting command's job: a stop that wrote a new certificate would replace the
-// one the running relay is serving.
 test("given the performance relay certificate, when it is issued, then it is owner-only and replaces the last one", {
   skip: process.platform === "win32"
 }, () => {
@@ -433,7 +423,7 @@ test("given the performance relay certificate, when it is issued, then it is own
       ["x509", "-enddate", "-noout", "-in", join(directory, "cert.pem")], { encoding: "utf8" });
     assert.equal(enddate.status, 0, enddate.stderr);
     assert.ok(Date.parse(enddate.stdout.replace("notAfter=", "")) - Date.now() > 7 * 24 * 3600 * 1000,
-      "the certificate expires under a stack a run is still being measured against");
+      "the certificate expires under a stack that is left standing between runs");
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }

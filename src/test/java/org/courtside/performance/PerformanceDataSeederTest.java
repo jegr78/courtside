@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockingDetails;
@@ -104,8 +105,6 @@ class PerformanceDataSeederTest {
         verify(bookings, never()).save(any());
     }
 
-    // A seed made while a slot was under way creates one court set fewer, and the environment is
-    // started again far more often than it is created.
     @Test
     void givenASeedMadeWhileASlotWasUnderWay_whenStartingAgain_thenTheDatasetCountsAsComplete() {
         // given
@@ -133,6 +132,34 @@ class PerformanceDataSeederTest {
         assertThatCode(() -> seeder.run(new DefaultApplicationArguments(new String[0])))
                 .doesNotThrowAnyException();
         verify(persons, never()).save(any());
+    }
+
+    @Test
+    void givenASeedThatStoppedPartWay_whenStartingAgain_thenTheDatasetIsRefused() {
+        // given
+        PersonRepository persons = mock(PersonRepository.class);
+        UserAccountRepository accounts = mock(UserAccountRepository.class);
+        MemberRepository members = mock(MemberRepository.class);
+        FacilityService facility = mock(FacilityService.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        when(accounts.existsByUsername(PerformanceDataSeeder.MARKER_USERNAME)).thenReturn(true);
+        when(accounts.count()).thenReturn(PerformanceDataSeeder.MEMBER_COUNT + 1L);
+        when(members.count()).thenReturn((long) PerformanceDataSeeder.MEMBER_COUNT);
+        when(facility.allCourts()).thenReturn(java.util.Collections.nCopies(
+                PerformanceDataSeeder.COURT_COUNT, mock(Court.class)));
+        when(accounts.findByUsername(PerformanceDataSeeder.CONTENTION_USERNAME))
+                .thenReturn(Optional.of(mock(org.courtside.identity.UserAccount.class)));
+        when(bookings.count()).thenReturn(PerformanceDataSeeder.SEEDED_BOOKING_FLOOR - 1L);
+        PerformanceDataSeeder seeder = new PerformanceDataSeeder(
+                GERMAN_CLUB, persons, accounts, members, facility, mock(BookingService.class),
+                mock(HistoricalBookingImporter.class), bookings, mock(PasswordEncoder.class),
+                new PerformanceProperties(true, "performance-password"), Clock.systemUTC(),
+                () -> java.time.ZoneId.of("Europe/Berlin"));
+
+        // when / then
+        assertThatThrownBy(() -> seeder.run(new DefaultApplicationArguments(new String[0])))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("perf-reset");
     }
 
     @Test

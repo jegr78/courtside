@@ -19,8 +19,7 @@ services:
       timeout: 3s
       retries: 30
 
-  # A load run measures bookings, and a booking hands a message over on an executor whose rejection
-  # policy makes the caller wait, so the run pays what a club with a working relay pays and no more.
+  # A booking hands its message over on an executor that makes the caller wait once the queue fills.
   mail:
     image: axllent/mailpit:v1.31@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
     user: ${COURTSIDE_PERF_MAIL_USER:?run node tools/courtside.mjs perf}

@@ -56,8 +56,7 @@ const funnelPerformanceConfirmation = "courtside-uat-funnel";
 const perfStateFile = join(root, "build", "perf-environment.json");
 const perfMailDirectory = join(root, "build", "perf-mail");
 
-// A measured stack is left standing for days, and a relay certificate expiring under one puts every
-// message back on the retry ladder this environment exists to keep out of the measurement.
+// The restore smoke tears its stack down in minutes; this one is left standing between runs.
 const PERF_MAIL_CERTIFICATE_DAYS = 30;
 const privateAddresses = new BlockList();
 [
@@ -320,8 +319,7 @@ export function perfComposeArgs(withDatabasePort = false, withTelemetry = false)
     ...(withTelemetry ? ["-f", perfTelemetryComposeFile] : [])];
 }
 
-// The compose file requires the relay variables of every command that interpolates it, so building
-// the arguments without an environment is the one mistake this leaves no room for.
+// Compose treats a variable the file requires and the environment omits as an error, not as empty.
 export function perfComposePlan(trailing, { dbPort = false, telemetry = false, environment } = {}) {
   return {
     command: "docker",
@@ -911,14 +909,11 @@ function startPerformance(options) {
   process.stdout.write(performanceStartupSummary(password, options));
 }
 
-// The stack outlives this command -- perf-run is pointed at it afterwards -- so the certificate
-// lives beside the other build output under a fixed name that a restart replaces.
 export function performanceRelaySettings(directory = perfMailDirectory) {
   return { COURTSIDE_PERF_MAIL_CERT_DIR: directory, COURTSIDE_PERF_MAIL_USER: currentHostIdentity() };
 }
 
-// Every plan interpolating the compose file names these, because a variable left undefined there is
-// an error rather than an empty string; issuing the certificate is the starting command's job alone.
+// Issuing is the starting command's job alone: a stop that reissued would replace what the relay serves.
 export function performanceRelayCertificate(directory = perfMailDirectory) {
   rmSync(directory, { recursive: true, force: true });
   mkdirSync(directory, { recursive: true, mode: 0o700 });

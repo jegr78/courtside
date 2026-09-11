@@ -225,21 +225,41 @@ test("given a stack that accepts any relay certificate, when it is read, then it
     const directory = fileURLToPath(new URL("../deploy/", import.meta.url));
     const stacks = readdirSync(directory).filter((name) => /^compose[.\w-]*\.yaml$/.test(name));
     const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+    // Compose adds `!reset` and `!override`, which are tags no general YAML reader knows.
+    const services = (name) =>
+      yaml.load(deploymentFile(name).replaceAll(/!reset\b|!override\b/g, "")).services ?? {};
 
     // when
-    const trusting = stacks.filter((name) =>
-      /COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: "true"/.test(deploymentFile(name)));
+    const trusting = stacks.filter((name) => Object.values(services(name)).some((service) =>
+      String(service?.environment?.COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE) === "true"));
 
     // then
     assert.ok(stacks.includes("compose.yaml"), "no compose file was read at all");
     assert.ok(!trusting.includes("compose.yaml"),
       "the reference deployment accepts whatever certificate the relay presents");
+    assert.ok(trusting.length > 0, "no stack sets it, so the loop below reads nothing");
     for (const name of trusting) {
-      const services = yaml.load(deploymentFile(name)).services;
-      const host = services.app.environment.COURTSIDE_MAIL_RELAY_HOST;
-      assert.match(services[host]?.image ?? "", /^axllent\/mailpit:/,
+      const host = services(name).app.environment.COURTSIDE_MAIL_RELAY_HOST;
+      assert.match(services(name)[host]?.image ?? "", /^axllent\/mailpit:/,
         `${name} accepts any certificate from ${host}, a relay it does not run itself`);
     }
+  });
+
+// The third setter the specification names is not a compose stack, so the same line is drawn where
+// the browser journey builds its own relay instead.
+test("given the browser journey, when it accepts any relay certificate, then it issued that certificate",
+  () => {
+    // given
+    const journey = readFileSync(fileURLToPath(
+      new URL("../frontend/e2e/global-setup.ts", import.meta.url)), "utf8");
+
+    // when / then
+    assert.match(journey, /COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: "true"/,
+      "the journey no longer sets it, so the specification names a setter that does not exist");
+    assert.match(journey, /const relayCertificate = selfSignedRelayCertificate\(\)/,
+      "the journey accepts any certificate without issuing one");
+    assert.match(journey, /content: relayCertificate\.certificate/,
+      "the journey issues a certificate its own relay never serves");
   });
 
 test("given the mail smoke, when it verifies a certificate, then openssl reports a failure as one",

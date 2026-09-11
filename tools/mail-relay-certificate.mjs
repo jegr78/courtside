@@ -3,8 +3,6 @@ import { chmodSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// The application requires STARTTLS of its relay, so an environment that runs one has to hand it a
-// certificate, and it has to stay valid for as long as that environment is left standing.
 export function createMailCertificate(directory, days = 1) {
   const key = join(directory, "key.pem");
   const result = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes",
