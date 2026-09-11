@@ -31,9 +31,12 @@ class DataProtectionInventoryTest extends AbstractIntegrationTest {
     private static final Pattern CSV_HEADER = Pattern.compile(
             "HEADER =\\s*\\n?\\s*List\\.of\\(([^)]*)\\)", Pattern.MULTILINE);
 
-    private static final Pattern KEYED_FIELD = Pattern.compile(
+    // <[^>]*> stops at the first > and so cannot span Map<String, List<String>>, which is how a
+    // held collection stayed invisible; one level of nesting is matched explicitly instead.
+    private static final Pattern HELD_FIELD = Pattern.compile(
             "private (?:final )?[\\w.]*\\b(?:Map|ConcurrentMap|HashMap|LinkedHashMap"
-                    + "|ConcurrentHashMap|SortedMap|TreeMap)<[^>]*>\\s+\\w+\\s*[=;]");
+                    + "|ConcurrentHashMap|SortedMap|TreeMap|Cache|LoadingCache|Set|List|Collection"
+                    + "|Queue|Deque)<(?:[^<>]|<[^<>]*>)*>\\s+\\w+\\s*[=;]");
 
     @Autowired
     private JdbcClient jdbc;
@@ -168,16 +171,18 @@ class DataProtectionInventoryTest extends AbstractIntegrationTest {
         TreeSet<String> found = new TreeSet<>();
         sourceFiles().forEach(file -> {
             String source = read(file);
-            if (!source.contains("@Entity") && KEYED_FIELD.matcher(source).find()) {
+            if (!source.contains("@Entity") && HELD_FIELD.matcher(source).find()) {
                 found.add(file.getFileName().toString().replace(".java", ""));
             }
         });
 
         // then
         assertThat(found)
-                .as("a value held against a key outside an entity is a copy of something the"
+                .as("a collection an instance holds outside an entity is a copy of something the"
                         + " schema's own sweeps never reach, so the inventory says what is in it"
-                        + " and what bounds it")
+                        + " and what bounds it. The rule is the field's shape and not its name,"
+                        + " because a cache called nameCache is a cache and a Map is not the only"
+                        + " way to hold one.")
                 .isEqualTo(new TreeSet<>(declared));
     }
 

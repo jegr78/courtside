@@ -30,6 +30,7 @@ public class BookingRulesViolatedException extends DomainFailure {
 
     @Override
     protected Map<String, Object> properties() {
-        return Map.of("violations", violations);
+        return Map.of("violations",
+                violations.stream().map(entry -> violation(entry.code(), entry.params())).toList());
     }
 }

@@ -1707,7 +1707,7 @@
           "manualProcedureId": "MAN-DATA-001",
           "controlEvidence": {
             "productionPath": "src/main/resources/api/openapi.yaml",
-            "falsifyingTest": "tools/url-parameter-policy.test.mjs#given a value that names or authenticates a person, when it is classified, then no URL carries it"
+            "falsifyingTest": "tools/url-parameter-policy.test.mjs#given a URL parameter, when its schema is read, then it does not admit unconstrained text"
           }
         },
         {

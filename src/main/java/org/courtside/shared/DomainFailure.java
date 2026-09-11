@@ -40,6 +40,10 @@ public abstract class DomainFailure extends RuntimeException implements ErrorRes
 
     // Always an array, even for a single entry.
     protected static List<Map<String, Object>> oneViolation(String code, Map<String, Object> params) {
-        return List.of(Map.of("code", code, "params", params == null ? Map.of() : params));
+        return List.of(violation(code, params));
+    }
+
+    protected static Map<String, Object> violation(String code, Map<String, Object> params) {
+        return Map.of("code", code, "params", params == null ? Map.of() : params);
     }
 }

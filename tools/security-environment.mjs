@@ -769,8 +769,10 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
       generatedBytes += Buffer.byteLength(report);
       events[mode] = report.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
     };
-    await runMode("positive");
+    // Positive mode used to be GET-only, so a fingerprint taken after it still bracketed every
+    // request that could write; it now generates reading POSTs, whose effect would be baked in.
     const stateBefore = await limits.captureState();
+    await runMode("positive");
     await runMode("negative");
     const importResult = await limits.runImportCases(fixture);
     const inputResult = await limits.runInputCases(fixture);

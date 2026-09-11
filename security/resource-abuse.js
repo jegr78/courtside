@@ -86,7 +86,9 @@ function loadBookingInputs() {
   const courts = http.get(`${target}/api/public/courts`, { headers });
   const cards = http.get(`${target}/api/public/booking-cards`, { headers });
   const participantCards = http.get(`${target}/api/public/participant-cards`, { headers });
-  const members = http.get(`${target}/api/public/participant-members?query=Member2`, { headers });
+  const members = http.post(`${target}/api/public/participant-members`,
+    JSON.stringify({ query: "Member2" }),
+    { headers: { ...headers, "Content-Type": "application/json", "X-XSRF-TOKEN": token } });
   courtId = courts.json()?.[0]?.id;
   bookingCardId = cards.json()?.find((card) => card.id === memberCardId)?.id;
   participantCardId = participantCards.json()?.find((card) => card.label === "Limited assessment card")?.id;

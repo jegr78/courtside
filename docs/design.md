@@ -2321,8 +2321,10 @@ deliver the implementation.
   parameter may be a string the document leaves unconstrained — which is the shape a name arrives
   in, whatever anyone classified it as. **Built.**
 - **Accepted: a person-scoped identifier stays in the URL.** `personId` addresses every operation
-  about one person and `subjectId` filters the change log, and both are in the path or the query
-  where a record that keeps URLs can see them. What is observable is that such a record links a series of
+  about one person and `subjectId` filters the change log; `sessionHandle`, `bookingId`,
+  `fromBookingId` and `cursor` are in the same class, because each resolves to one person through an
+  authorised call. All of them are in the path or the query where a record that keeps URLs can see
+  them, and everything below applies to the class, not to the two that name it. What is observable is that such a record links a series of
   requests to one person over time. What an observer needs is access to that record; the reference
   deployment writes no access log, but no club can promise what an upstream service keeps. What
   bounds it is that the value is minted here as a random UUID rather than derived from anything

@@ -161,14 +161,59 @@
     "club-configuration": "Lives as long as the club keeps it; a board changes it in the product and no person's lifecycle reaches it."
   },
   "inMemoryState": {
+    "AuditService": {
+      "level": "operational",
+      "holds": "The `ConfigurationSubjectNames` ports Spring injected, one per module that can name what an audit subject id refers to. It holds components, not data.",
+      "bounded": "The application context."
+    },
+    "BookingRulesViolatedException": {
+      "level": "operational",
+      "holds": "The rule violations one evaluation collected, each an i18n code and its parameters. Evaluation collects all of them rather than stopping at the first, so the list is as long as the rules that refused.",
+      "bounded": "The request that raised it."
+    },
+    "CodedDomainFailure": {
+      "level": "operational",
+      "holds": "The parameters of one rule violation, for the life of the exception that carries it. They are the numbers and ids a message needs, because a violation carries an i18n code and never rendered text.",
+      "bounded": "The request that raised it."
+    },
+    "ConfigService": {
+      "level": "operational",
+      "holds": "The `BookingGridConstraint` ports Spring injected, which answer what bounds a grid request. It holds components, not data.",
+      "bounded": "The application context."
+    },
     "HaveIBeenPwnedPasswordLookup": {
       "level": "pseudonymous",
       "holds": "The five-character SHA-1 prefix of a candidate password and the suffixes the range service answered with. The prefix is shared by many passwords by construction, and the suffixes come from the service rather than from this club.",
       "bounded": "A fixed number of entries and a lifetime, in memory only; a restart empties it."
     },
-    "CodedDomainFailure": {
+    "PasswordPolicy": {
       "level": "operational",
-      "holds": "The parameters of one rule violation, for the life of the exception that carries it. They are the numbers and ids a message needs, because a violation carries an i18n code and never rendered text.",
+      "holds": "Two word lists a candidate password is refused for containing: the shipped common-password list, and the terms derived from the club's own identity. Neither names a person; both are read, never written.",
+      "bounded": "The application context, from a shipped resource and the club configuration."
+    },
+    "RuleEngine": {
+      "level": "operational",
+      "holds": "The `BookingRule` implementations Spring injected. Rules are data in the schema; this list holds the code that evaluates them.",
+      "bounded": "The application context."
+    },
+    "SecurityEventLog": {
+      "level": "operational",
+      "holds": "Per security event, the field names its structured log line may carry and, for each, the values that field is allowed to take. It is an allow-list of vocabulary, which is what keeps a name or an address out of a log line rather than a rule that hopes nobody adds one.",
+      "bounded": "The declaration of each event, fixed at class initialisation."
+    },
+    "SeriesMoveConflictException": {
+      "level": "pseudonymous",
+      "holds": "The ids of the bookings a series move would have collided with. A uuid names a row and describes nobody; resolving it needs the database.",
+      "bounded": "The request that raised it."
+    },
+    "ShippedLanguages": {
+      "level": "operational",
+      "holds": "The IETF language tags this build ships message bundles for, derived from the bundles rather than listed by hand.",
+      "bounded": "The application context."
+    },
+    "WeeklyOpeningHoursRejectedException": {
+      "level": "operational",
+      "holds": "The opening-hours violations one submission collected, each an i18n code and the day it concerns.",
       "bounded": "The request that raised it."
     }
   },
