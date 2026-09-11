@@ -12,13 +12,14 @@ import tools.jackson.databind.deser.ValueDeserializerModifier;
 import tools.jackson.databind.module.SimpleModule;
 
 import java.time.temporal.Temporal;
+import java.util.Set;
 
 // The java.time readers take a number as an epoch of their own choosing, which the coercion
 // configuration does not reach, so 1700000000000 for a date-time read as the year 55840.
 @Component
-class RejectsNumericInstants extends SimpleModule {
+class RejectsNumericTemporals extends SimpleModule {
 
-    RejectsNumericInstants() {
+    RejectsNumericTemporals() {
         super("courtside-textual-instants");
         setDeserializerModifier(new ValueDeserializerModifier() {
             @Override
@@ -34,8 +35,8 @@ class RejectsNumericInstants extends SimpleModule {
 
     private static final class ReadsOnlyText extends ValueDeserializer<Object> {
 
-        private static final java.util.Set<JsonToken> NUMERIC =
-                java.util.Set.of(JsonToken.VALUE_NUMBER_INT, JsonToken.VALUE_NUMBER_FLOAT);
+        private static final Set<JsonToken> NUMERIC =
+                Set.of(JsonToken.VALUE_NUMBER_INT, JsonToken.VALUE_NUMBER_FLOAT);
 
         private final ValueDeserializer<?> delegate;
         private final Class<?> temporal;
