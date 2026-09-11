@@ -181,13 +181,16 @@ class DataProtectionInventoryTest extends AbstractIntegrationTest {
                 .isEqualTo(new TreeSet<>(declared));
     }
 
+    // A record reads `lastName()` where an entity reads `getLastName()`, and this codebase carries
+    // both, so a guard that knows only the bean form is satisfied by the half it happens to see.
     private Set<String> personalAccessors() {
         TreeSet<String> accessors = new TreeSet<>();
         classified().forEach((field, entry) -> {
             if ("personal".equals(entry.get("level").asText())) {
-                String column = field.substring(field.indexOf('.') + 1);
-                accessors.add("get" + Character.toUpperCase(camelCase(column).charAt(0))
-                        + camelCase(column).substring(1) + "()");
+                String property = camelCase(field.substring(field.indexOf('.') + 1));
+                accessors.add(property + "()");
+                accessors.add("get" + Character.toUpperCase(property.charAt(0))
+                        + property.substring(1) + "()");
             }
         });
         return accessors;
