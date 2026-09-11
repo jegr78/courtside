@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { EventEmitter } from "node:events";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -347,6 +348,10 @@ test("given the performance environment, when its mail is handed over, then the 
     "the application requires STARTTLS, so a relay without it refuses every message");
   assert.equal(app.environment.COURTSIDE_MAIL_RELAY_PORT, "1025");
   assert.equal(app.environment.COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE, "true");
+  assert.equal(app.depends_on.mail.condition, "service_healthy",
+    "the seed starts against a relay that is not listening yet, so its first messages wait on a retry");
+  assert.notEqual(relay.healthcheck?.disable, true,
+    "the condition waits on a health the stack switched off");
 });
 
 // The load contract thresholds `booking`, and a booking sends mail on an executor whose rejection
@@ -361,6 +366,7 @@ test("given the performance documentation, when a run is read, then it states wh
   // when
   const relay = compose.match(/image: axllent\/(mailpit):/)?.[1];
   const issued = tool.match(/perfMailDirectory = join\(root, "build", "([a-z-]+)"\)/)?.[1];
+  const days = tool.match(/PERF_MAIL_CERTIFICATE_DAYS = (\d+);/)?.[1];
 
   // then
   assert.ok(relay, "the performance stack runs no Mailpit for the documentation to describe");
@@ -371,6 +377,9 @@ test("given the performance documentation, when a run is read, then it states wh
     "the documentation names another place for the certificate than the CLI writes");
   assert.match(documentation, /STARTTLS/,
     "the documentation does not say the relay is reached over STARTTLS");
+  assert.ok(days, "the CLI issues the certificate for a period this test cannot read");
+  assert.match(documentation, new RegExp(`${days} days`),
+    "the documentation states another life for the certificate than the CLI issues it for");
 });
 
 // Every one of these interpolates the same compose file, and Compose treats a variable the file
@@ -415,6 +424,11 @@ test("given the performance relay certificate, when it is issued, then it is own
     assert.equal(statSync(directory).mode & 0o777, 0o700);
     assert.equal(statSync(join(directory, "key.pem")).mode & 0o777, 0o600);
     assert.ok(existsSync(join(directory, "cert.pem")));
+    const enddate = spawnSync("openssl",
+      ["x509", "-enddate", "-noout", "-in", join(directory, "cert.pem")], { encoding: "utf8" });
+    assert.equal(enddate.status, 0, enddate.stderr);
+    assert.ok(Date.parse(enddate.stdout.replace("notAfter=", "")) - Date.now() > 7 * 24 * 3600 * 1000,
+      "the certificate expires under a stack a run is still being measured against");
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }

@@ -121,7 +121,8 @@ queue is full the handover time is inside the request, so where mail goes is par
 
 The environment therefore runs a Mailpit relay on the `backend` network and points the application
 at it over STARTTLS, with a certificate the CLI issues per start into the ignored
-`build/perf-mail`. Handover succeeds in milliseconds and the message is kept in the relay's memory
+`build/perf-mail`, valid for 30 days so that a stack left standing between runs does not outlive
+it. Handover succeeds in milliseconds and the message is kept in the relay's memory
 and never delivered anywhere. **A load run measures an instance whose relay accepts**, which is
 what a club with a working mail server sees; it does not measure an instance that skips mail, and
 it does not measure one whose relay is refusing.

@@ -56,7 +56,7 @@ services:
       db:
         condition: service_healthy
       mail:
-        condition: service_started
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: perf
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_perf

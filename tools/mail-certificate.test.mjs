@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -214,6 +215,31 @@ test("given the mail server, when the instance dials it, then it dials the name 
       "an instance that keeps dialling `mail` cannot authenticate what answers");
     assert.match(compose, /COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: \$\{[^}]*:-false\}/,
       "this deployment still accepts whatever certificate the relay presents");
+  });
+
+// Section 10 of the design specification says the setter is always a harness holding both ends of
+// the hop, which is only true while each one serves the certificate it accepts unchecked.
+test("given a stack that accepts any relay certificate, when it is read, then it serves that certificate itself",
+  () => {
+    // given
+    const directory = fileURLToPath(new URL("../deploy/", import.meta.url));
+    const stacks = readdirSync(directory).filter((name) => /^compose[.\w-]*\.yaml$/.test(name));
+    const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+
+    // when
+    const trusting = stacks.filter((name) =>
+      /COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: "true"/.test(deploymentFile(name)));
+
+    // then
+    assert.ok(stacks.includes("compose.yaml"), "no compose file was read at all");
+    assert.ok(!trusting.includes("compose.yaml"),
+      "the reference deployment accepts whatever certificate the relay presents");
+    for (const name of trusting) {
+      const services = yaml.load(deploymentFile(name)).services;
+      const host = services.app.environment.COURTSIDE_MAIL_RELAY_HOST;
+      assert.match(services[host]?.image ?? "", /^axllent\/mailpit:/,
+        `${name} accepts any certificate from ${host}, a relay it does not run itself`);
+    }
   });
 
 test("given the mail smoke, when it verifies a certificate, then openssl reports a failure as one",

@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // The application requires STARTTLS of its relay, so an environment that runs one has to hand it a
-// certificate; a day is longer than any run and shorter than anything worth keeping.
-export function createMailCertificate(directory) {
+// certificate, and it has to stay valid for as long as that environment is left standing.
+export function createMailCertificate(directory, days = 1) {
   const key = join(directory, "key.pem");
-  const result = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
-    "-subj", "/CN=mail", "-addext", "subjectAltName=DNS:mail",
+  const result = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes",
+    "-days", String(days), "-subj", "/CN=mail", "-addext", "subjectAltName=DNS:mail",
     "-keyout", key, "-out", join(directory, "cert.pem")], { encoding: "utf8" });
   if (result.error) throw result.error;
   if (result.status !== 0) {

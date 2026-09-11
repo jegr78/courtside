@@ -55,6 +55,10 @@ const perfProject = "courtside-perf";
 const funnelPerformanceConfirmation = "courtside-uat-funnel";
 const perfStateFile = join(root, "build", "perf-environment.json");
 const perfMailDirectory = join(root, "build", "perf-mail");
+
+// A measured stack is left standing for days, and a relay certificate expiring under one puts every
+// message back on the retry ladder this environment exists to keep out of the measurement.
+const PERF_MAIL_CERTIFICATE_DAYS = 30;
 const privateAddresses = new BlockList();
 [
   ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8],
@@ -913,19 +917,17 @@ function startPerformance(options) {
 }
 
 // The stack outlives this command -- perf-run is pointed at it afterwards -- so the certificate
-// lives beside the other build output rather than in a directory the process removes on exit, and
-// the name is fixed so a restart replaces it instead of leaving the last one behind.
-// Stopping, reading or removing the stack interpolates the same compose file, and a variable it
-// leaves undefined is an error rather than an empty string, so every plan names these -- issuing a
-// certificate is the starting command's job alone.
+// lives beside the other build output under a fixed name that a restart replaces.
 export function performanceRelaySettings(directory = perfMailDirectory) {
   return { COURTSIDE_PERF_MAIL_CERT_DIR: directory, COURTSIDE_PERF_MAIL_USER: currentHostIdentity() };
 }
 
+// Every plan interpolating the compose file names these, because a variable left undefined there is
+// an error rather than an empty string; issuing the certificate is the starting command's job alone.
 export function performanceRelayCertificate(directory = perfMailDirectory) {
   rmSync(directory, { recursive: true, force: true });
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  createMailCertificate(directory);
+  createMailCertificate(directory, PERF_MAIL_CERTIFICATE_DAYS);
   return performanceRelaySettings(directory);
 }
 
