@@ -1861,9 +1861,14 @@ whether it is built or designed. **Designed means absent today.**
   before authentication. What can be parsed is what the connector accepts at all — a body of three
   megabytes is refused and the connection closed before any parameter exists — and the reference
   deployment caps a request body at 2 MB in front of that. The parameter map holds nothing of a multipart body, which was
-  measured rather than assumed: a logo uploaded with two parts named `file` reached the handler. The
-  repeated part is now refused too, but behind the authorization decision, because reading the parts
-  parses the upload and no unauthenticated caller had that work done for them before.
+  measured rather than assumed: a logo uploaded with two parts named `file` reached the handler.
+  Reading that map nevertheless *parses* such a body and spools every part to disk, which the first
+  version of this guard did not measure and got backwards, so the guard in front of the security
+  chain now leaves a multipart request alone entirely. Its parts and its query string are both read
+  behind the authorization decision instead. One thing still parses such a body before
+  authentication and predates this: the CSRF filter falls back to the `_csrf` parameter when the
+  request carries no token header. An upload carrying more parts than the connector accepts answers
+  403 rather than 413 when that header is present, which is what measures the difference.
 - **One request means one message.** *Built.* Thirteen ambiguously framed messages, beside one that
   is not — among them two lengths that agree and two that disagree, a length beside a chunked body,
   a chunked body named twice and named with a companion encoding, an encoding neither hop

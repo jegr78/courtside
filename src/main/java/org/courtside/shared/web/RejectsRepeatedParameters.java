@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Map;
 
 // A name the request states twice has two readings, and getParameterMap joins the query string and
 // the form body into the single map every reading below this filter takes its value from.
@@ -25,20 +24,15 @@ class RejectsRepeatedParameters extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
-        String repeated = firstRepeatedName(request);
+        // Reading the parameter map of a multipart request parses the upload and spools every part
+        // to disk, so that body is left to the filter behind the authorization decision.
+        String repeated = Multipart.carriedBy(request)
+                ? null
+                : Multipart.firstRepeatedParameter(request);
         if (repeated == null) {
             filterChain.doFilter(request, response);
             return;
         }
-        refusal.write(request, response, "parameter", repeated);
-    }
-
-    private static String firstRepeatedName(HttpServletRequest request) {
-        for (Map.Entry<String, String[]> parameter : request.getParameterMap().entrySet()) {
-            if (parameter.getValue().length > 1) {
-                return parameter.getKey();
-            }
-        }
-        return null;
+        refusal.report(request, response, "parameter", repeated);
     }
 }

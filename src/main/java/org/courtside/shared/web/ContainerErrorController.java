@@ -25,15 +25,25 @@ class ContainerErrorController implements ErrorController {
     @RequestMapping("${server.error.path:/error}")
     ResponseEntity<ProblemDetail> handleContainerError(HttpServletRequest request) {
         HttpStatus status = statusOf(request);
-        ProblemDetail problem = problemFor(status);
+        ProblemDetail problem = request.getAttribute(RefusesAmbiguity.DETAIL) instanceof String detail
+                ? ambiguous(detail)
+                : problemFor(status);
         if (request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI) instanceof String requestUri) {
             problem.setInstance(URI.create(requestUri));
         }
         traceReference.addTo(problem);
         log.debug("Answering {} for {}", status, problem.getType());
-        return ResponseEntity.status(status)
+        return ResponseEntity.status(HttpStatus.valueOf(problem.getStatus()))
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .body(problem);
+    }
+
+    private static ProblemDetail ambiguous(String detail) {
+        ProblemDetail problem =
+                ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        problem.setType(URI.create("urn:courtside:error:ambiguous-parameter"));
+        problem.setTitle("Ambiguous parameter");
+        return problem;
     }
 
     static ProblemDetail problemFor(HttpStatus status) {

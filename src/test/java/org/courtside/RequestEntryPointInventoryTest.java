@@ -138,18 +138,21 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                             + " the address among them is the one the client asked for, echoed into"
                             + " the problem instance and nowhere else", List.of("getAttribute"))),
             Map.entry("org/courtside/shared/web/RejectsRepeatedParameters.java",
-                    new Boundary("every parameter name the request carries, read as the one map the"
-                            + " query string and the form body arrive in, so that a name stating two"
-                            + " values is refused before anything below chooses one of them",
-                            List.of("getParameterMap"))),
+                    new Boundary("nothing of the request itself: it asks the reading below for a"
+                            + " repeated name and reports one", List.of())),
             Map.entry("org/courtside/shared/web/RejectsRepeatedParts.java",
-                    new Boundary("the names of a multipart body's parts and the media type that"
-                            + " declares one, read where the parts are already admitted, so that a"
-                            + " part stating a name twice is refused before a handler takes one",
-                            List.of("getContentType", "getParts"))),
+                    new Boundary("the names of a multipart body's parts, read where the parts are"
+                            + " already admitted, so that a part stating a name twice is refused"
+                            + " before a handler takes one", List.of("getParts"))),
+            Map.entry("org/courtside/shared/web/Multipart.java",
+                    new Boundary("the declared media type, and every parameter name the request"
+                            + " carries as the one map the query string and the form body arrive"
+                            + " in, so that a name stating two values is refused before anything"
+                            + " below chooses one of them",
+                            List.of("getContentType", "getParameterMap"))),
             Map.entry("org/courtside/shared/web/RefusesAmbiguity.java",
-                    new Boundary("the requested address, echoed into the problem instance and"
-                            + " nowhere else", List.of("getRequestURI"))));
+                    new Boundary("nothing of the request itself: it writes an attribute the error"
+                            + " dispatch reads back", List.of())));
 
     private static final Map<String, String> REVIEWED_FILTERS = Map.ofEntries(
             Map.entry("DisableEncodeUrlFilter", "refuses a session id in a URL"),

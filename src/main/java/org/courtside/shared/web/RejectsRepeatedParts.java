@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -28,21 +27,28 @@ class RejectsRepeatedParts extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
-        String repeated = carriesMultipart(request) ? firstRepeatedName(request) : null;
-        if (repeated == null) {
+        if (!Multipart.carriedBy(request)) {
             filterChain.doFilter(request, response);
             return;
         }
-        refusal.write(request, response, "part", repeated);
-    }
-
-    private static boolean carriesMultipart(HttpServletRequest request) {
-        return StringUtils.startsWithIgnoreCase(request.getContentType(), "multipart/");
+        String part = firstRepeatedPart(request);
+        if (part != null) {
+            refusal.report(request, response, "part", part);
+            return;
+        }
+        // The front filter leaves a multipart request untouched, so its query string is read here
+        // too rather than by nobody.
+        String parameter = Multipart.firstRepeatedParameter(request);
+        if (parameter == null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        refusal.report(request, response, "parameter", parameter);
     }
 
     // A body this filter cannot read is a body the resolver below reports on, and its answer says
     // what is wrong with more than a repeated name would.
-    private static String firstRepeatedName(HttpServletRequest request) {
+    private static String firstRepeatedPart(HttpServletRequest request) {
         Set<String> seen = new HashSet<>();
         try {
             for (Part part : request.getParts()) {

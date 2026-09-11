@@ -47,6 +47,7 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
     private static final String USERNAME = "richard.miles";
     private static final String PASSWORD = "correct-horse-battery-staple";
     private static final String INJECTED = "X-Injected";
+    private static final int PARTS_THE_CONNECTOR_ALLOWS = 50;
 
     private static final Pattern SERVLET_WRITE = Pattern.compile(
             "\\bresponse\\.(?:set|add)(?:Header|IntHeader|DateHeader)\\(\\s*\"([^\"]+)\"");
@@ -170,6 +171,37 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
         // then
         assertThat(answer.statusCode()).isIn(401, 403);
         assertThat(answer.body()).doesNotContain("urn:courtside:error:ambiguous-parameter");
+    }
+
+    // A body over the connector's part limit says who read it first: a 413 means something parsed
+    // the upload, and nothing in front of the authorization decision is allowed to.
+    @Test
+    void givenNoSession_whenAnUploadCarriesMorePartsThanTheConnectorAllows_thenNothingParsedIt()
+            throws Exception {
+        // given
+        String boundary = "courtsideboundary";
+        StringBuilder body = new StringBuilder();
+        for (int part = 0; part <= PARTS_THE_CONNECTOR_ALLOWS; part++) {
+            body.append(namedPart(boundary, "p" + part));
+        }
+        body.append("--").append(boundary).append("--\r\n");
+
+        // when
+        HttpResponse<String> answer = httpClient.send(HttpRequest.newBuilder(
+                        URI.create(baseUrl() + "/api/admin/config/logo"))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .header("X-XSRF-TOKEN", "not-a-token")
+                .PUT(HttpRequest.BodyPublishers.ofString(body.toString()))
+                .build(), HttpResponse.BodyHandlers.ofString());
+
+        // then
+        assertThat(answer.statusCode()).isEqualTo(403);
+        assertThat(answer.body()).contains("urn:courtside:error:access-denied");
+    }
+
+    private static String namedPart(String boundary, String name) {
+        return "--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + name
+                + "\"\r\n\r\nx\r\n";
     }
 
     private static String filePart(String boundary) {
