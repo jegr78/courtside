@@ -51,6 +51,13 @@ class ContainerErrorController implements ErrorController {
             problem.setTitle("Unmapped path");
             return problem;
         }
+        if (status == HttpStatus.NOT_IMPLEMENTED) {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    status, "This request asks for something this server does not implement");
+            problem.setType(URI.create("urn:courtside:error:not-implemented"));
+            problem.setTitle("Not implemented");
+            return problem;
+        }
         if (status.is5xxServerError()) {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     status, "This request could not be completed");

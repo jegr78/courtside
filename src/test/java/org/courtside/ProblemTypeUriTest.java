@@ -109,6 +109,7 @@ class ProblemTypeUriTest {
 
     private static final List<String> KNOWN_ADVICE_SLUGS = List.of(
             "urn:courtside:error:access-denied",
+            "urn:courtside:error:ambiguous-parameter",
             "urn:courtside:error:concurrent-modification",
             "urn:courtside:error:constraint-violation",
             "urn:courtside:error:database-lock-unavailable",
@@ -118,6 +119,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:missing-parameter",
             "urn:courtside:error:missing-request-part",
             "urn:courtside:error:not-acceptable",
+            "urn:courtside:error:not-implemented",
             "urn:courtside:error:parameter-type-mismatch",
             "urn:courtside:error:payload-too-large",
             "urn:courtside:error:request-rejected",
