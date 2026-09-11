@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.6.0",
+  "catalogVersion": "1.5.8",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",

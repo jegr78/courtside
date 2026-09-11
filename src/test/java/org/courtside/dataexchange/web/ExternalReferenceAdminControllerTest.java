@@ -72,13 +72,15 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
         UUID jane = person("Jane", "Doe");
 
         // when
-        mockMvc.perform(link("4711", jane))
+        String location = mockMvc.perform(link("4711", jane))
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location",
-                        "/api/admin/import/sources/" + source + "/references/4711"))
                 .andExpect(jsonPath("$.externalId").value("4711"))
                 .andExpect(jsonPath("$.personId").value(jane.toString()))
-                .andExpect(jsonPath("$.linkedAt").exists());
+                .andExpect(jsonPath("$.linkedAt").exists())
+                .andReturn().getResponse().getHeader("Location");
+        assertThat(location).isEqualTo("/api/admin/import/sources/" + source + "/references/"
+                + JsonPath.read(page(), "$.references[0].referenceId"));
+        assertThat(location).doesNotContain("4711");
 
         // then
         mockMvc.perform(get("/api/admin/import/sources/{sourceId}/references", source))
@@ -182,11 +184,11 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         UUID jane = person("Jane", "Doe");
-        mockMvc.perform(link("4711", jane)).andExpect(status().isCreated());
+        String reference = referenceIdOf(link("4711", jane));
 
         // when
-        mockMvc.perform(delete("/api/admin/import/sources/{sourceId}/references/{externalId}",
-                        source, "4711").with(csrf()))
+        mockMvc.perform(delete("/api/admin/import/sources/{sourceId}/references/{referenceId}",
+                        source, reference).with(csrf()))
                 .andExpect(status().isNoContent());
 
         // then
@@ -198,25 +200,35 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenAMemberNumberCarryingASpace_whenItIsLinked_thenTheLocationAddressesIt()
-            throws Exception {
+    void givenAMemberNumberCarryingASpace_whenItIsLinked_thenNoUrlCarriesIt() throws Exception {
         // given
         String location = mockMvc.perform(link("A 1234", person("Jane", "Doe")))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getHeader("Location");
 
         // when / then
+        assertThat(location).doesNotContain("A 1234").doesNotContain("A%201234");
         mockMvc.perform(delete(URI.create(location)).with(csrf()))
                 .andExpect(status().isNoContent());
     }
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenAMemberNumberNoReferenceCanHold_whenUnlinking_thenItIsReportedAsNotFound()
-            throws Exception {
+    void givenAPathWithoutAUuid_whenUnlinking_thenTheParameterIsNamed() throws Exception {
         // when / then
-        mockMvc.perform(delete(URI.create("/api/admin/import/sources/" + source
-                        + "/references/%20")).with(csrf()))
+        mockMvc.perform(delete("/api/admin/import/sources/{sourceId}/references/{referenceId}",
+                        source, "4711").with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:parameter-type-mismatch"))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("referenceId"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenNoSuchReference_whenUnlinking_thenItIsReportedAsNotFound() throws Exception {
+        // when / then
+        mockMvc.perform(delete("/api/admin/import/sources/{sourceId}/references/{referenceId}",
+                        source, UUID.randomUUID()).with(csrf()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type")
                         .value("urn:courtside:error:import-external-reference-not-found"));
@@ -224,13 +236,24 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenNoSuchReference_whenUnlinking_thenItIsReportedAsNotFound() throws Exception {
+    void givenAReferenceOfAnotherSource_whenUnlinking_thenItIsReportedAsNotFound() throws Exception {
+        // given
+        String reference = referenceIdOf(link("4711", person("Jane", "Doe")));
+        UUID other = sources.create("second-system", "Second system", ",", "UTF-8",
+                Map.of("Member number", CanonicalField.EXTERNAL_ID,
+                        "First name", CanonicalField.FIRST_NAME,
+                        "Last name", CanonicalField.LAST_NAME,
+                        "Email", CanonicalField.EMAIL),
+                Map.of(), ACTIVE_TYPE, Set.of(), 10).sourceId();
+
         // when / then
-        mockMvc.perform(delete("/api/admin/import/sources/{sourceId}/references/{externalId}",
-                        source, "4711").with(csrf()))
+        mockMvc.perform(delete("/api/admin/import/sources/{sourceId}/references/{referenceId}",
+                        other, reference).with(csrf()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type")
                         .value("urn:courtside:error:import-external-reference-not-found"));
+        int stillHeld = JsonPath.read(page(), "$.references.length()");
+        assertThat(stillHeld).isEqualTo(1);
     }
 
     @Test
@@ -273,6 +296,16 @@ class ExternalReferenceAdminControllerTest extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"externalId\":\"" + externalId + "\",\"personId\":\"" + personId + "\"}")
                 .with(csrf());
+    }
+
+    private String referenceIdOf(RequestBuilder linking) throws Exception {
+        return JsonPath.read(mockMvc.perform(linking).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.referenceId");
+    }
+
+    private String page() throws Exception {
+        return mockMvc.perform(get("/api/admin/import/sources/{sourceId}/references", source))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
     }
 
     private UUID person(String firstName, String lastName) {

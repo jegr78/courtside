@@ -1680,4 +1680,19 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.detail").value("No such person"));
     }
 
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnExplicitNullLimit_whenTheRosterIsSearched_thenTheDocumentsDefaultStands()
+            throws Exception {
+        // given
+        identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createPerson("Mary", "Major", "mary.major@example.org");
+
+        // when / then
+        mockMvc.perform(searchRoster("{\"limit\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries.length()").value(2))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+    }
 }

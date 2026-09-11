@@ -121,4 +121,16 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[0].personId").value(literal.toString()))
                 .andExpect(jsonPath("$[0].displayName").value("' OR 1=1 -- Literal"));
     }
+
+    @Test
+    @WithMockUser(username = "member", roles = "MEMBER")
+    void givenAnExplicitNullQuery_whenMembersAreSearched_thenItIsRejectedAsAFieldError()
+            throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/public/participant-members").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"query\":null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("query"));
+    }
 }

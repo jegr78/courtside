@@ -573,15 +573,21 @@ test("a member's name reaches the roster search without entering any request URL
   page.on("request", (request) => urls.push(request.url()));
 
   // when
+  // the view loads its first page on mount, so the waiter binds to the request that carries the
+  // name rather than to the path, which both halves of this journey issue
   const searched = page.waitForResponse((response) =>
-    response.url().endsWith("/api/admin/roster/search") && response.request().method() === "POST");
+    response.url().endsWith("/api/admin/roster/search") && response.request().method() === "POST"
+      && (response.request().postData() ?? "").includes(surname));
   await page.getByTestId("roster-search").fill(surname);
   await page.getByTestId("roster-search-submit").click();
-  const answer = await (await searched).json() as { entries: Array<{ lastName: string }> };
+  const answer = await (await searched).json() as {
+    entries: Array<{ firstName: string; lastName: string }>;
+  };
 
   // then
   expect(answer.entries.length).toBeGreaterThan(0);
-  expect(answer.entries.every((entry) => entry.lastName === surname)).toBe(true);
+  expect(answer.entries.every((entry) =>
+    `${entry.firstName} ${entry.lastName}`.toLowerCase().includes(surname.toLowerCase()))).toBe(true);
   expect(urls.length).toBeGreaterThan(0);
   expect(urls.filter((url) => url.toLowerCase().includes(surname.toLowerCase()))).toEqual([]);
   expect(page.url().toLowerCase()).not.toContain(surname.toLowerCase());

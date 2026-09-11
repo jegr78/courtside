@@ -117,4 +117,17 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(exportRoster("{}"))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void givenAnExplicitNullSeparatorAndEncoding_whenTheRosterIsExported_thenTheDefaultsStand()
+            throws Exception {
+        // when
+        String written = mockMvc.perform(exportRoster("{\"separator\":null,\"encoding\":null}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        assertThat(written).contains("memberNumber,firstName,lastName").contains("Renée,Major");
+    }
 }
