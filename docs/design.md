@@ -895,6 +895,16 @@ left out leaves the courts as they are. The three are held apart at the wire by
 `OmittedContainerWireTest`, because which one a field falls under is decided by the document and
 delivered by the deserialiser, and nothing in between states it.
 
+**A default survives an explicit `null`.** A query string has two states, absent and a value; a body
+has three, and the third is what a parameter gains the day it moves into one. A property the
+document gives a `default` therefore keeps it when a body sends `null`, because `default` states the
+value for "not supplied" and a null supplies nothing. The deserialiser is what delivers this, from
+the document, for every optional non-nullable property at once; a field whose type admits `null`
+keeps its own meaning, which is why clearing the rule set assigned to a person without a membership
+type still works. `OmittedContainerWireTest` reads it at the wire, because the alternative is a
+field that arrives null into code that unboxes or dereferences it, and a `500` to a request the
+document permits.
+
 A misspelt field name never reaches that rule: `fail-on-unknown-properties` is on, so the request is
 refused naming the field nobody declared. The two defences answer `400` for different reasons and
 neither substitutes for the other — turning the setting off would leave a typo to be read as an

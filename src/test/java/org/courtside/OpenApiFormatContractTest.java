@@ -3,10 +3,7 @@ package org.courtside;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.annotation.Nulls;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -98,37 +95,6 @@ class OpenApiFormatContractTest {
                     .as("%s.managingRoles", schema)
                     .contains("empty means only an admin may");
         });
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void givenAPropertyWithADefault_whenReadingItsField_thenAnExplicitNullLeavesTheDefaultStanding()
-            throws Exception {
-        // given
-        Map<String, Object> schemas = (Map<String, Object>) ((Map<String, Object>)
-                document.get("components")).get("schemas");
-
-        // when / then
-        for (Map.Entry<String, Object> schema : schemas.entrySet()) {
-            Map<String, Object> properties = (Map<String, Object>)
-                    ((Map<String, Object>) schema.getValue()).get("properties");
-            if (properties == null) continue;
-            for (Map.Entry<String, Object> property : properties.entrySet()) {
-                if (!(property.getValue() instanceof Map<?, ?> definition)
-                        || !definition.containsKey("default")) {
-                    continue;
-                }
-                Field field = Class.forName("org.courtside.api.Api" + schema.getKey())
-                        .getDeclaredField(property.getKey());
-                JsonSetter setter = field.getAnnotation(JsonSetter.class);
-                assertThat(setter)
-                        .as("%s.%s declares a default, so an explicit null must leave it standing"
-                                + " rather than reach the code that reads it",
-                                schema.getKey(), property.getKey())
-                        .isNotNull();
-                assertThat(setter.nulls()).isEqualTo(Nulls.SKIP);
-            }
-        }
     }
 
     private String normalizedDescription(String schema, String property) {
