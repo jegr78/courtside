@@ -1858,8 +1858,9 @@ whether it is built or designed. **Designed means absent today.**
   front of the security filter chain, because that chain reads parameters of its own, the CSRF token
   among them, and `getParameterMap` merges the query string with the form body — a name appearing
   once in each is the same ambiguity and gets the same answer. The cost is that a form body is parsed
-  before authentication, bounded by the connector's own post size and parameter count and by the
-  2 MB the reference proxy accepts. The parameter map holds nothing of a multipart body, which was
+  before authentication. What can be parsed is what the connector accepts at all — a body of three
+  megabytes is refused and the connection closed before any parameter exists — and the reference
+  deployment caps a request body at 2 MB in front of that. The parameter map holds nothing of a multipart body, which was
   measured rather than assumed: a logo uploaded with two parts named `file` reached the handler. The
   repeated part is now refused too, but behind the authorization decision, because reading the parts
   parses the upload and no unauthenticated caller had that work done for them before.
