@@ -23,8 +23,6 @@ class RejectsCoercedScalars implements JsonMapperBuilderCustomizer {
             LogicalType.Boolean,
             List.of(CoercionInputShape.String, CoercionInputShape.Integer, CoercionInputShape.Float),
             LogicalType.Textual,
-            List.of(CoercionInputShape.Integer, CoercionInputShape.Float, CoercionInputShape.Boolean),
-            LogicalType.DateTime,
             List.of(CoercionInputShape.Integer, CoercionInputShape.Float, CoercionInputShape.Boolean));
 
     @Override

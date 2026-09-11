@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -208,7 +208,7 @@ describe("AdminBookingCardView", () => {
   it("given a navigation state that merely resembles the creation mark, when the page opens, then nothing announces a created card", async () => {
     // given / when
     for (const cardCreated of [1, "true", "cardCreated", {}, [true]]) {
-      document.body.innerHTML = "";
+      cleanup();
       show("card-1", false, { cardCreated });
       await screen.findAllByTestId("card-label");
 

@@ -31,11 +31,13 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,7 +59,7 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                     .flatMap(Arrays::stream)
                     .map(Method::getName)
                     .filter(name -> name.startsWith("get") || name.startsWith("is"))
-                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                    .collect(Collectors.toUnmodifiableSet());
 
     private static final Map<String, Boundary> REVIEWED_REQUEST_READS = Map.ofEntries(
             Map.entry("org/courtside/identity/RecentAuthentication.java",
@@ -126,11 +128,12 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             Map.entry("SessionManagementFilter", "applies the session policy"),
             Map.entry("ExceptionTranslationFilter", "turns a refusal into the problem answer"),
             Map.entry("AuthorizationFilter", "decides the request against the authorization rules"),
-            Map.entry("characterEncodingFilter", "fixes the encoding a request body is read with"),
-            Map.entry("formContentFilter", "reads a form body on a method the servlet API would not"),
-            Map.entry("requestContextFilter", "publishes the request to the thread"),
-            Map.entry("springSecurityFilterChain", "delegates into the security chain above"),
-            Map.entry("springSessionRepositoryFilter", "resolves the session cookie to a stored session"));
+            Map.entry("OrderedCharacterEncodingFilter", "fixes the encoding a request body is read with"),
+            Map.entry("OrderedFormContentFilter",
+                    "reads a form body on a method the servlet API would not"),
+            Map.entry("OrderedRequestContextFilter", "publishes the request to the thread"),
+            Map.entry("CompositeFilterChainProxy", "delegates into the security chain above"),
+            Map.entry("SessionRepositoryFilter", "resolves the session cookie to a stored session"));
 
     private static final Set<String> SUPPORTED_ENCODINGS = Set.of(
             "application/json", "application/x-www-form-urlencoded", "multipart/form-data");
@@ -187,7 +190,9 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
     @Test
     void whenEveryFilterThatCanSeeARequestIsRead_thenTheInventoryClassifiesIt() throws Exception {
         // when
-        TreeSet<String> present = new TreeSet<>(filterBeans.keySet());
+        TreeSet<String> present = filterBeans.values().stream()
+                .map(filter -> filter.getClass().getSimpleName())
+                .collect(Collectors.toCollection(TreeSet::new));
         securityFilters.getFilterChains().stream()
                 .flatMap(chain -> chain.getFilters().stream())
                 .map(filter -> filter.getClass().getSimpleName())
@@ -216,7 +221,7 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                         + " states, so an unlisted one is an input nobody classified.")
                 .containsExactlyInAnyOrderEntriesOf(new TreeMap<>(REVIEWED_REQUEST_READS.entrySet()
                         .stream()
-                        .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey,
+                        .collect(Collectors.toMap(Map.Entry::getKey,
                                 entry -> entry.getValue().reads()))));
         assertThat(REVIEWED_REQUEST_READS.values()).allSatisfy(boundary ->
                 assertThat(boundary.classification()).isNotBlank());
@@ -274,29 +279,29 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
         return declared;
     }
 
-    private static java.util.Optional<String> input(MethodParameter parameter, boolean form) {
+    private static Optional<String> input(MethodParameter parameter, boolean form) {
         for (Annotation annotation : parameter.getParameterAnnotations()) {
             if (annotation instanceof PathVariable variable) {
-                return java.util.Optional.of("path:" + name(variable.name(), variable.value(), parameter));
+                return Optional.of("path:" + name(variable.name(), variable.value(), parameter));
             }
             if (annotation instanceof RequestParam query) {
                 String name = name(query.name(), query.value(), parameter);
-                return java.util.Optional.of((form ? "body:" : "query:") + name);
+                return Optional.of((form ? "body:" : "query:") + name);
             }
             if (annotation instanceof RequestHeader header) {
-                return java.util.Optional.of("header:" + name(header.name(), header.value(), parameter));
+                return Optional.of("header:" + name(header.name(), header.value(), parameter));
             }
             if (annotation instanceof CookieValue cookie) {
-                return java.util.Optional.of("cookie:" + name(cookie.name(), cookie.value(), parameter));
+                return Optional.of("cookie:" + name(cookie.name(), cookie.value(), parameter));
             }
             if (annotation instanceof RequestPart part) {
-                return java.util.Optional.of("body:" + name(part.name(), part.value(), parameter));
+                return Optional.of("body:" + name(part.name(), part.value(), parameter));
             }
             if (annotation instanceof RequestBody) {
-                return java.util.Optional.of("body");
+                return Optional.of("body");
             }
         }
-        return java.util.Optional.empty();
+        return Optional.empty();
     }
 
     private static String name(String name, String value, MethodParameter parameter) {
@@ -422,7 +427,7 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                         ((Map<String, Object>) entry.getValue()).get("schema")))
                 .filter(schema -> schema.containsKey("properties"))
                 .flatMap(schema -> ((Map<String, Object>) schema.get("properties")).keySet().stream())
-                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));
+                .collect(Collectors.toCollection(TreeSet::new));
     }
 
     @SuppressWarnings("unchecked")

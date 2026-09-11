@@ -1816,10 +1816,13 @@ whether it is built or designed. **Designed means absent today.**
   trust here is that the answer to "what can be sent to this instance" is derived rather than
   remembered.
 - **A field is the type the document declares.** *Built.* The reader used to reinterpret a scalar of
-  another JSON shape, so `"3"` reached an integer field and `1` reached a boolean one while a
-  boolean for the same integer was already refused. A foreign shape for an integer, a boolean, a
-  string or a date-time is now refused as `validation.TypeMismatch` on the field, which is the answer
-  the neighbouring shapes already gave.
+  another JSON shape, so `"3"` reached an integer field, `1` reached a boolean one and `7` reached a
+  string, while a boolean for the same integer was already refused. A foreign shape for an integer, a
+  boolean or a string is now refused as `validation.TypeMismatch` on the field, which is the answer
+  the neighbouring shapes already gave. A date-time took a second correction, because the `java.time`
+  readers take a number as an epoch of their own choosing and the coercion configuration does not
+  reach them: `1700000000000` for a `date-time` was read as the year 55840 rather than refused, and a
+  number for any of those types is now refused by name.
 - **The browser reads external values too, and each one is named.** *Built.* The stored appearance
   and language, the address and its fragment, the query, the route parameters, the navigation state a
   previous page set and the readable CSRF cookie are inventoried by file, and every entry names the

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -313,13 +313,13 @@ describe("AdminPersonView", () => {
 
     // when
     for (const personCreated of [1, "true", "personCreated", {}, [true]]) {
-      document.body.innerHTML = "";
+      cleanup();
       render(<MemoryRouter initialEntries={[{ pathname: "/admin/roster/person-1", state: { personCreated } }]}><WithClubConfiguration><UnsavedChangesProvider>
         <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
       </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
 
       // then
-      await waitFor(() => expect(screen.getAllByRole("heading", { level: 1 })[0]).toHaveTextContent("Jane Doe"));
+      await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Jane Doe"));
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
     }
   });

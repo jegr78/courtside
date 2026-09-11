@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { useFragmentTarget } from "./useFragmentTarget";
@@ -19,7 +19,7 @@ describe("useFragmentTarget", () => {
   it("given a fragment naming another element, when the target is ready, then nothing takes the focus", () => {
     // given / when
     for (const fragment of ["#other", "#Wanted", "#wanted ", "#wanted2", "#", "?wanted"]) {
-      document.body.innerHTML = "";
+      cleanup();
       show(fragment);
 
       // then
