@@ -8,9 +8,8 @@ import { fileURLToPath } from "node:url";
 import {
   applicationStateTables,
   columnsAddedSinceTheFixture,
-  createMailCertificateDirectory,
-  currentHostIdentity
 } from "./courtside.restore-smoke.mjs";
+import { createMailCertificateDirectory, currentHostIdentity } from "./mail-relay-certificate.mjs";
 
 function source(path) {
   return readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
@@ -33,7 +32,7 @@ test("given a restore qualification, when resources are inspected, then each run
   assert.match(compose, /COURTSIDE_MAIL_RELAY_HOST: mail/);
   assert.match(compose, /COURTSIDE_MAIL_RELAY_PORT: "1025"/);
   assert.match(compose, /COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: "true"/);
-  assert.match(runner, /openssl.*req.*-x509.*subjectAltName=DNS:mail/s);
+  assert.match(source("./mail-relay-certificate.mjs"), /openssl.*req.*-x509.*subjectAltName=DNS:mail/s);
 });
 
 test("given a backup archive, when qualification runs, then corruption is rejected atomically before restore", () => {
@@ -126,8 +125,8 @@ test("given private database archives, when mail TLS is configured, then the mai
 
   // when / then
   assert.match(runner, /privateDirectory = mkdtempSync\(join\(tmpdir\(\), "courtside-restore-"\)\)/);
-  assert.match(runner, /mailCertificateDirectory = createMailCertificateDirectory\(\)/);
-  assert.match(runner, /chmodSync\(key, 0o600\)/);
+  assert.match(runner, /mailCertificateDirectory = createMailCertificateDirectory\(tmpdir\(\), "courtside-restore-mail-"\)/);
+  assert.match(source("./mail-relay-certificate.mjs"), /chmodSync\(key, 0o600\)/);
   assert.match(runner, /COURTSIDE_RESTORE_MAIL_CERT_DIR: mailCertificateDirectory/);
   assert.match(runner, /COURTSIDE_RESTORE_MAIL_USER: currentHostIdentity\(\)/);
   assert.doesNotMatch(runner, /COURTSIDE_RESTORE_MAIL_CERT_DIR: privateDirectory/);

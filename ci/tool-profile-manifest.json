@@ -47,6 +47,7 @@
     { "path": "tools/mail-certificate-peer.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/mail-certificate.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/mail-plan.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/mail-relay-certificate.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/nightly-failure-tracker.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/nightly-failure-tracker.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/nightly-failure-workflow.test.mjs", "profiles": ["tooling"], "test": true },

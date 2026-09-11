@@ -324,6 +324,41 @@ test("given the performance environment, when its image is built, then Compose r
     [`BASE_IMAGE=${plans[0].args[plans[0].args.indexOf("-t") + 1]}`]);
 });
 
+// A relay the seed cannot reach is not a slow relay: the handover walks its whole retry ladder per
+// message, and the caller-runs policy then makes the seeding thread itself wait for every one.
+test("given the performance environment, when its mail is handed over, then the relay is one it can reach", () => {
+  // given
+  const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+  const compose = yaml.load(readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8"));
+  const app = compose.services.app;
+
+  // when
+  const relay = compose.services[app.environment.COURTSIDE_MAIL_RELAY_HOST];
+
+  // then
+  assert.ok(relay, `the application hands its mail to ${app.environment.COURTSIDE_MAIL_RELAY_HOST}, which this stack does not run`);
+  assert.ok(relay.networks.some((network) => app.networks.includes(network)),
+    "the relay shares no network with the application");
+  assert.match(relay.image, /^axllent\/mailpit:[^\s]+@sha256:[a-f0-9]{64}$/);
+  assert.ok(relay.command.includes("--smtp-require-starttls"),
+    "the application requires STARTTLS, so a relay without it refuses every message");
+  assert.equal(app.environment.COURTSIDE_MAIL_RELAY_PORT, "1025");
+  assert.equal(app.environment.COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE, "true");
+});
+
+// The load contract thresholds `booking`, and a booking sends mail on an executor whose rejection
+// policy hands the work back to the caller, so what a run measures depends on where that mail goes.
+test("given the performance documentation, when a run is read, then it states what the load pays for mail", () => {
+  // given
+  const documentation = readFileSync(fileURLToPath(new URL("../docs/performance-testing.md", import.meta.url)), "utf8");
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(documentation, /mail/i, "the documentation never mentions mail");
+  assert.match(documentation, /mailpit/i, "the documentation does not name the relay the run measures against");
+  assert.match(compose, /axllent\/mailpit/);
+});
+
 test("given automated performance startup, when suppressing credentials, then the password is absent from output", () => {
   // given
   const options = parseArguments(["perf", "--skip-verify", "--no-credential-output"]);

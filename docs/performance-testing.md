@@ -106,11 +106,31 @@ node tools/courtside.mjs perf-stop
 node tools/courtside.mjs perf-reset courtside-perf
 ```
 
-`perf` verifies the source, builds the local image, and starts PostgreSQL 17, the application, and
-a dedicated Caddy boundary. The application is available at `https://localhost:9443`; its local CA
+`perf` verifies the source, builds the local image, and starts PostgreSQL 17, the application, a
+Mailpit relay, and a dedicated Caddy boundary. The application is available at `https://localhost:9443`; its local CA
 is intentionally disposable. The CLI generates one shared password, stores it only in the ignored
 `build/perf-environment.json` with owner-only permissions where supported, and creates the accounts
 `member0001` through `member1000`. Account `member1000` is reserved for contention workloads.
+
+### What a run pays for mail
+
+A confirmed booking hands a message to a relay, and the executor that carries it has four threads,
+a queue of a hundred, and a rejection policy that makes the caller do the work itself. Once that
+queue is full the handover time is inside the request, so where mail goes is part of what the
+`booking` threshold measures rather than a detail beside it.
+
+The environment therefore runs a Mailpit relay on the `backend` network and points the application
+at it over STARTTLS, with a certificate the CLI issues per start into the ignored
+`build/perf-mail`. Handover succeeds in milliseconds and the message is kept in the relay's memory
+and never delivered anywhere. **A load run measures an instance whose relay accepts**, which is
+what a club with a working mail server sees; it does not measure an instance that skips mail, and
+it does not measure one whose relay is refusing.
+
+That last case is not hypothetical. The environment previously pointed at `mail.invalid`, a name
+RFC 2606 reserves so that it never resolves. Every message then walked the whole retry ladder --
+four attempts with five, fifteen and forty-five second pauses -- and because the seed creates far
+more messages than the queue holds, the seeding thread itself waited sixty-five seconds per
+message. The dataset never finished and the environment never became healthy.
 
 `--telemetry` adds Prometheus and a PostgreSQL exporter to the isolated project. Prometheus is
 available only on `http://127.0.0.1:9090`; the exporter and the application's management port have

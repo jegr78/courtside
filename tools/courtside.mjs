@@ -23,6 +23,7 @@ import {
   recoverSecurityRun, requestEmergencyStop, securityRunContract
 } from "./security-runner.mjs";
 import { fixtureImagePlan, stageFixtureClasses } from "./fixture-artifact.mjs";
+import { createMailCertificate, currentHostIdentity } from "./mail-relay-certificate.mjs";
 import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
 import { isGitHubLogin } from "./nightly-failure-tracker.mjs";
 
@@ -53,6 +54,7 @@ const perfTelemetryComposeFile = join(root, "deploy", "compose.perf-telemetry.ya
 const perfProject = "courtside-perf";
 const funnelPerformanceConfirmation = "courtside-uat-funnel";
 const perfStateFile = join(root, "build", "perf-environment.json");
+const perfMailDirectory = join(root, "build", "perf-mail");
 const privateAddresses = new BlockList();
 [
   ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8],
@@ -611,6 +613,7 @@ async function execute(options) {
   if (options.command === "perf-reset") {
     runInteractive(perfResetPlan());
     rmSync(perfStateFile, { force: true });
+    rmSync(perfMailDirectory, { recursive: true, force: true });
     process.stdout.write("Performance data and local credentials removed.\n");
     return;
   }
@@ -879,7 +882,11 @@ function uatEnvironment(version, password) {
 function startPerformance(options) {
   const state = readPerformanceState();
   const password = state?.password ?? newBootstrapPassword();
-  const environment = { ...process.env, COURTSIDE_PERF_SHARED_PASSWORD: password };
+  const environment = {
+    ...process.env,
+    COURTSIDE_PERF_SHARED_PASSWORD: password,
+    ...performanceRelayCertificate()
+  };
   writePrivateFile(perfStateFile,
     `${JSON.stringify({ password, dbPort: options.dbPort, telemetry: options.telemetry }, null, 2)}\n`);
   runInteractive(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
@@ -895,6 +902,16 @@ function startPerformance(options) {
     environment
   });
   process.stdout.write(performanceStartupSummary(password, options));
+}
+
+// The stack outlives this command -- perf-run is pointed at it afterwards -- so the certificate
+// lives beside the other build output rather than in a directory the process removes on exit, and
+// the name is fixed so a restart replaces it instead of leaving the last one behind.
+export function performanceRelayCertificate(directory = perfMailDirectory) {
+  rmSync(directory, { recursive: true, force: true });
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  createMailCertificate(directory);
+  return { COURTSIDE_PERF_MAIL_CERT_DIR: directory, COURTSIDE_PERF_MAIL_USER: currentHostIdentity() };
 }
 
 export function performanceImagePlans() {
