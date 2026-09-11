@@ -2712,7 +2712,7 @@
           "manualProcedureId": "MAN-SESSION-001",
           "controlEvidence": {
             "productionPath": "src/main/java/org/courtside/identity/RecentAuthentication.java",
-            "falsifyingTest": "src/test/java/org/courtside/identity/SessionVariableScopeTest.java#givenEveryCourtsideSessionVariable_whenItsWritersAndAuthorityAreReviewed_thenEachHasOnePurpose"
+            "falsifyingTest": "src/test/java/org/courtside/identity/SessionVariableScopeTest.java#givenEveryAttributeThisApplicationWrites_whenTheirWritersAndAuthorityAreReviewed_thenEachHasOnePurpose"
           }
         },
         {
