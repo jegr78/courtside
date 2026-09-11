@@ -1,0 +1,40 @@
+{
+  "classes": {
+    "personal": "Describes or names a person, or is a value a club typed about one.",
+    "secret": "Authenticates a caller or authorises an action on its own.",
+    "identifier": "Minted by this instance, names a row and describes nobody.",
+    "neutral": "Carries nothing about a person: a date, a count, a format or a configured choice."
+  },
+  "parameters": [
+    { "name": "Idempotency-Key", "in": "header", "class": "identifier" },
+    { "name": "bookingId", "in": "path", "class": "identifier" },
+    { "name": "cardId", "in": "path", "class": "identifier" },
+    { "name": "courtId", "in": "path", "class": "identifier" },
+    { "name": "day", "in": "path", "class": "neutral" },
+    { "name": "externalId", "in": "path", "class": "personal" },
+    { "name": "id", "in": "path", "class": "identifier" },
+    { "name": "personId", "in": "path", "class": "identifier" },
+    { "name": "ruleType", "in": "path", "class": "neutral" },
+    { "name": "sessionHandle", "in": "path", "class": "identifier" },
+    { "name": "sourceId", "in": "path", "class": "identifier" },
+    { "name": "closesAt", "in": "query", "class": "neutral" },
+    { "name": "cursor", "in": "query", "class": "identifier" },
+    { "name": "date", "in": "query", "class": "neutral" },
+    { "name": "encoding", "in": "query", "class": "neutral" },
+    { "name": "from", "in": "query", "class": "neutral" },
+    { "name": "fromBookingId", "in": "query", "class": "identifier" },
+    { "name": "limit", "in": "query", "class": "neutral" },
+    { "name": "membershipTypeId", "in": "query", "class": "identifier" },
+    { "name": "opensAt", "in": "query", "class": "neutral" },
+    { "name": "personId", "in": "query", "class": "identifier" },
+    { "name": "query", "in": "query", "class": "personal" },
+    { "name": "scope", "in": "query", "class": "neutral" },
+    { "name": "separator", "in": "query", "class": "neutral" },
+    { "name": "sourceId", "in": "query", "class": "identifier" },
+    { "name": "state", "in": "query", "class": "neutral" },
+    { "name": "subjectId", "in": "query", "class": "identifier" },
+    { "name": "to", "in": "query", "class": "neutral" },
+    { "name": "unsettled", "in": "query", "class": "neutral" },
+    { "name": "v", "in": "query", "class": "identifier" }
+  ]
+}
