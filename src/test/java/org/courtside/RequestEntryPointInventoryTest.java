@@ -57,6 +57,7 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
     private static final Set<String> SERVLET_READS =
             Stream.of(HttpServletRequest.class.getMethods(), ServletRequest.class.getMethods())
                     .flatMap(Arrays::stream)
+                    .filter(method -> method.getDeclaringClass() != Object.class)
                     .map(Method::getName)
                     .filter(name -> name.startsWith("get") || name.startsWith("is"))
                     .collect(Collectors.toUnmodifiableSet());
