@@ -1836,7 +1836,9 @@ whether it is built or designed. **Designed means absent today.**
   epoch of their own choosing and an array as the components of a date, neither of which the
   coercion configuration reaches: `1700000000000` for a `date-time` was read as the year 55840 and
   `[8, 0]` for a wall-clock time as eight o'clock, where the document declares a string for both.
-  Such a field now reads text and nothing else.
+  Such a field now reads text and nothing else. A body that names one field twice is refused rather
+  than read: two values and no rule saying which wins is a request nobody can answer, and the reader
+  used to take the later one in silence.
 - **The browser reads external values too, and each one this repository writes is named.** *Built.*
   Across `frontend/src`, excluding the harness the suite imports and the bundle never does, the
   stored appearance and language, the address and its fragment, the query, the route parameters, the

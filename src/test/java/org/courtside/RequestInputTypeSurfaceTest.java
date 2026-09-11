@@ -156,6 +156,29 @@ class RequestInputTypeSurfaceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenANumberOutsideTheDeclaredBounds_whenUpdatingACourt_thenItIsRefusedWithTheField()
+            throws Exception {
+        // when / then
+        for (String number : new String[] {"0", "1000", "-1"}) {
+            court("{\"number\":" + number + "}")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                    .andExpect(jsonPath("$.fieldErrors[0].field").value("number"));
+        }
+    }
+
+    @Test
+    void givenTheSameFieldTwice_whenUpdatingACourt_thenTheAnswerIsNotAmbiguous() throws Exception {
+        // when
+        ResultActions result = court("{\"number\":3,\"number\":900}");
+
+        // then
+        result.andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:malformed-request-body"))
+                .andExpect(jsonPath("$.detail").value("The request body could not be parsed"));
+    }
+
+    @Test
     void givenTheTypesTheDocumentDeclares_whenUpdatingACourt_thenTheRequestIsAccepted() throws Exception {
         // when / then
         court("{\"number\":3,\"name\":\"Court 3\"}")
