@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { api, type AuditEntry, type ClubConfig } from "../api/client";
+import { api, ApiError, type AuditEntry, type ClubConfig } from "../api/client";
 import i18n from "../i18n";
 import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
@@ -281,6 +281,22 @@ describe("AdminAuditView", () => {
       "Administrative changes appear here. Change club settings, people or facilities to create the first entry."
     );
     expect(screen.queryByTestId("audit-load-more")).not.toBeInTheDocument();
+  });
+
+  it("given a subject the address names but the instance refuses, when the log is opened, then the refusal is shown instead of an unfiltered log", async () => {
+    // given
+    const refused = vi.spyOn(api, "audit").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:parameter-type-mismatch", title: "Bad Request", status: 400,
+      detail: "The parameter subjectId is not of the expected type"
+    }));
+
+    // when
+    show({ at: "/admin/audit?subjectId=not-a-subject" });
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(refused).toHaveBeenCalledWith(undefined, 50, "not-a-subject");
+    expect(screen.queryAllByTestId("audit-row")).toHaveLength(0);
   });
 
   it("given the log cannot load, when opening the view, then the failure replaces the loading state", async () => {

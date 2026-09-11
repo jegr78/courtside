@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes, useLocation } from "react-router-dom";
-import { api, type MembershipType, type RosterEntry } from "../api/client";
+import { api, ApiError, type MembershipType, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
 import { UnsavedChangesGuard } from "../unsaved/UnsavedChangesGuard";
@@ -74,6 +74,23 @@ describe("AdminRosterView", () => {
       expect(within(person).getByTestId(testId)).toHaveTextContent(label);
       expect(within(person).getByTestId(testId)).toHaveAttribute("aria-hidden", "true");
     }
+  });
+
+  it("given a membership type the address names but the instance refuses, when the roster is opened, then the refusal is shown instead of an unfiltered roster", async () => {
+    // given
+    const refused = vi.spyOn(api, "roster").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:parameter-type-mismatch", title: "Bad Request", status: 400,
+      detail: "The parameter membershipTypeId is not of the expected type"
+    }));
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/roster?membershipTypeId=not-a-type"]}>
+      <UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(refused).toHaveBeenCalledWith(undefined, undefined, 50, "not-a-type");
+    expect(screen.queryByTestId("roster-row-person-1")).toBeNull();
   });
 
   it("given the roster cannot load, when opening the view, then the failure replaces the loading state", async () => {

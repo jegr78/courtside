@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -203,6 +203,18 @@ describe("AdminBookingCardView", () => {
 
     // then
     expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1");
+  });
+
+  it("given a navigation state that merely resembles the creation mark, when the page opens, then nothing announces a created card", async () => {
+    // given / when
+    for (const cardCreated of [1, "true", "cardCreated", {}, [true]]) {
+      cleanup();
+      show("card-1", false, { cardCreated });
+      await screen.findAllByTestId("card-label");
+
+      // then
+      expect(screen.queryByRole("status")).toBeNull();
+    }
   });
 
   // Two banners at once would have the page congratulate the board on a save that just failed.

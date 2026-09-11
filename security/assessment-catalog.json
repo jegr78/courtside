@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.5.5",
+  "catalogVersion": "1.5.6",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -1823,7 +1823,10 @@
           "id": "v5.0.0-15.3.5",
           "status": "implemented",
           "manualProcedureId": "MAN-ARCH-001",
-          "findingReference": "docs/security-findings.md#external-type-and-strict-comparison-evidence-is-incomplete"
+          "controlEvidence": {
+            "productionPath": "src/main/java/org/courtside/shared/RejectsCoercedScalars.java",
+            "falsifyingTest": "src/test/java/org/courtside/RequestInputTypeSurfaceTest.java#givenAWholeNumberWrittenAsText_whenUpdatingACourt_thenTheTypeIsRefusedRatherThanRead"
+          }
         },
         {
           "id": "v5.0.0-15.3.6",
@@ -2474,7 +2477,10 @@
           "id": "WSTG-v4.2-INFO-06",
           "status": "implemented",
           "manualProcedureId": "MAN-ARCH-001",
-          "findingReference": "docs/security-findings.md#request-entry-point-and-input-inventory-is-incomplete"
+          "controlEvidence": {
+            "productionPath": "src/main/resources/api/openapi.yaml",
+            "falsifyingTest": "src/test/java/org/courtside/RequestEntryPointInventoryTest.java#whenTheApplicationBindsARequestInput_thenTheDocumentDeclaresTheSameOne"
+          }
         },
         {
           "id": "WSTG-v4.2-INFO-07",
