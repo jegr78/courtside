@@ -40,6 +40,8 @@ class MessageBoundaryAgreementTest extends AbstractIntegrationTest {
     private static final Pattern CADDY_IMAGE =
             Pattern.compile("caddy:[\\w.-]+@sha256:[a-f0-9]{64}");
     private static final Pattern STATUS_LINE = Pattern.compile("(?m)^HTTP/1\\.[01] (\\d{3})");
+    private static final int FIRST_BYTE_MILLIS = 20000;
+    private static final int IDLE_MILLIS = 1500;
     private static final Pattern FIELD = Pattern.compile("(?m)^([A-Za-z-]+):[ \\t]*(.*)\\r?$");
 
     private enum Reading { PROXY_REFUSED, CONNECTOR_REFUSED, APPLICATION_ANSWERED }
@@ -206,23 +208,29 @@ class MessageBoundaryAgreementTest extends AbstractIntegrationTest {
 
     private static Answer send(String host, int port, String request) throws IOException {
         try (Socket socket = new Socket(host, port)) {
-            socket.setSoTimeout(3000);
+            socket.setSoTimeout(FIRST_BYTE_MILLIS);
             OutputStream out = socket.getOutputStream();
             out.write(request.getBytes(StandardCharsets.ISO_8859_1));
             out.flush();
-            return read(socket.getInputStream());
+            return read(socket);
         }
     }
 
-    private static Answer read(InputStream in) throws IOException {
+    // A hop that answers and keeps the connection open ends this read by falling idle, so the wait
+    // for the first byte is long enough for a slow runner and every wait after it is short.
+    private static Answer read(Socket socket) throws IOException {
         StringBuilder answer = new StringBuilder();
         byte[] buffer = new byte[4096];
+        InputStream in = socket.getInputStream();
         try {
             for (int count = in.read(buffer); count >= 0; count = in.read(buffer)) {
                 answer.append(new String(buffer, 0, count, StandardCharsets.ISO_8859_1));
+                socket.setSoTimeout(IDLE_MILLIS);
             }
-        } catch (SocketTimeoutException stillOpen) {
-            // A hop that keeps the connection open has said everything it means to say.
+        } catch (SocketTimeoutException idle) {
+            if (answer.isEmpty()) {
+                throw idle;
+            }
         }
         Matcher statusLines = STATUS_LINE.matcher(answer);
         int responses = 0;

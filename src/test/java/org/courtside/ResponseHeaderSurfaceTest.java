@@ -135,17 +135,45 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
         assertThat(responses(answer)).isEqualTo(1);
     }
 
+    // The forwarded host replaces the one the filter reflects, so it is the second way a caller
+    // reaches that header's value and it is refused on the same ground.
     @Test
     void givenALineBreakInAForwardedHost_whenItWouldBecomeAHeader_thenTheConnectorRefusesIt()
             throws IOException {
         // when
         String answer = raw("GET /api/public/config HTTP/1.1\r\nHost: localhost\r\n"
-                + "X-Forwarded-Host: other.example\r\nX-Injected: yes\r\n\r\n");
+                + "X-Forwarded-Host: other.example\rX-Injected: yes\r\n\r\n");
 
         // then
-        assertThat(answer).startsWith("HTTP/1.1 200");
+        assertThat(answer).startsWith("HTTP/1.1 400")
+                .contains("urn:courtside:error:request-rejected");
         assertThat(headerNames(answer)).doesNotContain(INJECTED.toLowerCase());
         assertThat(responses(answer)).isEqualTo(1);
+    }
+
+    // The part guard reads the upload, so it has to sit behind the decision that says who may.
+    @Test
+    void givenNoSession_whenAMultipartPartIsNamedTwice_thenAuthorizationAnswersBeforeTheGuard()
+            throws Exception {
+        // given
+        String boundary = "courtsideboundary";
+        String body = filePart(boundary) + filePart(boundary) + "--" + boundary + "--\r\n";
+
+        // when
+        HttpResponse<String> answer = httpClient.send(HttpRequest.newBuilder(
+                        URI.create(baseUrl() + "/api/admin/config/logo"))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .PUT(HttpRequest.BodyPublishers.ofString(body))
+                .build(), HttpResponse.BodyHandlers.ofString());
+
+        // then
+        assertThat(answer.statusCode()).isIn(401, 403);
+        assertThat(answer.body()).doesNotContain("urn:courtside:error:ambiguous-parameter");
+    }
+
+    private static String filePart(String boundary) {
+        return "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\";"
+                + " filename=\"logo.png\"\r\nContent-Type: image/png\r\n\r\nPNG\r\n";
     }
 
     @Test
