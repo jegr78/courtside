@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -14,6 +15,32 @@ const assessment = readFileSync(join(repository, "docs/security-assessment.md"),
 const dependabot = readFileSync(join(repository, ".github/dependabot.yml"), "utf8");
 const npmAudit = readFileSync(join(repository, ".github/workflows/npm-audit.yml"), "utf8");
 const runContract = JSON.parse(readFileSync(join(repository, "security/run-contract.json"), "utf8"));
+const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+
+function jobsStartingASecurityTarget() {
+  const directory = join(repository, ".github/workflows");
+  return readdirSync(directory).filter((file) => file.endsWith(".yml")).flatMap((file) =>
+    Object.entries(yaml.load(readFileSync(join(directory, file), "utf8")).jobs ?? {})
+      .filter(([, job]) => (job.steps ?? []).some((step) => /courtside\.mjs security\s/.test(step.run ?? "")))
+      .map(([name, job]) => ({ file, name, job })));
+}
+
+// The seeder image adds the compiled fixture classes, which only a Maven build produces, so a job
+// that pulls a published candidate has to be handed them instead.
+test("given every job that starts a security target, when it runs, then the fixture classes are there", () => {
+  // given
+  const starters = jobsStartingASecurityTarget();
+
+  // when
+  const unsupplied = starters.filter(({ job }) => !(job.steps ?? []).some((step) =>
+    /\.\/mvnw\b/.test(step.run ?? "")
+    || (step.uses ?? "").startsWith("actions/download-artifact@") && step.with?.name === "assessment-fixtures"));
+
+  // then
+  assert.ok(starters.length >= 2, "no workflow starts a security target");
+  assert.deepEqual(unsupplied.map(({ file, name }) => `${file}:${name}`), []);
+  assert.match(release, /name: assessment-fixtures\n\s+path: target\/fixtures-classes/);
+});
 
 test("given dependency findings, when scheduled and release gates run, then overdue evidence is enforced without hard update pins", () => {
   // when / then

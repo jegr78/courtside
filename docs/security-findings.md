@@ -54,20 +54,6 @@ alternate and failure paths. The control remains non-passing until a bounded inv
 member, booking, import, account and administration workflows and fails when an unclassified path
 is introduced.
 
-### Production artifact contains non-production seeders
-
-- State: validated artifact gap
-- Priority: P2
-- Controls: ASVS 5.0.0 `v5.0.0-15.2.3`
-- Review: `MAN-ARCH-001`, 9 September 2026
-- Remediation: #903
-
-The production JAR contains demo, performance and security-assessment seeders and their supporting
-configuration. Profiles and environment guards prevent accidental activation, but they do not
-remove sample and test-only functionality from the shipped artifact. The control remains
-non-passing until production packaging excludes those classes and resources while explicit test
-artifacts retain the isolated workflows that need them.
-
 ### External trust-boundary map is incomplete
 
 - State: validated architecture gap

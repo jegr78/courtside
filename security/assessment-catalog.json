@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.5.4",
+  "catalogVersion": "1.5.5",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -1776,7 +1776,10 @@
           "id": "v5.0.0-15.2.3",
           "status": "implemented",
           "manualProcedureId": "MAN-ARCH-001",
-          "findingReference": "docs/security-findings.md#production-artifact-contains-non-production-seeders"
+          "controlEvidence": {
+            "productionPath": "pom.xml",
+            "falsifyingTest": "src/test/java/org/courtside/ProductionArtifactIT.java#givenTheFixtureArtifact_whenTheProductionArtifactIsRead_thenItCarriesNoFixtureFile"
+          }
         },
         {
           "id": "v5.0.0-15.3.1",

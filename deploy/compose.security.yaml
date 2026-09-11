@@ -41,7 +41,6 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: security
-      SPRING_MAIN_WEB_APPLICATION_TYPE: none
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_security
       SPRING_DATASOURCE_USERNAME: courtside
       SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}

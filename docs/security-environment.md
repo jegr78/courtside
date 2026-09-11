@@ -1,11 +1,13 @@
 # Security assessment environment
 
-The `security` Spring profile and `deploy/compose.security.yaml` create one disposable target for active security assessments. They are not a general development or UAT environment. The application refuses to start unless all of these identities agree:
+`deploy/compose.security.yaml` creates one disposable target for active security assessments. It is not a general development or UAT environment. The assessed application is the candidate image itself, started with no non-production profile and no fixture configuration; the `security` Spring profile belongs to the `seeder` service, which fills the disposable database and exits before the target starts. The seeder refuses to run unless all of these identities agree:
 
 - `COURTSIDE_ENVIRONMENT=SECURITY`;
 - a confirmed disposable profile;
 - a valid per-run identifier, seed fingerprint and instance fingerprint; and
 - the Compose-local `courtside_security` database on host `db`.
+
+Startup builds the seeder's image from the candidate that was handed to it, so the assessment data is written through the candidate's own domain services while the candidate image carries no seeder of its own. That image is removed with the rest of the run.
 
 ## Prepare the images
 

@@ -223,14 +223,35 @@ export async function startSecurityEnvironment(runId, image) {
   process.stdout.write(`${securityEnvironmentReadyMessage(runId)}\n`);
 }
 
-// The seeder reaches the assessment data through the candidate's own domain services, so it is built
-// from the candidate rather than named beside it.
+// A locally built image also carries a `name@sha256:<image id>` digest that no store resolves, so a
+// tag is the reference to try first and a registry digest only the fallback for a pulled candidate.
+export function fixtureImageBase({ RepoDigests: digests = [], RepoTags: tags = [] }) {
+  const reference = [...tags, ...digests].find((candidate) => candidate && !candidate.includes("<none>"));
+  if (!reference) throw new Error("The security candidate carries no reference a build can start from");
+  return reference;
+}
+
+export function assertFixtureImageDerivation(candidateLayers, fixtureLayers) {
+  if (!Array.isArray(candidateLayers) || candidateLayers.length === 0
+      || !Array.isArray(fixtureLayers) || fixtureLayers.length !== candidateLayers.length + 1
+      || candidateLayers.some((layer, index) => fixtureLayers[index] !== layer)) {
+    throw new Error("The security seeder is not the candidate carrying its fixture classes");
+  }
+}
+
+// The seeder writes the assessment data through the candidate's own domain services, so it is built
+// from the candidate rather than named beside it; a bare image ID is not a reference a build accepts.
 function buildSecurityFixturesImage(runId, image) {
   stageFixtureClasses();
-  const plan = securityFixturesImagePlan(runId, image);
+  const tag = securityFixturesImageTag(runId);
+  const plan = securityFixturesImagePlan(runId, fixtureImageBase(inspectImage(image)));
   execute(plan.command, plan.args);
-  return execute("docker",
-    ["image", "inspect", securityFixturesImageTag(runId), "--format", "{{.Id}}"]).trim();
+  assertFixtureImageDerivation(inspectImage(image).RootFS.Layers, inspectImage(tag).RootFS.Layers);
+  return inspectImage(tag).Id;
+}
+
+function inspectImage(reference) {
+  return JSON.parse(execute("docker", ["image", "inspect", reference, "--format", "{{json .}}"]));
 }
 
 export function securityEnvironmentReadyMessage(runId) {

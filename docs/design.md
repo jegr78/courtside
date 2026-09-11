@@ -29,7 +29,11 @@ environments — a walkthrough dataset, a synthetic load-test dataset and the da
 assessment runs against — and each refuses to start unless its environment guard confirms the
 database it is about to fill is the disposable one it names (`courtside_dev` for `demo`,
 `courtside_perf` for `performance`, `courtside_security` for `securityassessment`), not whatever the
-deployment happens to point at. The `reporting` and `integration` modules of section 3 are designed
+deployment happens to point at. None of the three reaches a club: packaging writes them to a
+separate fixture artifact, the production image build fails if one of their files returns, and the
+environments that need them run an image with those classes layered over the production one — the
+security assessment goes further and seeds from a one-shot container so that the target it scans is
+the production image itself. The `reporting` and `integration` modules of section 3 are designed
 and not built. `audit` is built: every configuration change made through the admin API — facility,
 cards, config, rule sets, the roster and the import configuration — is recorded in the append-only
 `domain_event` table before the commit that makes it: actor, time, entity, and, except for free

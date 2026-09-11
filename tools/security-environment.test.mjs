@@ -45,7 +45,6 @@ test("given the security Compose file, when reading the assessed target, then it
   });
   assert.equal(seeder.image, "${COURTSIDE_SECURITY_FIXTURES_IMAGE:?required}");
   assert.equal(seeder.environment.SPRING_PROFILES_ACTIVE, "security");
-  assert.equal(seeder.environment.SPRING_MAIN_WEB_APPLICATION_TYPE, "none");
   assert.equal(seeder.environment.COURTSIDE_SECURITY_SEED_ONLY, "true");
   assert.deepEqual(seeder.networks, ["backend"]);
   assert.equal(seeder.ports, undefined);
