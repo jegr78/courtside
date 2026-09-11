@@ -4,8 +4,10 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.ErrorResponse;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public abstract class DomainFailure extends RuntimeException implements ErrorResponse {
 
@@ -45,5 +47,18 @@ public abstract class DomainFailure extends RuntimeException implements ErrorRes
 
     protected static Map<String, Object> violation(String code, Map<String, Object> params) {
         return Map.of("code", code, "params", params == null ? Map.of() : params);
+    }
+
+    // The i18n keys alone. A violation's params are built from what the request submitted, so a
+    // caller that wants to say which rule refused must not be handed the values it refused over.
+    public List<String> violationCodes() {
+        if (!(properties().get("violations") instanceof Collection<?> collected)) {
+            return List.of();
+        }
+        return collected.stream()
+                .map(entry -> entry instanceof Map<?, ?> violation ? violation.get("code") : null)
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .toList();
     }
 }

@@ -10,13 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
-import static java.util.Objects.requireNonNullElse;
-
 // Ahead of SharedExceptionHandler and its cause-chain fallback.
 @Slf4j
 @RestControllerAdvice
@@ -43,19 +36,7 @@ class DomainFailureHandler {
             log.warn("Answering {} for {}", failure.getStatusCode(), body.getType(), failure);
         } else {
             log.debug("Answering {} for {}: {}", failure.getStatusCode(), body.getType(),
-                    codesOf(body));
+                    failure.violationCodes());
         }
-    }
-
-    private static List<String> codesOf(ProblemDetail body) {
-        Object violations = requireNonNullElse(body.getProperties(), Map.of()).get("violations");
-        if (!(violations instanceof Collection<?> collected)) {
-            return List.of();
-        }
-        return collected.stream()
-                .map(violation -> violation instanceof Map<?, ?> entry ? entry.get("code") : null)
-                .filter(Objects::nonNull)
-                .map(Object::toString)
-                .toList();
     }
 }
