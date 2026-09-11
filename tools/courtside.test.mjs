@@ -356,10 +356,21 @@ test("given the performance documentation, when a run is read, then it states wh
   const documentation = readFileSync(fileURLToPath(new URL("../docs/performance-testing.md", import.meta.url)), "utf8");
   const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8");
 
-  // when / then
-  assert.match(documentation, /mail/i, "the documentation never mentions mail");
-  assert.match(documentation, /mailpit/i, "the documentation does not name the relay the run measures against");
-  assert.match(compose, /axllent\/mailpit/);
+  const tool = readFileSync(fileURLToPath(new URL("../tools/courtside.mjs", import.meta.url)), "utf8");
+
+  // when
+  const relay = compose.match(/image: axllent\/(mailpit):/)?.[1];
+  const issued = tool.match(/perfMailDirectory = join\(root, "build", "([a-z-]+)"\)/)?.[1];
+
+  // then
+  assert.ok(relay, "the performance stack runs no Mailpit for the documentation to describe");
+  assert.ok(issued, "the CLI issues the certificate somewhere this test cannot read");
+  assert.match(documentation, new RegExp(relay, "i"),
+    "the documentation does not name the relay a run is measured against");
+  assert.match(documentation, new RegExp(`build/${issued}`),
+    "the documentation names another place for the certificate than the CLI writes");
+  assert.match(documentation, /STARTTLS/,
+    "the documentation does not say the relay is reached over STARTTLS");
 });
 
 // Every one of these interpolates the same compose file, and Compose treats a variable the file
