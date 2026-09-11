@@ -41,9 +41,9 @@ class SessionVariableScopeTest extends AbstractIntegrationTest {
         planted.setAttribute("courtside.authenticated-at", Long.MAX_VALUE);
         planted.setAttribute("courtside.browser-family", "CHROME");
 
+        // The third writer names a request attribute, which is gone with the request that carried it.
+
         // when / then
-        // The third writer names a request attribute and not a session one: it lives for the error
-        // dispatch that reads it back and is gone with the request that carried it.
         assertThat(writers).containsExactly(
                 "org/courtside/identity/RecentAuthentication.java:.setAttribute(AUTHENTICATED_AT, clock.instant().toEpochMilli());",
                 "org/courtside/identity/internal/SecurityConfiguration.java:request.getSession(true).setAttribute(AccountSessionService.BROWSER_FAMILY,",
