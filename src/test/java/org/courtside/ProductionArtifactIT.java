@@ -2,12 +2,15 @@ package org.courtside;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
@@ -77,12 +80,15 @@ class ProductionArtifactIT {
     }
 
     private static Set<String> recordedExclusions() throws IOException {
-        try (JarFile jar = new JarFile(productionArtifact().toFile());
-             InputStream source = jar.getInputStream(jar.getEntry(EXCLUSION_RECORD))) {
-            return new java.io.BufferedReader(new java.io.InputStreamReader(source, UTF_8)).lines()
-                    .map(String::trim)
-                    .filter(line -> !line.isEmpty())
-                    .collect(Collectors.toCollection(TreeSet::new));
+        try (JarFile jar = new JarFile(productionArtifact().toFile())) {
+            if (jar.getEntry(EXCLUSION_RECORD) == null) return Set.of();
+            try (InputStream source = jar.getInputStream(jar.getEntry(EXCLUSION_RECORD));
+                 BufferedReader lines = new BufferedReader(new InputStreamReader(source, UTF_8))) {
+                return lines.lines()
+                        .map(String::trim)
+                        .filter(line -> !line.isEmpty())
+                        .collect(Collectors.toCollection(TreeSet::new));
+            }
         }
     }
 
@@ -98,6 +104,7 @@ class ProductionArtifactIT {
 
         // then
         assertThat(productionFactories).as("the production artifact registers no factory").isNotEmpty();
+        assertThat(fixtureFactories).as("the fixture artifact registers no factory").isNotEmpty();
         assertThat(missing(productionFactories, production))
                 .as("the production artifact registers a factory it does not carry").isEmpty();
         assertThat(missing(fixtureFactories, fixtures))
@@ -106,17 +113,19 @@ class ProductionArtifactIT {
                 .as("both artifacts register the same factory").isEmpty();
     }
 
-    private static java.util.List<String> missing(Set<String> factories, Set<String> content) {
+    private static List<String> missing(Set<String> factories, Set<String> content) {
         return factories.stream()
                 .filter(name -> !content.contains(name.replace('.', '/') + ".class"))
                 .toList();
     }
 
     private static Set<String> registeredFactories(Path artifact, String registration) throws IOException {
-        try (JarFile jar = new JarFile(artifact.toFile());
-             InputStream source = jar.getInputStream(jar.getEntry(registration))) {
+        try (JarFile jar = new JarFile(artifact.toFile())) {
+            if (jar.getEntry(registration) == null) return Set.of();
             Properties declarations = new Properties();
-            declarations.load(source);
+            try (InputStream source = jar.getInputStream(jar.getEntry(registration))) {
+                declarations.load(source);
+            }
             return declarations.stringPropertyNames().stream()
                     .flatMap(key -> Arrays.stream(declarations.getProperty(key).split(",")))
                     .map(String::trim)
