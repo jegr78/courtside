@@ -871,9 +871,9 @@ function startPerformance(options) {
     `${JSON.stringify({ password, dbPort: options.dbPort, telemetry: options.telemetry }, null, 2)}\n`);
   runInteractive(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
   extractApplicationLayers();
-  runInteractive({ command: "docker", args: ["build", "-t", "courtside:perf-base", "."] });
+  runInteractive(performanceImagePlans()[0]);
   stageFixtureClasses();
-  runInteractive(fixtureImagePlan("courtside:perf-local", "courtside:perf-base"));
+  runInteractive(performanceImagePlans()[1]);
   runInteractive({
     command: "docker",
     args: [...perfComposeArgs(options.dbPort, options.telemetry), "up", "-d", "--wait", "--force-recreate",
@@ -881,6 +881,13 @@ function startPerformance(options) {
     environment
   });
   process.stdout.write(performanceStartupSummary(password, options));
+}
+
+export function performanceImagePlans() {
+  return [
+    { command: "docker", args: ["build", "-t", "courtside:perf-base", "."] },
+    fixtureImagePlan("courtside:perf-local", "courtside:perf-base")
+  ];
 }
 
 export function performanceStartupSummary(password, options) {
