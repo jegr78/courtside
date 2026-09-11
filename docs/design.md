@@ -1802,6 +1802,31 @@ whether it is built or designed. **Designed means absent today.**
   configured, which section 8 already accounts for, and a value a board chose is not a review this
   list can hold. What bounds the rest: everything in the build is a committed file, visible in
   review before it ships.
+- **What the application reads out of a request, in one list:** every input a handler binds is
+  compared with the input the OpenAPI document declares, in both directions and per operation, so a
+  header, query, path or form parameter, a request body or a supported encoding on either side alone
+  fails the build. *Built.* Three things sit outside that contract and are therefore inventoried by
+  name: every filter that can see a request, derived at once from the running filter beans, from
+  every security chain and from the classes `src/main` declares, because one of them exists only
+  where `courtside.environment` is `SECURITY` and no ordinary context carries it; every class that
+  holds the servlet request, scanned for the reads it performs with the vocabulary taken from the
+  servlet interfaces rather than from a list, each read classified by the external value it names;
+  and the login, which a filter serves rather than a handler, whose form fields are read off the
+  running filter and compared with the form the document declares. What a club is being asked to
+  trust here is that the answer to "what can be sent to this instance" is derived rather than
+  remembered.
+- **A field is the type the document declares.** *Built.* The reader used to reinterpret a scalar of
+  another JSON shape, so `"3"` reached an integer field and `1` reached a boolean one while a
+  boolean for the same integer was already refused. A foreign shape for an integer, a boolean, a
+  string or a date-time is now refused as `validation.TypeMismatch` on the field, which is the answer
+  the neighbouring shapes already gave.
+- **The browser reads external values too, and each one is named.** *Built.* The stored appearance
+  and language, the address and its fragment, the query, the route parameters, the navigation state a
+  previous page set and the readable CSRF cookie are inventoried by file, and every entry names the
+  behavior test that measures what the boundary does with a value it did not expect. The strict
+  compiler and the equality rule the lint enforces are policy over the shipped text and are recorded
+  as such: replacing one `=== true` with `Boolean(...)` leaves both of them green and turns the
+  behavior test red, which is why the inventory binds to behavior and not to either of them.
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the build submits the tree Maven resolves so its alerts
   reach the transitive Java dependencies a POM does not name — the graph carried the declared ones

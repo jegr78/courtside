@@ -11,35 +11,6 @@ These public entries record the safe result of reading a pinned control against 
 They omit request examples, concrete identifiers and protected evidence. The catalog links the
 affected control to the heading, and the remediation issue owns the product change and retest.
 
-### External-type and strict-comparison evidence is incomplete
-
-- State: validated evidence gap
-- Priority: P2
-- Controls: ASVS 5.0.0 `v5.0.0-15.3.5`
-- Review: `MAN-ARCH-001`, 9 September 2026
-- Remediation: #908
-
-The court editor behaviorally rejects representative coercive and out-of-range number strings, and
-the shipped TypeScript source is guarded by strict compiler and equality policies. The behavioral
-test does not cover a coercive comparison mutation elsewhere on that production path, while the
-syntax policy alone does not prove external-value behavior. The control remains non-passing until
-the relevant external-value boundaries are closed and one coherent evidence set falsifies both
-type validation and strict comparison behavior.
-
-### Request entry-point and input inventory is incomplete
-
-- State: validated evidence gap
-- Priority: P2
-- Controls: WSTG 4.2 `WSTG-v4.2-INFO-06`
-- Review: `MAN-ARCH-001`, 9 September 2026
-- Remediation: #908
-
-The API contract test compares public MVC method and path pairs with OpenAPI. It does not detect a
-new header, query or form parameter, request-body field or supported encoding added to an existing
-route, and filter-based request entry points are outside that inventory. The control remains
-non-passing until the complete request surface is derived and every non-OpenAPI boundary is
-explicitly classified.
-
 ### Principal workflow inventory is incomplete
 
 - State: validated architecture gap
