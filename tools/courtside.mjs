@@ -22,6 +22,7 @@ import {
   buildSecurityPlan, clearEmergencyStop, executeSecurityPlan, fingerprintSecurityTarget, readSecurityManifest,
   recoverSecurityRun, requestEmergencyStop, securityRunContract
 } from "./security-runner.mjs";
+import { fixtureImagePlan, stageFixtureClasses } from "./fixture-artifact.mjs";
 import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
 import { isGitHubLogin } from "./nightly-failure-tracker.mjs";
 
@@ -870,7 +871,9 @@ function startPerformance(options) {
     `${JSON.stringify({ password, dbPort: options.dbPort, telemetry: options.telemetry }, null, 2)}\n`);
   runInteractive(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
   extractApplicationLayers();
-  runInteractive({ command: "docker", args: ["build", "-t", "courtside:perf-local", "."] });
+  runInteractive({ command: "docker", args: ["build", "-t", "courtside:perf-base", "."] });
+  stageFixtureClasses();
+  runInteractive(fixtureImagePlan("courtside:perf-local", "courtside:perf-base"));
   runInteractive({
     command: "docker",
     args: [...perfComposeArgs(options.dbPort, options.telemetry), "up", "-d", "--wait", "--force-recreate",

@@ -23,6 +23,48 @@ services:
       org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
+  seeder:
+    image: ${COURTSIDE_SECURITY_FIXTURES_IMAGE:?required}
+    pull_policy: never
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 1.0
+    mem_limit: 1g
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: security
+      SPRING_MAIN_WEB_APPLICATION_TYPE: none
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_security
+      SPRING_DATASOURCE_USERNAME: courtside
+      SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
+      COURTSIDE_ENVIRONMENT: SECURITY
+      COURTSIDE_SECURITY_CONFIRM_DISPOSABLE: "true"
+      COURTSIDE_SECURITY_SEED_ONLY: "true"
+      COURTSIDE_SECURITY_RUN_ID: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      COURTSIDE_SECURITY_SEED_FINGERPRINT: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      COURTSIDE_SECURITY_SHARED_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
+      COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: security.bootstrap
+      COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
+      COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe
+      COURTSIDE_MAIL_RELAY_HOST: mail.invalid
+      COURTSIDE_MAIL_FROM: no-reply@example.org
+      COURTSIDE_MAIL_REPLY_TO: board@example.org
+    networks:
+      - backend
+    labels:
+      org.courtside.environment: SECURITY
+      org.courtside.security.run-id: ${COURTSIDE_SECURITY_RUN_ID:?required}
+      org.courtside.security.seed-fingerprint: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
+      org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
+
   app:
     image: ${COURTSIDE_SECURITY_IMAGE:?required}
     pull_policy: never
@@ -38,21 +80,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      seeder:
+        condition: service_completed_successfully
     environment:
-      SPRING_PROFILES_ACTIVE: security
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_security
       SPRING_DATASOURCE_USERNAME: courtside
       SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
       COURTSIDE_COOKIE_SECURE: "true"
       COURTSIDE_ENVIRONMENT: SECURITY
-      COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"
       COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES: ${COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES:?required}
       COURTSIDE_LOGIN_GLOBAL_THRESHOLD: "20"
       MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"
-      COURTSIDE_SECURITY_CONFIRM_DISPOSABLE: "true"
-      COURTSIDE_SECURITY_RUN_ID: ${COURTSIDE_SECURITY_RUN_ID:?required}
-      COURTSIDE_SECURITY_SEED_FINGERPRINT: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}
-      COURTSIDE_SECURITY_SHARED_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: security.bootstrap
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
       COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe

@@ -32,6 +32,8 @@
     { "path": "tools/docs-check.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/docs-check.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/endpoint-surface.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/fixture-artifact.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/fixture-artifact.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/github-metadata.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/github-template-metadata.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/i18n-bundle-parity.test.mjs", "profiles": ["tooling"], "test": true },
