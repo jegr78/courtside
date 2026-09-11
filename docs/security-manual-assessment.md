@@ -137,7 +137,9 @@ the category procedure is incomplete.
   absolute origin and credential pattern it reviews; read the request surface the application
   derives - the inputs each handler binds against the OpenAPI document, the filters, the direct
   servlet reads, the supported encodings and the external values the browser reads - and challenge
-  every classification it carries; challenge every implicit trust decision and record an owner for
+  every classification it carries; compare the message boundary the reference deployment accepts
+  with the one the application accepts, and treat any message the proxy admits and the connector
+  refuses as a boundary to justify rather than to record; challenge every implicit trust decision and record an owner for
   each security control.
 - Expected secure outcome: the shipped architecture has no undocumented trust boundary, privileged
   flow or control owner, and deviations are explicit findings rather than assumptions.
@@ -167,7 +169,10 @@ the category procedure is incomplete.
 - Prerequisites: SECURITY only, active authorization, OpenAPI inventory and bounded gateway.
 - Steps: select representative JSON, multipart, CSV and header operations; vary duplicate fields,
   encodings, delimiters, lengths and conflicting framing without volumetric traffic; compare proxy,
-  application and persistence interpretation; minimize any disagreement before retaining evidence.
+  application and persistence interpretation; read the framing corpus the repository already sends
+  through both hops and the response-header sources it derives, and challenge every message the
+  corpus omits and every classification a header carries; minimize any disagreement before retaining
+  evidence.
 - Expected secure outcome: every layer agrees on one request meaning, rejects ambiguity before state
   changes and returns no sensitive parser detail.
 

@@ -136,7 +136,23 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             Map.entry("org/courtside/shared/web/ContainerErrorController.java",
                     new Boundary("the attributes the servlet container sets on an error dispatch;"
                             + " the address among them is the one the client asked for, echoed into"
-                            + " the problem instance and nowhere else", List.of("getAttribute"))));
+                            + " the problem instance and nowhere else", List.of("getAttribute"))),
+            Map.entry("org/courtside/shared/web/RejectsRepeatedParameters.java",
+                    new Boundary("nothing of the request itself: it asks the reading below for a"
+                            + " repeated name and reports one", List.of())),
+            Map.entry("org/courtside/shared/web/RejectsRepeatedParts.java",
+                    new Boundary("the names of a multipart body's parts, read where the parts are"
+                            + " already admitted, so that a part stating a name twice is refused"
+                            + " before a handler takes one", List.of("getParts"))),
+            Map.entry("org/courtside/shared/web/Multipart.java",
+                    new Boundary("the declared media type, and every parameter name the request"
+                            + " carries as the one map the query string and the form body arrive"
+                            + " in, so that a name stating two values is refused before anything"
+                            + " below chooses one of them",
+                            List.of("getContentType", "getParameterMap"))),
+            Map.entry("org/courtside/shared/web/RefusesAmbiguity.java",
+                    new Boundary("nothing of the request itself: it writes an attribute the error"
+                            + " dispatch reads back", List.of())));
 
     private static final Map<String, String> REVIEWED_FILTERS = Map.ofEntries(
             Map.entry("DisableEncodeUrlFilter", "refuses a session id in a URL"),
@@ -171,7 +187,13 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                     "reads a form body on a method the servlet API would not"),
             Map.entry("OrderedRequestContextFilter", "publishes the request to the thread"),
             Map.entry("CompositeFilterChainProxy", "delegates into the security chain above"),
-            Map.entry("SessionRepositoryFilter", "resolves the session cookie to a stored session"));
+            Map.entry("SessionRepositoryFilter", "resolves the session cookie to a stored session"),
+            Map.entry("RejectsRepeatedParameters",
+                    "refuses a request that names one parameter twice, before the security chain"
+                            + " below reads a parameter of its own"),
+            Map.entry("RejectsRepeatedParts",
+                    "refuses a multipart body that names one part twice, behind the authorization"
+                            + " decision, because reading the parts parses the upload"));
 
     private static final Map<String, Mapping> REVIEWED_HANDLER_MAPPINGS = Map.of(
             "RequestMappingHandlerMapping", answers("the annotated handlers, whose every bound input"

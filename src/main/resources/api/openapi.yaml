@@ -52,6 +52,13 @@ info:
 
     All six arrive as `400` with type `urn:courtside:error:validation-failed`.
 
+    A name carries one value. No parameter here is an array, so a request that states the same
+    query parameter, form field or multipart part twice is refused with `400` and type
+    `urn:courtside:error:ambiguous-parameter` before the operation runs: two values and no rule
+    saying which wins is a request nobody can answer. A query parameter and a form field of the
+    same name are the same name. This refusal precedes dispatch, so it can answer any operation
+    here, including one that declares no `400` of its own.
+
     ## Authentication
 
     Anonymous callers may read the public court plan and its anonymised occupancy. Creating,

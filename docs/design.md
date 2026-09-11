@@ -1850,6 +1850,52 @@ whether it is built or designed. **Designed means absent today.**
   shipped text and are recorded as such: replacing one `=== true` with `Boolean(...)` leaves both of
   them green and turns the behavior test red, which is why the inventory binds to behavior and not
   to either of them.
+- **A parameter is named once.** *Built.* A repeated query or form parameter used to be accepted
+  and its values joined into one comma-separated string, so `?query=aa&query=bb` bound `aa,bb`, and a
+  sign-in naming `username` twice would have been decided by whichever of the two the reading reached
+  first. The document declares no array parameter, so a name carries one value by contract, and a
+  request repeating one is refused as `urn:courtside:error:ambiguous-parameter`. It is refused in
+  front of the security filter chain, because that chain reads parameters of its own, the CSRF token
+  among them, and `getParameterMap` merges the query string with the form body — a name appearing
+  once in each is the same ambiguity and gets the same answer. The cost is that a form body is parsed
+  before authentication. What can be parsed is what the connector accepts at all — a body of three
+  megabytes is refused and the connection closed before any parameter exists — and the reference
+  deployment caps a request body at 2 MB in front of that. The parameter map holds nothing of a multipart body, which was
+  measured rather than assumed: a logo uploaded with two parts named `file` reached the handler.
+  Reading that map nevertheless *parses* such a body and spools every part to disk, which the first
+  version of this guard did not measure and got backwards, so the guard in front of the security
+  chain now leaves a multipart request alone entirely. Its parts and its query string are both read
+  behind the authorization decision instead. One thing still parses such a body before
+  authentication and predates this: the CSRF filter falls back to the `_csrf` parameter when the
+  request carries no token header. An upload carrying more parts than the connector accepts answers
+  403 rather than 413 when that header is present, which is what measures the difference.
+- **One request means one message.** *Built.* Thirteen ambiguously framed messages, beside one that
+  is not — among them two lengths that agree and two that disagree, a length beside a chunked body,
+  a chunked body named twice and named with a companion encoding, an encoding neither hop
+  implements, a chunk size that is not a number, a bare newline ending the request line, a carriage
+  return inside a header value, a second host, a space before a header colon — are sent as raw bytes
+  both straight at the connector and
+  through the reference proxy, which is started from `deploy/Caddyfile` with the upstream address as
+  the only substitution. Every one of them is answered exactly once at both hops, which is the
+  property a smuggled second request would have to break. Each hop's status and the identity of
+  whoever refused are recorded per message, so a parser change on either side is a red test and not
+  a quiet widening. The two hops do not refuse in the same place: the proxy terminates the message
+  and frames a new one, and it admits two `Content-Length` headers that agree where the connector
+  alone refuses them. That admission is allowed only because those fields state one boundary, and
+  the corpus checks that rather than asserting it. An encoding the connector does not implement is
+  answered 501, which the error controller used to label an internal error — reporting a framing the
+  caller chose as a fault of ours; 501 now carries a type of its own.
+- **Every response header says where its value came from.** *Built.* The eight places `src/main`
+  writes a response header are derived from the sources and each is classified: two `Location`
+  headers built from an identifier this application generated, one built from a stored identifier
+  escaped into a single path segment, a content disposition built here from the dates a request
+  states, a count of seconds, a constant, and the host and scheme the application observed, which
+  exist only where `courtside.environment` is `SECURITY`. The outbound password lookup sets two
+  headers too and is left out because its request travels away from this application, which the
+  inventory establishes from the shape of that file rather than by naming it. A line break cannot
+  open a second header from either direction: the connector refuses a carriage return inside an
+  incoming header value, and the stored identifier that reaches a `Location` is refused by the
+  contract that declares it and escaped by the encoder that places it.
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the build submits the tree Maven resolves so its alerts
   reach the transitive Java dependencies a POM does not name — the graph carried the declared ones

@@ -33,34 +33,37 @@ class SessionVariableScopeTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenEveryCourtsideSessionVariable_whenItsWritersAndAuthorityAreReviewed_thenEachHasOnePurpose()
+    void givenEveryAttributeThisApplicationWrites_whenTheirWritersAndAuthorityAreReviewed_thenEachHasOnePurpose()
             throws Exception {
         // given
-        List<String> writers = sessionAttributeWriters();
+        List<String> writers = attributeWriters();
         MockHttpSession planted = new MockHttpSession();
         planted.setAttribute("courtside.authenticated-at", Long.MAX_VALUE);
         planted.setAttribute("courtside.browser-family", "CHROME");
 
+        // The third writer names a request attribute, which is gone with the request that carried it.
+
         // when / then
         assertThat(writers).containsExactly(
                 "org/courtside/identity/RecentAuthentication.java:.setAttribute(AUTHENTICATED_AT, clock.instant().toEpochMilli());",
-                "org/courtside/identity/internal/SecurityConfiguration.java:request.getSession(true).setAttribute(AccountSessionService.BROWSER_FAMILY,");
+                "org/courtside/identity/internal/SecurityConfiguration.java:request.getSession(true).setAttribute(AccountSessionService.BROWSER_FAMILY,",
+                "org/courtside/shared/web/RefusesAmbiguity.java:request.setAttribute(DETAIL, QUOTABLE.matcher(name).matches()");
         mockMvc.perform(get("/api/account/sessions").session(planted))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
     }
 
-    private static List<String> sessionAttributeWriters() throws IOException {
+    private static List<String> attributeWriters() throws IOException {
         Path root = Path.of("src/main/java");
         try (var files = Files.walk(root)) {
             return files.filter(path -> path.toString().endsWith(".java"))
-                    .flatMap(path -> sessionAttributeWriters(root, path).stream())
+                    .flatMap(path -> attributeWriters(root, path).stream())
                     .sorted()
                     .toList();
         }
     }
 
-    private static List<String> sessionAttributeWriters(Path root, Path path) {
+    private static List<String> attributeWriters(Path root, Path path) {
         try {
             String relative = root.relativize(path).toString().replace('\\', '/');
             return Files.readAllLines(path).stream()
