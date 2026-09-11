@@ -26,8 +26,9 @@ class DataProtectionInventoryTest extends AbstractIntegrationTest {
     private static final Pattern LOG_STATEMENT = Pattern.compile(
             "log\\.(trace|debug|info|warn|error)\\((?:[^;]|\\n)*?\\);", Pattern.MULTILINE);
 
-    private static final Pattern CACHE_FIELD = Pattern.compile(
-            "private final [^;\\n]*\\b(cache|Cache)\\b[^;\\n]*;");
+    private static final Pattern KEYED_FIELD = Pattern.compile(
+            "private (?:final )?[\\w.]*\\b(?:Map|ConcurrentMap|HashMap|LinkedHashMap"
+                    + "|ConcurrentHashMap|SortedMap|TreeMap)<[^>]*>\\s+\\w+\\s*[=;]");
 
     @Autowired
     private JdbcClient jdbc;
@@ -113,22 +114,24 @@ class DataProtectionInventoryTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenTheApplicationKeepsSomethingInMemory_thenTheInventoryNamesThatCache() {
+    void whenSomethingIsKeptOutsideTheSchema_thenTheInventoryNamesWhatIsInIt() {
         // given
-        Set<String> declared = names(inventory().get("caches"));
+        Set<String> declared = names(inventory().get("inMemoryState"));
 
         // when
         TreeSet<String> found = new TreeSet<>();
         sourceFiles().forEach(file -> {
-            if (CACHE_FIELD.matcher(read(file)).find()) {
+            String source = read(file);
+            if (!source.contains("@Entity") && KEYED_FIELD.matcher(source).find()) {
                 found.add(file.getFileName().toString().replace(".java", ""));
             }
         });
 
         // then
         assertThat(found)
-                .as("a cache holds a copy of something outside the schema and outside its sweep,"
-                        + " so the inventory says what is in it and what bounds it")
+                .as("a value held against a key outside an entity is a copy of something the"
+                        + " schema's own sweeps never reach, so the inventory says what is in it"
+                        + " and what bounds it")
                 .isEqualTo(new TreeSet<>(declared));
     }
 

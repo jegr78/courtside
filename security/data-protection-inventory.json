@@ -160,11 +160,16 @@
     "attempt-window": "Replaced when the next attempt window opens.",
     "club-configuration": "Lives as long as the club keeps it; a board changes it in the product and no person's lifecycle reaches it."
   },
-  "caches": {
+  "inMemoryState": {
     "HaveIBeenPwnedPasswordLookup": {
       "level": "pseudonymous",
-      "holds": "The five-character SHA-1 prefix of a candidate password and the suffixes the range service answered with. The prefix is shared by many passwords by construction and the suffixes come from the service, not from this club.",
-      "bounded": "COURTSIDE_PASSWORD_LOOKUP_CACHE_ENTRIES entries and COURTSIDE_PASSWORD_LOOKUP_CACHE_LIFETIME, in memory only; a restart empties it."
+      "holds": "The five-character SHA-1 prefix of a candidate password and the suffixes the range service answered with. The prefix is shared by many passwords by construction, and the suffixes come from the service rather than from this club.",
+      "bounded": "A fixed number of entries and a lifetime, in memory only; a restart empties it."
+    },
+    "CodedDomainFailure": {
+      "level": "operational",
+      "holds": "The parameters of one rule violation, for the life of the exception that carries it. They are the numbers and ids a message needs, because a violation carries an i18n code and never rendered text.",
+      "bounded": "The request that raised it."
     }
   },
   "storedFields": {
