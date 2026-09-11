@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.5.3",
+  "catalogVersion": "1.5.4",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -1811,7 +1811,10 @@
           "id": "v5.0.0-15.3.4",
           "status": "implemented",
           "manualProcedureId": "MAN-ARCH-001",
-          "findingReference": "docs/security-findings.md#correct-client-address-attribution-is-not-proven"
+          "controlEvidence": {
+            "productionPath": "deploy/Caddyfile",
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#two peers behind the production proxy each keep their own login rate-limit subject"
+          }
         },
         {
           "id": "v5.0.0-15.3.5",

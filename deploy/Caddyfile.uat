@@ -54,17 +54,22 @@ https://localhost:443 {
 	method @unknownMethod PATCH
 
 	handle /api-ui* {
-		reverse_proxy api-ui:8080
+		reverse_proxy api-ui:8080 {
+			header_up -Forwarded
+			header_up -X-Forwarded-Port
+			header_up -X-Forwarded-Prefix
+			header_up -X-Forwarded-Ssl
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto {scheme}
+		}
 	}
 
 	handle {
 		reverse_proxy app:8080 {
 			header_up -Forwarded
-			header_up -X-Forwarded-For
-			header_up -X-Forwarded-Host
 			header_up -X-Forwarded-Port
 			header_up -X-Forwarded-Prefix
-			header_up -X-Forwarded-Proto
 			header_up -X-Forwarded-Ssl
 			header_up X-Forwarded-For {remote_host}
 			header_up X-Forwarded-Host {host}
@@ -104,11 +109,7 @@ http://:8083 {
 	handle {
 		reverse_proxy app:8080 {
 			header_up -Forwarded
-			header_up -X-Forwarded-For
-			header_up -X-Forwarded-Host
-			header_up -X-Forwarded-Port
 			header_up -X-Forwarded-Prefix
-			header_up -X-Forwarded-Proto
 			header_up -X-Forwarded-Ssl
 			header_up X-Forwarded-For {remote_host}
 			header_up X-Forwarded-Host {host}

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { type AddressInfo } from "node:net";
-import type { DatabaseLock, JourneyService } from "./global-setup";
+import type { DatabaseLock, JourneyService, PeerLoginAttempt, PeerLoginSubjects } from "./global-setup";
 import { browserFailureReasons, type BrowserDiagnostics, type BrowserFailureReason, type FailedTest } from "./browser-diagnostics";
 
 export interface JourneyControlReference {
@@ -15,8 +15,10 @@ export interface JourneyControlReference {
 
 interface JourneyCommand {
   operation: "pinnedBrowser" | "releasePinnedBrowser" | "browserDiagnostics" | "recordBrowserTest" | "executeSql" | "holdDatabaseLock" | "waitForWaiters"
-    | "releaseLock" | "publishServiceWorkerUpdate" | "reset" | "restart";
+    | "releaseLock" | "publishServiceWorkerUpdate" | "reset" | "restart"
+    | "peerLoginSubjects" | "failedLoginFromSecondPeer";
   browserName?: string;
+  forwardedFor?: string;
   reason?: string;
   failedTest?: unknown;
   sql?: string;
@@ -96,6 +98,9 @@ async function executeCommand(command: JourneyCommand, service: JourneyService,
     case "recordBrowserTest": return service.recordBrowserTest(requiredString(command.browserName, "browserName"),
       requiredString(command.projectName, "projectName"), requiredTestPosition(command.testPosition),
       requiredLifecyclePhase(command.phase));
+    case "peerLoginSubjects": return service.peerLoginSubjects(requiredString(command.browserName, "browserName"));
+    case "failedLoginFromSecondPeer":
+      return service.failedLoginFromSecondPeer(requiredString(command.forwardedFor, "forwardedFor"));
     case "executeSql": return service.executeSql(requiredString(command.sql, "sql"));
     case "holdDatabaseLock": {
       const lockId = randomUUID();
@@ -198,6 +203,10 @@ export function connectJourneyService(reference: JourneyControlReference): Journ
       { operation: "browserDiagnostics", browserName, reason, failedTest }),
     recordBrowserTest: (browserName, projectName, testPosition, phase) => command(reference,
       { operation: "recordBrowserTest", browserName, projectName, testPosition, phase }),
+    peerLoginSubjects: (browserName) => command<PeerLoginSubjects>(reference,
+      { operation: "peerLoginSubjects", browserName }),
+    failedLoginFromSecondPeer: (forwardedFor) => command<PeerLoginAttempt>(reference,
+      { operation: "failedLoginFromSecondPeer", forwardedFor }),
     executeSql: (sql) => command(reference, { operation: "executeSql", sql }),
     holdDatabaseLock: async (sql) => {
       const lockId = await command<string>(reference, { operation: "holdDatabaseLock", sql });

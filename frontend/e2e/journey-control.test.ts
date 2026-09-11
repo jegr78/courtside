@@ -12,6 +12,8 @@ function journeyService(): { service: JourneyService; calls: Record<string, Retu
     releasePinnedBrowser: vi.fn().mockResolvedValue(undefined),
     browserDiagnostics: vi.fn().mockResolvedValue({ browserName: "webkit", containerState: { OOMKilled: false } }),
     recordBrowserTest: vi.fn().mockResolvedValue(undefined),
+    peerLoginSubjects: vi.fn().mockResolvedValue({ browser: "a".repeat(64), secondPeer: "b".repeat(64) }),
+    failedLoginFromSecondPeer: vi.fn().mockResolvedValue({ status: 401, type: "urn:courtside:error:unauthenticated" }),
     executeSql: vi.fn().mockResolvedValue("result"),
     holdDatabaseLock: vi.fn().mockResolvedValue(lock),
     publishServiceWorkerUpdate: vi.fn().mockResolvedValue(undefined),
@@ -27,6 +29,8 @@ function journeyService(): { service: JourneyService; calls: Record<string, Retu
     releasePinnedBrowser: calls.releasePinnedBrowser,
     browserDiagnostics: calls.browserDiagnostics,
     recordBrowserTest: calls.recordBrowserTest,
+    peerLoginSubjects: calls.peerLoginSubjects,
+    failedLoginFromSecondPeer: calls.failedLoginFromSecondPeer,
     executeSql: calls.executeSql,
     holdDatabaseLock: calls.holdDatabaseLock,
     publishServiceWorkerUpdate: calls.publishServiceWorkerUpdate,
@@ -49,6 +53,8 @@ describe("journey control", () => {
       const diagnostics = await remote.browserDiagnostics("webkit", "browser-disconnected");
       await remote.recordBrowserTest("webkit", "webkit-accessibility", 1, "start");
       await remote.releasePinnedBrowser("webkit");
+      const subjects = await remote.peerLoginSubjects("webkit");
+      const peerAttempt = await remote.failedLoginFromSecondPeer("203.0.113.9");
       const sql = await remote.executeSql("SELECT 1");
       const lock = await remote.holdDatabaseLock("LOCK TABLE booking");
       const waiters = await lock.waitForWaiters(2);
@@ -65,12 +71,16 @@ describe("journey control", () => {
       });
       expect(browser).toBe("ws://127.0.0.1/browser");
       expect(diagnostics).toMatchObject({ browserName: "webkit", containerState: { OOMKilled: false } });
+      expect(subjects).toEqual({ browser: "a".repeat(64), secondPeer: "b".repeat(64) });
+      expect(peerAttempt).toEqual({ status: 401, type: "urn:courtside:error:unauthenticated" });
       expect(sql).toBe("result");
       expect(waiters).toBe("waiting");
       expect(calls.pinnedBrowser).toHaveBeenCalledWith("webkit");
       expect(calls.browserDiagnostics).toHaveBeenCalledWith("webkit", "browser-disconnected", undefined);
       expect(calls.recordBrowserTest).toHaveBeenCalledWith("webkit", "webkit-accessibility", 1, "start");
       expect(calls.releasePinnedBrowser).toHaveBeenCalledWith("webkit");
+      expect(calls.peerLoginSubjects).toHaveBeenCalledWith("webkit");
+      expect(calls.failedLoginFromSecondPeer).toHaveBeenCalledWith("203.0.113.9");
       expect(calls.executeSql).toHaveBeenCalledWith("SELECT 1");
       expect(calls.holdDatabaseLock).toHaveBeenCalledWith("LOCK TABLE booking", expect.any(AbortSignal));
       expect(calls.publishServiceWorkerUpdate).toHaveBeenCalledOnce();

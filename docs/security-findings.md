@@ -40,20 +40,6 @@ route, and filter-based request entry points are outside that inventory. The con
 non-passing until the complete request surface is derived and every non-OpenAPI boundary is
 explicitly classified.
 
-### Correct client-address attribution is not proven
-
-- State: validated evidence gap
-- Priority: P2
-- Controls: ASVS 5.0.0 `v5.0.0-15.3.4`
-- Review: `MAN-ARCH-001`, 9 September 2026
-- Remediation: #905
-
-The browser-to-Caddy-to-Spring test proves that forged forwarded-address values cannot split one
-login rate-limit bucket. It would still pass if every request were attributed to one fixed proxy
-address, so it does not prove that distinct real peers retain their correct original addresses.
-The control remains non-passing until both distinct-peer attribution and the existing spoofing
-case are falsified through the reference proxy.
-
 ### Principal workflow inventory is incomplete
 
 - State: validated architecture gap

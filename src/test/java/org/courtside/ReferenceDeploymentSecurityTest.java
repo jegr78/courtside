@@ -1,14 +1,25 @@
 package org.courtside;
 
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.OutputFrame;
+import org.testcontainers.containers.output.ToStringConsumer;
+import org.testcontainers.containers.startupcheck.OneShotStartupCheckStrategy;
+import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.utility.MountableFile;
 import org.yaml.snakeyaml.Yaml;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -35,6 +46,15 @@ public class ReferenceDeploymentSecurityTest {
             "(?m)^http://:80 \\{\\R(?<body>(?:.*\\R)*?)^}$");
     private static final Pattern HEADER_BLOCK = Pattern.compile(
             "(?m)^\\theader \\{\\R(?<fields>(?:\\t\\t.*\\R)*)\\t}$");
+    private static final List<String> FORWARDED_HEADERS = List.of("forwarded", "x-forwarded-for",
+            "x-forwarded-host", "x-forwarded-port", "x-forwarded-prefix", "x-forwarded-proto",
+            "x-forwarded-ssl");
+    private static final Map<String, Boolean> APPLICATION_UPSTREAMS = Map.of(
+            "app:8080", true, "host.docker.internal:8080", true, "api-ui:8080", false);
+    private static final List<String> TLS_MODES = List.of("plaintext", "serve");
+    private static final String CLIENT_HEADER_PLACEHOLDER = "{http.request.header.";
+    private static final Pattern CADDY_IMAGE = Pattern.compile(
+            "caddy(?::[\\w.-]+)?@sha256:[a-f0-9]{64}");
     private static final Pattern SERVICE_BLOCK = Pattern.compile(
             "(?ms)^  [a-zA-Z0-9_-]+:\\R(?<body>.*?)(?=^  [a-zA-Z0-9_-]+:\\R|\\z)");
 
@@ -221,11 +241,8 @@ public class ReferenceDeploymentSecurityTest {
         });
         assertThat(headers.group("directives").lines().map(String::strip).toList()).containsExactly(
                 "header_up -Forwarded",
-                "header_up -X-Forwarded-For",
-                "header_up -X-Forwarded-Host",
                 "header_up -X-Forwarded-Port",
                 "header_up -X-Forwarded-Prefix",
-                "header_up -X-Forwarded-Proto",
                 "header_up -X-Forwarded-Ssl",
                 "header_up X-Forwarded-For {remote_host}",
                 "header_up X-Forwarded-Host {host}",
@@ -394,6 +411,106 @@ public class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void whenEveryDeploymentIsAdapted_thenEveryApplicationUpstreamAssertsItsOwnForwardedHeaders()
+            throws IOException {
+        // given
+        List<AdaptedUpstream> upstreams = adaptedUpstreams();
+
+        // when / then
+        assertThat(upstreams).hasSizeGreaterThan(6).allSatisfy(upstream -> {
+            assertThat(APPLICATION_UPSTREAMS).as("%s dials the uninventoried %s",
+                    upstream.origin(), upstream.dial()).containsKey(upstream.dial());
+            if (!Boolean.TRUE.equals(APPLICATION_UPSTREAMS.get(upstream.dial()))) {
+                return;
+            }
+            Set<String> contradicted = new LinkedHashSet<>(upstream.asserted().keySet());
+            contradicted.retainAll(upstream.deleted());
+            assertThat(contradicted).as("%s both asserts and deletes a header, so Caddy's own "
+                    + "operation order decides which wins", upstream.origin()).isEmpty();
+            Set<String> handled = new LinkedHashSet<>(upstream.deleted());
+            handled.addAll(upstream.asserted().keySet());
+            assertThat(handled).as("%s forwards a client value to the application", upstream.origin())
+                    .containsAll(FORWARDED_HEADERS);
+            assertThat(upstream.asserted()).allSatisfy((name, value) ->
+                    assertThat(value).as("%s asserts %s from what the client sent",
+                            upstream.origin(), name).doesNotContain(CLIENT_HEADER_PLACEHOLDER));
+        });
+    }
+
+    private record AdaptedUpstream(String origin, String dial, Map<String, String> asserted,
+                                   Set<String> deleted) {}
+
+    private static List<AdaptedUpstream> adaptedUpstreams() throws IOException {
+        List<AdaptedUpstream> upstreams = new ArrayList<>();
+        for (Path caddyfile : deploymentCaddyfiles()) {
+            for (String mode : TLS_MODES) {
+                readUpstreams(caddyfile.getFileName() + "@" + mode,
+                        adapted(caddyfile, mode), upstreams);
+            }
+        }
+        return upstreams;
+    }
+
+    private static void readUpstreams(String origin, JsonNode node, List<AdaptedUpstream> upstreams) {
+        if (node.isArray()) {
+            node.values().forEach(element -> readUpstreams(origin, element, upstreams));
+            return;
+        }
+        if (!node.isObject()) {
+            return;
+        }
+        if ("reverse_proxy".equals(node.path("handler").asString(""))) {
+            JsonNode request = node.path("headers").path("request");
+            Map<String, String> asserted = new LinkedHashMap<>();
+            request.path("set").properties().forEach(field -> asserted.put(
+                    field.getKey().toLowerCase(Locale.ROOT), field.getValue().toString()));
+            Set<String> deleted = new LinkedHashSet<>();
+            request.path("delete").values()
+                    .forEach(name -> deleted.add(name.asString("").toLowerCase(Locale.ROOT)));
+            node.path("upstreams").values().forEach(entry -> upstreams.add(new AdaptedUpstream(
+                    origin, entry.path("dial").asString(""), asserted, deleted)));
+        }
+        node.values().forEach(child -> readUpstreams(origin, child, upstreams));
+    }
+
+    // Caddy applies its own header operations in an order the file does not show, and it rewrites
+    // every shorthand the Caddyfile allows, so the adapted configuration is what this reads.
+    private static JsonNode adapted(Path caddyfile, String tlsMode) throws IOException {
+        ToStringConsumer configuration = new ToStringConsumer();
+        try (GenericContainer<?> adapter = new GenericContainer<>(DockerImageName.parse(deployedCaddy()))
+                .withCopyToContainer(MountableFile.forHostPath(caddyfile), "/etc/caddy/Caddyfile")
+                .withEnv("COURTSIDE_DOMAIN", "https://club.example")
+                .withEnv("COURTSIDE_MAIL_HOSTNAME", "mail.club.example")
+                .withEnv("COURTSIDE_APP_TLS_MODE", tlsMode)
+                .withCommand("caddy", "adapt", "--config", "/etc/caddy/Caddyfile")
+                .withStartupCheckStrategy(new OneShotStartupCheckStrategy())
+                .withLogConsumer(frame -> {
+                    if (frame.getType() == OutputFrame.OutputType.STDOUT) {
+                        configuration.accept(frame);
+                    }
+                })) {
+            adapter.start();
+        }
+        String json = configuration.toUtf8String();
+        assertThat(json).as("Caddy adapts %s under %s", caddyfile, tlsMode).startsWith("{");
+        return new ObjectMapper().readTree(json);
+    }
+
+    private static String deployedCaddy() throws IOException {
+        Matcher image = CADDY_IMAGE.matcher(Files.readString(Path.of("deploy", "compose.yaml")));
+        assertThat(image.find()).as("the deployment pins a Caddy image").isTrue();
+        return image.group();
+    }
+
+    private static List<Path> deploymentCaddyfiles() throws IOException {
+        try (Stream<Path> deployment = Files.walk(Path.of("deploy"))) {
+            return deployment.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().startsWith("Caddyfile"))
+                    .sorted().toList();
+        }
+    }
+
+    @Test
     void whenReadingCaddyTopLevelBlocks_thenLayoutAndCommentsCannotHideAnApplication() {
         assertThat(topLevelCaddyBlocks("""
                 {
@@ -515,13 +632,9 @@ public class ReferenceDeploymentSecurityTest {
         assertThat(securityProxy.group("directives").lines().map(String::strip).toList())
                 .containsExactly("header_up Host localhost",
                         "header_up -Forwarded",
-                        "header_up -X-Forwarded-For",
-                        "header_up -X-Forwarded-Host",
                         "header_up -X-Forwarded-Port",
                         "header_up -X-Forwarded-Prefix",
-                        "header_up -X-Forwarded-Proto",
                         "header_up -X-Forwarded-Ssl",
-                        "header_up Forwarded \"for={remote_host};host=localhost;proto={scheme}\"",
                         "header_up X-Forwarded-For {remote_host}",
                         "header_up X-Forwarded-Host localhost",
                         "header_up X-Forwarded-Proto {scheme}");

@@ -104,6 +104,34 @@ test("forged forwarded addresses cannot split the login rate-limit bucket at the
   )).toBe("1");
 });
 
+test("two peers behind the production proxy each keep their own login rate-limit subject",
+  async ({ page, browserName, journeyService }) => {
+  // given
+  await page.goto(`https://${PROXY_BOUNDARY_HOST}/login`);
+  await expect(page.getByTestId("login-view")).toBeVisible();
+  const forged = "203.0.113.9";
+  const subjects = await journeyService.peerLoginSubjects(browserName);
+  expect(subjects.browser).toMatch(/^[0-9a-f]{64}$/);
+  expect(subjects.secondPeer).toMatch(/^[0-9a-f]{64}$/);
+  expect(subjects.browser).not.toBe(subjects.secondPeer);
+
+  // when
+  const fromBrowser = await failedLoginFrom(page, forged);
+  const fromSecondPeer = await journeyService.failedLoginFromSecondPeer(forged);
+
+  // then
+  expect(fromBrowser).toEqual({
+    status: 401,
+    type: "urn:courtside:error:unauthenticated",
+    retryAfter: null
+  });
+  expect(fromSecondPeer).toEqual({ status: 401, type: "urn:courtside:error:unauthenticated" });
+  expect(await journeyService.executeSql(`
+    SELECT string_agg(subject_hash, ',' ORDER BY subject_hash COLLATE "C")
+    FROM login_attempt_limit WHERE scope = 'ADDRESS'
+  `)).toBe([subjects.browser, subjects.secondPeer].toSorted().join(","));
+});
+
 async function browserInventory(page: import("@playwright/test").Page) {
   const storage = await page.evaluate(async (sensitiveMarkers: string[]) => {
     const cacheNames = await caches.keys();
