@@ -117,11 +117,10 @@ class PerformanceDataSeederTest {
         when(accounts.existsByUsername(PerformanceDataSeeder.MARKER_USERNAME)).thenReturn(true);
         when(accounts.count()).thenReturn(PerformanceDataSeeder.MEMBER_COUNT + 1L);
         when(members.count()).thenReturn((long) PerformanceDataSeeder.MEMBER_COUNT);
-        java.util.Optional<org.courtside.identity.UserAccount> contender =
-                java.util.Optional.of(mock(org.courtside.identity.UserAccount.class));
-        when(accounts.findByUsername(PerformanceDataSeeder.CONTENTION_USERNAME)).thenReturn(contender);
-        List<Court> seeded = courts(PerformanceDataSeeder.COURT_COUNT);
-        when(facility.allCourts()).thenReturn(seeded);
+        when(accounts.findByUsername(PerformanceDataSeeder.CONTENTION_USERNAME))
+                .thenReturn(Optional.of(mock(org.courtside.identity.UserAccount.class)));
+        when(facility.allCourts()).thenReturn(java.util.Collections.nCopies(
+                PerformanceDataSeeder.COURT_COUNT, mock(Court.class)));
         when(bookings.count()).thenReturn(
                 PerformanceDataSeeder.BOOKING_COUNT - (long) PerformanceDataSeeder.COURT_COUNT);
         PerformanceDataSeeder seeder = new PerformanceDataSeeder(
@@ -131,15 +130,9 @@ class PerformanceDataSeederTest {
                 () -> java.time.ZoneId.of("Europe/Berlin"));
 
         // when / then
-        seeder.run(new DefaultApplicationArguments(new String[0]));
-    }
-
-    private List<Court> courts(int count) {
-        List<Court> all = new java.util.ArrayList<>();
-        for (int number = 1; number <= count; number++) {
-            all.add(court(number));
-        }
-        return all;
+        assertThatCode(() -> seeder.run(new DefaultApplicationArguments(new String[0])))
+                .doesNotThrowAnyException();
+        verify(persons, never()).save(any());
     }
 
     @Test
