@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -78,6 +79,11 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
 
+    private static MockHttpServletRequestBuilder searchRoster(String criteria) {
+        return post("/api/admin/roster/search").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content(criteria);
+    }
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
@@ -98,7 +104,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
-        mockMvc.perform(get("/api/admin/roster"))
+        mockMvc.perform(searchRoster("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries.length()").value(2))
                 .andExpect(jsonPath("$.nextCursor").doesNotExist())
@@ -125,7 +131,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
-        mockMvc.perform(get("/api/admin/roster").queryParam("limit", "1"))
+        mockMvc.perform(searchRoster("{\"limit\":1}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries.length()").value(1))
                 .andExpect(jsonPath("$.entries[0].personId").value(jane.toString()))
@@ -135,7 +141,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @Test
     void givenNoSession_whenListingTheRoster_thenItIsUnauthenticated() throws Exception {
         // when / then
-        mockMvc.perform(get("/api/admin/roster"))
+        mockMvc.perform(searchRoster("{}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
     }
@@ -144,7 +150,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "member", roles = "MEMBER")
     void givenAMemberSession_whenListingTheRoster_thenItIsDenied() throws Exception {
         // when / then
-        mockMvc.perform(get("/api/admin/roster"))
+        mockMvc.perform(searchRoster("{}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:access-denied"));
     }
@@ -154,7 +160,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenALimitAboveTheContractMaximum_whenListingTheRoster_thenItIsRejectedByTheContract()
             throws Exception {
         // when / then
-        mockMvc.perform(get("/api/admin/roster").queryParam("limit", "201"))
+        mockMvc.perform(searchRoster("{\"limit\":201}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("limit"))
@@ -169,7 +175,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         identity.createPerson("Jane", "Doe", "jane.doe@example.org");
 
         // when / then
-        mockMvc.perform(get("/api/admin/roster").queryParam("cursor", UUID.randomUUID().toString()))
+        mockMvc.perform(searchRoster("{\"cursor\":\"" + UUID.randomUUID() + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:roster-cursor-unknown"))
                 .andExpect(jsonPath("$.violations[0].code").value("roster.cursor.unknown"));
@@ -180,7 +186,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     void givenAQueryLongerThanTheContractAllows_whenListingTheRoster_thenItIsRejectedByTheContract()
             throws Exception {
         // when / then
-        mockMvc.perform(get("/api/admin/roster").queryParam("query", "d".repeat(61)))
+        mockMvc.perform(searchRoster("{\"query\":\"" + "d".repeat(61) + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("query"))
@@ -858,7 +864,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.locale").value("en"));
 
         // then
-        mockMvc.perform(get("/api/admin/roster"))
+        mockMvc.perform(searchRoster("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries[?(@.personId=='" + jane + "')].locale").value("en"));
     }
@@ -1210,7 +1216,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.membershipTypeId").value(MEMBERSHIP_TYPE_ID.toString()));
 
         // then
-        mockMvc.perform(get("/api/admin/roster"))
+        mockMvc.perform(searchRoster("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries[0].membershipTypeId")
                         .value(MEMBERSHIP_TYPE_ID.toString()));
@@ -1350,7 +1356,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
         // then
         assertThat(members.findByPersonIdIn(List.of(mary))).isNotEmpty();
-        mockMvc.perform(get("/api/admin/roster"))
+        mockMvc.perform(searchRoster("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries[0].personId").value(mary.toString()))
                 .andExpect(jsonPath("$.entries[0].membershipTypeId")
@@ -1566,7 +1572,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         members.save(departed);
 
         // when / then
-        mockMvc.perform(get("/api/admin/roster").queryParam("membershipTypeId", MEMBERSHIP_TYPE_ID.toString()))
+        mockMvc.perform(searchRoster("{\"membershipTypeId\":\"" + MEMBERSHIP_TYPE_ID + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries.length()").value(1))
                 .andExpect(jsonPath("$.entries[0].personId").value(jane.toString()));
@@ -1583,7 +1589,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         members.save(memberSince(mary, OTHER_MEMBERSHIP_TYPE_ID));
 
         // when / then
-        mockMvc.perform(get("/api/admin/roster").queryParam("membershipTypeId", OTHER_MEMBERSHIP_TYPE_ID.toString()))
+        mockMvc.perform(searchRoster("{\"membershipTypeId\":\"" + OTHER_MEMBERSHIP_TYPE_ID + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries.length()").value(1))
                 .andExpect(jsonPath("$.entries[0].personId").value(mary.toString()));
@@ -1601,9 +1607,8 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         members.save(memberSince(richard, OTHER_MEMBERSHIP_TYPE_ID));
 
         // when / then
-        mockMvc.perform(get("/api/admin/roster")
-                        .queryParam("membershipTypeId", OTHER_MEMBERSHIP_TYPE_ID.toString())
-                        .queryParam("query", "j"))
+        mockMvc.perform(searchRoster("{\"membershipTypeId\":\"" + OTHER_MEMBERSHIP_TYPE_ID
+                        + "\",\"query\":\"j\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries.length()").value(1))
                 .andExpect(jsonPath("$.entries[0].personId").value(mary.toString()));
@@ -1618,7 +1623,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
-        mockMvc.perform(get("/api/admin/roster").queryParam("membershipTypeId", MEMBERSHIP_TYPE_ID.toString()))
+        mockMvc.perform(searchRoster("{\"membershipTypeId\":\"" + MEMBERSHIP_TYPE_ID + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries.length()").value(0))
                 .andExpect(jsonPath("$.nextCursor").doesNotExist());

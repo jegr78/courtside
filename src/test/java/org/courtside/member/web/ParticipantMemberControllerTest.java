@@ -9,7 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -17,7 +19,8 @@ import java.util.UUID;
 
 import static org.courtside.member.MemberFixtures.memberSince;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -38,6 +41,16 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
 
+    private static RequestBuilder searchFor(String query) {
+        return post("/api/public/participant-members").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"query\":" + quoted(query) + "}");
+    }
+
+    private static String quoted(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
@@ -54,7 +67,7 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
         members.save(memberSince(john, MEMBERSHIP_TYPE_ID));
 
         // when / then
-        mockMvc.perform(get("/api/public/participant-members").queryParam("query", "do"))
+        mockMvc.perform(searchFor("do"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].personId").value(jane.toString()))
@@ -64,7 +77,7 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
     @Test
     void givenNoSession_whenSearchingMembers_thenItIsUnauthenticated() throws Exception {
         // when / then
-        mockMvc.perform(get("/api/public/participant-members").queryParam("query", "do"))
+        mockMvc.perform(searchFor("do"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
     }
@@ -73,7 +86,7 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "member", roles = "MEMBER")
     void givenAShortQuery_whenSearchingMembers_thenItIsRejectedByTheContract() throws Exception {
         // when / then
-        mockMvc.perform(get("/api/public/participant-members").queryParam("query", "d"))
+        mockMvc.perform(searchFor("d"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("query"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"));
@@ -87,7 +100,7 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
         members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
 
         // when / then
-        mockMvc.perform(get("/api/public/participant-members").queryParam("query", "%%"))
+        mockMvc.perform(searchFor("%%"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
@@ -102,8 +115,7 @@ class ParticipantMemberControllerTest extends AbstractIntegrationTest {
         members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
 
         // when / then
-        mockMvc.perform(get("/api/public/participant-members")
-                        .queryParam("query", "' OR 1=1 --"))
+        mockMvc.perform(searchFor("' OR 1=1 --"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].personId").value(literal.toString()))

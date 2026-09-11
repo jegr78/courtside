@@ -2826,6 +2826,7 @@ paths:
     post:
       tags: [participants]
       operationId: searchParticipantMembers
+      x-courtside-state-invariant: true
       summary: Members matching a name fragment for participant selection.
       description: |
         Any authenticated account may search the entire member directory by a name fragment,
@@ -3963,6 +3964,7 @@ paths:
     post:
       tags: [admin-roster]
       operationId: searchRoster
+      x-courtside-state-invariant: true
       summary: The club's people, with their account and membership when they have one.
       description: |
         A person exists without an account — children and dormant records from a membership import

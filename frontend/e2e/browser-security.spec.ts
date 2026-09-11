@@ -249,7 +249,7 @@ test("cross-origin browser requests neither carry session authority nor expose A
     expect(sessionResponse!.headers()["content-type"]).toContain("application/json");
     expect(sessionResponse!.headers()["x-content-type-options"]).toBe("nosniff");
     expect(sessionResponse!.headers()["access-control-allow-origin"]).toBeUndefined();
-    const scriptResponse = await probePage.goto(`${secureOrigin}/api/admin/roster?limit=1`);
+    const scriptResponse = await probePage.goto(`${secureOrigin}/api/admin/config`);
     expect(scriptResponse).not.toBeNull();
     expect(scriptResponse!.status()).toBe(401);
     expect(scriptResponse!.headers()["content-type"]).toContain("application/problem+json");
@@ -282,13 +282,13 @@ test("cross-origin browser requests neither carry session authority nor expose A
   // when
   const scriptResult = await page.evaluate((origin) => new Promise<string>((resolve) => {
     const script = document.createElement("script");
-    script.src = `${origin}/api/admin/roster?limit=1`;
+    script.src = `${origin}/api/admin/config`;
     script.onload = () => resolve("loaded");
     script.onerror = () => resolve("blocked-by-browser");
     document.head.append(script);
   }), secureOrigin);
   const scriptRequest = observedRequests.find((request) =>
-    request.url() === `${secureOrigin}/api/admin/roster?limit=1`
+    request.url() === `${secureOrigin}/api/admin/config`
       && request.resourceType() === "script");
 
   // then

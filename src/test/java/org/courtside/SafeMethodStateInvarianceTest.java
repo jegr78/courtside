@@ -50,6 +50,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -93,6 +94,14 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
 
     private static final int ANSWERED = 200;
 
+    private static final String STATE_INVARIANT = "x-courtside-state-invariant";
+
+    // A read that had to become a POST because its criteria name somebody. It says so in the
+    // document, and saying so is what puts it under the fingerprint below.
+    private static final Map<String, String> READING_POSTS = Map.of(
+            "/api/public/participant-members", "{\"query\":\"Miles\"}",
+            "/api/admin/roster/search", "{\"limit\":10}");
+
     private record Probe(String identifier, String query) {
     }
 
@@ -122,7 +131,6 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/public/config/logo", read()),
             entry("/api/public/booking-cards", read()),
             entry("/api/public/participant-cards", read()),
-            entry("/api/public/participant-members", read("query=Miles")),
             entry("/api/bookings", read("date=" + TODAY)),
             entry("/api/bookings/eligibility", read()),
             entry("/api/my/bookings", read()),
@@ -137,7 +145,6 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/admin/participant-cards/{id}", read("participantCardId", "")),
             entry("/api/admin/membership-types", read()),
             entry("/api/admin/membership-types/{id}", read("membershipTypeId", "")),
-            entry("/api/admin/roster", read()),
             entry("/api/admin/roster/{personId}", read("personId", "")),
             entry("/api/admin/import/encodings", read()),
             entry("/api/admin/import/sources", read()),
@@ -295,6 +302,18 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenTheContractIsRead_thenEveryStateInvariantPostHasAProbe() {
+        // when
+        TreeSet<String> claimed = documentedStateInvariantPosts();
+
+        // then
+        assertThat(new TreeSet<>(READING_POSTS.keySet()))
+                .as("an operation claiming %s without a probe claims it to nobody. Add it to"
+                        + " READING_POSTS, with a body that answers successfully.", STATE_INVARIANT)
+                .isEqualTo(claimed);
+    }
+
+    @Test
     void whenTheSchemaIsRead_thenEveryExemptColumnStillExists() {
         // when
         Set<String> columns = columnsOfEveryTable().entrySet().stream()
@@ -341,6 +360,20 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             }
             Map<String, String> after = stateFingerprint();
             failures.addAll(changedState(probe.getKey(), before, after));
+            exemptColumnsThatMoved.addAll(movedAmong(EXEMPT_COLUMNS.keySet(), before, after));
+        }
+
+        for (Map.Entry<String, String> reading : new TreeMap<>(READING_POSTS).entrySet()) {
+            Map<String, String> before = stateFingerprint();
+            HttpResponse<byte[]> read = sendJson(reading.getKey(), reading.getValue());
+            if (read.statusCode() != ANSWERED) {
+                failures.add("POST " + reading.getKey() + " answered " + read.statusCode()
+                        + " instead of " + ANSWERED + ": "
+                        + new String(read.body(), StandardCharsets.UTF_8));
+                continue;
+            }
+            Map<String, String> after = stateFingerprint();
+            failures.addAll(changedState(reading.getKey(), before, after));
             exemptColumnsThatMoved.addAll(movedAmong(EXEMPT_COLUMNS.keySet(), before, after));
         }
 
@@ -455,6 +488,14 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
                 .build(), HttpResponse.BodyHandlers.ofByteArray());
     }
 
+    private HttpResponse<byte[]> sendJson(String uri, String body) throws Exception {
+        return httpClient.send(HttpRequest.newBuilder(URI.create(baseUrl() + uri))
+                .header("Content-Type", "application/json")
+                .header("X-XSRF-TOKEN", csrfToken())
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build(), HttpResponse.BodyHandlers.ofByteArray());
+    }
+
     private void uploadClubLogo() throws Exception {
         String boundary = "courtside-" + UUID.randomUUID();
         ByteArrayOutputStream body = new ByteArrayOutputStream();
@@ -524,6 +565,27 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     }
 
     @SuppressWarnings("unchecked")
+    private static TreeSet<String> documentedStateInvariantPosts() {
+        return documentedPaths().entrySet().stream()
+                .filter(path -> Boolean.TRUE.equals(operation(path.getValue()).get(STATE_INVARIANT)))
+                .map(Map.Entry::getKey)
+                .collect(TreeSet::new, TreeSet::add, TreeSet::addAll);
+    }
+
+    private static Map<String, Object> operation(Object pathItem) {
+        Object post = ((Map<String, Object>) pathItem).get("post");
+        return post == null ? Map.of() : (Map<String, Object>) post;
+    }
+
+    private static Map<String, Object> documentedPaths() {
+        try (InputStream document = SafeMethodStateInvarianceTest.class.getResourceAsStream(DOCUMENT)) {
+            Map<String, Object> tree = new Yaml().load(document);
+            return (Map<String, Object>) tree.get("paths");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private static TreeSet<String> documentedSafeOperations() {
         try (InputStream document = SafeMethodStateInvarianceTest.class.getResourceAsStream(DOCUMENT)) {
             Map<String, Object> tree = new Yaml().load(document);

@@ -8,7 +8,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -36,6 +38,11 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
 
     private MockMvc mockMvc;
 
+    private static MockHttpServletRequestBuilder exportRoster(String criteria) {
+        return post("/api/admin/export/roster").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content(criteria);
+    }
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
@@ -46,7 +53,7 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(roles = "ADMIN")
     void givenARosterToTakeOut_whenItIsExported_thenTheAnswerIsAFileTheBrowserSaves() throws Exception {
         // when / then
-        String written = mockMvc.perform(post("/api/admin/export/roster").with(csrf()))
+        String written = mockMvc.perform(exportRoster("{}"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("text/csv"))
                 .andExpect(header().string("Content-Disposition",
@@ -61,8 +68,7 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
     void givenAClubWhoseSpreadsheetReadsWindows1252_whenItExports_thenTheBytesAreInThatCharacterSet()
             throws Exception {
         // when
-        byte[] written = mockMvc.perform(post("/api/admin/export/roster")
-                        .param("encoding", "windows-1252").param("separator", ";").with(csrf()))
+        byte[] written = mockMvc.perform(exportRoster("{\"encoding\":\"windows-1252\",\"separator\":\";\"}"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
 
@@ -75,7 +81,7 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
     void givenAnEncodingNoCharsetProvides_whenItExports_thenTheAnswerNamesTheEncodingBack()
             throws Exception {
         // when / then
-        mockMvc.perform(post("/api/admin/export/roster").param("encoding", "utf-9").with(csrf()))
+        mockMvc.perform(exportRoster("{\"encoding\":\"utf-9\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:snapshot-encoding-unsupported"))
                 .andExpect(jsonPath("$.violations[0].code")
@@ -87,8 +93,7 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
     void givenAnEncodingThatOnlyReads_whenItExports_thenItIsRefusedRatherThanFailingToWrite()
             throws Exception {
         // when / then
-        mockMvc.perform(post("/api/admin/export/roster")
-                        .param("encoding", "x-JISAutoDetect").with(csrf()))
+        mockMvc.perform(exportRoster("{\"encoding\":\"x-JISAutoDetect\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.violations[0].code")
                         .value("import.snapshot.encodingUnsupported"))
@@ -100,7 +105,7 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
     void givenASeparatorTheDocumentDoesNotAllow_whenItExports_thenTheFieldIsNamedBack()
             throws Exception {
         // when / then
-        mockMvc.perform(post("/api/admin/export/roster").param("separator", "\"").with(csrf()))
+        mockMvc.perform(exportRoster("{\"separator\":\"\\\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("separator"));
     }
@@ -109,7 +114,7 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
     @WithMockUser(roles = "MEMBER")
     void givenAMemberRatherThanABoard_whenTheyAskForTheRoster_thenTheyAreRefused() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/admin/export/roster").with(csrf()))
+        mockMvc.perform(exportRoster("{}"))
                 .andExpect(status().isForbidden());
     }
 }

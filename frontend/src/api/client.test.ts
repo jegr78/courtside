@@ -324,10 +324,12 @@ it("given a scoped move, when previewing it, then the language-neutral request i
   expect(preview.executable).toBe(true);
 });
 
-it("given a name fragment, when searching participant members, then it is encoded in the query", async () => {
+it("given a name fragment, when searching participant members, then the url carries no part of it", async () => {
   // given
-  server.use(http.get("/api/public/participant-members", ({ request }) => {
-    expect(new URL(request.url).searchParams.get("query")).toBe("Jane D");
+  let requested: URL | undefined;
+  server.use(http.post("/api/public/participant-members", async ({ request }) => {
+    requested = new URL(request.url);
+    expect(await request.json()).toEqual({ query: "Jane D" });
     return HttpResponse.json([{
       personId: "11111111-1111-1111-1111-111111111111", displayName: "Jane Doe"
     }]);
@@ -338,6 +340,8 @@ it("given a name fragment, when searching participant members, then it is encode
 
   // then
   expect(members[0].displayName).toBe("Jane Doe");
+  expect(requested?.search).toBe("");
+  expect(requested?.pathname).toBe("/api/public/participant-members");
 });
 
 it("given a snapshot file, when creating a preview, then both parts go out under a boundary the browser chose", async () => {
@@ -364,19 +368,23 @@ it("given a snapshot file, when creating a preview, then both parts go out under
   expect(body).toContain("WINDOWS_1252");
 });
 
-it("given a membership type filter, when listing the roster, then it reaches the query string", async () => {
+it("given a name fragment, when searching the roster, then the criteria are the body and the url is bare", async () => {
   // given
-  let seen: string | undefined;
-  server.use(http.get("/api/admin/roster", ({ request }) => {
-    seen = new URL(request.url).search;
+  let requested: URL | undefined;
+  let sent: unknown;
+  server.use(http.post("/api/admin/roster/search", async ({ request }) => {
+    requested = new URL(request.url);
+    sent = await request.json();
     return HttpResponse.json({ entries: [] });
   }));
 
   // when
-  await api.roster(undefined, undefined, 50, "type-1");
+  await api.roster("Jane D", undefined, 50, "type-1");
 
   // then
-  expect(seen).toContain("membershipTypeId=type-1");
+  expect(sent).toEqual({ limit: 50, query: "Jane D", membershipTypeId: "type-1" });
+  expect(requested?.search).toBe("");
+  expect(requested?.pathname).toBe("/api/admin/roster/search");
 });
 
 it("given a person, when reading them alone, then the entry is returned", async () => {
@@ -393,7 +401,7 @@ it("given a person, when reading them alone, then the entry is returned", async 
   expect(person.firstName).toBe("Jane");
 });
 
-it("given an external id with characters a path would swallow, when unlinking it, then it survives the url", async () => {
+it("given a link to undo, when it is unlinked, then the url names the reference and not the member number", async () => {
   // given
   let path: string | undefined;
   server.use(http.delete("/api/admin/import/sources/s1/references/*", ({ request }) => {
@@ -402,10 +410,10 @@ it("given an external id with characters a path would swallow, when unlinking it
   }));
 
   // when
-  await api.unlinkExternalReference("s1", "A/4711");
+  await api.unlinkExternalReference("s1", "22222222-2222-2222-2222-222222222222");
 
   // then
-  expect(path).toBe("/api/admin/import/sources/s1/references/A%2F4711");
+  expect(path).toBe("/api/admin/import/sources/s1/references/22222222-2222-2222-2222-222222222222");
 });
 
 // Signing out clears the CSRF token, so the sign-in that follows carries none and is answered 403 —
