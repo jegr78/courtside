@@ -628,6 +628,16 @@ components:
         label: { type: string }
         capacity: { type: [integer, "null"] }
 
+    ParticipantMemberSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 2
+          maxLength: 60
+          description: Matched case-insensitively anywhere in a member's full name.
+
     PublicParticipantMember:
       type: object
       required: [personId, displayName]
@@ -1346,6 +1356,74 @@ components:
           type: [string, "null"]
           format: uuid
           description: Pass this person id as `cursor` to continue after the current page.
+
+    RosterSearchRequest:
+      type: object
+      description: |
+        What narrows the roster, and why it is a body rather than a query string: a fragment of a
+        name is the name of a person, and a URL reaches browser history, an intermediary's log and
+        an operator's diagnostics, none of which the protections on a response body cover.
+      properties:
+        query:
+          type: string
+          maxLength: 60
+          description: Matches against the person's full name, case-insensitively.
+        membershipTypeId:
+          type: string
+          format: uuid
+          description: |
+            Only the people who hold this membership type **right now**. A membership that has
+            ended does not match, even though the entry still names the type its holder last held
+            — `membershipTypeId` on an entry answers "of what were they a member", and this
+            field answers "of what are they one". Combining it with `query` narrows by both.
+        cursor:
+          type: string
+          format: uuid
+          description: The `nextCursor` of the preceding page.
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+
+    RosterExportRequest:
+      type: object
+      description: |
+        The same narrowing the roster list takes, plus what the receiving spreadsheet needs. It is
+        a body for the reason above and not because the operation is a `POST`.
+      properties:
+        query:
+          type: string
+          maxLength: 60
+          description: Matches against the person's full name, case-insensitively.
+        membershipTypeId:
+          type: string
+          format: uuid
+          description: Only the people who hold this membership type right now.
+        sourceId:
+          type: string
+          format: uuid
+          description: |
+            The import source whose member numbers fill `memberNumber`. An unknown one is answered
+            `404`, as it is everywhere else it names a source.
+        separator:
+          type: string
+          pattern: '^[,;|\t]$'
+          minLength: 1
+          maxLength: 1
+          default: ","
+          description: |
+            The single character between two cells. A club whose spreadsheet reads semicolons says
+            so here; the default is a comma.
+        encoding:
+          type: string
+          maxLength: 40
+          default: "UTF-8"
+          description: |
+            One of the names `/api/admin/import/encodings` lists. That list answers the import,
+            so a few of its names decode only and cannot write a file; asking one of them for an
+            export is answered `400` for the same reason an unusable name is — it names a club's
+            tooling and not a caller's bug.
 
     AccountRequest:
       type: object
@@ -2745,9 +2823,9 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
 
   /api/public/participant-members:
-    get:
+    post:
       tags: [participants]
-      operationId: listParticipantMembers
+      operationId: searchParticipantMembers
       summary: Members matching a name fragment for participant selection.
       description: |
         Any authenticated account may search the entire member directory by a name fragment,
@@ -2757,11 +2835,19 @@ paths:
         implicit. The current authorization does not verify club membership. Before authenticated
         external guest accounts are introduced, this endpoint must gain that boundary so those
         accounts do not inherit the directory reach.
-      parameters:
-        - name: query
-          in: query
-          required: true
-          schema: { type: string, minLength: 2, maxLength: 60 }
+
+        Reading the directory is a `POST` because the fragment is part of somebody's name, and a
+        name in a URL outlives the request in browser history, an intermediary's log and an
+        operator's diagnostics. It changes nothing, and `SafeMethodStateInvarianceTest` holds it
+        to that alongside the safe methods.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ParticipantMemberSearchRequest" }
       responses:
         "200":
           description: Matching members ordered by display name.
@@ -3839,61 +3925,6 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   /api/admin/roster:
-    get:
-      tags: [admin-roster]
-      operationId: listRoster
-      summary: The club's people, with their account and membership when they have one.
-      description: |
-        A person exists without an account — children and dormant records from a membership import
-        have none — so `accountId`, `username` and `roles` are absent for them and `enabled` reports
-        the account's state only where one exists.
-
-        The page is ordered by last name, then first name, then person id, and `cursor` continues
-        after the entry it names in that same order.
-      parameters:
-        - name: query
-          in: query
-          required: false
-          description: Matches against the person's full name, case-insensitively.
-          schema: { type: string, maxLength: 60 }
-        - name: membershipTypeId
-          in: query
-          required: false
-          description: |
-            Only the people who hold this membership type **right now**. A membership that has
-            ended does not match, even though the entry still names the type its holder last held
-            — `membershipTypeId` on an entry answers "of what were they a member", and this
-            parameter answers "of what are they one". Combining it with `query` narrows by both.
-
-            An unknown type is not an error: nobody holds it, so the page is empty.
-          schema: { type: string, format: uuid }
-        - name: cursor
-          in: query
-          required: false
-          description: |
-            The opaque `nextCursor` returned by the preceding page. A cursor naming somebody the
-            roster no longer holds is normally answered `400` rather than silently ending the list,
-            because a truncated page is the one wrong answer a client cannot detect. The check and
-            the page are separate statements, so somebody removed between the two still yields an
-            empty final page; a client that must be certain a list was complete re-reads it from
-            the first page.
-          schema: { type: string, format: uuid }
-        - name: limit
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
-      responses:
-        "200":
-          description: The page.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/RosterPage" }
-        "400":
-          $ref: "#/components/responses/Invalid"
-        "401":
-          $ref: "#/components/responses/Unauthenticated"
-        "403":
-          $ref: "#/components/responses/Forbidden"
     post:
       tags: [admin-roster]
       operationId: createPerson
@@ -3921,6 +3952,48 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/RosterEntry" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/roster/search:
+    post:
+      tags: [admin-roster]
+      operationId: searchRoster
+      summary: The club's people, with their account and membership when they have one.
+      description: |
+        A person exists without an account — children and dormant records from a membership import
+        have none — so `accountId`, `username` and `roles` are absent for them and `enabled` reports
+        the account's state only where one exists.
+
+        The page is ordered by last name, then first name, then person id, and `cursor` continues
+        after the entry it names in that same order. A cursor naming somebody the roster no longer
+        holds is answered `400` rather than silently ending the list, because a truncated page is
+        the one wrong answer a client cannot detect. The check and the page are separate statements,
+        so somebody removed between the two still yields an empty final page; a client that must be
+        certain a list was complete re-reads it from the first page. An unknown membership type is
+        not an error: nobody holds it, so the page is empty.
+
+        Reading the roster is a `POST` because the criteria name a person and a criterion in a URL
+        outlives the request in places a response body never reaches. It changes nothing, and
+        `SafeMethodStateInvarianceTest` holds it to that alongside the safe methods.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RosterSearchRequest" }
+      responses:
+        "200":
+          description: The page.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RosterPage" }
         "400":
           $ref: "#/components/responses/Invalid"
         "401":
@@ -4758,7 +4831,7 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
-  /api/admin/import/sources/{sourceId}/references/{externalId}:
+  /api/admin/import/sources/{sourceId}/references/{referenceId}:
     delete:
       tags: [admin-import-references]
       operationId: unlinkExternalReference
@@ -4768,9 +4841,11 @@ paths:
         number names them. The next snapshot carrying that member number therefore reads as a person
         this instance has not seen before.
 
-        A member number outside the shape a reference can hold — blank, or longer than the stored
-        value allows — is answered `404` like any other one nothing points at, because no reference
-        can be holding it.
+        The link is addressed by `referenceId`, the id this instance minted for it and which every
+        entry of the reference list already carries. The member number would name the same row, but
+        it is a value the club's own source system holds about a person, and a path segment reaches
+        browser history, an intermediary's log and an operator's diagnostics. A `referenceId` that
+        belongs to another source, or that nothing points at, is answered `404`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -4779,10 +4854,10 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
-        - name: externalId
+        - name: referenceId
           in: path
           required: true
-          schema: { type: string, minLength: 1, maxLength: 120 }
+          schema: { type: string, format: uuid }
       responses:
         "204":
           description: Unlinked.
@@ -5705,40 +5780,11 @@ paths:
       security:
         - sessionCookie: []
           csrfToken: []
-      parameters:
-        - name: query
-          in: query
-          required: false
-          description: Matches against the person's full name, case-insensitively.
-          schema: { type: string, maxLength: 60 }
-        - name: membershipTypeId
-          in: query
-          required: false
-          description: Only the people who hold this membership type right now.
-          schema: { type: string, format: uuid }
-        - name: sourceId
-          in: query
-          required: false
-          description: |
-            The import source whose member numbers fill `memberNumber`. An unknown one is answered
-            `404`, as it is everywhere else it names a source.
-          schema: { type: string, format: uuid }
-        - name: separator
-          in: query
-          required: false
-          description: |
-            The single character between two cells. A club whose spreadsheet reads semicolons says
-            so here; the default is a comma.
-          schema: { type: string, pattern: '^[,;|\t]$', minLength: 1, maxLength: 1, default: "," }
-        - name: encoding
-          in: query
-          required: false
-          description: |
-            One of the names `/api/admin/import/encodings` lists. That list answers the import,
-            so a few of its names decode only and cannot write a file; asking one of them for an
-            export is answered `400` for the same reason an unusable name is — it names a club's
-            tooling and not a caller's bug.
-          schema: { type: string, maxLength: 40, default: "UTF-8" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RosterExportRequest" }
       responses:
         "200":
           description: The roster, one row per person.
@@ -5805,8 +5851,13 @@ paths:
           required: false
           description: |
             One of the names `/api/admin/import/encodings` lists that can write a file; a
-            decode-only one is answered `400`.
-          schema: { type: string, maxLength: 40, default: "UTF-8" }
+            decode-only one is answered `400`. The shape is the one a character set name may take
+            at all, so a value that is not a name of one is refused before it reaches the list.
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,39}$"
+            maxLength: 40
+            default: "UTF-8"
       responses:
         "200":
           description: The period's confirmed bookings, one row per court and slot.

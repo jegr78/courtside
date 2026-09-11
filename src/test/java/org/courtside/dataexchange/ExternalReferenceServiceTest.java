@@ -158,10 +158,10 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
         // given
         UUID source = source("roster-system");
         UUID jane = person("Jane", "Doe");
-        references.link(source, "4711", jane);
+        UUID reference = references.link(source, "4711", jane).referenceId();
 
         // when
-        references.unlink(source, "4711");
+        references.unlink(source, reference);
 
         // then
         assertThat(personIdsOf(source)).isEmpty();
@@ -174,7 +174,7 @@ class ExternalReferenceServiceTest extends AbstractIntegrationTest {
         UUID source = source("roster-system");
 
         // when / then
-        assertThatThrownBy(() -> references.unlink(source, "4711"))
+        assertThatThrownBy(() -> references.unlink(source, UUID.randomUUID()))
                 .isInstanceOf(ExternalReferenceNotFoundException.class);
     }
 
