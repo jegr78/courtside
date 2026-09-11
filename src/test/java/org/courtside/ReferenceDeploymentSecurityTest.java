@@ -70,24 +70,32 @@ public class ReferenceDeploymentSecurityTest {
             "image: ${COURTSIDE_RESTORE_IMAGE}";
     private static final String SECURITY_CANDIDATE_IMAGE_ALIAS =
             "image: ${COURTSIDE_SECURITY_IMAGE:?required}";
+    private static final String SECURITY_FIXTURES_IMAGE_ALIAS =
+            "image: ${COURTSIDE_SECURITY_FIXTURES_IMAGE:?required}";
+    private static final String FIXTURE_IMAGE_BASE = "FROM ${BASE_IMAGE}";
     private static final Set<String> OWN_IMAGE_REFERENCES =
             Set.of(GHCR_RELEASE_IMAGE, UAT_LOCAL_IMAGE_ALIAS, PERF_LOCAL_IMAGE_ALIAS,
                     UPGRADE_CANDIDATE_IMAGE_ALIAS, RESTORE_CANDIDATE_IMAGE_ALIAS,
-                    SECURITY_CANDIDATE_IMAGE_ALIAS);
+                    SECURITY_CANDIDATE_IMAGE_ALIAS, SECURITY_FIXTURES_IMAGE_ALIAS,
+                    FIXTURE_IMAGE_BASE);
 
     @Test
     void whenReadingImageSources_thenEveryThirdPartyImageIsPinnedByDigest() throws IOException {
         // given
         List<Path> sources;
-        try (var deploymentFiles = Files.list(Path.of("deploy"))) {
-            sources = deploymentFiles
-                    .filter(path -> path.getFileName().toString().matches("compose(?:\\..+)?\\.yaml"))
+        try (var deploymentFiles = Files.list(Path.of("deploy"));
+             var images = Files.list(Path.of("."))) {
+            sources = Stream.concat(
+                            images.filter(path -> path.getFileName().toString().matches("Dockerfile(?:\\..+)?")),
+                            deploymentFiles.filter(path ->
+                                    path.getFileName().toString().matches("compose(?:\\..+)?\\.yaml")))
                     .sorted()
                     .toList();
         }
 
         // when / then
-        for (Path source : Stream.concat(Stream.of(Path.of("Dockerfile")), sources.stream()).toList()) {
+        assertThat(sources).as("no deployment source was read").hasSizeGreaterThan(1);
+        for (Path source : sources) {
             Files.readAllLines(source).stream()
                     .map(String::strip)
                     .filter(line -> line.startsWith("FROM ") || line.startsWith("image:"))

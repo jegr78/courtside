@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
 import { PassThrough } from "node:stream";
@@ -11,7 +12,7 @@ import {
   superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
-  performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
+  performanceImagePlans, performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
   resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference, repositoryFromRemote,
   validateNode, validatePublicAddress
 } from "./courtside.mjs";
@@ -303,6 +304,24 @@ test("given security commands, when parsing them, then run identity and authoriz
   assert.throws(() => parseArguments(["security-recover", "run-0001"]), /--attempt/);
   assert.throws(() => parseArguments(["security-reset", "run-0001", "--confirm", "wrong"]),
     /courtside-security-run-0001/);
+});
+
+// A plain production image would leave the environment with no accounts to load, and a load test
+// against an empty database reports a number rather than failing.
+test("given the performance environment, when its image is built, then Compose runs the fixture image", () => {
+  // given
+  const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+  const compose = yaml.load(readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8"));
+
+  // when
+  const plans = performanceImagePlans();
+
+  // then
+  const served = plans.filter((plan) => plan.args.includes(compose.services.app.image));
+  assert.equal(served.length, 1, "no image build produces what Compose runs");
+  assert.ok(served[0].args.includes("Dockerfile.fixtures"), "Compose runs an image without the fixtures");
+  assert.deepEqual(served[0].args.filter((argument) => argument.startsWith("BASE_IMAGE=")),
+    [`BASE_IMAGE=${plans[0].args[plans[0].args.indexOf("-t") + 1]}`]);
 });
 
 test("given automated performance startup, when suppressing credentials, then the password is absent from output", () => {

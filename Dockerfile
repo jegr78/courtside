@@ -15,6 +15,18 @@ COPY ${LAYERS}/snapshot-dependencies/ ./
 COPY ${LAYERS}/application/ ./
 COPY LICENSE NOTICE ./
 
+RUN set -eu; \
+    recorded=0; \
+    while IFS= read -r file; do \
+      [ -n "$file" ] || continue; \
+      recorded=$((recorded + 1)); \
+      if [ -e "BOOT-INF/classes/$file" ]; then \
+        echo "The production image carries the non-production file $file" >&2; \
+        exit 1; \
+      fi; \
+    done < META-INF/courtside-excluded-fixtures.txt; \
+    [ "$recorded" -gt 0 ] || { echo "The exclusion record names no file to keep out" >&2; exit 1; }
+
 USER 10001:10001
 EXPOSE 8080
 

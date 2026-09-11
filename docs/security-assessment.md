@@ -167,7 +167,22 @@ start the candidate's image at all is different and stops the job, because a com
 toolchains to have met the application; tolerating an absent base run would let a branch suppress
 the difference it is being measured by. Each side reads its own deployment description; the base worktree is created before any candidate code runs, though both
 still share the workspace's git directory, so the independence of the previous toolchain rests on
-that ordering rather than on isolation. The workflow
+that ordering rather than on isolation. That worktree is built as well as installed,
+because its tooling stages the assessment fixtures out of build output rather than out of the
+source tree, and a worktree that only installed Node could not start its target at all. The
+synthetic dataset reaches the base target from the candidate. The shipped image no longer carries
+the seeders, so a toolchain that predates that change has nothing to seed with, and the candidate
+runs its own seeder against the base's project between starting that target and assessing it. That
+step builds and removes an image tag of its own, so the fixture image the base built for itself is
+never retagged. The seeder is idempotent, so where the base's own description already seeds, the
+step verifies the dataset against the candidate's expectation instead of writing it. That
+verification is the one check the pair's fixture fingerprint cannot make, because the fingerprint
+reads the dataset's properties file and not the code that writes it. It also moves where the base
+leg's data comes from. The worktree ordering above keeps the previous toolchain's judgement
+independent, and that is a claim about the tools rather than about the fixture: from this change
+onwards the dataset both toolchains meet is written by the candidate's seeder, and only the
+properties file that seeder reads is fingerprinted. A branch that changed how the dataset is written
+would therefore change both legs at once, which the whole-branch review is what stands behind. The workflow
 uses the comparator from the protected base revision whenever the two are byte-identical, so a
 branch that changes the comparator is judged by its own and the whole-branch review is what stands
 behind that. It computes both

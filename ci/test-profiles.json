@@ -7,6 +7,7 @@
         ".gitignore",
         ".release-please-manifest.json",
         "Dockerfile",
+        "Dockerfile.fixtures",
         "SECURITY.md",
         "release-please-config.json",
         "frontend/.npmrc",

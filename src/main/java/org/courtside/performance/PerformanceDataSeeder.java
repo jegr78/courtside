@@ -4,7 +4,6 @@ import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingRulesViolatedException;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
-import org.courtside.booking.HistoricalBookingImporter;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.facility.Court;
 import org.courtside.config.ClubIdentity;

@@ -269,6 +269,14 @@ jobs:
           path: build
           retention-days: 1
 
+      # The assessment seeds from an image built on the candidate, and this job is the only one that
+      # compiles the fixture classes that image adds.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: assessment-fixtures
+          path: target/fixtures-classes
+          retention-days: 1
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-security-base
@@ -464,6 +472,10 @@ jobs:
         with:
           name: image-qualification-amd64
           path: build/uat-smoke
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: assessment-fixtures
+          path: target/fixtures-classes
       - name: Start the digest-bound security target
         run: |
           set -o pipefail

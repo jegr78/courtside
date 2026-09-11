@@ -6,6 +6,7 @@ import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { passiveScannerOrigin, runOwnedProcess } from "./security-passive-deployment.mjs";
 import { evaluateResourceSignals, evaluateSafetyLimits } from "./security-resource-abuse.mjs";
+import { fixtureImagePlan, stageFixtureClasses } from "./fixture-artifact.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
@@ -35,7 +36,42 @@ export function securityComposeArgs(runId) {
   return ["compose", "-p", securityProject(runId), "-f", composeFile];
 }
 
-export function securityEnvironment(runId, image, password = randomBytes(24).toString("base64url"), httpsPort = 0) {
+export function securityFixturesImageTag(runId) {
+  securityProject(runId);
+  return `courtside:security-fixtures-${runId}`;
+}
+
+export function securitySeedImageTag(runId) {
+  securityProject(runId);
+  return `courtside:security-seed-${runId}`;
+}
+
+// Compose reads only the names its own file interpolates, and any other key of the recorded file
+// would reach the docker child as PATH or DOCKER_HOST and decide which executable runs.
+function interpolatedSecurityNames() {
+  return new Set([...readFileSync(composeFile, "utf8").matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)/g)]
+    .map(([, name]) => name));
+}
+
+export function securitySeedPlan(runId, image, recorded) {
+  if (recorded.COURTSIDE_SECURITY_RUN_ID !== runId) {
+    throw new Error("The recorded environment belongs to a different security run");
+  }
+  if (recorded.COURTSIDE_SECURITY_IMAGE !== image) {
+    throw new Error("The recorded environment assesses a different candidate image");
+  }
+  const interpolated = interpolatedSecurityNames();
+  return {
+    command: "docker",
+    args: [...securityComposeArgs(runId), "run", "--rm", "--no-deps", "-T", "seeder"],
+    environment: Object.fromEntries([...Object.entries(recorded),
+      ["COURTSIDE_SECURITY_FIXTURES_IMAGE", securitySeedImageTag(runId)]]
+      .filter(([name]) => interpolated.has(name)))
+  };
+}
+
+export function securityEnvironment(runId, image, password = randomBytes(24).toString("base64url"),
+    httpsPort = 0) {
   if (!/^(?:sha256:[a-f0-9]{64}|[^\s@]+@sha256:[a-f0-9]{64})$/.test(image)) {
     throw new Error("The security candidate must be selected by immutable image digest");
   }
@@ -45,6 +81,7 @@ export function securityEnvironment(runId, image, password = randomBytes(24).toS
   return {
     COURTSIDE_SECURITY_RUN_ID: runId,
     COURTSIDE_SECURITY_IMAGE: image,
+    COURTSIDE_SECURITY_FIXTURES_IMAGE: securityFixturesImageTag(runId),
     COURTSIDE_SECURITY_HTTPS_PORT: String(httpsPort),
     COURTSIDE_SECURITY_SHARED_PASSWORD: password,
     COURTSIDE_SECURITY_SEED_FINGERPRINT: seedFingerprint,
@@ -189,6 +226,7 @@ export async function startSecurityEnvironment(runId, image) {
     reserveSecurityEnvironment(environment);
     writeState(runId, environment);
     try {
+      buildSecurityFixturesImage(runId, image);
       execute("docker", [...securityComposeArgs(runId), "up", "-d", "--wait"],
         { ...process.env, ...environment });
       break;
@@ -206,6 +244,63 @@ export async function startSecurityEnvironment(runId, image) {
   const identity = verifySecurityEnvironment(runId);
   writeIdentity(runId, identity);
   process.stdout.write(`${securityEnvironmentReadyMessage(runId)}\n`);
+}
+
+// A locally built image also carries a `name@sha256:<image id>` digest that no store resolves, so a
+// tag is the reference to try first and a registry digest only the fallback for a pulled candidate.
+export function fixtureImageBase({ RepoDigests: digests = [], RepoTags: tags = [] }) {
+  const reference = [...tags, ...digests].find((candidate) => candidate && !candidate.includes("<none>"));
+  if (!reference) throw new Error("The security candidate carries no reference a build can start from");
+  return reference;
+}
+
+export function assertFixtureImageDerivation(candidate, fixtures) {
+  const layers = candidate?.RootFS?.Layers;
+  const fixtureLayers = fixtures?.RootFS?.Layers;
+  if (!Array.isArray(layers) || layers.length === 0
+      || !Array.isArray(fixtureLayers) || fixtureLayers.length !== layers.length + 1
+      || layers.some((layer, index) => fixtureLayers[index] !== layer)) {
+    throw new Error("The security seeder is not the candidate carrying its fixture classes");
+  }
+  if (["Entrypoint", "Cmd", "User"].some((field) => JSON.stringify(candidate.Config?.[field] ?? null)
+      !== JSON.stringify(fixtures.Config?.[field] ?? null))) {
+    throw new Error("The security seeder does not run the candidate's own entry point");
+  }
+}
+
+// The seeder writes the assessment data through the candidate's own domain services, so it is built
+// from the candidate rather than named beside it; a bare image ID is not a reference a build accepts.
+function buildSecurityFixturesImage(runId, image, tag = securityFixturesImageTag(runId)) {
+  stageFixtureClasses();
+  const plan = fixtureImagePlan(tag, fixtureImageBase(inspectImage(image)));
+  execute(plan.command, plan.args);
+  assertFixtureImageDerivation(inspectImage(image), inspectImage(tag));
+}
+
+export function seedSecurityEnvironment(runId, image, stateFile) {
+  const recorded = JSON.parse(readFileSync(resolve(stateFile), "utf8"));
+  const plan = securitySeedPlan(runId, image, recorded);
+  const resources = securityProjectResources(runId);
+  if (resources.length === 0) {
+    throw new Error("No security environment of this run is running");
+  }
+  assertSecurityRecoveryOwnership(resources, {
+    runId,
+    seedFingerprint: recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+    instanceFingerprint: recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
+  });
+  const tag = plan.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE;
+  try {
+    buildSecurityFixturesImage(runId, image, tag);
+    execute(plan.command, plan.args, { ...process.env, ...plan.environment });
+  } finally {
+    removeSecurityImage(tag);
+  }
+  process.stdout.write(`Security environment ${runId} carries the synthetic assessment dataset\n`);
+}
+
+function inspectImage(reference) {
+  return JSON.parse(execute("docker", ["image", "inspect", reference, "--format", "{{json .}}"]));
 }
 
 export function securityEnvironmentReadyMessage(runId) {
@@ -936,6 +1031,7 @@ async function cleanupResourceAbuseBookings(runId, command) {
 async function recoverAfterResourceAbuse(runId, stateBefore, stateAfter, command) {
   const database = (await command([...securityComposeArgs(runId), "exec", "-T", "db", "pg_isready", "-U",
     "courtside", "-d", "courtside_security"], { acceptedExitCodes: [0, 1] })).code === 0;
+  await command([...securityComposeArgs(runId), "run", "--rm", "--no-deps", "-T", "seeder"]);
   await command([...securityComposeArgs(runId), "restart", "app"]);
   await command([...securityComposeArgs(runId), "up", "-d", "--wait", "app", "proxy"]);
   const health = verifySecurityEnvironment(runId).environment === "SECURITY";
@@ -1076,8 +1172,14 @@ function removeOwnedSecurityEnvironment(runId, expected) {
   const resources = securityProjectResources(runId);
   assertSecurityRecoveryOwnership(resources, expected);
   removeSecurityResources(resources);
+  removeSecurityImage(securityFixturesImageTag(runId));
   rmSync(securityStateFile(runId), { force: true });
   rmSync(securityIdentityFile(runId), { force: true });
+}
+
+function removeSecurityImage(tag) {
+  if (!execute("docker", ["image", "ls", "-q", tag]).trim()) return;
+  execute("docker", ["image", "rm", "-f", tag]);
 }
 
 function securityProjectResources(runId) {

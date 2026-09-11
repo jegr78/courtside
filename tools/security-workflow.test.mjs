@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -14,6 +15,84 @@ const assessment = readFileSync(join(repository, "docs/security-assessment.md"),
 const dependabot = readFileSync(join(repository, ".github/dependabot.yml"), "utf8");
 const npmAudit = readFileSync(join(repository, ".github/workflows/npm-audit.yml"), "utf8");
 const runContract = JSON.parse(readFileSync(join(repository, "security/run-contract.json"), "utf8"));
+const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+
+function jobsStartingASecurityTarget() {
+  const directory = join(repository, ".github/workflows");
+  return readdirSync(directory).filter((file) => file.endsWith(".yml")).flatMap((file) =>
+    Object.entries(yaml.load(readFileSync(join(directory, file), "utf8")).jobs ?? {})
+      .filter(([, job]) => (job.steps ?? []).some((step) => /courtside\.mjs security\s/.test(step.run ?? "")))
+      .map(([name, job]) => ({ file, name, job })));
+}
+
+// The seeder image adds the compiled fixture classes, which only a Maven build produces, whether the
+// job runs one itself, reaches one through courtside.uat-smoke.mjs, or is handed the artifact.
+test("given every job that starts a security target, when it runs, then the fixture classes are there", () => {
+  // given
+  const starters = jobsStartingASecurityTarget();
+
+  // when
+  const unsupplied = starters.filter(({ job }) => !(buildsWithMaven(job)
+    || commandLines(job).some((line) => line.includes("courtside.uat-smoke.mjs"))
+    || (job.steps ?? []).some((step) =>
+      (step.uses ?? "").startsWith("actions/download-artifact@") && step.with?.name === "assessment-fixtures")));
+
+  // then
+  assert.ok(starters.length >= 2, "no workflow starts a security target");
+  assert.deepEqual(unsupplied.map(({ file, name }) => `${file}:${name}`), []);
+  assert.match(release, /name: assessment-fixtures\n\s+path: target\/fixtures-classes/);
+});
+
+const LIFECYCLE_GOALS = ["prepare-package", "package", "verify", "install"];
+
+function assessedWorktrees(job) {
+  return (job.steps ?? []).flatMap((step) =>
+    [...(step.run ?? "").matchAll(/git worktree add[^\n]*?"([^"\n]+)"/g)].map(([, path]) => path));
+}
+
+function commandLines(job) {
+  return (job.steps ?? []).flatMap((step) => (step.run ?? "").replace(/\\\n\s*/g, " ").split("\n"));
+}
+
+// A plugin goal such as install-node-and-npm compiles nothing, so the goal decides, not the command.
+function buildsWithMaven(job, pom = null) {
+  return commandLines(job).some((line) => /mvnw/.test(line)
+    && (pom === null || line.includes(pom))
+    && line.split(/\s+/).some((token) => LIFECYCLE_GOALS.includes(token)));
+}
+
+// The second worktree runs its own tooling, and that tooling now stages fixture classes out of the
+// build output, so the worktree needs a build of its own rather than only a Node installation.
+test("given a job that assesses from a second worktree, when it starts that target, then the worktree is packaged", () => {
+  // given
+  const starters = jobsStartingASecurityTarget();
+
+  // when
+  const unpackaged = starters.flatMap(({ file, name, job }) => assessedWorktrees(job)
+    .filter((path) => !buildsWithMaven(job, `${path}/pom.xml`))
+    .map((path) => `${file}:${name}:${path}`));
+
+  // then
+  assert.ok(starters.some(({ job }) => assessedWorktrees(job).length > 0),
+    "no job assesses a target from a second worktree");
+  assert.deepEqual(unpackaged, []);
+});
+
+// The candidate image stopped carrying the seeders, so a toolchain that predates that change cannot
+// bring the synthetic dataset with it and has to be handed one.
+test("given a job that assesses from a second worktree, when it starts that target, then the candidate seeds it", () => {
+  // given
+  const starters = jobsStartingASecurityTarget();
+
+  // when
+  const unseeded = starters.filter(({ job }) => assessedWorktrees(job).length > 0
+    && !(job.steps ?? []).some((step) => /courtside\.mjs security-seed\s/.test(step.run ?? "")));
+
+  // then
+  assert.ok(starters.some(({ job }) => assessedWorktrees(job).length > 0),
+    "no job assesses a target from a second worktree");
+  assert.deepEqual(unseeded.map(({ file, name }) => `${file}:${name}`), []);
+});
 
 test("given dependency findings, when scheduled and release gates run, then overdue evidence is enforced without hard update pins", () => {
   // when / then

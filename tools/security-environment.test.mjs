@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { zapVersion } from "./security-passive-deployment.mjs";
 import { openApiFuzzPolicy, openApiFuzzVersion } from "./security-openapi-fuzz.mjs";
 import { readFileSync } from "node:fs";
@@ -16,8 +17,112 @@ import {
   relayableMethods,
   securityEnvironmentReadyMessage,
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
+  assertFixtureImageDerivation, fixtureImageBase,
+  securityFixturesImageTag,
+  securitySeedImageTag, securitySeedPlan,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
+import { fixtureImagePlan } from "./fixture-artifact.mjs";
+
+const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+
+function securityServices() {
+  return yaml.load(readFileSync(
+    fileURLToPath(new URL("../deploy/compose.security.yaml", import.meta.url)), "utf8")).services;
+}
+
+test("given the security Compose file, when reading the assessed target, then it runs no fixture component", () => {
+  // given
+  const { app, seeder } = securityServices();
+
+  // when
+  const fixtureConfiguration = Object.keys(app.environment)
+    .filter((name) => name.startsWith("COURTSIDE_SECURITY_") || name.startsWith("SPRING_PROFILES_"));
+
+  // then
+  assert.deepEqual(fixtureConfiguration, []);
+  assert.equal(app.image, "${COURTSIDE_SECURITY_IMAGE:?required}");
+  assert.deepEqual(app.depends_on, {
+    db: { condition: "service_healthy" },
+    seeder: { condition: "service_completed_successfully" }
+  });
+  assert.equal(seeder.image, "${COURTSIDE_SECURITY_FIXTURES_IMAGE:?required}");
+  assert.equal(seeder.environment.SPRING_PROFILES_ACTIVE, "security");
+  assert.equal(seeder.environment.COURTSIDE_SECURITY_SEED_ONLY, "true");
+  assert.deepEqual(seeder.networks, ["backend"]);
+  assert.equal(seeder.ports, undefined);
+  assert.equal(seeder.read_only, true);
+  assert.deepEqual(seeder.cap_drop, ["ALL"]);
+  assert.deepEqual(seeder.security_opt, ["no-new-privileges:true"]);
+});
+
+test("given a candidate image, when choosing what a build can start from, then a tag comes first", () => {
+  // when / then
+  assert.equal(fixtureImageBase({
+    RepoTags: ["courtside:uat-local"],
+    RepoDigests: [`courtside@sha256:${"b".repeat(64)}`]
+  }), "courtside:uat-local");
+  assert.equal(fixtureImageBase({
+    RepoTags: ["<none>:<none>"],
+    RepoDigests: [`ghcr.io/jegr78/courtside@sha256:${"b".repeat(64)}`]
+  }), `ghcr.io/jegr78/courtside@sha256:${"b".repeat(64)}`);
+  assert.throws(() => fixtureImageBase({ RepoTags: [], RepoDigests: [] }),
+    /carries no reference a build can start from/);
+});
+
+function inspected(layers, configuration = {}) {
+  return {
+    RootFS: { Layers: layers },
+    Config: { Entrypoint: ["/entry.sh"], Cmd: null, User: "10001:10001", ...configuration }
+  };
+}
+
+test("given a built seeder image, when it is not the candidate plus its classes, then the run is refused", () => {
+  // given
+  const candidate = ["sha256:one", "sha256:two"];
+
+  // when / then
+  assertFixtureImageDerivation(inspected(candidate), inspected([...candidate, "sha256:fixtures"]));
+  assert.throws(() => assertFixtureImageDerivation(inspected(candidate), inspected(candidate)),
+    /not the candidate carrying its fixture classes/);
+  assert.throws(() => assertFixtureImageDerivation(inspected(candidate),
+    inspected(["sha256:one", "sha256:other", "sha256:fixtures"])),
+    /not the candidate carrying its fixture classes/);
+  assert.throws(() => assertFixtureImageDerivation(inspected(candidate),
+    inspected([...candidate, "sha256:fixtures", "sha256:more"])),
+    /not the candidate carrying its fixture classes/);
+  assert.throws(() => assertFixtureImageDerivation(inspected([]), inspected(["sha256:fixtures"])),
+    /not the candidate carrying its fixture classes/);
+});
+
+// The base is resolved through a mutable local tag, so identical layers alone would also accept an
+// image that merely shares them and starts something else.
+test("given a built seeder image, when it starts something other than the candidate, then the run is refused", () => {
+  // given
+  const candidate = ["sha256:one", "sha256:two"];
+  const fixtures = [...candidate, "sha256:fixtures"];
+
+  // when / then
+  for (const configuration of [{ Entrypoint: ["/other.sh"] }, { Cmd: ["--serve"] }, { User: "0:0" }]) {
+    assert.throws(() => assertFixtureImageDerivation(inspected(candidate), inspected(fixtures, configuration)),
+      /does not run the candidate's own entry point/,
+      `a changed ${Object.keys(configuration)[0]} was accepted`);
+  }
+});
+
+test("given a security run, when building its seeder, then the image is layered over the candidate itself", () => {
+  // given
+  const image = `sha256:${"b".repeat(64)}`;
+
+  // when
+  const plan = fixtureImagePlan(securityFixturesImageTag("run-0001"), image);
+
+  // then
+  assert.equal(securityFixturesImageTag("run-0001"), "courtside:security-fixtures-run-0001");
+  assert.deepEqual(plan.args, ["build", "-t", "courtside:security-fixtures-run-0001",
+    "--build-arg", `BASE_IMAGE=${image}`, "-f", "Dockerfile.fixtures", "."]);
+  assert.throws(() => securityFixturesImageTag("../outside"), /security run ID/);
+});
 
 test("given the application runtime, when file permissions are inspected, then no broader actor can alter its files", () => {
   // given
@@ -101,6 +206,7 @@ test("given a security run, when deriving its identity, then secrets and seed id
 
   // then
   assert.equal(environment.COURTSIDE_SECURITY_IMAGE, image);
+  assert.equal(environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, "courtside:security-fixtures-run-0001");
   assert.equal(environment.COURTSIDE_SECURITY_SHARED_PASSWORD, "synthetic-password-value");
   assert.equal(environment.COURTSIDE_SECURITY_HTTPS_PORT, "23456");
   assert.equal(environment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES, "5");
@@ -192,6 +298,7 @@ test("given lost private state, when preparing recovery, then Compose interpolat
   // then
   assert.equal(environment.COURTSIDE_SECURITY_RUN_ID, "run-0001");
   assert.match(environment.COURTSIDE_SECURITY_IMAGE, /^sha256:[a-f0-9]{64}$/);
+  assert.equal(environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, "courtside:security-fixtures-run-0001");
   assert.match(environment.COURTSIDE_SECURITY_SEED_FINGERPRINT, /^sha256:[a-f0-9]{64}$/);
   assert.ok(environment.COURTSIDE_SECURITY_SHARED_PASSWORD.length >= 16);
 });
@@ -279,15 +386,14 @@ test("given the security Compose file, when inspecting boundaries, then resource
   // when / then
   assert.match(compose, /127\.0\.0\.1:\$\{COURTSIDE_SECURITY_HTTPS_PORT:\?required\}:443/);
   assert.equal((compose.match(/internal: true/g) ?? []).length, 4);
-  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 8);
-  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 13);
-  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 13);
+  assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 9);
+  assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 14);
+  assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 14);
   assert.match(compose, /\/var\/lib\/postgresql\/data:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
   assert.match(compose, /zaproxy\/zap-stable:[\w.]+@sha256:[a-f0-9]{64}/);
   assert.match(compose, /schemathesis\/schemathesis:4\.25\.2@sha256:[a-f0-9]{64}/);
   assert.match(compose, /grafana\/k6:2\.2\.0@sha256:[a-f0-9]{64}/);
-  assert.match(compose, /COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"/);
   assert.match(compose, /MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"/);
   assert.match(compose, /profiles: \[assessment\]/);
   assert.match(compose, /\/zap\/wrk:uid=1000,gid=1000,mode=0700,size=25m/);
@@ -439,4 +545,64 @@ test("given docker commands that end with their process, when running them, then
     + "ends when the stack's health checks pass. A process timeout measures neither condition; it "
     + "only kills a valid wait on a loaded machine, and raising the number is not a fix. The job's "
     + "timeout-minutes is what bounds a wedged daemon.");
+});
+
+function recordedEnvironment(overrides = {}) {
+  return {
+    COURTSIDE_SECURITY_RUN_ID: "compare-base-1-1",
+    COURTSIDE_SECURITY_IMAGE: `sha256:${"a".repeat(64)}`,
+    COURTSIDE_SECURITY_SHARED_PASSWORD: "synthetic",
+    COURTSIDE_SECURITY_SEED_FINGERPRINT: `sha256:${"b".repeat(64)}`,
+    COURTSIDE_SECURITY_INSTANCE_FINGERPRINT: `sha256:${"c".repeat(64)}`,
+    ...overrides
+  };
+}
+
+test("given a recorded environment, when the candidate seeds it, then the seeder runs beside the target it names", () => {
+  // given
+  const recorded = recordedEnvironment();
+
+  // when
+  const plan = securitySeedPlan("compare-base-1-1", recorded.COURTSIDE_SECURITY_IMAGE, recorded);
+
+  // then
+  assert.equal(plan.command, "docker");
+  assert.deepEqual(plan.args, [...securityComposeArgs("compare-base-1-1"),
+    "run", "--rm", "--no-deps", "-T", "seeder"]);
+  assert.equal(plan.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, securitySeedImageTag("compare-base-1-1"));
+  assert.notEqual(securitySeedImageTag("compare-base-1-1"), securityFixturesImageTag("compare-base-1-1"),
+    "seeding another run must not retag the fixture image that run built for itself");
+  assert.equal(plan.environment.COURTSIDE_SECURITY_SHARED_PASSWORD, "synthetic",
+    "the synthetic accounts have to carry the password the recorded run already published to its tooling");
+});
+
+test("given an environment recorded for another run or image, when the candidate seeds it, then it refuses", () => {
+  // given
+  const recorded = recordedEnvironment();
+
+  // when / then
+  assert.throws(() => securitySeedPlan("compare-head-1-1", recorded.COURTSIDE_SECURITY_IMAGE, recorded),
+    /belongs to a different security run/);
+  assert.throws(() => securitySeedPlan("compare-base-1-1", `sha256:${"d".repeat(64)}`, recorded),
+    /assesses a different candidate/);
+});
+
+test("given a recorded environment, when the candidate seeds it, then only what compose reads is handed on", () => {
+  // given
+  const recorded = recordedEnvironment({
+    COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES: "5",
+    PATH: "/tmp/attacker",
+    DOCKER_HOST: "tcp://attacker.invalid:2375"
+  });
+
+  // when
+  const plan = securitySeedPlan("compare-base-1-1", recorded.COURTSIDE_SECURITY_IMAGE, recorded);
+
+  // then
+  assert.equal(plan.environment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES, "5",
+    "compose refuses to interpolate its own required name");
+  for (const name of ["PATH", "DOCKER_HOST"]) {
+    assert.equal(name in plan.environment, false,
+      `${name} from the recorded file would decide which executable the docker call runs`);
+  }
 });
