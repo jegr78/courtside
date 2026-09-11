@@ -50,6 +50,8 @@
         <quicktheories.version>0.26</quicktheories.version>
         <jgit.version>7.7.1.202607240634-r</jgit.version>
         <jacocoArgLine/>
+        <fixtures.classes>${project.build.directory}/fixtures-classes</fixtures.classes>
+        <fixtures.directory>${project.build.directory}/fixtures</fixtures.directory>
     </properties>
 
     <dependencyManagement>
@@ -255,6 +257,47 @@
                 <artifactId>maven-resources-plugin</artifactId>
                 <executions>
                     <execution>
+                        <id>register-fixtures-for-tests</id>
+                        <phase>process-test-resources</phase>
+                        <goals><goal>copy-resources</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.testOutputDirectory}</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/src/fixtures/resources</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>stage-fixtures</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>copy-resources</goal></goals>
+                        <configuration>
+                            <outputDirectory>${fixtures.classes}</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.build.outputDirectory}</directory>
+                                    <filtering>false</filtering>
+                                    <includes>
+                                        <include>org/courtside/demo/**</include>
+                                        <include>org/courtside/performance/**</include>
+                                        <include>org/courtside/securityassessment/**</include>
+                                        <include>application-demo.yaml</include>
+                                        <include>application-perf.yaml</include>
+                                        <include>application-security.yaml</include>
+                                        <include>security-assessment-dataset.properties</include>
+                                    </includes>
+                                </resource>
+                                <resource>
+                                    <directory>${project.basedir}/src/fixtures/resources</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>copy-web-client</id>
                         <phase>prepare-package</phase>
                         <goals><goal>copy-resources</goal></goals>
@@ -267,6 +310,40 @@
                                     <filtering>false</filtering>
                                 </resource>
                             </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-jar</id>
+                        <configuration>
+                            <excludes>
+                                <exclude>org/courtside/demo/**</exclude>
+                                <exclude>org/courtside/performance/**</exclude>
+                                <exclude>org/courtside/securityassessment/**</exclude>
+                                <exclude>application-demo.yaml</exclude>
+                                <exclude>application-perf.yaml</exclude>
+                                <exclude>application-security.yaml</exclude>
+                                <exclude>security-assessment-dataset.properties</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>fixtures</id>
+                        <phase>package</phase>
+                        <goals><goal>jar</goal></goals>
+                        <configuration>
+                            <classifier>fixtures</classifier>
+                            <classesDirectory>${fixtures.classes}</classesDirectory>
+                            <outputDirectory>${fixtures.directory}</outputDirectory>
+                            <forceCreation>true</forceCreation>
+                            <archive>
+                                <addMavenDescriptor>false</addMavenDescriptor>
+                            </archive>
                         </configuration>
                     </execution>
                 </executions>
@@ -422,6 +499,18 @@
                     <argLine>@{jacocoArgLine} -Xshare:off --sun-misc-unsafe-memory-access=deny -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
                     <runOrder>${surefire.runOrder}</runOrder>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
