@@ -18,6 +18,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerMapping;
+import org.springframework.web.servlet.function.support.RouterFunctionMapping;
+import org.springframework.web.servlet.handler.AbstractHandlerMethodMapping;
+import org.springframework.web.servlet.handler.AbstractUrlHandlerMapping;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.yaml.snakeyaml.Yaml;
@@ -46,6 +49,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
 
     private record Boundary(String classification, List<String> reads) {
+    }
+
+    private record Mapping(String classification, boolean registersNothing) {
+    }
+
+    private static Mapping answers(String classification) {
+        return new Mapping(classification, false);
+    }
+
+    private static Mapping registersNothing(String classification) {
+        return new Mapping(classification, true);
     }
 
     private static final Path SOURCE_ROOT = Path.of("src/main/java");
@@ -151,23 +165,24 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             Map.entry("CompositeFilterChainProxy", "delegates into the security chain above"),
             Map.entry("SessionRepositoryFilter", "resolves the session cookie to a stored session"));
 
-    private static final Map<String, String> REVIEWED_HANDLER_MAPPINGS = Map.of(
-            "RequestMappingHandlerMapping",
-            "the annotated handlers, whose every bound input this inventory compares",
-            "SimpleUrlHandlerMapping",
-            "the shell routes and the built resources, which forward and bind nothing;"
-                    + " security/published-web-resources.json is their inventory",
-            "WebMvcEndpointHandlerMapping",
-            "the exposed actuator endpoints, which are health alone and read no request value",
+    private static final Map<String, Mapping> REVIEWED_HANDLER_MAPPINGS = Map.of(
+            "RequestMappingHandlerMapping", answers("the annotated handlers, whose every bound input"
+                    + " this inventory compares"),
+            "SimpleUrlHandlerMapping", answers("the shell routes and the built resources, which"
+                    + " forward and bind nothing; security/published-web-resources.json is their"
+                    + " inventory"),
+            "WebMvcEndpointHandlerMapping", answers("the exposed actuator endpoints, which are"
+                    + " health alone and read no request value"),
             "AdditionalHealthEndpointPathsWebMvcHandlerMapping",
-            "the health endpoint under its management-group addresses, none of which are exposed",
-            "ControllerEndpointHandlerMapping", "no controller endpoint is registered",
-            "RouterFunctionMapping", "no router function is registered",
-            "BeanNameUrlHandlerMapping", "no controller is published under a bean name",
+            answers("the health endpoint under its management-group addresses"),
             "WelcomePageHandlerMapping",
-            "the index the shell serves at the root, which binds nothing",
+            answers("the index the shell serves at the root, which binds nothing"),
             "WelcomePageNotAcceptableHandlerMapping",
-            "the answer when that index is not acceptable, which binds nothing");
+            answers("the answer when that index is not acceptable, which binds nothing"),
+            "ControllerEndpointHandlerMapping", registersNothing("no controller endpoint exists"),
+            "RouterFunctionMapping", registersNothing("no router function exists"),
+            "BeanNameUrlHandlerMapping",
+            registersNothing("no controller is published under a bean name"));
 
     private static final Set<String> REVIEWED_UNBOUND_PARAMETERS = Set.of("HttpServletRequest");
 
@@ -212,6 +227,10 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
         TreeSet<String> present = handlerMappings.values().stream()
                 .map(mapping -> mapping.getClass().getSimpleName())
                 .collect(Collectors.toCollection(TreeSet::new));
+        TreeSet<String> empty = handlerMappings.values().stream()
+                .filter(RequestEntryPointInventoryTest::registersNothing)
+                .map(mapping -> mapping.getClass().getSimpleName())
+                .collect(Collectors.toCollection(TreeSet::new));
 
         // then
         assertThat(present).as("a handler mapping exists to be classified").isNotEmpty();
@@ -219,8 +238,16 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                 .as("the input comparison reads one mapping, so another one that answers addresses"
                         + " is a surface it does not cover and has to say what it binds.")
                 .containsExactlyInAnyOrderElementsOf(REVIEWED_HANDLER_MAPPINGS.keySet());
-        assertThat(REVIEWED_HANDLER_MAPPINGS.values()).allSatisfy(classification ->
-                assertThat(classification).isNotBlank());
+        assertThat(REVIEWED_HANDLER_MAPPINGS.values()).allSatisfy(mapping ->
+                assertThat(mapping.classification()).isNotBlank());
+        assertThat(empty)
+                .as("a mapping the inventory dismisses as carrying nothing has to still carry"
+                        + " nothing, or the sentence beside it is the only thing keeping it out."
+                        + " Another mapping may be empty here and carry something in a packaged"
+                        + " image, so this reads one way only.")
+                .containsAll(REVIEWED_HANDLER_MAPPINGS.entrySet().stream()
+                        .filter(entry -> entry.getValue().registersNothing())
+                        .map(Map.Entry::getKey).toList());
     }
 
     @Test
@@ -317,6 +344,16 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                 .as("an encoding decides which parser reads a request body, so a new one is a new"
                         + " parser on the request path rather than a detail of one operation.")
                 .containsExactlyInAnyOrderElementsOf(SUPPORTED_ENCODINGS);
+    }
+
+    private static boolean registersNothing(HandlerMapping mapping) {
+        if (mapping instanceof RouterFunctionMapping router) {
+            return router.getRouterFunction() == null;
+        }
+        if (mapping instanceof AbstractHandlerMethodMapping<?> methods) {
+            return methods.getHandlerMethods().isEmpty();
+        }
+        return mapping instanceof AbstractUrlHandlerMapping urls && urls.getHandlerMap().isEmpty();
     }
 
     private TreeSet<String> boundInputs() {
