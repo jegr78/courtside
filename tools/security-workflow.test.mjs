@@ -42,6 +42,50 @@ test("given every job that starts a security target, when it runs, then the fixt
   assert.match(release, /name: assessment-fixtures\n\s+path: target\/fixtures-classes/);
 });
 
+const LIFECYCLE_GOALS = ["prepare-package", "package", "verify", "install"];
+
+function assessedWorktrees(job) {
+  return (job.steps ?? []).flatMap((step) =>
+    [...(step.run ?? "").matchAll(/git worktree add[^\n]*?"([^"\n]+)"/g)].map(([, path]) => path));
+}
+
+function mavenInvocations(job, path) {
+  return (job.steps ?? []).flatMap((step) => (step.run ?? "").replace(/\\\n\s*/g, " ").split("\n"))
+    .filter((line) => /mvnw/.test(line) && line.includes(`${path}/pom.xml`));
+}
+
+// The second worktree runs its own tooling, and that tooling now stages fixture classes out of the
+// build output, so the worktree needs a build of its own rather than only a Node installation.
+test("given a job that assesses from a second worktree, when it starts that target, then the worktree is packaged", () => {
+  // given
+  const starters = jobsStartingASecurityTarget();
+
+  // when
+  const unpackaged = starters.flatMap(({ file, name, job }) => assessedWorktrees(job)
+    .filter((path) => !mavenInvocations(job, path)
+      .some((line) => line.split(/\s+/).some((token) => LIFECYCLE_GOALS.includes(token))))
+    .map((path) => `${file}:${name}:${path}`));
+
+  // then
+  assert.ok(starters.some(({ job }) => assessedWorktrees(job).length > 0),
+    "no job assesses a target from a second worktree");
+  assert.deepEqual(unpackaged, []);
+});
+
+// The candidate image stopped carrying the seeders, so a toolchain that predates that change cannot
+// bring the synthetic dataset with it and has to be handed one.
+test("given a job that assesses from a second worktree, when it starts that target, then the candidate seeds it", () => {
+  // given
+  const starters = jobsStartingASecurityTarget();
+
+  // when
+  const unseeded = starters.filter(({ job }) => assessedWorktrees(job).length > 0
+    && !(job.steps ?? []).some((step) => /courtside\.mjs security-seed\s/.test(step.run ?? "")));
+
+  // then
+  assert.deepEqual(unseeded.map(({ file, name }) => `${file}:${name}`), []);
+});
+
 test("given dependency findings, when scheduled and release gates run, then overdue evidence is enforced without hard update pins", () => {
   // when / then
   assert.doesNotMatch(dependabot, /\n\s+ignore:/);

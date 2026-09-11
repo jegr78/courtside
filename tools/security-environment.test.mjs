@@ -18,9 +18,11 @@ import {
   securityEnvironmentReadyMessage,
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
   assertFixtureImageDerivation, fixtureImageBase,
-  securityFixturesImagePlan, securityFixturesImageTag,
+  securityFixturesImageTag,
+  securitySeedImageTag, securitySeedPlan,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
+import { fixtureImagePlan } from "./fixture-artifact.mjs";
 
 const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 
@@ -89,7 +91,7 @@ test("given a security run, when building its seeder, then the image is layered 
   const image = `sha256:${"b".repeat(64)}`;
 
   // when
-  const plan = securityFixturesImagePlan("run-0001", image);
+  const plan = fixtureImagePlan(securityFixturesImageTag("run-0001"), image);
 
   // then
   assert.equal(securityFixturesImageTag("run-0001"), "courtside:security-fixtures-run-0001");
@@ -519,4 +521,44 @@ test("given docker commands that end with their process, when running them, then
     + "ends when the stack's health checks pass. A process timeout measures neither condition; it "
     + "only kills a valid wait on a loaded machine, and raising the number is not a fix. The job's "
     + "timeout-minutes is what bounds a wedged daemon.");
+});
+
+function recordedEnvironment(overrides = {}) {
+  return {
+    COURTSIDE_SECURITY_RUN_ID: "compare-base-1-1",
+    COURTSIDE_SECURITY_IMAGE: `sha256:${"a".repeat(64)}`,
+    COURTSIDE_SECURITY_SHARED_PASSWORD: "synthetic",
+    COURTSIDE_SECURITY_SEED_FINGERPRINT: `sha256:${"b".repeat(64)}`,
+    COURTSIDE_SECURITY_INSTANCE_FINGERPRINT: `sha256:${"c".repeat(64)}`,
+    ...overrides
+  };
+}
+
+test("given a recorded environment, when the candidate seeds it, then the seeder runs beside the target it names", () => {
+  // given
+  const recorded = recordedEnvironment();
+
+  // when
+  const plan = securitySeedPlan("compare-base-1-1", recorded.COURTSIDE_SECURITY_IMAGE, recorded);
+
+  // then
+  assert.equal(plan.command, "docker");
+  assert.deepEqual(plan.args, [...securityComposeArgs("compare-base-1-1"),
+    "run", "--rm", "--no-deps", "-T", "seeder"]);
+  assert.equal(plan.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, securitySeedImageTag("compare-base-1-1"));
+  assert.notEqual(securitySeedImageTag("compare-base-1-1"), securityFixturesImageTag("compare-base-1-1"),
+    "seeding another run must not retag the fixture image that run built for itself");
+  assert.equal(plan.environment.COURTSIDE_SECURITY_SHARED_PASSWORD, "synthetic",
+    "the synthetic accounts have to carry the password the recorded run already published to its tooling");
+});
+
+test("given an environment recorded for another run or image, when the candidate seeds it, then it refuses", () => {
+  // given
+  const recorded = recordedEnvironment();
+
+  // when / then
+  assert.throws(() => securitySeedPlan("compare-head-1-1", recorded.COURTSIDE_SECURITY_IMAGE, recorded),
+    /belongs to a different security run/);
+  assert.throws(() => securitySeedPlan("compare-base-1-1", `sha256:${"d".repeat(64)}`, recorded),
+    /assesses a different candidate/);
 });

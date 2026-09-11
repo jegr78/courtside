@@ -41,8 +41,23 @@ export function securityFixturesImageTag(runId) {
   return `courtside:security-fixtures-${runId}`;
 }
 
-export function securityFixturesImagePlan(runId, image) {
-  return fixtureImagePlan(securityFixturesImageTag(runId), image);
+export function securitySeedImageTag(runId) {
+  securityProject(runId);
+  return `courtside:security-seed-${runId}`;
+}
+
+export function securitySeedPlan(runId, image, recorded) {
+  if (recorded.COURTSIDE_SECURITY_RUN_ID !== runId) {
+    throw new Error("The recorded environment belongs to a different security run");
+  }
+  if (recorded.COURTSIDE_SECURITY_IMAGE !== image) {
+    throw new Error("The recorded environment assesses a different candidate image");
+  }
+  return {
+    command: "docker",
+    args: [...securityComposeArgs(runId), "run", "--rm", "--no-deps", "-T", "seeder"],
+    environment: { ...recorded, COURTSIDE_SECURITY_FIXTURES_IMAGE: securitySeedImageTag(runId) }
+  };
 }
 
 export function securityEnvironment(runId, image, password = randomBytes(24).toString("base64url"),
@@ -239,12 +254,23 @@ export function assertFixtureImageDerivation(candidateLayers, fixtureLayers) {
 
 // The seeder writes the assessment data through the candidate's own domain services, so it is built
 // from the candidate rather than named beside it; a bare image ID is not a reference a build accepts.
-function buildSecurityFixturesImage(runId, image) {
+function buildSecurityFixturesImage(runId, image, tag = securityFixturesImageTag(runId)) {
   stageFixtureClasses();
-  const plan = securityFixturesImagePlan(runId, fixtureImageBase(inspectImage(image)));
+  const plan = fixtureImagePlan(tag, fixtureImageBase(inspectImage(image)));
   execute(plan.command, plan.args);
-  assertFixtureImageDerivation(inspectImage(image).RootFS.Layers,
-    inspectImage(securityFixturesImageTag(runId)).RootFS.Layers);
+  assertFixtureImageDerivation(inspectImage(image).RootFS.Layers, inspectImage(tag).RootFS.Layers);
+}
+
+export function seedSecurityEnvironment(runId, image, stateFile) {
+  const plan = securitySeedPlan(runId, image, JSON.parse(readFileSync(resolve(stateFile), "utf8")));
+  const tag = plan.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE;
+  buildSecurityFixturesImage(runId, image, tag);
+  try {
+    execute(plan.command, plan.args, { ...process.env, ...plan.environment });
+  } finally {
+    removeSecurityImage(tag);
+  }
+  process.stdout.write(`Security environment ${runId} carries the synthetic assessment dataset\n`);
 }
 
 function inspectImage(reference) {
@@ -1120,13 +1146,12 @@ function removeOwnedSecurityEnvironment(runId, expected) {
   const resources = securityProjectResources(runId);
   assertSecurityRecoveryOwnership(resources, expected);
   removeSecurityResources(resources);
-  removeSecurityFixturesImage(runId);
+  removeSecurityImage(securityFixturesImageTag(runId));
   rmSync(securityStateFile(runId), { force: true });
   rmSync(securityIdentityFile(runId), { force: true });
 }
 
-function removeSecurityFixturesImage(runId) {
-  const tag = securityFixturesImageTag(runId);
+function removeSecurityImage(tag) {
   if (!execute("docker", ["image", "ls", "-q", tag]).trim()) return;
   execute("docker", ["image", "rm", "-f", tag]);
 }

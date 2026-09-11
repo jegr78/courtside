@@ -219,6 +219,11 @@ jobs:
       - name: Install protected-base assessment dependencies
         working-directory: ${{ runner.temp }}/courtside-security-base/frontend
         run: ./node/node ./node/node_modules/npm/bin/npm-cli.js ci --ignore-scripts
+      - name: Build the protected-base assessment fixtures
+        run: >
+          "$RUNNER_TEMP/courtside-security-base/mvnw" -B
+          -f "$RUNNER_TEMP/courtside-security-base/pom.xml"
+          -Pjava-only -Dmaven.test.skip=true package
       - name: Install candidate assessment dependencies
         run: >
           ./mvnw -B
@@ -255,6 +260,11 @@ jobs:
           (
             cd "$BASE_ROOT"
             frontend/node/node tools/courtside.mjs security "$BASE_RUN_ID" "$TARGET_IMAGE"
+          )
+          frontend/node/node tools/courtside.mjs security-seed "$BASE_RUN_ID" "$TARGET_IMAGE" \
+            --state "$BASE_ROOT/build/security/$BASE_RUN_ID/environment.json"
+          (
+            cd "$BASE_ROOT"
             frontend/node/node tools/courtside.mjs security-run "$BASE_RUN_ID" active \
               --qualification "$QUALIFICATION" \
               --authorize "authorize-active-$BASE_RUN_ID" || true
