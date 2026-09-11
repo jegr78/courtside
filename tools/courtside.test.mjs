@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { EventEmitter } from "node:events";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -10,9 +13,10 @@ import {
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
   openBackupForRestore, processPlans, requiredPorts, restoreDatabase, runInteractive, runLifecyclePlans, startProcesses,
   superviseFunnel, terminate,
-  terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
+  terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfComposePlan, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
-  performanceImagePlans, performanceStartupSummary, funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
+  performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
+  funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
   resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference, repositoryFromRemote,
   validateNode, validatePublicAddress
 } from "./courtside.mjs";
@@ -322,6 +326,107 @@ test("given the performance environment, when its image is built, then Compose r
   assert.ok(served[0].args.includes("Dockerfile.fixtures"), "Compose runs an image without the fixtures");
   assert.deepEqual(served[0].args.filter((argument) => argument.startsWith("BASE_IMAGE=")),
     [`BASE_IMAGE=${plans[0].args[plans[0].args.indexOf("-t") + 1]}`]);
+});
+
+test("given the performance environment, when its mail is handed over, then the relay is one it can reach", () => {
+  // given
+  const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+  const compose = yaml.load(readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8"));
+  const app = compose.services.app;
+
+  // when
+  const relay = compose.services[app.environment.COURTSIDE_MAIL_RELAY_HOST];
+
+  // then
+  assert.ok(relay, `the application hands its mail to ${app.environment.COURTSIDE_MAIL_RELAY_HOST}, which this stack does not run`);
+  assert.ok(relay.networks.some((network) => app.networks.includes(network)),
+    "the relay shares no network with the application");
+  assert.match(relay.image, /^axllent\/mailpit:[^\s]+@sha256:[a-f0-9]{64}$/);
+  assert.ok(relay.command.includes("--smtp-require-starttls"),
+    "the application requires STARTTLS, so a relay without it refuses every message");
+  assert.equal(app.environment.COURTSIDE_MAIL_RELAY_PORT, "1025");
+  assert.equal(app.environment.COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE, "true");
+  assert.equal(app.depends_on.mail.condition, "service_healthy",
+    "the seed starts against a relay that is not listening yet, so its first messages wait on a retry");
+});
+
+test("given the performance documentation, when a run is read, then it states what the load pays for mail", () => {
+  // given
+  const documentation = readFileSync(fileURLToPath(new URL("../docs/performance-testing.md", import.meta.url)), "utf8");
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8");
+
+  const tool = readFileSync(fileURLToPath(new URL("../tools/courtside.mjs", import.meta.url)), "utf8");
+
+  // when
+  const relay = compose.match(/image: axllent\/(mailpit):/)?.[1];
+  const issued = tool.match(/perfMailDirectory = join\(root, "build", "([a-z-]+)"\)/)?.[1];
+  const days = tool.match(/PERF_MAIL_CERTIFICATE_DAYS = (\d+);/)?.[1];
+
+  // then
+  assert.ok(relay, "the performance stack runs no Mailpit for the documentation to describe");
+  assert.ok(issued, "the CLI issues the certificate somewhere this test cannot read");
+  assert.match(documentation, new RegExp(relay, "i"),
+    "the documentation does not name the relay a run is measured against");
+  assert.match(documentation, new RegExp(`build/${issued}`),
+    "the documentation names another place for the certificate than the CLI writes");
+  assert.match(documentation, /STARTTLS/,
+    "the documentation does not say the relay is reached over STARTTLS");
+  assert.ok(days, "the CLI issues the certificate for a period this test cannot read");
+  assert.match(documentation, new RegExp(`${days} days`),
+    "the documentation states another life for the certificate than the CLI issues it for");
+});
+
+test("given a performance command other than the start, when it is planned, then it still defines the relay", () => {
+  // given
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8");
+  const source = readFileSync(fileURLToPath(new URL("./courtside.mjs", import.meta.url)), "utf8");
+  const required = [...compose.matchAll(/\$\{(COURTSIDE_PERF_MAIL_[A-Z_]+):\?/g)].map((match) => match[1]);
+
+  // when
+  const plans = [lifecyclePlan("perf-stop", {}), lifecyclePlan("perf-logs", {}),
+    lifecyclePlan("perf-db-shell", {}), perfResetPlan(), perfComposePlan(["ps"])];
+
+  // then
+  assert.ok(required.length > 0, "the compose file requires no relay variable at all");
+  for (const plan of plans) {
+    for (const name of required) {
+      assert.ok(plan.environment?.[name], `${plan.args.at(-1)} leaves ${name} undefined`);
+    }
+  }
+  const built = [...source.matchAll(/perfComposeArgs\(/g)];
+  assert.equal(built.length, 2,
+    "the arguments are built somewhere other than perfComposePlan, which is how a command comes to "
+    + "interpolate the compose file without defining what it requires");
+});
+
+test("given the performance relay certificate, when it is issued, then it is owner-only and replaces the last one", {
+  skip: process.platform === "win32"
+}, () => {
+  // given
+  const parent = mkdtempSync(join(tmpdir(), "courtside-perf-mail-"));
+  const directory = join(parent, "perf-mail");
+
+  try {
+    // when
+    const first = performanceRelayCertificate(directory);
+    writeFileSync(join(directory, "stale.pem"), "x");
+    const second = performanceRelayCertificate(directory);
+
+    // then
+    assert.deepEqual(first, second);
+    assert.deepEqual(first, performanceRelaySettings(directory));
+    assert.equal(existsSync(join(directory, "stale.pem")), false, "a restart kept the last issue");
+    assert.equal(statSync(directory).mode & 0o777, 0o700);
+    assert.equal(statSync(join(directory, "key.pem")).mode & 0o777, 0o600);
+    assert.ok(existsSync(join(directory, "cert.pem")));
+    const enddate = spawnSync("openssl",
+      ["x509", "-enddate", "-noout", "-in", join(directory, "cert.pem")], { encoding: "utf8" });
+    assert.equal(enddate.status, 0, enddate.stderr);
+    assert.ok(Date.parse(enddate.stdout.replace("notAfter=", "")) - Date.now() > 7 * 24 * 3600 * 1000,
+      "the certificate expires under a stack that is left standing between runs");
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
 });
 
 test("given automated performance startup, when suppressing credentials, then the password is absent from output", () => {
@@ -832,7 +937,7 @@ test("given telemetry was previously enabled, when starting without it, then orp
   const source = readFileSync(fileURLToPath(new URL("./courtside.mjs", import.meta.url)), "utf8");
 
   // when / then
-  assert.match(source, /perfComposeArgs\(options\.dbPort, options\.telemetry\).*--remove-orphans/s);
+  assert.match(source, /dbPort: options\.dbPort, telemetry: options\.telemetry.*--remove-orphans/s);
 });
 
 test("given the performance compose contract, when inspecting isolation, then resources and ports are bounded", () => {

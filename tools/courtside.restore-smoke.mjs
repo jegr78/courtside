@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { localRequest, newBootstrapPassword } from "./courtside.mjs";
+import {
+  createMailCertificate, createMailCertificateDirectory, currentHostIdentity
+} from "./mail-relay-certificate.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 export const columnsAddedSinceTheFixture = [
@@ -47,22 +50,6 @@ function compose(project, environment, args, options = {}) {
   return run("docker", ["compose", "-p", project, "-f", composeFile, ...args], {
     ...options, environment: { ...process.env, ...environment }
   });
-}
-
-function createMailCertificate(directory) {
-  const key = join(directory, "key.pem");
-  run("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
-    "-subj", "/CN=mail", "-addext", "subjectAltName=DNS:mail",
-    "-keyout", key, "-out", join(directory, "cert.pem")]);
-  chmodSync(key, 0o600);
-}
-
-export function createMailCertificateDirectory(parent = tmpdir()) {
-  return mkdtempSync(join(parent, "courtside-restore-mail-"));
-}
-
-export function currentHostIdentity(runtime = process) {
-  return `${runtime.getuid?.() ?? 0}:${runtime.getgid?.() ?? 0}`;
 }
 
 function psql(project, environment, args, options = {}) {
@@ -355,7 +342,7 @@ async function execute() {
   const project = `courtside-restore-${runId}`;
   const build = join(root, "build", "database-restore", runId);
   const privateDirectory = mkdtempSync(join(tmpdir(), "courtside-restore-"));
-  const mailCertificateDirectory = createMailCertificateDirectory();
+  const mailCertificateDirectory = createMailCertificateDirectory(tmpdir(), "courtside-restore-mail-");
   const applicationDumpPath = join(privateDirectory, "application.dump");
   const legacyDumpPath = join(privateDirectory, "legacy.dump");
   const password = newBootstrapPassword();

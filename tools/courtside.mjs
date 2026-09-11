@@ -23,6 +23,7 @@ import {
   recoverSecurityRun, requestEmergencyStop, securityRunContract
 } from "./security-runner.mjs";
 import { fixtureImagePlan, stageFixtureClasses } from "./fixture-artifact.mjs";
+import { createMailCertificate, currentHostIdentity } from "./mail-relay-certificate.mjs";
 import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
 import { isGitHubLogin } from "./nightly-failure-tracker.mjs";
 
@@ -53,6 +54,10 @@ const perfTelemetryComposeFile = join(root, "deploy", "compose.perf-telemetry.ya
 const perfProject = "courtside-perf";
 const funnelPerformanceConfirmation = "courtside-uat-funnel";
 const perfStateFile = join(root, "build", "perf-environment.json");
+const perfMailDirectory = join(root, "build", "perf-mail");
+
+// The restore smoke tears its stack down in minutes; this one is left standing between runs.
+const PERF_MAIL_CERTIFICATE_DAYS = 30;
 const privateAddresses = new BlockList();
 [
   ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8],
@@ -314,6 +319,15 @@ export function perfComposeArgs(withDatabasePort = false, withTelemetry = false)
     ...(withTelemetry ? ["-f", perfTelemetryComposeFile] : [])];
 }
 
+// Compose treats a variable the file requires and the environment omits as an error, not as empty.
+export function perfComposePlan(trailing, { dbPort = false, telemetry = false, environment } = {}) {
+  return {
+    command: "docker",
+    args: [...perfComposeArgs(dbPort, telemetry), ...trailing],
+    environment: environment ?? { ...process.env, ...performanceRelaySettings() }
+  };
+}
+
 export function parseTailscaleNodeStatus(output) {
   const status = parseJsonObject(output, "Tailscale status");
   const capabilities = Object.keys(status.Self?.CapMap ?? {});
@@ -497,17 +511,14 @@ export function lifecyclePlan(command, options = {}) {
     return { command: "docker", args: [...uatComposeArgs(), "exec", "db", "psql", "-U", "courtside", "courtside"] };
   }
   if (command === "perf-stop") {
-    return { command: "docker", args: [...perfComposeArgs(false, true), "stop"] };
+    return perfComposePlan(["stop"], { telemetry: true });
   }
   if (command === "perf-logs") {
-    return {
-      command: "docker",
-      args: [...perfComposeArgs(false, true), "logs",
-        ...(options.noFollow ? ["--no-color"] : ["--follow"])]
-    };
+    return perfComposePlan(["logs", ...(options.noFollow ? ["--no-color"] : ["--follow"])],
+      { telemetry: true });
   }
   if (command === "perf-db-shell") {
-    return { command: "docker", args: [...perfComposeArgs(), "exec", "db", "psql", "-U", "courtside", "courtside_perf"] };
+    return perfComposePlan(["exec", "db", "psql", "-U", "courtside", "courtside_perf"]);
   }
   throw new Error(`No lifecycle plan for ${command}`);
 }
@@ -611,6 +622,7 @@ async function execute(options) {
   if (options.command === "perf-reset") {
     runInteractive(perfResetPlan());
     rmSync(perfStateFile, { force: true });
+    rmSync(perfMailDirectory, { recursive: true, force: true });
     process.stdout.write("Performance data and local credentials removed.\n");
     return;
   }
@@ -879,7 +891,11 @@ function uatEnvironment(version, password) {
 function startPerformance(options) {
   const state = readPerformanceState();
   const password = state?.password ?? newBootstrapPassword();
-  const environment = { ...process.env, COURTSIDE_PERF_SHARED_PASSWORD: password };
+  const environment = {
+    ...process.env,
+    COURTSIDE_PERF_SHARED_PASSWORD: password,
+    ...performanceRelayCertificate()
+  };
   writePrivateFile(perfStateFile,
     `${JSON.stringify({ password, dbPort: options.dbPort, telemetry: options.telemetry }, null, 2)}\n`);
   runInteractive(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
@@ -888,13 +904,21 @@ function startPerformance(options) {
   runInteractive(productionImage);
   stageFixtureClasses();
   runInteractive(fixtureImage);
-  runInteractive({
-    command: "docker",
-    args: [...perfComposeArgs(options.dbPort, options.telemetry), "up", "-d", "--wait", "--force-recreate",
-      "--remove-orphans"],
-    environment
-  });
+  runInteractive(perfComposePlan(["up", "-d", "--wait", "--force-recreate", "--remove-orphans"],
+    { dbPort: options.dbPort, telemetry: options.telemetry, environment }));
   process.stdout.write(performanceStartupSummary(password, options));
+}
+
+export function performanceRelaySettings(directory = perfMailDirectory) {
+  return { COURTSIDE_PERF_MAIL_CERT_DIR: directory, COURTSIDE_PERF_MAIL_USER: currentHostIdentity() };
+}
+
+// Issuing is the starting command's job alone: a stop that reissued would replace what the relay serves.
+export function performanceRelayCertificate(directory = perfMailDirectory) {
+  rmSync(directory, { recursive: true, force: true });
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  createMailCertificate(directory, PERF_MAIL_CERTIFICATE_DAYS);
+  return performanceRelaySettings(directory);
 }
 
 export function performanceImagePlans() {
@@ -937,7 +961,7 @@ function readPerformanceState() {
 }
 
 export function perfResetPlan() {
-  return { command: "docker", args: [...perfComposeArgs(false, true), "down", "--volumes", "--remove-orphans"] };
+  return perfComposePlan(["down", "--volumes", "--remove-orphans"], { telemetry: true });
 }
 
 export function containerUserArguments(platform = process.platform) {
@@ -1032,10 +1056,8 @@ async function runPerformance(options) {
   const resultDirectory = join(root, "build", "performance", options.profile, runId);
   const certificateFile = join(resultDirectory, "root.crt");
   mkdirSync(resultDirectory, { recursive: true });
-  runInteractive({
-    command: "docker",
-    args: [...perfComposeArgs(), "cp", "proxy:/data/caddy/pki/authorities/local/root.crt", certificateFile]
-  });
+  runInteractive(perfComposePlan(
+    ["cp", "proxy:/data/caddy/pki/authorities/local/root.crt", certificateFile]));
   const identity = await localRequest({
     secure: true, port: 9443, path: "/api/source", ca: readFileSync(certificateFile), servername: "localhost"
   });
@@ -1887,10 +1909,11 @@ async function showStatus(environment, asJson) {
   const uatState = readUatState();
   const perfState = readPerformanceState();
   const project = isUat ? uatProject : isPerf ? perfProject : "courtside-dev";
-  const composeArgs = isUat ? uatComposeArgs(uatState.dbPort)
-    : isPerf ? perfComposeArgs(perfState?.dbPort, perfState?.telemetry) : devComposeArgs;
-  const compose = spawnSync("docker", [...composeArgs, "ps", "--format", "json"], {
-    cwd: root, encoding: "utf8"
+  const statusCompose = isPerf
+    ? perfComposePlan([], { dbPort: perfState?.dbPort, telemetry: perfState?.telemetry })
+    : { args: isUat ? uatComposeArgs(uatState.dbPort) : devComposeArgs, environment: process.env };
+  const compose = spawnSync("docker", [...statusCompose.args, "ps", "--format", "json"], {
+    cwd: root, encoding: "utf8", env: statusCompose.environment
   });
   const git = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" });
   const dirty = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
@@ -1931,9 +1954,9 @@ async function showStatus(environment, asJson) {
         ? { debugger: { port: 5005, reachable: isListenerActive(5005) } }
         : {})
     },
-    health: isPerf ? readPerformanceHealth(composeArgs) : await readHealth(
+    health: isPerf ? readPerformanceHealth(statusCompose) : await readHealth(
       isUat ? "https://localhost:8443/actuator/health" : "http://127.0.0.1:8080/actuator/health",
-      isUat ? composeArgs : undefined),
+      isUat ? statusCompose : undefined),
     volumes: volumes.stdout.trim().split(/\r?\n/).filter(Boolean),
     containers: compose.stdout.trim().split(/\r?\n/).filter(Boolean).map(parseJson),
     ...(isUat ? { funnel } : {})
@@ -2026,16 +2049,17 @@ function isProcessRunning(pid) {
   }
 }
 
-function localAuthority(composeArgs) {
-  const result = spawnSync("docker", [...composeArgs, "exec", "-T", "proxy",
-    "cat", "/data/caddy/pki/authorities/local/root.crt"], { cwd: root, encoding: "utf8" });
+function localAuthority(plan) {
+  const result = spawnSync("docker", [...plan.args, "exec", "-T", "proxy",
+    "cat", "/data/caddy/pki/authorities/local/root.crt"],
+  { cwd: root, encoding: "utf8", env: plan.environment });
   return result.status === 0 && result.stdout.includes("BEGIN CERTIFICATE") ? result.stdout : undefined;
 }
 
-async function readHealth(url, composeArgs) {
+async function readHealth(url, plan) {
   try {
-    if (composeArgs) {
-      const ca = localAuthority(composeArgs);
+    if (plan) {
+      const ca = localAuthority(plan);
       if (!ca) return "unavailable";
       const target = new URL(url);
       const response = await localRequest({
@@ -2051,9 +2075,9 @@ async function readHealth(url, composeArgs) {
   }
 }
 
-function readPerformanceHealth(composeArgs) {
-  const result = spawnSync("docker", [...composeArgs, "exec", "-T", "app", "curl", "-fsS",
-    "http://127.0.0.1:9091/actuator/health"], { encoding: "utf8" });
+function readPerformanceHealth(plan) {
+  const result = spawnSync("docker", [...plan.args, "exec", "-T", "app", "curl", "-fsS",
+    "http://127.0.0.1:9091/actuator/health"], { cwd: root, encoding: "utf8", env: plan.environment });
   if (result.status !== 0) return "unavailable";
   return parseJson(result.stdout).status ?? "unknown";
 }

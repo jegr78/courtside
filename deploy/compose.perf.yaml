@@ -19,6 +19,27 @@ services:
       timeout: 3s
       retries: 30
 
+  # A booking hands its message over on an executor that makes the caller wait once the queue fills.
+  mail:
+    image: axllent/mailpit:v1.31@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
+    user: ${COURTSIDE_PERF_MAIL_USER:?run node tools/courtside.mjs perf}
+    command:
+      - --smtp-tls-cert
+      - /certs/cert.pem
+      - --smtp-tls-key
+      - /certs/key.pem
+      - --smtp-require-starttls
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 0.5
+    mem_limit: 256m
+    volumes:
+      - ${COURTSIDE_PERF_MAIL_CERT_DIR:?run node tools/courtside.mjs perf}:/certs:ro
+    networks:
+      - backend
+
   app:
     image: courtside:perf-local
     read_only: true
@@ -33,6 +54,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mail:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: perf
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside_perf
@@ -46,7 +69,9 @@ services:
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: admin
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_PERF_SHARED_PASSWORD:-}
       COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe
-      COURTSIDE_MAIL_RELAY_HOST: mail.invalid
+      COURTSIDE_MAIL_RELAY_HOST: mail
+      COURTSIDE_MAIL_RELAY_PORT: "1025"
+      COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: "true"
       COURTSIDE_MAIL_FROM: no-reply@example.org
       COURTSIDE_MAIL_REPLY_TO: board@example.org
     networks:

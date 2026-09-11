@@ -470,9 +470,9 @@
       },
       "class": "credential-protection",
       "owner": "repository-maintainer",
-      "storageBoundary": "A temporary directory for the life of one run, and never a tracked file. Every certificate is self-signed, valid for a day, and issued to a name under a reserved example domain.",
+      "storageBoundary": "A temporary directory for the life of one run, or the ignored owner-only build/perf-mail for the life of one performance stack, and never a tracked file. Every certificate is self-signed and issued to a name under a reserved example domain, for a day except the performance relay's, which is issued for thirty because that stack is left standing between runs.",
       "permittedUse": "Standing up a relay or a proxy a test then connects to. No generated key is ever trusted by an instance, published, or reused across runs.",
-      "rotation": "Each run generates its own; there is nothing that outlives a run to rotate.",
+      "rotation": "Each run generates its own; the performance stack reissues on every start and perf-reset removes the directory, so nothing outlives the stack that made it.",
       "revocation": "Not applicable: no party trusts these beyond the run that made them.",
       "recovery": "None is needed; a rerun generates new material.",
       "retirement": "Replaced by whatever the tested transport requires.",
@@ -484,6 +484,8 @@
       "locations": [
         "tools/security-authorization.test.mjs",
         "tools/courtside.restore-smoke.mjs",
+        "tools/mail-relay-certificate.mjs",
+        "tools/courtside.test.mjs",
         "tools/mail-certificate-peer.test.mjs",
         "tools/mail-certificate.test.mjs",
         "tools/database-restore.test.mjs",
@@ -627,6 +629,7 @@
         "src/main/java/org/courtside/notification/internal/NotificationConfiguration.java",
         "src/main/resources/application.yaml",
         "deploy/compose.restore.yaml",
+        "deploy/compose.perf.yaml",
         "tools/*.mjs"
       ]
     },
