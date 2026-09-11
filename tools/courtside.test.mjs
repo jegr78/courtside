@@ -13,7 +13,7 @@ import {
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
   openBackupForRestore, processPlans, requiredPorts, restoreDatabase, runInteractive, runLifecyclePlans, startProcesses,
   superviseFunnel, terminate,
-  terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfResetPlan,
+  terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfComposePlan, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
   funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
@@ -387,11 +387,12 @@ test("given the performance documentation, when a run is read, then it states wh
 test("given a performance command other than the start, when it is planned, then it still defines the relay", () => {
   // given
   const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf.yaml", import.meta.url)), "utf8");
+  const source = readFileSync(fileURLToPath(new URL("./courtside.mjs", import.meta.url)), "utf8");
   const required = [...compose.matchAll(/\$\{(COURTSIDE_PERF_MAIL_[A-Z_]+):\?/g)].map((match) => match[1]);
 
   // when
   const plans = [lifecyclePlan("perf-stop", {}), lifecyclePlan("perf-logs", {}),
-    lifecyclePlan("perf-db-shell", {}), perfResetPlan()];
+    lifecyclePlan("perf-db-shell", {}), perfResetPlan(), perfComposePlan(["ps"])];
 
   // then
   assert.ok(required.length > 0, "the compose file requires no relay variable at all");
@@ -400,6 +401,10 @@ test("given a performance command other than the start, when it is planned, then
       assert.ok(plan.environment?.[name], `${plan.args.at(-1)} leaves ${name} undefined`);
     }
   }
+  const built = [...source.matchAll(/perfComposeArgs\(/g)];
+  assert.equal(built.length, 2,
+    "the arguments are built somewhere other than perfComposePlan, which is how a command comes to "
+    + "interpolate the compose file without defining what it requires");
 });
 
 // Issuing it is the starting command's job: a stop that wrote a new certificate would replace the
@@ -942,7 +947,7 @@ test("given telemetry was previously enabled, when starting without it, then orp
   const source = readFileSync(fileURLToPath(new URL("./courtside.mjs", import.meta.url)), "utf8");
 
   // when / then
-  assert.match(source, /perfComposeArgs\(options\.dbPort, options\.telemetry\).*--remove-orphans/s);
+  assert.match(source, /dbPort: options\.dbPort, telemetry: options\.telemetry.*--remove-orphans/s);
 });
 
 test("given the performance compose contract, when inspecting isolation, then resources and ports are bounded", () => {
