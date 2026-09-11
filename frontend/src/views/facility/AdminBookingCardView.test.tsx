@@ -205,6 +205,18 @@ describe("AdminBookingCardView", () => {
     expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1");
   });
 
+  it("given a navigation state that merely resembles the creation mark, when the page opens, then nothing announces a created card", async () => {
+    // given / when
+    for (const cardCreated of [1, "true", "cardCreated", {}, [true]]) {
+      document.body.innerHTML = "";
+      show("card-1", false, { cardCreated });
+      await screen.findAllByTestId("card-label");
+
+      // then
+      expect(screen.queryByRole("status")).toBeNull();
+    }
+  });
+
   // Two banners at once would have the page congratulate the board on a save that just failed.
   it("given the card was just created, when the next save fails, then only the failure is shown", async () => {
     // given

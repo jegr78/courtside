@@ -157,8 +157,10 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
         assertThat(bound).as("a request input exists to be compared").isNotEmpty();
         assertThat(bound)
                 .as("an input the application binds but %s does not declare is a request surface"
-                        + " nobody reviewed, and one the document declares but nothing binds is a"
-                        + " promise the application does not keep.", "src/main/resources/api/openapi.yaml")
+                        + " nobody reviewed, including one on an address the document does not"
+                        + " describe at all, and one the document declares but nothing binds is a"
+                        + " promise the application does not keep.",
+                        "src/main/resources/api/openapi.yaml")
                 .containsExactlyInAnyOrderElementsOf(declared);
     }
 
@@ -240,9 +242,6 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
         TreeSet<String> bound = new TreeSet<>();
         mappings.getHandlerMethods().forEach((info, handler) ->
                 paths(info).forEach(path -> methods(info).forEach(method -> {
-                    if (operation(path, method) == null) {
-                        return;
-                    }
                     boolean form = !formProperties(path, method).isEmpty();
                     for (MethodParameter parameter : handler.getMethodParameters()) {
                         input(parameter, form).ifPresent(
@@ -316,9 +315,12 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                         .map(pattern -> pattern.getPatternString()).toList();
     }
 
+    // A mapping that restricts no method answers all of them, so it must not drop out of the
+    // comparison for having named none.
     private static List<String> methods(RequestMappingInfo info) {
-        return info.getMethodsCondition().getMethods().stream()
+        List<String> named = info.getMethodsCondition().getMethods().stream()
                 .map(method -> method.name().toLowerCase()).toList();
+        return named.isEmpty() ? List.of("any") : named;
     }
 
     private Map<String, List<String>> requestReads() throws Exception {

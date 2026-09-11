@@ -307,6 +307,40 @@ describe("AdminPersonView", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Person created."));
   });
 
+  it("given a navigation state that merely resembles the creation mark, when the page opens, then nothing announces a created person", async () => {
+    // given
+    vi.spyOn(api, "person").mockResolvedValue(jane);
+
+    // when
+    for (const personCreated of [1, "true", "personCreated", {}, [true]]) {
+      document.body.innerHTML = "";
+      render(<MemoryRouter initialEntries={[{ pathname: "/admin/roster/person-1", state: { personCreated } }]}><WithClubConfiguration><UnsavedChangesProvider>
+        <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
+      </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
+
+      // then
+      await waitFor(() => expect(screen.getAllByRole("heading", { level: 1 })[0]).toHaveTextContent("Jane Doe"));
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    }
+  });
+
+  it("given an address naming no person the instance knows, when the page opens, then the refusal is shown instead of an empty page", async () => {
+    // given
+    const refused = vi.spyOn(api, "person").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:parameter-type-mismatch", title: "Bad Request", status: 400,
+      detail: "The parameter personId is not of the expected type"
+    }));
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/roster/not-a-person"]}><WithClubConfiguration><UnsavedChangesProvider>
+      <Routes><Route path="/admin/roster/:personId" element={<AdminPersonView />} /></Routes>
+    </UnsavedChangesProvider></WithClubConfiguration></MemoryRouter>);
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(refused).toHaveBeenCalledWith("not-a-person");
+  });
+
   it("given the person cannot load, when opening the page, then the failure replaces the loading state", async () => {
     // given
     vi.spyOn(api, "person").mockRejectedValue(new Error("unavailable"));
