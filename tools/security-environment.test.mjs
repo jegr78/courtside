@@ -17,6 +17,7 @@ import {
   relayableMethods,
   securityEnvironmentReadyMessage,
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
+  assertFixtureImageDerivation, fixtureImageBase,
   securityFixturesImagePlan, securityFixturesImageTag,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
@@ -51,6 +52,36 @@ test("given the security Compose file, when reading the assessed target, then it
   assert.equal(seeder.read_only, true);
   assert.deepEqual(seeder.cap_drop, ["ALL"]);
   assert.deepEqual(seeder.security_opt, ["no-new-privileges:true"]);
+});
+
+test("given a candidate image, when choosing what a build can start from, then a tag comes first", () => {
+  // when / then
+  assert.equal(fixtureImageBase({
+    RepoTags: ["courtside:uat-local"],
+    RepoDigests: [`courtside@sha256:${"b".repeat(64)}`]
+  }), "courtside:uat-local");
+  assert.equal(fixtureImageBase({
+    RepoTags: ["<none>:<none>"],
+    RepoDigests: [`ghcr.io/jegr78/courtside@sha256:${"b".repeat(64)}`]
+  }), `ghcr.io/jegr78/courtside@sha256:${"b".repeat(64)}`);
+  assert.throws(() => fixtureImageBase({ RepoTags: [], RepoDigests: [] }),
+    /carries no reference a build can start from/);
+});
+
+test("given a built seeder image, when it is not the candidate plus its classes, then the run is refused", () => {
+  // given
+  const candidate = ["sha256:one", "sha256:two"];
+
+  // when / then
+  assertFixtureImageDerivation(candidate, [...candidate, "sha256:fixtures"]);
+  assert.throws(() => assertFixtureImageDerivation(candidate, candidate),
+    /not the candidate carrying its fixture classes/);
+  assert.throws(() => assertFixtureImageDerivation(candidate, ["sha256:one", "sha256:other", "sha256:fixtures"]),
+    /not the candidate carrying its fixture classes/);
+  assert.throws(() => assertFixtureImageDerivation(candidate, [...candidate, "sha256:fixtures", "sha256:more"]),
+    /not the candidate carrying its fixture classes/);
+  assert.throws(() => assertFixtureImageDerivation([], ["sha256:fixtures"]),
+    /not the candidate carrying its fixture classes/);
 });
 
 test("given a security run, when building its seeder, then the image is layered over the candidate itself", () => {

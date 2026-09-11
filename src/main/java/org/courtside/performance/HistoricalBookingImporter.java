@@ -1,5 +1,9 @@
-package org.courtside.booking;
+package org.courtside.performance;
 
+import org.courtside.booking.Booking;
+import org.courtside.booking.BookingRepository;
+import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.ParticipantSpec;
 import org.courtside.card.CardService;
 import org.courtside.facility.FacilityService;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +16,7 @@ import java.time.Clock;
 @Service
 @Profile("perf")
 @RequiredArgsConstructor
-public class HistoricalBookingImporter {
+class HistoricalBookingImporter {
 
     private final BookingRepository bookings;
     private final FacilityService facility;

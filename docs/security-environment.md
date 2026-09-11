@@ -7,7 +7,9 @@
 - a valid per-run identifier, seed fingerprint and instance fingerprint; and
 - the Compose-local `courtside_security` database on host `db`.
 
-Startup builds the seeder's image from the candidate that was handed to it, so the assessment data is written through the candidate's own domain services while the candidate image carries no seeder of its own. That image is removed with the rest of the run.
+Startup builds the seeder's image from the candidate that was handed to it, so the assessment data is written through the candidate's own domain services while the candidate image carries no seeder of its own. That image is removed with the rest of the run. The fixture classes it adds come from `target/fixtures-classes`, so package the checkout before starting a run against a published candidate.
+
+The candidate image carries one piece of assessment instrumentation of its own: a filter that answers every request with the host and scheme the application observed, which is how the passive suite proves the proxy canonicalises them. It is bound to `COURTSIDE_ENVIRONMENT=SECURITY`, a value a club deployment never sets, it adds two response headers, and it reads nothing from the request. `NonProductionProfileTest` keeps everything else out: a shipped class may not exist only for a non-production Spring profile, and the packaging's own exclusion list is what the test reads to decide which packages are not shipped.
 
 ## Prepare the images
 

@@ -20,7 +20,7 @@ class SecurityAssessmentSeedCompletion implements ApplicationRunner {
 
     private final ConfigurableApplicationContext context;
 
-    // The scheduling threads are not daemons, so closing the context is not enough to end the process.
+    // The scheduling and web threads are not daemons, so closing the context does not end the process.
     @Override
     public void run(ApplicationArguments arguments) {
         System.exit(SpringApplication.exit(context));
