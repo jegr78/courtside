@@ -172,6 +172,35 @@
       "bounded": "The request that raised it."
     }
   },
+  "exportedFields": {
+    "roster": {
+      "writtenBy": "src/main/java/org/courtside/dataexchange/internal/RosterCsv.java",
+      "level": "personal",
+      "bounded": "An administrator asks for it and the file leaves the instance; no entry records that it was taken, which section 11 records as accepted.",
+      "columns": {
+        "memberNumber": "import_external_reference.external_id",
+        "firstName": "person.first_name",
+        "lastName": "person.last_name",
+        "email": "person.email",
+        "membershipType": "membership_type.name",
+        "membershipStartedOn": "member.started_on",
+        "membershipEndedOn": "member.ended_on"
+      }
+    },
+    "bookings": {
+      "writtenBy": "src/main/java/org/courtside/dataexchange/internal/BookingExportService.java",
+      "level": "pseudonymous",
+      "bounded": "An administrator asks for it; it names bookings and the accounts behind them rather than addresses.",
+      "columns": {
+        "date": "court_allocation.starts_at",
+        "startsAt": "court_allocation.starts_at",
+        "endsAt": "court_allocation.ends_at",
+        "courtNumber": "court.number",
+        "courtName": "court.name",
+        "card": "booking_card.label"
+      }
+    }
+  },
   "storedFields": {
     "booking": {
       "booked_by": {

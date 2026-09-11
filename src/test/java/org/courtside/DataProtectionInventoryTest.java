@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -25,6 +27,9 @@ class DataProtectionInventoryTest extends AbstractIntegrationTest {
 
     private static final Pattern LOG_STATEMENT = Pattern.compile(
             "log\\.(trace|debug|info|warn|error)\\((?:[^;]|\\n)*?\\);", Pattern.MULTILINE);
+
+    private static final Pattern CSV_HEADER = Pattern.compile(
+            "HEADER =\\s*\\n?\\s*List\\.of\\(([^)]*)\\)", Pattern.MULTILINE);
 
     private static final Pattern KEYED_FIELD = Pattern.compile(
             "private (?:final )?[\\w.]*\\b(?:Map|ConcurrentMap|HashMap|LinkedHashMap"
@@ -99,6 +104,35 @@ class DataProtectionInventoryTest extends AbstractIntegrationTest {
                 .as("a column classified as a secret must not be a name the published contract"
                         + " carries, because that is the contract offering to hand it out")
                 .isEmpty();
+    }
+
+    @Test
+    void whenAFileLeavesTheInstance_thenEveryColumnInItNamesTheFieldItCameFrom() {
+        // given
+        Set<String> stored = classified().keySet();
+        JsonNode exports = inventory().get("exportedFields");
+
+        // when / then
+        exports.properties().forEach(export -> {
+            List<String> written = headerOf(Path.of(export.getValue().get("writtenBy").asText()));
+            JsonNode columns = export.getValue().get("columns");
+            assertThat(names(columns))
+                    .as("%s writes a column the inventory does not account for, or accounts for one"
+                            + " it no longer writes", export.getKey())
+                    .isEqualTo(new TreeSet<>(written));
+            columns.properties().forEach(column -> assertThat(stored)
+                    .as("%s.%s says it comes from %s, which is not a field this schema holds",
+                            export.getKey(), column.getKey(), column.getValue().asText())
+                    .contains(column.getValue().asText()));
+        });
+    }
+
+    private static List<String> headerOf(Path writer) {
+        Matcher header = CSV_HEADER.matcher(read(writer));
+        assertThat(header.find()).as("%s declares no CSV header any more", writer).isTrue();
+        return Arrays.stream(header.group(1).split(","))
+                .map(column -> column.replaceAll("[\"\\s]", "")).filter(column -> !column.isEmpty())
+                .toList();
     }
 
     @Test

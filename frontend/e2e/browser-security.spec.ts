@@ -558,3 +558,31 @@ declare global {
   var __courtsideCspExecuted: boolean;
   var __courtsideCspEvents: Array<{ directive: string; blocked: string }>;
 }
+
+// Every URL this journey produces is the URL the club proxy in front of it receives, so what the
+// browser records here is also what an intermediary would have to keep for the finding to bite.
+test("a member's name reaches the roster search without entering any request URL", async ({ page }) => {
+  // given
+  const surname = "Miles";
+  await login(page, "configuration-admin");
+  await page.getByTestId("administration-link").click();
+  await expect(page.getByTestId("admin-shell")).toBeVisible();
+  await page.getByTestId("admin-roster-link").click();
+  await expect(page.getByTestId("admin-roster-view")).toBeVisible();
+  const urls: string[] = [];
+  page.on("request", (request) => urls.push(request.url()));
+
+  // when
+  const searched = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/roster/search") && response.request().method() === "POST");
+  await page.getByTestId("roster-search").fill(surname);
+  await page.getByTestId("roster-search-submit").click();
+  const answer = await (await searched).json() as { entries: Array<{ lastName: string }> };
+
+  // then
+  expect(answer.entries.length).toBeGreaterThan(0);
+  expect(answer.entries.every((entry) => entry.lastName === surname)).toBe(true);
+  expect(urls.length).toBeGreaterThan(0);
+  expect(urls.filter((url) => url.toLowerCase().includes(surname.toLowerCase()))).toEqual([]);
+  expect(page.url().toLowerCase()).not.toContain(surname.toLowerCase());
+});
