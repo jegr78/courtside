@@ -47,7 +47,7 @@ export function buildOpenApiFuzzInventory(api, policy = openApiFuzzPolicy) {
       if (!operation.operationId) throw new Error(`${method.toUpperCase()} ${path} has no operationId`);
       const excluded = policy.excludedOperations[operation.operationId];
       if (excluded) return operationCoverage(operation.operationId, method, path, [], { all: excluded });
-      const mutation = method !== "get";
+      const mutation = method !== "get" && operation["x-courtside-state-invariant"] !== true;
       const inputs = [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])].length > 0
         || operation.requestBody != null;
       const modes = mutation ? (inputs ? ["negative"] : []) : inputs ? ["positive", "negative"] : ["positive"];
@@ -143,7 +143,7 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     throw new Error("OpenAPI fuzzing has no remaining request budget");
   }
   const inventory = buildOpenApiFuzzInventory(api);
-  const generatedInventory = inventory.filter(({ method }) => method === "GET");
+  const generatedInventory = inventory.filter(({ modes }) => modes.includes("positive"));
   const scanner = await context.runFuzzer(plan, {
     inventory: generatedInventory,
     policy: openApiFuzzPolicy,
@@ -361,7 +361,7 @@ function constrainedQueryParameter(parameters) {
 
 export async function runOpenApiMutationCases(plan, fixture, context) {
   const operations = buildOpenApiFuzzInventory(api)
-    .filter(({ method, modes }) => method !== "GET" && modes.includes("negative"));
+    .filter(({ modes }) => !modes.includes("positive") && modes.includes("negative"));
   const results = [];
   let generatedBytes = 0;
   const send = context.request ?? ((probe) => authorizationRequest(plan.target, fixture.client, probe, {
@@ -492,7 +492,7 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
       !== JSON.stringify(openApiFuzzPolicy.inputClasses.toSorted())) {
     throw new Error("OpenAPI fuzz evidence omits a required input class");
   }
-  const expectedMutations = inventory.filter(({ method, modes }) => method !== "GET" && modes.includes("negative"))
+  const expectedMutations = inventory.filter(({ modes }) => !modes.includes("positive") && modes.includes("negative"))
     .map(({ operationId, method, path }) => JSON.stringify({ operationId, method, path })).toSorted();
   if (JSON.stringify(evidence.mutationCases.map(({ operationId, method, path }) =>
     JSON.stringify({ operationId, method, path })).toSorted())

@@ -55,7 +55,7 @@ test("given the current contract, when inventorying fuzz coverage, then every op
     modes: ["positive"],
     excludedModes: { negative: "The operation has no request input to invalidate." }
   });
-  assert.equal(inventory.find(({ operationId }) => operationId === "listRoster").modes.join(","),
+  assert.equal(inventory.find(({ operationId }) => operationId === "searchRoster").modes.join(","),
     "positive,negative");
   assert.equal(inventory.find(({ operationId }) => operationId === "facilityUtilisation").modes.join(","),
     "positive,negative");
@@ -115,19 +115,19 @@ test("given generated status failures, when the deployment contract explains the
   ];
 
   // when
-  const documented = normalizeSchemathesisEvents(events(entry("listRoster"), "positive", 400,
+  const documented = normalizeSchemathesisEvents(events(entry("searchRoster"), "positive", 400,
     "positive_data_acceptance"),
-    [entry("listRoster")], "positive", 1);
+    [entry("searchRoster")], "positive", 1);
   const proxyRejection = normalizeSchemathesisEvents(events(entry("getCourt"), "negative", 421,
     "negative_data_rejection"), [entry("getCourt")], "negative", 1);
   const undocumented = normalizeSchemathesisEvents(events(entry("courtImpact"), "positive", 404),
     [entry("courtImpact")], "positive", 1);
-  const serverError = normalizeSchemathesisEvents(events(entry("listRoster"), "positive", 503,
-    "not_a_server_error"), [entry("listRoster")], "positive", 1);
-  const positive421 = normalizeSchemathesisEvents(events(entry("listRoster"), "positive", 421),
-    [entry("listRoster")], "positive", 1);
-  const unqualifiedDocumented = normalizeSchemathesisEvents(events(entry("listRoster"), "positive", 400),
-    [entry("listRoster")], "positive", 1);
+  const serverError = normalizeSchemathesisEvents(events(entry("searchRoster"), "positive", 503,
+    "not_a_server_error"), [entry("searchRoster")], "positive", 1);
+  const positive421 = normalizeSchemathesisEvents(events(entry("searchRoster"), "positive", 421),
+    [entry("searchRoster")], "positive", 1);
+  const unqualifiedDocumented = normalizeSchemathesisEvents(events(entry("searchRoster"), "positive", 400),
+    [entry("searchRoster")], "positive", 1);
   const unqualifiedProxyRejection = normalizeSchemathesisEvents(events(entry("getCourt"), "negative", 421,
     "positive_data_acceptance"), [entry("getCourt")], "negative", 1);
   const relatedProxyEvents = events(entry("getCourt"), "negative", 421, "negative_data_rejection");
@@ -137,11 +137,11 @@ test("given generated status failures, when the deployment contract explains the
     } });
   const relatedProxyRejections = normalizeSchemathesisEvents(relatedProxyEvents,
     [entry("getCourt")], "negative", 1);
-  const acceptedNegative = normalizeSchemathesisEvents(events(entry("listRoster"), "negative", 200,
-    "negative_data_rejection"), [entry("listRoster")], "negative", 1);
+  const acceptedNegative = normalizeSchemathesisEvents(events(entry("searchRoster"), "negative", 200,
+    "negative_data_rejection"), [entry("searchRoster")], "negative", 1);
   const controlFailures = [401, 403, 429].map((status) => normalizeSchemathesisEvents(
-    events(entry("listRoster"), "positive", status, "positive_data_acceptance"),
-    [entry("listRoster")], "positive", 1));
+    events(entry("searchRoster"), "positive", status, "positive_data_acceptance"),
+    [entry("searchRoster")], "positive", 1));
 
   // then
   assert.equal(documented.operationResults[0].outcome, "passed");
@@ -175,15 +175,15 @@ test("given generated status failures, when the deployment contract explains the
 test("given minimized Schemathesis events, when normalizing them, then failures retain no raw traffic", () => {
   // given
   const inventory = [buildOpenApiFuzzInventory(api)
-    .find(({ operationId }) => operationId === "listRoster")];
+    .find(({ operationId }) => operationId === "searchRoster")];
   const events = [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
     { ScenarioFinished: {
       status: "failure",
       phase: "Fuzzing",
       recorder: {
-        label: "GET /api/admin/roster",
-        cases: { "credential-shaped-case-id": { value: { method: "GET", path: "/api/admin/roster",
+        label: "POST /api/admin/roster/search",
+        cases: { "credential-shaped-case-id": { value: { method: "POST", path: "/api/admin/roster/search",
           path_parameters: { memberId: "sensitive-object-id" }, query: { cursor: "sensitive-cursor-value" },
           body: { password: "sensitive-body-value" },
           headers: { "X-Api-Key": "request-secret", "X-Trace": "object-id" },
@@ -201,11 +201,11 @@ test("given minimized Schemathesis events, when normalizing them, then failures 
   const normalized = normalizeSchemathesisEvents(events, inventory, "negative");
 
   // then
-  assert.equal(normalized.operationResults[0].operationId, "listRoster");
+  assert.equal(normalized.operationResults[0].operationId, "searchRoster");
   assert.equal(normalized.operationResults[0].outcome, "incomplete");
   assert.equal(normalized.counterexamples[0].check, "not-a-server-error");
   assert.equal(normalized.counterexamples[0].caseId, "case-1");
-  assert.equal(normalized.counterexamples[0].pathTemplate, "/api/admin/roster");
+  assert.equal(normalized.counterexamples[0].pathTemplate, "/api/admin/roster/search");
   assert.deepEqual(normalized.counterexamples[0].reason,
     { kind: "status", observedStatus: 503, expectedStatuses: ["non-5xx"] });
   assert.deepEqual(normalized.counterexamples[0].requestShape, { locations: ["body", "path", "query"] });
@@ -218,13 +218,13 @@ test("given minimized Schemathesis events, when normalizing them, then failures 
 test("given distinct structural failures, when normalizing them, then candidates remain distinguishable", () => {
   // given
   const inventory = [buildOpenApiFuzzInventory(api)
-    .find(({ operationId }) => operationId === "listRoster")];
+    .find(({ operationId }) => operationId === "searchRoster")];
   const check = (missingProperty) => ({ name: "response_schema_conformance", status: "failure",
     failure_info: { reason: { kind: "schema", instancePointer: "/items/*",
       validationKeyword: "required", missingProperties: [missingProperty] } } });
   const events = [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
-    { ScenarioFinished: { status: "failure", recorder: { label: "GET /api/admin/roster",
+    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster/search",
       cases: {
         one: { value: { method: "GET", meta: { generation: { mode: "negative" } } } },
         two: { value: { method: "GET", meta: { generation: { mode: "negative" } } } }
@@ -243,12 +243,12 @@ test("given distinct structural failures, when normalizing them, then candidates
 test("given exact statuses in one class, when normalizing them, then their disagreements remain distinguishable", () => {
   // given
   const inventory = [buildOpenApiFuzzInventory(api)
-    .find(({ operationId }) => operationId === "listRoster")];
+    .find(({ operationId }) => operationId === "searchRoster")];
   const check = (observedStatus) => ({ name: "status_code_conformance", status: "failure",
     failure_info: { reason: { kind: "status", observedStatus, expectedStatuses: [400] } } });
   const events = [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
-    { ScenarioFinished: { status: "failure", recorder: { label: "GET /api/admin/roster",
+    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster/search",
       cases: {
         one: { value: { method: "GET", meta: { generation: { mode: "negative" } } } },
         two: { value: { method: "GET", meta: { generation: { mode: "negative" } } } }
@@ -266,10 +266,10 @@ test("given exact statuses in one class, when normalizing them, then their disag
 test("given unsafe or unsupported failure reasons, when normalizing them, then the adapter fails closed", () => {
   // given
   const inventory = [buildOpenApiFuzzInventory(api)
-    .find(({ operationId }) => operationId === "listRoster")];
+    .find(({ operationId }) => operationId === "searchRoster")];
   const events = (reason, name = "response_schema_conformance") => [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
-    { ScenarioFinished: { status: "failure", recorder: { label: "GET /api/admin/roster",
+    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster/search",
       cases: { one: { value: { method: "GET", meta: { generation: { mode: "negative" } } } } },
       checks: { one: [{ name, status: "failure",
         failure_info: { reason } }] } } } }
@@ -316,12 +316,12 @@ test("given missing or contradictory operation evidence, when normalizing it, th
 test("given an unexpected observed operation, when normalizing it, then it becomes a review candidate", () => {
   // given
   const inventory = [buildOpenApiFuzzInventory(api)
-    .find(({ operationId }) => operationId === "listRoster")];
+    .find(({ operationId }) => operationId === "searchRoster")];
   const events = [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
     { ScenarioFinished: { status: "success", recorder: { label: "GET /api/internal/diagnostics",
       cases: {}, checks: {} } } },
-    { ScenarioFinished: { status: "success", recorder: { label: "GET /api/admin/roster",
+    { ScenarioFinished: { status: "success", recorder: { label: "POST /api/admin/roster/search",
       cases: { one: { value: { meta: { generation: { mode: "positive" } } } } }, checks: {} } } }
   ];
 
@@ -352,12 +352,12 @@ test("given runtime handler mappings, when comparing them with OpenAPI, then und
 test("given repeated and distinct failures, when retaining lifecycle evidence, then candidates follow reasons", async () => {
   // given
   const inventory = buildOpenApiFuzzInventory(api);
-  const generatedInventory = inventory.filter(({ method }) => method === "GET");
+  const generatedInventory = inventory.filter(({ modes }) => modes.includes("positive"));
   const events = (mode) => [
     { LoadingFinished: { statistic: { operations: { total: inventory.length,
       selected: generatedInventory.filter(({ modes }) => modes.includes(mode)).length } } } },
     ...generatedInventory.filter(({ modes }) => modes.includes(mode)).map((entry) => {
-      const failing = entry.operationId === "listRoster" && mode === "negative";
+      const failing = entry.operationId === "searchRoster" && mode === "negative";
       const cases = failing ? ["one", "two", "three", "four"] : ["one"];
       return { ScenarioFinished: { status: failing ? "failure" : "success", recorder: {
         label: `${entry.method} ${entry.path}`,
@@ -383,7 +383,7 @@ test("given repeated and distinct failures, when retaining lifecycle evidence, t
     problemType: "urn:courtside:error:import-snapshot-unreadable", observation: "typed-upload-rejection",
     outcome: "passed" })).concat(["oversized-cell", "conflicting-reference"].map((id) => ({ id, status: 201,
     observation: "row-level-rejection", outcome: "passed" })));
-  const mutationCases = inventory.filter(({ method, modes }) => method !== "GET" && modes.includes("negative"))
+  const mutationCases = inventory.filter(({ modes }) => !modes.includes("positive") && modes.includes("negative"))
     .map(({ operationId, method, path }) => ({ operationId, method, path, status: 400,
       problemType: "urn:courtside:error:validation-failed", observation: "invalid-mutation-rejected",
       outcome: "passed" }));
@@ -463,13 +463,13 @@ test("given a contract chosen for the run, when the fuzzer loads, then it is the
 test("given a scenario that ended without succeeding, when nothing failed a check, then the operation still says what happened", () => {
   // given
   const inventory = [buildOpenApiFuzzInventory(api)
-    .find(({ operationId }) => operationId === "listRoster")];
+    .find(({ operationId }) => operationId === "searchRoster")];
   const events = [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
     { ScenarioFinished: {
       status: "error",
       recorder: {
-        label: "GET /api/admin/roster",
+        label: "POST /api/admin/roster/search",
         cases: { one: { value: { method: "GET", query: { cursor: "boundary" },
           meta: { generation: { mode: "positive" } } } } },
         checks: {}
@@ -484,7 +484,7 @@ test("given a scenario that ended without succeeding, when nothing failed a chec
   assert.equal(normalized.operationResults[0].outcome, "incomplete");
   assert.equal(normalized.counterexamples.length, 1);
   assert.equal(normalized.counterexamples[0].check, "scenario-completion");
-  assert.equal(normalized.counterexamples[0].operationId, "listRoster");
+  assert.equal(normalized.counterexamples[0].operationId, "searchRoster");
   assert.deepEqual(normalized.counterexamples[0].reason,
     { kind: "scenario", scenarioStatus: "error" });
   assert.match(normalized.counterexamples[0].reproductionDigest, /^sha256:[a-f0-9]{64}$/);
@@ -494,13 +494,13 @@ test("given a scenario that ended without succeeding, when nothing failed a chec
 test("given an unfinished scenario reporting a status nobody defined, when it is retained, then the status is not carried through", () => {
   // given
   const inventory = [buildOpenApiFuzzInventory(api)
-    .find(({ operationId }) => operationId === "listRoster")];
+    .find(({ operationId }) => operationId === "searchRoster")];
   const events = [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
     { ScenarioFinished: {
       status: "something-the-scanner-invented",
       recorder: {
-        label: "GET /api/admin/roster",
+        label: "POST /api/admin/roster/search",
         cases: { one: { value: { method: "GET", meta: { generation: { mode: "positive" } } } } },
         checks: {}
       }
@@ -521,12 +521,12 @@ test("given an unfinished scenario reporting a status nobody defined, when it is
 test("given a mutation probe that was not answered as documented, when the run is retained, then it says which one", async () => {
   // given
   const inventory = buildOpenApiFuzzInventory(api);
-  const generatedInventory = inventory.filter(({ method }) => method === "GET");
+  const generatedInventory = inventory.filter(({ modes }) => modes.includes("positive"));
   const events = (mode) => [
     { LoadingFinished: { statistic: { operations: { total: inventory.length,
       selected: generatedInventory.filter(({ modes }) => modes.includes(mode)).length } } } },
     ...generatedInventory.filter(({ modes }) => modes.includes(mode)).map((entry) => ({
-      ScenarioFinished: { status: entry.operationId === "listRoster" ? "timeout" : "success", recorder: {
+      ScenarioFinished: { status: entry.operationId === "searchRoster" ? "timeout" : "success", recorder: {
         label: `${entry.method} ${entry.path}`,
         cases: { one: { value: { method: entry.method, path: entry.path,
           query: { case: "0" }, meta: { generation: { mode } } } } },
@@ -548,7 +548,7 @@ test("given a mutation probe that was not answered as documented, when the run i
     outcome: id === "invalid-utf8" ? "incomplete" : "passed" }))
     .concat(["oversized-cell", "conflicting-reference"].map((id) => ({ id, status: 201,
       observation: "row-level-rejection", outcome: "passed" })));
-  const mutations = inventory.filter(({ method, modes }) => method !== "GET" && modes.includes("negative"));
+  const mutations = inventory.filter(({ modes }) => !modes.includes("positive") && modes.includes("negative"));
   const mutationCases = (unfinishedStatus) => mutations.map(({ operationId, method, path }) => ({
     operationId, method, path,
     status: operationId === "exportRoster" ? unfinishedStatus : 400,
@@ -608,7 +608,8 @@ test("given a mutation probe that was not answered as documented, when the run i
 
 // An operation with no body, no path parameter and no required header leaves the probe nothing to
 // corrupt, so it used to send a valid request and then report the correct answer as a violation.
-test("given an operation with only optional query parameters, when the probe is built, then it corrupts one of them", async () => {
+// The roster export was that operation until its filters moved out of the query string.
+test("given the operation that had only optional query parameters, when the probe is built, then its body is what is corrupted", async () => {
   // given
   const probes = new Map();
   const fixture = { client: {} };
@@ -625,9 +626,33 @@ test("given an operation with only optional query parameters, when the probe is 
   // then
   const roster = probes.get("/api/admin/export/roster");
   assert.ok(roster, "the roster export is no longer probed at all");
-  assert.match(roster.path, /[?&]membershipTypeId=invalid\b/,
-    "a uuid query parameter is what this operation offers to make invalid");
-  assert.equal(roster.body, undefined, "the operation declares no request body");
+  assert.equal(roster.body, "{", "the filters are a body now, so the body is what can be made invalid");
+  assert.equal(roster.headers["content-type"], "application/json");
+  assert.equal(new URL(roster.path, "https://example.org").search, "",
+    "a filter left in the query string is a personal value back in a URL");
+});
+
+// The branch that corrupts an optional query parameter has nothing to exercise it while no
+// operation has that shape, so this says when it comes back rather than leaving it unnoticed.
+test("given the contract, when an operation offers only optional query parameters, then a probe case covers it", () => {
+  // given
+  const shapes = buildOpenApiFuzzInventory(api)
+    .filter(({ modes }) => !modes.includes("positive") && modes.includes("negative"))
+    .filter(({ method, path }) => {
+      const operation = api.paths[path][method.toLowerCase()];
+      const parameters = [...(api.paths[path].parameters ?? []), ...(operation.parameters ?? [])];
+      const query = parameters.map((parameter) => parameter.$ref
+        ? api.components.parameters[parameter.$ref.split("/").pop()] : parameter)
+        .filter(({ in: where }) => where === "query");
+      return !operation.requestBody && !parameters.some(({ in: where }) => where === "path")
+        && !parameters.some(({ in: where, required }) => where === "header" && required)
+        && query.length > 0 && query.every(({ required }) => !required);
+    });
+
+  // when / then
+  assert.deepEqual(shapes.map(({ operationId }) => operationId), [],
+    "an operation whose probe can only corrupt an optional query parameter is back, so the test"
+    + " above needs a case for it again rather than only the roster export's body");
 });
 
 // A probe that could not corrupt anything sends a valid request and then reports the correct answer
