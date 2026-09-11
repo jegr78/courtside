@@ -52,6 +52,11 @@ class MessageBoundaryAgreementTest extends AbstractIntegrationTest {
     private record Hop(int status, Reading reading) {
     }
 
+    private record Readings(Answer direct, Answer throughTheProxy) {
+    }
+
+    private static final Map<String, Readings> MEASURED = new LinkedHashMap<>();
+
     private record Framing(String request, Hop direct, Hop throughTheDeployment) {
     }
 
@@ -136,11 +141,11 @@ class MessageBoundaryAgreementTest extends AbstractIntegrationTest {
     void givenAnAmbiguouslyFramedMessage_whenBothHopsReadIt_thenNeitherAnswersTwice()
             throws Exception {
         // when / then
-        for (Map.Entry<String, Framing> entry : CORPUS.entrySet()) {
-            assertThat(directly(entry.getValue()).responses())
-                    .as("%s, read by the connector", entry.getKey()).isEqualTo(1);
-            assertThat(throughTheDeployment(entry.getValue()).responses())
-                    .as("%s, read through the deployment", entry.getKey()).isEqualTo(1);
+        for (String label : CORPUS.keySet()) {
+            assertThat(measured(label).direct().responses())
+                    .as("%s, read by the connector", label).isEqualTo(1);
+            assertThat(measured(label).throughTheProxy().responses())
+                    .as("%s, read through the deployment", label).isEqualTo(1);
         }
     }
 
@@ -149,26 +154,28 @@ class MessageBoundaryAgreementTest extends AbstractIntegrationTest {
             throws Exception {
         // when / then
         for (Map.Entry<String, Framing> entry : CORPUS.entrySet()) {
-            Framing framing = entry.getValue();
-            assertThat(hop(directly(framing)))
-                    .as("%s, read by the connector", entry.getKey()).isEqualTo(framing.direct());
-            assertThat(hop(throughTheDeployment(framing)))
+            assertThat(hop(measured(entry.getKey()).direct()))
+                    .as("%s, read by the connector", entry.getKey())
+                    .isEqualTo(entry.getValue().direct());
+            assertThat(hop(measured(entry.getKey()).throughTheProxy()))
                     .as("%s, read through the deployment", entry.getKey())
-                    .isEqualTo(framing.throughTheDeployment());
+                    .isEqualTo(entry.getValue().throughTheDeployment());
         }
     }
 
     // Where the deployment admits a message the connector alone refuses, the field it repeats has
     // to carry one value, because a message with one possible boundary has nothing to disagree on.
     @Test
-    void givenTheDeploymentAdmitsWhatTheConnectorRefuses_thenTheRepeatedFieldsStateOneBoundary() {
+    void givenTheDeploymentAdmitsWhatTheConnectorRefuses_thenTheRepeatedFieldsStateOneBoundary()
+            throws IOException {
         // given
-        List<String> widened = CORPUS.entrySet().stream()
-                .filter(entry -> entry.getValue().direct().reading() == Reading.CONNECTOR_REFUSED)
-                .filter(entry -> entry.getValue().throughTheDeployment().reading()
-                        == Reading.APPLICATION_ANSWERED)
-                .map(Map.Entry::getKey)
-                .toList();
+        List<String> widened = new ArrayList<>();
+        for (String label : CORPUS.keySet()) {
+            if (measured(label).direct().reading() == Reading.CONNECTOR_REFUSED
+                    && measured(label).throughTheProxy().reading() == Reading.APPLICATION_ANSWERED) {
+                widened.add(label);
+            }
+        }
 
         // when / then
         assertThat(widened).isNotEmpty();
@@ -195,6 +202,19 @@ class MessageBoundaryAgreementTest extends AbstractIntegrationTest {
 
     private static Hop hop(Answer answer) {
         return new Hop(answer.status(), answer.reading());
+    }
+
+    // Every one of these costs a round trip at each hop, and the three readings below ask the same
+    // question of the same bytes, so the message is sent once and all three read that answer.
+    private Readings measured(String label) throws IOException {
+        Readings known = MEASURED.get(label);
+        if (known != null) {
+            return known;
+        }
+        Framing framing = CORPUS.get(label);
+        Readings taken = new Readings(directly(framing), throughTheDeployment(framing));
+        MEASURED.put(label, taken);
+        return taken;
     }
 
     private Answer directly(Framing framing) throws IOException {
