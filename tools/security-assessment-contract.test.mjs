@@ -77,14 +77,14 @@ test("given a reviewed control with a finding, when validating it, then the refe
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
   const referenced = structuredClone(catalog);
   const control = referenced.controlCoverage.flatMap(({ controls }) => controls)
-    .find(({ id }) => id === "v5.0.0-14.1.1");
-  control.findingReference = "docs/security-findings.md#incomplete-sensitive-data-classification";
+    .find(({ id }) => id === "v5.0.0-8.1.1");
+  control.findingReference = "docs/security-findings.md#incomplete-authorization-rule-documentation";
 
   // when / then
   assert.equal(validate(referenced), true, JSON.stringify(validate.errors));
-  control.findingReference = "../protected-evidence.md#incomplete-sensitive-data-classification";
+  control.findingReference = "../protected-evidence.md#incomplete-authorization-rule-documentation";
   assert.equal(validate(referenced), false);
-  control.findingReference = "docs/security-findings.md#incomplete-sensitive-data-classification";
+  control.findingReference = "docs/security-findings.md#incomplete-authorization-rule-documentation";
   control.controlEvidence = {
     productionPath: "docs/data-model.md",
     falsifyingTest: "tools/data-model-documentation.test.mjs#given the documented schema, when reading migrations, then every table is named"

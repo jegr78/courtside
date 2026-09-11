@@ -46,6 +46,18 @@ class DataProtectionInventoryTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenTheSpecificationCountsTheSchema_thenItCountsWhatTheSchemaHolds() {
+        // given
+        String specification = read(Path.of("docs/design.md"));
+
+        // when / then
+        assertThat(specification)
+                .as("section 11 states a column count, and a migration moves it. The number is a"
+                        + " promise to a reader, so it is derived here rather than remembered.")
+                .contains("classifies all " + storedFields().size() + " columns of the schema");
+    }
+
+    @Test
     void whenTheInventoryIsRead_thenEveryLevelAndOwnerIsOneTheDocumentDefines() {
         // given
         JsonNode inventory = inventory();

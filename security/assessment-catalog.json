@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.5.8",
+  "catalogVersion": "1.6.0",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -1689,7 +1689,10 @@
           "id": "v5.0.0-14.1.1",
           "status": "implemented",
           "manualProcedureId": "MAN-DATA-001",
-          "findingReference": "docs/security-findings.md#incomplete-sensitive-data-classification"
+          "controlEvidence": {
+            "productionPath": "security/data-protection-inventory.json",
+            "falsifyingTest": "src/test/java/org/courtside/DataProtectionInventoryTest.java#whenTheSchemaIsRead_thenEveryStoredFieldCarriesAProtectionLevelAndAnOwner"
+          }
         },
         {
           "id": "v5.0.0-14.1.2",
@@ -1702,7 +1705,10 @@
           "id": "v5.0.0-14.2.1",
           "status": "implemented",
           "manualProcedureId": "MAN-DATA-001",
-          "findingReference": "docs/security-findings.md#personal-data-enters-request-urls"
+          "controlEvidence": {
+            "productionPath": "src/main/resources/api/openapi.yaml",
+            "falsifyingTest": "tools/url-parameter-policy.test.mjs#given a value that names or authenticates a person, when it is classified, then no URL carries it"
+          }
         },
         {
           "id": "v5.0.0-14.2.2",
