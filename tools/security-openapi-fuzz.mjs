@@ -13,6 +13,7 @@ const Ajv = require("ajv/dist/2020").default;
 const specification = readFileSync(apiDocumentPath());
 const api = yaml.load(specification.toString("utf8"));
 const operationResponses = collectOperationResponses(api);
+const requestBodySchemas = collectRequestBodySchemas(api);
 const publicPropertyNames = collectPropertyNames(api.components?.schemas ?? {});
 const publicMediaTypes = collectMediaTypes(api);
 const evidenceSchema = JSON.parse(readFileSync(
@@ -570,6 +571,28 @@ function bodyShapeProjection(generatedCase) {
   };
 }
 
+// A negative case is negative because the generator mutated the schema, and a mutation can land on
+// data the schema still accepts. Whether it did is a question the contract answers.
+function collectRequestBodySchemas(document) {
+  const ajv = new Ajv({ strict: false, validateFormats: false });
+  ajv.addSchema(document, "contract");
+  const validators = new Map();
+  for (const pathItem of Object.values(document.paths ?? {})) {
+    for (const [method, operation] of Object.entries(pathItem)) {
+      const reference = operation?.requestBody?.content?.["application/json"]?.schema?.$ref;
+      if (!methods.has(method) || !operation.operationId || !reference) continue;
+      validators.set(operation.operationId, ajv.compile({ $ref: `contract${reference}` }));
+    }
+  }
+  return validators;
+}
+
+function bodyConformance(operation, generatedCase) {
+  const conforms = requestBodySchemas.get(operation.operationId);
+  if (!conforms || generatedCase?.body === undefined) return null;
+  return conforms(generatedCase.body) === true;
+}
+
 // Which headers a case set, never what it set them to: the media type it chose is the remaining
 // place a mutation can sit once the method and the body shape are known.
 function headerNamesProjection(generatedCase) {
@@ -603,6 +626,11 @@ function counterexampleDisposition(counterexample) {
       && status >= 200 && status < 300) {
     return "safe-method-carries-no-body-semantics";
   }
+  const carriedValidData = counterexample.mode === "negative"
+    && counterexample.check === "negative-data-rejection" && counterexample.bodyConforms === true;
+  if (carriedValidData && status >= 200 && status < 300) {
+    return "negative-case-carried-valid-data";
+  }
   const qualifiedProxyRejection = ["negative-data-rejection", "status-code-conformance"]
     .includes(counterexample.check);
   if (counterexample.mode === "negative" && qualifiedProxyRejection
@@ -625,6 +653,7 @@ function dispositionProjection(counterexample, disposition) {
     method: counterexample.method,
     requestMethod: counterexample.requestMethod,
     bodyShape: counterexample.bodyShape,
+    bodyConforms: counterexample.bodyConforms,
     headerNames: counterexample.headerNames,
     pathTemplate: counterexample.pathTemplate,
     reason: counterexample.reason,
@@ -756,6 +785,7 @@ function safeCounterexample(operation, mode, sequence, check, generatedCase) {
     method: operation.method,
     requestMethod: relayedMethod(generatedCase, operation),
     bodyShape: bodyShapeProjection(generatedCase),
+    bodyConforms: bodyConformance(operation, generatedCase),
     headerNames: headerNamesProjection(generatedCase),
     pathTemplate: operation.path,
     reason,

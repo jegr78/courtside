@@ -688,12 +688,12 @@ test("given a coverage case that differs from the operation only by its method, 
   const rejection = { name: "negative_data_rejection", status: "failure",
     failure_info: { reason: { kind: "status", observedStatus: 200,
       expectedStatuses: [400, 415, "5xx"] } } };
-  const caseFor = (method) => ({ value: { method, body: { query: "00" },
+  const caseFor = (method, body) => ({ value: { method, body,
     meta: { generation: { mode: "negative" } } } });
   const events = [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
     { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster-search",
-      cases: { safe: caseFor("OPTIONS"), own: caseFor("POST") },
+      cases: { safe: caseFor("OPTIONS", { query: "00" }), own: caseFor("POST", { limit: 500 }) },
       checks: { safe: [rejection], own: [rejection] } } } }
   ];
 
@@ -729,4 +729,29 @@ test("given a counterexample, when it is retained, then it names the shape of th
   assert.deepEqual(counterexample.bodyShape, { kind: "object",
     properties: ["cursor:null", "limit:number", "membershipTypeId:array(1)", "query:string(3)"] });
   assert.deepEqual(counterexample.headerNames, ["content-type=application/json", "x-trace"]);
+});
+
+test("given a negative case whose body the contract still accepts, when it is answered, then only the body the contract refuses remains a finding", () => {
+  // given
+  const inventory = [buildOpenApiFuzzInventory(api)
+    .find(({ operationId }) => operationId === "searchRoster")];
+  const rejection = { name: "negative_data_rejection", status: "failure",
+    failure_info: { reason: { kind: "status", observedStatus: 200,
+      expectedStatuses: [400, 415, "5xx"] } } };
+  const caseFor = (body) => ({ value: { method: "POST", body,
+    meta: { generation: { mode: "negative" } } } });
+  const events = [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster-search",
+      cases: { valid: caseFor({ query: "Doe" }), refused: caseFor({ limit: 500 }) },
+      checks: { valid: [rejection], refused: [rejection] } } } }
+  ];
+
+  // when
+  const normalized = normalizeSchemathesisEvents(events, inventory, "negative");
+
+  // then
+  assert.deepEqual(normalized.counterexamples.map(({ bodyConforms }) => bodyConforms), [false]);
+  assert.deepEqual(normalized.dispositions.map(({ disposition }) => disposition),
+    ["negative-case-carried-valid-data"]);
 });
