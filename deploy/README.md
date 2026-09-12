@@ -4,7 +4,13 @@ Every club runs its own instance. This directory is the deployment the maintaine
 so that yours is the same thing rather than a reconstruction of it. Copy the directory, fill in
 `.env`, and adapt what your infrastructure requires — you are not expected to send changes back.
 
-You need Docker with the Compose plugin. The application container is capped at 1 GiB and an idle
+You need Docker with Compose 2.33.1 or newer. The minimum is declared in `compose.yaml`; older
+versions do not understand the gateway selection that keeps external traffic on the dedicated
+egress networks and reject the deployment instead of choosing an arbitrary internal gateway. The
+same file's `x-courtside-production-overlays` list is the closed machine-readable inventory of
+supported production overlays; repository checks reject a manifest entry omitted from the
+architecture map. The
+application container is capped at 1 GiB and an idle
 instance with an empty database sits at roughly 450 MiB of that; raise `COURTSIDE_MEMORY` if your
 club outgrows it.
 
@@ -226,8 +232,19 @@ Two things about the mail container are worth knowing regardless:
   `COURTSIDE_MAIL_HOSTNAME` and verifies the chain and that name like any other client, so a relay
   serving the wrong certificate stops the mail rather than receiving it. That name answers on a
   network of its own, joined by the instance and the mail server and by nothing else: an alias
-  answers for every container sharing its network, and `mail-check` has to read the public record
-  for the same name. MTA-STS and DANE remain out of scope.
+  answers for every container sharing its network. `mail-check` instead uses the delivery network,
+  where it can resolve the public record and reach port 25 without receiving a mail-administration
+  credential. Stalwart listens on ports 25, 587 and 8080 on every network interface, so every
+  container sharing any network with it can reach all three listeners. Network membership limits
+  which processes reach the container; SMTP authentication, relay policy and Stalwart's scoped
+  administration accounts limit what those processes may do. The application and `mail-check`
+  receive no administration credential. MTA-STS and DANE remain out of scope.
+
+The remaining Compose networks separate database, reverse-proxy, mail administration and mail
+delivery reachability. The application and proxy each also have a single-member egress network:
+the application still needs operator-selected SMTP and telemetry targets plus the fixed production
+password-range service, while Caddy needs ACME. Those networks preserve outbound routing; they do
+not grant either service a path into another deployment component.
 
 ### The certificate the mail server serves
 

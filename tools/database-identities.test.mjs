@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+
+const require = createRequire(new URL("../frontend/package.json", import.meta.url));
+const YAML = require("yaml");
 
 function source(path) {
   return readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
@@ -10,6 +14,9 @@ function source(path) {
 const base = source("../deploy/compose.yaml");
 const identities = source("../deploy/compose.database-identities.yaml");
 const documentation = source("../deploy/README.md");
+const baseCompose = YAML.parse(base);
+const identityCompose = YAML.parse(identities.replaceAll("!reset null", "null"));
+const networkNames = (networks) => Array.isArray(networks) ? networks : Object.keys(networks ?? {});
 
 function service(name, next) {
   const start = identities.indexOf(`  ${name}:`);
@@ -55,6 +62,18 @@ test("given separate identities, when startup is ordered, then migration complet
   assert.match(runtime, /database-migrate:[\s\S]*condition: service_completed_successfully/);
   assert.match(runtime, /SPRING_DATASOURCE_USERNAME: !reset null/);
   assert.match(runtime, /SPRING_DATASOURCE_PASSWORD: !reset null/);
+});
+
+test("given the identity overlay, when it is merged with the reference deployment, then every database process can reach db", () => {
+  // given
+  const databaseNetworks = new Set(networkNames(baseCompose.services.db.networks));
+
+  // when / then
+  for (const helper of ["database-setup", "database-migrate"]) {
+    const helperNetworks = networkNames(identityCompose.services[helper].networks);
+    assert.ok(helperNetworks.some((network) => databaseNetworks.has(network)),
+      `${helper} shares no network with the base deployment's database`);
+  }
 });
 
 test("given optional TLS and bounded identities, when combined, then setup and migration share its policy", () => {

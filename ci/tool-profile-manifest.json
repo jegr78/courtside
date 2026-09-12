@@ -62,6 +62,7 @@
     { "path": "tools/performance-runner.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/performance-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/post-merge-policy.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/production-architecture.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/pwa-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/quality-strategy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/risk-register.mjs", "profiles": ["full"], "test": false },

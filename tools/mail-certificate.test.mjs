@@ -204,11 +204,15 @@ test("given the shipped plan, when it creates the reload identity, then that ide
 
 test("given the mail server, when the instance dials it, then it dials the name on its certificate",
   () => {
-    // given / when / then
+    // given
+    const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+    const deployment = yaml.load(compose);
+
+    // when / then
     assert.match(service("mail"),
       /relay:\n +aliases:\n(?: +#[^\n]*\n)* +- \$\{COURTSIDE_MAIL_HOSTNAME:\?/,
       "the compose network answers for `mail` alone, a name no authority issues a certificate for");
-    assert.match(service("app"), /networks:\n(?: +- \w+\n)* +- relay\n/,
+    assert.ok(Object.hasOwn(deployment.services.app.networks, "relay"),
       "the instance is not on the network the name answers on, so it reaches nothing under it");
     assert.match(compose,
       /COURTSIDE_MAIL_RELAY_HOST: \$\{COURTSIDE_MAIL_RELAY_HOST:-\$\{COURTSIDE_MAIL_HOSTNAME:\?/,

@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-09-12",
+  "source": "src/main/resources/api/openapi.yaml",
+  "authorizationSource": "tools/security-authorization.mjs#buildOperationAuthorizationMatrix",
+  "workflows": [
+    {
+      "id": "build-and-source-discovery",
+      "actors": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "INITIAL_PASSWORD"],
+      "entryPoints": "Public source-offer and OpenAPI endpoints.",
+      "operationIds": ["getSourceOffer", "getApiDocument"],
+      "backgroundEntryPoints": [],
+      "stateTransitions": ["No product state changes."],
+      "alternatePaths": ["The source offer reflects the configured fork and the API document describes the running contract."],
+      "failurePaths": ["An invalid source URL refuses startup; unavailable metadata remains a conspicuous build-identity failure."],
+      "productionPaths": ["src/main/java/org/courtside/shared/web/SourceOfferController.java", "src/main/java/org/courtside/shared/web/ApiDocumentController.java"],
+      "evidence": ["src/test/java/org/courtside/SourceOfferTest.java#givenNobodyIsLoggedIn_whenAskingWhereTheSourceIs_thenTheAnswerNamesAVersionAndAPlace"]
+    },
+    {
+      "id": "session-and-own-account",
+      "actors": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "INITIAL_PASSWORD"],
+      "entryPoints": "Login, logout, reauthentication and own-account endpoints.",
+      "operationIds": ["getSessionStatus", "logIn", "logOut", "reauthenticate", "changeInitialPassword", "changeOwnPassword", "listOwnSessions", "endOwnSessions", "endOwnSession", "changeOwnLocale", "listOwnMessageChoices", "chooseOwnMessages"],
+      "backgroundEntryPoints": ["AgedSessionSweep#deleteSessionsPastTheirLifetime", "BootstrapAdminInitializer#run", "CredentialMailer#on(CredentialsRequested)", "IdentityCleanupSchedule#deleteExpiredCredentialIssues", "IdentityCleanupSchedule#deleteExpiredLoginAttempts"],
+      "stateTransitions": ["Credentials create a server-side session.", "Password or security changes revoke earlier authority.", "Logout and session termination delete or invalidate sessions.", "Locale and message choices update account preferences."],
+      "alternatePaths": ["Initial credentials require a permanent password before ordinary use.", "The current session can be ended without a second proof while other sessions require recent authentication."],
+      "failurePaths": ["Unknown, disabled and wrong-credential logins remain indistinguishable.", "Expired proof, CSRF failure, rate limits and invalid password policy refuse without partial account mutation."],
+      "productionPaths": ["src/main/java/org/courtside/identity/internal/SecurityConfiguration.java", "src/main/java/org/courtside/identity/internal/AccountController.java", "src/main/java/org/courtside/notification/web/MessageChoiceController.java"],
+      "evidence": ["src/test/java/org/courtside/identity/LoginTest.java#givenFiveDifferentReasonsToRefuse_whenSigningIn_thenTheAnswersCannotBeToldApart", "src/test/java/org/courtside/identity/SignOutTest.java#givenASignedInAccount_whenItSignsOut_thenTheSessionIsGone"]
+    },
+    {
+      "id": "public-club-and-availability",
+      "actors": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "INITIAL_PASSWORD"],
+      "entryPoints": "Public configuration, courts, opening hours, cards, participant lookup and booking-grid endpoints.",
+      "operationIds": ["listCourts", "listOpeningHours", "getBookingGrid", "getClubConfig", "getClubLogo", "getWebManifest", "listBookableCards", "listParticipantCards", "listParticipantMembers"],
+      "backgroundEntryPoints": [],
+      "stateTransitions": ["No product state changes."],
+      "alternatePaths": ["Uploaded branding replaces the configured URL fallback.", "Anonymous and authenticated callers receive the same public availability without private fields."],
+      "failurePaths": ["Missing uploaded branding returns a typed not-found response.", "Participant search and grid bounds reject invalid input without broadening the returned set."],
+      "productionPaths": ["src/main/java/org/courtside/config/web/ConfigController.java", "src/main/java/org/courtside/facility/web/CourtController.java", "src/main/java/org/courtside/booking/web/BookingController.java"],
+      "evidence": ["src/test/java/org/courtside/config/web/ConfigControllerTest.java#whenReadingThePublicConfig_thenItPublishesNothingOnlyABoardShouldSee", "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenNoUploadedLogo_whenReadingIt_thenTheTypedNotFoundProblemIsServed"]
+    },
+    {
+      "id": "booking-participation-and-series",
+      "actors": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "INITIAL_PASSWORD"],
+      "entryPoints": "Booking, participation, managed-appointment and recurring-series endpoints.",
+      "operationIds": ["listAllocations", "createBooking", "getBookingEligibility", "cancelBooking", "listPersonalBookings", "listOwnParticipations", "removeOwnParticipation", "listManagedAppointments", "getManagedAppointment", "previewSeries", "createSeries", "cancelSeries", "previewSeriesMove", "moveSeries"],
+      "backgroundEntryPoints": ["BookingMailer#on(BookingConfirmed)", "BookingReminderSchedule#remindWhatIsDue", "DisplacementMailer#on(BookingDisplaced)", "ParticipationMailer#on(ParticipantRecorded)", "ParticipationMailer#on(ParticipantWithdrew)", "ReminderMailer#on(BookingReminderDue)"],
+      "stateTransitions": ["A valid request creates a confirmed booking and court allocations.", "Cancellation releases allocations and records its actor.", "Participation withdrawal removes only the caller's participant record.", "Series creation, move and cancellation change all selected occurrences transactionally."],
+      "alternatePaths": ["Booking-card roles and ADMIN authority select which appointments a caller may create or manage.", "Series and move previews report blocked occurrences without mutation."],
+      "failurePaths": ["Rules, opening hours, unavailable resources and duplicate participants reject the whole write.", "Unauthorized access is concealed as absence where existence would disclose another person's booking.", "Concurrency and stale series state roll back rather than leave a partial calendar."],
+      "productionPaths": ["src/main/java/org/courtside/booking/BookingService.java", "src/main/java/org/courtside/booking/ParticipationService.java", "src/main/java/org/courtside/booking/series/SeriesService.java"],
+      "evidence": ["src/test/java/org/courtside/booking/BookingServiceTest.java#givenAnExistingBooking_whenCreatingAnOverlappingOne_thenCourtUnavailableIsThrown", "src/test/java/org/courtside/booking/ParticipationServiceTest.java#givenAMemberNamedInSomebodyElsesBooking_whenTheyWithdraw_thenTheBookingKeepsEverythingElse"]
+    },
+    {
+      "id": "facility-card-and-membership-configuration",
+      "actors": ["ADMIN"],
+      "entryPoints": "Administrative court, opening-hour, booking-card, participant-card and membership-type endpoints.",
+      "operationIds": ["listCourtsForAdmin", "createCourt", "getCourt", "changeCourt", "setCourtActive", "listBookingCards", "createBookingCard", "getBookingCard", "changeBookingCard", "setBookingCardActive", "listParticipantCardsForAdmin", "createParticipantCard", "getParticipantCard", "changeParticipantCard", "setParticipantCardActive", "listMembershipTypes", "createMembershipType", "getMembershipType", "changeMembershipType", "setMembershipTypeActive", "listOpeningHoursForAdmin", "setWeeklyOpeningHours"],
+      "backgroundEntryPoints": ["ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)", "ClosureAnnouncements#on(FacilityEvent.CourtAvailabilityChanged)", "ClosureAnnouncements#on(FacilityEvent.OpeningHoursClosed)", "ClosureAnnouncements#on(FacilityEvent.OpeningHoursSet)"],
+      "stateTransitions": ["Administrators create and correct configuration records.", "Active flags retire and restore resources without deleting history.", "Opening-hour changes replace the weekly schedule."],
+      "alternatePaths": ["Impact endpoints let the board inspect affected future bookings before a restrictive change.", "Existing records remain readable and correctable after deactivation."],
+      "failurePaths": ["A change that would invalidate future bookings is refused with the affected state intact.", "Invalid role, capacity, time or colour data returns field-specific violations."],
+      "productionPaths": ["src/main/java/org/courtside/facility/FacilityService.java", "src/main/java/org/courtside/card/CardService.java", "src/main/java/org/courtside/member/MemberService.java"],
+      "evidence": ["src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenAFutureBooking_whenChangingTheTimeZone_thenItIsRejected"]
+    },
+    {
+      "id": "roster-membership-and-account-administration",
+      "actors": ["ADMIN"],
+      "entryPoints": "Roster, membership, account, role, credential and session-administration endpoints.",
+      "operationIds": ["listRoster", "createPerson", "readPerson", "changePerson", "createAccount", "changeAccountRoles", "changeAccountUsername", "changeAccountLocale", "requestAccountCredentials", "endAccountSessions", "endAllSessions", "setAccountActive", "assignMembership", "removeMembership"],
+      "backgroundEntryPoints": [],
+      "stateTransitions": ["A person may gain or lose a current membership.", "An account may be created, corrected, enabled, disabled or assigned a new credential.", "Role and username changes revoke stale authority.", "Session termination removes one account's or every account's sessions."],
+      "alternatePaths": ["A person may exist without an account and an account may retain non-member roles after membership ends.", "Credentials can be issued for a new account or reset for an existing one."],
+      "failurePaths": ["The last enabled administrator cannot remove its own continuity.", "Duplicate usernames, stale writes, invalid roles and missing recent proof refuse without partial security changes."],
+      "productionPaths": ["src/main/java/org/courtside/member/RosterService.java", "src/main/java/org/courtside/identity/internal/AccountSessionService.java"],
+      "evidence": ["src/test/java/org/courtside/identity/SecurityDecisionEventTest.java#givenTheOnlyAdminWouldRemoveItsRole_whenContinuityRefusesIt_thenTheGuardIsRecorded"]
+    },
+    {
+      "id": "roster-import-and-full-sync",
+      "actors": ["ADMIN"],
+      "entryPoints": "Import-source, external-reference, preview, execution and run-history endpoints.",
+      "operationIds": ["listSupportedEncodings", "listImportSources", "createImportSource", "readImportSource", "changeImportSource", "deleteImportSource", "listExternalReferences", "linkExternalReference", "unlinkExternalReference", "createImportPreview", "readImportPreview", "executeImportPreview", "listImportRuns"],
+      "backgroundEntryPoints": ["PreviewExpirySchedule#sweepNow"],
+      "stateTransitions": ["An import source defines the external identifier and field mapping.", "An uploaded snapshot creates a preview bound to its reviewer.", "Executing a current preview creates or corrects people, memberships and optional accounts, then records one run.", "Missing source members lose the member role or receive the mapped membership state."],
+      "alternatePaths": ["External references can be linked manually before the next full sync.", "A removal threshold requires explicit confirmation before execution."],
+      "failurePaths": ["Malformed rows stay row failures in the preview.", "Expired, superseded, stale or differently owned previews refuse transactionally.", "Concurrent execution for one source serializes and cannot duplicate people."],
+      "productionPaths": ["src/main/java/org/courtside/dataexchange/PreviewService.java", "src/main/java/org/courtside/dataexchange/ExecutionService.java", "src/main/java/org/courtside/member/RosterSyncService.java"],
+      "evidence": ["src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAReviewedPreview_whenItIsExecuted_thenEveryRecordExistsAndIsLinked", "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAPreviewThatWouldEndAMembership_whenSomebodyItTouchesChangedSince_thenItIsRefused"]
+    },
+    {
+      "id": "booking-rules-and-club-configuration",
+      "actors": ["ADMIN"],
+      "entryPoints": "Rule-set, rule-type, rule and club-configuration endpoints.",
+      "operationIds": ["listRuleSets", "createRuleSet", "listRuleTypes", "getRuleSet", "changeRuleSet", "setRuleSetActive", "getClubConfigForAdmin", "changeClubConfig", "uploadClubLogo", "deleteClubLogo", "listRules", "setRule", "removeRule"],
+      "backgroundEntryPoints": [],
+      "stateTransitions": ["Administrators create, correct, activate and retire rule sets.", "Rules are added, replaced or removed by declared type.", "Club identity, locale, time zone, booking grid, message validity and branding are corrected.", "An uploaded logo becomes the effective same-origin image until removed."],
+      "alternatePaths": ["A default rule set applies when a member has no membership type.", "Removing an uploaded logo restores the configured URL fallback."],
+      "failurePaths": ["Unknown rule types and malformed specs are rejected.", "Changes that conflict with opening hours or future bookings fail without mutation.", "Unsafe URLs and active-content uploads return field-specific failures."],
+      "productionPaths": ["src/main/java/org/courtside/rules/internal/RuleAdminService.java", "src/main/java/org/courtside/config/internal/ConfigService.java"],
+      "evidence": ["src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenAnUploadedLogoAndAUrlFallback_whenDeletingTheUpload_thenTheFallbackIsEffective", "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenActiveContent_whenUploadingALogo_thenTheTypedViolationIsReturned"]
+    },
+    {
+      "id": "administrative-impact-reporting-and-records",
+      "actors": ["ADMIN"],
+      "entryPoints": "Impact, utilisation, message-history and audit-log endpoints.",
+      "operationIds": ["courtImpact", "bookingCardImpact", "openingHoursImpact", "facilityUtilisation", "readMessageLog", "readAuditLog"],
+      "backgroundEntryPoints": [],
+      "stateTransitions": ["No product state changes."],
+      "alternatePaths": ["Impact reads page through all affected future bookings before a configuration write.", "Reports use the club time zone and bounded periods.", "Message and audit records expose privacy-safe event metadata to the permitted board role."],
+      "failurePaths": ["Unknown subjects, cross-scope cursors and invalid report periods refuse without disclosing another set.", "Unavailable delivery evidence remains explicit rather than appearing successful."],
+      "productionPaths": ["src/main/java/org/courtside/booking/internal/ImpactService.java", "src/main/java/org/courtside/booking/internal/FacilityUtilisationService.java", "src/main/java/org/courtside/audit/internal/AuditService.java", "src/main/java/org/courtside/notification/internal/MessageLogService.java"],
+      "evidence": ["src/test/java/org/courtside/booking/web/ImpactControllerTest.java#givenACursorFromAnotherCourt_whenRequestingImpact_thenNoPositionedBookingsAreDisclosed", "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenTheEndPrecedesTheStart_whenReportingUtilisation_thenThePeriodViolationIsReturned"]
+    },
+    {
+      "id": "administrative-export-and-subject-access",
+      "actors": ["ADMIN"],
+      "entryPoints": "Roster, booking and per-person export endpoints.",
+      "operationIds": ["exportRoster", "exportBookings", "exportPersonData"],
+      "backgroundEntryPoints": [],
+      "stateTransitions": ["A subject-access export records that the answer was produced; ordinary CSV exports do not change domain state."],
+      "alternatePaths": ["Roster and booking exports select bounded fields and periods.", "Subject access assembles every record about one person while omitting other people's data."],
+      "failurePaths": ["Unauthorized callers are refused.", "Unknown people and invalid periods return typed failures without an empty or cross-person export."],
+      "productionPaths": ["src/main/java/org/courtside/dataexchange/web/ExportAdminController.java", "src/main/java/org/courtside/dataexchange/web/SubjectAccessAdminController.java"],
+      "evidence": ["src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenAPersonTheInstanceHoldsEverythingAbout_whenABoardAsks_thenEachOfThoseThingsIsAnswered", "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenAMemberRatherThanTheBoard_whenTheyAskWhatIsHeldAboutSomebody_thenItIsRefused"]
+    }
+  ]
+}

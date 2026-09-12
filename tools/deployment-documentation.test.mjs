@@ -13,9 +13,12 @@ function repositoryFile(path) {
 
 // The verification profiles beside these are not an operator surface, and documenting their
 // variables would describe this repository's harness to a club.
-const OPERATOR_FACING =
-  ["compose.yaml", "compose.database-tls.yaml", "compose.database-tls-local.yaml",
-    "compose.app-tls.yaml", "compose.database-identities.yaml"];
+const baseCompose = deploymentFile("compose.yaml");
+const overlayBlock = baseCompose.match(
+  /^x-courtside-production-overlays:\n(?<entries>(?:  - compose[\w.-]+\.yaml\n)+)/m);
+assert.ok(overlayBlock, "compose.yaml has no closed production-overlay manifest");
+const OPERATOR_FACING = ["compose.yaml", ...[...overlayBlock.groups.entries
+  .matchAll(/^  - (compose[\w.-]+\.yaml)$/gm)].map((match) => match[1])];
 const compose = OPERATOR_FACING.map(deploymentFile).join("\n");
 const readme = deploymentFile("README.md");
 const example = deploymentFile(".env.example");
@@ -49,21 +52,17 @@ function announced(script) {
     .map((match) => match[1].replace(/^(?:failed|ok) /, ""));
 }
 
-test("given the two documentation contracts, when both read Compose, then they read the same files",
+test("given the two documentation contracts, when both read Compose, then the production manifest stays authoritative",
   () => {
     // given
     const contract = repositoryFile(
       "src/test/java/org/courtside/ReferenceDeploymentDocumentationTest.java");
 
     // when
-    const named = [...new Set([...contract
-      .slice(contract.indexOf("variablesReadByCompose"))
-      .matchAll(/"deploy\/(compose[\w.-]*\.yaml)"/g)].map((match) => match[1]))];
-
     // then
-    assert.deepEqual(named.sort(), [...OPERATOR_FACING].sort(),
-      "both contracts read the operator-facing Compose files, and an overlay added to only one of "
-      + "them narrows the other's gate without failing it");
+    assert.match(contract, /x-courtside-production-overlays/);
+    assert.doesNotMatch(contract, /compose\.database-(?:tls|identities)\.yaml/,
+      "the Java documentation contract duplicated the production-overlay manifest");
   });
 
 test("given the reference deployment, when a variable is read, then it is documented and offered",

@@ -18,6 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReferenceDeploymentDocumentationTest {
 
     private static final Pattern VARIABLE = Pattern.compile("\\$\\{(COURTSIDE_[A-Z0-9_]+)");
+    private static final Pattern PRODUCTION_OVERLAYS = Pattern.compile(
+            "(?m)^x-courtside-production-overlays:\\R(?<entries>(?:  - compose[\\w.-]+\\.yaml\\R)+)");
+    private static final Pattern OVERLAY_ENTRY = Pattern.compile("(?m)^  - (compose[\\w.-]+\\.yaml)$");
 
     private static final Pattern RECORD_KIND = Pattern.compile("\\b(PTR|MX|SPF|DKIM|DMARC)\\b");
 
@@ -145,10 +148,15 @@ class ReferenceDeploymentDocumentationTest {
     // variables would describe this repository's harness to a club.
     private static List<String> variablesReadByCompose() throws IOException {
         List<String> variables = new ArrayList<>();
-        for (String operatorFacing : List.of("deploy/compose.yaml",
-                "deploy/compose.database-tls.yaml", "deploy/compose.database-tls-local.yaml",
-                "deploy/compose.app-tls.yaml", "deploy/compose.database-identities.yaml")) {
-            VARIABLE.matcher(Files.readString(Path.of(operatorFacing))).results()
+        String base = Files.readString(Path.of("deploy/compose.yaml"));
+        Matcher manifest = PRODUCTION_OVERLAYS.matcher(base);
+        assertThat(manifest.find()).as("compose.yaml declares its production overlays").isTrue();
+        List<String> operatorFacing = new ArrayList<>(List.of("deploy/compose.yaml"));
+        OVERLAY_ENTRY.matcher(manifest.group("entries")).results()
+                .map(match -> "deploy/" + match.group(1))
+                .forEach(operatorFacing::add);
+        for (String composeFile : operatorFacing) {
+            VARIABLE.matcher(Files.readString(Path.of(composeFile))).results()
                     .map(match -> match.group(1))
                     .forEach(variables::add);
         }

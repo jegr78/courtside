@@ -1,5 +1,12 @@
 name: courtside
 
+x-courtside-compose-version: ">=2.33.1"
+x-courtside-production-overlays:
+  - compose.database-identities.yaml
+  - compose.database-tls.yaml
+  - compose.database-tls-local.yaml
+  - compose.app-tls.yaml
+
 x-logging: &logging
   driver: json-file
   options:
@@ -17,6 +24,8 @@ services:
       POSTGRES_DB: courtside
       POSTGRES_USER: courtside
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+    networks:
+      - database
     volumes:
       - db:/var/lib/postgresql/data
     healthcheck:
@@ -87,8 +96,11 @@ services:
       COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: ${COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE:-false}
       LOGGING_LEVEL_ORG_COURTSIDE: ${COURTSIDE_LOG_LEVEL:-INFO}
     networks:
-      - default
-      - relay
+      app-egress:
+        gw_priority: 1
+      database: {}
+      ingress: {}
+      relay: {}
     ports:
       - "127.0.0.1:${COURTSIDE_PORT:-8080}:8080"
 
@@ -108,12 +120,15 @@ services:
       STALWART_RECOVERY_ADMIN: ${COURTSIDE_MAIL_RECOVERY_ADMIN:-}
       STALWART_RECOVERY_MODE: ${COURTSIDE_MAIL_RECOVERY_MODE:-}
     networks:
-      default: {}
       relay:
         aliases:
-          # The name on the certificate this server serves, on a network of its own: an alias
-          # answers for everyone who shares the network, and `mail-check` reads the public record.
+          # The name on the certificate this server serves, on a network shared only with the app.
           - ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+      mail-admin:
+        aliases:
+          - ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+      mail-delivery:
+        gw_priority: 1
     volumes:
       - mail-config:/etc/stalwart
       - mail-data:/var/lib/stalwart
@@ -179,6 +194,8 @@ services:
       COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE: ${COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE:-6}
       COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL: ${COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL:-3600}
       COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME: ${COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME:-34560000}
+    networks:
+      - mail-admin
     volumes:
       - ./mail-certificate-peer.mjs:/mail-certificate-peer.mjs:ro
       - ./mail-reload.sh:/mail-reload.sh:ro
@@ -199,6 +216,7 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    network_mode: none
     read_only: true
     environment:
       COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
@@ -234,6 +252,8 @@ services:
       STALWART_URL: http://mail:8080
       STALWART_USER: admin
       STALWART_PASSWORD: ${COURTSIDE_MAIL_SETUP_PASSWORD:?set COURTSIDE_MAIL_SETUP_PASSWORD in .env}
+    networks:
+      - mail-admin
     volumes:
       - mail-plan:/plan:ro
     command: ["apply", "--file", "/plan/bootstrap.ndjson"]
@@ -258,6 +278,8 @@ services:
       STALWART_URL: http://mail:8080
       STALWART_USER: admin
       STALWART_PASSWORD: ${COURTSIDE_MAIL_SETUP_PASSWORD:?set COURTSIDE_MAIL_SETUP_PASSWORD in .env}
+    networks:
+      - mail-admin
     volumes:
       - mail-plan:/plan:ro
     command: ["apply", "--file", "/plan/base.ndjson"]
@@ -278,6 +300,8 @@ services:
       COURTSIDE_MAIL_OUTBOUND_PROBE: ${COURTSIDE_MAIL_OUTBOUND_PROBE:-gmail-smtp-in.l.google.com}
       COURTSIDE_MAIL_RELAY_PROBE: ${COURTSIDE_MAIL_RELAY_PROBE:-relay-probe.example.com}
       COURTSIDE_MAIL_RELAY_TARGET: ${COURTSIDE_MAIL_RELAY_TARGET:-mail}
+    networks:
+      - mail-delivery
     volumes:
       - ./mail-check.sh:/mail-check.sh:ro
     entrypoint: ["sh", "/mail-check.sh"]
@@ -295,6 +319,10 @@ services:
     environment:
       COURTSIDE_DOMAIN: ${COURTSIDE_DOMAIN:?set COURTSIDE_DOMAIN in .env}
       COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+    networks:
+      ingress: {}
+      proxy-egress:
+        gw_priority: 1
     ports:
       - "80:80"
       - "443:443"
@@ -304,8 +332,17 @@ services:
       - caddy-config:/config
 
 networks:
-  default:
+  app-egress:
+  database:
+    internal: true
+  ingress:
+    internal: true
   relay:
+    internal: true
+  mail-admin:
+    internal: true
+  mail-delivery:
+  proxy-egress:
 
 volumes:
   db:

@@ -44,15 +44,41 @@ The catalog inventories the public PWA, authentication and server-side sessions,
 
 A single-tenant deployment reduces cross-club authorization paths but does not remove horizontal access between people in the same club or the need to test configuration and deployment isolation.
 
-The reference deployment maps its components explicitly. `db` is the private PostgreSQL store;
-`app` is the only Courtside application and publishes its container port on loopback only; optional
-`proxy` is the public HTTP/HTTPS boundary. The optional mail path consists of `mail`,
-`mail-certificate`, `mail-reload`, `mail-plan`, `mail-bootstrap`, `mail-configure` and `mail-check`.
-Only SMTP and the proxy's HTTP/HTTPS listeners are public; the application and mail administration
-listeners remain on loopback. The browser-to-proxy, proxy-to-application, application-to-database,
-source-to-image and operator-to-evidence transitions are the corresponding trust boundaries. A
-service or listener added to `deploy/compose.yaml` therefore changes the architecture and requires
-this map and its falsifying inventory test to change together.
+The reference deployment's closed component and data-flow map lives in
+`security/production-architecture.json`. It derives its internal services and published listeners
+from the base Compose file and its supported production TLS and database-identity overlays,
+Stalwart's configured listeners from its base plan, network-capable
+application APIs and configured targets from production Java and `application.yaml`, and its
+configurable browser destinations from OpenAPI. Writer-to-reader volume handoffs, Caddy upstreams
+and mail delivery routes are exact source-derived relations that each resolve to a boundary.
+Each boundary records its direction, allowed target, data,
+owner, dependency-failure behavior, software controls and executable evidence. Exact-coverage tests
+reject a new service, published or mail-plan listener, deployment relation, outbound client or
+browser destination until the map classifies it.
+The network inventory closes service membership, each protected service's permitted peer
+transitions and every segment's internal-routing and default-gateway posture. Stalwart exposes all
+three configured listeners on each of its attached
+networks; the inventory records every network-reachable source explicitly. Its scoped credentials,
+SMTP authentication and relay policy therefore remain security boundaries even after network
+membership has reduced the set of processes that can reach the mail container.
+The map includes SMTP submission and delivery, HIBP, ACME, DNS, recipient systems, optional OTLP,
+Stalwart's runtime WebUI release download, configured browser destinations, build publication and
+operator-held evidence. The machine-readable production-overlay manifest also includes the local
+PostgreSQL server-TLS overlay and its database-only private-key handoff. Operational choices
+remain assigned to the club operator; the map does not claim that Courtside controls external DNS,
+recipient systems, telemetry storage or evidence retention.
+Optional OTLP export has explicit connection and response deadlines. Collector refusal and a
+stalled response are exercised without changing application request outcomes, and a later export
+must succeed while the stalled response remains blocked.
+
+`security/production-workflows.json` is the corresponding workflow view. Every OpenAPI operation
+and every scheduled, asynchronous or startup entry point belongs to exactly one principal workflow.
+Each workflow names its actors, entry points, state transitions, alternate paths, failure paths,
+production files and falsifying tests. Actors are the exact union of callers that the maintained
+operation-level authorization contract admits to at least one HTTP entry point in that workflow;
+business-rule and object-level refusal remains part of its alternate and failure paths. Adding or
+duplicating an entry point, or changing its gateway authorization, fails the inventory contract
+instead of leaving the map incomplete.
 
 The production web-server fingerprint review covers successful application responses,
 upstream-generated errors, rejected hostnames, malformed requests and an unavailable upstream.
@@ -61,12 +87,6 @@ handler also replaces proxy failures with a generic response carrying the normal
 headers, so that failure does not publish Caddy or the upstream implementation. The runtime test
 checks both headers and bodies, while the production-site contract makes a newly added direct Caddy
 directive require an explicit response-class review.
-
-This map is not yet complete for outbound services. The application-to-SMTP-relay and
-application-to-HIBP calls, proxy-to-ACME certificate automation, optional application-to-OTLP
-telemetry, mail-to-DNS and recipient delivery, and browser-to-third-party destinations configured
-for club branding or legal links are production boundaries that the current closed inventory
-omits. The validated gap remains non-passing under #902 until the map and its contract cover them.
 
 Operational events use the configured ECS standard-output format. ECS `@timestamp` is offset-aware
 and the emitted value uses UTC, while containers share the deployment host's clock rather than

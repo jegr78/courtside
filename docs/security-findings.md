@@ -11,38 +11,6 @@ These public entries record the safe result of reading a pinned control against 
 They omit request examples, concrete identifiers and protected evidence. The catalog links the
 affected control to the heading, and the remediation issue owns the product change and retest.
 
-### Principal workflow inventory is incomplete
-
-- State: validated architecture gap
-- Priority: P2
-- Controls: WSTG 4.2 `WSTG-v4.2-INFO-07`
-- Review: `MAN-ARCH-001`, 9 September 2026
-- Remediation: #902
-
-The application classifies mapped routes by access level, and browser tests exercise selected core
-journeys. Neither source is a closed map of principal workflows, their state transitions, or their
-alternate and failure paths. The control remains non-passing until a bounded inventory covers the
-member, booking, import, account and administration workflows and fails when an unclassified path
-is introduced.
-
-### External trust-boundary map is incomplete
-
-- State: validated architecture gap
-- Priority: P2
-- Controls: WSTG 4.2 `WSTG-v4.2-INFO-10`; ASVS 5.0.0 `v5.0.0-13.1.1`,
-  `v5.0.0-13.2.4`, `v5.0.0-16.5.2`
-- Review: `MAN-ARCH-001`, 9 September 2026
-- Remediation: #902
-
-The current map covers the browser, proxy, application, database, build and evidence boundaries.
-It omits application calls to SMTP, HIBP and an optional OTLP collector, certificate automation
-from the proxy to its ACME provider, mail delivery to DNS and external recipients, and configurable
-browser-to-third-party branding or legal destinations. The control remains non-passing until a
-closed inventory names those flows and a test fails for an undocumented production service,
-listener, outbound client or trust transition. That inventory must also state the allowed target
-for every outbound flow and the secure behavior when the dependency refuses, times out or returns
-invalid data; the current map cannot yet prove either property across the complete set.
-
 ### Incomplete sensitive-data classification
 
 - State: validated design gap
