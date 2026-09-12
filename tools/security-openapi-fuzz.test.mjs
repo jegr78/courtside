@@ -727,6 +727,6 @@ test("given a counterexample, when it is retained, then it names the shape of th
 
   // then
   assert.deepEqual(counterexample.bodyShape, { kind: "object",
-    properties: ["cursor:null", "limit:number", "membershipTypeId:array", "query:string"] });
+    properties: ["cursor:null", "limit:number", "membershipTypeId:array(1)", "query:string(3)"] });
   assert.deepEqual(counterexample.headerNames, ["content-type=application/json", "x-trace"]);
 });

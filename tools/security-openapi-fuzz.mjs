@@ -583,8 +583,9 @@ function headerNamesProjection(generatedCase) {
 
 function jsonKindOf(value) {
   if (value === null) return "null";
-  if (Array.isArray(value)) return "array";
-  return typeof value === "object" ? "object" : typeof value;
+  if (Array.isArray(value)) return `array(${value.length})`;
+  if (typeof value === "string") return `string(${[...value].length})`;
+  return typeof value === "object" ? `object(${Object.keys(value).length})` : typeof value;
 }
 
 function relayedMethod(generatedCase, operation) {
