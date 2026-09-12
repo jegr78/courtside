@@ -303,6 +303,19 @@ evidence under `performance/`; safety-limit breaches belong to the security run.
 
 ## Authentication and authorization method
 
+[`security/authorization-policy.json`](../security/authorization-policy.json) is the normative
+function-, object- and field-level rule catalog. It assigns every shipped OpenAPI operation to one
+rule, names the resource attributes used by each decision, and identifies each decision's
+production paths plus positive and negative tests. The generated
+[`authorization-policy.md`](authorization-policy.md) is the readable view. Its contract rejects a
+new or duplicate operation, product role, protected field or decision that the maintained policy
+does not resolve. Every reachable field is explicitly classified as ordinary or assigned to a
+narrower protected rule. Fingerprints over the OpenAPI fields, those classifications and named
+production authorization methods make additions, removals and enforcement changes fail closed
+until the catalog is reviewed. Source-derived discovery also rejects a new authorization method
+that uses a supported enforcement primitive but has no decision. The contract rejects dead source
+or test anchors and generated-document drift as well.
+
 The active suite generates its operation inventory from OpenAPI. Every operation records an explicit result for anonymous access, all seven product roles and an initial-password session. A second independently authenticated identity for every role verifies that the result is not tied to one seeded account. Separate object checks substitute booking and series identifiers between two members, try administrative field injection and compare domain state before and after the rejected requests.
 
 Every mutation receives a missing-CSRF request, a hostile-origin preflight, a hostile Host request and an untrusted forwarded-host request. The Host probe must observe the proxy's canonical upstream host. The retained record contains only operation identifiers, actors, normalized outcomes, status codes and Courtside problem URNs. [`security/authorization-evidence.schema.json`](../security/authorization-evidence.schema.json) rejects additional fields, and semantic validation rejects a missing operation, actor, object check or request boundary.

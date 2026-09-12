@@ -8,6 +8,8 @@
     { "path": "tools/audit-log-documentation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/audit-message-keys.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/audit-message-placeholders.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/authorization-policy.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/authorization-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/browser-build-policy.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/browser-build-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/browser-input-inventory.test.mjs", "profiles": ["tooling"], "test": true },

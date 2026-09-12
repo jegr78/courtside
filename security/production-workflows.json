@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-09-12",
   "source": "src/main/resources/api/openapi.yaml",
-  "authorizationSource": "tools/security-authorization.mjs#buildOperationAuthorizationMatrix",
+  "authorizationSource": "security/authorization-policy.json",
   "workflows": [
     {
       "id": "build-and-source-discovery",

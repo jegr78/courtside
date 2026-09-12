@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:authorization-policy:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "reviewedAt", "purpose", "openApiFieldInventorySha256", "protectedFieldInventorySha256", "productionAuthorizationSha256", "ordinaryFields", "principals", "attributes", "operationRules", "decisions", "fieldRules"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "reviewedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "purpose": { "type": "string", "minLength": 40 },
+    "openApiFieldInventorySha256": { "$ref": "#/$defs/sha256" },
+    "protectedFieldInventorySha256": { "$ref": "#/$defs/sha256" },
+    "productionAuthorizationSha256": { "$ref": "#/$defs/sha256" },
+    "ordinaryFields": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 3 }
+    },
+    "principals": {
+      "type": "array",
+      "minItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description"],
+        "properties": {
+          "id": { "$ref": "#/$defs/actor" },
+          "description": { "type": "string", "minLength": 10 }
+        }
+      }
+    },
+    "attributes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "description": { "type": "string", "minLength": 10 }
+        }
+      }
+    },
+    "operationRules": {
+      "type": "array",
+      "minItems": 5,
+      "items": { "$ref": "#/$defs/operationRule" }
+    },
+    "decisions": {
+      "type": "array",
+      "minItems": 5,
+      "items": { "$ref": "#/$defs/decision" }
+    },
+    "fieldRules": {
+      "type": "array",
+      "minItems": 5,
+      "items": { "$ref": "#/$defs/fieldRule" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "operationId": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]+$" },
+    "actor": {
+      "enum": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "INITIAL_PASSWORD"]
+    },
+    "actors": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" }
+    },
+    "operationIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/operationId" }
+    },
+    "decisionIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "attributes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+    },
+    "operationRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "operationIds", "actors", "decisions"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "description": { "type": "string", "minLength": 15 },
+        "operationIds": { "$ref": "#/$defs/operationIds" },
+        "actors": { "$ref": "#/$defs/actors" },
+        "decisions": { "$ref": "#/$defs/decisionIds" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "rule", "attributes", "productionPaths", "positiveTests", "negativeTests"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "type": "string", "minLength": 5 },
+        "rule": { "type": "string", "minLength": 30 },
+        "attributes": { "$ref": "#/$defs/attributes" },
+        "productionPaths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^src/main/java/.+\\.java#[A-Za-z][A-Za-z0-9_]+(?:/[0-9]+)?$" }
+        },
+        "positiveTests": { "$ref": "#/$defs/tests" },
+        "negativeTests": { "$ref": "#/$defs/tests" }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^src/test/java/.+\\.java#[A-Za-z][A-Za-z0-9_]+$" }
+    },
+    "fieldRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "access", "description", "fields", "operationIds", "actors", "attributes", "decisions"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "access": { "enum": ["read", "write", "never-read"] },
+        "description": { "type": "string", "minLength": 20 },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^(?:[A-Za-z][A-Za-z0-9]+|\\$request)\\.[A-Za-z][A-Za-z0-9]+$" }
+        },
+        "operationIds": { "$ref": "#/$defs/operationIds" },
+        "actors": { "$ref": "#/$defs/actors" },
+        "attributes": { "$ref": "#/$defs/attributes" },
+        "decisions": { "$ref": "#/$defs/decisionIds" }
+      }
+    }
+  }
+}
