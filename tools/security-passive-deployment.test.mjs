@@ -25,6 +25,7 @@ const observationById = {
   "header-limit": "oversized-header-rejected", "http-redirect": "http-port-not-published",
   "host-boundary": "upstream-host-canonicalized",
   "loopback-publication": "proxy-loopback-only", "management-separation": "management-internal-only",
+  "meter-registry-separation": "meters-internal-only",
   "method-override": "unsafe-and-overridden-methods-rejected",
   "qualified-image-evidence": "covered-by-image-qualification",
   "runtime-file-permissions": "application-files-confined", "runtime-hardening": "runtime-controls-present",
@@ -38,7 +39,8 @@ function passingObservations() {
   return requiredPassiveCheckIds.map((id) => {
     const layer = ["runtime-hardening", "scanner-runtime-hardening"].includes(id) ? "container"
       : ["loopback-publication", "http-redirect", "transport-security", "qualified-image-evidence"].includes(id)
-        ? "host" : ["management-separation", "direct-forwarded-behavior"].includes(id) ? "application" : "proxy";
+        ? "host" : ["management-separation", "meter-registry-separation", "direct-forwarded-behavior"]
+          .includes(id) ? "application" : "proxy";
     const outcome = ["http-redirect", "transport-security"].includes(id)
       ? "not-applicable" : undefined;
     const observation = observationById[id] ?? (id.startsWith("exposure-") ? "route-not-exposed"

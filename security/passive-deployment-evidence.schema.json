@@ -19,7 +19,7 @@
     "checks": {
       "type": "array",
       "minItems": 33,
-      "maxItems": 33,
+      "maxItems": 34,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -177,7 +177,7 @@
         "exposure-actuator", "exposure-actuator-health", "exposure-assets-app-js-map",
         "exposure-swagger-ui-index-html", "forwarded-boundary", "header-limit", "headers-api-source",
         "headers-does-not-exist", "headers-icon-svg", "headers-login", "headers-root", "host-boundary", "http-redirect",
-        "loopback-publication", "management-separation", "method-connect", "method-override", "method-trace", "method-track",
+        "loopback-publication", "management-separation", "meter-registry-separation", "method-connect", "method-override", "method-trace", "method-track",
         "qualified-image-evidence", "runtime-file-permissions", "runtime-hardening", "scanner-runtime-hardening",
         "secure-cookie-delivery", "sensitive-extension-exposure", "tls-ciphers", "tls-versions",
         "transport-security"]
@@ -188,6 +188,7 @@
         "covered-by-image-qualification", "direct-app-distinguished-from-proxy", "direct-app-probe-failed",
         "http-port-not-published", "insecure-cookie-issued", "issued-cookies-secure",
         "localhost-transport-qualified-externally", "management-internal-only", "management-internal-unavailable",
+        "meters-internal-only", "meters-reachable-from-outside",
         "method-accepted", "method-boundary-mismatch", "method-rejected", "oversized-header-accepted", "oversized-header-rejected",
         "proxy-body-limit-enforced", "proxy-body-limit-not-proven", "proxy-loopback-only",
         "proxy-publication-mismatch", "route-not-exposed", "runtime-controls-incomplete",

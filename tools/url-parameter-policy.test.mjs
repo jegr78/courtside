@@ -35,6 +35,19 @@ function declaredParameters() {
   return found;
 }
 
+// A string arrives under three spellings the document uses: `type: string`, the nullable
+// `type: [string, "null"]`, and a branch of anyOf/oneOf. Reading only the first lets a parameter
+// carry free text past this test by being declared in either of the others.
+function textShapesOf(schema) {
+  const kinds = Array.isArray(schema.type) ? schema.type : [schema.type];
+  const here = kinds.includes("string") ? [schema] : [];
+  const branches = [...(schema.anyOf ?? []), ...(schema.oneOf ?? []), ...(schema.allOf ?? [])]
+    .flatMap((branch) => textShapesOf(branch.$ref
+      ? api.components.schemas[branch.$ref.split("/").pop()] ?? {}
+      : branch));
+  return [...here, ...branches];
+}
+
 function schemaOf(declaration) {
   const reference = declaration.schema?.$ref?.split("/").pop();
   return reference ? api.components.schemas[reference] : declaration.schema ?? {};
@@ -80,11 +93,11 @@ test("given a URL parameter, when its schema is read, then it does not admit unc
     // when / then
     for (const [key, declaration] of parameters) {
       if (declaration.in !== "path" && declaration.in !== "query") continue;
-      const schema = schemaOf(declaration);
-      if (schema.type !== "string") continue;
-      const pinned = Boolean(schema.format || schema.enum || schema.pattern);
-      assert.ok(pinned,
-        `${key} is a string in a ${declaration.in} with no format, enum or pattern, so ${declaration.operations[0]}`
-        + " accepts free text in a URL — the shape a person's name arrives in");
+      for (const schema of textShapesOf(schemaOf(declaration))) {
+        const pinned = Boolean(schema.format || schema.enum || schema.pattern);
+        assert.ok(pinned,
+          `${key} is a string in a ${declaration.in} with no format, enum or pattern, so ${declaration.operations[0]}`
+          + " accepts free text in a URL — the shape a person's name arrives in");
+      }
     }
   });

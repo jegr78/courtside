@@ -404,6 +404,18 @@ export async function inspectPassiveSecurityRuntime(plan, { control, stopFile })
   const management = (await runSecurityCommand("docker", ["exec", `${project}-app-1`, "curl", "--silent",
     "--output", "/dev/null", "--write-out", "%{http_code}", "http://127.0.0.1:8080/actuator/health"],
   environment, control, stopFile)).stdout.trim();
+  // The meter registry answers inside the container so the abuse run can sample it, and the proxy
+  // must answer 404 for it. Two requests rather than a reading of the files that configure them:
+  // this deployment already rewrites two other actuator paths onto external routes.
+  const meters = (await runSecurityCommand("docker", ["exec", `${project}-app-1`, "curl", "--silent",
+    "--output", "/dev/null", "--write-out", "%{http_code}", "http://127.0.0.1:8080/actuator/prometheus"],
+  environment, control, stopFile)).stdout.trim();
+  const metersFromOutside = (await runOwnedProcess("curl", ["--silent", "--insecure",
+    "--output", "/dev/null", "--write-out", "%{http_code}", "--resolve",
+    `localhost:${environment.COURTSIDE_SECURITY_HTTPS_PORT}:127.0.0.1`,
+    `https://localhost:${environment.COURTSIDE_SECURITY_HTTPS_PORT}/actuator/prometheus`], {
+    timeoutMilliseconds: control.remainingMilliseconds(), stopFile, environment
+  })).stdout.trim();
   const direct = (await runSecurityCommand("docker", ["exec", `${project}-app-1`, "curl", "--silent", "--dump-header", "-",
     "--output", "/dev/null", "--header", "Host: attacker.example", "--header", "X-Forwarded-Host: attacker.example",
     "--header", "X-Forwarded-Proto: https", "http://127.0.0.1:8080/actuator/health"],
@@ -422,7 +434,7 @@ export async function inspectPassiveSecurityRuntime(plan, { control, stopFile })
   const filePermissions = evaluateRuntimeFilePermissions({ userId,
     appDirectoryWritable: appWritable.code === 0, tempDirectoryWritable: tempWritable.code === 0,
     groupOrWorldWritablePaths: writablePaths });
-  return { requestCount: 6, observations: [
+  return { requestCount: 8, observations: [
     { id: "runtime-hardening", layer: "container", passed: hardened,
       observation: hardened ? "runtime-controls-present" : "runtime-controls-incomplete" },
     { id: "loopback-publication", layer: "host", passed: published.length === 1
@@ -431,6 +443,10 @@ export async function inspectPassiveSecurityRuntime(plan, { control, stopFile })
         ? "proxy-loopback-only" : "proxy-publication-mismatch" },
     { id: "management-separation", layer: "application", passed: management === "200",
       observation: management === "200" ? "management-internal-only" : "management-internal-unavailable" },
+    { id: "meter-registry-separation", layer: "application",
+      passed: meters === "200" && metersFromOutside === "404",
+      observation: meters === "200" && metersFromOutside === "404"
+        ? "meters-internal-only" : "meters-reachable-from-outside" },
     { id: "direct-forwarded-behavior", layer: "application", passed: directObserved,
       observation: directObserved ? "direct-app-distinguished-from-proxy" : "direct-app-probe-failed" },
     { id: "runtime-file-permissions", layer: "container", ...filePermissions }

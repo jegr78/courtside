@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.5.8",
+  "catalogVersion": "1.5.9",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -1707,7 +1707,10 @@
           "manualProcedureId": "MAN-DATA-001",
           "controlEvidence": {
             "productionPath": "src/main/resources/api/openapi.yaml",
-            "falsifyingTest": "tools/url-parameter-policy.test.mjs#given a URL parameter, when its schema is read, then it does not admit unconstrained text"
+            "falsifyingTest": [
+              "tools/url-parameter-policy.test.mjs#given a URL parameter, when its schema is read, then it does not admit unconstrained text",
+              "tools/url-parameter-policy.test.mjs#given a value that names or authenticates a person, when it is classified, then no URL carries it"
+            ]
           }
         },
         {

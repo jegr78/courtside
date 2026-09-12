@@ -44,19 +44,21 @@ export function readControl(control, findings, resolve, catalog) {
     throw new Error(`${control.id} carries both a control anchor and an open lifecycle finding`);
   }
   if (control.controlEvidence) {
-    const { productionPath, falsifyingTest } = control.controlEvidence;
-    const [testFile, testName] = falsifyingTest.split("#");
-    if (![productionPath, testFile].every((path) => repositoryPath.test(path))) {
+    const { productionPath } = control.controlEvidence;
+    if (![productionPath, ...falsifyingTests(control).map(([file]) => file)]
+      .every((path) => repositoryPath.test(path))) {
       throw new Error(`${control.id} names a path the catalog may not carry`);
     }
     if (resolve(productionPath) === null) {
       throw new Error(`${control.id} names the production path ${productionPath}, which the assessed commit `
         + "does not carry");
     }
-    if (!declaresAssessment(catalog, control, testFile, testName)
-        && !declares(resolve(testFile) ?? "", testName)) {
-      throw new Error(`${control.id} names ${testName} in ${testFile}, which declares no such test at the `
-        + "assessed commit");
+    for (const [testFile, testName] of falsifyingTests(control)) {
+      if (!declaresAssessment(catalog, control, testFile, testName)
+          && !declares(resolve(testFile) ?? "", testName)) {
+        throw new Error(`${control.id} names ${testName} in ${testFile}, which declares no such test at the `
+          + "assessed commit");
+      }
     }
     return { outcome: "pass", disposition: "control-evidence", ...control.controlEvidence };
   }
@@ -106,7 +108,7 @@ const steps = (control, reading, input) => {
   if (reading.disposition === "control-evidence") {
     return [
       `Read ${reading.productionPath} at source commit ${commit} as the production path this control names.`,
-      `Located ${reading.falsifyingTest.split("#")[1]} in ${reading.falsifyingTest.split("#")[0]} at that commit.`,
+      ...falsifyingTests(reading).map(([file, name]) => `Located ${name} in ${file} at that commit.`),
       `Read hosted ${input.verification.workflow} run ${input.verification.runId}, which executed the assessed `
         + `commit's whole test suite.`
     ];
@@ -131,10 +133,19 @@ const steps = (control, reading, input) => {
   return [`Read the catalog's control-specific rationale for ${control.id} at source commit ${commit}.`];
 };
 
+// A control whose requirement two assertions carry between them names both, so that neither half
+// can be cited as though it closed the whole. One name stays a plain string.
+function falsifyingTests(carrier) {
+  const named = carrier.controlEvidence?.falsifyingTest ?? carrier.falsifyingTest;
+  return (Array.isArray(named) ? named : [named]).map((entry) => entry.split("#"));
+}
+
 const expectation = (control, reading) => {
   if (reading.disposition === "control-evidence") {
-    return `${reading.productionPath} keeps the behaviour ${reading.falsifyingTest.split("#")[1]} asserts, `
-      + "and that test goes red when it stops.";
+    const asserted = falsifyingTests(reading).map(([, name]) => name);
+    return `${reading.productionPath} keeps the behaviour ${asserted.join(" and ")} assert${
+      asserted.length === 1 ? "s" : ""}, and ${asserted.length === 1 ? "that test goes" : "those tests go"} `
+      + "red when it stops.";
   }
   if (reading.disposition === "lifecycle-finding") {
     return `No open finding maps ${control.id}, or a passed retest records that its condition is gone.`;
@@ -152,8 +163,8 @@ const expectation = (control, reading) => {
 const observation = (control, reading, input) => {
   const commit = input.manifest.application.commit;
   if (reading.disposition === "control-evidence") {
-    const [file, name] = reading.falsifyingTest.split("#");
-    return `${reading.productionPath} is present at ${commit}, ${file} contains ${name}, and hosted `
+    const located = falsifyingTests(reading).map(([file, name]) => `${file} contains ${name}`);
+    return `${reading.productionPath} is present at ${commit}, ${located.join(", ")}, and hosted `
       + `${input.verification.workflow} run ${input.verification.runId} concluded `
       + `${input.verification.conclusion} for that commit.`;
   }
@@ -201,8 +212,8 @@ export function buildAnchoredRun(input) {
     input.verification.commit);
   const anchoredPaths = new Set(input.catalog.controlCoverage.flatMap(({ controls }) => controls)
     .filter(({ controlEvidence }) => controlEvidence)
-    .flatMap(({ controlEvidence }) => [controlEvidence.productionPath,
-      controlEvidence.falsifyingTest.split("#")[0]]));
+    .flatMap((control) => [control.controlEvidence.productionPath,
+      ...falsifyingTests(control).map(([file]) => file)]));
   const moved = drifted.filter((path) => anchoredPaths.has(path));
   if (moved.length > 0) {
     throw new Error(`The verification ran over ${input.verification.commit}, which differs from the `

@@ -836,16 +836,19 @@ test("given a control-specific anchor, when reading the catalog, then its produc
   for (const { id, controlEvidence } of anchored) {
     assert.notEqual(readableFile(controlEvidence.productionPath), null,
       `${id} names a production path that is no readable file`);
-    const [testPath, testName] = controlEvidence.falsifyingTest.split("#");
-    const source = readableFile(testPath);
-    assert.notEqual(source, null, `${id} names a test file that is no readable file`);
-    const assessment = testPath === "security/assessment-catalog.json"
-      ? catalog.tests.find(({ id: assessmentId }) => assessmentId === testName)
-      : undefined;
-    const declaredAssessment = assessment?.executionMode === "automated"
-      && Object.values(assessment.standardReferences).flat().includes(id);
-    assert.equal(declaredAssessment || declarationOf(testName).some((declaration) => declaration.test(source)), true,
-      `${id} names ${testName}, which ${testPath} declares no test for`);
+    const named = controlEvidence.falsifyingTest;
+    for (const reference of Array.isArray(named) ? named : [named]) {
+      const [testPath, testName] = reference.split("#");
+      const source = readableFile(testPath);
+      assert.notEqual(source, null, `${id} names a test file that is no readable file`);
+      const assessment = testPath === "security/assessment-catalog.json"
+        ? catalog.tests.find(({ id: assessmentId }) => assessmentId === testName)
+        : undefined;
+      const declaredAssessment = assessment?.executionMode === "automated"
+        && Object.values(assessment.standardReferences).flat().includes(id);
+      assert.equal(declaredAssessment || declarationOf(testName).some((declaration) => declaration.test(source)), true,
+        `${id} names ${testName}, which ${testPath} declares no test for`);
+    }
   }
 });
 

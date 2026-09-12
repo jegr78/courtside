@@ -607,19 +607,17 @@ test("given a recorded environment, when the candidate seeds it, then only what 
   }
 });
 
-// The sampling that decides whether a resource-abuse run stayed inside its safety limits reads the
-// meter registry through the application port, and the authorization rule for it is off by default.
+// A run measures its own meter boundary now: `meter-registry-separation` asks the container and
+// the proxy and compares 200 against 404. What is left here is the arrangement that makes that
+// measurement possible, which no request can show — the flag that lets the registry answer at all.
 test("given the security Compose file, when the run samples the meter registry, "
-  + "then the environment the sampling reads is enabled and stays container-internal", () => {
+  + "then the environment enables it and the run measures who can reach it", () => {
   // given
   const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.security.yaml", import.meta.url)), "utf8");
-  const caddyfile = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.security", import.meta.url)), "utf8");
   const environment = readFileSync(fileURLToPath(new URL("./security-environment.mjs", import.meta.url)), "utf8");
 
   // when / then
-  assert.match(environment, /"curl", "-fsS",\s*\n?\s*"http:\/\/127\.0\.0\.1:8080\/actuator\/prometheus"/);
   assert.match(compose, /MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,mappings/);
   assert.match(compose, /COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"/);
-  assert.match(caddyfile, /@private path [^\n]*\/actuator\*/);
-  assert.match(caddyfile, /respond @private 404/);
+  assert.match(environment, /id: "meter-registry-separation"[\s\S]*?meters === "200" && metersFromOutside === "404"/);
 });

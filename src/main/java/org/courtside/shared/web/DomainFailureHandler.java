@@ -34,7 +34,7 @@ class DomainFailureHandler {
     private static void logAnswered(DomainFailure failure, ProblemDetail body) {
         if (failure.getStatusCode().is5xxServerError()) {
             log.warn("Answering {} for {}", failure.getStatusCode(), body.getType(), failure);
-        } else {
+        } else if (log.isDebugEnabled()) {
             log.debug("Answering {} for {}: {}", failure.getStatusCode(), body.getType(),
                     failure.violationCodes());
         }
