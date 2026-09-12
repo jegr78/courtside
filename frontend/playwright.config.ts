@@ -18,8 +18,18 @@ const qualificationProjects = process.env.COURTSIDE_WEBKIT_AXE === "true" ? [
   { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" as const } }
 ] : [];
 
+// The journey run is the record a release reads, not a gate: it records video, trace and a
+// screenshot for every step, which no pull request should pay for.
+const recorded = { video: "on" as const, trace: "on" as const, screenshot: "on" as const };
+
+const journeyProjects = process.env.COURTSIDE_JOURNEY_RUN === "true" ? [
+  { name: "journey-desktop", testMatch: /journeys\/.*\.spec\.ts$/, use: { browserName: "chromium" as const, viewport: { width: 1440, height: 900 }, ...recorded } },
+  { name: "journey-iphone", testMatch: /journeys\/.*\.spec\.ts$/, use: { ...devices["iPhone 15"], ...recorded } },
+  { name: "journey-android", testMatch: /journeys\/.*\.spec\.ts$/, use: { ...devices["Pixel 7"], ...recorded } }
+] : [];
+
 const configuredProjects = [
-  { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts|guide-screenshots\.spec\.ts/, use: { browserName: "chromium" as const } },
+  { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts|guide-screenshots\.spec\.ts|journeys\//, use: { browserName: "chromium" as const } },
   { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "chromium" as const } },
   { name: "visual", testMatch: /visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
   // The guides' captures are snapshots too, so a surface that moves fails them and the pages that
@@ -33,7 +43,8 @@ const configuredProjects = [
   { name: "iphone", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["iPhone 15"] } },
   { name: "android", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["Pixel 7"] } },
   ...qualificationProjects,
-  ...periodicProjects
+  ...periodicProjects,
+  ...journeyProjects
 ];
 
 const projects = projectOrder === "reversed"

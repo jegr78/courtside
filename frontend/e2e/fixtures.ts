@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { expect, test as base, type Browser, type BrowserContext, type Metadata, type Page } from "@playwright/test";
 import { journeyInstant, type JourneyService } from "./global-setup";
 import { connectJourneyService, type JourneyControlReference } from "./journey-control";
@@ -21,9 +22,19 @@ interface TestFixtures {
 }
 
 export async function journeyContext(browser: Browser): Promise<BrowserContext> {
-  const context = await browser.newContext();
+  const context = await browser.newContext(recordedVideoDirectory());
   await pinJourneyClock(context);
   return context;
+}
+
+// The runner records video for the context it owns; this one is created here, so it has to ask.
+function recordedVideoDirectory(): { recordVideo?: { dir: string } } {
+  try {
+    const info = base.info();
+    return info.project.use.video === "on" ? { recordVideo: { dir: info.outputDir } } : {};
+  } catch {
+    return {};
+  }
 }
 
 const browserScope = browserFixtureScope(browserIsolationVariant());
@@ -73,12 +84,17 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       ? journeyService.plainBaseURL
       : journeyService.baseURL);
   },
-  context: async ({ pinnedBrowser }, provide) => {
+  context: async ({ pinnedBrowser }, provide, testInfo) => {
     const context = await journeyContext(pinnedBrowser);
     try {
       await provide(context);
     } finally {
+      const recordings = context.pages().map((open) => open.video());
       await context.close();
+      for (const [index, recording] of recordings.entries()) {
+        if (!recording) continue;
+        await recording.saveAs(join(testInfo.outputDir, `journey-${index + 1}.webm`));
+      }
     }
   },
   browserLifecycle: [async ({ pinnedBrowser, browserName, journeyService }, provide, testInfo) => {
