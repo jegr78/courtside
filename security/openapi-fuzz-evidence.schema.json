@@ -59,7 +59,7 @@
     "counterexample": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operationId", "mode", "caseId", "check", "method", "requestMethod", "pathTemplate", "reason", "requestShape", "reproductionDigest"],
+      "required": ["operationId", "mode", "caseId", "check", "method", "requestMethod", "bodyShape", "pathTemplate", "reason", "requestShape", "reproductionDigest"],
       "properties": {
         "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
         "mode": { "enum": ["positive", "negative"] },
@@ -67,6 +67,10 @@
         "check": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80 },
         "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
         "requestMethod": { "enum": ["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] },
+        "bodyShape": { "type": "object", "additionalProperties": false, "required": ["kind", "properties"],
+          "properties": {
+            "kind": { "enum": ["absent", "null", "array", "object", "string", "number", "boolean"] },
+            "properties": { "type": "array", "maxItems": 40, "items": { "type": "string", "maxLength": 80 } } } },
         "pathTemplate": { "type": "string", "pattern": "^/", "maxLength": 200 },
         "reason": { "$ref": "#/$defs/failureReason" },
         "requestShape": { "type": "object", "additionalProperties": false, "required": ["locations"],
@@ -78,7 +82,7 @@
     "disposition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operationId", "mode", "caseId", "check", "method", "requestMethod", "pathTemplate", "reason", "requestShape", "reproductionDigest", "disposition"],
+      "required": ["operationId", "mode", "caseId", "check", "method", "requestMethod", "bodyShape", "pathTemplate", "reason", "requestShape", "reproductionDigest", "disposition"],
       "properties": {
         "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
         "mode": { "enum": ["positive", "negative"] },
@@ -86,6 +90,10 @@
         "check": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80 },
         "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
         "requestMethod": { "enum": ["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] },
+        "bodyShape": { "type": "object", "additionalProperties": false, "required": ["kind", "properties"],
+          "properties": {
+            "kind": { "enum": ["absent", "null", "array", "object", "string", "number", "boolean"] },
+            "properties": { "type": "array", "maxItems": 40, "items": { "type": "string", "maxLength": 80 } } } },
         "pathTemplate": { "type": "string", "pattern": "^/", "maxLength": 200 },
         "reason": { "$ref": "#/$defs/failureReason" },
         "requestShape": { "type": "object", "additionalProperties": false, "required": ["locations"],

@@ -554,6 +554,28 @@ const RELAYED_METHODS = ["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIO
 // safe method by design, so a rejection check reading its body learns nothing from the answer.
 const ANSWERED_AS_A_SAFE_METHOD = ["OPTIONS"];
 
+// The values a case generated are never retained, but the shape it sent is what a reader needs to
+// know which mutation the answer belongs to.
+function bodyShapeProjection(generatedCase) {
+  const body = generatedCase?.body;
+  if (body === undefined) return { kind: "absent", properties: [] };
+  if (body === null) return { kind: "null", properties: [] };
+  if (Array.isArray(body)) return { kind: "array", properties: [] };
+  if (typeof body !== "object") return { kind: typeof body, properties: [] };
+  return {
+    kind: "object",
+    properties: Object.entries(body)
+      .map(([property, value]) => `${property}:${jsonKindOf(value)}`)
+      .toSorted().slice(0, 40)
+  };
+}
+
+function jsonKindOf(value) {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value === "object" ? "object" : typeof value;
+}
+
 function relayedMethod(generatedCase, operation) {
   const method = String(generatedCase?.method ?? operation.method).toUpperCase();
   return RELAYED_METHODS.includes(method) ? method : operation.method;
@@ -590,6 +612,7 @@ function dispositionProjection(counterexample, disposition) {
     check: counterexample.check,
     method: counterexample.method,
     requestMethod: counterexample.requestMethod,
+    bodyShape: counterexample.bodyShape,
     pathTemplate: counterexample.pathTemplate,
     reason: counterexample.reason,
     requestShape: counterexample.requestShape,
@@ -719,6 +742,7 @@ function safeCounterexample(operation, mode, sequence, check, generatedCase) {
     check: normalizedCheck.slice(0, 80),
     method: operation.method,
     requestMethod: relayedMethod(generatedCase, operation),
+    bodyShape: bodyShapeProjection(generatedCase),
     pathTemplate: operation.path,
     reason,
     requestShape,

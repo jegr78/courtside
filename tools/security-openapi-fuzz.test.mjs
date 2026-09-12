@@ -705,3 +705,26 @@ test("given a coverage case that differs from the operation only by its method, 
   assert.deepEqual(normalized.dispositions.map(({ requestMethod, disposition }) =>
     [requestMethod, disposition]), [["OPTIONS", "safe-method-carries-no-body-semantics"]]);
 });
+
+test("given a counterexample, when it is retained, then it names the shape of the body without its values", () => {
+  // given
+  const inventory = [buildOpenApiFuzzInventory(api)
+    .find(({ operationId }) => operationId === "searchRoster")];
+  const rejection = { name: "negative_data_rejection", status: "failure",
+    failure_info: { reason: { kind: "status", observedStatus: 200, expectedStatuses: [400] } } };
+  const events = [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster-search",
+      cases: { one: { value: { method: "POST",
+        body: { cursor: null, limit: 50, query: "Doe", membershipTypeId: ["x"] },
+        meta: { generation: { mode: "negative" } } } } },
+      checks: { one: [rejection] } } } }
+  ];
+
+  // when
+  const [counterexample] = normalizeSchemathesisEvents(events, inventory, "negative").counterexamples;
+
+  // then
+  assert.deepEqual(counterexample.bodyShape, { kind: "object",
+    properties: ["cursor:null", "limit:number", "membershipTypeId:array", "query:string"] });
+});
