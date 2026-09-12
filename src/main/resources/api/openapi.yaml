@@ -2319,6 +2319,15 @@ components:
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
+    UnsupportedMediaType:
+      description: The request's content type is not one this operation consumes.
+      headers:
+        Accept:
+          description: The media types the operation does consume.
+          schema: { type: string }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
     Conflict:
       description: The request collides with the current state; the problem `type` names the case.
       content:
@@ -2484,6 +2493,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -2522,6 +2533,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
         "429":
           $ref: "#/components/responses/RateLimited"
         "503":
@@ -2553,6 +2566,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
         "429":
           $ref: "#/components/responses/RateLimited"
         "503":
@@ -2643,6 +2658,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/account/messages:
     get:
@@ -2690,6 +2707,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "409":
           $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/public/courts:
     get:
@@ -2861,6 +2880,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/bookings:
     get:
@@ -2931,6 +2952,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
         "422":
           description: One or more booking rules refused it.
           content:
@@ -3182,6 +3205,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/booking-series:
     post:
@@ -3214,6 +3239,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/booking-series/{id}:
     delete:
@@ -3302,6 +3329,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/booking-series/{id}/move:
     post:
@@ -3348,6 +3377,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/courts:
     get:
@@ -3397,6 +3428,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/courts/{id}:
     get:
@@ -3458,6 +3491,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/courts/{id}/active:
     put:
@@ -3492,6 +3527,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/booking-cards:
     get:
@@ -3541,6 +3578,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/booking-cards/{id}:
     get:
@@ -3602,6 +3641,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/booking-cards/{id}/active:
     put:
@@ -3636,6 +3677,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/participant-cards:
     get:
@@ -3685,6 +3728,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/participant-cards/{id}:
     get:
@@ -3746,6 +3791,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/participant-cards/{id}/active:
     put:
@@ -3780,6 +3827,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/membership-types:
     get:
@@ -3829,6 +3878,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/membership-types/{id}:
     get:
@@ -3890,6 +3941,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/membership-types/{id}/active:
     put:
@@ -3924,6 +3977,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/roster:
     post:
@@ -3959,6 +4014,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/roster/search:
     post:
@@ -4002,6 +4059,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/roster/{personId}:
     get:
@@ -4078,6 +4137,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/roster/{personId}/account:
     post:
@@ -4136,6 +4197,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/roster/{personId}/account/roles:
     put:
@@ -4190,6 +4253,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/roster/{personId}/account/username:
     put:
@@ -4243,6 +4308,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/roster/{personId}/account/locale:
     put:
@@ -4281,6 +4348,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/roster/{personId}/account/credentials:
     post:
@@ -4447,6 +4516,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/roster/{personId}/membership:
     put:
@@ -4521,6 +4592,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
     delete:
       tags: [admin-roster]
       operationId: removeMembership
@@ -4643,6 +4716,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/import/sources/{id}:
     get:
@@ -4709,6 +4784,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
     delete:
       tags: [admin-import]
       operationId: deleteImportSource
@@ -4832,6 +4909,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/import/sources/{sourceId}/references/{referenceId}:
     delete:
@@ -4956,6 +5035,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/import/previews/{id}:
     get:
@@ -5043,6 +5124,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/import/sources/{sourceId}/runs:
     get:
@@ -5123,6 +5206,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/rule-types:
     get:
@@ -5202,6 +5287,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/rule-sets/{id}/active:
     put:
@@ -5236,6 +5323,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/opening-hours:
     get:
@@ -5287,6 +5376,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/config:
     get:
@@ -5329,6 +5420,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/config/logo:
     put:
@@ -5365,6 +5458,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
     delete:
       tags: [admin-config]
       operationId: deleteClubLogo
@@ -5448,6 +5543,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
     delete:
       tags: [admin-rule-sets]
       operationId: removeRule
@@ -5807,6 +5904,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/admin/export/bookings:
     post:

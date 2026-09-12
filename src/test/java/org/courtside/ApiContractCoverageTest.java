@@ -155,6 +155,30 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void everyOperationWithARequestBodyDocumentsTheAnswerToAnUnsupportedContentType() {
+        // when
+        TreeSet<String> silent = new TreeSet<>();
+        paths().forEach((path, methods) -> operationsOf(methods).forEach((method, operation) -> {
+            String operationName = method.toUpperCase() + " " + path;
+            if (operation.containsKey("requestBody")
+                    && !NOT_BACKED_BY_A_HANDLER.contains(operationName)
+                    && !responsesOf(operation).containsKey("415")) {
+                silent.add(operationName);
+            }
+        }));
+
+        // then
+        assertThat(silent)
+                .as("a request body states the media types the operation consumes, so any other one"
+                        + " is refused before the handler sees it — 415"
+                        + " urn:courtside:error:unsupported-media-type, which is what a request"
+                        + " carrying the wrong content type or none at all receives. The exception"
+                        + " is an operation the filter chain answers instead of a handler: there"
+                        + " authentication is settled before the content type is.")
+                .isEmpty();
+    }
+
+    @Test
     void everyOperationWithAQueryParameterItCanRefuseDocumentsTheAnswer() {
         // when
         TreeSet<String> silent = operationsWithNo("400", ApiContractCoverageTest::canBeRefused);

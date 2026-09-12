@@ -329,6 +329,33 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAJsonBody_whenPuttingWhereTheDocumentConsumesMultipart_thenTheAnswerIsTheSame()
+            throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(put("/api/admin/config/logo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "urn:courtside:error:unsupported-media-type");
+        assertThat(headerValues(result, "Accept"))
+                .containsExactly("multipart/form-data");
+    }
+
+    @Test
+    void givenNoContentTypeAtAll_whenPosting_thenTheAnswerIsStillUnsupportedMediaType()
+            throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(post("/api/admin/booking-cards")
+                .content("nope")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "urn:courtside:error:unsupported-media-type");
+    }
+
+    @Test
     void givenAnUnacceptableRepresentation_whenRequesting_thenTheResponseCarriesItsOwnType() throws Exception {
         // given / when
         ResultActions result = mockMvc.perform(get("/api/admin/config").accept(MediaType.APPLICATION_XML));
