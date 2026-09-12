@@ -123,11 +123,15 @@ management:
       export:
         otlp:
           endpoint: ${COURTSIDE_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+          connect-timeout: 2s
+          timeout: 10s
   otlp:
     metrics:
       export:
         enabled: ${COURTSIDE_OTLP_ENABLED:false}
         url: ${COURTSIDE_OTLP_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}
+        connect-timeout: 2s
+        read-timeout: 10s
   prometheus:
     metrics:
       export:

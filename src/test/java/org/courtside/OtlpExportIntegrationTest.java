@@ -19,8 +19,13 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +33,11 @@ import static org.awaitility.Awaitility.await;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "management.opentelemetry.tracing.export.schedule-delay=100ms",
+        "management.opentelemetry.tracing.export.otlp.connect-timeout=100ms",
+        "management.opentelemetry.tracing.export.otlp.timeout=200ms",
         "management.otlp.metrics.export.step=1s",
+        "management.otlp.metrics.export.connect-timeout=100ms",
+        "management.otlp.metrics.export.read-timeout=200ms",
         "management.tracing.sampling.probability=1.0"
 })
 class OtlpExportIntegrationTest extends AbstractIntegrationTest {
@@ -74,12 +83,76 @@ class OtlpExportIntegrationTest extends AbstractIntegrationTest {
         assertThat(COLLECTOR.payloadText()).doesNotContain(PRIVATE_MARKER);
     }
 
+    @Test
+    void givenTheCollectorRefusesExport_whenTheApplicationHandlesARequest_thenTheRequestStillSucceeds()
+            throws Exception {
+        // given
+        int refusalsBefore = COLLECTOR.refusalResponses();
+        COLLECTOR.respondWith(503);
+
+        try {
+            // when
+            meters.counter("courtside.export.refusal.test").increment();
+            HttpResponse<Void> response = HttpClient.newHttpClient().send(
+                    HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + applicationPort
+                            + "/api/public/courts?export-refusal=true")).build(),
+                    HttpResponse.BodyHandlers.discarding());
+
+            // then
+            assertThat(response.statusCode()).isEqualTo(200);
+            await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                    assertThat(COLLECTOR.refusalResponses()).isGreaterThan(refusalsBefore));
+        } finally {
+            COLLECTOR.respondWith(200);
+        }
+    }
+
+    @Test
+    void givenTheCollectorStalls_whenTheApplicationHandlesARequest_thenTheRequestStillSucceeds()
+            throws Exception {
+        // given
+        int stalledBefore = COLLECTOR.stalledResponses();
+        CountDownLatch stalledResponse = COLLECTOR.stallNextResponse("/v1/traces");
+
+        try {
+            // when
+            meters.counter("courtside.export.timeout.test").increment();
+            HttpResponse<Void> response = request("export-timeout");
+
+            // then
+            assertThat(response.statusCode()).isEqualTo(200);
+            await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                    assertThat(COLLECTOR.stalledResponses()).isGreaterThan(stalledBefore));
+            int successesAfterStall = COLLECTOR.successfulResponses("/v1/traces");
+            assertThat(request("export-after-timeout").statusCode()).isEqualTo(200);
+            await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                    assertThat(COLLECTOR.successfulResponses("/v1/traces"))
+                            .isGreaterThan(successesAfterStall));
+        } finally {
+            stalledResponse.countDown();
+        }
+    }
+
+    private HttpResponse<Void> request(String probe) throws IOException, InterruptedException {
+        return HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + applicationPort
+                        + "/api/public/courts?" + probe + "=true")).build(),
+                HttpResponse.BodyHandlers.discarding());
+    }
+
     private static final class Collector {
 
         private final HttpServer server;
         private final List<String> paths = new CopyOnWriteArrayList<>();
         private final List<String> authorizations = new CopyOnWriteArrayList<>();
         private final List<byte[]> payloads = new CopyOnWriteArrayList<>();
+        private final AtomicInteger responseStatus = new AtomicInteger(200);
+        private final AtomicInteger refusalResponses = new AtomicInteger();
+        private final AtomicInteger stalledResponses = new AtomicInteger();
+        private final AtomicReference<String> stalledPath = new AtomicReference<>();
+        private final AtomicReference<CountDownLatch> responseGate =
+                new AtomicReference<>(new CountDownLatch(0));
+        private final Map<String, AtomicInteger> successfulResponses = new ConcurrentHashMap<>();
 
         private Collector(HttpServer server) {
             this.server = server;
@@ -90,7 +163,7 @@ class OtlpExportIntegrationTest extends AbstractIntegrationTest {
                 HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
                 Collector collector = new Collector(server);
                 server.createContext("/", collector::receive);
-                server.setExecutor(Executors.newSingleThreadExecutor(runnable -> {
+                server.setExecutor(Executors.newCachedThreadPool(runnable -> {
                     Thread thread = new Thread(runnable, "test-otlp-collector");
                     thread.setDaemon(true);
                     return thread;
@@ -120,6 +193,29 @@ class OtlpExportIntegrationTest extends AbstractIntegrationTest {
                     .reduce("", String::concat);
         }
 
+        void respondWith(int status) {
+            responseStatus.set(status);
+        }
+
+        int refusalResponses() {
+            return refusalResponses.get();
+        }
+
+        CountDownLatch stallNextResponse(String path) {
+            CountDownLatch gate = new CountDownLatch(1);
+            stalledPath.set(path);
+            responseGate.set(gate);
+            return gate;
+        }
+
+        int stalledResponses() {
+            return stalledResponses.get();
+        }
+
+        int successfulResponses(String path) {
+            return successfulResponses.getOrDefault(path, new AtomicInteger()).get();
+        }
+
         private void receive(HttpExchange exchange) throws IOException {
             paths.add(exchange.getRequestURI().getPath());
             authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
@@ -128,7 +224,27 @@ class OtlpExportIntegrationTest extends AbstractIntegrationTest {
                 body = new GZIPInputStream(new java.io.ByteArrayInputStream(body)).readAllBytes();
             }
             payloads.add(body);
-            exchange.sendResponseHeaders(200, -1);
+            CountDownLatch gate = responseGate.get();
+            if (exchange.getRequestURI().getPath().equals(stalledPath.get())
+                    && gate.getCount() > 0
+                    && responseGate.compareAndSet(gate, new CountDownLatch(0))) {
+                stalledResponses.incrementAndGet();
+                try {
+                    gate.await();
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted collector delay", exception);
+                }
+            }
+            int status = responseStatus.get();
+            exchange.sendResponseHeaders(status, -1);
+            if (status >= 200 && status < 300) {
+                successfulResponses.computeIfAbsent(exchange.getRequestURI().getPath(),
+                        ignored -> new AtomicInteger()).incrementAndGet();
+            }
+            if (status == 503) {
+                refusalResponses.incrementAndGet();
+            }
             exchange.close();
         }
     }

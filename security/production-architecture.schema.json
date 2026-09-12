@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:production-architecture:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "reviewedAt", "sources", "components", "publishedListeners", "browserDestinations", "trustBoundaries"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "reviewedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compose", "composeFiles", "reviewedImages", "proxy", "application", "openapi", "outboundClientFiles", "reviewedNetworkApiFiles", "configuredTargets", "nonTargetEnvironment", "configuredListeners", "networkPosture", "networkSegments", "deploymentRelations"],
+      "properties": {
+        "compose": { "const": "deploy/compose.yaml" },
+        "composeFiles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+        "reviewedImages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["service", "boundaryId"],
+            "properties": {
+              "service": { "$ref": "#/$defs/id" },
+              "boundaryId": { "$ref": "#/$defs/id" }
+            }
+          }
+        },
+        "proxy": { "const": "deploy/Caddyfile" },
+        "application": { "const": "src/main/resources/application.yaml" },
+        "openapi": { "const": "src/main/resources/api/openapi.yaml" },
+        "outboundClientFiles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+        "reviewedNetworkApiFiles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+        "configuredTargets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["target", "productionPath", "boundaryIds"],
+            "properties": {
+              "target": { "type": "string", "pattern": "^(application|compose):.+" },
+              "productionPath": { "$ref": "#/$defs/path" },
+              "boundaryIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+            }
+          }
+        },
+        "nonTargetEnvironment": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^compose:[a-z0-9-]+:[A-Z0-9_]+$" }
+        },
+        "configuredListeners": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "port", "boundaryIds", "reachableSources", "accessControl", "evidence"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+              "boundaryIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+              "reachableSources": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+              "accessControl": { "type": "string", "minLength": 1 },
+              "evidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/testAnchor" } }
+            }
+          }
+        },
+        "networkPosture": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["service", "mode", "networks"],
+            "properties": {
+              "service": { "$ref": "#/$defs/id" },
+              "mode": { "enum": ["attached", "none"] },
+              "networks": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+            }
+          }
+        },
+        "networkSegments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "internal", "members", "egressGatewayFor", "protectedServices", "purpose", "boundaryIds"],
+            "properties": {
+              "name": { "$ref": "#/$defs/id" },
+              "internal": { "type": "boolean" },
+              "members": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+              "egressGatewayFor": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+              "protectedServices": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+              "purpose": { "type": "string", "minLength": 1 },
+              "boundaryIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+            }
+          }
+        },
+        "deploymentRelations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["relation", "boundaryId"],
+            "properties": {
+              "relation": { "type": "string", "pattern": "^(compose-bind|compose-volume|configured-target|caddy-upstream|mail-mx):.+" },
+              "boundaryId": { "$ref": "#/$defs/id" }
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "source", "kind", "owner", "purpose"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "source": { "enum": ["compose", "browser", "build", "operator", "external"] },
+          "kind": { "enum": ["service", "client", "process", "artifact", "person", "external-service", "external-network"] },
+          "owner": { "type": "string", "minLength": 1 },
+          "purpose": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "publishedListeners": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["service", "published", "exposure", "purpose", "boundaryIds"],
+        "properties": {
+          "service": { "$ref": "#/$defs/id" },
+          "published": { "type": "string", "minLength": 1 },
+          "exposure": { "enum": ["public", "loopback"] },
+          "purpose": { "type": "string", "minLength": 1 },
+          "boundaryIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+        }
+      }
+    },
+    "browserDestinations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "boundaryId", "fields", "allowedTarget", "failureBehavior"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "boundaryId": { "$ref": "#/$defs/id" },
+          "fields": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 3 } },
+          "allowedTarget": { "type": "string", "minLength": 1 },
+          "failureBehavior": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "trustBoundaries": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "direction", "from", "to", "allowedTarget", "transferredData", "owner", "dependencyFailureBehavior", "softwareControls", "productionPaths", "evidence"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "direction": { "enum": ["inbound", "outbound", "internal", "delivery"] },
+          "from": { "$ref": "#/$defs/id" },
+          "to": { "$ref": "#/$defs/id" },
+          "allowedTarget": { "type": "string", "minLength": 1 },
+          "transferredData": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 },
+          "dependencyFailureBehavior": { "type": "string", "minLength": 1 },
+          "operationalAssumption": { "type": "string", "minLength": 1 },
+          "reviewedImageService": { "$ref": "#/$defs/id" },
+          "reviewedImageRepository": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._/-]+$" },
+          "reviewedImageTag": { "type": "string", "minLength": 1 },
+          "reviewedImageDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "softwareControls": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "productionPaths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+          "evidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[^#]+#[^#]+$" } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "path": { "type": "string", "pattern": "^(\\.github|deploy|docs|frontend|src|tools|security)/.+" },
+    "testAnchor": { "type": "string", "pattern": "^[^#]+#[^#]+$" }
+  }
+}

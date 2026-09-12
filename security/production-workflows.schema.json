@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:courtside:security:production-workflows:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "reviewedAt", "source", "authorizationSource", "workflows"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "reviewedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "source": { "const": "src/main/resources/api/openapi.yaml" },
+    "authorizationSource": { "const": "tools/security-authorization.mjs#buildOperationAuthorizationMatrix" },
+    "workflows": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "actors", "entryPoints", "operationIds", "backgroundEntryPoints", "stateTransitions", "alternatePaths", "failurePaths", "productionPaths", "evidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "actors": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["ANONYMOUS", "MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN", "INITIAL_PASSWORD"] } },
+          "entryPoints": { "type": "string", "minLength": 1 },
+          "operationIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]+$" } },
+          "backgroundEntryPoints": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9.]+#.+$" } },
+          "stateTransitions": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "alternatePaths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "failurePaths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "productionPaths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^(frontend|src)/.+" } },
+          "evidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[^#]+#[^#]+$" } }
+        }
+      }
+    }
+  }
+}

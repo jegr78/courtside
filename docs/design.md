@@ -1404,8 +1404,12 @@ logging.structured.format.console=ecs
 logging.structured.ecs.service.name=courtside
 management.tracing.export.otlp.enabled=${COURTSIDE_OTLP_ENABLED:false}
 management.opentelemetry.tracing.export.otlp.endpoint=${COURTSIDE_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+management.opentelemetry.tracing.export.otlp.connect-timeout=2s
+management.opentelemetry.tracing.export.otlp.timeout=10s
 management.otlp.metrics.export.enabled=${COURTSIDE_OTLP_ENABLED:false}
 management.otlp.metrics.export.url=${COURTSIDE_OTLP_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}
+management.otlp.metrics.export.connect-timeout=2s
+management.otlp.metrics.export.read-timeout=10s
 management.tracing.sampling.probability=${COURTSIDE_TRACING_SAMPLING_PROBABILITY:0.1}
 ```
 
@@ -1470,6 +1474,24 @@ access, retention, alerting and escalation belong to the operator of each instal
 A club admin decides here whether to trust Courtside with member credentials, so each item says
 whether it is built or designed. **Designed means absent today.**
 
+- **What runs, what it talks to, and which workflows cross those boundaries:**
+  `security/production-architecture.json` is the closed map of the reference deployment and its
+  supported production overlays, every
+  published listener, outbound application client, external mail and certificate dependency,
+  optional telemetry, configured browser destination, build publication and operator evidence.
+  Each flow says which target is allowed, what crosses it, who owns it, what dependency failure
+  does and which controls and behavior evidence apply. Published ports and Stalwart's internal
+  listeners point to their incoming boundaries; shared-volume handoffs, Caddy upstreams and mail
+  delivery routes are derived and classified as well. `security/production-workflows.json`
+  assigns every OpenAPI operation and every scheduled, asynchronous or startup entry point to one
+  principal workflow with its actors, state transitions, alternate paths and failure paths. Tests
+  derive the changing parts from Compose, application configuration, bounded network-capable Java
+  APIs, OpenAPI and the operation authorization matrix. A new service, listener, outbound client,
+  configured target, deployment relation, browser destination, entry point or gateway actor
+  therefore cannot ship unclassified. A workflow's actor list is the union admitted to at least one of its HTTP entry
+  points; object-level authorization remains visible in alternate and failure paths. External DNS,
+  recipient behavior, telemetry storage and evidence retention remain operating choices, not
+  guarantees the software pretends to enforce. *Built.*
 - **Passwords:** Argon2id at `m=19456`, `t=2`, `p=1`, OWASP's current guidance and above Spring
   Security's own defaults. Login by username (section 4). *Built.* A stored hash below the current
   parameters is re-encoded on its owner's next successful sign-in; storing it is best effort, so a

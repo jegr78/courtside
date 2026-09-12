@@ -391,28 +391,35 @@ public class ReferenceDeploymentSecurityTest {
     void whenReadingReferenceDeployment_thenEveryApplicationAndListenerIsInventoried()
             throws IOException {
         // given
-        Map<String, Object> compose = new Yaml().load(Files.readString(Path.of("deploy/compose.yaml")));
-        Map<String, Map<String, Object>> services = (Map<String, Map<String, Object>>) compose.get("services");
+        JsonNode inventory = new ObjectMapper().readTree(
+                Files.readString(Path.of("security/production-architecture.json")));
+        Set<String> services = new LinkedHashSet<>();
+        Map<String, List<String>> published = new LinkedHashMap<>();
+        for (JsonNode composeFile : inventory.path("sources").path("composeFiles")) {
+            String source = Files.readString(Path.of(composeFile.asString()))
+                    .replace("!reset null", "null");
+            Map<String, Object> compose = new Yaml().load(source);
+            Map<String, Map<String, Object>> sourceServices =
+                    (Map<String, Map<String, Object>>) compose.get("services");
+            services.addAll(sourceServices.keySet());
+            sourceServices.forEach((service, definition) -> {
+                if (definition.containsKey("ports")) {
+                    published.computeIfAbsent(service, ignored -> new ArrayList<>())
+                            .addAll((List<String>) definition.get("ports"));
+                }
+            });
+        }
 
         // when / then
-        assertThat(services.keySet()).containsExactly(
-                "db", "app", "mail", "mail-certificate", "mail-reload", "mail-plan",
-                "mail-bootstrap", "mail-configure", "mail-check", "proxy");
-        assertThat(services.entrySet().stream()
-                .filter(entry -> entry.getValue().containsKey("ports"))
-                .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey,
-                        entry -> entry.getValue().get("ports"))))
-                .containsExactlyInAnyOrderEntriesOf(Map.of(
-                        "app", List.of("127.0.0.1:${COURTSIDE_PORT:-8080}:8080"),
-                        "mail", List.of("25:25", "127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT:-8081}:8080"),
-                        "proxy", List.of("80:80", "443:443")));
-        String architecture = Files.readString(Path.of("docs/security-assessment.md"));
-        services.keySet().forEach(service -> assertThat(architecture)
-                .as("the architecture map names service %s", service)
-                .contains("`" + service + "`"));
-        assertThat(architecture).contains(
-                "browser-to-proxy", "proxy-to-application", "application-to-database",
-                "source-to-image", "operator-to-evidence");
+        List<String> inventoriedServices = inventory.path("components").values().stream()
+                .filter(component -> "compose".equals(component.path("source").asString()))
+                .map(component -> component.path("id").asString()).toList();
+        assertThat(inventoriedServices).containsExactlyInAnyOrderElementsOf(services);
+        Map<String, List<String>> inventoriedListeners = new LinkedHashMap<>();
+        inventory.path("publishedListeners").values().forEach(listener -> inventoriedListeners
+                .computeIfAbsent(listener.path("service").asString(), ignored -> new ArrayList<>())
+                .add(listener.path("published").asString()));
+        assertThat(inventoriedListeners).containsExactlyInAnyOrderEntriesOf(published);
         assertThat(topLevelCaddyBlocks(Files.readString(Path.of("deploy/Caddyfile")))).containsExactly(
                         "(applicationHeaders)", "(plaintext)", "(serve)", "http://:80",
                         "{$COURTSIDE_DOMAIN}", "{$COURTSIDE_MAIL_HOSTNAME}");

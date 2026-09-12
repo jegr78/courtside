@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "catalogVersion": "1.5.7",
+  "catalogVersion": "1.5.8",
   "standards": {
     "wstg": "4.2",
     "asvs": "5.0.0-level-2",
@@ -1588,7 +1588,10 @@
           "id": "v5.0.0-13.1.1",
           "status": "implemented",
           "manualProcedureId": "MAN-OPS-001",
-          "findingReference": "docs/security-findings.md#external-trust-boundary-map-is-incomplete"
+          "controlEvidence": {
+            "productionPath": "security/production-architecture.json",
+            "falsifyingTest": "tools/production-architecture.test.mjs#given a trust boundary, when its endpoints and anchors are resolved, then it names real classified components and evidence"
+          }
         },
         {
           "id": "v5.0.0-13.2.1",
@@ -1613,7 +1616,10 @@
           "id": "v5.0.0-13.2.4",
           "status": "implemented",
           "manualProcedureId": "MAN-OPS-001",
-          "findingReference": "docs/security-findings.md#external-trust-boundary-map-is-incomplete"
+          "controlEvidence": {
+            "productionPath": "security/production-architecture.json",
+            "falsifyingTest": "tools/production-architecture.test.mjs#given production outbound clients and browser destinations, when a new target appears, then it needs a classified boundary"
+          }
         },
         {
           "id": "v5.0.0-13.2.5",
@@ -1945,7 +1951,10 @@
           "id": "v5.0.0-16.5.2",
           "status": "implemented",
           "manualProcedureId": "MAN-OPS-001",
-          "findingReference": "docs/security-findings.md#external-trust-boundary-map-is-incomplete"
+          "controlEvidence": {
+            "productionPath": "security/production-architecture.json",
+            "falsifyingTest": "tools/production-architecture.test.mjs#given a trust boundary, when its endpoints and anchors are resolved, then it names real classified components and evidence"
+          }
         },
         {
           "id": "v5.0.0-16.5.3",
@@ -2492,7 +2501,10 @@
           "id": "WSTG-v4.2-INFO-07",
           "status": "implemented",
           "manualProcedureId": "MAN-ARCH-001",
-          "findingReference": "docs/security-findings.md#principal-workflow-inventory-is-incomplete"
+          "controlEvidence": {
+            "productionPath": "security/production-workflows.json",
+            "falsifyingTest": "tools/production-architecture.test.mjs#given production entry points, when an operation or background task changes, then workflow coverage fails closed"
+          }
         },
         {
           "id": "WSTG-v4.2-INFO-08",
@@ -2509,7 +2521,10 @@
           "id": "WSTG-v4.2-INFO-10",
           "status": "implemented",
           "manualProcedureId": "MAN-ARCH-001",
-          "findingReference": "docs/security-findings.md#external-trust-boundary-map-is-incomplete"
+          "controlEvidence": {
+            "productionPath": "security/production-architecture.json",
+            "falsifyingTest": "tools/production-architecture.test.mjs#given the reference deployment, when components and published listeners change, then the architecture inventory fails closed"
+          }
         },
         {
           "id": "WSTG-v4.2-INPV-01",
