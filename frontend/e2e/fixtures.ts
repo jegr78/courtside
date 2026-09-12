@@ -22,16 +22,18 @@ interface TestFixtures {
 }
 
 export async function journeyContext(browser: Browser): Promise<BrowserContext> {
-  const context = await browser.newContext(recordedVideoDirectory());
+  const context = await browser.newContext(recordedVideo());
   await pinJourneyClock(context);
   return context;
 }
 
 // The runner records video for the context it owns; this one is created here, so it has to ask.
-function recordedVideoDirectory(): { recordVideo?: { dir: string } } {
+// Without a size the recording is fitted into 800x800, which halves a desktop viewport.
+function recordedVideo(): { recordVideo?: { dir: string; size?: { width: number; height: number } } } {
   try {
     const info = base.info();
-    return info.project.use.video === "on" ? { recordVideo: { dir: info.outputDir } } : {};
+    if (info.project.use.video !== "on") return {};
+    return { recordVideo: { dir: info.outputDir, size: info.project.use.viewport ?? undefined } };
   } catch {
     return {};
   }
@@ -93,7 +95,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       await context.close();
       for (const [index, recording] of recordings.entries()) {
         if (!recording) continue;
-        await recording.saveAs(join(testInfo.outputDir, `journey-${index + 1}.webm`));
+        const path = join(testInfo.outputDir, `journey-${index + 1}.webm`);
+        await recording.saveAs(path);
+        await testInfo.attach(`journey-${index + 1}`, { path, contentType: "video/webm" });
       }
     }
   },
