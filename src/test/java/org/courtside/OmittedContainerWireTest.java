@@ -84,6 +84,80 @@ class OmittedContainerWireTest extends AbstractIntegrationTest {
                 .isEmpty();
     }
 
+    @Test
+    void everyOptionalPropertyAnswersAnExplicitNullTheWayTheDocumentDeclaresIt() {
+        // given
+        List<Container> properties = requestBodyProperties();
+
+        // when
+        TreeSet<String> wrong = new TreeSet<>();
+        for (Container property : properties) {
+            boolean refused = refusesNull(property);
+            if (refused == nullable(property)) {
+                wrong.add(property.schema() + "." + property.property()
+                        + (refused ? " refuses" : " accepts") + " an explicit null, and the document"
+                        + (nullable(property) ? " allows one" : " does not"));
+            }
+        }
+
+        // then
+        assertThat(properties).as("the document must declare request body properties").isNotEmpty();
+        assertThat(wrong)
+                .as("a query string cannot send an explicit null and a body can, so moving a"
+                        + " parameter into one creates a value the document has to answer for. Where"
+                        + " it writes the null into the type it declares, a body may send one; where"
+                        + " it does not, null is a shape the contract never described and the"
+                        + " request is refused rather than quietly read as the field being absent. A"
+                        + " required property is not here: the generated @NotNull refuses its null"
+                        + " and names the field while doing it, which is the better answer.")
+                .isEmpty();
+    }
+
+    private boolean refusesNull(Container property) {
+        try {
+            valueOf(property, "{\"" + property.property() + "\":null}");
+            return false;
+        } catch (RuntimeException refused) {
+            return true;
+        }
+    }
+
+    private List<Container> requestBodyProperties() {
+        List<Container> properties = new ArrayList<>();
+        for (String schema : requestBodySchemas()) {
+            propertiesOf(schema).keySet().stream()
+                    .filter(property -> !requiredOf(schema).contains(property))
+                    .forEach(property -> properties.add(new Container(schema, property)));
+        }
+        return properties;
+    }
+
+    private List<Container> defaultedProperties() {
+        List<Container> defaulted = new ArrayList<>();
+        for (String schema : requestBodySchemas()) {
+            propertiesOf(schema).forEach((property, definition) -> {
+                if (definition instanceof Map<?, ?> declaration && declaration.containsKey("default")) {
+                    defaulted.add(new Container(schema, property));
+                }
+            });
+        }
+        assertThat(defaulted).as("the document must declare defaults in its request bodies")
+                .isNotEmpty();
+        return defaulted;
+    }
+
+    private Object valueOf(Container container, String body) {
+        try {
+            Class<?> type = Class.forName(MODEL_PREFIX + container.schema());
+            Method getter = type.getMethod("get" + capitalized(container.property()));
+            return getter.invoke(mapper.readValue(body, type));
+        } catch (ReflectiveOperationException notGenerated) {
+            throw new AssertionError(
+                    "the document names " + container.schema() + "." + container.property()
+                            + ", which the generator did not produce as expected", notGenerated);
+        }
+    }
+
     private TreeSet<String> disagreeingWith(Absent expected, Predicate<Container> selects) {
         List<Container> selected = containers().stream().filter(selects).toList();
         assertThat(selected)
@@ -103,15 +177,7 @@ class OmittedContainerWireTest extends AbstractIntegrationTest {
     }
 
     private Object absentValueOf(Container container) {
-        try {
-            Class<?> type = Class.forName(MODEL_PREFIX + container.schema());
-            Method getter = type.getMethod("get" + capitalized(container.property()));
-            return getter.invoke(mapper.readValue("{}", type));
-        } catch (ReflectiveOperationException notGenerated) {
-            throw new AssertionError(
-                    "the document names " + container.schema() + "." + container.property()
-                            + ", which the generator did not produce as expected", notGenerated);
-        }
+        return valueOf(container, "{}");
     }
 
     private static boolean isEmptyContainer(Object held) {

@@ -367,6 +367,10 @@
     }
   },
   "$defs": {
+    "falsifyingTestReference": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*#[A-Za-z0-9][A-Za-z0-9 ,._-]*$"
+    },
     "productRole": {
       "enum": [
         "MEMBER",
@@ -562,8 +566,11 @@
               "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9._-]*|\\.github)(/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
             },
             "falsifyingTest": {
-              "type": "string",
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*#[A-Za-z0-9][A-Za-z0-9 ,._-]*$"
+              "oneOf": [
+                { "$ref": "#/$defs/falsifyingTestReference" },
+                { "type": "array", "minItems": 2, "uniqueItems": true,
+                  "items": { "$ref": "#/$defs/falsifyingTestReference" } }
+              ]
             }
           }
         },

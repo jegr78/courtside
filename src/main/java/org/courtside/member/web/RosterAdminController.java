@@ -11,6 +11,7 @@ import org.courtside.api.ApiRolesRequest;
 import org.courtside.api.ApiAccountLocaleRequest;
 import org.courtside.api.ApiRosterEntry;
 import org.courtside.api.ApiRosterPage;
+import org.courtside.api.ApiRosterSearchRequest;
 import org.courtside.api.ApiUsernameRequest;
 import org.courtside.identity.Role;
 import org.courtside.identity.GlobalSessionAdministration;
@@ -45,8 +46,9 @@ class RosterAdminController implements AdminRosterApi {
     private final CurrentUser currentUser;
 
     @Override
-    public ResponseEntity<ApiRosterPage> listRoster(String query, UUID membershipTypeId, UUID cursor, Integer limit) {
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(query, membershipTypeId, cursor, limit);
+    public ResponseEntity<ApiRosterPage> searchRoster(ApiRosterSearchRequest request) {
+        CursorPage.Result<RosterService.RosterEntry> page = roster.list(request.getQuery(),
+                request.getMembershipTypeId(), request.getCursor(), request.getLimit());
         return ResponseEntity.ok(new ApiRosterPage(page.items().stream()
                 .map(RosterAdminController::toResponse)
                 .toList())

@@ -895,6 +895,16 @@ left out leaves the courts as they are. The three are held apart at the wire by
 `OmittedContainerWireTest`, because which one a field falls under is decided by the document and
 delivered by the deserialiser, and nothing in between states it.
 
+**A default survives an explicit `null`.** A query string has two states, absent and a value; a body
+has three, and the third is what a parameter gains the day it moves into one. A property the
+document gives a `default` therefore keeps it when a body sends `null`, because `default` states the
+value for "not supplied" and a null supplies nothing. The deserialiser is what delivers this, from
+the document, for every optional non-nullable property at once; a field whose type admits `null`
+keeps its own meaning, which is why clearing the rule set assigned to a person without a membership
+type still works. `OmittedContainerWireTest` reads it at the wire, because the alternative is a
+field that arrives null into code that unboxes or dereferences it, and a `500` to a request the
+document permits.
+
 A misspelt field name never reaches that rule: `fail-on-unknown-properties` is on, so the request is
 refused naming the field nobody declared. The two defences answer `400` for different reasons and
 neither substitutes for the other — turning the setting off would leave a typo to be read as an
@@ -928,7 +938,7 @@ gives and not only for the ones a servlet saw.
 on the operation that answers them, and build-time checks keep that true: an operation with a path
 parameter declares `400`, because a path parameter can always arrive malformed; one whose path
 parameter is not an enum declares `404`, because such a parameter names something that may not
-exist — a uuid names a row, an external identifier names a reference — and what names nothing is
+exist — a uuid names a row, a session handle names a session — and what names nothing is
 answered `404`; and one carrying a query parameter it can refuse — one whose schema states a type,
 a format, an enum or a bound — declares `400`. An enum path parameter is exempt from the `404` rule
 on purpose: every value it accepts exists, so there is no unknown one to answer. A declared status
@@ -1059,7 +1069,7 @@ Two safeguards:
 
 ### Conflict handling on creation: preview and explicit decision
 
-`POST /api/booking-series/preview` lists every occurrence the rule produces up to the
+`POST /api/booking-series-preview` lists every occurrence the rule produces up to the
 horizon, together with the court ids already occupied on that date, if any. Nothing is
 written; a preview is open to any authenticated user, including one who could not actually
 create the card in question — the card's allowed roles are enforced by `BookingWriter` at
@@ -2293,6 +2303,40 @@ after a booking conflict, whenever the window regains focus and once per minute.
 
 Each club is its own controller. Courtside cannot take that responsibility away, but it can
 deliver the implementation.
+
+- **Every stored field has one protection level and one lifecycle.**
+  `security/data-protection-inventory.json` classifies all 215 columns of the schema as `personal`,
+  `pseudonymous`, `secret` or `operational`, and names for each the mechanism below that ends it.
+  The list is derived rather than maintained: `DataProtectionInventoryTest` reads
+  `information_schema.columns` after Flyway has run, so a migration that adds a column fails the
+  build until the column is classified. The same file classifies every path and query parameter the
+  API declares, which is what makes the next point testable rather than aspirational. **Built.**
+- **Nothing that names a person travels in a request URL.** A response body is read once by the
+  client that asked for it; a URL is written down — by the browser's history, by whatever sits
+  between the member and the instance, and by an operator's diagnostics. So a name fragment, and a
+  member number a club's own source system holds, travel in a request body. Searching the roster and
+  searching the member directory are `POST` for that reason and for no other, and they are held to
+  changing nothing by the same test that holds every safe method to it. Two guards keep it: no
+  parameter classified `personal` or `secret` may sit in a path or a query, and no path or query
+  parameter may be a string the document leaves unconstrained — which is the shape a name arrives
+  in, whatever anyone classified it as. **Built.**
+- **Accepted: a person-scoped identifier stays in the URL.** `personId` addresses every operation
+  about one person and `subjectId` filters the change log; `sessionHandle`, `bookingId`,
+  `fromBookingId` and `cursor` are in the same class, because each resolves to one person through an
+  authorised call. All of them are in the path or the query where a record that keeps URLs can see
+  them, and everything below applies to the class, not to the two that name it. What is observable is that such a record links a series of
+  requests to one person over time. What an observer needs is access to that record; the reference
+  deployment writes no access log, but no club can promise what an upstream service keeps. What
+  bounds it is that the value is minted here as a random UUID rather than derived from anything
+  about the person, that it describes nobody who cannot already be named by resolving it through an
+  authorised call, and that it is not a value a club entered.
+
+  The reason it is not simply moved is that moving it would not achieve the thing: the browser holds
+  `/admin/roster/<personId>` and `?subjectId=` in its own history because those are the application's
+  own routes, and taking the id out of the API while leaving the route would trade a real property
+  for the appearance of one. Removing it from both means addressing every person-scoped operation by
+  something other than a stable id, and that is a shape for the product to choose, not for the
+  branch that closed the two findings above.
 
 - **Deletion concept as a scheduled job**, configurable: bookings are pseudonymised X
   months after season end (utilisation statistics survive, the personal reference does

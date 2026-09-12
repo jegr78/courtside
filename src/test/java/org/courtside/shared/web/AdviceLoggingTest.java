@@ -116,7 +116,31 @@ class AdviceLoggingTest {
             assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
             assertThat(event.getFormattedMessage())
                     .contains("409 CONFLICT", "urn:courtside:error:test-failure-conflict",
-                            "card.label.taken", "cardLabel");
+                            "card.label.taken");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
+    @Test
+    void givenAViolationWhoseParamsNameAMember_whenItIsAnswered_thenOnlyItsCodeIsLogged() {
+        // given
+        String memberNumber = "A 1234";
+        DomainFailure failure = new ConflictFailure("import.preview.externalIdClaimed",
+                Map.of("externalIds", List.of(memberNumber)));
+
+        // when
+        new DomainFailureHandler(mock(ProblemTraceReference.class)).handleDomainFailure(failure);
+
+        // then
+        assertThat(domainAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage())
+                    .as("a violation's params are built from what the request submitted, and a"
+                            + " club member number is one of the fields this instance classifies"
+                            + " personal. The code says which rule refused; the values are the"
+                            + " member's.")
+                    .contains("import.preview.externalIdClaimed")
+                    .doesNotContain(memberNumber)
+                    .doesNotContain("externalIds");
             assertThat(event.getThrowableProxy()).isNull();
         });
     }

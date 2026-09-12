@@ -344,7 +344,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
 
     private org.springframework.test.web.servlet.ResultActions postSeriesPreview(String body)
             throws Exception {
-        return mockMvc.perform(post("/api/booking-series/preview")
+        return mockMvc.perform(post("/api/booking-series-preview")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body)
                 .with(csrf()));

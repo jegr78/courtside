@@ -81,7 +81,7 @@ export const requiredPassiveCheckIds = Object.freeze([
   "method-trace", "method-connect", "method-track", "body-limit", "header-limit", "forwarded-boundary",
   "method-override", "host-boundary", "tls-versions", "tls-ciphers", "certificate-trust", "http-redirect",
   "runtime-file-permissions", "runtime-hardening", "loopback-publication",
-  "management-separation", "direct-forwarded-behavior", "scanner-runtime-hardening", "secure-cookie-delivery", "transport-security",
+  "management-separation", "meter-registry-separation", "direct-forwarded-behavior", "scanner-runtime-hardening", "secure-cookie-delivery", "transport-security",
   "qualified-image-evidence"
 ].toSorted());
 

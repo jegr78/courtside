@@ -394,4 +394,23 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         return JsonPath.read(body, "$.id");
     }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void givenAnExplicitNullForAFieldWithADefault_whenACardIsCreated_thenTheContractRefusesIt()
+            throws Exception {
+        // when / then
+        mockMvc.perform(post("/api/admin/booking-cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"label": "Probe", "color": "#c8a415",
+                                 "allowedRoles": ["TRAINER"], "allowedPlayerCounts": [2],
+                                 "countsAgainstLimits": false, "guestAllowed": true,
+                                 "showGenericOccupancy": null}
+                                """)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("showGenericOccupancy"));
+    }
 }

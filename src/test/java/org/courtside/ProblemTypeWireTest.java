@@ -329,6 +329,79 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAJsonBody_whenPuttingWhereTheDocumentConsumesMultipart_thenTheAnswerIsTheSame()
+            throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(put("/api/admin/config/logo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "urn:courtside:error:unsupported-media-type");
+        assertThat(headerValues(result, "Accept"))
+                .containsExactly("multipart/form-data");
+    }
+
+    @Test
+    void givenAnEmptyStringWhereTheDocumentDeclaresAnIdentifier_whenSearching_thenItIsRefused()
+            throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(post("/api/admin/roster-search")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cursor\":\"\"}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        assertThat(result.andReturn().getResponse().getContentAsString()).contains("cursor");
+    }
+
+    @Test
+    void givenAQueryOfOneAstralCharacter_whenSearching_thenTheDocumentedMinimumStillHolds()
+            throws Exception {
+        // given
+        String oneCharacterTwoUnits = "\uD83D\uDE00";
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/public/participant-members")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"" + oneCharacterTwoUnits + "\"}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+    }
+
+    @Test
+    void givenAQueryOfSixtyAstralCharacters_whenSearching_thenTheDocumentedMaximumStillHolds()
+            throws Exception {
+        // given
+        String sixtyCharactersOneHundredAndTwentyUnits = "\uD83D\uDE00".repeat(60);
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/public/participant-members")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"" + sixtyCharactersOneHundredAndTwentyUnits + "\"}")
+                .with(csrf()));
+
+        // then
+        result.andExpect(status().isOk());
+    }
+
+    @Test
+    void givenNoContentTypeAtAll_whenPosting_thenTheAnswerIsStillUnsupportedMediaType()
+            throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(post("/api/admin/booking-cards")
+                .content("nope")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "urn:courtside:error:unsupported-media-type");
+    }
+
+    @Test
     void givenAnUnacceptableRepresentation_whenRequesting_thenTheResponseCarriesItsOwnType() throws Exception {
         // given / when
         ResultActions result = mockMvc.perform(get("/api/admin/config").accept(MediaType.APPLICATION_XML));

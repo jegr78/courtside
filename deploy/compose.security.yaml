@@ -90,6 +90,9 @@ services:
       COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES: ${COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES:?required}
       COURTSIDE_LOGIN_GLOBAL_THRESHOLD: "20"
       MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"
+      # The proxy answers 404 for /actuator*, so this opens the meter registry to the
+      # container-internal sampling the resource-abuse assessment reads and to nothing else.
+      COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"
       COURTSIDE_BOOTSTRAP_ADMIN_USERNAME: security.bootstrap
       COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}
       COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME: Jane Doe

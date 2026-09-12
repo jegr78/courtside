@@ -2,6 +2,7 @@ package org.courtside.dataexchange.web;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.AdminExportApi;
+import org.courtside.api.ApiRosterExportRequest;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.dataexchange.SupportedEncodings;
 import org.courtside.dataexchange.internal.BookingExportService;
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.nio.charset.Charset;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -28,10 +28,10 @@ class ExportAdminController implements AdminExportApi {
     private final Clock clock;
 
     @Override
-    public ResponseEntity<Resource> exportRoster(String query, UUID membershipTypeId, UUID sourceId,
-                                                 String separator, String encoding) {
-        byte[] file = rosterExports.roster(query, membershipTypeId, sourceId,
-                separator.charAt(0), encoding);
+    public ResponseEntity<Resource> exportRoster(ApiRosterExportRequest request) {
+        String encoding = request.getEncoding();
+        byte[] file = rosterExports.roster(request.getQuery(), request.getMembershipTypeId(),
+                request.getSourceId(), request.getSeparator().charAt(0), encoding);
         return offered("roster-%s".formatted(today()), file, SupportedEncodings.forWriting(encoding));
     }
 

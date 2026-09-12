@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-// The document declares a type per field, so a value of another JSON shape is a request the
-// contract does not describe. A whole number stays a number, because JSON has only one of those.
+// The document declares a type per field, so another JSON shape is a request it never described,
+// an empty string included. A whole number stays a number, because JSON has only one of those.
 @Component
 class RejectsCoercedScalars implements JsonMapperBuilderCustomizer {
 
@@ -29,6 +29,9 @@ class RejectsCoercedScalars implements JsonMapperBuilderCustomizer {
 
     @Override
     public void customize(JsonMapper.Builder builder) {
+        builder.withCoercionConfigDefaults(refuse(List.of(CoercionInputShape.EmptyString)))
+                .withCoercionConfig(LogicalType.Textual,
+                        config -> config.setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsEmpty));
         FOREIGN_SHAPES.forEach((type, shapes) -> builder.withCoercionConfig(type, refuse(shapes)));
     }
 

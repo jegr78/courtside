@@ -86,7 +86,9 @@ function loadBookingInputs() {
   const courts = http.get(`${target}/api/public/courts`, { headers });
   const cards = http.get(`${target}/api/public/booking-cards`, { headers });
   const participantCards = http.get(`${target}/api/public/participant-cards`, { headers });
-  const members = http.get(`${target}/api/public/participant-members?query=Member2`, { headers });
+  const members = http.post(`${target}/api/public/participant-members`,
+    JSON.stringify({ query: "Member2" }),
+    { headers: { ...headers, "Content-Type": "application/json", "X-XSRF-TOKEN": token } });
   courtId = courts.json()?.[0]?.id;
   bookingCardId = cards.json()?.find((card) => card.id === memberCardId)?.id;
   participantCardId = participantCards.json()?.find((card) => card.label === "Limited assessment card")?.id;
@@ -196,7 +198,7 @@ function participantCapacity() {
 function seriesAndRuleCost() {
   if (!scenarioFixturesReady("series-and-rule-cost", () => Boolean(courtId))) return;
   const startsOn = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-  const response = http.post(`${target}/api/booking-series/preview`, JSON.stringify({
+  const response = http.post(`${target}/api/booking-series-preview`, JSON.stringify({
     courtIds: [courtId], cardId: seriesCardId, startsOn, startTime: "18:00:00",
     durationMinutes: 60, intervalWeeks: 1,
     weekdays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"],
@@ -216,7 +218,7 @@ function previewMutationRace() {
     startTime: "18:00:00", durationMinutes: 60, intervalWeeks: 1, weekdays: [weekday],
     occurrenceCount: 1, note: `Security TOCTOU ${runId}`
   };
-  const preview = http.post(`${target}/api/booking-series/preview`, JSON.stringify(series), {
+  const preview = http.post(`${target}/api/booking-series-preview`, JSON.stringify(series), {
     headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": token, Cookie: cookieHeader() }
   });
   const confirmedStart = preview.json("occurrences.0.startsAt");

@@ -134,6 +134,7 @@
     { "path": "tools/tool-tests.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/tracked-symlink-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/ui-selector-policy.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/url-parameter-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/webkit-reliability.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/webkit-reliability.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/workflow-action-pinning.test.mjs", "profiles": ["tooling"], "test": true },

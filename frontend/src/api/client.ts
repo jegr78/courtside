@@ -292,12 +292,11 @@ export const api = {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
   roster: (query?: string, cursor?: string, limit = 50, membershipTypeId?: string) => request<RosterPage>(
-    `/api/admin/roster?${new URLSearchParams({
-      limit: String(limit),
-      ...(query ? { query } : {}),
-      ...(cursor ? { cursor } : {}),
-      ...(membershipTypeId ? { membershipTypeId } : {})
-    })}`
+    "/api/admin/roster-search", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limit, ...(query ? { query } : {}), ...(cursor ? { cursor } : {}),
+        ...(membershipTypeId ? { membershipTypeId } : {}) })
+    }
   ),
   person: (personId: string) => request<RosterEntry>(`/api/admin/roster/${personId}`),
   createPerson: (person: PersonRequest) => request<RosterEntry>("/api/admin/roster", {
@@ -387,8 +386,8 @@ export const api = {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(reference)
     }
   ),
-  unlinkExternalReference: (sourceId: string, externalId: string) => request<void>(
-    `/api/admin/import/sources/${sourceId}/references/${encodeURIComponent(externalId)}`,
+  unlinkExternalReference: (sourceId: string, referenceId: string) => request<void>(
+    `/api/admin/import/sources/${sourceId}/references/${referenceId}`,
     { method: "DELETE" }
   ),
   // No Content-Type: only the browser knows the boundary it is about to write.
@@ -398,9 +397,11 @@ export const api = {
   exportBookings: (parameters: BookingExportParameters) => requestFile(
     `/api/admin/export/bookings?${new URLSearchParams(parameters).toString()}`, { method: "POST" }),
   exportRoster: (parameters: RosterExportParameters) => requestFile(
-    `/api/admin/export/roster?${new URLSearchParams(
-      Object.entries(parameters).filter(([, value]) => value)
-    ).toString()}`, { method: "POST" }),
+    "/api/admin/export/roster", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.fromEntries(
+        Object.entries(parameters).filter(([, value]) => value)))
+    }),
   createImportPreview: (sourceId: string, file: File, mode: SnapshotMode, encoding: string) => {
     const form = new FormData();
     form.append("file", file);
@@ -443,14 +444,17 @@ export const api = {
   bookingCards: () => request<PublicBookingCard[]>("/api/public/booking-cards"),
   participantCards: () => request<PublicParticipantCard[]>("/api/public/participant-cards"),
   participantMembers: (query: string) => request<PublicParticipantMember[]>(
-    `/api/public/participant-members?${new URLSearchParams({ query })}`
+    "/api/public/participant-members", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query })
+    }
   ),
   createBooking: (booking: CreateBookingRequest, idempotencyKey: string) => request<BookingCreated>("/api/bookings", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
     body: JSON.stringify(booking)
   }),
-  bookingEligibility: () => request<BookingEligibility>("/api/bookings/eligibility"),
+  bookingEligibility: () => request<BookingEligibility>("/api/booking-eligibility"),
   cancelBooking: (bookingId: string) => request<void>(`/api/bookings/${bookingId}`, { method: "DELETE" }),
   personalBookings: (cursor?: string, limit = 50) => request<PersonalBookingPage>(
     `/api/my/bookings?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
@@ -467,7 +471,7 @@ export const api = {
   managedAppointment: (bookingId: string) => request<ManagedAppointmentDetail>(
     `/api/managed/bookings/${bookingId}`
   ),
-  previewSeries: (rule: SeriesRuleRequest) => request<SeriesPreview>("/api/booking-series/preview", {
+  previewSeries: (rule: SeriesRuleRequest) => request<SeriesPreview>("/api/booking-series-preview", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rule)
   }),
   createSeries: (series: CreateSeriesRequest) => request<SeriesCreated>("/api/booking-series", {

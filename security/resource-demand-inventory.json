@@ -183,9 +183,9 @@
         "listMembershipTypes",
         "listParticipantCards",
         "listParticipantCardsForAdmin",
-        "listParticipantMembers",
-        "listRoster",
-        "listRuleSets"
+        "listRuleSets",
+        "searchParticipantMembers",
+        "searchRoster"
       ],
       "growthDrivers": "Collection queries grow with courts, cards, members, import history, rule sets or one day of occupied court slots in the club database.",
       "inputOrDataBound": "Roster pages stop at 200 and participant search at 20; one occupancy response spans one day and at most 999 courts. Several configuration and import-history lists have no row ceiling beyond tenant data.",

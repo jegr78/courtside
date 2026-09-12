@@ -235,6 +235,20 @@ Everything else in that list is a row a board changes in the admin surface: cour
 booking cards, participant cards, rule sets, membership types and the club configuration all have
 one.
 
+## What each column is, in protection terms
+
+This document says what a table holds and why. What each *column* counts as under data protection —
+one of `personal`, `pseudonymous`, `secret` or `operational` — and which mechanism ends its life is
+in [`security/data-protection-inventory.json`](../security/data-protection-inventory.json), one
+entry per column, beside the same classification for every URL parameter the API declares.
+
+It is there and not here because a prose table would be a second copy of the schema, maintained by
+hand, and this repository has watched that kind of copy rot. `DataProtectionInventoryTest` reads
+`information_schema.columns` after Flyway has run and requires an entry for every column it finds,
+so a migration that adds a column fails the build until somebody says what the column is. The
+lifecycle each entry names is the mechanism section 11 of `docs/design.md` describes, not a separate
+promise.
+
 ## Reading this against the code
 
 `ModularityTests` keeps the module boundaries the tables are grouped by, and

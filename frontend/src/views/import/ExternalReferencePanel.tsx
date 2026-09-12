@@ -86,7 +86,7 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
     setSuccess(undefined);
     setPending(true);
     try {
-      await api.unlinkExternalReference(sourceId, reference.externalId);
+      await api.unlinkExternalReference(sourceId, reference.referenceId);
       setReferences((current) =>
         (current ?? []).filter((held) => held.referenceId !== reference.referenceId));
       setSuccess(t("admin.import.referenceUnlinked"));

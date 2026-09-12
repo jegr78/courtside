@@ -10,10 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Map;
-
-import static java.util.Objects.requireNonNullElse;
-
 // Ahead of SharedExceptionHandler and its cause-chain fallback.
 @Slf4j
 @RestControllerAdvice
@@ -33,13 +29,14 @@ class DomainFailureHandler {
                 .body(body);
     }
 
-    // Never the exception's message: a throw site builds it from the submitted value.
+    // Never the exception's message and never a violation's params: both are built from the
+    // submitted value, and a member number is somebody's.
     private static void logAnswered(DomainFailure failure, ProblemDetail body) {
         if (failure.getStatusCode().is5xxServerError()) {
             log.warn("Answering {} for {}", failure.getStatusCode(), body.getType(), failure);
-        } else {
+        } else if (log.isDebugEnabled()) {
             log.debug("Answering {} for {}: {}", failure.getStatusCode(), body.getType(),
-                    requireNonNullElse(body.getProperties(), Map.of()));
+                    failure.violationCodes());
         }
     }
 }

@@ -77,14 +77,14 @@ test("given a reviewed control with a finding, when validating it, then the refe
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true }).compile(schema);
   const referenced = structuredClone(catalog);
   const control = referenced.controlCoverage.flatMap(({ controls }) => controls)
-    .find(({ id }) => id === "v5.0.0-14.1.1");
-  control.findingReference = "docs/security-findings.md#incomplete-sensitive-data-classification";
+    .find(({ id }) => id === "v5.0.0-8.1.1");
+  control.findingReference = "docs/security-findings.md#incomplete-authorization-rule-documentation";
 
   // when / then
   assert.equal(validate(referenced), true, JSON.stringify(validate.errors));
-  control.findingReference = "../protected-evidence.md#incomplete-sensitive-data-classification";
+  control.findingReference = "../protected-evidence.md#incomplete-authorization-rule-documentation";
   assert.equal(validate(referenced), false);
-  control.findingReference = "docs/security-findings.md#incomplete-sensitive-data-classification";
+  control.findingReference = "docs/security-findings.md#incomplete-authorization-rule-documentation";
   control.controlEvidence = {
     productionPath: "docs/data-model.md",
     falsifyingTest: "tools/data-model-documentation.test.mjs#given the documented schema, when reading migrations, then every table is named"
@@ -836,16 +836,19 @@ test("given a control-specific anchor, when reading the catalog, then its produc
   for (const { id, controlEvidence } of anchored) {
     assert.notEqual(readableFile(controlEvidence.productionPath), null,
       `${id} names a production path that is no readable file`);
-    const [testPath, testName] = controlEvidence.falsifyingTest.split("#");
-    const source = readableFile(testPath);
-    assert.notEqual(source, null, `${id} names a test file that is no readable file`);
-    const assessment = testPath === "security/assessment-catalog.json"
-      ? catalog.tests.find(({ id: assessmentId }) => assessmentId === testName)
-      : undefined;
-    const declaredAssessment = assessment?.executionMode === "automated"
-      && Object.values(assessment.standardReferences).flat().includes(id);
-    assert.equal(declaredAssessment || declarationOf(testName).some((declaration) => declaration.test(source)), true,
-      `${id} names ${testName}, which ${testPath} declares no test for`);
+    const named = controlEvidence.falsifyingTest;
+    for (const reference of Array.isArray(named) ? named : [named]) {
+      const [testPath, testName] = reference.split("#");
+      const source = readableFile(testPath);
+      assert.notEqual(source, null, `${id} names a test file that is no readable file`);
+      const assessment = testPath === "security/assessment-catalog.json"
+        ? catalog.tests.find(({ id: assessmentId }) => assessmentId === testName)
+        : undefined;
+      const declaredAssessment = assessment?.executionMode === "automated"
+        && Object.values(assessment.standardReferences).flat().includes(id);
+      assert.equal(declaredAssessment || declarationOf(testName).some((declaration) => declaration.test(source)), true,
+        `${id} names ${testName}, which ${testPath} declares no test for`);
+    }
   }
 });
 

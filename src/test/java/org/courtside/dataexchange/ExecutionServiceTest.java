@@ -333,8 +333,8 @@ class ExecutionServiceTest extends AbstractIntegrationTest {
     void givenASourceThatHasRun_whenItsReferencesAreGoneAndItIsDeleted_thenItIsStillRefused() {
         // given
         executions.execute(preview(TWO_MEMBERS, SnapshotMode.FULL_SNAPSHOT), false, actor);
-        references.unlink(source, "4711");
-        references.unlink(source, "4712");
+        references.list(source, null, 10).items()
+                .forEach(link -> references.unlink(source, link.referenceId()));
 
         // when / then
         assertThatThrownBy(() -> sources.delete(source))

@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -66,23 +65,16 @@ public class ExternalReferenceService {
     }
 
     @Transactional
-    public void unlink(UUID sourceId, String externalId) {
+    public void unlink(UUID sourceId, UUID referenceId) {
         SourceConfiguration configuration = sources.configurationOf(sourceId);
         UUID source = configuration.sourceId();
-        ExternalReference held = heldReference(source, externalId)
+        ExternalReference held = references.findById(referenceId)
+                .filter(reference -> reference.getSourceId().equals(source))
                 .orElseThrow(() -> new ExternalReferenceNotFoundException(
-                        "No such reference from import source " + source));
+                        "No reference " + referenceId + " in import source " + source));
         references.delete(held);
         events.publishEvent(new DataExchangeEvent.ExternalReferenceUnlinked(
                 held.getPersonId(), source, configuration.sourceKey()));
-    }
-
-    // A member number no reference can hold reaches this from a path segment, where no validation
-    // precedes it, so it is answered as the absence it describes rather than as a broken request.
-    private Optional<ExternalReference> heldReference(UUID sourceId, String externalId) {
-        return MemberNumber.isUsable(externalId)
-                ? references.findBySourceIdAndExternalId(sourceId, new MemberNumber(externalId).value())
-                : Optional.empty();
     }
 
     private ExternalReference saveOrTranslateCollision(ExternalReference reference, String externalId) {

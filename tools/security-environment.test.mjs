@@ -606,3 +606,18 @@ test("given a recorded environment, when the candidate seeds it, then only what 
       `${name} from the recorded file would decide which executable the docker call runs`);
   }
 });
+
+// A run measures its own meter boundary now: `meter-registry-separation` asks the container and
+// the proxy and compares 200 against 404. What is left here is the arrangement that makes that
+// measurement possible, which no request can show — the flag that lets the registry answer at all.
+test("given the security Compose file, when the run samples the meter registry, "
+  + "then the environment enables it and the run measures who can reach it", () => {
+  // given
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.security.yaml", import.meta.url)), "utf8");
+  const environment = readFileSync(fileURLToPath(new URL("./security-environment.mjs", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(compose, /MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,mappings/);
+  assert.match(compose, /COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"/);
+  assert.match(environment, /id: "meter-registry-separation"[\s\S]*?meters === "200" && metersFromOutside === "404"/);
+});

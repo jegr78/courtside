@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -320,10 +321,11 @@ test("given the destructive k6 profile, when inspecting it, then every curated a
   assert.match(script, /urn:courtside:error:court-unavailable/);
   assert.match(script, /booking\.participants\.cardUnavailable/);
   assert.match(script, /duplicate-delivery:replay-returns-original/);
-  assert.match(script, /\/api\/booking-series\/preview/);
+  assert.match(script, /\/api\/booking-series-preview/);
   assert.match(script, /\/api\/booking-series`/);
   assert.match(script, /confirmedStarts/);
-  assert.match(script, /participant-members\?query=Member2/);
+  assert.match(script,
+    /http\.post\(`\$\{target\}\/api\/public\/participant-members`[\s\S]*?query: "Member2"[\s\S]*?"X-XSRF-TOKEN": token/);
   assert.match(script, /if \(!failedToken\)[\s\S]*captureCookies\(session, failedSessionCookies\)/);
   assert.match(script, /http\.post\(`\$\{target\}\/api\/session`[\s\S]*captureCookies\(response, failedSessionCookies\)/);
   assert.match(script, /case 0:[\s\S]*competingOccupancy\(\)[\s\S]*case 5:[\s\S]*failedLogin\(\)/);
@@ -339,4 +341,33 @@ test("given the destructive k6 profile, when inspecting it, then every curated a
   }
   assert.match(script, /preview_mutation:[\s\S]*exec: "previewMutation"/);
   assert.match(script, /request_body:[\s\S]*exec: "requestBodyLimit"/);
+});
+
+test("given every request the assessment script makes, when it is read against the contract, "
+  + "then each one names an operation the document declares with that method", () => {
+  // given
+  const require = createRequire(new URL("../frontend/package.json", import.meta.url));
+  const api = require("js-yaml").load(
+    readFileSync(new URL("../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
+  const script = readFileSync(new URL("../security/resource-abuse.js", import.meta.url), "utf8");
+  const declared = new Set(Object.entries(api.paths).flatMap(([path, item]) =>
+    Object.keys(item).map((method) => `${method.toUpperCase()} ${path}`)));
+
+  // when
+  const issued = [...script.matchAll(/http\.(get|post|put|del|patch)\(`\$\{target\}(\/api\/[^`]*)`/g)]
+    .map(([, verb, url]) => ({
+      method: verb === "del" ? "DELETE" : verb.toUpperCase(),
+      path: url.split("?")[0].replaceAll(/\$\{[^}]*\}/g, "{id}")
+    }));
+
+  // then
+  assert.ok(issued.length > 0, "the script must issue requests for this to prove anything");
+  const undeclared = issued
+    .filter(({ method, path }) => !declared.has(`${method} ${path}`)
+      && ![...declared].some((operation) => operation.replaceAll(/\{[^}]*\}/g, "{id}")
+        === `${method} ${path}`))
+    .map(({ method, path }) => `${method} ${path}`);
+  assert.deepEqual([...new Set(undeclared)].toSorted(), [],
+    "a request the contract does not declare is answered 405 or 404, and the scenario that needs "
+      + "its fixture reports incomplete rather than failing where anyone would look");
 });

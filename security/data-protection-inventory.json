@@ -1,0 +1,1244 @@
+{
+  "classes": {
+    "personal": "Describes or names a person, or is a value a club typed about one.",
+    "secret": "Authenticates a caller or authorises an action on its own.",
+    "identifier": "Minted by this instance, names a row and describes nobody.",
+    "neutral": "Carries nothing about a person: a date, a count, a format or a configured choice."
+  },
+  "parameters": [
+    {
+      "name": "Idempotency-Key",
+      "in": "header",
+      "class": "identifier"
+    },
+    {
+      "name": "bookingId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
+      "name": "cardId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
+      "name": "courtId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
+      "name": "day",
+      "in": "path",
+      "class": "neutral"
+    },
+    {
+      "name": "id",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
+      "name": "personId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
+      "name": "referenceId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
+      "name": "ruleType",
+      "in": "path",
+      "class": "neutral"
+    },
+    {
+      "name": "sessionHandle",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
+      "name": "sourceId",
+      "in": "path",
+      "class": "identifier"
+    },
+    {
+      "name": "closesAt",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "cursor",
+      "in": "query",
+      "class": "identifier"
+    },
+    {
+      "name": "date",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "encoding",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "from",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "fromBookingId",
+      "in": "query",
+      "class": "identifier"
+    },
+    {
+      "name": "limit",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "opensAt",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "personId",
+      "in": "query",
+      "class": "identifier"
+    },
+    {
+      "name": "scope",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "separator",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "state",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "subjectId",
+      "in": "query",
+      "class": "identifier"
+    },
+    {
+      "name": "to",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "unsettled",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "v",
+      "in": "query",
+      "class": "identifier"
+    }
+  ],
+  "levels": {
+    "personal": "Names or describes a person, or is text a club typed that may name one.",
+    "pseudonymous": "Names a person only through a row this instance holds; it describes nobody on its own.",
+    "secret": "Authenticates a caller on its own.",
+    "operational": "Carries nothing about a person: a time, a count, a state, or the club's own configuration."
+  },
+  "lifecycles": {
+    "roster-record": "Ends when the club removes the person; a departed member is deactivated rather than erased.",
+    "account-cascade": "Removed with the account it belongs to, by ON DELETE CASCADE.",
+    "session-cleanup": "Swept on the cadence of COURTSIDE_SESSION_CLEANUP_CRON, which may be widened but not switched off.",
+    "booking-pseudonymisation": "Pseudonymised by the scheduled deletion job some months after season end; the utilisation survives, the personal reference does not.",
+    "preview-retention": "Bounded by COURTSIDE_IMPORT_PREVIEW_RETENTION and enforced by a scheduled sweep.",
+    "import-record": "Kept for as long as the source is configured; it records that an import happened and against which member number.",
+    "append-only-log": "Never rewritten. Removing the person the id names is what makes the entry anonymous.",
+    "publication-registry": "Deleted once its consumers finish, so nothing accumulates for a job to clean up.",
+    "attempt-window": "Replaced when the next attempt window opens.",
+    "club-configuration": "Lives as long as the club keeps it; a board changes it in the product and no person's lifecycle reaches it."
+  },
+  "inMemoryState": {
+    "BookingController": {
+      "level": "personal",
+      "holds": "The participant specifications of one booking request, each able to name a guest.",
+      "bounded": "The request that built it."
+    },
+    "BookingHistoryService": {
+      "level": "personal",
+      "holds": "The bookings one person made, assembled to answer a subject-access request.",
+      "bounded": "The request that built it."
+    },
+    "BookingRequestFingerprint": {
+      "level": "personal",
+      "holds": "The participants of a booking request, hashed into the fingerprint that makes a retry idempotent.",
+      "bounded": "The request that built it."
+    },
+    "BookingWriter": {
+      "level": "personal",
+      "holds": "The participant specifications a booking is written from, each able to name a guest.",
+      "bounded": "The request that built it."
+    },
+    "ChangeSetResolver": {
+      "level": "personal",
+      "holds": "The person changes one import preview would apply, each carrying a member number and the canonical fields it would write.",
+      "bounded": "The preview it belongs to, which expires."
+    },
+    "CreateBookingCommand": {
+      "level": "personal",
+      "holds": "The participant specifications of one booking command, each able to name a guest.",
+      "bounded": "The request that built it."
+    },
+    "CsvSnapshot": {
+      "level": "personal",
+      "holds": "The rows of one uploaded roster file, as the club's own source system wrote them.",
+      "bounded": "The preview it belongs to, which expires."
+    },
+    "CurrentRoster": {
+      "level": "personal",
+      "holds": "The people this instance currently holds, keyed by person id, as an import compares against them.",
+      "bounded": "The import run that reads it."
+    },
+    "ExecutionService": {
+      "level": "personal",
+      "holds": "The people an import run would create, each carrying the names and address the file gave.",
+      "bounded": "The import run."
+    },
+    "ExternalReferenceService": {
+      "level": "personal",
+      "holds": "The links between a club member number and a person, as one page of them.",
+      "bounded": "The request that built it."
+    },
+    "ManagedAppointmentQuery": {
+      "level": "personal",
+      "holds": "The participants of the appointments a manager may see, each able to name a guest.",
+      "bounded": "The request that built it."
+    },
+    "ParticipantCardCapacity": {
+      "level": "personal",
+      "holds": "The participant specifications one card's capacity is measured against.",
+      "bounded": "The request that built it."
+    },
+    "PersonBookingHistory": {
+      "level": "personal",
+      "holds": "The bookings one person made, as a subject-access export renders them.",
+      "bounded": "The request that built it."
+    },
+    "PreviewService": {
+      "level": "personal",
+      "holds": "The current roster keyed by person id, held while a preview is resolved against it.",
+      "bounded": "The preview it belongs to, which expires."
+    },
+    "ResolvedChangeSet": {
+      "level": "personal",
+      "holds": "The person changes a preview resolved, each carrying a member number and the canonical fields it would write.",
+      "bounded": "The preview it belongs to, which expires."
+    },
+    "RosterChangeSet": {
+      "level": "personal",
+      "holds": "The people an import would create, each carrying the names and address the file gave.",
+      "bounded": "The import run."
+    },
+    "RosterCsv": {
+      "level": "personal",
+      "holds": "The rows of a roster export, each a person's name and address as the file will carry them.",
+      "bounded": "The response that offers the file."
+    },
+    "RosterExportService": {
+      "level": "personal",
+      "holds": "The rows a roster export is written from.",
+      "bounded": "The response that offers the file."
+    },
+    "RosterService": {
+      "level": "personal",
+      "holds": "One page of roster entries, each naming a person and their account.",
+      "bounded": "The request that built it."
+    },
+    "RosterSyncService": {
+      "level": "personal",
+      "holds": "The accounts an import would create, each carrying the username derived from a name.",
+      "bounded": "The import run."
+    },
+    "SnapshotParser": {
+      "level": "personal",
+      "holds": "The rows parsed out of one uploaded roster file.",
+      "bounded": "The preview it belongs to, which expires."
+    },
+    "SubjectAccessAdminController": {
+      "level": "personal",
+      "holds": "The reservations of one person, as a subject-access response renders them.",
+      "bounded": "The request that built it."
+    },
+    "SubjectAccessRecord": {
+      "level": "personal",
+      "holds": "The accounts belonging to one person, assembled to answer a subject-access request.",
+      "bounded": "The request that built it."
+    },
+    "SubjectAccessService": {
+      "level": "personal",
+      "holds": "The bookings one person made, assembled to answer a subject-access request.",
+      "bounded": "The request that built it."
+    }
+  },
+  "exportedFields": {
+    "roster": {
+      "writtenBy": "src/main/java/org/courtside/dataexchange/internal/RosterCsv.java",
+      "level": "personal",
+      "bounded": "An administrator asks for it and the file leaves the instance; no entry records that it was taken, which section 11 records as accepted.",
+      "columns": {
+        "memberNumber": "import_external_reference.external_id",
+        "firstName": "person.first_name",
+        "lastName": "person.last_name",
+        "email": "person.email",
+        "membershipType": "membership_type.name",
+        "membershipStartedOn": "member.started_on",
+        "membershipEndedOn": "member.ended_on"
+      }
+    },
+    "bookings": {
+      "writtenBy": "src/main/java/org/courtside/dataexchange/internal/BookingExportService.java",
+      "level": "pseudonymous",
+      "bounded": "An administrator asks for it; it names bookings and the accounts behind them rather than addresses.",
+      "columns": {
+        "date": "court_allocation.starts_at",
+        "startsAt": "court_allocation.starts_at",
+        "endsAt": "court_allocation.ends_at",
+        "courtNumber": "court.number",
+        "courtName": "court.name",
+        "card": "booking_card.label"
+      }
+    }
+  },
+  "storedFields": {
+    "booking": {
+      "booked_by": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "cancelled_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "cancelled_by": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "card_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "idempotency_key": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "moved_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "moved_by": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "note": {
+        "level": "personal",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "reminded_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "request_fingerprint": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "series_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "status": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      }
+    },
+    "booking_card": {
+      "active": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "allowed_player_counts": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "color": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "counts_against_limits": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "guest_allowed": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "label": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "show_generic_occupancy": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "booking_card_allowed_role": {
+      "booking_card_id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "role": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "booking_card_managing_role": {
+      "booking_card_id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "role": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "booking_participant": {
+      "booking_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "card_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "guest_name": {
+        "level": "personal",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "id": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "kind": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "person_id": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "position": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      }
+    },
+    "booking_series": {
+      "card_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "created_by": {
+        "level": "pseudonymous",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "duration_minutes": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "ends_on": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "interval_weeks": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "note": {
+        "level": "personal",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "occurrence_count": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "start_time": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "starts_on": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "weekdays": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      }
+    },
+    "booking_series_court": {
+      "booking_series_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "court_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "position": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      }
+    },
+    "club_config": {
+      "accent_color": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "booking_reminder_hours": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "club_name": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "default_locale": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "imprint_url": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "logo_content": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "logo_digest": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "logo_media_type": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "logo_url": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "new_account_credential_hours": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "no_membership_type_rule_set_id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "password_reset_credential_hours": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "primary_color": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "privacy_url": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "slot_minutes": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "time_zone": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "court": {
+      "active": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "name": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "number": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "court_allocation": {
+      "booking_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "court_id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "ends_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "starts_at": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      },
+      "status": {
+        "level": "operational",
+        "lifecycle": "booking-pseudonymisation"
+      }
+    },
+    "credential_issue_limit": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
+      "issued_count": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "window_started_at": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      }
+    },
+    "domain_event": {
+      "actor_account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "append-only-log"
+      },
+      "event_type": {
+        "level": "operational",
+        "lifecycle": "append-only-log"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "append-only-log"
+      },
+      "occurred_at": {
+        "level": "operational",
+        "lifecycle": "append-only-log"
+      },
+      "payload": {
+        "level": "pseudonymous",
+        "lifecycle": "append-only-log"
+      },
+      "subject_id": {
+        "level": "pseudonymous",
+        "lifecycle": "append-only-log"
+      }
+    },
+    "event_publication": {
+      "completion_attempts": {
+        "level": "operational",
+        "lifecycle": "publication-registry"
+      },
+      "completion_date": {
+        "level": "operational",
+        "lifecycle": "publication-registry"
+      },
+      "event_type": {
+        "level": "operational",
+        "lifecycle": "publication-registry"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "publication-registry"
+      },
+      "last_resubmission_date": {
+        "level": "operational",
+        "lifecycle": "publication-registry"
+      },
+      "listener_id": {
+        "level": "operational",
+        "lifecycle": "publication-registry"
+      },
+      "publication_date": {
+        "level": "operational",
+        "lifecycle": "publication-registry"
+      },
+      "serialized_event": {
+        "level": "operational",
+        "lifecycle": "publication-registry"
+      },
+      "status": {
+        "level": "operational",
+        "lifecycle": "publication-registry"
+      }
+    },
+    "import_column_mapping": {
+      "canonical_field": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "column_header": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "source_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      }
+    },
+    "import_external_reference": {
+      "external_id": {
+        "level": "personal",
+        "lifecycle": "import-record"
+      },
+      "id": {
+        "level": "pseudonymous",
+        "lifecycle": "import-record"
+      },
+      "linked_at": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "person_id": {
+        "level": "pseudonymous",
+        "lifecycle": "import-record"
+      },
+      "source_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      }
+    },
+    "import_owned_field": {
+      "canonical_field": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "source_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      }
+    },
+    "import_preview": {
+      "change_set": {
+        "level": "personal",
+        "lifecycle": "preview-retention"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "created_by_account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "preview-retention"
+      },
+      "expires_at": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "file_hash": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "file_name": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "fingerprints": {
+        "level": "pseudonymous",
+        "lifecycle": "preview-retention"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "mode": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "removal_count": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "removal_percent": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "removal_warning_pct": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "row_count": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "source_id": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      },
+      "superseded_at": {
+        "level": "operational",
+        "lifecycle": "preview-retention"
+      }
+    },
+    "import_run": {
+      "accounts_created_count": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "accounts_disabled_count": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "corrected_count": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "created_count": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "ended_count": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "executed_at": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "executed_by_account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "import-record"
+      },
+      "file_hash": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "mode": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "preview_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "removals_confirmed": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "roles_removed_count": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "row_error_count": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "source_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      }
+    },
+    "import_source": {
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "default_membership_type_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "display_name": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "encoding": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "removal_warning_percent": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "separator": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "source_key": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      }
+    },
+    "import_type_mapping": {
+      "membership_type_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "source_id": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      },
+      "source_value": {
+        "level": "operational",
+        "lifecycle": "import-record"
+      }
+    },
+    "login_attempt_limit": {
+      "attempt_count": {
+        "level": "operational",
+        "lifecycle": "attempt-window"
+      },
+      "blocked_until": {
+        "level": "operational",
+        "lifecycle": "attempt-window"
+      },
+      "scope": {
+        "level": "operational",
+        "lifecycle": "attempt-window"
+      },
+      "subject_hash": {
+        "level": "pseudonymous",
+        "lifecycle": "attempt-window"
+      },
+      "window_started_at": {
+        "level": "operational",
+        "lifecycle": "attempt-window"
+      }
+    },
+    "member": {
+      "ended_on": {
+        "level": "operational",
+        "lifecycle": "roster-record"
+      },
+      "id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
+      },
+      "membership_type_id": {
+        "level": "operational",
+        "lifecycle": "roster-record"
+      },
+      "person_id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
+      },
+      "started_on": {
+        "level": "operational",
+        "lifecycle": "roster-record"
+      }
+    },
+    "membership_type": {
+      "active": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "grants_account": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "name": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "rule_set_id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "message_optout": {
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "kind": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "user_account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      }
+    },
+    "message_record": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "kind": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "message_id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
+      "queued_at": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "queued_seq": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "reason": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "settled_at": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "state": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "status_code": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      }
+    },
+    "opening_hours": {
+      "closes_at": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "day_of_week": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "opens_at": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "participant_card": {
+      "active": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "capacity": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "label": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "person": {
+      "email": {
+        "level": "personal",
+        "lifecycle": "roster-record"
+      },
+      "first_name": {
+        "level": "personal",
+        "lifecycle": "roster-record"
+      },
+      "id": {
+        "level": "pseudonymous",
+        "lifecycle": "roster-record"
+      },
+      "last_name": {
+        "level": "personal",
+        "lifecycle": "roster-record"
+      }
+    },
+    "rule_definition": {
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "params": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "rule_set_id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "rule_type": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "rule_set": {
+      "active": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "name": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "spring_session": {
+      "creation_time": {
+        "level": "operational",
+        "lifecycle": "session-cleanup"
+      },
+      "expiry_time": {
+        "level": "operational",
+        "lifecycle": "session-cleanup"
+      },
+      "last_access_time": {
+        "level": "operational",
+        "lifecycle": "session-cleanup"
+      },
+      "max_inactive_interval": {
+        "level": "operational",
+        "lifecycle": "session-cleanup"
+      },
+      "primary_id": {
+        "level": "pseudonymous",
+        "lifecycle": "session-cleanup"
+      },
+      "principal_name": {
+        "level": "personal",
+        "lifecycle": "session-cleanup"
+      },
+      "session_id": {
+        "level": "secret",
+        "lifecycle": "session-cleanup"
+      }
+    },
+    "spring_session_attributes": {
+      "attribute_bytes": {
+        "level": "personal",
+        "lifecycle": "session-cleanup"
+      },
+      "attribute_name": {
+        "level": "operational",
+        "lifecycle": "session-cleanup"
+      },
+      "session_primary_id": {
+        "level": "pseudonymous",
+        "lifecycle": "session-cleanup"
+      }
+    },
+    "user_account": {
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "credentials_expire_at": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "enabled": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
+      "last_login_at": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "locale": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "password_change_required": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "password_hash": {
+        "level": "secret",
+        "lifecycle": "account-cascade"
+      },
+      "person_id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
+      "security_epoch": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "username": {
+        "level": "personal",
+        "lifecycle": "account-cascade"
+      },
+      "version": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      }
+    },
+    "user_account_role": {
+      "role": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "user_account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      }
+    }
+  }
+}

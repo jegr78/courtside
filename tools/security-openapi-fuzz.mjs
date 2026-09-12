@@ -13,6 +13,7 @@ const Ajv = require("ajv/dist/2020").default;
 const specification = readFileSync(apiDocumentPath());
 const api = yaml.load(specification.toString("utf8"));
 const operationResponses = collectOperationResponses(api);
+const requestBodySchemas = collectRequestBodySchemas(api);
 const publicPropertyNames = collectPropertyNames(api.components?.schemas ?? {});
 const publicMediaTypes = collectMediaTypes(api);
 const evidenceSchema = JSON.parse(readFileSync(
@@ -47,7 +48,7 @@ export function buildOpenApiFuzzInventory(api, policy = openApiFuzzPolicy) {
       if (!operation.operationId) throw new Error(`${method.toUpperCase()} ${path} has no operationId`);
       const excluded = policy.excludedOperations[operation.operationId];
       if (excluded) return operationCoverage(operation.operationId, method, path, [], { all: excluded });
-      const mutation = method !== "get";
+      const mutation = method !== "get" && operation["x-courtside-state-invariant"] !== true;
       const inputs = [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])].length > 0
         || operation.requestBody != null;
       const modes = mutation ? (inputs ? ["negative"] : []) : inputs ? ["positive", "negative"] : ["positive"];
@@ -143,7 +144,7 @@ export async function runOpenApiFuzzAssessment(plan, context) {
     throw new Error("OpenAPI fuzzing has no remaining request budget");
   }
   const inventory = buildOpenApiFuzzInventory(api);
-  const generatedInventory = inventory.filter(({ method }) => method === "GET");
+  const generatedInventory = inventory.filter(({ modes }) => modes.includes("positive"));
   const scanner = await context.runFuzzer(plan, {
     inventory: generatedInventory,
     policy: openApiFuzzPolicy,
@@ -361,7 +362,7 @@ function constrainedQueryParameter(parameters) {
 
 export async function runOpenApiMutationCases(plan, fixture, context) {
   const operations = buildOpenApiFuzzInventory(api)
-    .filter(({ method, modes }) => method !== "GET" && modes.includes("negative"));
+    .filter(({ modes }) => !modes.includes("positive") && modes.includes("negative"));
   const results = [];
   let generatedBytes = 0;
   const send = context.request ?? ((probe) => authorizationRequest(plan.target, fixture.client, probe, {
@@ -492,7 +493,7 @@ export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFu
       !== JSON.stringify(openApiFuzzPolicy.inputClasses.toSorted())) {
     throw new Error("OpenAPI fuzz evidence omits a required input class");
   }
-  const expectedMutations = inventory.filter(({ method, modes }) => method !== "GET" && modes.includes("negative"))
+  const expectedMutations = inventory.filter(({ modes }) => !modes.includes("positive") && modes.includes("negative"))
     .map(({ operationId, method, path }) => JSON.stringify({ operationId, method, path })).toSorted();
   if (JSON.stringify(evidence.mutationCases.map(({ operationId, method, path }) =>
     JSON.stringify({ operationId, method, path })).toSorted())
@@ -546,10 +547,90 @@ function counterexampleCandidate(counterexample, plan, context, observedAt) {
   });
 }
 
+// The gateway relays these, so a coverage case can carry any of them; anything else the harness
+// answers instead of the deployment.
+const RELAYED_METHODS = ["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
+
+// RFC 9110 gives content in an OPTIONS request no semantics, and this deployment answers it as a
+// safe method by design, so a rejection check reading its body learns nothing from the answer.
+const ANSWERED_AS_A_SAFE_METHOD = ["OPTIONS"];
+
+// The values a case generated are never retained, but the shape it sent is what a reader needs to
+// know which mutation the answer belongs to.
+function bodyShapeProjection(generatedCase) {
+  const body = generatedCase?.body;
+  if (body === undefined) return { kind: "absent", properties: [] };
+  if (body === null) return { kind: "null", properties: [] };
+  if (Array.isArray(body)) return { kind: "array", properties: [] };
+  if (typeof body !== "object") return { kind: typeof body, properties: [] };
+  return {
+    kind: "object",
+    properties: Object.entries(body)
+      .map(([property, value]) => `${property}:${jsonKindOf(value)}`)
+      .toSorted().slice(0, 40)
+  };
+}
+
+// A negative case is negative because the generator mutated the schema, and a mutation can land on
+// data the schema still accepts. Whether it did is a question the contract answers.
+function collectRequestBodySchemas(document) {
+  const ajv = new Ajv({ strict: false, validateFormats: false });
+  ajv.addSchema(document, "contract");
+  const validators = new Map();
+  for (const pathItem of Object.values(document.paths ?? {})) {
+    for (const [method, operation] of Object.entries(pathItem)) {
+      const reference = operation?.requestBody?.content?.["application/json"]?.schema?.$ref;
+      if (!methods.has(method) || !operation.operationId || !reference) continue;
+      validators.set(operation.operationId, ajv.compile({ $ref: `contract${reference}` }));
+    }
+  }
+  return validators;
+}
+
+function bodyConformance(operation, generatedCase) {
+  const conforms = requestBodySchemas.get(operation.operationId);
+  if (!conforms || generatedCase?.body === undefined) return null;
+  return conforms(generatedCase.body) === true;
+}
+
+// Which headers a case set, never what it set them to: the media type it chose is the remaining
+// place a mutation can sit once the method and the body shape are known.
+function headerNamesProjection(generatedCase) {
+  const headers = generatedCase?.headers;
+  if (headers === null || typeof headers !== "object") return [];
+  return Object.entries(headers)
+    .map(([name, value]) => name.toLowerCase() === "content-type"
+      ? `content-type=${String(value).slice(0, 60)}` : name.toLowerCase())
+    .toSorted().slice(0, 20);
+}
+
+function jsonKindOf(value) {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return `array(${value.length})`;
+  if (typeof value === "string") return `string(${[...value].length})`;
+  return typeof value === "object" ? `object(${Object.keys(value).length})` : typeof value;
+}
+
+function relayedMethod(generatedCase, operation) {
+  const method = String(generatedCase?.method ?? operation.method).toUpperCase();
+  return RELAYED_METHODS.includes(method) ? method : operation.method;
+}
+
 function counterexampleDisposition(counterexample) {
   if (counterexample.reason.kind !== "status") return null;
   const status = counterexample.reason.observedStatus;
   if (status >= 500) return null;
+  const probesTheMethod = counterexample.requestMethod !== counterexample.method;
+  if (counterexample.mode === "negative" && counterexample.check === "negative-data-rejection"
+      && probesTheMethod && ANSWERED_AS_A_SAFE_METHOD.includes(counterexample.requestMethod)
+      && status >= 200 && status < 300) {
+    return "safe-method-carries-no-body-semantics";
+  }
+  const carriedValidData = counterexample.mode === "negative"
+    && counterexample.check === "negative-data-rejection" && counterexample.bodyConforms === true;
+  if (carriedValidData && status >= 200 && status < 300) {
+    return "negative-case-carried-valid-data";
+  }
   const qualifiedProxyRejection = ["negative-data-rejection", "status-code-conformance"]
     .includes(counterexample.check);
   if (counterexample.mode === "negative" && qualifiedProxyRejection
@@ -570,6 +651,10 @@ function dispositionProjection(counterexample, disposition) {
     caseId: counterexample.caseId,
     check: counterexample.check,
     method: counterexample.method,
+    requestMethod: counterexample.requestMethod,
+    bodyShape: counterexample.bodyShape,
+    bodyConforms: counterexample.bodyConforms,
+    headerNames: counterexample.headerNames,
     pathTemplate: counterexample.pathTemplate,
     reason: counterexample.reason,
     requestShape: counterexample.requestShape,
@@ -698,6 +783,10 @@ function safeCounterexample(operation, mode, sequence, check, generatedCase) {
     caseId: `case-${sequence}`,
     check: normalizedCheck.slice(0, 80),
     method: operation.method,
+    requestMethod: relayedMethod(generatedCase, operation),
+    bodyShape: bodyShapeProjection(generatedCase),
+    bodyConforms: bodyConformance(operation, generatedCase),
+    headerNames: headerNamesProjection(generatedCase),
     pathTemplate: operation.path,
     reason,
     requestShape,

@@ -158,10 +158,10 @@ class ImportAuditTest extends AbstractIntegrationTest {
         // given
         UUID source = source("roster-system");
         UUID jane = identities.createPerson("Jane", "Doe");
-        references.link(source, "4711", jane);
+        UUID reference = references.link(source, "4711", jane).referenceId();
 
         // when
-        references.unlink(source, "4711");
+        references.unlink(source, reference);
 
         // then
         assertThat(audit.latestPayload(jane, DataExchangeEvent.ExternalReferenceUnlinked.TYPE))

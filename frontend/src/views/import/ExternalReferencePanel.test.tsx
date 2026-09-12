@@ -260,7 +260,7 @@ describe("ExternalReferencePanel", () => {
     await userEvent.click(await screen.findByTestId("unlink-4711"));
 
     // then
-    expect(unlinking).toHaveBeenCalledWith("source-1", "4711");
+    expect(unlinking).toHaveBeenCalledWith("source-1", "ref-1");
     expect(screen.queryByTestId("reference-4711")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Reference unlinked.");
   });

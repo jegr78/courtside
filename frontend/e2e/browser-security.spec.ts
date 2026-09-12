@@ -249,7 +249,7 @@ test("cross-origin browser requests neither carry session authority nor expose A
     expect(sessionResponse!.headers()["content-type"]).toContain("application/json");
     expect(sessionResponse!.headers()["x-content-type-options"]).toBe("nosniff");
     expect(sessionResponse!.headers()["access-control-allow-origin"]).toBeUndefined();
-    const scriptResponse = await probePage.goto(`${secureOrigin}/api/admin/roster?limit=1`);
+    const scriptResponse = await probePage.goto(`${secureOrigin}/api/admin/config`);
     expect(scriptResponse).not.toBeNull();
     expect(scriptResponse!.status()).toBe(401);
     expect(scriptResponse!.headers()["content-type"]).toContain("application/problem+json");
@@ -282,13 +282,13 @@ test("cross-origin browser requests neither carry session authority nor expose A
   // when
   const scriptResult = await page.evaluate((origin) => new Promise<string>((resolve) => {
     const script = document.createElement("script");
-    script.src = `${origin}/api/admin/roster?limit=1`;
+    script.src = `${origin}/api/admin/config`;
     script.onload = () => resolve("loaded");
     script.onerror = () => resolve("blocked-by-browser");
     document.head.append(script);
   }), secureOrigin);
   const scriptRequest = observedRequests.find((request) =>
-    request.url() === `${secureOrigin}/api/admin/roster?limit=1`
+    request.url() === `${secureOrigin}/api/admin/config`
       && request.resourceType() === "script");
 
   // then
@@ -558,3 +558,37 @@ declare global {
   var __courtsideCspExecuted: boolean;
   var __courtsideCspEvents: Array<{ directive: string; blocked: string }>;
 }
+
+// Every URL this journey produces is the URL the club proxy in front of it receives, so what the
+// browser records here is also what an intermediary would have to keep for the finding to bite.
+test("a member's name reaches the roster search without entering any request URL", async ({ page }) => {
+  // given
+  const surname = "Miles";
+  await login(page, "configuration-admin");
+  await page.getByTestId("administration-link").click();
+  await expect(page.getByTestId("admin-shell")).toBeVisible();
+  await page.getByTestId("admin-roster-link").click();
+  await expect(page.getByTestId("admin-roster-view")).toBeVisible();
+  const urls: string[] = [];
+  page.on("request", (request) => urls.push(request.url()));
+
+  // when
+  // the view loads its first page on mount, so the waiter binds to the request that carries the
+  // name rather than to the path, which both halves of this journey issue
+  const searched = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/roster-search") && response.request().method() === "POST"
+      && (response.request().postData() ?? "").includes(surname));
+  await page.getByTestId("roster-search").fill(surname);
+  await page.getByTestId("roster-search-submit").click();
+  const answer = await (await searched).json() as {
+    entries: Array<{ firstName: string; lastName: string }>;
+  };
+
+  // then
+  expect(answer.entries.length).toBeGreaterThan(0);
+  expect(answer.entries.every((entry) =>
+    `${entry.firstName} ${entry.lastName}`.toLowerCase().includes(surname.toLowerCase()))).toBe(true);
+  expect(urls.length).toBeGreaterThan(0);
+  expect(urls.filter((url) => url.toLowerCase().includes(surname.toLowerCase()))).toEqual([]);
+  expect(page.url().toLowerCase()).not.toContain(surname.toLowerCase());
+});

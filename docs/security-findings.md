@@ -11,33 +11,6 @@ These public entries record the safe result of reading a pinned control against 
 They omit request examples, concrete identifiers and protected evidence. The catalog links the
 affected control to the heading, and the remediation issue owns the product change and retest.
 
-### Incomplete sensitive-data classification
-
-- State: validated design gap
-- Priority: P2
-- Controls: ASVS 5.0.0 `v5.0.0-14.1.1`
-- Review: `MAN-DATA-001`, 8 September 2026
-- Remediation: #882
-
-`docs/data-model.md` inventories stored fields and section 11 of `docs/design.md` describes selected
-personal-data lifecycles. Neither assigns every stored, exported, cached, logged and retained field
-to a maintained protection level. The repository therefore cannot prove that it identified all
-sensitive data or derive handling rules from one complete classification.
-
-### Personal data enters request URLs
-
-- State: validated design gap
-- Priority: P2
-- Controls: ASVS 5.0.0 `v5.0.0-14.2.1`
-- Review: `MAN-DATA-001`, 8 September 2026
-- Remediation: #882
-
-The public OpenAPI contract accepts personal name fragments and person-linked identifiers in path or
-query parameters. Such values can enter browser, intermediary and operator URL records even though
-response bodies and retained assessment evidence have stricter handling. The reference deployment
-does not enable access logs by default, but the software cannot treat that optional operator choice
-as proof that URLs contain no personal data.
-
 ### Incomplete authorization rule documentation
 
 - State: validated design gap
