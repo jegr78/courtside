@@ -47,6 +47,42 @@ export function buildOperationAuthorizationMatrix(api) {
       }));
 }
 
+// The assessment runs against a target whose contract may be a revision ahead of this tool: the
+// paired comparison mounts the candidate's document for both runs. So the probes that need a page
+// of roster entries ask the document which operation answers one instead of naming a path.
+export function rosterListingProbe(api, limit) {
+  const answering = Object.entries(api.paths ?? {}).flatMap(([path, item]) =>
+    Object.entries(item)
+      .filter(([method]) => methods.has(method))
+      .filter(([, operation]) => operation.responses?.["200"]?.content?.["application/json"]
+        ?.schema?.$ref === "#/components/schemas/RosterPage")
+      .map(([method, operation]) => ({ method: method.toUpperCase(), path, operation })));
+  if (answering.length !== 1) {
+    throw new Error(`The contract must declare exactly one operation answering a roster page, not ${answering.length}`);
+  }
+  const [{ method, path, operation }] = answering;
+  if (path.includes("{")) {
+    throw new Error(`The roster page is answered by ${method} ${path}, whose template this probe cannot fill`);
+  }
+  if (!path.startsWith("/api/admin")) {
+    throw new Error(`The roster page is answered by ${path}, which is outside the prefix the checks `
+      + "beside this probe expect only an administrator to reach");
+  }
+  if (!declaresLimit(operation)) {
+    throw new Error(`${method} ${path} declares no limit, so a probe bounding the page cannot set one`);
+  }
+  return method === "GET"
+    ? { method, path: `${path}?limit=${limit}`, headers: {} }
+    : { method, path, headers: { "content-type": "application/json" }, body: JSON.stringify({ limit }) };
+}
+
+function declaresLimit(operation) {
+  if ((operation.parameters ?? []).some(({ name }) => name === "limit")) return true;
+  const body = operation.requestBody?.content?.["application/json"]?.schema;
+  const schema = body?.$ref ? undefined : body;
+  return Boolean(schema?.properties?.limit) || Boolean(body?.$ref);
+}
+
 function operationExpectations(path, method, security) {
   const expectations = Object.fromEntries(authorizationActors.map((actor) => [actor, "deny-forbidden"]));
   if (path === "/api/account/initial-password") {
@@ -161,7 +197,7 @@ function boundaryResult(operationId, boundary, response, passed, secureObservati
     observation: passed ? secureObservation : `${boundary}-boundary-mismatch` };
 }
 
-export async function executeObjectAuthorizationChecks(send) {
+export async function executeObjectAuthorizationChecks(send, rosterListing) {
   const checks = [];
   const beforeBookings = await send("MEMBER_OWNER", { method: "GET", path: "/api/my/bookings?limit=100", headers: {} });
   const items = beforeBookings.json?.items;
@@ -205,7 +241,7 @@ export async function executeObjectAuthorizationChecks(send) {
   });
   checks.push(objectCheck("vertical-admin-management", adminDetail,
     adminDetail.status === 200, "admin-management-allowed"));
-  const rosterBefore = await send("ADMIN", { method: "GET", path: "/api/admin/roster?limit=200", headers: {} });
+  const rosterBefore = await send("ADMIN", rosterListing(200));
   const member = rosterBefore.json?.entries?.find(({ username }) => username === "security.member.1");
   if (rosterBefore.status !== 200 || !member?.personId) throw new Error("The synthetic roster fixture is incomplete");
   const massAssignment = await send("ADMIN", { method: "PUT", path: `/api/admin/roster/${member.personId}`,
@@ -213,7 +249,7 @@ export async function executeObjectAuthorizationChecks(send) {
       firstName: member.firstName, lastName: member.lastName, email: member.email,
       roles: ["ADMIN"], enabled: false, accountId: "00000000-0000-0000-0000-000000000000"
     }) });
-  const rosterAfter = await send("ADMIN", { method: "GET", path: "/api/admin/roster?limit=200", headers: {} });
+  const rosterAfter = await send("ADMIN", rosterListing(200));
   const memberAfter = rosterAfter.json?.entries?.find(({ personId }) => personId === member.personId);
   const assignmentRejected = typedResponse(massAssignment, 400, "urn:courtside:error:validation-failed")
     && rosterAfter.status === 200
@@ -346,14 +382,15 @@ export function loginTimingSampleOrder(sample) {
   return sample % 2 === 0 ? ["known", "unknown"] : ["unknown", "known"];
 }
 
-export async function executeSecondaryIdentityChecks(send, password, beforeLogin) {
+export async function executeSecondaryIdentityChecks(send, password, beforeLogin, rosterListing) {
   const checks = [];
+  const listing = rosterListing(1);
   for (const role of roles) {
     const client = new SecurityCookieJar();
     const username = `security.${role.toLowerCase().replaceAll("_", ".")}.2`;
     await signInSecurityUsername(send, client, username, password, role, beforeLogin);
     const session = await send(client, { method: "GET", path: "/api/session", headers: {} });
-    const admin = await send(client, { method: "GET", path: "/api/admin/roster?limit=1", headers: {} });
+    const admin = await send(client, listing, { csrf: listing.method !== "GET" });
     const expectedAdminStatus = role === "ADMIN" ? 200 : 403;
     const passed = session.status === 200 && session.json?.roles?.length === 1
       && session.json.roles[0] === role && admin.status === expectedAdminStatus
@@ -369,7 +406,7 @@ export async function executeSecondaryIdentityChecks(send, password, beforeLogin
       beforeLogin);
     const session = await send(client, { method: "GET", path: "/api/session", headers: {} });
     const managed = await send(client, { method: "GET", path: "/api/managed/bookings?limit=1", headers: {} });
-    const admin = await send(client, { method: "GET", path: "/api/admin/roster?limit=1", headers: {} });
+    const admin = await send(client, listing, { csrf: listing.method !== "GET" });
     const passed = session.status === 200
       && JSON.stringify(session.json?.roles?.toSorted()) === JSON.stringify(managerRoles)
       && managed.status === 200 && typedResponse(admin, 403, "urn:courtside:error:access-denied");
@@ -493,8 +530,9 @@ export async function runAuthorizationAssessment(plan, context) {
     const secondMember = new SecurityCookieJar();
     await signInSecurityUsername(request, secondMember, "security.member.2", context.sharedPassword, "MEMBER",
       context.resetLoginAttempts);
+    const rosterListing = (limit) => rosterListingProbe(api, limit);
     const identityChecks = await executeSecondaryIdentityChecks(request, context.sharedPassword,
-      context.resetLoginAttempts);
+      context.resetLoginAttempts, rosterListing);
     const boundaryChecks = await executeMutationBoundaryChecks(matrix, async (operation, boundary, probe) => {
       const allowedActor = authorizationActors.find((actor) => actor !== "ANONYMOUS"
         && operation.expectations[actor] === "allow") ?? "ANONYMOUS";
@@ -504,7 +542,7 @@ export async function runAuthorizationAssessment(plan, context) {
     });
     const objectClients = { MEMBER_OWNER: clients.MEMBER, MEMBER_NON_OWNER: secondMember, ADMIN: clients.ADMIN };
     const objectChecks = await executeObjectAuthorizationChecks((actor, probe) =>
-      request(objectClients[actor], probe, { csrf: probe.method !== "GET" }));
+      request(objectClients[actor], probe, { csrf: probe.method !== "GET" }), rosterListing);
     const results = await executeOperationMatrix(matrix, async (operation, actor, probe) => {
       if (operation.operationId === "logIn") {
         const client = actor === "ANONYMOUS" ? new SecurityCookieJar() : clients[actor];
@@ -592,8 +630,11 @@ export function authorizationRequest(origin, client, probe, options = {}) {
   const cookie = client.header();
   if (cookie) headers.cookie = cookie;
   if (options.csrf) {
+    // Sending without the token anyway would answer 403 access-denied, which is byte-identical to
+    // the refusal a missing role produces — the probe would pass without reaching what it tests.
     const token = client.csrfToken();
-    if (token) headers["x-xsrf-token"] = token;
+    if (!token) throw new Error(`A probe of ${probe.method} ${probe.path} asked for a CSRF token the client does not hold`);
+    headers["x-xsrf-token"] = token;
   }
   if (probe.body !== undefined) headers["content-length"] = Buffer.byteLength(probe.body);
   return new Promise((resolve, reject) => {

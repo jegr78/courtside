@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import {
+  rosterListingProbe,
   authorizationActors,
   buildOperationAuthorizationMatrix,
   buildOperationProbe,
@@ -142,7 +143,7 @@ test("given two members and an administrator, when substituting owned identifier
       return { status: 404, problemType: "urn:courtside:error:booking-not-found" };
     }
     return { status: 404, problemType: "urn:courtside:error:booking-not-found" };
-  });
+  }, (limit) => ({ method: "GET", path: `/api/admin/roster?limit=${limit}`, headers: {} }));
 
   // then
   assert.ok(checks.length >= 7);
@@ -382,7 +383,7 @@ async function producedObjectCheckIds() {
     }
     if (actor === "ADMIN") return { status: 200 };
     return { status: 404, problemType: "urn:courtside:error:booking-not-found" };
-  });
+  }, (limit) => ({ method: "GET", path: `/api/admin/roster?limit=${limit}`, headers: {} }));
   return checks.map(({ id }) => id);
 }
 
@@ -484,3 +485,32 @@ async function startSilentlyClosingServer() {
     close: () => { server.closeAllConnections(); return new Promise((closed) => server.close(closed)); }
   };
 }
+
+test("given a contract that spells the roster listing differently, when the probe is derived, "
+  + "then it follows the document rather than a path this tool remembers", () => {
+  // given
+  const page = { responses: { "200": { content: { "application/json": {
+    schema: { $ref: "#/components/schemas/RosterPage" } } } } } };
+  const listing = { paths: { "/api/admin/roster": { get: {
+    operationId: "listRoster", parameters: [{ name: "limit", in: "query" }], ...page } } } };
+  const search = { paths: { "/api/admin/roster/search": { post: {
+    operationId: "searchRoster",
+    requestBody: { content: { "application/json": { schema: { properties: { limit: {} } } } } },
+    ...page } } } };
+
+  // when / then
+  assert.deepEqual(rosterListingProbe(listing, 200),
+    { method: "GET", path: "/api/admin/roster?limit=200", headers: {} });
+  assert.deepEqual(rosterListingProbe(search, 200),
+    { method: "POST", path: "/api/admin/roster/search",
+      headers: { "content-type": "application/json" }, body: JSON.stringify({ limit: 200 }) });
+  assert.throws(() => rosterListingProbe({ paths: {} }, 1), /exactly one operation answering a roster page/);
+  assert.throws(() => rosterListingProbe({ paths: { "/api/admin/roster/{personId}": { get: {
+    operationId: "readPerson", parameters: [{ name: "limit", in: "query" }], ...page } } } }, 1),
+  /whose template this probe cannot fill/);
+  assert.throws(() => rosterListingProbe({ paths: { "/api/public/roster": { get: {
+    operationId: "publicRoster", parameters: [{ name: "limit", in: "query" }], ...page } } } }, 1),
+  /outside the prefix the checks beside this probe expect/);
+  assert.throws(() => rosterListingProbe({ paths: { "/api/admin/roster": { get: {
+    operationId: "listRoster", ...page } } } }, 1), /declares no limit/);
+});
