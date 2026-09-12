@@ -134,7 +134,7 @@ test("given two members and an administrator, when substituting owned identifier
   const checks = await executeObjectAuthorizationChecks(async (actor, probe) => {
     calls.push({ actor, probe });
     if (probe.path === "/api/my/bookings?limit=100") return { status: 200, json: bookings };
-    if (probe.path === "/api/admin/roster/search" && probe.method === "POST") return { status: 200, json: roster };
+    if (probe.path === "/api/admin/roster?limit=200" && probe.method === "GET") return { status: 200, json: roster };
     if (probe.path === `/api/admin/roster/${personId}` && probe.method === "PUT") {
       return { status: 400, problemType: "urn:courtside:error:validation-failed" };
     }
@@ -375,7 +375,7 @@ async function producedObjectCheckIds() {
     membershipTypeId: "50000000-0000-0000-0000-000000000001" }] };
   const checks = await executeObjectAuthorizationChecks(async (actor, probe) => {
     if (probe.path === "/api/my/bookings?limit=100") return { status: 200, json: bookings };
-    if (probe.path === "/api/admin/roster/search" && probe.method === "POST") {
+    if (probe.path === "/api/admin/roster?limit=200" && probe.method === "GET") {
       return { status: 200, json: roster };
     }
     if (probe.path === `/api/admin/roster/${personId}` && probe.method === "PUT") {
