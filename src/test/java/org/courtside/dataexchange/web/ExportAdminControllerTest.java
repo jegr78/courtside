@@ -120,14 +120,13 @@ class ExportAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void givenAnExplicitNullSeparatorAndEncoding_whenTheRosterIsExported_thenTheDefaultsStand()
+    void givenAnExplicitNullSeparatorAndEncoding_whenTheRosterIsExported_thenTheContractRefusesThem()
             throws Exception {
-        // when
-        String written = mockMvc.perform(exportRoster("{\"separator\":null,\"encoding\":null}"))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        // then
-        assertThat(written).contains("memberNumber,firstName,lastName").contains("Renée,Major");
+        // when / then
+        mockMvc.perform(exportRoster("{\"separator\":null,\"encoding\":null}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[*].field",
+                        org.hamcrest.Matchers.hasItem("separator")));
     }
 }

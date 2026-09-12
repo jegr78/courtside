@@ -397,7 +397,7 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void givenAnExplicitNullForAFieldWithADefault_whenACardIsCreated_thenTheDefaultStands()
+    void givenAnExplicitNullForAFieldWithADefault_whenACardIsCreated_thenTheContractRefusesIt()
             throws Exception {
         // when / then
         mockMvc.perform(post("/api/admin/booking-cards")
@@ -409,7 +409,8 @@ class BookingCardAdminControllerTest extends AbstractIntegrationTest {
                                  "showGenericOccupancy": null}
                                 """)
                         .with(csrf()))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.showGenericOccupancy").value(false));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("showGenericOccupancy"));
     }
 }

@@ -1305,7 +1305,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
                 Arguments.of("absent", "validation.NotNull", "{}"),
                 Arguments.of("null", "validation.NotNull", membershipBody(null)),
                 Arguments.of("notAUuid", "validation.TypeMismatch", membershipBody("nothing")),
-                Arguments.of("blank", "validation.NotNull", membershipBody("   ")));
+                Arguments.of("blank", "validation.TypeMismatch", membershipBody("   ")));
     }
 
     @ParameterizedTest(name = "[{index}] {0}")
@@ -1683,16 +1683,15 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenAnExplicitNullLimit_whenTheRosterIsSearched_thenTheDocumentsDefaultStands()
+    void givenAnExplicitNullLimit_whenTheRosterIsSearched_thenTheContractRefusesIt()
             throws Exception {
         // given
         identity.createPerson("Jane", "Doe", "jane.doe@example.org");
-        identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when / then
         mockMvc.perform(searchRoster("{\"limit\":null}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.entries.length()").value(2))
-                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("limit"));
     }
 }

@@ -85,30 +85,51 @@ class OmittedContainerWireTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void everyPropertyWithADefaultKeepsItWhenTheBodySendsAnExplicitNull() {
+    void everyOptionalPropertyAnswersAnExplicitNullTheWayTheDocumentDeclaresIt() {
         // given
-        List<Container> defaulted = defaultedProperties();
+        List<Container> properties = requestBodyProperties();
 
         // when
         TreeSet<String> wrong = new TreeSet<>();
-        for (Container property : defaulted) {
-            Object declared = propertiesOf(property.schema()).get(property.property()) instanceof
-                    Map<?, ?> definition ? definition.get("default") : null;
-            Object held = valueOf(property, "{\"" + property.property() + "\":null}");
-            if (!String.valueOf(declared).equals(String.valueOf(held))) {
-                wrong.add(property.schema() + "." + property.property() + " declares " + declared
-                        + " and arrived as " + held);
+        for (Container property : properties) {
+            boolean refused = refusesNull(property);
+            if (refused == nullable(property)) {
+                wrong.add(property.schema() + "." + property.property()
+                        + (refused ? " refuses" : " accepts") + " an explicit null, and the document"
+                        + (nullable(property) ? " allows one" : " does not"));
             }
         }
 
         // then
+        assertThat(properties).as("the document must declare request body properties").isNotEmpty();
         assertThat(wrong)
                 .as("a query string cannot send an explicit null and a body can, so moving a"
-                        + " parameter into one creates a value the default was never asked about."
-                        + " A property the document gives a default must keep it, because the code"
-                        + " that reads such a field unboxes or dereferences it and a null there"
-                        + " answers 500 to a request the document permits.")
+                        + " parameter into one creates a value the document has to answer for. Where"
+                        + " it writes the null into the type it declares, a body may send one; where"
+                        + " it does not, null is a shape the contract never described and the"
+                        + " request is refused rather than quietly read as the field being absent. A"
+                        + " required property is not here: the generated @NotNull refuses its null"
+                        + " and names the field while doing it, which is the better answer.")
                 .isEmpty();
+    }
+
+    private boolean refusesNull(Container property) {
+        try {
+            valueOf(property, "{\"" + property.property() + "\":null}");
+            return false;
+        } catch (RuntimeException refused) {
+            return true;
+        }
+    }
+
+    private List<Container> requestBodyProperties() {
+        List<Container> properties = new ArrayList<>();
+        for (String schema : requestBodySchemas()) {
+            propertiesOf(schema).keySet().stream()
+                    .filter(property -> !requiredOf(schema).contains(property))
+                    .forEach(property -> properties.add(new Container(schema, property)));
+        }
+        return properties;
     }
 
     private List<Container> defaultedProperties() {
