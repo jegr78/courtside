@@ -1153,13 +1153,19 @@
           "id": "v5.0.0-8.1.1",
           "status": "implemented",
           "manualProcedureId": "MAN-AUTHZ-001",
-          "findingReference": "docs/security-findings.md#incomplete-authorization-rule-documentation"
+          "controlEvidence": {
+            "productionPath": "security/authorization-policy.json",
+            "falsifyingTest": "tools/authorization-policy.test.mjs#given the shipped API and production authorization paths, when reading the policy, then every rule is complete and falsifiable"
+          }
         },
         {
           "id": "v5.0.0-8.1.2",
           "status": "implemented",
           "manualProcedureId": "MAN-AUTHZ-001",
-          "findingReference": "docs/security-findings.md#incomplete-authorization-rule-documentation"
+          "controlEvidence": {
+            "productionPath": "security/authorization-policy.json",
+            "falsifyingTest": "tools/authorization-policy.test.mjs#given the shipped API and production authorization paths, when reading the policy, then every rule is complete and falsifiable"
+          }
         },
         {
           "id": "v5.0.0-8.2.1",

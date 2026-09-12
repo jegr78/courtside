@@ -1496,8 +1496,9 @@ whether it is built or designed. **Designed means absent today.**
   assigns every OpenAPI operation and every scheduled, asynchronous or startup entry point to one
   principal workflow with its actors, state transitions, alternate paths and failure paths. Tests
   derive the changing parts from Compose, application configuration, bounded network-capable Java
-  APIs, OpenAPI and the operation authorization matrix. A new service, listener, outbound client,
-  configured target, deployment relation, browser destination, entry point or gateway actor
+  APIs, OpenAPI and the normative `security/authorization-policy.json` rule catalog. A new service,
+  listener, outbound client, configured target, deployment relation, browser destination, entry
+  point or gateway actor
   therefore cannot ship unclassified. A workflow's actor list is the union admitted to at least one of its HTTP entry
   points; object-level authorization remains visible in alternate and failure paths. External DNS,
   recipient behavior, telemetry storage and evidence retention remain operating choices, not

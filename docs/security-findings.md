@@ -11,19 +11,27 @@ These public entries record the safe result of reading a pinned control against 
 They omit request examples, concrete identifiers and protected evidence. The catalog links the
 affected control to the heading, and the remediation issue owns the product change and retest.
 
-### Incomplete authorization rule documentation
+## Resolved control-review findings
 
-- State: validated design gap
+### Authorization rule documentation completed
+
+- State: retest passed
 - Priority: P2
 - Controls: ASVS 5.0.0 `v5.0.0-8.1.1`, `v5.0.0-8.1.2`
 - Review: `MAN-AUTHZ-001`, 8 September 2026
 - Remediation: #884
 
-`docs/design.md` defines broad role capabilities and selected ownership and field-minimisation rules.
-The active assessment also exercises an operation-role matrix and selected object substitutions.
-Neither is a complete, maintained policy for every function, resource attribute and field-level read
-or write restriction. Tool expectations cannot silently stand in for the normative authorization
-documentation these controls require.
+[`authorization-policy.json`](../security/authorization-policy.json) now assigns every shipped
+OpenAPI operation to exactly one rule, names its admitted principals and resource attributes, and
+records the protected field projections whose access is narrower than the OpenAPI shape. Every
+decision resolves to production paths plus positive and negative tests. The contract rejects an
+unclassified or duplicate operation, an unknown actor, decision or field, a dead evidence anchor,
+and drift in the generated [`authorization-policy.md`](authorization-policy.md). The complete field
+inventory is explicitly split between ordinary and narrower protected classifications.
+Fingerprints catch changes to that inventory and to the named production authorization methods;
+source-derived discovery rejects an unclassified method using the supported authorization
+primitives. The 12 September 2026 retest therefore replaced this finding with falsifiable control
+evidence in the assessment catalog.
 
 [`finding-lifecycle.schema.json`](../security/finding-lifecycle.schema.json) defines the retained run
 record. [`exceptions.schema.json`](../security/exceptions.schema.json) defines the shared policy for

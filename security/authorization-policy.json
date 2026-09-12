@@ -1,0 +1,3360 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-09-12",
+  "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
+  "openApiFieldInventorySha256": "8478141579450f2acbf3e5c7bfd59d7872ea8e5b4e838fbf2aa97e66972bf0e8",
+  "protectedFieldInventorySha256": "c0e22b77ed63cd3eb0ab9650426128dacc44abd03cf7b4fb1a349c1052249774",
+  "productionAuthorizationSha256": "a45d52fd6e98dac9bf524cc037285a12e26fee264e9bba801239ab9e471d9762",
+  "ordinaryFields": [
+    "Problem.detail",
+    "Problem.fieldErrors",
+    "Problem.instance",
+    "Problem.spanId",
+    "Problem.status",
+    "Problem.title",
+    "Problem.traceId",
+    "Problem.type",
+    "Problem.violations",
+    "assignMembership:parameter:$parameter.path.personId",
+    "assignMembership:request:MembershipRequest.endedOn",
+    "assignMembership:request:MembershipRequest.membershipTypeId",
+    "assignMembership:request:MembershipRequest.startedOn",
+    "assignMembership:response:$response.header.Accept",
+    "assignMembership:response:FieldError.code",
+    "assignMembership:response:FieldError.field",
+    "assignMembership:response:FieldError.params",
+    "assignMembership:response:FieldError.params.*",
+    "assignMembership:response:Violation.code",
+    "assignMembership:response:Violation.params",
+    "assignMembership:response:Violation.params.*",
+    "bookingCardImpact:parameter:$parameter.path.cardId",
+    "bookingCardImpact:parameter:$parameter.query.cursor",
+    "bookingCardImpact:parameter:$parameter.query.limit",
+    "bookingCardImpact:response:AffectedBooking.bookingId",
+    "bookingCardImpact:response:AffectedBooking.courtIds",
+    "bookingCardImpact:response:AffectedBooking.endsAt",
+    "bookingCardImpact:response:AffectedBooking.startsAt",
+    "bookingCardImpact:response:FieldError.code",
+    "bookingCardImpact:response:FieldError.field",
+    "bookingCardImpact:response:FieldError.params",
+    "bookingCardImpact:response:FieldError.params.*",
+    "bookingCardImpact:response:Impact.affectedCount",
+    "bookingCardImpact:response:Impact.bookings",
+    "bookingCardImpact:response:Impact.nextCursor",
+    "bookingCardImpact:response:Impact.truncated",
+    "bookingCardImpact:response:Violation.code",
+    "bookingCardImpact:response:Violation.params",
+    "bookingCardImpact:response:Violation.params.*",
+    "cancelBooking:parameter:$parameter.path.id",
+    "cancelBooking:response:FieldError.code",
+    "cancelBooking:response:FieldError.field",
+    "cancelBooking:response:FieldError.params",
+    "cancelBooking:response:FieldError.params.*",
+    "cancelBooking:response:Violation.code",
+    "cancelBooking:response:Violation.params",
+    "cancelBooking:response:Violation.params.*",
+    "cancelSeries:parameter:$parameter.path.id",
+    "cancelSeries:parameter:$parameter.query.fromBookingId",
+    "cancelSeries:parameter:$parameter.query.scope",
+    "cancelSeries:response:FieldError.code",
+    "cancelSeries:response:FieldError.field",
+    "cancelSeries:response:FieldError.params",
+    "cancelSeries:response:FieldError.params.*",
+    "cancelSeries:response:Violation.code",
+    "cancelSeries:response:Violation.params",
+    "cancelSeries:response:Violation.params.*",
+    "changeAccountLocale:parameter:$parameter.path.personId",
+    "changeAccountLocale:request:AccountLocaleRequest.locale",
+    "changeAccountLocale:response:$response.header.Accept",
+    "changeAccountLocale:response:FieldError.code",
+    "changeAccountLocale:response:FieldError.field",
+    "changeAccountLocale:response:FieldError.params",
+    "changeAccountLocale:response:FieldError.params.*",
+    "changeAccountLocale:response:Violation.code",
+    "changeAccountLocale:response:Violation.params",
+    "changeAccountLocale:response:Violation.params.*",
+    "changeAccountRoles:parameter:$parameter.path.personId",
+    "changeAccountRoles:response:$response.header.Accept",
+    "changeAccountRoles:response:FieldError.code",
+    "changeAccountRoles:response:FieldError.field",
+    "changeAccountRoles:response:FieldError.params",
+    "changeAccountRoles:response:FieldError.params.*",
+    "changeAccountRoles:response:Violation.code",
+    "changeAccountRoles:response:Violation.params",
+    "changeAccountRoles:response:Violation.params.*",
+    "changeAccountUsername:parameter:$parameter.path.personId",
+    "changeAccountUsername:response:$response.header.Accept",
+    "changeAccountUsername:response:FieldError.code",
+    "changeAccountUsername:response:FieldError.field",
+    "changeAccountUsername:response:FieldError.params",
+    "changeAccountUsername:response:FieldError.params.*",
+    "changeAccountUsername:response:Violation.code",
+    "changeAccountUsername:response:Violation.params",
+    "changeAccountUsername:response:Violation.params.*",
+    "changeBookingCard:parameter:$parameter.path.id",
+    "changeBookingCard:request:BookingCardRequest.allowedPlayerCounts",
+    "changeBookingCard:request:BookingCardRequest.allowedRoles",
+    "changeBookingCard:request:BookingCardRequest.color",
+    "changeBookingCard:request:BookingCardRequest.countsAgainstLimits",
+    "changeBookingCard:request:BookingCardRequest.guestAllowed",
+    "changeBookingCard:request:BookingCardRequest.label",
+    "changeBookingCard:request:BookingCardRequest.managingRoles",
+    "changeBookingCard:request:BookingCardRequest.showGenericOccupancy",
+    "changeBookingCard:response:$response.header.Accept",
+    "changeBookingCard:response:BookingCard.active",
+    "changeBookingCard:response:BookingCard.allowedPlayerCounts",
+    "changeBookingCard:response:BookingCard.allowedRoles",
+    "changeBookingCard:response:BookingCard.color",
+    "changeBookingCard:response:BookingCard.countsAgainstLimits",
+    "changeBookingCard:response:BookingCard.guestAllowed",
+    "changeBookingCard:response:BookingCard.id",
+    "changeBookingCard:response:BookingCard.label",
+    "changeBookingCard:response:BookingCard.managingRoles",
+    "changeBookingCard:response:BookingCard.showGenericOccupancy",
+    "changeBookingCard:response:BookingCard.tracksPlayers",
+    "changeBookingCard:response:FieldError.code",
+    "changeBookingCard:response:FieldError.field",
+    "changeBookingCard:response:FieldError.params",
+    "changeBookingCard:response:FieldError.params.*",
+    "changeBookingCard:response:Violation.code",
+    "changeBookingCard:response:Violation.params",
+    "changeBookingCard:response:Violation.params.*",
+    "changeClubConfig:request:ClubConfigRequest.accentColor",
+    "changeClubConfig:request:ClubConfigRequest.clubName",
+    "changeClubConfig:request:ClubConfigRequest.defaultLocale",
+    "changeClubConfig:request:ClubConfigRequest.imprintUrl",
+    "changeClubConfig:request:ClubConfigRequest.logoUrl",
+    "changeClubConfig:request:ClubConfigRequest.primaryColor",
+    "changeClubConfig:request:ClubConfigRequest.privacyUrl",
+    "changeClubConfig:request:ClubConfigRequest.slotMinutes",
+    "changeClubConfig:request:ClubConfigRequest.timeZone",
+    "changeClubConfig:response:$response.header.Accept",
+    "changeClubConfig:response:AdminClubConfig.logoFallbackUrl",
+    "changeClubConfig:response:AdminClubConfig.logoUploaded",
+    "changeClubConfig:response:ClubConfig.accentColor",
+    "changeClubConfig:response:ClubConfig.clubName",
+    "changeClubConfig:response:ClubConfig.defaultLocale",
+    "changeClubConfig:response:ClubConfig.imprintUrl",
+    "changeClubConfig:response:ClubConfig.logoUrl",
+    "changeClubConfig:response:ClubConfig.primaryColor",
+    "changeClubConfig:response:ClubConfig.privacyUrl",
+    "changeClubConfig:response:ClubConfig.slotMinutes",
+    "changeClubConfig:response:ClubConfig.supportedLocales",
+    "changeClubConfig:response:ClubConfig.timeZone",
+    "changeClubConfig:response:FieldError.code",
+    "changeClubConfig:response:FieldError.field",
+    "changeClubConfig:response:FieldError.params",
+    "changeClubConfig:response:FieldError.params.*",
+    "changeClubConfig:response:Violation.code",
+    "changeClubConfig:response:Violation.params",
+    "changeClubConfig:response:Violation.params.*",
+    "changeCourt:parameter:$parameter.path.id",
+    "changeCourt:request:CourtRequest.name",
+    "changeCourt:request:CourtRequest.number",
+    "changeCourt:response:$response.header.Accept",
+    "changeCourt:response:Court.active",
+    "changeCourt:response:Court.id",
+    "changeCourt:response:Court.name",
+    "changeCourt:response:Court.number",
+    "changeCourt:response:FieldError.code",
+    "changeCourt:response:FieldError.field",
+    "changeCourt:response:FieldError.params",
+    "changeCourt:response:FieldError.params.*",
+    "changeCourt:response:Violation.code",
+    "changeCourt:response:Violation.params",
+    "changeCourt:response:Violation.params.*",
+    "changeImportSource:parameter:$parameter.path.id",
+    "changeImportSource:request:ImportSourceRequest.columns",
+    "changeImportSource:request:ImportSourceRequest.columns.*",
+    "changeImportSource:request:ImportSourceRequest.defaultMembershipTypeId",
+    "changeImportSource:request:ImportSourceRequest.displayName",
+    "changeImportSource:request:ImportSourceRequest.encoding",
+    "changeImportSource:request:ImportSourceRequest.membershipTypes",
+    "changeImportSource:request:ImportSourceRequest.membershipTypes.*",
+    "changeImportSource:request:ImportSourceRequest.ownedFields",
+    "changeImportSource:request:ImportSourceRequest.removalWarningPercent",
+    "changeImportSource:request:ImportSourceRequest.separator",
+    "changeImportSource:request:ImportSourceRequest.sourceKey",
+    "changeImportSource:response:$response.header.Accept",
+    "changeImportSource:response:FieldError.code",
+    "changeImportSource:response:FieldError.field",
+    "changeImportSource:response:FieldError.params",
+    "changeImportSource:response:FieldError.params.*",
+    "changeImportSource:response:ImportSource.columns",
+    "changeImportSource:response:ImportSource.columns.*",
+    "changeImportSource:response:ImportSource.defaultMembershipTypeId",
+    "changeImportSource:response:ImportSource.displayName",
+    "changeImportSource:response:ImportSource.encoding",
+    "changeImportSource:response:ImportSource.id",
+    "changeImportSource:response:ImportSource.membershipTypes",
+    "changeImportSource:response:ImportSource.membershipTypes.*",
+    "changeImportSource:response:ImportSource.ownedFields",
+    "changeImportSource:response:ImportSource.removalWarningPercent",
+    "changeImportSource:response:ImportSource.separator",
+    "changeImportSource:response:ImportSource.sourceKey",
+    "changeImportSource:response:Violation.code",
+    "changeImportSource:response:Violation.params",
+    "changeImportSource:response:Violation.params.*",
+    "changeInitialPassword:response:$response.header.Accept",
+    "changeInitialPassword:response:$response.header.Retry-After",
+    "changeInitialPassword:response:FieldError.code",
+    "changeInitialPassword:response:FieldError.field",
+    "changeInitialPassword:response:FieldError.params",
+    "changeInitialPassword:response:FieldError.params.*",
+    "changeInitialPassword:response:Violation.code",
+    "changeInitialPassword:response:Violation.params",
+    "changeInitialPassword:response:Violation.params.*",
+    "changeMembershipType:parameter:$parameter.path.id",
+    "changeMembershipType:request:MembershipTypeRequest.grantsAccount",
+    "changeMembershipType:request:MembershipTypeRequest.name",
+    "changeMembershipType:request:MembershipTypeRequest.ruleSetId",
+    "changeMembershipType:response:$response.header.Accept",
+    "changeMembershipType:response:FieldError.code",
+    "changeMembershipType:response:FieldError.field",
+    "changeMembershipType:response:FieldError.params",
+    "changeMembershipType:response:FieldError.params.*",
+    "changeMembershipType:response:MembershipType.active",
+    "changeMembershipType:response:MembershipType.grantsAccount",
+    "changeMembershipType:response:MembershipType.id",
+    "changeMembershipType:response:MembershipType.name",
+    "changeMembershipType:response:MembershipType.ruleSetId",
+    "changeMembershipType:response:Violation.code",
+    "changeMembershipType:response:Violation.params",
+    "changeMembershipType:response:Violation.params.*",
+    "changeOwnLocale:request:AccountLocaleRequest.locale",
+    "changeOwnLocale:response:$response.header.Accept",
+    "changeOwnLocale:response:FieldError.code",
+    "changeOwnLocale:response:FieldError.field",
+    "changeOwnLocale:response:FieldError.params",
+    "changeOwnLocale:response:FieldError.params.*",
+    "changeOwnLocale:response:Violation.code",
+    "changeOwnLocale:response:Violation.params",
+    "changeOwnLocale:response:Violation.params.*",
+    "changeOwnPassword:response:$response.header.Accept",
+    "changeOwnPassword:response:$response.header.Retry-After",
+    "changeOwnPassword:response:FieldError.code",
+    "changeOwnPassword:response:FieldError.field",
+    "changeOwnPassword:response:FieldError.params",
+    "changeOwnPassword:response:FieldError.params.*",
+    "changeOwnPassword:response:Violation.code",
+    "changeOwnPassword:response:Violation.params",
+    "changeOwnPassword:response:Violation.params.*",
+    "changeParticipantCard:parameter:$parameter.path.id",
+    "changeParticipantCard:request:ParticipantCardRequest.capacity",
+    "changeParticipantCard:request:ParticipantCardRequest.label",
+    "changeParticipantCard:response:$response.header.Accept",
+    "changeParticipantCard:response:FieldError.code",
+    "changeParticipantCard:response:FieldError.field",
+    "changeParticipantCard:response:FieldError.params",
+    "changeParticipantCard:response:FieldError.params.*",
+    "changeParticipantCard:response:ParticipantCard.active",
+    "changeParticipantCard:response:ParticipantCard.capacity",
+    "changeParticipantCard:response:ParticipantCard.id",
+    "changeParticipantCard:response:ParticipantCard.label",
+    "changeParticipantCard:response:Violation.code",
+    "changeParticipantCard:response:Violation.params",
+    "changeParticipantCard:response:Violation.params.*",
+    "changePerson:parameter:$parameter.path.personId",
+    "changePerson:response:$response.header.Accept",
+    "changePerson:response:FieldError.code",
+    "changePerson:response:FieldError.field",
+    "changePerson:response:FieldError.params",
+    "changePerson:response:FieldError.params.*",
+    "changePerson:response:Violation.code",
+    "changePerson:response:Violation.params",
+    "changePerson:response:Violation.params.*",
+    "changeRuleSet:parameter:$parameter.path.id",
+    "changeRuleSet:request:RuleSetRequest.name",
+    "changeRuleSet:response:$response.header.Accept",
+    "changeRuleSet:response:FieldError.code",
+    "changeRuleSet:response:FieldError.field",
+    "changeRuleSet:response:FieldError.params",
+    "changeRuleSet:response:FieldError.params.*",
+    "changeRuleSet:response:RuleSet.active",
+    "changeRuleSet:response:RuleSet.id",
+    "changeRuleSet:response:RuleSet.name",
+    "changeRuleSet:response:Violation.code",
+    "changeRuleSet:response:Violation.params",
+    "changeRuleSet:response:Violation.params.*",
+    "chooseOwnMessages:request:MessageChoiceRequest.declined",
+    "chooseOwnMessages:response:$response.header.Accept",
+    "chooseOwnMessages:response:FieldError.code",
+    "chooseOwnMessages:response:FieldError.field",
+    "chooseOwnMessages:response:FieldError.params",
+    "chooseOwnMessages:response:FieldError.params.*",
+    "chooseOwnMessages:response:Violation.code",
+    "chooseOwnMessages:response:Violation.params",
+    "chooseOwnMessages:response:Violation.params.*",
+    "courtImpact:parameter:$parameter.path.courtId",
+    "courtImpact:parameter:$parameter.query.cursor",
+    "courtImpact:parameter:$parameter.query.limit",
+    "courtImpact:response:AffectedBooking.bookingId",
+    "courtImpact:response:AffectedBooking.courtIds",
+    "courtImpact:response:AffectedBooking.endsAt",
+    "courtImpact:response:AffectedBooking.startsAt",
+    "courtImpact:response:FieldError.code",
+    "courtImpact:response:FieldError.field",
+    "courtImpact:response:FieldError.params",
+    "courtImpact:response:FieldError.params.*",
+    "courtImpact:response:Impact.affectedCount",
+    "courtImpact:response:Impact.bookings",
+    "courtImpact:response:Impact.nextCursor",
+    "courtImpact:response:Impact.truncated",
+    "courtImpact:response:Violation.code",
+    "courtImpact:response:Violation.params",
+    "courtImpact:response:Violation.params.*",
+    "createAccount:parameter:$parameter.path.personId",
+    "createAccount:response:$response.header.Accept",
+    "createAccount:response:FieldError.code",
+    "createAccount:response:FieldError.field",
+    "createAccount:response:FieldError.params",
+    "createAccount:response:FieldError.params.*",
+    "createAccount:response:Violation.code",
+    "createAccount:response:Violation.params",
+    "createAccount:response:Violation.params.*",
+    "createBooking:parameter:$parameter.header.Idempotency-Key",
+    "createBooking:request:CreateBookingRequest.cardId",
+    "createBooking:request:CreateBookingRequest.courtIds",
+    "createBooking:request:CreateBookingRequest.endsAt",
+    "createBooking:request:CreateBookingRequest.startsAt",
+    "createBooking:response:$response.header.Accept",
+    "createBooking:response:$response.header.Location",
+    "createBooking:response:BookingCreated.id",
+    "createBooking:response:FieldError.code",
+    "createBooking:response:FieldError.field",
+    "createBooking:response:FieldError.params",
+    "createBooking:response:FieldError.params.*",
+    "createBooking:response:Violation.code",
+    "createBooking:response:Violation.params",
+    "createBooking:response:Violation.params.*",
+    "createBookingCard:request:BookingCardRequest.allowedPlayerCounts",
+    "createBookingCard:request:BookingCardRequest.allowedRoles",
+    "createBookingCard:request:BookingCardRequest.color",
+    "createBookingCard:request:BookingCardRequest.countsAgainstLimits",
+    "createBookingCard:request:BookingCardRequest.guestAllowed",
+    "createBookingCard:request:BookingCardRequest.label",
+    "createBookingCard:request:BookingCardRequest.managingRoles",
+    "createBookingCard:request:BookingCardRequest.showGenericOccupancy",
+    "createBookingCard:response:$response.header.Accept",
+    "createBookingCard:response:$response.header.Location",
+    "createBookingCard:response:BookingCard.active",
+    "createBookingCard:response:BookingCard.allowedPlayerCounts",
+    "createBookingCard:response:BookingCard.allowedRoles",
+    "createBookingCard:response:BookingCard.color",
+    "createBookingCard:response:BookingCard.countsAgainstLimits",
+    "createBookingCard:response:BookingCard.guestAllowed",
+    "createBookingCard:response:BookingCard.id",
+    "createBookingCard:response:BookingCard.label",
+    "createBookingCard:response:BookingCard.managingRoles",
+    "createBookingCard:response:BookingCard.showGenericOccupancy",
+    "createBookingCard:response:BookingCard.tracksPlayers",
+    "createBookingCard:response:FieldError.code",
+    "createBookingCard:response:FieldError.field",
+    "createBookingCard:response:FieldError.params",
+    "createBookingCard:response:FieldError.params.*",
+    "createBookingCard:response:Violation.code",
+    "createBookingCard:response:Violation.params",
+    "createBookingCard:response:Violation.params.*",
+    "createCourt:request:CourtRequest.name",
+    "createCourt:request:CourtRequest.number",
+    "createCourt:response:$response.header.Accept",
+    "createCourt:response:$response.header.Location",
+    "createCourt:response:Court.active",
+    "createCourt:response:Court.id",
+    "createCourt:response:Court.name",
+    "createCourt:response:Court.number",
+    "createCourt:response:FieldError.code",
+    "createCourt:response:FieldError.field",
+    "createCourt:response:FieldError.params",
+    "createCourt:response:FieldError.params.*",
+    "createCourt:response:Violation.code",
+    "createCourt:response:Violation.params",
+    "createCourt:response:Violation.params.*",
+    "createImportPreview:parameter:$parameter.path.sourceId",
+    "createImportPreview:request:$request.encoding",
+    "createImportPreview:request:$request.file",
+    "createImportPreview:request:$request.mode",
+    "createImportPreview:response:$response.header.Accept",
+    "createImportPreview:response:$response.header.Location",
+    "createImportPreview:response:FieldError.code",
+    "createImportPreview:response:FieldError.field",
+    "createImportPreview:response:FieldError.params",
+    "createImportPreview:response:FieldError.params.*",
+    "createImportPreview:response:ImportPersonChange.account",
+    "createImportPreview:response:ImportPersonChange.kind",
+    "createImportPreview:response:ImportPersonChange.membershipTypeId",
+    "createImportPreview:response:ImportPersonChange.rowNumber",
+    "createImportPreview:response:ImportPossibleDuplicate.rowNumber",
+    "createImportPreview:response:ImportPreview.changes",
+    "createImportPreview:response:ImportPreview.createdAt",
+    "createImportPreview:response:ImportPreview.expiresAt",
+    "createImportPreview:response:ImportPreview.fileHash",
+    "createImportPreview:response:ImportPreview.fileName",
+    "createImportPreview:response:ImportPreview.ignoredColumns",
+    "createImportPreview:response:ImportPreview.mode",
+    "createImportPreview:response:ImportPreview.needsConfirmation",
+    "createImportPreview:response:ImportPreview.possibleDuplicates",
+    "createImportPreview:response:ImportPreview.previewId",
+    "createImportPreview:response:ImportPreview.removals",
+    "createImportPreview:response:ImportPreview.rowCount",
+    "createImportPreview:response:ImportPreview.rowErrors",
+    "createImportPreview:response:ImportPreview.sharedAddresses",
+    "createImportPreview:response:ImportPreview.sourceId",
+    "createImportPreview:response:ImportPreview.superseded",
+    "createImportPreview:response:ImportRemovalCounts.count",
+    "createImportPreview:response:ImportRemovalCounts.currentlyLinked",
+    "createImportPreview:response:ImportRemovalCounts.percent",
+    "createImportPreview:response:ImportRowError.code",
+    "createImportPreview:response:ImportRowError.params",
+    "createImportPreview:response:ImportRowError.params.*",
+    "createImportPreview:response:ImportRowError.rowNumber",
+    "createImportPreview:response:ImportSharedAddress.rowNumber",
+    "createImportPreview:response:ImportSharedAddress.sharedBy",
+    "createImportPreview:response:Violation.code",
+    "createImportPreview:response:Violation.params",
+    "createImportPreview:response:Violation.params.*",
+    "createImportSource:request:ImportSourceRequest.columns",
+    "createImportSource:request:ImportSourceRequest.columns.*",
+    "createImportSource:request:ImportSourceRequest.defaultMembershipTypeId",
+    "createImportSource:request:ImportSourceRequest.displayName",
+    "createImportSource:request:ImportSourceRequest.encoding",
+    "createImportSource:request:ImportSourceRequest.membershipTypes",
+    "createImportSource:request:ImportSourceRequest.membershipTypes.*",
+    "createImportSource:request:ImportSourceRequest.ownedFields",
+    "createImportSource:request:ImportSourceRequest.removalWarningPercent",
+    "createImportSource:request:ImportSourceRequest.separator",
+    "createImportSource:request:ImportSourceRequest.sourceKey",
+    "createImportSource:response:$response.header.Accept",
+    "createImportSource:response:$response.header.Location",
+    "createImportSource:response:FieldError.code",
+    "createImportSource:response:FieldError.field",
+    "createImportSource:response:FieldError.params",
+    "createImportSource:response:FieldError.params.*",
+    "createImportSource:response:ImportSource.columns",
+    "createImportSource:response:ImportSource.columns.*",
+    "createImportSource:response:ImportSource.defaultMembershipTypeId",
+    "createImportSource:response:ImportSource.displayName",
+    "createImportSource:response:ImportSource.encoding",
+    "createImportSource:response:ImportSource.id",
+    "createImportSource:response:ImportSource.membershipTypes",
+    "createImportSource:response:ImportSource.membershipTypes.*",
+    "createImportSource:response:ImportSource.ownedFields",
+    "createImportSource:response:ImportSource.removalWarningPercent",
+    "createImportSource:response:ImportSource.separator",
+    "createImportSource:response:ImportSource.sourceKey",
+    "createImportSource:response:Violation.code",
+    "createImportSource:response:Violation.params",
+    "createImportSource:response:Violation.params.*",
+    "createMembershipType:request:MembershipTypeRequest.grantsAccount",
+    "createMembershipType:request:MembershipTypeRequest.name",
+    "createMembershipType:request:MembershipTypeRequest.ruleSetId",
+    "createMembershipType:response:$response.header.Accept",
+    "createMembershipType:response:$response.header.Location",
+    "createMembershipType:response:FieldError.code",
+    "createMembershipType:response:FieldError.field",
+    "createMembershipType:response:FieldError.params",
+    "createMembershipType:response:FieldError.params.*",
+    "createMembershipType:response:MembershipType.active",
+    "createMembershipType:response:MembershipType.grantsAccount",
+    "createMembershipType:response:MembershipType.id",
+    "createMembershipType:response:MembershipType.name",
+    "createMembershipType:response:MembershipType.ruleSetId",
+    "createMembershipType:response:Violation.code",
+    "createMembershipType:response:Violation.params",
+    "createMembershipType:response:Violation.params.*",
+    "createParticipantCard:request:ParticipantCardRequest.capacity",
+    "createParticipantCard:request:ParticipantCardRequest.label",
+    "createParticipantCard:response:$response.header.Accept",
+    "createParticipantCard:response:$response.header.Location",
+    "createParticipantCard:response:FieldError.code",
+    "createParticipantCard:response:FieldError.field",
+    "createParticipantCard:response:FieldError.params",
+    "createParticipantCard:response:FieldError.params.*",
+    "createParticipantCard:response:ParticipantCard.active",
+    "createParticipantCard:response:ParticipantCard.capacity",
+    "createParticipantCard:response:ParticipantCard.id",
+    "createParticipantCard:response:ParticipantCard.label",
+    "createParticipantCard:response:Violation.code",
+    "createParticipantCard:response:Violation.params",
+    "createParticipantCard:response:Violation.params.*",
+    "createPerson:response:$response.header.Accept",
+    "createPerson:response:$response.header.Location",
+    "createPerson:response:FieldError.code",
+    "createPerson:response:FieldError.field",
+    "createPerson:response:FieldError.params",
+    "createPerson:response:FieldError.params.*",
+    "createPerson:response:Violation.code",
+    "createPerson:response:Violation.params",
+    "createPerson:response:Violation.params.*",
+    "createRuleSet:request:RuleSetRequest.name",
+    "createRuleSet:response:$response.header.Accept",
+    "createRuleSet:response:$response.header.Location",
+    "createRuleSet:response:FieldError.code",
+    "createRuleSet:response:FieldError.field",
+    "createRuleSet:response:FieldError.params",
+    "createRuleSet:response:FieldError.params.*",
+    "createRuleSet:response:RuleSet.active",
+    "createRuleSet:response:RuleSet.id",
+    "createRuleSet:response:RuleSet.name",
+    "createRuleSet:response:Violation.code",
+    "createRuleSet:response:Violation.params",
+    "createRuleSet:response:Violation.params.*",
+    "createSeries:request:CreateSeriesRequest.confirmedStarts",
+    "createSeries:request:SeriesRuleRequest.cardId",
+    "createSeries:request:SeriesRuleRequest.courtIds",
+    "createSeries:request:SeriesRuleRequest.durationMinutes",
+    "createSeries:request:SeriesRuleRequest.endsOn",
+    "createSeries:request:SeriesRuleRequest.intervalWeeks",
+    "createSeries:request:SeriesRuleRequest.occurrenceCount",
+    "createSeries:request:SeriesRuleRequest.startTime",
+    "createSeries:request:SeriesRuleRequest.startsOn",
+    "createSeries:request:SeriesRuleRequest.weekdays",
+    "createSeries:response:$response.header.Accept",
+    "createSeries:response:$response.header.Location",
+    "createSeries:response:FieldError.code",
+    "createSeries:response:FieldError.field",
+    "createSeries:response:FieldError.params",
+    "createSeries:response:FieldError.params.*",
+    "createSeries:response:SeriesCreated.bookingIds",
+    "createSeries:response:SeriesCreated.seriesId",
+    "createSeries:response:SeriesCreated.skipped",
+    "createSeries:response:Violation.code",
+    "createSeries:response:Violation.params",
+    "createSeries:response:Violation.params.*",
+    "deleteClubLogo:response:AdminClubConfig.logoFallbackUrl",
+    "deleteClubLogo:response:AdminClubConfig.logoUploaded",
+    "deleteClubLogo:response:ClubConfig.accentColor",
+    "deleteClubLogo:response:ClubConfig.clubName",
+    "deleteClubLogo:response:ClubConfig.defaultLocale",
+    "deleteClubLogo:response:ClubConfig.imprintUrl",
+    "deleteClubLogo:response:ClubConfig.logoUrl",
+    "deleteClubLogo:response:ClubConfig.primaryColor",
+    "deleteClubLogo:response:ClubConfig.privacyUrl",
+    "deleteClubLogo:response:ClubConfig.slotMinutes",
+    "deleteClubLogo:response:ClubConfig.supportedLocales",
+    "deleteClubLogo:response:ClubConfig.timeZone",
+    "deleteClubLogo:response:FieldError.code",
+    "deleteClubLogo:response:FieldError.field",
+    "deleteClubLogo:response:FieldError.params",
+    "deleteClubLogo:response:FieldError.params.*",
+    "deleteClubLogo:response:Violation.code",
+    "deleteClubLogo:response:Violation.params",
+    "deleteClubLogo:response:Violation.params.*",
+    "deleteImportSource:parameter:$parameter.path.id",
+    "deleteImportSource:response:FieldError.code",
+    "deleteImportSource:response:FieldError.field",
+    "deleteImportSource:response:FieldError.params",
+    "deleteImportSource:response:FieldError.params.*",
+    "deleteImportSource:response:Violation.code",
+    "deleteImportSource:response:Violation.params",
+    "deleteImportSource:response:Violation.params.*",
+    "endAccountSessions:parameter:$parameter.path.personId",
+    "endAccountSessions:response:FieldError.code",
+    "endAccountSessions:response:FieldError.field",
+    "endAccountSessions:response:FieldError.params",
+    "endAccountSessions:response:FieldError.params.*",
+    "endAccountSessions:response:Violation.code",
+    "endAccountSessions:response:Violation.params",
+    "endAccountSessions:response:Violation.params.*",
+    "endAllSessions:response:FieldError.code",
+    "endAllSessions:response:FieldError.field",
+    "endAllSessions:response:FieldError.params",
+    "endAllSessions:response:FieldError.params.*",
+    "endAllSessions:response:Violation.code",
+    "endAllSessions:response:Violation.params",
+    "endAllSessions:response:Violation.params.*",
+    "endOwnSession:parameter:$parameter.path.sessionHandle",
+    "endOwnSession:response:FieldError.code",
+    "endOwnSession:response:FieldError.field",
+    "endOwnSession:response:FieldError.params",
+    "endOwnSession:response:FieldError.params.*",
+    "endOwnSession:response:Violation.code",
+    "endOwnSession:response:Violation.params",
+    "endOwnSession:response:Violation.params.*",
+    "endOwnSessions:response:FieldError.code",
+    "endOwnSessions:response:FieldError.field",
+    "endOwnSessions:response:FieldError.params",
+    "endOwnSessions:response:FieldError.params.*",
+    "endOwnSessions:response:Violation.code",
+    "endOwnSessions:response:Violation.params",
+    "endOwnSessions:response:Violation.params.*",
+    "executeImportPreview:parameter:$parameter.path.id",
+    "executeImportPreview:request:ExecutionRequest.confirmRemovals",
+    "executeImportPreview:response:$response.header.Accept",
+    "executeImportPreview:response:FieldError.code",
+    "executeImportPreview:response:FieldError.field",
+    "executeImportPreview:response:FieldError.params",
+    "executeImportPreview:response:FieldError.params.*",
+    "executeImportPreview:response:ImportRun.accountsCreated",
+    "executeImportPreview:response:ImportRun.accountsDisabled",
+    "executeImportPreview:response:ImportRun.corrected",
+    "executeImportPreview:response:ImportRun.created",
+    "executeImportPreview:response:ImportRun.executedAt",
+    "executeImportPreview:response:ImportRun.fileHash",
+    "executeImportPreview:response:ImportRun.membershipsEnded",
+    "executeImportPreview:response:ImportRun.mode",
+    "executeImportPreview:response:ImportRun.previewId",
+    "executeImportPreview:response:ImportRun.removalsConfirmed",
+    "executeImportPreview:response:ImportRun.rolesRemoved",
+    "executeImportPreview:response:ImportRun.rowErrors",
+    "executeImportPreview:response:ImportRun.runId",
+    "executeImportPreview:response:ImportRun.sourceId",
+    "executeImportPreview:response:Violation.code",
+    "executeImportPreview:response:Violation.params",
+    "executeImportPreview:response:Violation.params.*",
+    "exportBookings:parameter:$parameter.query.encoding",
+    "exportBookings:parameter:$parameter.query.from",
+    "exportBookings:parameter:$parameter.query.separator",
+    "exportBookings:parameter:$parameter.query.to",
+    "exportBookings:response:$response.header.Content-Disposition",
+    "exportBookings:response:FieldError.code",
+    "exportBookings:response:FieldError.field",
+    "exportBookings:response:FieldError.params",
+    "exportBookings:response:FieldError.params.*",
+    "exportBookings:response:Violation.code",
+    "exportBookings:response:Violation.params",
+    "exportBookings:response:Violation.params.*",
+    "exportPersonData:parameter:$parameter.path.personId",
+    "exportPersonData:response:FieldError.code",
+    "exportPersonData:response:FieldError.field",
+    "exportPersonData:response:FieldError.params",
+    "exportPersonData:response:FieldError.params.*",
+    "exportPersonData:response:SubjectAccessDeclinedMessage.declinedAt",
+    "exportPersonData:response:SubjectAccessDeclinedMessage.kind",
+    "exportPersonData:response:SubjectAccessExport.bookingSeries",
+    "exportPersonData:response:SubjectAccessExport.declinedMessages",
+    "exportPersonData:response:SubjectAccessExport.messages",
+    "exportPersonData:response:SubjectAccessExport.producedAt",
+    "exportPersonData:response:SubjectAccessMessage.kind",
+    "exportPersonData:response:SubjectAccessMessage.messageId",
+    "exportPersonData:response:SubjectAccessMessage.queuedAt",
+    "exportPersonData:response:SubjectAccessMessage.reason",
+    "exportPersonData:response:SubjectAccessMessage.settledAt",
+    "exportPersonData:response:SubjectAccessMessage.state",
+    "exportPersonData:response:SubjectAccessMessage.statusCode",
+    "exportPersonData:response:SubjectAccessSeries.createdAt",
+    "exportPersonData:response:SubjectAccessSeries.durationMinutes",
+    "exportPersonData:response:SubjectAccessSeries.endsOn",
+    "exportPersonData:response:SubjectAccessSeries.intervalWeeks",
+    "exportPersonData:response:SubjectAccessSeries.note",
+    "exportPersonData:response:SubjectAccessSeries.occurrenceCount",
+    "exportPersonData:response:SubjectAccessSeries.seriesId",
+    "exportPersonData:response:SubjectAccessSeries.startTime",
+    "exportPersonData:response:SubjectAccessSeries.startsOn",
+    "exportPersonData:response:SubjectAccessSeries.weekdays",
+    "exportPersonData:response:Violation.code",
+    "exportPersonData:response:Violation.params",
+    "exportPersonData:response:Violation.params.*",
+    "exportRoster:request:RosterExportRequest.encoding",
+    "exportRoster:request:RosterExportRequest.membershipTypeId",
+    "exportRoster:request:RosterExportRequest.query",
+    "exportRoster:request:RosterExportRequest.separator",
+    "exportRoster:request:RosterExportRequest.sourceId",
+    "exportRoster:response:$response.header.Accept",
+    "exportRoster:response:$response.header.Content-Disposition",
+    "exportRoster:response:FieldError.code",
+    "exportRoster:response:FieldError.field",
+    "exportRoster:response:FieldError.params",
+    "exportRoster:response:FieldError.params.*",
+    "exportRoster:response:Violation.code",
+    "exportRoster:response:Violation.params",
+    "exportRoster:response:Violation.params.*",
+    "facilityUtilisation:parameter:$parameter.query.from",
+    "facilityUtilisation:parameter:$parameter.query.to",
+    "facilityUtilisation:response:CourtUtilisation.bookingCount",
+    "facilityUtilisation:response:CourtUtilisation.courtId",
+    "facilityUtilisation:response:CourtUtilisation.courtName",
+    "facilityUtilisation:response:CourtUtilisation.courtNumber",
+    "facilityUtilisation:response:CourtUtilisation.occupiedMinutes",
+    "facilityUtilisation:response:FacilityUtilisation.courts",
+    "facilityUtilisation:response:FacilityUtilisation.from",
+    "facilityUtilisation:response:FacilityUtilisation.timeZone",
+    "facilityUtilisation:response:FacilityUtilisation.to",
+    "facilityUtilisation:response:FieldError.code",
+    "facilityUtilisation:response:FieldError.field",
+    "facilityUtilisation:response:FieldError.params",
+    "facilityUtilisation:response:FieldError.params.*",
+    "facilityUtilisation:response:Violation.code",
+    "facilityUtilisation:response:Violation.params",
+    "facilityUtilisation:response:Violation.params.*",
+    "getBookingCard:parameter:$parameter.path.id",
+    "getBookingCard:response:BookingCard.active",
+    "getBookingCard:response:BookingCard.allowedPlayerCounts",
+    "getBookingCard:response:BookingCard.allowedRoles",
+    "getBookingCard:response:BookingCard.color",
+    "getBookingCard:response:BookingCard.countsAgainstLimits",
+    "getBookingCard:response:BookingCard.guestAllowed",
+    "getBookingCard:response:BookingCard.id",
+    "getBookingCard:response:BookingCard.label",
+    "getBookingCard:response:BookingCard.managingRoles",
+    "getBookingCard:response:BookingCard.showGenericOccupancy",
+    "getBookingCard:response:BookingCard.tracksPlayers",
+    "getBookingCard:response:FieldError.code",
+    "getBookingCard:response:FieldError.field",
+    "getBookingCard:response:FieldError.params",
+    "getBookingCard:response:FieldError.params.*",
+    "getBookingCard:response:Violation.code",
+    "getBookingCard:response:Violation.params",
+    "getBookingCard:response:Violation.params.*",
+    "getBookingEligibility:response:BookingEligibility.maxBookingMinutes",
+    "getBookingEligibility:response:BookingEligibility.violations",
+    "getBookingEligibility:response:FieldError.code",
+    "getBookingEligibility:response:FieldError.field",
+    "getBookingEligibility:response:FieldError.params",
+    "getBookingEligibility:response:FieldError.params.*",
+    "getBookingEligibility:response:Violation.code",
+    "getBookingEligibility:response:Violation.params",
+    "getBookingEligibility:response:Violation.params.*",
+    "getBookingGrid:response:BookingGrid.openingHours",
+    "getBookingGrid:response:BookingGrid.slotMinutes",
+    "getBookingGrid:response:BookingGrid.timeZone",
+    "getBookingGrid:response:OpeningHours.closesAt",
+    "getBookingGrid:response:OpeningHours.dayOfWeek",
+    "getBookingGrid:response:OpeningHours.opensAt",
+    "getClubConfig:response:ClubConfig.accentColor",
+    "getClubConfig:response:ClubConfig.clubName",
+    "getClubConfig:response:ClubConfig.defaultLocale",
+    "getClubConfig:response:ClubConfig.imprintUrl",
+    "getClubConfig:response:ClubConfig.logoUrl",
+    "getClubConfig:response:ClubConfig.primaryColor",
+    "getClubConfig:response:ClubConfig.privacyUrl",
+    "getClubConfig:response:ClubConfig.slotMinutes",
+    "getClubConfig:response:ClubConfig.supportedLocales",
+    "getClubConfig:response:ClubConfig.timeZone",
+    "getClubConfigForAdmin:response:AdminClubConfig.logoFallbackUrl",
+    "getClubConfigForAdmin:response:AdminClubConfig.logoUploaded",
+    "getClubConfigForAdmin:response:ClubConfig.accentColor",
+    "getClubConfigForAdmin:response:ClubConfig.clubName",
+    "getClubConfigForAdmin:response:ClubConfig.defaultLocale",
+    "getClubConfigForAdmin:response:ClubConfig.imprintUrl",
+    "getClubConfigForAdmin:response:ClubConfig.logoUrl",
+    "getClubConfigForAdmin:response:ClubConfig.primaryColor",
+    "getClubConfigForAdmin:response:ClubConfig.privacyUrl",
+    "getClubConfigForAdmin:response:ClubConfig.slotMinutes",
+    "getClubConfigForAdmin:response:ClubConfig.supportedLocales",
+    "getClubConfigForAdmin:response:ClubConfig.timeZone",
+    "getClubConfigForAdmin:response:FieldError.code",
+    "getClubConfigForAdmin:response:FieldError.field",
+    "getClubConfigForAdmin:response:FieldError.params",
+    "getClubConfigForAdmin:response:FieldError.params.*",
+    "getClubConfigForAdmin:response:Violation.code",
+    "getClubConfigForAdmin:response:Violation.params",
+    "getClubConfigForAdmin:response:Violation.params.*",
+    "getClubLogo:parameter:$parameter.query.v",
+    "getClubLogo:response:$response.header.Cache-Control",
+    "getClubLogo:response:$response.header.ETag",
+    "getClubLogo:response:FieldError.code",
+    "getClubLogo:response:FieldError.field",
+    "getClubLogo:response:FieldError.params",
+    "getClubLogo:response:FieldError.params.*",
+    "getClubLogo:response:Violation.code",
+    "getClubLogo:response:Violation.params",
+    "getClubLogo:response:Violation.params.*",
+    "getCourt:parameter:$parameter.path.id",
+    "getCourt:response:Court.active",
+    "getCourt:response:Court.id",
+    "getCourt:response:Court.name",
+    "getCourt:response:Court.number",
+    "getCourt:response:FieldError.code",
+    "getCourt:response:FieldError.field",
+    "getCourt:response:FieldError.params",
+    "getCourt:response:FieldError.params.*",
+    "getCourt:response:Violation.code",
+    "getCourt:response:Violation.params",
+    "getCourt:response:Violation.params.*",
+    "getManagedAppointment:parameter:$parameter.path.id",
+    "getManagedAppointment:response:FieldError.code",
+    "getManagedAppointment:response:FieldError.field",
+    "getManagedAppointment:response:FieldError.params",
+    "getManagedAppointment:response:FieldError.params.*",
+    "getManagedAppointment:response:ManagedAppointment.cardColor",
+    "getManagedAppointment:response:ManagedAppointment.cardLabel",
+    "getManagedAppointment:response:ManagedAppointment.courtIds",
+    "getManagedAppointment:response:ManagedAppointment.endsAt",
+    "getManagedAppointment:response:ManagedAppointment.id",
+    "getManagedAppointment:response:ManagedAppointment.participantCount",
+    "getManagedAppointment:response:ManagedAppointment.seriesId",
+    "getManagedAppointment:response:ManagedAppointment.startsAt",
+    "getManagedAppointment:response:ManagedAppointment.status",
+    "getManagedAppointment:response:Violation.code",
+    "getManagedAppointment:response:Violation.params",
+    "getManagedAppointment:response:Violation.params.*",
+    "getMembershipType:parameter:$parameter.path.id",
+    "getMembershipType:response:FieldError.code",
+    "getMembershipType:response:FieldError.field",
+    "getMembershipType:response:FieldError.params",
+    "getMembershipType:response:FieldError.params.*",
+    "getMembershipType:response:MembershipType.active",
+    "getMembershipType:response:MembershipType.grantsAccount",
+    "getMembershipType:response:MembershipType.id",
+    "getMembershipType:response:MembershipType.name",
+    "getMembershipType:response:MembershipType.ruleSetId",
+    "getMembershipType:response:Violation.code",
+    "getMembershipType:response:Violation.params",
+    "getMembershipType:response:Violation.params.*",
+    "getParticipantCard:parameter:$parameter.path.id",
+    "getParticipantCard:response:FieldError.code",
+    "getParticipantCard:response:FieldError.field",
+    "getParticipantCard:response:FieldError.params",
+    "getParticipantCard:response:FieldError.params.*",
+    "getParticipantCard:response:ParticipantCard.active",
+    "getParticipantCard:response:ParticipantCard.capacity",
+    "getParticipantCard:response:ParticipantCard.id",
+    "getParticipantCard:response:ParticipantCard.label",
+    "getParticipantCard:response:Violation.code",
+    "getParticipantCard:response:Violation.params",
+    "getParticipantCard:response:Violation.params.*",
+    "getRuleSet:parameter:$parameter.path.id",
+    "getRuleSet:response:FieldError.code",
+    "getRuleSet:response:FieldError.field",
+    "getRuleSet:response:FieldError.params",
+    "getRuleSet:response:FieldError.params.*",
+    "getRuleSet:response:RuleSet.active",
+    "getRuleSet:response:RuleSet.id",
+    "getRuleSet:response:RuleSet.name",
+    "getRuleSet:response:Violation.code",
+    "getRuleSet:response:Violation.params",
+    "getRuleSet:response:Violation.params.*",
+    "getSessionStatus:response:SessionStatus.authenticated",
+    "getSourceOffer:response:SourceOffer.commit",
+    "getSourceOffer:response:SourceOffer.environment",
+    "getSourceOffer:response:SourceOffer.sourceUrl",
+    "getSourceOffer:response:SourceOffer.version",
+    "getWebManifest:response:WebManifest.background_color",
+    "getWebManifest:response:WebManifest.display",
+    "getWebManifest:response:WebManifest.icons",
+    "getWebManifest:response:WebManifest.name",
+    "getWebManifest:response:WebManifest.short_name",
+    "getWebManifest:response:WebManifest.start_url",
+    "getWebManifest:response:WebManifest.theme_color",
+    "getWebManifest:response:WebManifestIcon.sizes",
+    "getWebManifest:response:WebManifestIcon.src",
+    "getWebManifest:response:WebManifestIcon.type",
+    "linkExternalReference:parameter:$parameter.path.sourceId",
+    "linkExternalReference:request:ExternalReferenceRequest.externalId",
+    "linkExternalReference:request:ExternalReferenceRequest.personId",
+    "linkExternalReference:response:$response.header.Accept",
+    "linkExternalReference:response:$response.header.Location",
+    "linkExternalReference:response:ExternalReference.linkedAt",
+    "linkExternalReference:response:ExternalReference.referenceId",
+    "linkExternalReference:response:ExternalReference.sourceId",
+    "linkExternalReference:response:FieldError.code",
+    "linkExternalReference:response:FieldError.field",
+    "linkExternalReference:response:FieldError.params",
+    "linkExternalReference:response:FieldError.params.*",
+    "linkExternalReference:response:Violation.code",
+    "linkExternalReference:response:Violation.params",
+    "linkExternalReference:response:Violation.params.*",
+    "listAllocations:parameter:$parameter.query.date",
+    "listAllocations:response:Allocation.bookingId",
+    "listAllocations:response:Allocation.cardColor",
+    "listAllocations:response:Allocation.cardLabel",
+    "listAllocations:response:Allocation.courtId",
+    "listAllocations:response:Allocation.endsAt",
+    "listAllocations:response:Allocation.participantCount",
+    "listAllocations:response:Allocation.showGenericOccupancy",
+    "listAllocations:response:Allocation.startsAt",
+    "listAllocations:response:FieldError.code",
+    "listAllocations:response:FieldError.field",
+    "listAllocations:response:FieldError.params",
+    "listAllocations:response:FieldError.params.*",
+    "listAllocations:response:Violation.code",
+    "listAllocations:response:Violation.params",
+    "listAllocations:response:Violation.params.*",
+    "listBookableCards:response:FieldError.code",
+    "listBookableCards:response:FieldError.field",
+    "listBookableCards:response:FieldError.params",
+    "listBookableCards:response:FieldError.params.*",
+    "listBookableCards:response:PublicBookingCard.allowedPlayerCounts",
+    "listBookableCards:response:PublicBookingCard.color",
+    "listBookableCards:response:PublicBookingCard.guestAllowed",
+    "listBookableCards:response:PublicBookingCard.id",
+    "listBookableCards:response:PublicBookingCard.label",
+    "listBookableCards:response:Violation.code",
+    "listBookableCards:response:Violation.params",
+    "listBookableCards:response:Violation.params.*",
+    "listBookingCards:response:BookingCard.active",
+    "listBookingCards:response:BookingCard.allowedPlayerCounts",
+    "listBookingCards:response:BookingCard.allowedRoles",
+    "listBookingCards:response:BookingCard.color",
+    "listBookingCards:response:BookingCard.countsAgainstLimits",
+    "listBookingCards:response:BookingCard.guestAllowed",
+    "listBookingCards:response:BookingCard.id",
+    "listBookingCards:response:BookingCard.label",
+    "listBookingCards:response:BookingCard.managingRoles",
+    "listBookingCards:response:BookingCard.showGenericOccupancy",
+    "listBookingCards:response:BookingCard.tracksPlayers",
+    "listBookingCards:response:FieldError.code",
+    "listBookingCards:response:FieldError.field",
+    "listBookingCards:response:FieldError.params",
+    "listBookingCards:response:FieldError.params.*",
+    "listBookingCards:response:Violation.code",
+    "listBookingCards:response:Violation.params",
+    "listBookingCards:response:Violation.params.*",
+    "listCourts:response:PublicCourt.id",
+    "listCourts:response:PublicCourt.name",
+    "listCourts:response:PublicCourt.number",
+    "listCourtsForAdmin:response:Court.active",
+    "listCourtsForAdmin:response:Court.id",
+    "listCourtsForAdmin:response:Court.name",
+    "listCourtsForAdmin:response:Court.number",
+    "listCourtsForAdmin:response:FieldError.code",
+    "listCourtsForAdmin:response:FieldError.field",
+    "listCourtsForAdmin:response:FieldError.params",
+    "listCourtsForAdmin:response:FieldError.params.*",
+    "listCourtsForAdmin:response:Violation.code",
+    "listCourtsForAdmin:response:Violation.params",
+    "listCourtsForAdmin:response:Violation.params.*",
+    "listExternalReferences:parameter:$parameter.path.sourceId",
+    "listExternalReferences:parameter:$parameter.query.cursor",
+    "listExternalReferences:parameter:$parameter.query.limit",
+    "listExternalReferences:response:ExternalReference.linkedAt",
+    "listExternalReferences:response:ExternalReference.referenceId",
+    "listExternalReferences:response:ExternalReference.sourceId",
+    "listExternalReferences:response:ExternalReferencePage.nextCursor",
+    "listExternalReferences:response:ExternalReferencePage.references",
+    "listExternalReferences:response:FieldError.code",
+    "listExternalReferences:response:FieldError.field",
+    "listExternalReferences:response:FieldError.params",
+    "listExternalReferences:response:FieldError.params.*",
+    "listExternalReferences:response:Violation.code",
+    "listExternalReferences:response:Violation.params",
+    "listExternalReferences:response:Violation.params.*",
+    "listImportRuns:parameter:$parameter.path.sourceId",
+    "listImportRuns:response:FieldError.code",
+    "listImportRuns:response:FieldError.field",
+    "listImportRuns:response:FieldError.params",
+    "listImportRuns:response:FieldError.params.*",
+    "listImportRuns:response:ImportRun.accountsCreated",
+    "listImportRuns:response:ImportRun.accountsDisabled",
+    "listImportRuns:response:ImportRun.corrected",
+    "listImportRuns:response:ImportRun.created",
+    "listImportRuns:response:ImportRun.executedAt",
+    "listImportRuns:response:ImportRun.fileHash",
+    "listImportRuns:response:ImportRun.membershipsEnded",
+    "listImportRuns:response:ImportRun.mode",
+    "listImportRuns:response:ImportRun.previewId",
+    "listImportRuns:response:ImportRun.removalsConfirmed",
+    "listImportRuns:response:ImportRun.rolesRemoved",
+    "listImportRuns:response:ImportRun.rowErrors",
+    "listImportRuns:response:ImportRun.runId",
+    "listImportRuns:response:ImportRun.sourceId",
+    "listImportRuns:response:Violation.code",
+    "listImportRuns:response:Violation.params",
+    "listImportRuns:response:Violation.params.*",
+    "listImportSources:response:FieldError.code",
+    "listImportSources:response:FieldError.field",
+    "listImportSources:response:FieldError.params",
+    "listImportSources:response:FieldError.params.*",
+    "listImportSources:response:ImportSource.columns",
+    "listImportSources:response:ImportSource.columns.*",
+    "listImportSources:response:ImportSource.defaultMembershipTypeId",
+    "listImportSources:response:ImportSource.displayName",
+    "listImportSources:response:ImportSource.encoding",
+    "listImportSources:response:ImportSource.id",
+    "listImportSources:response:ImportSource.membershipTypes",
+    "listImportSources:response:ImportSource.membershipTypes.*",
+    "listImportSources:response:ImportSource.ownedFields",
+    "listImportSources:response:ImportSource.removalWarningPercent",
+    "listImportSources:response:ImportSource.separator",
+    "listImportSources:response:ImportSource.sourceKey",
+    "listImportSources:response:Violation.code",
+    "listImportSources:response:Violation.params",
+    "listImportSources:response:Violation.params.*",
+    "listManagedAppointments:parameter:$parameter.query.cursor",
+    "listManagedAppointments:parameter:$parameter.query.limit",
+    "listManagedAppointments:response:FieldError.code",
+    "listManagedAppointments:response:FieldError.field",
+    "listManagedAppointments:response:FieldError.params",
+    "listManagedAppointments:response:FieldError.params.*",
+    "listManagedAppointments:response:ManagedAppointment.cardColor",
+    "listManagedAppointments:response:ManagedAppointment.cardLabel",
+    "listManagedAppointments:response:ManagedAppointment.courtIds",
+    "listManagedAppointments:response:ManagedAppointment.endsAt",
+    "listManagedAppointments:response:ManagedAppointment.id",
+    "listManagedAppointments:response:ManagedAppointment.participantCount",
+    "listManagedAppointments:response:ManagedAppointment.seriesId",
+    "listManagedAppointments:response:ManagedAppointment.startsAt",
+    "listManagedAppointments:response:ManagedAppointment.status",
+    "listManagedAppointments:response:ManagedAppointmentPage.items",
+    "listManagedAppointments:response:ManagedAppointmentPage.nextCursor",
+    "listManagedAppointments:response:Violation.code",
+    "listManagedAppointments:response:Violation.params",
+    "listManagedAppointments:response:Violation.params.*",
+    "listMembershipTypes:response:FieldError.code",
+    "listMembershipTypes:response:FieldError.field",
+    "listMembershipTypes:response:FieldError.params",
+    "listMembershipTypes:response:FieldError.params.*",
+    "listMembershipTypes:response:MembershipType.active",
+    "listMembershipTypes:response:MembershipType.grantsAccount",
+    "listMembershipTypes:response:MembershipType.id",
+    "listMembershipTypes:response:MembershipType.name",
+    "listMembershipTypes:response:MembershipType.ruleSetId",
+    "listMembershipTypes:response:Violation.code",
+    "listMembershipTypes:response:Violation.params",
+    "listMembershipTypes:response:Violation.params.*",
+    "listOpeningHours:response:OpeningHours.closesAt",
+    "listOpeningHours:response:OpeningHours.dayOfWeek",
+    "listOpeningHours:response:OpeningHours.opensAt",
+    "listOpeningHoursForAdmin:response:FieldError.code",
+    "listOpeningHoursForAdmin:response:FieldError.field",
+    "listOpeningHoursForAdmin:response:FieldError.params",
+    "listOpeningHoursForAdmin:response:FieldError.params.*",
+    "listOpeningHoursForAdmin:response:OpeningHours.closesAt",
+    "listOpeningHoursForAdmin:response:OpeningHours.dayOfWeek",
+    "listOpeningHoursForAdmin:response:OpeningHours.opensAt",
+    "listOpeningHoursForAdmin:response:Violation.code",
+    "listOpeningHoursForAdmin:response:Violation.params",
+    "listOpeningHoursForAdmin:response:Violation.params.*",
+    "listOwnMessageChoices:response:FieldError.code",
+    "listOwnMessageChoices:response:FieldError.field",
+    "listOwnMessageChoices:response:FieldError.params",
+    "listOwnMessageChoices:response:FieldError.params.*",
+    "listOwnMessageChoices:response:MessageChoice.declinable",
+    "listOwnMessageChoices:response:MessageChoice.enabled",
+    "listOwnMessageChoices:response:MessageChoice.kind",
+    "listOwnMessageChoices:response:Violation.code",
+    "listOwnMessageChoices:response:Violation.params",
+    "listOwnMessageChoices:response:Violation.params.*",
+    "listOwnParticipations:parameter:$parameter.query.cursor",
+    "listOwnParticipations:parameter:$parameter.query.limit",
+    "listOwnParticipations:response:FieldError.code",
+    "listOwnParticipations:response:FieldError.field",
+    "listOwnParticipations:response:FieldError.params",
+    "listOwnParticipations:response:FieldError.params.*",
+    "listOwnParticipations:response:Participation.cardColor",
+    "listOwnParticipations:response:Participation.cardLabel",
+    "listOwnParticipations:response:Participation.courtIds",
+    "listOwnParticipations:response:Participation.endsAt",
+    "listOwnParticipations:response:Participation.id",
+    "listOwnParticipations:response:Participation.startsAt",
+    "listOwnParticipations:response:Participation.status",
+    "listOwnParticipations:response:ParticipationPage.items",
+    "listOwnParticipations:response:ParticipationPage.nextCursor",
+    "listOwnParticipations:response:Violation.code",
+    "listOwnParticipations:response:Violation.params",
+    "listOwnParticipations:response:Violation.params.*",
+    "listOwnSessions:response:FieldError.code",
+    "listOwnSessions:response:FieldError.field",
+    "listOwnSessions:response:FieldError.params",
+    "listOwnSessions:response:FieldError.params.*",
+    "listOwnSessions:response:Violation.code",
+    "listOwnSessions:response:Violation.params",
+    "listOwnSessions:response:Violation.params.*",
+    "listParticipantCards:response:FieldError.code",
+    "listParticipantCards:response:FieldError.field",
+    "listParticipantCards:response:FieldError.params",
+    "listParticipantCards:response:FieldError.params.*",
+    "listParticipantCards:response:PublicParticipantCard.capacity",
+    "listParticipantCards:response:PublicParticipantCard.id",
+    "listParticipantCards:response:PublicParticipantCard.label",
+    "listParticipantCards:response:Violation.code",
+    "listParticipantCards:response:Violation.params",
+    "listParticipantCards:response:Violation.params.*",
+    "listParticipantCardsForAdmin:response:FieldError.code",
+    "listParticipantCardsForAdmin:response:FieldError.field",
+    "listParticipantCardsForAdmin:response:FieldError.params",
+    "listParticipantCardsForAdmin:response:FieldError.params.*",
+    "listParticipantCardsForAdmin:response:ParticipantCard.active",
+    "listParticipantCardsForAdmin:response:ParticipantCard.capacity",
+    "listParticipantCardsForAdmin:response:ParticipantCard.id",
+    "listParticipantCardsForAdmin:response:ParticipantCard.label",
+    "listParticipantCardsForAdmin:response:Violation.code",
+    "listParticipantCardsForAdmin:response:Violation.params",
+    "listParticipantCardsForAdmin:response:Violation.params.*",
+    "listPersonalBookings:parameter:$parameter.query.cursor",
+    "listPersonalBookings:parameter:$parameter.query.limit",
+    "listPersonalBookings:response:FieldError.code",
+    "listPersonalBookings:response:FieldError.field",
+    "listPersonalBookings:response:FieldError.params",
+    "listPersonalBookings:response:FieldError.params.*",
+    "listPersonalBookings:response:PersonalBooking.cardColor",
+    "listPersonalBookings:response:PersonalBooking.cardLabel",
+    "listPersonalBookings:response:PersonalBooking.courtIds",
+    "listPersonalBookings:response:PersonalBooking.endsAt",
+    "listPersonalBookings:response:PersonalBooking.startsAt",
+    "listPersonalBookings:response:PersonalBooking.status",
+    "listPersonalBookings:response:PersonalBookingPage.items",
+    "listPersonalBookings:response:PersonalBookingPage.nextCursor",
+    "listPersonalBookings:response:Violation.code",
+    "listPersonalBookings:response:Violation.params",
+    "listPersonalBookings:response:Violation.params.*",
+    "listRuleSets:response:FieldError.code",
+    "listRuleSets:response:FieldError.field",
+    "listRuleSets:response:FieldError.params",
+    "listRuleSets:response:FieldError.params.*",
+    "listRuleSets:response:RuleSet.active",
+    "listRuleSets:response:RuleSet.id",
+    "listRuleSets:response:RuleSet.name",
+    "listRuleSets:response:Violation.code",
+    "listRuleSets:response:Violation.params",
+    "listRuleSets:response:Violation.params.*",
+    "listRuleTypes:response:FieldError.code",
+    "listRuleTypes:response:FieldError.field",
+    "listRuleTypes:response:FieldError.params",
+    "listRuleTypes:response:FieldError.params.*",
+    "listRuleTypes:response:RuleParameter.maximum",
+    "listRuleTypes:response:RuleParameter.minimum",
+    "listRuleTypes:response:RuleParameter.name",
+    "listRuleTypes:response:RuleTypeConfiguration.configurable",
+    "listRuleTypes:response:RuleTypeConfiguration.parameters",
+    "listRuleTypes:response:RuleTypeConfiguration.ruleType",
+    "listRuleTypes:response:Violation.code",
+    "listRuleTypes:response:Violation.params",
+    "listRuleTypes:response:Violation.params.*",
+    "listRules:parameter:$parameter.path.id",
+    "listRules:response:FieldError.code",
+    "listRules:response:FieldError.field",
+    "listRules:response:FieldError.params",
+    "listRules:response:FieldError.params.*",
+    "listRules:response:RuleDefinition.params",
+    "listRules:response:RuleDefinition.params.*",
+    "listRules:response:RuleDefinition.ruleType",
+    "listRules:response:Violation.code",
+    "listRules:response:Violation.params",
+    "listRules:response:Violation.params.*",
+    "listSupportedEncodings:response:FieldError.code",
+    "listSupportedEncodings:response:FieldError.field",
+    "listSupportedEncodings:response:FieldError.params",
+    "listSupportedEncodings:response:FieldError.params.*",
+    "listSupportedEncodings:response:Violation.code",
+    "listSupportedEncodings:response:Violation.params",
+    "listSupportedEncodings:response:Violation.params.*",
+    "logIn:response:$response.header.Retry-After",
+    "logIn:response:$response.header.X-Courtside-Password-Change-Required",
+    "logIn:response:FieldError.code",
+    "logIn:response:FieldError.field",
+    "logIn:response:FieldError.params",
+    "logIn:response:FieldError.params.*",
+    "logIn:response:Violation.code",
+    "logIn:response:Violation.params",
+    "logIn:response:Violation.params.*",
+    "moveSeries:parameter:$parameter.path.id",
+    "moveSeries:request:MoveRequest.fromBookingId",
+    "moveSeries:request:MoveRequest.newCourtIds",
+    "moveSeries:request:MoveRequest.newDurationMinutes",
+    "moveSeries:request:MoveRequest.newStartTime",
+    "moveSeries:request:MoveRequest.scope",
+    "moveSeries:response:$response.header.Accept",
+    "moveSeries:response:FieldError.code",
+    "moveSeries:response:FieldError.field",
+    "moveSeries:response:FieldError.params",
+    "moveSeries:response:FieldError.params.*",
+    "moveSeries:response:MoveExecuted.moved",
+    "moveSeries:response:Violation.code",
+    "moveSeries:response:Violation.params",
+    "moveSeries:response:Violation.params.*",
+    "openingHoursImpact:parameter:$parameter.path.day",
+    "openingHoursImpact:parameter:$parameter.query.closesAt",
+    "openingHoursImpact:parameter:$parameter.query.cursor",
+    "openingHoursImpact:parameter:$parameter.query.limit",
+    "openingHoursImpact:parameter:$parameter.query.opensAt",
+    "openingHoursImpact:response:AffectedBooking.bookingId",
+    "openingHoursImpact:response:AffectedBooking.courtIds",
+    "openingHoursImpact:response:AffectedBooking.endsAt",
+    "openingHoursImpact:response:AffectedBooking.startsAt",
+    "openingHoursImpact:response:FieldError.code",
+    "openingHoursImpact:response:FieldError.field",
+    "openingHoursImpact:response:FieldError.params",
+    "openingHoursImpact:response:FieldError.params.*",
+    "openingHoursImpact:response:Impact.affectedCount",
+    "openingHoursImpact:response:Impact.bookings",
+    "openingHoursImpact:response:Impact.nextCursor",
+    "openingHoursImpact:response:Impact.truncated",
+    "openingHoursImpact:response:Violation.code",
+    "openingHoursImpact:response:Violation.params",
+    "openingHoursImpact:response:Violation.params.*",
+    "previewSeries:request:SeriesRuleRequest.cardId",
+    "previewSeries:request:SeriesRuleRequest.courtIds",
+    "previewSeries:request:SeriesRuleRequest.durationMinutes",
+    "previewSeries:request:SeriesRuleRequest.endsOn",
+    "previewSeries:request:SeriesRuleRequest.intervalWeeks",
+    "previewSeries:request:SeriesRuleRequest.occurrenceCount",
+    "previewSeries:request:SeriesRuleRequest.startTime",
+    "previewSeries:request:SeriesRuleRequest.startsOn",
+    "previewSeries:request:SeriesRuleRequest.weekdays",
+    "previewSeries:response:$response.header.Accept",
+    "previewSeries:response:FieldError.code",
+    "previewSeries:response:FieldError.field",
+    "previewSeries:response:FieldError.params",
+    "previewSeries:response:FieldError.params.*",
+    "previewSeries:response:Occurrence.blockedCourtIds",
+    "previewSeries:response:Occurrence.creatable",
+    "previewSeries:response:Occurrence.endsAt",
+    "previewSeries:response:Occurrence.startsAt",
+    "previewSeries:response:Occurrence.violations",
+    "previewSeries:response:SeriesPreview.creatableCount",
+    "previewSeries:response:SeriesPreview.horizonLimit",
+    "previewSeries:response:SeriesPreview.occurrences",
+    "previewSeries:response:SeriesPreview.truncatedByHorizon",
+    "previewSeries:response:Violation.code",
+    "previewSeries:response:Violation.params",
+    "previewSeries:response:Violation.params.*",
+    "previewSeriesMove:parameter:$parameter.path.id",
+    "previewSeriesMove:request:MoveRequest.fromBookingId",
+    "previewSeriesMove:request:MoveRequest.newCourtIds",
+    "previewSeriesMove:request:MoveRequest.newDurationMinutes",
+    "previewSeriesMove:request:MoveRequest.newStartTime",
+    "previewSeriesMove:request:MoveRequest.scope",
+    "previewSeriesMove:response:$response.header.Accept",
+    "previewSeriesMove:response:FieldError.code",
+    "previewSeriesMove:response:FieldError.field",
+    "previewSeriesMove:response:FieldError.params",
+    "previewSeriesMove:response:FieldError.params.*",
+    "previewSeriesMove:response:Move.blockedCourtIds",
+    "previewSeriesMove:response:Move.bookingId",
+    "previewSeriesMove:response:Move.executable",
+    "previewSeriesMove:response:Move.fromEndsAt",
+    "previewSeriesMove:response:Move.fromStartsAt",
+    "previewSeriesMove:response:Move.toEndsAt",
+    "previewSeriesMove:response:Move.toStartsAt",
+    "previewSeriesMove:response:Move.unbookableCourtIds",
+    "previewSeriesMove:response:Move.violations",
+    "previewSeriesMove:response:MovePreview.executable",
+    "previewSeriesMove:response:MovePreview.moves",
+    "previewSeriesMove:response:Violation.code",
+    "previewSeriesMove:response:Violation.params",
+    "previewSeriesMove:response:Violation.params.*",
+    "readAuditLog:parameter:$parameter.query.cursor",
+    "readAuditLog:parameter:$parameter.query.from",
+    "readAuditLog:parameter:$parameter.query.limit",
+    "readAuditLog:parameter:$parameter.query.subjectId",
+    "readAuditLog:parameter:$parameter.query.to",
+    "readAuditLog:response:AuditEntry.eventType",
+    "readAuditLog:response:AuditEntry.id",
+    "readAuditLog:response:AuditEntry.occurredAt",
+    "readAuditLog:response:AuditPage.entries",
+    "readAuditLog:response:AuditPage.nextCursor",
+    "readAuditLog:response:FieldError.code",
+    "readAuditLog:response:FieldError.field",
+    "readAuditLog:response:FieldError.params",
+    "readAuditLog:response:FieldError.params.*",
+    "readAuditLog:response:Violation.code",
+    "readAuditLog:response:Violation.params",
+    "readAuditLog:response:Violation.params.*",
+    "readImportPreview:parameter:$parameter.path.id",
+    "readImportPreview:response:FieldError.code",
+    "readImportPreview:response:FieldError.field",
+    "readImportPreview:response:FieldError.params",
+    "readImportPreview:response:FieldError.params.*",
+    "readImportPreview:response:ImportPersonChange.account",
+    "readImportPreview:response:ImportPersonChange.kind",
+    "readImportPreview:response:ImportPersonChange.membershipTypeId",
+    "readImportPreview:response:ImportPersonChange.rowNumber",
+    "readImportPreview:response:ImportPossibleDuplicate.rowNumber",
+    "readImportPreview:response:ImportPreview.changes",
+    "readImportPreview:response:ImportPreview.createdAt",
+    "readImportPreview:response:ImportPreview.expiresAt",
+    "readImportPreview:response:ImportPreview.fileHash",
+    "readImportPreview:response:ImportPreview.fileName",
+    "readImportPreview:response:ImportPreview.ignoredColumns",
+    "readImportPreview:response:ImportPreview.mode",
+    "readImportPreview:response:ImportPreview.needsConfirmation",
+    "readImportPreview:response:ImportPreview.possibleDuplicates",
+    "readImportPreview:response:ImportPreview.previewId",
+    "readImportPreview:response:ImportPreview.removals",
+    "readImportPreview:response:ImportPreview.rowCount",
+    "readImportPreview:response:ImportPreview.rowErrors",
+    "readImportPreview:response:ImportPreview.sharedAddresses",
+    "readImportPreview:response:ImportPreview.sourceId",
+    "readImportPreview:response:ImportPreview.superseded",
+    "readImportPreview:response:ImportRemovalCounts.count",
+    "readImportPreview:response:ImportRemovalCounts.currentlyLinked",
+    "readImportPreview:response:ImportRemovalCounts.percent",
+    "readImportPreview:response:ImportRowError.code",
+    "readImportPreview:response:ImportRowError.params",
+    "readImportPreview:response:ImportRowError.params.*",
+    "readImportPreview:response:ImportRowError.rowNumber",
+    "readImportPreview:response:ImportSharedAddress.rowNumber",
+    "readImportPreview:response:ImportSharedAddress.sharedBy",
+    "readImportPreview:response:Violation.code",
+    "readImportPreview:response:Violation.params",
+    "readImportPreview:response:Violation.params.*",
+    "readImportSource:parameter:$parameter.path.id",
+    "readImportSource:response:FieldError.code",
+    "readImportSource:response:FieldError.field",
+    "readImportSource:response:FieldError.params",
+    "readImportSource:response:FieldError.params.*",
+    "readImportSource:response:ImportSource.columns",
+    "readImportSource:response:ImportSource.columns.*",
+    "readImportSource:response:ImportSource.defaultMembershipTypeId",
+    "readImportSource:response:ImportSource.displayName",
+    "readImportSource:response:ImportSource.encoding",
+    "readImportSource:response:ImportSource.id",
+    "readImportSource:response:ImportSource.membershipTypes",
+    "readImportSource:response:ImportSource.membershipTypes.*",
+    "readImportSource:response:ImportSource.ownedFields",
+    "readImportSource:response:ImportSource.removalWarningPercent",
+    "readImportSource:response:ImportSource.separator",
+    "readImportSource:response:ImportSource.sourceKey",
+    "readImportSource:response:Violation.code",
+    "readImportSource:response:Violation.params",
+    "readImportSource:response:Violation.params.*",
+    "readMessageLog:parameter:$parameter.query.cursor",
+    "readMessageLog:parameter:$parameter.query.from",
+    "readMessageLog:parameter:$parameter.query.limit",
+    "readMessageLog:parameter:$parameter.query.personId",
+    "readMessageLog:parameter:$parameter.query.state",
+    "readMessageLog:parameter:$parameter.query.to",
+    "readMessageLog:parameter:$parameter.query.unsettled",
+    "readMessageLog:response:FieldError.code",
+    "readMessageLog:response:FieldError.field",
+    "readMessageLog:response:FieldError.params",
+    "readMessageLog:response:FieldError.params.*",
+    "readMessageLog:response:MessageEntry.id",
+    "readMessageLog:response:MessageEntry.kind",
+    "readMessageLog:response:MessageEntry.queuedAt",
+    "readMessageLog:response:MessageEntry.reason",
+    "readMessageLog:response:MessageEntry.settledAt",
+    "readMessageLog:response:MessageEntry.state",
+    "readMessageLog:response:MessageEntry.statusCode",
+    "readMessageLog:response:MessagePage.entries",
+    "readMessageLog:response:MessagePage.nextCursor",
+    "readMessageLog:response:Violation.code",
+    "readMessageLog:response:Violation.params",
+    "readMessageLog:response:Violation.params.*",
+    "readPerson:parameter:$parameter.path.personId",
+    "readPerson:response:FieldError.code",
+    "readPerson:response:FieldError.field",
+    "readPerson:response:FieldError.params",
+    "readPerson:response:FieldError.params.*",
+    "readPerson:response:Violation.code",
+    "readPerson:response:Violation.params",
+    "readPerson:response:Violation.params.*",
+    "reauthenticate:response:$response.header.Accept",
+    "reauthenticate:response:$response.header.Retry-After",
+    "reauthenticate:response:FieldError.code",
+    "reauthenticate:response:FieldError.field",
+    "reauthenticate:response:FieldError.params",
+    "reauthenticate:response:FieldError.params.*",
+    "reauthenticate:response:Violation.code",
+    "reauthenticate:response:Violation.params",
+    "reauthenticate:response:Violation.params.*",
+    "removeMembership:parameter:$parameter.path.personId",
+    "removeMembership:response:FieldError.code",
+    "removeMembership:response:FieldError.field",
+    "removeMembership:response:FieldError.params",
+    "removeMembership:response:FieldError.params.*",
+    "removeMembership:response:Violation.code",
+    "removeMembership:response:Violation.params",
+    "removeMembership:response:Violation.params.*",
+    "removeOwnParticipation:parameter:$parameter.path.bookingId",
+    "removeOwnParticipation:response:FieldError.code",
+    "removeOwnParticipation:response:FieldError.field",
+    "removeOwnParticipation:response:FieldError.params",
+    "removeOwnParticipation:response:FieldError.params.*",
+    "removeOwnParticipation:response:Violation.code",
+    "removeOwnParticipation:response:Violation.params",
+    "removeOwnParticipation:response:Violation.params.*",
+    "removeRule:parameter:$parameter.path.id",
+    "removeRule:parameter:$parameter.path.ruleType",
+    "removeRule:response:FieldError.code",
+    "removeRule:response:FieldError.field",
+    "removeRule:response:FieldError.params",
+    "removeRule:response:FieldError.params.*",
+    "removeRule:response:Violation.code",
+    "removeRule:response:Violation.params",
+    "removeRule:response:Violation.params.*",
+    "requestAccountCredentials:parameter:$parameter.path.personId",
+    "requestAccountCredentials:response:$response.header.Retry-After",
+    "requestAccountCredentials:response:FieldError.code",
+    "requestAccountCredentials:response:FieldError.field",
+    "requestAccountCredentials:response:FieldError.params",
+    "requestAccountCredentials:response:FieldError.params.*",
+    "requestAccountCredentials:response:Violation.code",
+    "requestAccountCredentials:response:Violation.params",
+    "requestAccountCredentials:response:Violation.params.*",
+    "searchParticipantMembers:request:ParticipantMemberSearchRequest.query",
+    "searchParticipantMembers:response:$response.header.Accept",
+    "searchParticipantMembers:response:FieldError.code",
+    "searchParticipantMembers:response:FieldError.field",
+    "searchParticipantMembers:response:FieldError.params",
+    "searchParticipantMembers:response:FieldError.params.*",
+    "searchParticipantMembers:response:Violation.code",
+    "searchParticipantMembers:response:Violation.params",
+    "searchParticipantMembers:response:Violation.params.*",
+    "searchRoster:request:RosterSearchRequest.cursor",
+    "searchRoster:request:RosterSearchRequest.limit",
+    "searchRoster:request:RosterSearchRequest.membershipTypeId",
+    "searchRoster:request:RosterSearchRequest.query",
+    "searchRoster:response:$response.header.Accept",
+    "searchRoster:response:FieldError.code",
+    "searchRoster:response:FieldError.field",
+    "searchRoster:response:FieldError.params",
+    "searchRoster:response:FieldError.params.*",
+    "searchRoster:response:RosterPage.entries",
+    "searchRoster:response:RosterPage.nextCursor",
+    "searchRoster:response:Violation.code",
+    "searchRoster:response:Violation.params",
+    "searchRoster:response:Violation.params.*",
+    "setAccountActive:parameter:$parameter.path.personId",
+    "setAccountActive:response:$response.header.Accept",
+    "setAccountActive:response:FieldError.code",
+    "setAccountActive:response:FieldError.field",
+    "setAccountActive:response:FieldError.params",
+    "setAccountActive:response:FieldError.params.*",
+    "setAccountActive:response:Violation.code",
+    "setAccountActive:response:Violation.params",
+    "setAccountActive:response:Violation.params.*",
+    "setBookingCardActive:parameter:$parameter.path.id",
+    "setBookingCardActive:request:ActiveRequest.active",
+    "setBookingCardActive:response:$response.header.Accept",
+    "setBookingCardActive:response:BookingCard.active",
+    "setBookingCardActive:response:BookingCard.allowedPlayerCounts",
+    "setBookingCardActive:response:BookingCard.allowedRoles",
+    "setBookingCardActive:response:BookingCard.color",
+    "setBookingCardActive:response:BookingCard.countsAgainstLimits",
+    "setBookingCardActive:response:BookingCard.guestAllowed",
+    "setBookingCardActive:response:BookingCard.id",
+    "setBookingCardActive:response:BookingCard.label",
+    "setBookingCardActive:response:BookingCard.managingRoles",
+    "setBookingCardActive:response:BookingCard.showGenericOccupancy",
+    "setBookingCardActive:response:BookingCard.tracksPlayers",
+    "setBookingCardActive:response:FieldError.code",
+    "setBookingCardActive:response:FieldError.field",
+    "setBookingCardActive:response:FieldError.params",
+    "setBookingCardActive:response:FieldError.params.*",
+    "setBookingCardActive:response:Violation.code",
+    "setBookingCardActive:response:Violation.params",
+    "setBookingCardActive:response:Violation.params.*",
+    "setCourtActive:parameter:$parameter.path.id",
+    "setCourtActive:request:ActiveRequest.active",
+    "setCourtActive:response:$response.header.Accept",
+    "setCourtActive:response:Court.active",
+    "setCourtActive:response:Court.id",
+    "setCourtActive:response:Court.name",
+    "setCourtActive:response:Court.number",
+    "setCourtActive:response:FieldError.code",
+    "setCourtActive:response:FieldError.field",
+    "setCourtActive:response:FieldError.params",
+    "setCourtActive:response:FieldError.params.*",
+    "setCourtActive:response:Violation.code",
+    "setCourtActive:response:Violation.params",
+    "setCourtActive:response:Violation.params.*",
+    "setMembershipTypeActive:parameter:$parameter.path.id",
+    "setMembershipTypeActive:request:ActiveRequest.active",
+    "setMembershipTypeActive:response:$response.header.Accept",
+    "setMembershipTypeActive:response:FieldError.code",
+    "setMembershipTypeActive:response:FieldError.field",
+    "setMembershipTypeActive:response:FieldError.params",
+    "setMembershipTypeActive:response:FieldError.params.*",
+    "setMembershipTypeActive:response:MembershipType.active",
+    "setMembershipTypeActive:response:MembershipType.grantsAccount",
+    "setMembershipTypeActive:response:MembershipType.id",
+    "setMembershipTypeActive:response:MembershipType.name",
+    "setMembershipTypeActive:response:MembershipType.ruleSetId",
+    "setMembershipTypeActive:response:Violation.code",
+    "setMembershipTypeActive:response:Violation.params",
+    "setMembershipTypeActive:response:Violation.params.*",
+    "setParticipantCardActive:parameter:$parameter.path.id",
+    "setParticipantCardActive:request:ActiveRequest.active",
+    "setParticipantCardActive:response:$response.header.Accept",
+    "setParticipantCardActive:response:FieldError.code",
+    "setParticipantCardActive:response:FieldError.field",
+    "setParticipantCardActive:response:FieldError.params",
+    "setParticipantCardActive:response:FieldError.params.*",
+    "setParticipantCardActive:response:ParticipantCard.active",
+    "setParticipantCardActive:response:ParticipantCard.capacity",
+    "setParticipantCardActive:response:ParticipantCard.id",
+    "setParticipantCardActive:response:ParticipantCard.label",
+    "setParticipantCardActive:response:Violation.code",
+    "setParticipantCardActive:response:Violation.params",
+    "setParticipantCardActive:response:Violation.params.*",
+    "setRule:parameter:$parameter.path.id",
+    "setRule:parameter:$parameter.path.ruleType",
+    "setRule:request:SetRuleRequest.params",
+    "setRule:request:SetRuleRequest.params.*",
+    "setRule:response:$response.header.Accept",
+    "setRule:response:FieldError.code",
+    "setRule:response:FieldError.field",
+    "setRule:response:FieldError.params",
+    "setRule:response:FieldError.params.*",
+    "setRule:response:RuleDefinition.params",
+    "setRule:response:RuleDefinition.params.*",
+    "setRule:response:RuleDefinition.ruleType",
+    "setRule:response:Violation.code",
+    "setRule:response:Violation.params",
+    "setRule:response:Violation.params.*",
+    "setRuleSetActive:parameter:$parameter.path.id",
+    "setRuleSetActive:request:ActiveRequest.active",
+    "setRuleSetActive:response:$response.header.Accept",
+    "setRuleSetActive:response:FieldError.code",
+    "setRuleSetActive:response:FieldError.field",
+    "setRuleSetActive:response:FieldError.params",
+    "setRuleSetActive:response:FieldError.params.*",
+    "setRuleSetActive:response:RuleSet.active",
+    "setRuleSetActive:response:RuleSet.id",
+    "setRuleSetActive:response:RuleSet.name",
+    "setRuleSetActive:response:Violation.code",
+    "setRuleSetActive:response:Violation.params",
+    "setRuleSetActive:response:Violation.params.*",
+    "setWeeklyOpeningHours:request:OpeningHours.closesAt",
+    "setWeeklyOpeningHours:request:OpeningHours.dayOfWeek",
+    "setWeeklyOpeningHours:request:OpeningHours.opensAt",
+    "setWeeklyOpeningHours:request:SetWeeklyOpeningHoursRequest.days",
+    "setWeeklyOpeningHours:response:$response.header.Accept",
+    "setWeeklyOpeningHours:response:FieldError.code",
+    "setWeeklyOpeningHours:response:FieldError.field",
+    "setWeeklyOpeningHours:response:FieldError.params",
+    "setWeeklyOpeningHours:response:FieldError.params.*",
+    "setWeeklyOpeningHours:response:OpeningHours.closesAt",
+    "setWeeklyOpeningHours:response:OpeningHours.dayOfWeek",
+    "setWeeklyOpeningHours:response:OpeningHours.opensAt",
+    "setWeeklyOpeningHours:response:Violation.code",
+    "setWeeklyOpeningHours:response:Violation.params",
+    "setWeeklyOpeningHours:response:Violation.params.*",
+    "unlinkExternalReference:parameter:$parameter.path.referenceId",
+    "unlinkExternalReference:parameter:$parameter.path.sourceId",
+    "unlinkExternalReference:response:FieldError.code",
+    "unlinkExternalReference:response:FieldError.field",
+    "unlinkExternalReference:response:FieldError.params",
+    "unlinkExternalReference:response:FieldError.params.*",
+    "unlinkExternalReference:response:Violation.code",
+    "unlinkExternalReference:response:Violation.params",
+    "unlinkExternalReference:response:Violation.params.*",
+    "uploadClubLogo:request:$request.file",
+    "uploadClubLogo:response:$response.header.Accept",
+    "uploadClubLogo:response:AdminClubConfig.logoFallbackUrl",
+    "uploadClubLogo:response:AdminClubConfig.logoUploaded",
+    "uploadClubLogo:response:ClubConfig.accentColor",
+    "uploadClubLogo:response:ClubConfig.clubName",
+    "uploadClubLogo:response:ClubConfig.defaultLocale",
+    "uploadClubLogo:response:ClubConfig.imprintUrl",
+    "uploadClubLogo:response:ClubConfig.logoUrl",
+    "uploadClubLogo:response:ClubConfig.primaryColor",
+    "uploadClubLogo:response:ClubConfig.privacyUrl",
+    "uploadClubLogo:response:ClubConfig.slotMinutes",
+    "uploadClubLogo:response:ClubConfig.supportedLocales",
+    "uploadClubLogo:response:ClubConfig.timeZone",
+    "uploadClubLogo:response:FieldError.code",
+    "uploadClubLogo:response:FieldError.field",
+    "uploadClubLogo:response:FieldError.params",
+    "uploadClubLogo:response:FieldError.params.*",
+    "uploadClubLogo:response:Violation.code",
+    "uploadClubLogo:response:Violation.params",
+    "uploadClubLogo:response:Violation.params.*"
+  ],
+  "principals": [
+    {
+      "id": "ANONYMOUS",
+      "description": "A caller without an authenticated Courtside session."
+    },
+    {
+      "id": "MEMBER",
+      "description": "An authenticated account holding the ordinary member role."
+    },
+    {
+      "id": "TRAINER",
+      "description": "An authenticated account holding the trainer role."
+    },
+    {
+      "id": "SPORT_DIRECTOR",
+      "description": "An authenticated account holding the sport-director role."
+    },
+    {
+      "id": "YOUTH_DIRECTOR",
+      "description": "An authenticated account holding the youth-director role."
+    },
+    {
+      "id": "GROUNDSKEEPER",
+      "description": "An authenticated account holding the groundskeeper role."
+    },
+    {
+      "id": "TREASURER",
+      "description": "An authenticated account holding the treasurer role."
+    },
+    {
+      "id": "ADMIN",
+      "description": "An authenticated account holding the instance administrator role."
+    },
+    {
+      "id": "INITIAL_PASSWORD",
+      "description": "An authenticated account restricted to replacing its issued one-time password."
+    }
+  ],
+  "attributes": [
+    {
+      "id": "account-enabled",
+      "description": "Whether the authenticated account remains enabled."
+    },
+    {
+      "id": "administrator",
+      "description": "Whether the current account carries ADMIN authority."
+    },
+    {
+      "id": "administrator-override",
+      "description": "The explicit ADMIN override for a booking role or ownership rule."
+    },
+    {
+      "id": "allowed-role",
+      "description": "Whether at least one current account role occurs in the booking card allowlist."
+    },
+    {
+      "id": "authenticated-at",
+      "description": "The server-side instant of the session's latest full password proof."
+    },
+    {
+      "id": "authenticated-session",
+      "description": "Whether a valid server-side session resolves to an account."
+    },
+    {
+      "id": "booking-card",
+      "description": "The booking card attached to the requested booking or series."
+    },
+    {
+      "id": "booking-card-active",
+      "description": "Whether the selected booking card remains active."
+    },
+    {
+      "id": "participant-card-active",
+      "description": "Whether a participant card remains active and may be offered for a new booking."
+    },
+    {
+      "id": "booking-owner",
+      "description": "Whether the current account created the selected booking."
+    },
+    {
+      "id": "current-account",
+      "description": "The account derived from the authenticated session rather than request input."
+    },
+    {
+      "id": "current-membership",
+      "description": "Whether a referenced person holds a membership that has not ended."
+    },
+    {
+      "id": "current-session",
+      "description": "Whether a session record is the browser session making the request."
+    },
+    {
+      "id": "dedicated-workflow",
+      "description": "Whether a protected value enters through the one operation intended to handle it."
+    },
+    {
+      "id": "enabled-administrator-count",
+      "description": "The number of other enabled accounts that retain ADMIN authority."
+    },
+    {
+      "id": "five-minute-window",
+      "description": "Whether the latest full password proof is no older than five minutes."
+    },
+    {
+      "id": "managing-role",
+      "description": "Whether a current account role occurs in the booking card manager list."
+    },
+    {
+      "id": "occurrence-scope",
+      "description": "The whole-series, following-occurrences or single-occurrence scope requested."
+    },
+    {
+      "id": "participant-person",
+      "description": "Whether the current person is the participation record being changed."
+    },
+    {
+      "id": "participant-schema",
+      "description": "Whether the response uses the bounded participant-member projection."
+    },
+    {
+      "id": "password-change-required",
+      "description": "Whether the account is restricted to replacing an issued credential."
+    },
+    {
+      "id": "permanent-account",
+      "description": "Whether the account has replaced its issued credential with a permanent password."
+    },
+    {
+      "id": "preview-current",
+      "description": "Whether the import preview is neither superseded nor expired."
+    },
+    {
+      "id": "preview-expiry",
+      "description": "The server-side expiry instant attached to the import preview."
+    },
+    {
+      "id": "preview-reviewer",
+      "description": "The account that created and is permitted to execute the import preview."
+    },
+    {
+      "id": "public-schema",
+      "description": "Whether the response uses the dedicated public OpenAPI projection."
+    },
+    {
+      "id": "recent-authentication",
+      "description": "Whether the current session satisfies the recent full-password proof rule."
+    },
+    {
+      "id": "request-field",
+      "description": "The exact OpenAPI request field through which a protected value may enter."
+    },
+    {
+      "id": "requested-enabled-state",
+      "description": "The enabled state requested for the target account."
+    },
+    {
+      "id": "requested-roles",
+      "description": "The complete replacement role set requested for the target account."
+    },
+    {
+      "id": "response-schema",
+      "description": "The explicit OpenAPI response projection produced by the operation."
+    },
+    {
+      "id": "role",
+      "description": "A product role resolved from the current account's granted authorities."
+    },
+    {
+      "id": "roster-fingerprint",
+      "description": "The preview-time digest of every roster record the import would touch."
+    },
+    {
+      "id": "route",
+      "description": "The normalized request path matched by the server authorization chain."
+    },
+    {
+      "id": "series-owner",
+      "description": "Whether the current account created the selected booking series."
+    },
+    {
+      "id": "session-handle",
+      "description": "The opaque revocation handle scoped to one account session."
+    },
+    {
+      "id": "source-version",
+      "description": "The import source version against which the preview was prepared."
+    },
+    {
+      "id": "subject-person",
+      "description": "The one person whose records a subject-access response may contain."
+    },
+    {
+      "id": "target-account",
+      "description": "The account whose roles, status, credentials or sessions are being administered."
+    },
+    {
+      "id": "target-person",
+      "description": "The person whose roster projection or identity data is being administered."
+    },
+    {
+      "id": "viewer-account",
+      "description": "The optional current account used to select viewer-specific public fields."
+    }
+  ],
+  "operationRules": [
+    {
+      "id": "public-platform-and-session-boundary",
+      "description": "Build metadata, the API document, login status and idempotent logout are available without permanent account authority.",
+      "operationIds": [
+        "getSourceOffer",
+        "getApiDocument",
+        "getSessionStatus",
+        "logOut"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "request-boundary"
+      ]
+    },
+    {
+      "id": "public-login-boundary",
+      "description": "Login accepts credentials from an anonymous or existing browser only through the dedicated form fields and never returns them.",
+      "operationIds": [
+        "logIn"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "request-boundary",
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "public-club-and-calendar",
+      "description": "Public club configuration, facilities and calendar occupancy are readable without account authority through deliberately bounded response projections.",
+      "operationIds": [
+        "listCourts",
+        "listOpeningHours",
+        "getBookingGrid",
+        "getClubConfig",
+        "getClubLogo",
+        "getWebManifest",
+        "listAllocations"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "request-boundary",
+        "public-projection"
+      ]
+    },
+    {
+      "id": "initial-password-replacement",
+      "description": "An account carrying an issued credential may replace it but may perform no ordinary authenticated operation first.",
+      "operationIds": [
+        "changeInitialPassword"
+      ],
+      "actors": [
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "initial-password-gate",
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "own-account-preferences-and-session-list",
+      "description": "Permanent accounts may read their sessions and change only the locale and message choices attached to their own account.",
+      "operationIds": [
+        "listOwnSessions",
+        "changeOwnLocale",
+        "listOwnMessageChoices",
+        "chooseOwnMessages"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "own-account-scope"
+      ]
+    },
+    {
+      "id": "own-credential-proof-and-replacement",
+      "description": "A permanent account may prove or replace only its own password through the dedicated credential operations.",
+      "operationIds": [
+        "reauthenticate",
+        "changeOwnPassword"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "own-account-scope",
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "own-session-termination",
+      "description": "A permanent account may terminate its own sessions; ending every session or another browser additionally requires a recent password proof.",
+      "operationIds": [
+        "endOwnSessions",
+        "endOwnSession"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "own-account-scope",
+        "recent-authentication"
+      ]
+    },
+    {
+      "id": "authenticated-booking-card-discovery",
+      "description": "Permanent accounts may discover active booking cards admitted by their roles for future booking requests.",
+      "operationIds": [
+        "listBookableCards"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "booking-card-eligibility"
+      ]
+    },
+    {
+      "id": "authenticated-participant-card-discovery",
+      "description": "Permanent accounts may discover the active participant-card types available when naming a booking participant.",
+      "operationIds": [
+        "listParticipantCards"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "participant-card-availability"
+      ]
+    },
+    {
+      "id": "authenticated-member-directory",
+      "description": "Permanent accounts may search the bounded current-member projection used to name a participant in their own booking request.",
+      "operationIds": [
+        "searchParticipantMembers"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "member-directory-projection"
+      ]
+    },
+    {
+      "id": "booking-create-and-preview",
+      "description": "A permanent account may create or preview bookings only with a booking card admitted by its roles and the current resource state.",
+      "operationIds": [
+        "createBooking",
+        "getBookingEligibility",
+        "previewSeries",
+        "createSeries"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "booking-card-eligibility"
+      ]
+    },
+    {
+      "id": "own-booking-and-participation",
+      "description": "A permanent account sees its own bookings and participations and may mutate only an owned booking or its own participation; administrators retain the documented booking override.",
+      "operationIds": [
+        "cancelBooking",
+        "listPersonalBookings",
+        "listOwnParticipations",
+        "removeOwnParticipation"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "booking-ownership"
+      ]
+    },
+    {
+      "id": "managed-booking",
+      "description": "A permanent account sees booking management data only when one of its roles manages the booking card; administrators may manage every card.",
+      "operationIds": [
+        "listManagedAppointments",
+        "getManagedAppointment"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "managed-booking-scope"
+      ]
+    },
+    {
+      "id": "owned-series",
+      "description": "Series cancellation and movement require ownership of the series or a booking-card management role; administrators retain the documented override.",
+      "operationIds": [
+        "cancelSeries",
+        "previewSeriesMove",
+        "moveSeries"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "series-ownership"
+      ]
+    },
+    {
+      "id": "administration",
+      "description": "Ordinary administration requires an enabled permanent account carrying ADMIN; operation-specific validation and state guards still apply.",
+      "operationIds": [
+        "listCourtsForAdmin",
+        "createCourt",
+        "getCourt",
+        "changeCourt",
+        "setCourtActive",
+        "listBookingCards",
+        "createBookingCard",
+        "getBookingCard",
+        "changeBookingCard",
+        "setBookingCardActive",
+        "listParticipantCardsForAdmin",
+        "createParticipantCard",
+        "getParticipantCard",
+        "changeParticipantCard",
+        "setParticipantCardActive",
+        "listMembershipTypes",
+        "createMembershipType",
+        "getMembershipType",
+        "changeMembershipType",
+        "setMembershipTypeActive",
+        "searchRoster",
+        "createPerson",
+        "readPerson",
+        "changeAccountLocale",
+        "assignMembership",
+        "removeMembership",
+        "listSupportedEncodings",
+        "listImportSources",
+        "createImportSource",
+        "readImportSource",
+        "changeImportSource",
+        "deleteImportSource",
+        "listExternalReferences",
+        "linkExternalReference",
+        "unlinkExternalReference",
+        "createImportPreview",
+        "readImportPreview",
+        "listImportRuns",
+        "listRuleSets",
+        "createRuleSet",
+        "listRuleTypes",
+        "getRuleSet",
+        "changeRuleSet",
+        "setRuleSetActive",
+        "listOpeningHoursForAdmin",
+        "setWeeklyOpeningHours",
+        "getClubConfigForAdmin",
+        "changeClubConfig",
+        "uploadClubLogo",
+        "deleteClubLogo",
+        "listRules",
+        "setRule",
+        "removeRule",
+        "courtImpact",
+        "bookingCardImpact",
+        "openingHoursImpact",
+        "facilityUtilisation",
+        "readMessageLog",
+        "readAuditLog",
+        "exportRoster",
+        "exportBookings",
+        "exportPersonData"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "recent-person-administration",
+      "description": "Correcting a person's identity or address requires ADMIN and a recent full-password proof.",
+      "operationIds": [
+        "changePerson"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "recent-account-administration",
+      "description": "Creating or correcting account security and terminating one account's sessions requires ADMIN and a recent full-password proof.",
+      "operationIds": [
+        "createAccount",
+        "changeAccountUsername",
+        "requestAccountCredentials",
+        "endAccountSessions"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "continuity-protected-account-administration",
+      "description": "Changing roles or enabled state requires ADMIN, recent authentication and preservation of at least one enabled administrator.",
+      "operationIds": [
+        "changeAccountRoles",
+        "setAccountActive"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication",
+        "administrator-continuity",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "global-session-termination",
+      "description": "Terminating every account session requires ADMIN and recent authentication and also ends the caller's current session.",
+      "operationIds": [
+        "endAllSessions"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication"
+      ]
+    },
+    {
+      "id": "import-execution",
+      "description": "Executing a reviewed import requires ADMIN, recent authentication and ownership of a current preview whose source and roster state still match.",
+      "operationIds": [
+        "executeImportPreview"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication",
+        "import-preview-owner",
+        "administrative-projection"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "request-boundary",
+      "title": "Public request boundary",
+      "rule": "Only explicitly public routes admit an anonymous caller; all other shipped operations require a valid server-side session.",
+      "attributes": [
+        "route",
+        "authenticated-session",
+        "account-enabled",
+        "password-change-required"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain",
+        "src/main/java/org/courtside/identity/internal/LoginAttemptFilter.java#doFilterInternal",
+        "src/main/java/org/courtside/identity/internal/SessionStatusController.java#getSessionStatus"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAnonymousAllowedEndpoint_thenEveryOneOfThemSucceeds"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAnonymousCaller_whenCallingEveryAuthenticatedEndpoint_thenEveryOneOfThemIsUnauthorized"
+      ]
+    },
+    {
+      "id": "permanent-account-gate",
+      "title": "Permanent account gate",
+      "rule": "Ordinary account operations require an authenticated, enabled account whose issued credential has already been replaced by a permanent password.",
+      "attributes": [
+        "authenticated-session",
+        "account-enabled",
+        "password-change-required"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenAnAuthenticatedMember_whenCallingEveryAuthenticatedEndpoint_thenNoneOfThemIsUnauthorized"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenEveryInitialPasswordRole_whenCallingEveryMappedEndpoint_thenOnlyPublicAndReplacementOperationsPassAuthorization"
+      ]
+    },
+    {
+      "id": "initial-password-gate",
+      "title": "Initial password gate",
+      "rule": "The initial-password authority reaches only password replacement and loses all authority when that replacement succeeds.",
+      "attributes": [
+        "authenticated-session",
+        "password-change-required"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain",
+        "src/main/java/org/courtside/identity/internal/InitialPasswordService.java#change",
+        "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java#run",
+        "src/main/java/org/courtside/identity/internal/CourtsideUserDetailsService.java#loadUserByUsername"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/LoginTest.java#givenTheBootstrapAdmin_whenChangingTheInitialPassword_thenTheOldPasswordStopsWorking"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/AdminSurfaceTest.java#givenEveryInitialPasswordRole_whenCallingEveryMappedEndpoint_thenOnlyPublicAndReplacementOperationsPassAuthorization"
+      ]
+    },
+    {
+      "id": "administrator-gate",
+      "title": "Administrator gate",
+      "rule": "Every route below /api/admin requires ADMIN and rejects anonymous, initial-password and every non-admin product role before the operation runs.",
+      "attributes": [
+        "route",
+        "role",
+        "password-change-required"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#filterChain"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/AdminAuthorizationTest.java#givenAnAdmin_whenCallingAnAdminEndpoint_thenItIsServed"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/AdminAuthorizationTest.java#givenEveryProductRole_whenCallingAnAdminEndpoint_thenOnlyAdminIsServed"
+      ]
+    },
+    {
+      "id": "own-account-scope",
+      "title": "Own account scope",
+      "rule": "The authenticated account identifier selects session, locale and message-choice state; callers cannot supply another account identifier to these operations.",
+      "attributes": [
+        "current-account",
+        "session-handle"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/CurrentUser.java#requireAccount",
+        "src/main/java/org/courtside/identity/internal/AccountSessionService.java#list",
+        "src/main/java/org/courtside/identity/internal/AccountSessionService.java#endOne",
+        "src/main/java/org/courtside/identity/internal/AccountSessionService.java#endAll",
+        "src/main/java/org/courtside/identity/internal/AccountLocaleService.java#change",
+        "src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#current",
+        "src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#choose",
+        "src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#accountId"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenTwoActiveSessions_whenOneIsListedAndEnded_thenOnlyPrivacySafeMetadataAndTheOtherRemain"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/internal/AccountSessionServiceTest.java#givenAnUnknownHandle_whenASessionIsEnded_thenNothingIsDeleted"
+      ]
+    },
+    {
+      "id": "credential-write-only",
+      "title": "Credential write-only boundary",
+      "rule": "Passwords are accepted only by their dedicated credential workflows, never returned in a response and never accepted by account administration.",
+      "attributes": [
+        "dedicated-workflow",
+        "request-field"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#loginEndpoint",
+        "src/main/java/org/courtside/identity/internal/AccountController.java#changeInitialPassword",
+        "src/main/java/org/courtside/identity/internal/AccountController.java#changeOwnPassword",
+        "src/main/java/org/courtside/identity/internal/PermanentPasswordService.java#change",
+        "src/main/java/org/courtside/identity/internal/ReauthenticationService.java#reauthenticate",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#createAccount"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/PermanentPasswordChangeTest.java#givenTwoActiveSessions_whenThePasswordIsReplaced_thenBothEndAndOnlyTheReplacementSignsIn"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/member/web/RosterAdminControllerTest.java#givenARequestStillCarryingAPassword_whenCreatingAnAccount_thenTheContractRefusesIt"
+      ]
+    },
+    {
+      "id": "booking-card-eligibility",
+      "title": "Booking card role and state",
+      "rule": "A booking card must be active and admit at least one actor role; ADMIN bypasses the card role list but not facility availability or invariant checks.",
+      "attributes": [
+        "booking-card",
+        "booking-card-active",
+        "allowed-role",
+        "administrator-override"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/internal/CardEligibilityPolicy.java#requireEligible",
+        "src/main/java/org/courtside/booking/internal/BookingRuleGate.java#bookingEligibilityFor",
+        "src/main/java/org/courtside/booking/internal/BookingRuleGate.java#maxBookingMinutesFor",
+        "src/main/java/org/courtside/booking/internal/BookingRuleGate.java#requireCancellationAllowed",
+        "src/main/java/org/courtside/booking/internal/BookingRuleGate.java#restrictionsApplyTo",
+        "src/main/java/org/courtside/booking/BookingWriter.java#write/3",
+        "src/main/java/org/courtside/card/CardService.java#bookableCards",
+        "src/main/java/org/courtside/card/web/CardController.java#callerRoles",
+        "src/main/java/org/courtside/booking/series/SeriesService.java#create",
+        "src/main/java/org/courtside/booking/web/BookingController.java#getBookingEligibility",
+        "src/main/java/org/courtside/booking/web/BookingController.java#createBooking",
+        "src/main/java/org/courtside/booking/web/SeriesController.java#createSeries",
+        "src/main/java/org/courtside/booking/web/SeriesController.java#previewSeries"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenTheRequiredRole_whenRequiringEligibility_thenTheCardIsReturned"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenOnlyAnotherRole_whenRequiringEligibility_thenTheRoleFailureIsRaised"
+      ]
+    },
+    {
+      "id": "booking-ownership",
+      "title": "Booking and participation ownership",
+      "rule": "Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN and withdrawal removes only the current person's participation.",
+      "attributes": [
+        "current-account",
+        "booking-owner",
+        "participant-person",
+        "administrator-override"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/BookingService.java#cancel",
+        "src/main/java/org/courtside/booking/BookingWriter.java#cancel",
+        "src/main/java/org/courtside/booking/Booking.java#withdrawParticipant",
+        "src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireManagementAccess",
+        "src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireRoleManagementAccess",
+        "src/main/java/org/courtside/booking/internal/BookingAccessControl.java#managementRoles",
+        "src/main/java/org/courtside/booking/ParticipationService.java#withdraw",
+        "src/main/java/org/courtside/booking/web/BookingController.java#listPersonalBookings",
+        "src/main/java/org/courtside/booking/web/BookingController.java#listOwnParticipations",
+        "src/main/java/org/courtside/booking/web/BookingController.java#removeOwnParticipation",
+        "src/main/java/org/courtside/booking/web/BookingController.java#cancelBooking"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed"
+      ]
+    },
+    {
+      "id": "participant-card-availability",
+      "title": "Participant card availability",
+      "rule": "Participant-card discovery returns active cards only; it has no booking-card role allowlist or administrator override.",
+      "attributes": [
+        "participant-card-active"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/card/CardService.java#activeParticipantCards",
+        "src/main/java/org/courtside/card/web/CardController.java#listParticipantCards"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/card/web/CardControllerTest.java#givenAnActiveAndADeactivatedParticipantCard_whenListingPublicly_thenOnlyTheActiveOneIsPresent"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/card/web/CardControllerTest.java#givenAnAnonymousCaller_whenListingParticipantCardsPublicly_thenItIsUnauthorized"
+      ]
+    },
+    {
+      "id": "managed-booking-scope",
+      "title": "Managed booking scope",
+      "rule": "Managed listings and details contain only bookings whose card names one of the actor roles as a managing role; ADMIN sees every card.",
+      "attributes": [
+        "booking-card",
+        "managing-role",
+        "administrator-override"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/BookingRepository.java#findManagedBookingIds",
+        "src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#list",
+        "src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#get",
+        "src/main/java/org/courtside/booking/web/BookingController.java#listManagedAppointments",
+        "src/main/java/org/courtside/booking/web/BookingController.java#getManagedAppointment"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOfficerAppointment_whenListingManagedAppointments_thenBothResponsibleRolesSeeIt",
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenACardManagedByTrainers_whenATrainerOpensAnAppointmentOnIt_thenTheParticipantsAreShown"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOfficerAppointment_whenAnOrdinaryMemberListsManagedAppointments_thenNothingIsDisclosed",
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenACardBookableByMembersAndTrainers_whenATrainerOpensAMemberAppointment_thenItIsRefused"
+      ]
+    },
+    {
+      "id": "series-ownership",
+      "title": "Series ownership and management",
+      "rule": "Moving or cancelling a series requires its creator, a role that manages the series booking card, or ADMIN; the selected occurrence scope is preserved.",
+      "attributes": [
+        "series-owner",
+        "booking-card",
+        "managing-role",
+        "administrator-override",
+        "occurrence-scope"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/series/SeriesService.java#requireManagementAccessTo",
+        "src/main/java/org/courtside/booking/series/SeriesService.java#previewMove/4",
+        "src/main/java/org/courtside/booking/web/SeriesController.java#cancelSeries",
+        "src/main/java/org/courtside/booking/web/SeriesController.java#moveSeries",
+        "src/main/java/org/courtside/booking/web/SeriesController.java#previewSeriesMove"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/series/SeriesMovePreviewTest.java#givenATrainingSeriesCreatedByATrainer_whenAYouthDirectorPreviewsAMove_thenItIsAllowed"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/booking/series/SeriesMovePreviewTest.java#givenTheCallerDoesNotOwnTheSeriesAndIsNotAdmin_whenPreviewingAMove_thenItIsRejected"
+      ]
+    },
+    {
+      "id": "recent-authentication",
+      "title": "Recent full-password proof",
+      "rule": "Sensitive account administration, another browser's session termination and import execution require a successful full-password proof no older than five minutes.",
+      "attributes": [
+        "authenticated-at",
+        "current-session",
+        "five-minute-window"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/RecentAuthentication.java#requireRecent",
+        "src/main/java/org/courtside/identity/GlobalSessionAdministration.java#endAll",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#changePerson",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#createAccount",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#changeAccountRoles",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#changeAccountUsername",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#requestAccountCredentials",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#setAccountActive",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#endAccountSessions",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#endAllSessions",
+        "src/main/java/org/courtside/dataexchange/web/ImportExecutionAdminController.java#executeImportPreview"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenAnotherAccountsSessions_whenAdminProofIsRefreshed_thenOnlyTheTargetEnds"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenNoRecentProof_whenAnAdminPerformsSensitiveChanges_thenEveryChangeIsRefused"
+      ]
+    },
+    {
+      "id": "administrator-continuity",
+      "title": "Administrator continuity",
+      "rule": "The last enabled administrator cannot remove its ADMIN role or disable its account; another enabled administrator makes the same transition permissible.",
+      "attributes": [
+        "target-account",
+        "enabled-administrator-count",
+        "requested-roles",
+        "requested-enabled-state"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/member/RosterService.java#changeRoles",
+        "src/main/java/org/courtside/member/RosterService.java#requireASuccessorAdministrator",
+        "src/main/java/org/courtside/member/RosterSyncService.java#withdrawMembershipFrom"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/member/web/RosterAdminControllerTest.java#givenASecondEnabledAdministrator_whenOneStepsDown_thenTheChangeStands"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/member/web/RosterAdminControllerTest.java#givenTheOnlyEnabledAdministrator_whenTheRoleIsTakenFromThem_thenTheInstanceKeepsIt"
+      ]
+    },
+    {
+      "id": "import-preview-owner",
+      "title": "Import preview ownership and state",
+      "rule": "Only the administrator who created a current, unexpired preview may execute it, and execution rechecks its source and roster fingerprints before any write.",
+      "attributes": [
+        "preview-reviewer",
+        "preview-current",
+        "preview-expiry",
+        "source-version",
+        "roster-fingerprint"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/dataexchange/ExecutionService.java#execute",
+        "src/main/java/org/courtside/dataexchange/ExecutionService.java#requireExecutable",
+        "src/main/java/org/courtside/dataexchange/ExecutionService.java#requireSameActor",
+        "src/main/java/org/courtside/dataexchange/ExecutionService.java#requireNobodyChangedSince"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAReviewedPreview_whenItIsExecuted_thenEveryRecordExistsAndIsLinked"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnotherAdministratorTookThePreview_whenExecutingIt_thenOnlyItsReviewerCanProceed"
+      ]
+    },
+    {
+      "id": "import-preview-read-projection",
+      "title": "Import preview read projection",
+      "rule": "Every administrator may read a stored preview; after its retention expires, personal change details and ignored columns are removed while non-personal counts and hashes remain.",
+      "attributes": [
+        "administrator",
+        "preview-expiry",
+        "response-schema"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/dataexchange/PreviewService.java#toSummary",
+        "src/main/java/org/courtside/dataexchange/web/ImportPreviewAdminController.java#readImportPreview",
+        "src/main/java/org/courtside/dataexchange/web/ImportPreviewAdminController.java#toResponse"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/dataexchange/web/ImportPreviewAdminControllerTest.java#givenAFileOfPeopleThisSourceHasNotSeen_whenPreviewing_thenEveryRowIsACreationAndNothingIsWritten"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/dataexchange/PreviewRetentionTest.java#givenAPreviewPastItsRetention_whenReadingIt_thenTheCountsRemainAndTheChangeSetIsGone"
+      ]
+    },
+    {
+      "id": "public-projection",
+      "title": "Public response projection",
+      "rule": "Public configuration and calendar responses use dedicated DTO projections and never widen to administrative configuration, roster or another person's booking details.",
+      "attributes": [
+        "viewer-account",
+        "booking-owner",
+        "public-schema"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/config/web/ConfigController.java#toResponse",
+        "src/main/java/org/courtside/booking/internal/AllocationVisibilityService.java#resolve",
+        "src/main/java/org/courtside/booking/internal/AllocationVisibilityService.java#participantPersonIds",
+        "src/main/java/org/courtside/booking/web/BookingController.java#listAllocations",
+        "src/main/java/org/courtside/booking/web/BookingController.java#toResponse"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenABookingOnADay_whenRequestingThatDaysGrid_thenTheBookingIsListed",
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenOwnBookingWithAnotherMember_whenLoadingTheGrid_thenOnlyOwnershipAndSurnameAreVisible"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/config/web/ConfigControllerTest.java#whenReadingThePublicConfig_thenItPublishesNothingOnlyABoardShouldSee",
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnotherMembersBooking_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden"
+      ]
+    },
+    {
+      "id": "member-directory-projection",
+      "title": "Participant directory projection",
+      "rule": "Participant search returns only the stable person identifier and display name of current members, never roster, account, address or membership administration fields.",
+      "attributes": [
+        "current-membership",
+        "permanent-account",
+        "participant-schema"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/member/web/ParticipantMemberController.java#searchParticipantMembers"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/member/web/ParticipantMemberControllerTest.java#givenMembersAndANonMember_whenSearchingByName_thenOnlyMatchingMembersAreReturned"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/member/web/ParticipantMemberControllerTest.java#givenNoSession_whenSearchingMembers_thenItIsUnauthenticated"
+      ]
+    },
+    {
+      "id": "administrative-projection",
+      "title": "Administrative response projection",
+      "rule": "Administrative DTOs may expose the documented roster and operational fields to ADMIN only; credentials remain absent and subject access omits other people's booking data.",
+      "attributes": [
+        "administrator",
+        "response-schema",
+        "subject-person"
+      ],
+      "productionPaths": [
+        "src/main/java/org/courtside/member/RosterService.java#load/1",
+        "src/main/java/org/courtside/member/RosterService.java#requiredLanguage/1",
+        "src/main/java/org/courtside/member/web/RosterAdminController.java#toResponse",
+        "src/main/java/org/courtside/member/internal/RosterSecurityEventLog.java#record",
+        "src/main/java/org/courtside/config/web/ConfigController.java#toAdminResponse",
+        "src/main/java/org/courtside/audit/internal/DomainEventWriter.java#actor",
+        "src/main/java/org/courtside/audit/web/AuditAdminController.java#toResponse",
+        "src/main/java/org/courtside/notification/web/MessageAdminController.java#toResponse",
+        "src/main/java/org/courtside/dataexchange/web/SubjectAccessAdminController.java#toResponse",
+        "src/main/java/org/courtside/dataexchange/web/ExternalReferenceAdminController.java#toResponse",
+        "src/main/java/org/courtside/dataexchange/web/ImportPreviewAdminController.java#createImportPreview",
+        "src/main/java/org/courtside/dataexchange/web/ImportPreviewAdminController.java#toResponse",
+        "src/main/java/org/courtside/dataexchange/web/ImportExecutionAdminController.java#toResponse",
+        "src/main/java/org/courtside/dataexchange/web/ExportAdminController.java#exportRoster",
+        "src/main/java/org/courtside/dataexchange/web/ExportAdminController.java#exportBookings"
+      ],
+      "positiveTests": [
+        "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenAPersonTheInstanceHoldsEverythingAbout_whenABoardAsks_thenEachOfThoseThingsIsAnswered"
+      ],
+      "negativeTests": [
+        "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenABookingSomebodyElseMade_whenABoardAsksAboutTheNamedMember_thenNeitherMakerNorNoteIsNamed"
+      ]
+    }
+  ],
+  "fieldRules": [
+    {
+      "id": "login-credentials-write-only",
+      "access": "never-read",
+      "description": "A username and password are accepted only by form login and never occur in an API response.",
+      "fields": [
+        "$request.username",
+        "$request.password"
+      ],
+      "operationIds": [
+        "logIn"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "dedicated-workflow",
+        "request-field"
+      ],
+      "decisions": [
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "session-identity-read",
+      "access": "read",
+      "description": "Session identity fields describe only the account attached to the current session and become absent or empty for an anonymous caller.",
+      "fields": [
+        "SessionStatus.username",
+        "SessionStatus.displayName",
+        "SessionStatus.locale",
+        "SessionStatus.roles",
+        "SessionStatus.passwordChangeRequired"
+      ],
+      "operationIds": [
+        "getSessionStatus"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "current-session"
+      ],
+      "decisions": [
+        "request-boundary",
+        "own-account-scope"
+      ]
+    },
+    {
+      "id": "own-session-metadata-read",
+      "access": "read",
+      "description": "Opaque revocation handles and normalized browser metadata are visible only to the account that owns those sessions.",
+      "fields": [
+        "AccountSession.handle",
+        "AccountSession.createdAt",
+        "AccountSession.lastActivityAt",
+        "AccountSession.current",
+        "AccountSession.browserFamily"
+      ],
+      "operationIds": [
+        "listOwnSessions"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account"
+      ],
+      "decisions": [
+        "own-account-scope"
+      ]
+    },
+    {
+      "id": "initial-credential-input-write-only",
+      "access": "never-read",
+      "description": "The issued credential replacement is accepted only by the initial-password operation and is never part of a response projection.",
+      "fields": [
+        "InitialPasswordChangeRequest.password"
+      ],
+      "operationIds": [
+        "changeInitialPassword"
+      ],
+      "actors": [
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "dedicated-workflow"
+      ],
+      "decisions": [
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "permanent-password-change-write-only",
+      "access": "never-read",
+      "description": "The current and replacement passwords are accepted only by the own-password operation and never appear in a response projection.",
+      "fields": [
+        "PasswordChangeRequest.currentPassword",
+        "PasswordChangeRequest.newPassword"
+      ],
+      "operationIds": [
+        "changeOwnPassword"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "dedicated-workflow",
+        "current-account"
+      ],
+      "decisions": [
+        "credential-write-only",
+        "own-account-scope"
+      ]
+    },
+    {
+      "id": "reauthentication-password-write-only",
+      "access": "never-read",
+      "description": "A password proof is accepted only by the reauthentication operation and never appears in a response projection.",
+      "fields": [
+        "ReauthenticationRequest.password"
+      ],
+      "operationIds": [
+        "reauthenticate"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "dedicated-workflow",
+        "current-account"
+      ],
+      "decisions": [
+        "credential-write-only",
+        "own-account-scope"
+      ]
+    },
+    {
+      "id": "participant-member-read",
+      "access": "read",
+      "description": "Current member lookup exposes only the identifier and display name needed to add that member to a booking.",
+      "fields": [
+        "PublicParticipantMember.personId",
+        "PublicParticipantMember.displayName"
+      ],
+      "operationIds": [
+        "searchParticipantMembers"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-membership"
+      ],
+      "decisions": [
+        "member-directory-projection"
+      ]
+    },
+    {
+      "id": "public-allocation-read",
+      "access": "read",
+      "description": "The public allocation projection withholds booker identity; participant surnames appear only on the authenticated viewer's own booking.",
+      "fields": [
+        "Allocation.ownBooking",
+        "Allocation.participantLastNames",
+        "Allocation.bookedByName"
+      ],
+      "operationIds": [
+        "listAllocations"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "viewer-account",
+        "booking-owner"
+      ],
+      "decisions": [
+        "public-projection",
+        "booking-ownership"
+      ]
+    },
+    {
+      "id": "personal-booking-read",
+      "access": "read",
+      "description": "A booking note and personal booking identifiers are returned only through the current account's own booking projection.",
+      "fields": [
+        "PersonalBooking.id",
+        "PersonalBooking.seriesId",
+        "PersonalBooking.note"
+      ],
+      "operationIds": [
+        "listPersonalBookings"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "booking-owner",
+        "current-account"
+      ],
+      "decisions": [
+        "booking-ownership"
+      ]
+    },
+    {
+      "id": "managed-booking-detail-read",
+      "access": "read",
+      "description": "Participant display names and internal notes appear only in the detail of a booking whose card the actor may manage.",
+      "fields": [
+        "ManagedAppointmentDetail.note",
+        "ManagedAppointmentDetail.participants",
+        "ManagedParticipant.displayName"
+      ],
+      "operationIds": [
+        "getManagedAppointment"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "booking-card",
+        "managing-role",
+        "administrator-override"
+      ],
+      "decisions": [
+        "managed-booking-scope"
+      ]
+    },
+    {
+      "id": "roster-person-create",
+      "access": "write",
+      "description": "Names and email addresses can be introduced only through the dedicated administrative person creation workflow.",
+      "fields": [
+        "PersonRequest.firstName",
+        "PersonRequest.lastName",
+        "PersonRequest.email"
+      ],
+      "operationIds": [
+        "createPerson"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator"
+      ],
+      "decisions": [
+        "administrator-gate"
+      ]
+    },
+    {
+      "id": "roster-person-correction",
+      "access": "write",
+      "description": "Correcting a person's names or email address requires both administrator authority and recent full-password proof.",
+      "fields": [
+        "PersonRequest.firstName",
+        "PersonRequest.lastName",
+        "PersonRequest.email"
+      ],
+      "operationIds": [
+        "changePerson"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "recent-authentication"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication"
+      ]
+    },
+    {
+      "id": "account-create-write",
+      "access": "write",
+      "description": "An account identifier and its initial roles are writable only through account creation after a recent administrator password proof.",
+      "fields": [
+        "AccountRequest.username",
+        "AccountRequest.roles"
+      ],
+      "operationIds": [
+        "createAccount"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "recent-authentication"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication"
+      ]
+    },
+    {
+      "id": "account-username-write",
+      "access": "write",
+      "description": "An account username is replaceable only through its dedicated operation after a recent administrator password proof.",
+      "fields": [
+        "UsernameRequest.username"
+      ],
+      "operationIds": [
+        "changeAccountUsername"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "recent-authentication"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication"
+      ]
+    },
+    {
+      "id": "account-role-write",
+      "access": "write",
+      "description": "Replacing account roles requires recent administrator proof and preserves at least one enabled administrator in the instance.",
+      "fields": [
+        "RolesRequest.roles"
+      ],
+      "operationIds": [
+        "changeAccountRoles"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "recent-authentication",
+        "enabled-administrator-count"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication",
+        "administrator-continuity"
+      ]
+    },
+    {
+      "id": "account-enabled-write",
+      "access": "write",
+      "description": "Replacing account enabled state requires recent administrator proof and preserves at least one enabled administrator in the instance.",
+      "fields": [
+        "ActiveRequest.active"
+      ],
+      "operationIds": [
+        "setAccountActive"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "recent-authentication",
+        "enabled-administrator-count"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "recent-authentication",
+        "administrator-continuity"
+      ]
+    },
+    {
+      "id": "roster-and-account-read",
+      "access": "read",
+      "description": "Full person, membership and account state is confined to administrative roster responses and never contains a password or reusable session credential.",
+      "fields": [
+        "RosterEntry.personId",
+        "RosterEntry.firstName",
+        "RosterEntry.lastName",
+        "RosterEntry.email",
+        "RosterEntry.accountId",
+        "RosterEntry.username",
+        "RosterEntry.locale",
+        "RosterEntry.addressSharedBy",
+        "RosterEntry.credentialState",
+        "RosterEntry.enabled",
+        "RosterEntry.membershipTypeId",
+        "RosterEntry.membershipStartedOn",
+        "RosterEntry.membershipEndedOn",
+        "RosterEntry.roles"
+      ],
+      "operationIds": [
+        "searchRoster",
+        "createPerson",
+        "readPerson",
+        "changePerson",
+        "createAccount",
+        "changeAccountRoles",
+        "changeAccountUsername",
+        "changeAccountLocale",
+        "requestAccountCredentials",
+        "setAccountActive",
+        "assignMembership"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "target-person"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection",
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "administrative-config-read-write",
+      "access": "read",
+      "description": "Credential lifetimes and the no-membership rule assignment are visible only in the administrative configuration projection.",
+      "fields": [
+        "AdminClubConfig.newAccountCredentialHours",
+        "AdminClubConfig.passwordResetCredentialHours",
+        "AdminClubConfig.bookingReminderHours",
+        "AdminClubConfig.noMembershipTypeRuleSetId"
+      ],
+      "operationIds": [
+        "getClubConfigForAdmin",
+        "changeClubConfig",
+        "uploadClubLogo",
+        "deleteClubLogo"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "administrative-config-write",
+      "access": "write",
+      "description": "Credential lifetimes, reminder timing and the no-membership rule assignment can be changed only through the administrator configuration operation.",
+      "fields": [
+        "ClubConfigRequest.newAccountCredentialHours",
+        "ClubConfigRequest.passwordResetCredentialHours",
+        "ClubConfigRequest.bookingReminderHours",
+        "ClubConfigRequest.noMembershipTypeRuleSetId"
+      ],
+      "operationIds": [
+        "changeClubConfig"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator"
+      ],
+      "decisions": [
+        "administrator-gate"
+      ]
+    },
+    {
+      "id": "booking-party-write",
+      "access": "write",
+      "description": "A participant's person identifier or guest name is accepted only as part of the current account's authorized individual booking request.",
+      "fields": [
+        "ParticipantRequest.personId",
+        "ParticipantRequest.guestName",
+        "ParticipantRequest.cardId",
+        "CreateBookingRequest.note",
+        "CreateBookingRequest.participants"
+      ],
+      "operationIds": [
+        "createBooking"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "booking-card",
+        "allowed-role",
+        "current-membership"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "booking-card-eligibility"
+      ]
+    },
+    {
+      "id": "booking-series-note-write",
+      "access": "write",
+      "description": "A recurring booking note is accepted only as part of the current account's authorized series preview or creation request.",
+      "fields": [
+        "SeriesRuleRequest.note"
+      ],
+      "operationIds": [
+        "previewSeries",
+        "createSeries"
+      ],
+      "actors": [
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN"
+      ],
+      "attributes": [
+        "current-account",
+        "booking-card",
+        "allowed-role"
+      ],
+      "decisions": [
+        "permanent-account-gate",
+        "booking-card-eligibility"
+      ]
+    },
+    {
+      "id": "audit-record-read",
+      "access": "read",
+      "description": "Audit actor data, parameters and resolved subject names are available only to administrators through the audit log.",
+      "fields": [
+        "AuditEntry.parameters",
+        "AuditEntry.subjectId",
+        "AuditEntry.subjectName",
+        "AuditEntry.actorAccountId",
+        "AuditEntry.actorUsername"
+      ],
+      "operationIds": [
+        "readAuditLog"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "message-record-read",
+      "access": "read",
+      "description": "Message identifiers and recipient metadata are available only to administrators through the message log.",
+      "fields": [
+        "MessageEntry.messageId",
+        "MessageEntry.personId",
+        "MessageEntry.personName"
+      ],
+      "operationIds": [
+        "readMessageLog"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "subject-access-read",
+      "access": "read",
+      "description": "The subject-access projection is administrator-only and contains data about exactly the selected person while excluding other people's booking notes and identities.",
+      "fields": [
+        "SubjectAccessExport.personId",
+        "SubjectAccessExport.firstName",
+        "SubjectAccessExport.lastName",
+        "SubjectAccessExport.email",
+        "SubjectAccessExport.accounts",
+        "SubjectAccessExport.memberships",
+        "SubjectAccessExport.bookingsMade",
+        "SubjectAccessExport.bookingsRecordedIn",
+        "SubjectAccessExport.externalReferences",
+        "SubjectAccessExport.changesAsSubject",
+        "SubjectAccessExport.changesAsActor"
+      ],
+      "operationIds": [
+        "exportPersonData"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "subject-person"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "external-reference-person-data-read",
+      "access": "read",
+      "description": "External member identifiers and their person links are confined to dedicated administrator reference operations.",
+      "fields": [
+        "ExternalReference.externalId",
+        "ExternalReference.personId",
+        "ExternalReference.personName"
+      ],
+      "operationIds": [
+        "listExternalReferences",
+        "linkExternalReference"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "import-preview-person-data-read",
+      "access": "read",
+      "description": "Previewed person values and possible matches are visible to administrators until the preview retention expires and the personal change set is removed.",
+      "fields": [
+        "ImportPersonChange.externalId",
+        "ImportPersonChange.personId",
+        "ImportPersonChange.personName",
+        "ImportPersonChange.values",
+        "ImportPossibleDuplicate.externalId",
+        "ImportPossibleDuplicate.personId",
+        "ImportPossibleDuplicate.personName",
+        "ImportSharedAddress.externalId"
+      ],
+      "operationIds": [
+        "createImportPreview",
+        "readImportPreview"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator",
+        "preview-expiry"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "import-preview-read-projection",
+        "administrative-projection"
+      ]
+    }
+  ]
+}

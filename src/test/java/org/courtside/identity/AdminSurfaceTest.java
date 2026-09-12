@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,6 +34,7 @@ import java.util.function.Predicate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -266,6 +268,36 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 .isEmpty();
     }
 
+    @Test
+    void givenEveryInitialPasswordRole_whenCallingEveryMappedEndpoint_thenOnlyPublicAndReplacementOperationsPassAuthorization() {
+        // given
+        List<MappedEndpoint> endpoints = endpointsMatching(pattern -> !pattern.equals(BOOT_ERROR_PATH));
+
+        // when
+        List<String> misrouted = new ArrayList<>();
+        List<String> wrongDecisions = new ArrayList<>();
+        for (Role role : Role.values()) {
+            for (MappedEndpoint endpoint : endpoints) {
+                String where = role + " " + endpoint.method() + " " + endpoint.concretePath();
+                if (!routesWithTheIntendedVariables(endpoint)) {
+                    misrouted.add(where);
+                    continue;
+                }
+                String failure = initialPasswordDecisionFailure(role, endpoint);
+                if (failure != null) {
+                    wrongDecisions.add(where + " — " + failure);
+                }
+            }
+        }
+
+        // then
+        assertMisroutedIsEmpty(misrouted);
+        assertThat(wrongDecisions)
+                .as("an issued credential may reach public operations and its one replacement "
+                        + "operation, but no ordinary authenticated or administrative operation")
+                .isEmpty();
+    }
+
     private void assertMisroutedIsEmpty(List<String> misrouted) {
         assertThat(misrouted)
                 .as("every concrete path built from a discovered pattern must resolve to a real "
@@ -374,6 +406,34 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                     return null;
                 }
                 return "answered 403 Forbidden — gated beyond plain authentication";
+            }
+            return null;
+        } catch (Exception | AssertionError failure) {
+            return failure.getMessage();
+        }
+    }
+
+    private String initialPasswordDecisionFailure(Role role, MappedEndpoint endpoint) {
+        try {
+            MockHttpServletResponse response = mockMvc.perform(
+                            request(endpoint.method(), endpoint.concretePath())
+                                    .contentType(endpoint.consumes())
+                                    .content(endpoint.probeBody())
+                                    .with(user("initial").authorities(
+                                            new SimpleGrantedAuthority("ROLE_" + role.name()),
+                                            new SimpleGrantedAuthority("PASSWORD_CHANGE_REQUIRED")))
+                                    .with(csrf()))
+                    .andReturn().getResponse();
+            boolean admitted = isAnonymousAllowed(endpoint)
+                    || endpoint.pattern().equals(INITIAL_PASSWORD_PATH);
+            if (admitted && (response.getStatus() == HttpStatus.UNAUTHORIZED.value()
+                    || response.getStatus() == HttpStatus.FORBIDDEN.value())) {
+                return "the authorization gate refused an admitted operation with "
+                        + response.getStatus();
+            }
+            if (!admitted && response.getStatus() != HttpStatus.FORBIDDEN.value()) {
+                return "an operation outside the initial-password boundary answered "
+                        + response.getStatus();
             }
             return null;
         } catch (Exception | AssertionError failure) {

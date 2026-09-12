@@ -78,6 +78,7 @@ test("given a reviewed control with a finding, when validating it, then the refe
   const referenced = structuredClone(catalog);
   const control = referenced.controlCoverage.flatMap(({ controls }) => controls)
     .find(({ id }) => id === "v5.0.0-8.1.1");
+  delete control.controlEvidence;
   control.findingReference = "docs/security-findings.md#incomplete-authorization-rule-documentation";
 
   // when / then
@@ -1095,16 +1096,16 @@ test("given a manual outcome, when its control carries no control-specific evide
   // given
   const digest = `sha256:${"a".repeat(64)}`;
   const control = {
-    controlId: "v5.0.0-8.1.1",
-    stepsPerformed: ["Compared the documented rules with the enforced ones"],
-    expectedSecureOutcome: "Every operation states who may call it.",
-    observedResult: "The document states role rules for one prefix only.",
+    controlId: "v5.0.0-2.1.1",
+    stepsPerformed: ["Compared documented business rules with the enforced request paths"],
+    expectedSecureOutcome: "Every business rule has control-specific falsifying evidence.",
+    observedResult: "The catalog records rationale but no control-specific evidence.",
     redactedEvidenceReferences: [{
       id: "evidence-001", digest, classification: "restricted-security-evidence", expiresOn: "2026-09-21"
     }],
     outcome: "pass"
   };
-  const anchored = { ...control, controlId: "v5.0.0-8.3.1" };
+  const anchored = { ...control, controlId: "v5.0.0-2.2.2" };
   const automated = { ...control, controlId: "v5.0.0-3.3.1" };
   const evidence = {
     schemaVersion: 2, catalogVersion: catalog.catalogVersion, runId: "manual-baseline-1",
@@ -1113,12 +1114,12 @@ test("given a manual outcome, when its control carries no control-specific evide
     environment: "SECURITY", profile: "active",
     authorization: {
       id: "protected-record-1", origin: "https://127.0.0.1:8443", targetFingerprint: digest,
-      targetImageDigest: digest, profile: "active", procedureIds: ["MAN-AUTHZ-001"],
+      targetImageDigest: digest, profile: "active", procedureIds: ["MAN-BUSINESS-001"],
       expiresAt: "2026-09-21T20:00:00Z"
     },
     selectedControlIds: [control.controlId], independentReview: { performed: false },
     procedures: [{
-      procedureId: "MAN-AUTHZ-001", prerequisites: ["Qualified target"], controls: [control],
+      procedureId: "MAN-BUSINESS-001", prerequisites: ["Qualified target"], controls: [control],
       tester: "Maintainer", recordedAt: "2026-08-21T20:00:00Z", targetImageDigest: digest
     }]
   };
@@ -1131,7 +1132,7 @@ test("given a manual outcome, when its control carries no control-specific evide
 
   // when / then
   assert.throws(() => validateManualAssessmentEvidence(evidence, assessmentDate),
-    /v5\.0\.0-8\.1\.1 passed without control-specific evidence in the catalog/);
+    /v5\.0\.0-2\.1\.1 passed without control-specific evidence in the catalog/);
   const blocked = withControls([{ ...control, outcome: "blocked",
     rationale: "No falsifying check names this rule yet.", owner: "Maintainer", trackingReference: "issue-804" }]);
   assert.equal(validateManualAssessmentEvidence(blocked, assessmentDate), blocked);
