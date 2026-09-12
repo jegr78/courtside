@@ -15,6 +15,8 @@ const assessment = readFileSync(join(repository, "docs/security-assessment.md"),
 const dependabot = readFileSync(join(repository, ".github/dependabot.yml"), "utf8");
 const npmAudit = readFileSync(join(repository, ".github/workflows/npm-audit.yml"), "utf8");
 const runContract = JSON.parse(readFileSync(join(repository, "security/run-contract.json"), "utf8"));
+const frontendPackage = JSON.parse(readFileSync(join(repository, "frontend/package.json"), "utf8"));
+const frontendLock = JSON.parse(readFileSync(join(repository, "frontend/package-lock.json"), "utf8"));
 const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 
 function jobsStartingASecurityTarget() {
@@ -24,6 +26,19 @@ function jobsStartingASecurityTarget() {
       .filter(([, job]) => (job.steps ?? []).some((step) => /courtside\.mjs security\s/.test(step.run ?? "")))
       .map(([name, job]) => ({ file, name, job })));
 }
+
+test("given Courtside and Redocly need different js-yaml majors, when npm resolves them, then neither receives an incompatible override", () => {
+  // given
+  const directRelease = frontendLock.packages["node_modules/js-yaml"].version;
+  const redoclyRelease = frontendLock.packages["node_modules/@redocly/openapi-core/node_modules/js-yaml"]?.version;
+
+  // when / then
+  assert.equal(frontendPackage.overrides?.["js-yaml"], undefined);
+  assert.equal(directRelease, frontendPackage.devDependencies["js-yaml"]);
+  assert.match(directRelease, /^5\./);
+  assert.equal(redoclyRelease?.split(".")[0], "4");
+  assert.ok(redoclyRelease.localeCompare("4.3.2", undefined, { numeric: true }) >= 0);
+});
 
 // The seeder image adds the compiled fixture classes, which only a Maven build produces, whether the
 // job runs one itself, reaches one through courtside.uat-smoke.mjs, or is handed the artifact.

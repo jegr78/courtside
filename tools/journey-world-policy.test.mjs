@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const setup = readFileSync(new URL("../frontend/e2e/global-setup.ts", import.meta.url), "utf8");
+const frontendPackage = JSON.parse(readFileSync(new URL("../frontend/package.json", import.meta.url), "utf8"));
 const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
 const playwright = readFileSync(new URL("../frontend/playwright.config.ts", import.meta.url), "utf8");
 const bookingReminders = readFileSync(new URL(
@@ -32,6 +33,17 @@ test("given several browser projects, when Playwright runs them, then one global
   assert.match(playwright, /workers: 1/);
   assert.match(playwright, /timeout: 60_000/);
   assert.match(playwright, /Unsupported browser project order/);
+});
+
+test("given Playwright starts browsers in a container, when its package changes, then the image uses the same release", () => {
+  // given
+  const packageRelease = frontendPackage.devDependencies["@playwright/test"];
+
+  // when
+  const imageRelease = /mcr\.microsoft\.com\/playwright:v(?<release>\d+\.\d+\.\d+)-/.exec(setup)?.groups?.release;
+
+  // then
+  assert.equal(imageRelease, packageRelease);
 });
 
 test("given a mutable PWA asset and database, when the next test starts, then both return to their baseline", () => {
