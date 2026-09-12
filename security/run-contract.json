@@ -50,7 +50,7 @@
     },
     {
       "id": "openapi-fuzzer",
-      "version": "4.25.2",
+      "version": "v4.27.0",
       "testIds": ["CSA-API-001", "CSA-IMPORT-001"]
     },
     {
