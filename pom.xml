@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -13,7 +11,7 @@
 
     <groupId>org.courtside</groupId>
     <artifactId>courtside</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
     <name>courtside</name>
     <description>Court booking system for sports clubs</description>
     <!-- The one place the upstream repository is named; application.yaml takes it as the
@@ -393,13 +391,11 @@
                         <configuration>
                             <target>
                                 <fileset id="courtside.fixtures" dir="${fixtures.classes}"/>
-                                <pathconvert property="courtside.excluded.fixtures"
-                                             refid="courtside.fixtures" pathsep="${line.separator}">
+                                <pathconvert property="courtside.excluded.fixtures" refid="courtside.fixtures" pathsep="${line.separator}">
                                     <globmapper from="${fixtures.classes}/*" to="*" handledirsep="true"/>
                                 </pathconvert>
                                 <mkdir dir="${project.build.outputDirectory}/META-INF"/>
-                                <echo file="${project.build.outputDirectory}/META-INF/courtside-excluded-fixtures.txt"
-                                      message="${courtside.excluded.fixtures}${line.separator}"/>
+                                <echo file="${project.build.outputDirectory}/META-INF/courtside-excluded-fixtures.txt" message="${courtside.excluded.fixtures}${line.separator}"/>
                             </target>
                         </configuration>
                     </execution>
@@ -411,14 +407,12 @@
                         </goals>
                         <configuration>
                             <target>
-                                <exec executable="git" dir="${project.basedir}"
-                                      outputproperty="courtside.git.commit" failonerror="true">
+                                <exec executable="git" dir="${project.basedir}" outputproperty="courtside.git.commit" failonerror="true">
                                     <arg value="rev-parse"/>
                                     <arg value="HEAD"/>
                                 </exec>
                                 <mkdir dir="${project.build.outputDirectory}"/>
-                                <echo file="${project.build.outputDirectory}/git.properties"
-                                      message="git.commit.id=${courtside.git.commit}"/>
+                                <echo file="${project.build.outputDirectory}/git.properties" message="git.commit.id=${courtside.git.commit}"/>
                             </target>
                         </configuration>
                     </execution>
