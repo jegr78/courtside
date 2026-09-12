@@ -344,6 +344,38 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAQueryOfOneAstralCharacter_whenSearching_thenTheDocumentedMinimumStillHolds()
+            throws Exception {
+        // given
+        String oneCharacterTwoUnits = "\uD83D\uDE00";
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/public/participant-members")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"" + oneCharacterTwoUnits + "\"}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+    }
+
+    @Test
+    void givenAQueryOfSixtyAstralCharacters_whenSearching_thenTheDocumentedMaximumStillHolds()
+            throws Exception {
+        // given
+        String sixtyCharactersOneHundredAndTwentyUnits = "\uD83D\uDE00".repeat(60);
+
+        // when
+        ResultActions result = mockMvc.perform(post("/api/public/participant-members")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"" + sixtyCharactersOneHundredAndTwentyUnits + "\"}")
+                .with(csrf()));
+
+        // then
+        result.andExpect(status().isOk());
+    }
+
+    @Test
     void givenNoContentTypeAtAll_whenPosting_thenTheAnswerIsStillUnsupportedMediaType()
             throws Exception {
         // given / when

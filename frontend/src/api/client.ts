@@ -292,7 +292,7 @@ export const api = {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
   roster: (query?: string, cursor?: string, limit = 50, membershipTypeId?: string) => request<RosterPage>(
-    "/api/admin/roster/search", {
+    "/api/admin/roster-search", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ limit, ...(query ? { query } : {}), ...(cursor ? { cursor } : {}),
         ...(membershipTypeId ? { membershipTypeId } : {}) })
@@ -454,7 +454,7 @@ export const api = {
     headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
     body: JSON.stringify(booking)
   }),
-  bookingEligibility: () => request<BookingEligibility>("/api/bookings/eligibility"),
+  bookingEligibility: () => request<BookingEligibility>("/api/booking-eligibility"),
   cancelBooking: (bookingId: string) => request<void>(`/api/bookings/${bookingId}`, { method: "DELETE" }),
   personalBookings: (cursor?: string, limit = 50) => request<PersonalBookingPage>(
     `/api/my/bookings?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
@@ -471,7 +471,7 @@ export const api = {
   managedAppointment: (bookingId: string) => request<ManagedAppointmentDetail>(
     `/api/managed/bookings/${bookingId}`
   ),
-  previewSeries: (rule: SeriesRuleRequest) => request<SeriesPreview>("/api/booking-series/preview", {
+  previewSeries: (rule: SeriesRuleRequest) => request<SeriesPreview>("/api/booking-series-preview", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rule)
   }),
   createSeries: (series: CreateSeriesRequest) => request<SeriesCreated>("/api/booking-series", {

@@ -155,6 +155,40 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void noConcretePathLiesInTheShadowOfATemplatedOne() {
+        // when
+        TreeSet<String> shadowed = new TreeSet<>();
+        TreeSet<String> concrete = new TreeSet<>(paths().keySet());
+        concrete.removeIf(path -> TEMPLATED_SEGMENT.matcher(path).find());
+        paths().forEach((template, methods) -> {
+            if (!TEMPLATED_SEGMENT.matcher(template).find()) {
+                return;
+            }
+            Pattern matching = Pattern.compile(TEMPLATED_SEGMENT.matcher(Pattern.quote(template))
+                    .replaceAll("\\\\E[^/]+\\\\Q"));
+            for (String path : concrete) {
+                if (!matching.matcher(path).matches()) {
+                    continue;
+                }
+                TreeSet<String> borrowed = new TreeSet<>(operationsOf(methods).keySet());
+                borrowed.removeAll(operationsOf(paths().get(path)).keySet());
+                if (!borrowed.isEmpty()) {
+                    shadowed.add(path + " " + borrowed + " from " + template);
+                }
+            }
+        });
+
+        // then
+        assertThat(shadowed)
+                .as("a concrete path owns its URL for every method, and this document says so — but"
+                        + " Spring routes one method at a time, so a method the concrete path does"
+                        + " not declare falls through to the templated sibling and is answered as a"
+                        + " malformed identifier instead of 405. The literal segment has to sit"
+                        + " outside the template's reach rather than beside it.")
+                .isEmpty();
+    }
+
+    @Test
     void everyOperationWithARequestBodyDocumentsTheAnswerToAnUnsupportedContentType() {
         // when
         TreeSet<String> silent = new TreeSet<>();

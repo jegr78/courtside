@@ -576,7 +576,7 @@ test("a member's name reaches the roster search without entering any request URL
   // the view loads its first page on mount, so the waiter binds to the request that carries the
   // name rather than to the path, which both halves of this journey issue
   const searched = page.waitForResponse((response) =>
-    response.url().endsWith("/api/admin/roster/search") && response.request().method() === "POST"
+    response.url().endsWith("/api/admin/roster-search") && response.request().method() === "POST"
       && (response.request().postData() ?? "").includes(surname));
   await page.getByTestId("roster-search").fill(surname);
   await page.getByTestId("roster-search-submit").click();

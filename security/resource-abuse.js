@@ -198,7 +198,7 @@ function participantCapacity() {
 function seriesAndRuleCost() {
   if (!scenarioFixturesReady("series-and-rule-cost", () => Boolean(courtId))) return;
   const startsOn = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-  const response = http.post(`${target}/api/booking-series/preview`, JSON.stringify({
+  const response = http.post(`${target}/api/booking-series-preview`, JSON.stringify({
     courtIds: [courtId], cardId: seriesCardId, startsOn, startTime: "18:00:00",
     durationMinutes: 60, intervalWeeks: 1,
     weekdays: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"],
@@ -218,7 +218,7 @@ function previewMutationRace() {
     startTime: "18:00:00", durationMinutes: 60, intervalWeeks: 1, weekdays: [weekday],
     occurrenceCount: 1, note: `Security TOCTOU ${runId}`
   };
-  const preview = http.post(`${target}/api/booking-series/preview`, JSON.stringify(series), {
+  const preview = http.post(`${target}/api/booking-series-preview`, JSON.stringify(series), {
     headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": token, Cookie: cookieHeader() }
   });
   const confirmedStart = preview.json("occurrences.0.startsAt");

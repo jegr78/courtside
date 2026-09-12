@@ -100,7 +100,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     // document, and saying so is what puts it under the fingerprint below.
     private static final Map<String, String> READING_POSTS = Map.of(
             "/api/public/participant-members", "{\"query\":\"Miles\"}",
-            "/api/admin/roster/search", "{\"query\":\"Miles\",\"limit\":10}");
+            "/api/admin/roster-search", "{\"query\":\"Miles\",\"limit\":10}");
 
     private record Probe(String identifier, String query) {
     }
@@ -132,7 +132,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/public/booking-cards", read()),
             entry("/api/public/participant-cards", read()),
             entry("/api/bookings", read("date=" + TODAY)),
-            entry("/api/bookings/eligibility", read()),
+            entry("/api/booking-eligibility", read()),
             entry("/api/my/bookings", read()),
             entry("/api/my/participations", read()),
             entry("/api/managed/bookings", read()),

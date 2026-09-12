@@ -2960,7 +2960,7 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
 
-  /api/bookings/eligibility:
+  /api/booking-eligibility:
     get:
       tags: [bookings]
       operationId: getBookingEligibility
@@ -3178,7 +3178,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /api/booking-series/preview:
+  /api/booking-series-preview:
     post:
       tags: [booking-series]
       operationId: previewSeries
@@ -4017,7 +4017,7 @@ paths:
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
 
-  /api/admin/roster/search:
+  /api/admin/roster-search:
     post:
       tags: [admin-roster]
       operationId: searchRoster

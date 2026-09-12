@@ -493,7 +493,7 @@ test("given a contract that spells the roster listing differently, when the prob
     schema: { $ref: "#/components/schemas/RosterPage" } } } } } };
   const listing = { paths: { "/api/admin/roster": { get: {
     operationId: "listRoster", parameters: [{ name: "limit", in: "query" }], ...page } } } };
-  const search = { paths: { "/api/admin/roster/search": { post: {
+  const search = { paths: { "/api/admin/roster-search": { post: {
     operationId: "searchRoster",
     requestBody: { content: { "application/json": { schema: { properties: { limit: {} } } } } },
     ...page } } } };
@@ -502,7 +502,7 @@ test("given a contract that spells the roster listing differently, when the prob
   assert.deepEqual(rosterListingProbe(listing, 200),
     { method: "GET", path: "/api/admin/roster?limit=200", headers: {} });
   assert.deepEqual(rosterListingProbe(search, 200),
-    { method: "POST", path: "/api/admin/roster/search",
+    { method: "POST", path: "/api/admin/roster-search",
       headers: { "content-type": "application/json" }, body: JSON.stringify({ limit: 200 }) });
   assert.throws(() => rosterListingProbe({ paths: {} }, 1), /exactly one operation answering a roster page/);
   assert.throws(() => rosterListingProbe({ paths: { "/api/admin/roster/{personId}": { get: {

@@ -52,7 +52,7 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
     @Test
     void givenAnonymousCaller_whenReadingBookingEligibility_thenUnauthorized() throws Exception {
         // when / then
-        mockMvc.perform(get("/api/bookings/eligibility"))
+        mockMvc.perform(get("/api/booking-eligibility"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -64,7 +64,7 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
         createAccountWithMembership("Jane", "Doe", "doe.jane", Role.MEMBER, true);
 
         // when / then
-        mockMvc.perform(get("/api/bookings/eligibility"))
+        mockMvc.perform(get("/api/booking-eligibility"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.violations.length()").value(1))
                 .andExpect(jsonPath("$.violations[0].code")
@@ -80,7 +80,7 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
         createAccountWithMembership("John", "Roe", "roe.john", Role.MEMBER, false);
 
         // when / then
-        mockMvc.perform(get("/api/bookings/eligibility"))
+        mockMvc.perform(get("/api/booking-eligibility"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.violations").isEmpty());
     }
@@ -93,7 +93,7 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
         createAccountWithMembership("Mary", "Major", "major.mary", Role.ADMIN, true);
 
         // when / then
-        mockMvc.perform(get("/api/bookings/eligibility"))
+        mockMvc.perform(get("/api/booking-eligibility"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.violations").isEmpty());
     }
@@ -109,7 +109,7 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
                 rules.ruleSetBoundingBookingDuration("Short slots", 90)));
 
         // when / then
-        mockMvc.perform(get("/api/bookings/eligibility"))
+        mockMvc.perform(get("/api/booking-eligibility"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.maxBookingMinutes").value(90));
     }
@@ -122,7 +122,7 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
         createAccountWithMembership("John", "Roe", "roe.john", Role.MEMBER, false);
 
         // when / then
-        mockMvc.perform(get("/api/bookings/eligibility"))
+        mockMvc.perform(get("/api/booking-eligibility"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.maxBookingMinutes").doesNotExist());
     }
@@ -138,7 +138,7 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
                 rules.ruleSetBoundingBookingDuration("Short slots", 90)));
 
         // when / then
-        mockMvc.perform(get("/api/bookings/eligibility"))
+        mockMvc.perform(get("/api/booking-eligibility"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.maxBookingMinutes").doesNotExist());
     }
@@ -154,7 +154,7 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
                 rules.ruleSetBoundingBookingDuration("Short slots", 90));
 
         // when / then
-        mockMvc.perform(get("/api/bookings/eligibility"))
+        mockMvc.perform(get("/api/booking-eligibility"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.maxBookingMinutes").value(90));
     }

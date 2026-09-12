@@ -273,7 +273,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         signInReadyAccount(jane, "doe.jane", Set.of(Role.MEMBER, Role.ADMIN));
         signInReadyAccount(mary, "major.mary", Set.of(Role.ADMIN));
         MockHttpSession session = signIn("doe.jane");
-        mockMvc.perform(post("/api/admin/roster/search").with(csrf()).session(session)
+        mockMvc.perform(post("/api/admin/roster-search").with(csrf()).session(session)
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk());
 
@@ -281,7 +281,7 @@ class RosterAccountTest extends AbstractIntegrationTest {
         roster.changeRoles(jane, Set.of(Role.MEMBER));
 
         // then
-        mockMvc.perform(post("/api/admin/roster/search").with(csrf()).session(session)
+        mockMvc.perform(post("/api/admin/roster-search").with(csrf()).session(session)
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));

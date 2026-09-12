@@ -86,7 +86,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void whenPreviewingAWeeklySeries_thenEveryOccurrenceIsListed() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/booking-series/preview")
+        mockMvc.perform(post("/api/booking-series-preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewJson(4))
                         .with(csrf()))
@@ -101,7 +101,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void givenACountLargerThanTheHorizonAllows_whenPreviewing_thenTheResponseSaysSo() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/booking-series/preview")
+        mockMvc.perform(post("/api/booking-series-preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewJson(100))
                         .with(csrf()))
@@ -116,7 +116,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     void givenEveryOccurrenceRunsPastClosingTime_whenPreviewing_thenTheViolationsCarryCodeAndParams()
             throws Exception {
         // when / then
-        mockMvc.perform(post("/api/booking-series/preview")
+        mockMvc.perform(post("/api/booking-series-preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(pastClosingTimePreviewJson())
                         .with(csrf()))
@@ -191,7 +191,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
         members.assignMembership(trainerPersonId, ACTIVE_MEMBERSHIP);
 
         // when / then
-        mockMvc.perform(post("/api/booking-series/preview")
+        mockMvc.perform(post("/api/booking-series-preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(fridayPreviewJson(6))
                         .with(csrf()))
@@ -205,7 +205,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     void givenAnAuthenticatedPrincipalWithoutAnAccountRow_whenPreviewing_thenItIsStillAllowed()
             throws Exception {
         // when / then
-        mockMvc.perform(post("/api/booking-series/preview")
+        mockMvc.perform(post("/api/booking-series-preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewJson(4))
                         .with(csrf()))
@@ -217,7 +217,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAMemberAndATrainerCard_whenPreviewing_thenItIsStillAllowed() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/booking-series/preview")
+        mockMvc.perform(post("/api/booking-series-preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewJson(4))
                         .with(csrf()))
@@ -357,7 +357,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void givenADurationLongerThanADay_whenPreviewing_thenBadRequest() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/booking-series/preview")
+        mockMvc.perform(post("/api/booking-series-preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -382,7 +382,7 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @WithMockUser(username = "trainer.john", roles = "TRAINER")
     void givenMoreOccurrencesThanAllowed_whenPreviewing_thenBadRequest() throws Exception {
         // when / then
-        mockMvc.perform(post("/api/booking-series/preview")
+        mockMvc.perform(post("/api/booking-series-preview")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(previewJson(32768))
                         .with(csrf()))

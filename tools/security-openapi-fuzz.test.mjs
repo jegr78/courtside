@@ -51,7 +51,7 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   assert.deepEqual(inventory.find(({ operationId }) => operationId === "getBookingEligibility"), {
     operationId: "getBookingEligibility",
     method: "GET",
-    path: "/api/bookings/eligibility",
+    path: "/api/booking-eligibility",
     modes: ["positive"],
     excludedModes: { negative: "The operation has no request input to invalidate." }
   });
@@ -182,8 +182,8 @@ test("given minimized Schemathesis events, when normalizing them, then failures 
       status: "failure",
       phase: "Fuzzing",
       recorder: {
-        label: "POST /api/admin/roster/search",
-        cases: { "credential-shaped-case-id": { value: { method: "POST", path: "/api/admin/roster/search",
+        label: "POST /api/admin/roster-search",
+        cases: { "credential-shaped-case-id": { value: { method: "POST", path: "/api/admin/roster-search",
           path_parameters: { memberId: "sensitive-object-id" }, query: { cursor: "sensitive-cursor-value" },
           body: { password: "sensitive-body-value" },
           headers: { "X-Api-Key": "request-secret", "X-Trace": "object-id" },
@@ -205,7 +205,7 @@ test("given minimized Schemathesis events, when normalizing them, then failures 
   assert.equal(normalized.operationResults[0].outcome, "incomplete");
   assert.equal(normalized.counterexamples[0].check, "not-a-server-error");
   assert.equal(normalized.counterexamples[0].caseId, "case-1");
-  assert.equal(normalized.counterexamples[0].pathTemplate, "/api/admin/roster/search");
+  assert.equal(normalized.counterexamples[0].pathTemplate, "/api/admin/roster-search");
   assert.deepEqual(normalized.counterexamples[0].reason,
     { kind: "status", observedStatus: 503, expectedStatuses: ["non-5xx"] });
   assert.deepEqual(normalized.counterexamples[0].requestShape, { locations: ["body", "path", "query"] });
@@ -224,7 +224,7 @@ test("given distinct structural failures, when normalizing them, then candidates
       validationKeyword: "required", missingProperties: [missingProperty] } } });
   const events = [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
-    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster/search",
+    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster-search",
       cases: {
         one: { value: { method: "GET", meta: { generation: { mode: "negative" } } } },
         two: { value: { method: "GET", meta: { generation: { mode: "negative" } } } }
@@ -248,7 +248,7 @@ test("given exact statuses in one class, when normalizing them, then their disag
     failure_info: { reason: { kind: "status", observedStatus, expectedStatuses: [400] } } });
   const events = [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
-    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster/search",
+    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster-search",
       cases: {
         one: { value: { method: "GET", meta: { generation: { mode: "negative" } } } },
         two: { value: { method: "GET", meta: { generation: { mode: "negative" } } } }
@@ -269,7 +269,7 @@ test("given unsafe or unsupported failure reasons, when normalizing them, then t
     .find(({ operationId }) => operationId === "searchRoster")];
   const events = (reason, name = "response_schema_conformance") => [
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
-    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster/search",
+    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster-search",
       cases: { one: { value: { method: "GET", meta: { generation: { mode: "negative" } } } } },
       checks: { one: [{ name, status: "failure",
         failure_info: { reason } }] } } } }
@@ -321,7 +321,7 @@ test("given an unexpected observed operation, when normalizing it, then it becom
     { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
     { ScenarioFinished: { status: "success", recorder: { label: "GET /api/internal/diagnostics",
       cases: {}, checks: {} } } },
-    { ScenarioFinished: { status: "success", recorder: { label: "POST /api/admin/roster/search",
+    { ScenarioFinished: { status: "success", recorder: { label: "POST /api/admin/roster-search",
       cases: { one: { value: { meta: { generation: { mode: "positive" } } } } }, checks: {} } } }
   ];
 
@@ -469,7 +469,7 @@ test("given a scenario that ended without succeeding, when nothing failed a chec
     { ScenarioFinished: {
       status: "error",
       recorder: {
-        label: "POST /api/admin/roster/search",
+        label: "POST /api/admin/roster-search",
         cases: { one: { value: { method: "GET", query: { cursor: "boundary" },
           meta: { generation: { mode: "positive" } } } } },
         checks: {}
@@ -500,7 +500,7 @@ test("given an unfinished scenario reporting a status nobody defined, when it is
     { ScenarioFinished: {
       status: "something-the-scanner-invented",
       recorder: {
-        label: "POST /api/admin/roster/search",
+        label: "POST /api/admin/roster-search",
         cases: { one: { value: { method: "GET", meta: { generation: { mode: "positive" } } } } },
         checks: {}
       }

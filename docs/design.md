@@ -1069,7 +1069,7 @@ Two safeguards:
 
 ### Conflict handling on creation: preview and explicit decision
 
-`POST /api/booking-series/preview` lists every occurrence the rule produces up to the
+`POST /api/booking-series-preview` lists every occurrence the rule produces up to the
 horizon, together with the court ids already occupied on that date, if any. Nothing is
 written; a preview is open to any authenticated user, including one who could not actually
 create the card in question — the card's allowed roles are enforced by `BookingWriter` at

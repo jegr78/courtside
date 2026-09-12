@@ -372,7 +372,7 @@ it("given a name fragment, when searching the roster, then the criteria are the 
   // given
   let requested: URL | undefined;
   let sent: unknown;
-  server.use(http.post("/api/admin/roster/search", async ({ request }) => {
+  server.use(http.post("/api/admin/roster-search", async ({ request }) => {
     requested = new URL(request.url);
     sent = await request.json();
     return HttpResponse.json({ entries: [] });
@@ -384,7 +384,7 @@ it("given a name fragment, when searching the roster, then the criteria are the 
   // then
   expect(sent).toEqual({ limit: 50, query: "Jane D", membershipTypeId: "type-1" });
   expect(requested?.search).toBe("");
-  expect(requested?.pathname).toBe("/api/admin/roster/search");
+  expect(requested?.pathname).toBe("/api/admin/roster-search");
 });
 
 it("given a person, when reading them alone, then the entry is returned", async () => {

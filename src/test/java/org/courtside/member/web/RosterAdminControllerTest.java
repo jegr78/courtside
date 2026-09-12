@@ -80,7 +80,7 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     private MockMvc mockMvc;
 
     private static MockHttpServletRequestBuilder searchRoster(String criteria) {
-        return post("/api/admin/roster/search").with(csrf())
+        return post("/api/admin/roster-search").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(criteria);
     }
 
