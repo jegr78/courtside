@@ -491,8 +491,12 @@ test("given a contract that spells the roster listing differently, when the prob
   // given
   const page = { responses: { "200": { content: { "application/json": {
     schema: { $ref: "#/components/schemas/RosterPage" } } } } } };
-  const listing = { paths: { "/api/admin/roster": { get: { operationId: "listRoster", ...page } } } };
-  const search = { paths: { "/api/admin/roster/search": { post: { operationId: "searchRoster", ...page } } } };
+  const listing = { paths: { "/api/admin/roster": { get: {
+    operationId: "listRoster", parameters: [{ name: "limit", in: "query" }], ...page } } } };
+  const search = { paths: { "/api/admin/roster/search": { post: {
+    operationId: "searchRoster",
+    requestBody: { content: { "application/json": { schema: { properties: { limit: {} } } } } },
+    ...page } } } };
 
   // when / then
   assert.deepEqual(rosterListingProbe(listing, 200),
@@ -501,4 +505,12 @@ test("given a contract that spells the roster listing differently, when the prob
     { method: "POST", path: "/api/admin/roster/search",
       headers: { "content-type": "application/json" }, body: JSON.stringify({ limit: 200 }) });
   assert.throws(() => rosterListingProbe({ paths: {} }, 1), /exactly one operation answering a roster page/);
+  assert.throws(() => rosterListingProbe({ paths: { "/api/admin/roster/{personId}": { get: {
+    operationId: "readPerson", parameters: [{ name: "limit", in: "query" }], ...page } } } }, 1),
+  /whose template this probe cannot fill/);
+  assert.throws(() => rosterListingProbe({ paths: { "/api/public/roster": { get: {
+    operationId: "publicRoster", parameters: [{ name: "limit", in: "query" }], ...page } } } }, 1),
+  /outside the prefix the checks beside this probe expect/);
+  assert.throws(() => rosterListingProbe({ paths: { "/api/admin/roster": { get: {
+    operationId: "listRoster", ...page } } } }, 1), /declares no limit/);
 });

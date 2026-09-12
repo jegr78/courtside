@@ -56,14 +56,31 @@ export function rosterListingProbe(api, limit) {
       .filter(([method]) => methods.has(method))
       .filter(([, operation]) => operation.responses?.["200"]?.content?.["application/json"]
         ?.schema?.$ref === "#/components/schemas/RosterPage")
-      .map(([method]) => ({ method: method.toUpperCase(), path })));
+      .map(([method, operation]) => ({ method: method.toUpperCase(), path, operation })));
   if (answering.length !== 1) {
     throw new Error(`The contract must declare exactly one operation answering a roster page, not ${answering.length}`);
   }
-  const [{ method, path }] = answering;
+  const [{ method, path, operation }] = answering;
+  if (path.includes("{")) {
+    throw new Error(`The roster page is answered by ${method} ${path}, whose template this probe cannot fill`);
+  }
+  if (!path.startsWith("/api/admin")) {
+    throw new Error(`The roster page is answered by ${path}, which is outside the prefix the checks `
+      + "beside this probe expect only an administrator to reach");
+  }
+  if (!declaresLimit(operation)) {
+    throw new Error(`${method} ${path} declares no limit, so a probe bounding the page cannot set one`);
+  }
   return method === "GET"
     ? { method, path: `${path}?limit=${limit}`, headers: {} }
     : { method, path, headers: { "content-type": "application/json" }, body: JSON.stringify({ limit }) };
+}
+
+function declaresLimit(operation) {
+  if ((operation.parameters ?? []).some(({ name }) => name === "limit")) return true;
+  const body = operation.requestBody?.content?.["application/json"]?.schema;
+  const schema = body?.$ref ? undefined : body;
+  return Boolean(schema?.properties?.limit) || Boolean(body?.$ref);
 }
 
 function operationExpectations(path, method, security) {
@@ -367,13 +384,13 @@ export function loginTimingSampleOrder(sample) {
 
 export async function executeSecondaryIdentityChecks(send, password, beforeLogin, rosterListing) {
   const checks = [];
+  const listing = rosterListing(1);
   for (const role of roles) {
     const client = new SecurityCookieJar();
     const username = `security.${role.toLowerCase().replaceAll("_", ".")}.2`;
     await signInSecurityUsername(send, client, username, password, role, beforeLogin);
     const session = await send(client, { method: "GET", path: "/api/session", headers: {} });
-    const probe = rosterListing(1);
-    const admin = await send(client, probe, { csrf: probe.method !== "GET" });
+    const admin = await send(client, listing, { csrf: listing.method !== "GET" });
     const expectedAdminStatus = role === "ADMIN" ? 200 : 403;
     const passed = session.status === 200 && session.json?.roles?.length === 1
       && session.json.roles[0] === role && admin.status === expectedAdminStatus
@@ -389,8 +406,7 @@ export async function executeSecondaryIdentityChecks(send, password, beforeLogin
       beforeLogin);
     const session = await send(client, { method: "GET", path: "/api/session", headers: {} });
     const managed = await send(client, { method: "GET", path: "/api/managed/bookings?limit=1", headers: {} });
-    const adminProbe = rosterListing(1);
-    const admin = await send(client, adminProbe, { csrf: adminProbe.method !== "GET" });
+    const admin = await send(client, listing, { csrf: listing.method !== "GET" });
     const passed = session.status === 200
       && JSON.stringify(session.json?.roles?.toSorted()) === JSON.stringify(managerRoles)
       && managed.status === 200 && typedResponse(admin, 403, "urn:courtside:error:access-denied");
@@ -614,8 +630,11 @@ export function authorizationRequest(origin, client, probe, options = {}) {
   const cookie = client.header();
   if (cookie) headers.cookie = cookie;
   if (options.csrf) {
+    // Sending without the token anyway would answer 403 access-denied, which is byte-identical to
+    // the refusal a missing role produces — the probe would pass without reaching what it tests.
     const token = client.csrfToken();
-    if (token) headers["x-xsrf-token"] = token;
+    if (!token) throw new Error(`A probe of ${probe.method} ${probe.path} asked for a CSRF token the client does not hold`);
+    headers["x-xsrf-token"] = token;
   }
   if (probe.body !== undefined) headers["content-length"] = Buffer.byteLength(probe.body);
   return new Promise((resolve, reject) => {
