@@ -344,6 +344,20 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnEmptyStringWhereTheDocumentDeclaresAnIdentifier_whenSearching_thenItIsRefused()
+            throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(post("/api/admin/roster-search")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cursor\":\"\"}")
+                .with(csrf()));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:validation-failed");
+        assertThat(result.andReturn().getResponse().getContentAsString()).contains("cursor");
+    }
+
+    @Test
     void givenAQueryOfOneAstralCharacter_whenSearching_thenTheDocumentedMinimumStillHolds()
             throws Exception {
         // given
