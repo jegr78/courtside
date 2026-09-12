@@ -546,10 +546,29 @@ function counterexampleCandidate(counterexample, plan, context, observedAt) {
   });
 }
 
+// The gateway relays these, so a coverage case can carry any of them; anything else the harness
+// answers instead of the deployment.
+const RELAYED_METHODS = ["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
+
+// RFC 9110 gives content in an OPTIONS request no semantics, and this deployment answers it as a
+// safe method by design, so a rejection check reading its body learns nothing from the answer.
+const ANSWERED_AS_A_SAFE_METHOD = ["OPTIONS"];
+
+function relayedMethod(generatedCase, operation) {
+  const method = String(generatedCase?.method ?? operation.method).toUpperCase();
+  return RELAYED_METHODS.includes(method) ? method : operation.method;
+}
+
 function counterexampleDisposition(counterexample) {
   if (counterexample.reason.kind !== "status") return null;
   const status = counterexample.reason.observedStatus;
   if (status >= 500) return null;
+  const probesTheMethod = counterexample.requestMethod !== counterexample.method;
+  if (counterexample.mode === "negative" && counterexample.check === "negative-data-rejection"
+      && probesTheMethod && ANSWERED_AS_A_SAFE_METHOD.includes(counterexample.requestMethod)
+      && status >= 200 && status < 300) {
+    return "safe-method-carries-no-body-semantics";
+  }
   const qualifiedProxyRejection = ["negative-data-rejection", "status-code-conformance"]
     .includes(counterexample.check);
   if (counterexample.mode === "negative" && qualifiedProxyRejection
@@ -570,6 +589,7 @@ function dispositionProjection(counterexample, disposition) {
     caseId: counterexample.caseId,
     check: counterexample.check,
     method: counterexample.method,
+    requestMethod: counterexample.requestMethod,
     pathTemplate: counterexample.pathTemplate,
     reason: counterexample.reason,
     requestShape: counterexample.requestShape,
@@ -698,6 +718,7 @@ function safeCounterexample(operation, mode, sequence, check, generatedCase) {
     caseId: `case-${sequence}`,
     check: normalizedCheck.slice(0, 80),
     method: operation.method,
+    requestMethod: relayedMethod(generatedCase, operation),
     pathTemplate: operation.path,
     reason,
     requestShape,

@@ -59,13 +59,14 @@
     "counterexample": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operationId", "mode", "caseId", "check", "method", "pathTemplate", "reason", "requestShape", "reproductionDigest"],
+      "required": ["operationId", "mode", "caseId", "check", "method", "requestMethod", "pathTemplate", "reason", "requestShape", "reproductionDigest"],
       "properties": {
         "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
         "mode": { "enum": ["positive", "negative"] },
         "caseId": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$", "maxLength": 32 },
         "check": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80 },
         "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+        "requestMethod": { "enum": ["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] },
         "pathTemplate": { "type": "string", "pattern": "^/", "maxLength": 200 },
         "reason": { "$ref": "#/$defs/failureReason" },
         "requestShape": { "type": "object", "additionalProperties": false, "required": ["locations"],
@@ -77,20 +78,22 @@
     "disposition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operationId", "mode", "caseId", "check", "method", "pathTemplate", "reason", "requestShape", "reproductionDigest", "disposition"],
+      "required": ["operationId", "mode", "caseId", "check", "method", "requestMethod", "pathTemplate", "reason", "requestShape", "reproductionDigest", "disposition"],
       "properties": {
         "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
         "mode": { "enum": ["positive", "negative"] },
         "caseId": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$", "maxLength": 32 },
         "check": { "type": "string", "pattern": "^[a-z0-9-]+$", "maxLength": 80 },
         "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
+        "requestMethod": { "enum": ["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] },
         "pathTemplate": { "type": "string", "pattern": "^/", "maxLength": 200 },
         "reason": { "$ref": "#/$defs/failureReason" },
         "requestShape": { "type": "object", "additionalProperties": false, "required": ["locations"],
           "properties": { "locations": { "type": "array", "maxItems": 3, "uniqueItems": true,
             "items": { "enum": ["body", "path", "query"] } } } },
         "reproductionDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-        "disposition": { "enum": ["documented-status", "proxy-negative-input-rejection"] }
+        "disposition": { "enum": ["documented-status", "proxy-negative-input-rejection",
+          "safe-method-carries-no-body-semantics"] }
       }
     },
     "failureReason": {

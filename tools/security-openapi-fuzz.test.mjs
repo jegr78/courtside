@@ -680,3 +680,28 @@ test("given every state-changing operation, when its probe is built, then the re
   assert.deepEqual(untouched, [],
     "these operations are probed with a request the contract permits, so their answer says nothing");
 });
+
+test("given a coverage case that differs from the operation only by its method, when a safe method answers it, then the body rejection check is dispositioned", () => {
+  // given
+  const inventory = [buildOpenApiFuzzInventory(api)
+    .find(({ operationId }) => operationId === "searchRoster")];
+  const rejection = { name: "negative_data_rejection", status: "failure",
+    failure_info: { reason: { kind: "status", observedStatus: 200,
+      expectedStatuses: [400, 415, "5xx"] } } };
+  const caseFor = (method) => ({ value: { method, body: { query: "00" },
+    meta: { generation: { mode: "negative" } } } });
+  const events = [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster-search",
+      cases: { safe: caseFor("OPTIONS"), own: caseFor("POST") },
+      checks: { safe: [rejection], own: [rejection] } } } }
+  ];
+
+  // when
+  const normalized = normalizeSchemathesisEvents(events, inventory, "negative");
+
+  // then
+  assert.deepEqual(normalized.counterexamples.map(({ requestMethod }) => requestMethod), ["POST"]);
+  assert.deepEqual(normalized.dispositions.map(({ requestMethod, disposition }) =>
+    [requestMethod, disposition]), [["OPTIONS", "safe-method-carries-no-body-semantics"]]);
+});

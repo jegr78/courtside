@@ -321,7 +321,7 @@ test("given the destructive k6 profile, when inspecting it, then every curated a
   assert.match(script, /urn:courtside:error:court-unavailable/);
   assert.match(script, /booking\.participants\.cardUnavailable/);
   assert.match(script, /duplicate-delivery:replay-returns-original/);
-  assert.match(script, /\/api\/booking-series\/preview/);
+  assert.match(script, /\/api\/booking-series-preview/);
   assert.match(script, /\/api\/booking-series`/);
   assert.match(script, /confirmedStarts/);
   assert.match(script,
