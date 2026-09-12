@@ -87,7 +87,7 @@ test("given the current contract, when inventorying fuzz coverage, then every op
   assert.deepEqual(modes("endAccountSessions"), ["negative"]);
   assert.deepEqual(modes("endAllSessions"), []);
   assert.match(openApiFuzzPolicy.image,
-    /^schemathesis\/schemathesis:4\.25\.2@sha256:[a-f0-9]{64}$/);
+    /^schemathesis\/schemathesis:v4\.27\.0@sha256:[a-f0-9]{64}$/);
   assert.ok(openApiFuzzPolicy.checks.includes("not_a_server_error"));
   assert.ok(!openApiFuzzPolicy.checks.includes("ignored_auth"));
   assert.deepEqual(openApiFuzzPolicy.negativeInputProxyStatuses, [421]);
