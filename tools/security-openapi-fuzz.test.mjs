@@ -717,6 +717,7 @@ test("given a counterexample, when it is retained, then it names the shape of th
     { ScenarioFinished: { status: "failure", recorder: { label: "POST /api/admin/roster-search",
       cases: { one: { value: { method: "POST",
         body: { cursor: null, limit: 50, query: "Doe", membershipTypeId: ["x"] },
+        headers: { "Content-Type": "application/json", "X-Trace": "secret" },
         meta: { generation: { mode: "negative" } } } } },
       checks: { one: [rejection] } } } }
   ];
@@ -727,4 +728,5 @@ test("given a counterexample, when it is retained, then it names the shape of th
   // then
   assert.deepEqual(counterexample.bodyShape, { kind: "object",
     properties: ["cursor:null", "limit:number", "membershipTypeId:array", "query:string"] });
+  assert.deepEqual(counterexample.headerNames, ["content-type=application/json", "x-trace"]);
 });

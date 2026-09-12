@@ -570,6 +570,17 @@ function bodyShapeProjection(generatedCase) {
   };
 }
 
+// Which headers a case set, never what it set them to: the media type it chose is the remaining
+// place a mutation can sit once the method and the body shape are known.
+function headerNamesProjection(generatedCase) {
+  const headers = generatedCase?.headers;
+  if (headers === null || typeof headers !== "object") return [];
+  return Object.entries(headers)
+    .map(([name, value]) => name.toLowerCase() === "content-type"
+      ? `content-type=${String(value).slice(0, 60)}` : name.toLowerCase())
+    .toSorted().slice(0, 20);
+}
+
 function jsonKindOf(value) {
   if (value === null) return "null";
   if (Array.isArray(value)) return "array";
@@ -613,6 +624,7 @@ function dispositionProjection(counterexample, disposition) {
     method: counterexample.method,
     requestMethod: counterexample.requestMethod,
     bodyShape: counterexample.bodyShape,
+    headerNames: counterexample.headerNames,
     pathTemplate: counterexample.pathTemplate,
     reason: counterexample.reason,
     requestShape: counterexample.requestShape,
@@ -743,6 +755,7 @@ function safeCounterexample(operation, mode, sequence, check, generatedCase) {
     method: operation.method,
     requestMethod: relayedMethod(generatedCase, operation),
     bodyShape: bodyShapeProjection(generatedCase),
+    headerNames: headerNamesProjection(generatedCase),
     pathTemplate: operation.path,
     reason,
     requestShape,
