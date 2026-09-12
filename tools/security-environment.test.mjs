@@ -606,3 +606,20 @@ test("given a recorded environment, when the candidate seeds it, then only what 
       `${name} from the recorded file would decide which executable the docker call runs`);
   }
 });
+
+// The sampling that decides whether a resource-abuse run stayed inside its safety limits reads the
+// meter registry through the application port, and the authorization rule for it is off by default.
+test("given the security Compose file, when the run samples the meter registry, "
+  + "then the environment the sampling reads is enabled and stays container-internal", () => {
+  // given
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.security.yaml", import.meta.url)), "utf8");
+  const caddyfile = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.security", import.meta.url)), "utf8");
+  const environment = readFileSync(fileURLToPath(new URL("./security-environment.mjs", import.meta.url)), "utf8");
+
+  // when / then
+  assert.match(environment, /"curl", "-fsS",\s*\n?\s*"http:\/\/127\.0\.0\.1:8080\/actuator\/prometheus"/);
+  assert.match(compose, /MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,mappings/);
+  assert.match(compose, /COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"/);
+  assert.match(caddyfile, /@private path [^\n]*\/actuator\*/);
+  assert.match(caddyfile, /respond @private 404/);
+});
