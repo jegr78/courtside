@@ -6,16 +6,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.UnexpectedTypeException;
+import jakarta.validation.Validator;
 import jakarta.validation.constraints.Size;
 
 import java.io.IOException;
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
+import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -39,6 +40,9 @@ class GeneratedApiImplementationTest extends AbstractIntegrationTest {
 
     @Autowired
     private ApplicationContext context;
+
+    @Autowired
+    private Validator validator;
 
     @Test
     void whenReadingEveryGeneratedApiInterface_thenEachIsImplementedByAController()
@@ -85,72 +89,48 @@ class GeneratedApiImplementationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenReadingEverySizeConstraintTheGeneratorEmits_thenThisApplicationValidatesItsType()
+    void whenValidatingEverySizeConstraintTheGeneratorEmits_thenAValidatorResolvesForItsType()
             throws Exception {
         // given
-        List<Class<?>> validated = validatedBySizeMapping();
+        List<Class<?>> constrained = generatedApiTypes().stream()
+                .filter(type -> !sizeConstrainedProperties(type).isEmpty()).toList();
 
         // when
-        TreeSet<String> unvalidated = new TreeSet<>();
-        for (Class<?> generated : generatedApiTypes()) {
-            for (AnnotatedElement element : sizeConstrained(generated)) {
-                Class<?> constrained = typeOf(element);
-                if (validated.stream().noneMatch(family -> family.isAssignableFrom(constrained))) {
-                    unvalidated.add(generated.getSimpleName() + " " + constrained.getSimpleName());
-                }
+        TreeSet<String> unresolved = new TreeSet<>();
+        TreeSet<Class<?>> resolved = new TreeSet<>(Comparator.comparing(Class::getName));
+        for (Class<?> type : constrained) {
+            try {
+                validator.validate(type.getDeclaredConstructor().newInstance());
+                sizeConstrainedProperties(type)
+                        .forEach(property -> resolved.add(property.getReturnType()));
+            } catch (UnexpectedTypeException e) {
+                unresolved.add(type.getSimpleName() + ": " + e.getMessage());
             }
+        }
+        for (Class<?> type : generatedApiTypes()) {
+            Stream.of(type.getDeclaredMethods())
+                    .flatMap(method -> Stream.of(method.getParameters()))
+                    .filter(parameter -> parameter.isAnnotationPresent(Size.class))
+                    .filter(parameter -> resolved.stream()
+                            .noneMatch(known -> known.isAssignableFrom(parameter.getType())))
+                    .forEach(parameter -> unresolved.add(
+                            type.getSimpleName() + ": " + parameter.getType().getSimpleName()));
         }
 
         // then
-        assertThat(validated).as("the size mapping must declare validators at all").isNotEmpty();
-        assertThat(unvalidated)
+        assertThat(constrained).as("the generator must emit @Size at all").isNotEmpty();
+        assertThat(unresolved)
                 .as("MeasuresLengthInCodePoints replaces the built-in @Size validators rather than"
-                        + " adding to them, so a bound the generator emits on a type it does not"
-                        + " cover would be declared in the document and enforced by nothing.")
+                        + " adding to them, so a bound the generator emits on a type the"
+                        + " replacement does not cover would be declared in the document and"
+                        + " enforced by nothing.")
                 .isEmpty();
     }
 
-    private static List<Class<?>> validatedBySizeMapping() throws ClassNotFoundException {
-        List<Class<?>> validated = new ArrayList<>();
-        for (Class<?> validator
-                : Class.forName("org.courtside.shared.MeasuresLengthInCodePoints").getDeclaredClasses()) {
-            for (Type implemented : validator.getGenericInterfaces()) {
-                if (implemented instanceof ParameterizedType parameterized
-                        && parameterized.getRawType() == jakarta.validation.ConstraintValidator.class) {
-                    validated.add(rawTypeOf(parameterized.getActualTypeArguments()[1]));
-                }
-            }
-        }
-        return validated;
-    }
-
-    private static List<AnnotatedElement> sizeConstrained(Class<?> generated) {
-        List<AnnotatedElement> constrained = new ArrayList<>();
-        Stream.of(generated.getDeclaredFields()).filter(field -> field.isAnnotationPresent(Size.class))
-                .forEach(constrained::add);
-        Stream.of(generated.getDeclaredMethods()).forEach(method -> {
-            if (method.isAnnotationPresent(Size.class)) {
-                constrained.add(method);
-            }
-            Stream.of(method.getParameters())
-                    .filter(parameter -> parameter.isAnnotationPresent(Size.class))
-                    .forEach(constrained::add);
-        });
-        return constrained;
-    }
-
-    private static Class<?> typeOf(AnnotatedElement element) {
-        return switch (element) {
-            case java.lang.reflect.Field field -> field.getType();
-            case java.lang.reflect.Method method -> method.getReturnType();
-            case java.lang.reflect.Parameter parameter -> parameter.getType();
-            default -> throw new IllegalStateException("Unexpected constrained element " + element);
-        };
-    }
-
-    private static Class<?> rawTypeOf(Type type) {
-        return type instanceof ParameterizedType parameterized
-                ? (Class<?>) parameterized.getRawType() : (Class<?>) type;
+    private static List<Method> sizeConstrainedProperties(Class<?> generated) {
+        return Stream.of(generated.getDeclaredMethods())
+                .filter(method -> method.getParameterCount() == 0)
+                .filter(method -> method.isAnnotationPresent(Size.class)).toList();
     }
 
     private static List<Class<?>> generatedApiTypes() throws IOException, URISyntaxException {
