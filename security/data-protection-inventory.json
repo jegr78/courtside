@@ -161,60 +161,125 @@
     "club-configuration": "Lives as long as the club keeps it; a board changes it in the product and no person's lifecycle reaches it."
   },
   "inMemoryState": {
-    "AuditService": {
-      "level": "operational",
-      "holds": "The `ConfigurationSubjectNames` ports Spring injected, one per module that can name what an audit subject id refers to. It holds components, not data.",
-      "bounded": "The application context."
+    "BookingController": {
+      "level": "personal",
+      "holds": "The participant specifications of one booking request, each able to name a guest.",
+      "bounded": "The request that built it."
     },
-    "BookingRulesViolatedException": {
-      "level": "operational",
-      "holds": "The rule violations one evaluation collected, each an i18n code and its parameters. Evaluation collects all of them rather than stopping at the first, so the list is as long as the rules that refused.",
-      "bounded": "The request that raised it."
+    "BookingHistoryService": {
+      "level": "personal",
+      "holds": "The bookings one person made, assembled to answer a subject-access request.",
+      "bounded": "The request that built it."
     },
-    "CodedDomainFailure": {
-      "level": "operational",
-      "holds": "The parameters of one rule violation, for the life of the exception that carries it. They are the numbers and ids a message needs, because a violation carries an i18n code and never rendered text.",
-      "bounded": "The request that raised it."
+    "BookingRequestFingerprint": {
+      "level": "personal",
+      "holds": "The participants of a booking request, hashed into the fingerprint that makes a retry idempotent.",
+      "bounded": "The request that built it."
     },
-    "ConfigService": {
-      "level": "operational",
-      "holds": "The `BookingGridConstraint` ports Spring injected, which answer what bounds a grid request. It holds components, not data.",
-      "bounded": "The application context."
+    "BookingWriter": {
+      "level": "personal",
+      "holds": "The participant specifications a booking is written from, each able to name a guest.",
+      "bounded": "The request that built it."
     },
-    "HaveIBeenPwnedPasswordLookup": {
-      "level": "pseudonymous",
-      "holds": "The five-character SHA-1 prefix of a candidate password and the suffixes the range service answered with. The prefix is shared by many passwords by construction, and the suffixes come from the service rather than from this club.",
-      "bounded": "A fixed number of entries and a lifetime, in memory only; a restart empties it."
+    "ChangeSetResolver": {
+      "level": "personal",
+      "holds": "The person changes one import preview would apply, each carrying a member number and the canonical fields it would write.",
+      "bounded": "The preview it belongs to, which expires."
     },
-    "PasswordPolicy": {
-      "level": "operational",
-      "holds": "Two word lists a candidate password is refused for containing: the shipped common-password list, and the terms derived from the club's own identity. Neither names a person; both are read, never written.",
-      "bounded": "The application context, from a shipped resource and the club configuration."
+    "CreateBookingCommand": {
+      "level": "personal",
+      "holds": "The participant specifications of one booking command, each able to name a guest.",
+      "bounded": "The request that built it."
     },
-    "RuleEngine": {
-      "level": "operational",
-      "holds": "The `BookingRule` implementations Spring injected. Rules are data in the schema; this list holds the code that evaluates them.",
-      "bounded": "The application context."
+    "CsvSnapshot": {
+      "level": "personal",
+      "holds": "The rows of one uploaded roster file, as the club's own source system wrote them.",
+      "bounded": "The preview it belongs to, which expires."
     },
-    "SecurityEventLog": {
-      "level": "operational",
-      "holds": "Per security event, the field names its structured log line may carry and, for each, the values that field is allowed to take. It is an allow-list of vocabulary, which is what keeps a name or an address out of a log line rather than a rule that hopes nobody adds one.",
-      "bounded": "The declaration of each event, fixed at class initialisation."
+    "CurrentRoster": {
+      "level": "personal",
+      "holds": "The people this instance currently holds, keyed by person id, as an import compares against them.",
+      "bounded": "The import run that reads it."
     },
-    "SeriesMoveConflictException": {
-      "level": "pseudonymous",
-      "holds": "The ids of the bookings a series move would have collided with. A uuid names a row and describes nobody; resolving it needs the database.",
-      "bounded": "The request that raised it."
+    "ExecutionService": {
+      "level": "personal",
+      "holds": "The people an import run would create, each carrying the names and address the file gave.",
+      "bounded": "The import run."
     },
-    "ShippedLanguages": {
-      "level": "operational",
-      "holds": "The IETF language tags this build ships message bundles for, derived from the bundles rather than listed by hand.",
-      "bounded": "The application context."
+    "ExternalReferenceService": {
+      "level": "personal",
+      "holds": "The links between a club member number and a person, as one page of them.",
+      "bounded": "The request that built it."
     },
-    "WeeklyOpeningHoursRejectedException": {
-      "level": "operational",
-      "holds": "The opening-hours violations one submission collected, each an i18n code and the day it concerns.",
-      "bounded": "The request that raised it."
+    "ManagedAppointmentQuery": {
+      "level": "personal",
+      "holds": "The participants of the appointments a manager may see, each able to name a guest.",
+      "bounded": "The request that built it."
+    },
+    "ParticipantCardCapacity": {
+      "level": "personal",
+      "holds": "The participant specifications one card's capacity is measured against.",
+      "bounded": "The request that built it."
+    },
+    "PersonBookingHistory": {
+      "level": "personal",
+      "holds": "The bookings one person made, as a subject-access export renders them.",
+      "bounded": "The request that built it."
+    },
+    "PreviewService": {
+      "level": "personal",
+      "holds": "The current roster keyed by person id, held while a preview is resolved against it.",
+      "bounded": "The preview it belongs to, which expires."
+    },
+    "ResolvedChangeSet": {
+      "level": "personal",
+      "holds": "The person changes a preview resolved, each carrying a member number and the canonical fields it would write.",
+      "bounded": "The preview it belongs to, which expires."
+    },
+    "RosterChangeSet": {
+      "level": "personal",
+      "holds": "The people an import would create, each carrying the names and address the file gave.",
+      "bounded": "The import run."
+    },
+    "RosterCsv": {
+      "level": "personal",
+      "holds": "The rows of a roster export, each a person's name and address as the file will carry them.",
+      "bounded": "The response that offers the file."
+    },
+    "RosterExportService": {
+      "level": "personal",
+      "holds": "The rows a roster export is written from.",
+      "bounded": "The response that offers the file."
+    },
+    "RosterService": {
+      "level": "personal",
+      "holds": "One page of roster entries, each naming a person and their account.",
+      "bounded": "The request that built it."
+    },
+    "RosterSyncService": {
+      "level": "personal",
+      "holds": "The accounts an import would create, each carrying the username derived from a name.",
+      "bounded": "The import run."
+    },
+    "SnapshotParser": {
+      "level": "personal",
+      "holds": "The rows parsed out of one uploaded roster file.",
+      "bounded": "The preview it belongs to, which expires."
+    },
+    "SubjectAccessAdminController": {
+      "level": "personal",
+      "holds": "The reservations of one person, as a subject-access response renders them.",
+      "bounded": "The request that built it."
+    },
+    "SubjectAccessRecord": {
+      "level": "personal",
+      "holds": "The accounts belonging to one person, assembled to answer a subject-access request.",
+      "bounded": "The request that built it."
+    },
+    "SubjectAccessService": {
+      "level": "personal",
+      "holds": "The bookings one person made, assembled to answer a subject-access request.",
+      "bounded": "The request that built it."
     }
   },
   "exportedFields": {

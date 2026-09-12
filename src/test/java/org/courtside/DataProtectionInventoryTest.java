@@ -31,12 +31,16 @@ class DataProtectionInventoryTest extends AbstractIntegrationTest {
     private static final Pattern CSV_HEADER = Pattern.compile(
             "HEADER =\\s*\\n?\\s*List\\.of\\(([^)]*)\\)", Pattern.MULTILINE);
 
-    // <[^>]*> stops at the first > and so cannot span Map<String, List<String>>, which is how a
-    // held collection stayed invisible; one level of nesting is matched explicitly instead.
-    private static final Pattern HELD_FIELD = Pattern.compile(
-            "private (?:final )?[\\w.]*\\b(?:Map|ConcurrentMap|HashMap|LinkedHashMap"
-                    + "|ConcurrentHashMap|SortedMap|TreeMap|Cache|LoadingCache|Set|List|Collection"
-                    + "|Queue|Deque)<(?:[^<>]|<[^<>]*>)*>\\s+\\w+\\s*[=;]");
+    // A type carries a person when it declares a member named like a column the inventory calls
+    // personal; a holder is then anything keeping a collection or array of such a type.
+    private static final Pattern PERSON_MEMBER_TEMPLATE = Pattern.compile(
+            "\\b(?:String|byte\\[\\]|Map<[^>]*>)\\s+(%s)\\b");
+
+    private static final Pattern DECLARED_TYPE = Pattern.compile(
+            "(?:record|class)\\s+(\\w+)[^{;]*?\\(([^)]*)\\)", Pattern.DOTALL);
+
+    private static final String COLLECTIONS =
+            "Map|Set|List|Collection|Queue|Deque|Cache|LoadingCache|ConcurrentMap|ConcurrentHashMap";
 
     @Autowired
     private JdbcClient jdbc;
@@ -163,27 +167,56 @@ class DataProtectionInventoryTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void whenSomethingIsKeptOutsideTheSchema_thenTheInventoryNamesWhatIsInIt() {
+    void whenACollectionOfPeopleIsHeldOutsideTheSchema_thenTheInventoryNamesWhatBoundsIt() {
         // given
-        Set<String> declared = names(inventory().get("inMemoryState"));
+        Pattern personMember = Pattern.compile(PERSON_MEMBER_TEMPLATE.pattern()
+                .formatted(String.join("|", personalProperties())));
+        Pattern holder = Pattern.compile("(?:%s)<[^>]*\\b(?:%s)\\b[^>]*>|\\b(?:%s)\\[\\]"
+                .formatted(COLLECTIONS, String.join("|", carrierTypes(personMember)),
+                        String.join("|", carrierTypes(personMember))));
 
         // when
         TreeSet<String> found = new TreeSet<>();
         sourceFiles().forEach(file -> {
             String source = read(file);
-            if (!source.contains("@Entity") && HELD_FIELD.matcher(source).find()) {
+            if (!source.contains("@Entity") && holder.matcher(source).find()) {
                 found.add(file.getFileName().toString().replace(".java", ""));
             }
         });
 
         // then
         assertThat(found)
-                .as("a collection an instance holds outside an entity is a copy of something the"
-                        + " schema's own sweeps never reach, so the inventory says what is in it"
-                        + " and what bounds it. The rule is the field's shape and not its name,"
-                        + " because a cache called nameCache is a cache and a Map is not the only"
-                        + " way to hold one.")
-                .isEqualTo(new TreeSet<>(declared));
+                .as("a collection of something that carries a person is a copy the schema's own"
+                        + " sweeps never reach, so the inventory says what ends it. The set is"
+                        + " derived twice over — the member names come from the columns this"
+                        + " inventory calls personal, and the carrying types from whoever declares"
+                        + " one — so a list of uuids or of roles never asks for an entry.")
+                .isEqualTo(new TreeSet<>(names(inventory().get("inMemoryState"))));
+    }
+
+    private TreeSet<String> personalProperties() {
+        TreeSet<String> properties = new TreeSet<>();
+        classified().forEach((field, entry) -> {
+            if ("personal".equals(entry.get("level").asText())) {
+                properties.add(camelCase(field.substring(field.indexOf('.') + 1)));
+            }
+        });
+        return properties;
+    }
+
+    private TreeSet<String> carrierTypes(Pattern personMember) {
+        TreeSet<String> carriers = new TreeSet<>();
+        sourceFiles().forEach(file -> {
+            String source = read(file);
+            Matcher declaration = DECLARED_TYPE.matcher(source);
+            while (declaration.find()) {
+                if (personMember.matcher(declaration.group(2)).find()) carriers.add(declaration.group(1));
+            }
+            if (!source.contains("@Entity") && personMember.matcher(source).find()) {
+                carriers.add(file.getFileName().toString().replace(".java", ""));
+            }
+        });
+        return carriers;
     }
 
     // A record reads `lastName()` where an entity reads `getLastName()`, and this codebase carries
