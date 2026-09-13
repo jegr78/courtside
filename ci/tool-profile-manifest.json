@@ -58,6 +58,8 @@
     { "path": "tools/nightly-image-retention.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/nightly-image-retention.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/nightly-image-workflow.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/nightly-release-evidence.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/nightly-release-evidence.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/nightly-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/node-toolchain.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/node-toolchain.test.mjs", "profiles": ["tooling"], "test": true },

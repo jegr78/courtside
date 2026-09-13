@@ -11,17 +11,13 @@ concurrency:
 permissions: {}
 
 jobs:
-  build:
+  nightly-evidence:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
       issues: read
-      security-events: write
-      vulnerability-alerts: read
-    outputs:
-      upgrade-origins: ${{ steps.upgrade-origins.outputs.origins }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -38,26 +34,30 @@ jobs:
       # first and the open issues below only complement it.
       - name: Demand a nightly that verified this release
         env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api --paginate \
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?event=schedule&status=success&per_page=100" \
-            --slurp | jq -r 'map(.workflow_runs[])[] | select(.run_attempt == 1) |
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?branch=${DEFAULT_BRANCH}&status=success&per_page=100" \
+            --slurp | jq -r 'map(.workflow_runs[])[] |
+              select(.event == "schedule" or .event == "workflow_dispatch") | select(.run_attempt == 1) |
               select(.head_sha | test("^[a-f0-9]{40}$")) | "\(.id) \(.head_sha)"' > nightly-runs.txt
           verified=""
           while read -r id head; do
             git cat-file -e "${head}^{commit}" 2>/dev/null || continue
             git merge-base --is-ancestor "$head" "$GITHUB_SHA" || continue
+            rm -rf nightly-evidence
+            mkdir -p nightly-evidence
+            gh run download "$id" --dir nightly-evidence \
+              --name "nightly-release-evidence-${id}-1" || continue
+            node tools/nightly-release-evidence.mjs \
+              --evidence nightly-evidence/evidence.json \
+              --commit "$head" --run-id "$id" || continue
             verified="$id"
             break
           done < nightly-runs.txt
           test -n "$verified" \
-            || { echo "::error::no green first-attempt nightly verified a commit this tag builds on"; exit 1; }
-          gh run download "$verified" --dir nightly-evidence \
-            --name "nightly-verification-${verified}-1"
-          jq -e '.releaseReadiness == "complete"' \
-            nightly-evidence/verification.json > /dev/null \
-            || { echo "::error::the nightly that verified this tag did not record a complete run"; exit 1; }
+            || { echo "::error::no green first-attempt build with a completed coupled nightly-image run verified a commit this tag builds on"; exit 1; }
           rm -rf nightly-runs.txt nightly-evidence
 
       - name: Refuse unresolved nightly failures
@@ -70,6 +70,23 @@ jobs:
               select(.body | contains("courtside-nightly-fingerprint")) |
               select(.body | contains("- Workflow: `npm audit`") | not)] | length')
           test "$count" = 0 || { echo "::error::$count nightly failure issue(s) remain open"; exit 1; }
+
+  build:
+    needs: nightly-evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      vulnerability-alerts: read
+    outputs:
+      upgrade-origins: ${{ steps.upgrade-origins.outputs.origins }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Take the version from the tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"

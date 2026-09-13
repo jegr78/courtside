@@ -57,6 +57,11 @@ test("given a complete build, when it finishes, then it calls the image workflow
   assert.equal(image.with.commit, "${{ github.sha }}");
   assert.equal(image.with.verification_run, "${{ github.run_id }}");
   assert.equal(image.with.publish, "${{ github.ref == 'refs/heads/main' }}");
+  const evidence = buildWorkflow.jobs["nightly-release-evidence"];
+  assert.deepEqual(evidence.needs, ["build", "nightly-image"]);
+  assert.match(String(evidence.if), /github\.event_name == 'schedule'/);
+  assert.match(String(evidence.if), /github\.event_name == 'workflow_dispatch'/);
+  assert.match(String(evidence.if), /github\.ref == 'refs\/heads\/main'/);
   assert.equal(workflow.concurrency.group, "nightly-image-${{ github.repository }}");
 });
 
