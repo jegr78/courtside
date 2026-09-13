@@ -30,13 +30,20 @@ account is deactivated, only your board can help.
 
 ## Forgotten password or username
 
-The page behind that link holds two forms, and neither needs you to be signed in.
+The page behind that link holds three forms, and none of them needs you to be signed in.
 
-The first takes your **username** and mails a new one-time password to the address held for your
-account. Your previous password is gone with it, as are any sessions you have open, and you carry
-on under *Replacing the one-time password* below.
+The first takes your **username** and mails an eight-character code to the address held for your
+account. Nothing about your account changes: your current password keeps working and your open
+sessions stay open.
 
-The second takes your **email address** and mails you your usernames — plural, because a family
+The second takes that **code** and your **new password**. This is where something changes — the new
+password works from that moment and every open session of your account ends. Only a password the
+rules accept spends the code, so if Courtside turns yours down you can try again with the same code.
+Upper and lower case make no difference, and neither does the hyphen. How long a code stays good is
+your club's setting, between a quarter of an hour and a day. Once it has run out Courtside says so,
+and you ask for a new one above.
+
+The third takes your **email address** and mails you your usernames — plural, because a family
 address can carry several accounts, and each of them then gets its own message. This form changes
 no password.
 
@@ -49,22 +56,27 @@ After too many attempts in a short time Courtside says exactly that and makes yo
 **signing in** it counts the network connection the attempts come from, not your account: nobody
 can lock you out by guessing your password often enough.
 
-The two forms above are different, and that is the price of their working without a sign-in: there
-the submitted name or address is counted too, across everybody who submits it. So somebody else can
-hold your recovery shut for a while by entering your username often enough. The window is short,
-your sign-in is unaffected, and your board can send you credentials throughout.
+Asking is different, and that is the price of its working without a sign-in: there the submitted
+name or address is counted too, across everybody who submits it. So somebody else can hold your
+asking shut for a while by entering your username often enough. The window is short, your sign-in is
+unaffected, and your board can send you credentials throughout.
+
+Redeeming counts only the network connection the attempts come from. Somebody guessing codes locks
+themselves out and nobody else.
 
 ## Replacing the one-time password
 
-The one-time password gets you to one page and no further: *Replace one-time password*. Until you
-have chosen a password of your own, every page of the application leads back there. You do not have
-unlimited time for it: how long an issued password stays valid is your club's setting, and after
-that you ask for a new one on the sign-in page.
+This is about the password your board sends you — for your first sign-in, or when you cannot reach
+your own mailbox any more. It gets you to one page and no further: *Replace one-time password*.
+Until you have chosen a password of your own, every page of the application leads back there. You do
+not have unlimited time for it: how long an issued password stays valid is your club's setting, and
+after that you ask your board for a new one.
 
 The new password needs at least twelve characters and at most 256. Courtside also refuses it if it
 is on a list of common passwords shipped with the application, if it contains your name, your
 username, your email address, the club name or a term your club added to that list, and if it
-matches your current or the issued password.
+matches your current or the issued password. The same rules decide the password you set by
+redeeming a code.
 
 On top of that, Courtside asks a public service whether this password has appeared in a known data
 breach. Your password does not leave the instance for that: what travels is five characters of a
