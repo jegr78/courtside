@@ -14,15 +14,16 @@ const report = resolve(directory, "results.json");
 mkdirSync(directory, { recursive: true });
 
 const cli = createRequire(resolve(frontend, "package.json")).resolve("@playwright/test/cli");
+// The catalogue is what this run records; without the path every other project in the
+// configuration runs too, and the index refuses a run it cannot name a device and a language for.
 const run = spawnSync(process.execPath, [cli, "test", "--reporter=list,json",
-  `--output=${resolve(directory, "artefacts")}`, ...process.argv.slice(2)], {
+  `--output=${resolve(directory, "artefacts")}`, "e2e/journeys", ...process.argv.slice(2)], {
   cwd: frontend,
   stdio: "inherit",
   env: {
     ...process.env,
     COURTSIDE_JOURNEY_RUN: "true",
-    PLAYWRIGHT_JSON_OUTPUT_NAME: report,
-    PLAYWRIGHT_HTML_REPORT: resolve(directory, "html")
+    PLAYWRIGHT_JSON_OUTPUT_NAME: report
   }
 });
 

@@ -13,8 +13,11 @@ export interface WalkedJourney {
 // counted by reading the directory instead.
 export function walkedJourneys(): WalkedJourney[] {
   const cli = createRequire(join(__dirname, "resolve-from-here.js")).resolve("@playwright/test/cli");
+  // Inside a recorded run the gate project does not exist, and the listing would fail on a name
+  // the configuration only offers when the recording is off.
+  const gateEnv = { ...process.env, COURTSIDE_JOURNEY_RUN: "false" };
   const listed = execFileSync(process.execPath, [cli, "test", "--list", "--reporter=json", "--project=journey-gate"],
-    { cwd: join(__dirname, ".."), encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+    { cwd: join(__dirname, ".."), encoding: "utf8", maxBuffer: 32 * 1024 * 1024, env: gateEnv });
   const report = JSON.parse(listed) as { suites: PlaywrightSuite[] };
   return report.suites.flatMap(everySpec).map((spec) => ({
     file: spec.file,
