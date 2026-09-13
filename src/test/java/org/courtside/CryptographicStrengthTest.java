@@ -37,6 +37,12 @@ class CryptographicStrengthTest {
     private static final Path INVENTORY = Path.of("security/cryptographic-inventory.json");
     private static final Path COMPOSE = Path.of("deploy/compose.yaml");
     private static final Path MAIL_PLANS = Path.of("deploy/mail");
+    private static final Path RESET_CODES = Path.of(
+            "src/main/java/org/courtside/identity/internal/ResetCodes.java");
+    private static final Pattern RESET_CODE_ALPHABET = Pattern.compile(
+            "ALPHABET\\s*=\\s*\"([^\"]+)\"");
+    private static final Pattern RESET_CODE_CHARACTERS = Pattern.compile(
+            "CHARACTERS\\s*=\\s*(\\d+)");
 
     private static final int POLICY_BITS = 128;
     private static final int BITS_PER_BYTE = 8;
@@ -44,9 +50,13 @@ class CryptographicStrengthTest {
     // How far a key parameter may sit from the call that generates the key, in characters.
     private static final int WITHIN_THE_CALL = 200;
 
-    // An identifier answers to uniqueness rather than to secrecy, which is why the minimum below
-    // does not reach it. docs/cryptographic-inventory.md says what the classes separate.
-    private static final String WITHOUT_A_MINIMUM = "identifier";
+    // An identifier answers to uniqueness and a rate-bounded secret to the budget an attacker gets,
+    // so neither answers to the minimum below. docs/cryptographic-inventory.md separates them.
+    private static final Set<String> WITHOUT_A_MINIMUM = Set.of("identifier", "rate-bounded-secret");
+
+    // A rate-bounded secret escapes the minimum on the strength of a literal in the code, so its
+    // bits have to be ones this test recomputes rather than ones the entry may simply assert.
+    private static final Set<String> RECOMPUTED = Set.of("password-reset-code");
 
     private static final Set<String> IMPLEMENTATIONS = Set.of("java-runtime", "bouncy-castle",
             "spring-security", "web-crypto", "node-crypto", "openssl", "sigstore", "stalwart",
@@ -175,10 +185,16 @@ class CryptographicStrengthTest {
                 assertThat(strength.propertyNames())
                         .as("%s is selected here, so it states its bits", id(entry))
                         .contains("bits");
-                if (!WITHOUT_A_MINIMUM.equals(entry.get("class").asText())) {
+                if (!WITHOUT_A_MINIMUM.contains(entry.get("class").asText())) {
                     assertThat(strength.get("bits").asInt())
                             .as("%s protects something, so it reaches the policy", id(entry))
                             .isGreaterThanOrEqualTo(POLICY_BITS);
+                }
+                if ("rate-bounded-secret".equals(entry.get("class").asText())) {
+                    assertThat(RECOMPUTED)
+                            .as("%s escapes the minimum, so this test reads its bits from the code",
+                                    id(entry))
+                            .contains(id(entry));
                 }
             } else {
                 assertThat(strength.propertyNames())
@@ -213,6 +229,26 @@ class CryptographicStrengthTest {
                 .as("%s draws a credential, which reaches the policy whatever else the harness draws"
                         + " for a name", where)
                 .isGreaterThanOrEqualTo(POLICY_BITS));
+    }
+
+    @Test
+    void whenTheResetCodeGeneratorIsRead_thenTheRecordedBitsAreTheOnesItDraws() throws IOException {
+        // given
+        String source = read(RESET_CODES);
+        Matcher alphabet = RESET_CODE_ALPHABET.matcher(source);
+        Matcher characters = RESET_CODE_CHARACTERS.matcher(source);
+
+        // when
+        assertThat(alphabet.find()).as("the reset code names the alphabet it draws from").isTrue();
+        assertThat(characters.find()).as("the reset code names how many it draws").isTrue();
+        int symbols = (int) alphabet.group(1).chars().distinct().count();
+        int drawn = (int) Math.floor(Integer.parseInt(characters.group(1))
+                * (Math.log(symbols) / Math.log(2)));
+
+        // then — a wider alphabet or a longer code is a change to what the entry claims
+        assertThat(bitsOf("password-reset-code"))
+                .as("the entry records what the generator draws")
+                .isEqualTo(drawn);
     }
 
     @Test

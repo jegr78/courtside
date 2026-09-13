@@ -15,6 +15,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,18 +57,13 @@ class PasswordResetRedemptionConcurrencyTest extends AbstractIntegrationTest {
 
     private Future<Boolean> redeemWhileTheFirstIsStillOpen(String code, ExecutorService executor) {
         TransactionTemplate template = new TransactionTemplate(transactionManager);
-        Future<Boolean>[] second = newHolder();
+        AtomicReference<Future<Boolean>> second = new AtomicReference<>();
         template.executeWithoutResult(status -> {
             tokens.redeem(code, "a-password-nobody-guessed");
-            second[0] = executor.submit(() -> redeemed(code, "another-password-entirely"));
+            second.set(executor.submit(() -> redeemed(code, "another-password-entirely")));
             awaitTheSecondBlockingOnTheRow();
         });
-        return second[0];
-    }
-
-    @SuppressWarnings("unchecked")
-    private Future<Boolean>[] newHolder() {
-        return new Future[1];
+        return second.get();
     }
 
     private void awaitTheSecondBlockingOnTheRow() {

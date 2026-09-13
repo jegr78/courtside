@@ -27,7 +27,7 @@ class MailTemplatesTest {
     private static final Map<String, String> VALUES = Map.ofEntries(
             entry("clubName", "Example Tennis Club"), entry("firstName", "Jane"),
             entry("username", "doe.jane"), entry("credential", "a-credential"),
-            entry("code", "ABCD-EFGH"), entry("expiresAt", "13 May 2026, 11:00"),
+            entry("resetCode", "ABCD-EFGH"), entry("expiresAt", "13 May 2026, 11:00"),
             entry("expiresOn", "1 May 2026"), entry("day", "Wednesday, 13 May 2026"),
             entry("from", "18:00"), entry("to", "19:00"), entry("courts", "Court 1"),
             entry("card", "Member booking"), entry("player", "John Roe"),

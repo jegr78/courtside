@@ -39,7 +39,7 @@ class PasswordResetCodeMailer {
                 "clubName", club.clubName(),
                 "firstName", issued.recipientFirstName(),
                 "username", issued.username(),
-                "code", issued.code(),
+                "resetCode", issued.code(),
                 "expiresAt", expiresAt(issued.expiresAt(), locale));
         handover.handOver(requested.accountId(), MessageKind.ACCOUNT_PASSWORD_RESET_CODE,
                 issued.recipientAddress(),
