@@ -64,6 +64,15 @@ export async function rewrite(target: Locator, text: string): Promise<void> {
   await keystrokes(target, text);
 }
 
+// Below the width a sidebar has room for, administration is a disclosure a board opens first, and
+// it folds itself again behind every destination reached through it.
+export async function reachAdministration(page: Page, testId: string): Promise<void> {
+  await expect(page.getByTestId("admin-navigation")).toBeVisible();
+  const destination = page.getByTestId(testId);
+  if (!await destination.isVisible()) await activate(page.getByTestId("admin-menu"));
+  await activate(destination);
+}
+
 export async function signIn(page: Page, username: string, password = "temporary-password"): Promise<void> {
   const link = page.getByTestId("sign-in-link");
   // A member reaches the form from the plan, but a sign-out already left them standing on it.

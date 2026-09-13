@@ -1,5 +1,5 @@
 import { expect, test } from "../../fixtures";
-import { activate, openTheApplication, rewrite, signIn, walks, writeDate, writeInto } from "../../journey-walking";
+import { activate, openTheApplication, reachAdministration, rewrite, signIn, walks, writeDate, writeInto } from "../../journey-walking";
 
 test("given a board that has taken on a new member, when they record the person, correct the name they mistyped, give them an account and later end the membership, then every step is one the board can take without a database console",
   walks("session-and-own-account", "roster-membership-and-account-administration"), async ({ page, language }) => {
@@ -10,7 +10,7 @@ test("given a board that has taken on a new member, when they record the person,
     await expect(page.getByTestId("admin-setup-view")).toBeVisible();
 
     // when — the person is recorded, with a first name that goes in wrong
-    await activate(page.getByTestId("admin-roster-link"));
+    await reachAdministration(page, "admin-roster-link");
     await expect(page.getByTestId("admin-roster-view")).toBeVisible();
     await writeInto(page.getByTestId("new-person-first-name"), "Mray");
     await writeInto(page.getByTestId("new-person-last-name"), "Major");

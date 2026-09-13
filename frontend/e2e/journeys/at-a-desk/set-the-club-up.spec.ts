@@ -1,5 +1,5 @@
 import { expect, test } from "../../fixtures";
-import { activate, journeyFile, openTheApplication, rewrite, signIn, walks, writeInto, writeTime } from "../../journey-walking";
+import { activate, journeyFile, openTheApplication, reachAdministration, rewrite, signIn, walks, writeInto, writeTime } from "../../journey-walking";
 
 // The club this journey installs into is the one the migrations ship and nothing else: a
 // bootstrap administrator holding a one-time password, the cards, one court, and no members.
@@ -24,7 +24,7 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     await expect(page.getByTestId("setup-progress")).toBeVisible();
 
     // when — the club says who it is and where it is
-    await activate(page.getByTestId("admin-configuration-link"));
+    await reachAdministration(page, "admin-configuration-link");
     await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
     await rewrite(page.getByTestId("club-name"), "Example Racquet Club");
     await page.getByTestId("time-zone").selectOption("Europe/Berlin");
@@ -39,7 +39,7 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     await expect(page.getByTestId("rule-set-name")).toBeVisible();
 
     // when — the courts it has
-    await activate(page.getByTestId("admin-courts-link"));
+    await reachAdministration(page, "admin-courts-link");
     await expect(page.getByTestId("admin-courts-view")).toBeVisible();
     await writeInto(page.getByTestId("new-court-number"), "2");
     await writeInto(page.getByTestId("new-court-name"), "Centre Court");
@@ -49,7 +49,7 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     await expect(page.locator('[data-testid^="court-row-"]')).toHaveCount(2);
 
     // when — the hours it opens them
-    await activate(page.getByTestId("admin-opening-hours-link"));
+    await reachAdministration(page, "admin-opening-hours-link");
     await expect(page.getByTestId("hours-open-MONDAY")).toBeVisible();
     await writeTime(page.getByTestId("apply-opens-at"), "08:00");
     await writeTime(page.getByTestId("apply-closes-at"), "22:00");
@@ -61,7 +61,7 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     await expect(page.getByTestId("admin-save-success")).toBeVisible();
 
     // when — a card of its own beside the ones it was shipped
-    await activate(page.getByTestId("admin-booking-cards-link"));
+    await reachAdministration(page, "admin-booking-cards-link");
     await expect(page.getByTestId("admin-booking-cards-view")).toBeVisible();
     await writeInto(page.getByTestId("new-card-label"), "Club evening");
     await activate(page.getByTestId("create-card"));
@@ -70,7 +70,7 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     await expect(page.locator('[data-testid^="card-row-"]').first()).toBeVisible();
 
     // when — and what else may be on a court
-    await activate(page.getByTestId("admin-slot-fillers-link"));
+    await reachAdministration(page, "admin-slot-fillers-link");
     await expect(page.getByTestId("admin-slot-fillers-view")).toBeVisible();
     await writeInto(page.getByTestId("new-participant-card-label"), "Practice wall");
     await writeInto(page.getByTestId("new-participant-card-capacity"), "1");

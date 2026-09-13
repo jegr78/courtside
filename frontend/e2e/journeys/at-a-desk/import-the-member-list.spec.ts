@@ -1,5 +1,5 @@
 import { expect, test } from "../../fixtures";
-import { activate, journeyFile, openTheApplication, signIn, walks, writeInto } from "../../journey-walking";
+import { activate, journeyFile, openTheApplication, reachAdministration, signIn, walks, writeInto } from "../../journey-walking";
 
 test("given a board that keeps its members in another system, when they describe that export once, read what it would do and run it, then the club holds the same people and a second, changed export updates them",
   walks("session-and-own-account", "facility-card-and-membership-configuration", "roster-import-and-full-sync"),
@@ -9,14 +9,14 @@ test("given a board that keeps its members in another system, when they describe
     await signIn(page, "configuration-admin");
     await activate(page.getByTestId("administration-link"));
     await expect(page.getByTestId("admin-shell")).toBeVisible();
-    await activate(page.getByTestId("admin-membership-types-link"));
+    await reachAdministration(page, "admin-membership-types-link");
     await writeInto(page.getByTestId("new-membership-type-name"), "Imported adults");
     await activate(page.getByTestId("new-membership-type-grants-account"));
     await activate(page.getByTestId("create-membership-type"));
     await expect(page.getByTestId("admin-save-success")).toBeVisible();
 
     // when — the board describes the export it already has
-    await activate(page.getByTestId("admin-import-link"));
+    await reachAdministration(page, "admin-import-link");
     await expect(page.getByTestId("no-sources")).toBeVisible();
     await activate(page.getByTestId("new-source"));
     await page.getByTestId("source-file").setInputFiles(journeyFile("members.csv"));

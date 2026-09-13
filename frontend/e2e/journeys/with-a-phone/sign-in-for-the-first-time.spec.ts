@@ -1,6 +1,6 @@
 import { expect, test } from "../../fixtures";
 import { credentialIn, messageTo } from "../../mailbox";
-import { activate, openTheApplication, signIn, signOut, walks, writeInto } from "../../journey-walking";
+import { activate, openTheApplication, reachAdministration, signIn, signOut, walks, writeInto } from "../../journey-walking";
 
 test("given a new member whose account the board has just opened, when they read the one-time password the club mailed them and choose one of their own, then they are in and nobody ever saw the password they were given",
   walks("session-and-own-account", "roster-membership-and-account-administration"),
@@ -9,7 +9,7 @@ test("given a new member whose account the board has just opened, when they read
     await openTheApplication(page, language);
     await signIn(page, "configuration-admin");
     await activate(page.getByTestId("administration-link"));
-    await activate(page.getByTestId("admin-roster-link"));
+    await reachAdministration(page, "admin-roster-link");
     await expect(page.getByTestId("admin-roster-view")).toBeVisible();
     await writeInto(page.getByTestId("new-person-first-name"), "Richard");
     await writeInto(page.getByTestId("new-person-last-name"), "Roe");
