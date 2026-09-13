@@ -129,6 +129,8 @@ test("given a qualified main image, when it is published, then verified evidence
   // when / then
   assert.match(source, /if \[\[ "\$publish" = true && "\$GITHUB_REF" != 'refs\/heads\/main' \]\]/);
   assert.match(String(workflow.jobs.publish.if), /needs\.select\.outputs\.publish == 'true'/);
+  assert.match(publish, /name: Prepare publication evidence directory\s+run: mkdir -p build/);
+  assert.ok(publish.indexOf("mkdir -p build") < publish.indexOf("anchore/sbom-action@"));
   assert.match(publish, /actions\/attest-build-provenance@[0-9a-f]{40}/);
   assert.match(publish, /actions\/attest-sbom@[0-9a-f]{40}/);
   assert.match(publish, /actions\/attest@[0-9a-f]{40}/);
