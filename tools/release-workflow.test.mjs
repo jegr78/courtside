@@ -54,6 +54,11 @@ test("given a qualified manifest, when publishing it, then tags and signatures a
   assert.match(publish, /cosign sign --yes "\$IMAGE"/);
   assert.match(publish, /cosign verify/);
   assert.match(publish, /gh attestation verify/);
+  assert.deepEqual(
+    [...publish.matchAll(/--signer-workflow "([^"]+)"/g)].map((match) => match[1]),
+    Array(2).fill("$GITHUB_REPOSITORY/.github/workflows/release.yml"),
+  );
+  assert.doesNotMatch(publish, /--signer-workflow "\$GITHUB_SERVER_URL/);
   assert.match(publish, /node tools\/security-supply-chain\.mjs/);
   assert.ok(publish.indexOf("cosign sign") < publish.indexOf("docker buildx imagetools create"));
   assert.ok(publish.indexOf("security-supply-chain.mjs") < publish.indexOf("docker buildx imagetools create"));
