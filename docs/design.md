@@ -90,7 +90,10 @@ set its own spreadsheet reads. The change log and the message log have no export
 OpenAPI document is the source of truth: every controller implements an interface generated from
 it, and an instance serves the document it actually answers to at `GET /api/openapi.yaml`. A
 tagged release builds a multi-arch container image, publishes it to GHCR signed with cosign and
-carrying an SBOM attestation, and attaches the OpenAPI document to the release. The reference
+carrying an SBOM attestation, and attaches the OpenAPI document to the release. The image path is
+exercised before the first release too: a separate nightly workflow takes the newest complete
+first-attempt scheduled build, qualifies its exact amd64/arm64 digest, and publishes signed
+acceptance-only tags under an identity distinct from a release. The reference
 deployment carries the club's own mail server behind a profile, together with a check that resolves
 the DNS a receiver looks at, and the application sends through it: the `notification` module reacts
 to an event and generates the credential at the moment it is sent. Both message bundles ship, and
@@ -2008,8 +2011,11 @@ whether it is built or designed. **Designed means absent today.**
   alone until then, and an advisory against anything the Spring Boot BOM brought in was seen by the
   nightly source scan and by nothing else. The release workflow signs each image keylessly with
   cosign and attaches an SBOM attestation. Trivy scans the application's extracted layers and the
-  source tree on every pull request and every release; the container image's own base layers are
-  not, so that half is designed and not built. SHA-bound npm and Trivy summaries establish the
+  source tree on every pull request and every release, and the release qualification scans both
+  architectures of the exact container digest, including its base layers. A separate scheduled
+  image workflow repeats that deployment and image qualification for the newest fully verified
+  nightly revision, then signs and attests it under a nightly-only identity before moving its
+  acceptance tags. SHA-bound npm and Trivy summaries establish the
   dependency findings on the tested revision; the earliest matching default-branch Dependabot
   alert starts their retained remediation clock. Critical findings have 72 hours, High 7 days,
   Medium 30 days and Low 90 days. An actively exploited, directly reachable or not-yet-assessed

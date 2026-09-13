@@ -1,19 +1,397 @@
 name: nightly image
 
 on:
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
+
+concurrency:
+  group: nightly-image-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions: {}
 
 jobs:
-  available:
+  select:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    outputs:
+      build: ${{ steps.selection.outputs.build }}
+      commit: ${{ steps.selection.outputs.commit }}
+      date: ${{ steps.selection.outputs.date }}
+      publish: ${{ steps.selection.outputs.publish }}
+      short_sha: ${{ steps.selection.outputs.short_sha }}
+      verification_run: ${{ steps.selection.outputs.verification_run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: selection
+        name: Select an immutable verified revision
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          set -o pipefail
+          verification_run=""
+          if [[ "${{ github.event_name }}" == 'workflow_dispatch' && "$GITHUB_REF" != 'refs/heads/main' ]]; then
+            commit="$GITHUB_SHA"
+          else
+            git fetch --no-tags origin "$DEFAULT_BRANCH"
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?event=schedule&status=success&per_page=100" \
+              --slurp | jq -r --arg branch "$DEFAULT_BRANCH" '
+                map(.workflow_runs[]) | sort_by(.created_at) | reverse | .[] |
+                select(.run_attempt == 1) | select(.head_branch == $branch) |
+                select(.head_sha | test("^[a-f0-9]{40}$")) | "\(.id) \(.head_sha)"' \
+              > "$RUNNER_TEMP/nightly-build-runs.txt"
+            commit=""
+            while read -r run_id head; do
+              git cat-file -e "${head}^{commit}" 2>/dev/null || continue
+              git merge-base --is-ancestor "$head" "origin/$DEFAULT_BRANCH" || continue
+              evidence="$RUNNER_TEMP/nightly-verification-$run_id"
+              rm -rf "$evidence"
+              if ! gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
+                --name "nightly-verification-${run_id}-1" --dir "$evidence"; then
+                continue
+              fi
+              if jq -e --arg commit "$head" --argjson runId "$run_id" '
+                .schemaVersion == 1 and .releaseReadiness == "complete" and
+                .commit == $commit and .runId == $runId and .attempt == 1 and .firstAttempt == true' \
+                "$evidence/verification.json" > /dev/null; then
+                commit="$head"
+                verification_run="$run_id"
+                break
+              fi
+            done < "$RUNNER_TEMP/nightly-build-runs.txt"
+            test -n "$commit" \
+              || { echo "::error::no complete first-attempt scheduled build on main was found"; exit 1; }
+          fi
+          published_revision=""
+          if docker pull "$IMAGE:nightly" > /dev/null 2>&1; then
+            if ! published_revision=$(docker image inspect "$IMAGE:nightly" \
+              --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'); then
+              published_revision=""
+            fi
+          fi
+          build=true
+          if [[ "$published_revision" = "$commit" ]]; then
+            build=false
+          fi
+          publish=false
+          if [[ "$GITHUB_REF" = 'refs/heads/main' ]]; then
+            publish=true
+          fi
+          {
+            echo "build=$build"
+            echo "commit=$commit"
+            echo "date=$(date -u +%Y%m%d)"
+            echo "publish=$publish"
+            echo "short_sha=${commit:0:7}"
+            echo "verification_run=$verification_run"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo '## Nightly image selection'
+            echo
+            echo "- Commit: \`$commit\`"
+            echo "- Existing nightly revision: \`${published_revision:-none}\`"
+            echo "- Build required: \`$build\`"
+            echo "- Publication allowed: \`$publish\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  package:
+    needs: select
+    if: needs.select.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ needs.select.outputs.commit }}
           persist-credentials: false
-      - name: Confirm the dispatch entry point
-        run: echo "The nightly image workflow is available for branch qualification."
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+
+      - name: Package the selected revision
+        run: ./mvnw -B package -DskipTests
+
+      - name: Extract the application layers
+        run: |
+          artifact=$(find target -maxdepth 1 -type f -name 'courtside-*.jar' ! -name '*.original' -print -quit)
+          test -n "$artifact"
+          java -Djarmode=tools -jar "$artifact" extract --layers --launcher --destination build/layers
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: nightly-image-input
+          path: build/layers
+          retention-days: 1
+          if-no-files-found: error
+
+  image:
+    needs: [select, package]
+    if: needs.select.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.select.outputs.commit }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: nightly-image-input
+          path: build/layers
+
+      - name: Restore the layer directory an empty artifact drops
+        run: mkdir -p build/layers/snapshot-dependencies
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository }}:nightly-candidate
+          labels: |
+            org.opencontainers.image.revision=${{ needs.select.outputs.commit }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+  qualify:
+    needs: [select, image]
+    if: needs.select.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runs-on: ubuntu-latest
+          - architecture: arm64
+            runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    env:
+      COURTSIDE_UAT_VERSION: nightly-candidate@${{ needs.image.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.select.outputs.commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate the deployment model
+        env:
+          COURTSIDE_UAT_IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          COURTSIDE_UAT_ADMIN_PASSWORD: compose-validation-only
+        run: docker compose -f deploy/compose.uat.yaml config --quiet
+
+      - name: Qualify the image through the reference deployment
+        run: node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          format: json
+          output: build/uat-smoke/trivy-${{ matrix.architecture }}.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Enforce candidate-image security policy
+        run: >
+          node tools/security-findings.mjs
+          --trivy build/uat-smoke/trivy-${{ matrix.architecture }}.json
+          --trivy-version "$(trivy --version | awk 'NR == 1 { print $2 }')"
+          --exceptions security/exceptions.json
+          --assessment-policy not-applicable
+          --scope release-image-${{ matrix.architecture }}
+          --subject ${{ needs.image.outputs.digest }}
+          --output build/uat-smoke/security-summary-${{ matrix.architecture }}.json
+
+      - name: Remove raw security report
+        if: always()
+        run: rm -f build/uat-smoke/trivy-${{ matrix.architecture }}.json
+
+      - name: Capture deployment diagnostics
+        if: failure()
+        run: docker compose -p courtside-uat -f deploy/compose.uat.yaml logs --no-color > build/uat-smoke/container-logs.txt 2>&1 || true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: nightly-image-qualification-${{ matrix.architecture }}
+          path: build/uat-smoke
+          retention-days: 14
+          if-no-files-found: error
+
+  publish:
+    needs: [select, image, qualify]
+    if: needs.select.outputs.build == 'true' && needs.select.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.select.outputs.commit }}
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          output-file: build/courtside-nightly.spdx.json
+          upload-artifact: false
+
+      - name: Record the verified source of the image
+        run: |
+          jq -n \
+            --arg repository "https://github.com/$GITHUB_REPOSITORY" \
+            --arg commit "${{ needs.select.outputs.commit }}" \
+            --argjson verificationRunId "${{ needs.select.outputs.verification_run }}" \
+            '{schemaVersion: 1, repository: $repository, commit: $commit,
+              verificationRunId: $verificationRunId}' \
+            > build/nightly-source.json
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ needs.image.outputs.digest }}
+          push-to-registry: true
+
+      - uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ needs.image.outputs.digest }}
+          sbom-path: build/courtside-nightly.spdx.json
+          push-to-registry: true
+
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ needs.image.outputs.digest }}
+          predicate-type: https://github.com/${{ github.repository }}/blob/main/docs/releasing.md#nightly-source-attestation-v1
+          predicate-path: build/nightly-source.json
+          push-to-registry: true
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Sign the image
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+        run: cosign sign --yes "$IMAGE"
+
+      - name: Verify nightly supply-chain evidence
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          GH_TOKEN: ${{ github.token }}
+          NIGHTLY_SOURCE_PREDICATE: https://github.com/${{ github.repository }}/blob/main/docs/releasing.md#nightly-source-attestation-v1
+          SELECTED_COMMIT: ${{ needs.select.outputs.commit }}
+          VERIFICATION_RUN_ID: ${{ needs.select.outputs.verification_run }}
+        run: |
+          cosign verify \
+            --certificate-identity "https://github.com/$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml@refs/heads/main" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$IMAGE" > /dev/null
+          gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
+            --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
+            --predicate-type https://slsa.dev/provenance/v1 > /dev/null
+          gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
+            --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
+            --predicate-type https://spdx.dev/Document/v2.3 > /dev/null
+          gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
+            --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
+            --predicate-type "$NIGHTLY_SOURCE_PREDICATE" --format json \
+            > build/nightly-source-verification.json
+          jq -e --arg repository "https://github.com/$GITHUB_REPOSITORY" \
+            --arg commit "$SELECTED_COMMIT" --argjson runId "$VERIFICATION_RUN_ID" '
+              any(.[].verificationResult.statement.predicate;
+                .schemaVersion == 1 and .repository == $repository and
+                .commit == $commit and .verificationRunId == $runId)' \
+            build/nightly-source-verification.json > /dev/null
+          docker pull --platform linux/amd64 "$IMAGE" > /dev/null
+          test "$(docker image inspect "$IMAGE" \
+            --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" \
+            = "${{ needs.select.outputs.commit }}"
+
+      - name: Publish nightly tags without rebuilding
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+        run: >
+          docker buildx imagetools create
+          --tag "ghcr.io/${{ github.repository }}:nightly"
+          --tag "ghcr.io/${{ github.repository }}:nightly-${{ needs.select.outputs.date }}-${{ needs.select.outputs.short_sha }}"
+          "$IMAGE"
+
+  retention:
+    needs: [select, publish]
+    if: always() && needs.select.outputs.publish == 'true' && (needs.publish.result == 'success' || needs.publish.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Apply the bounded registry retention plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          node tools/nightly-image-retention.mjs
+          --repository "$GITHUB_REPOSITORY"
+          --apply

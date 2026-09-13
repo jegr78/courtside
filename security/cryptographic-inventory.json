@@ -552,6 +552,32 @@
       ]
     },
     {
+      "id": "nightly-image-signature",
+      "purpose": "Let acceptance users verify that a nightly image passed this repository's nightly image workflow before its public tags moved",
+      "algorithm": "cosign-keyless and sigstore-attestation",
+      "implementation": "sigstore",
+      "strength": {
+        "decidedBy": "sigstore",
+        "basis": "Sigstore issues the ephemeral key and chooses the signature hash. The workflow pins cosign and every attestation action, binds the selected verified commit in a signed source predicate, and verifies their workflow identity before it publishes a nightly tag."
+      },
+      "class": "signing",
+      "owner": "repository-maintainer",
+      "storageBoundary": "No long-lived private key exists. The public registry holds the signature, provenance, selected-source and SBOM attestations beside the qualified image digest.",
+      "permittedUse": "Signing and attesting a qualified acceptance image. The identity is distinct from a release signature and grants no release status.",
+      "rotation": "Every nightly publication obtains a new short-lived certificate; there is nothing to rotate on a schedule.",
+      "revocation": "Not applicable to a keyless signature. Retention removes an obsolete nightly image and its attached manifests only after no retained tag reaches them.",
+      "recovery": "None is possible or needed: no signing material can be lost, and the next verified revision produces new evidence.",
+      "retirement": "Replaced by changing the nightly signing workflow and the verification identity documented with it.",
+      "evidence": ".github/workflows/nightly-image.yml, tools/nightly-image-workflow.test.mjs",
+      "detects": [
+        "cosign",
+        "actions/attest"
+      ],
+      "locations": [
+        ".github/workflows/nightly-image.yml"
+      ]
+    },
+    {
       "id": "build-attestation",
       "purpose": "Publish where an image came from and what it contains, signed by the workflow that built it",
       "algorithm": "sigstore-attestation",

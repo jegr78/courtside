@@ -86,6 +86,37 @@ cosign verify \
 The image also carries an SBOM and provenance attestation:
 `docker buildx imagetools inspect ghcr.io/jegr78/courtside:<version> --format '{{ json .SBOM }}'`.
 
+## Nightly images
+
+Nightly images are for acceptance and testing. They are not releases and are not the version a
+club should put into `COURTSIDE_VERSION` for normal operation. The moving `nightly` tag names the
+last published nightly. Each publication also writes an immutable-looking
+`nightly-<yyyymmdd>-<sha7>` tag. Pin that tag together with the resolved digest when an acceptance
+installation must keep running the exact candidate it tested:
+
+```sh
+docker pull ghcr.io/jegr78/courtside:nightly-<yyyymmdd>-<sha7>@sha256:<digest>
+```
+
+The registry keeps the seven newest dated nightly tags and their image, signature and attestation
+manifests. With daily changes to `main`, that is a seven-day availability window. A day without a
+new fully verified commit creates no dated image, so the seven retained publications may span
+longer. `nightly-candidate` is the unqualified staging tag and must not be deployed.
+
+The nightly workflow signs a digest only after amd64 and arm64 qualification. Verify its distinct
+identity before testing it:
+
+```sh
+cosign verify \
+  --certificate-identity 'https://github.com/jegr78/courtside/.github/workflows/nightly-image.yml@refs/heads/main' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/jegr78/courtside:nightly
+```
+
+Resolve `nightly` to a digest once and use that digest for the whole acceptance run. The moving tag
+may advance after the run starts. The repository package must be public before an anonymous
+installation can pull it.
+
 ## Plain HTTP clients
 
 The reference proxy redirects only `GET` and `HEAD` requests for known browser routes to the
