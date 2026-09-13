@@ -880,6 +880,30 @@ export function uatImageReference(version, environment = process.env, checkout =
   return `ghcr.io/${owner.toLowerCase()}/${name.toLowerCase()}:${version}`;
 }
 
+export function uatSmokeEnvironment(version, environment = process.env, checkout = checkoutRepository) {
+  const resolved = { ...environment };
+  if (version) resolved.COURTSIDE_UAT_IMAGE = uatImageReference(version, environment, checkout);
+  return resolved;
+}
+
+export function redactUatDiagnostics(value, secrets) {
+  let redacted = String(value);
+  for (const secret of secrets) {
+    if (!secret) continue;
+    const raw = String(secret);
+    let decoded = raw;
+    try {
+      decoded = decodeURIComponent(raw);
+    } catch {
+      // A malformed percent sequence still has its raw and safely encoded forms removed.
+    }
+    for (const representation of new Set([raw, encodeURIComponent(raw), decoded])) {
+      redacted = redacted.split(representation).join("[REDACTED]");
+    }
+  }
+  return redacted;
+}
+
 function uatEnvironment(version, password) {
   return {
     ...process.env,

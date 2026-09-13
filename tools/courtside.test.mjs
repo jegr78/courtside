@@ -17,7 +17,8 @@ import {
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
   funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
-  resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference, repositoryFromRemote,
+  redactUatDiagnostics, resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference,
+  uatSmokeEnvironment, repositoryFromRemote,
   validateNode, validatePublicAddress
 } from "./courtside.mjs";
 
@@ -1222,9 +1223,53 @@ test("given the release qualification smoke, when starting UAT, then credential 
 
   // when / then
   assert.match(smoke, /startArguments = \["uat", "--no-credential-output"/);
+  assert.ok(smoke.indexOf("confirmation.join") < smoke.indexOf("uatSmokeEnvironment(version)"));
+  assert.match(smoke, /const smokeEnvironment = uatSmokeEnvironment\(version\)/);
+  assert.match(smoke, /run\("docker", \[\.\.\.compose, \.\.\.args\], \{ environment: smokeEnvironment \}\)/);
+  assert.match(smoke, /resetPassword = newBootstrapPassword\(\)/);
+  assert.match(smoke, /smokeEnvironment\.COURTSIDE_UAT_ADMIN_PASSWORD = resetPassword/);
+  assert.match(smoke, /password, permanentPassword, resetPassword, plaintextCredential/);
+  assert.match(smoke,
+    /catch \(failure\) \{[\s\S]*redactUatDiagnostics\([\s\S]*writeFileSync\(join\(build, "container-logs\.txt"\)[\s\S]*throw failure;/);
   assert.match(smoke, /localCa = composeRun\("exec", "-T", "proxy", "cat"/);
   assert.ok(smoke.split("\n").filter((line) => line.includes("secure: true"))
     .every((line) => line.includes("ca: localCa")));
+});
+
+test("given a published UAT image, when the smoke resets its project, then every start keeps the same digest", () => {
+  // given
+  const source = { GITHUB_REPOSITORY: "example-club/courtside", UNRELATED: "retained" };
+  const version = `nightly-candidate@sha256:${"a".repeat(64)}`;
+
+  // when
+  const environment = uatSmokeEnvironment(version, source, () => undefined);
+  const beforeReset = { ...environment };
+  environment.COURTSIDE_UAT_ADMIN_PASSWORD = "second-bootstrap";
+  const afterReset = { ...environment };
+
+  // then
+  assert.notEqual(environment, source);
+  assert.equal(source.COURTSIDE_UAT_IMAGE, undefined);
+  assert.equal(beforeReset.COURTSIDE_UAT_IMAGE,
+    `ghcr.io/example-club/courtside:nightly-candidate@sha256:${"a".repeat(64)}`);
+  assert.equal(afterReset.COURTSIDE_UAT_IMAGE, beforeReset.COURTSIDE_UAT_IMAGE);
+  assert.equal(afterReset.UNRELATED, "retained");
+});
+
+test("given failed UAT logs, when diagnostics are retained, then credentials and encoded canaries are redacted", () => {
+  // given
+  const password = "p@ss word";
+  const cookie = "cookie%2Fvalue";
+
+  // when
+  const diagnostics = redactUatDiagnostics(
+    `safe password=${password} encoded=${encodeURIComponent(password)} cookie=${cookie} decoded=cookie/value`,
+    [password, cookie]
+  );
+
+  // then
+  assert.equal(diagnostics,
+    "safe password=[REDACTED] encoded=[REDACTED] cookie=[REDACTED] decoded=[REDACTED]");
 });
 
 test("given UAT status, when parsing output options, then the environment is retained", () => {

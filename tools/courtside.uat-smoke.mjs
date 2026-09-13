@@ -3,7 +3,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { localRequest, newBootstrapPassword, uatImageReference } from "./courtside.mjs";
+import {
+  localRequest, newBootstrapPassword, redactUatDiagnostics, uatImageReference, uatSmokeEnvironment
+} from "./courtside.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const confirmation = process.argv.slice(2);
@@ -13,6 +15,9 @@ const build = join(root, "build", "uat-smoke");
 if (confirmation.join(" ") !== "--confirm courtside-uat") {
   throw new Error("UAT smoke testing is destructive; pass --confirm courtside-uat");
 }
+
+const version = process.env.COURTSIDE_UAT_VERSION;
+const smokeEnvironment = uatSmokeEnvironment(version);
 
 mkdirSync(build, { recursive: true });
 
@@ -31,7 +36,7 @@ function cli(args, environment = process.env) {
 }
 
 function composeRun(...args) {
-  return run("docker", [...compose, ...args]);
+  return run("docker", [...compose, ...args], { environment: smokeEnvironment });
 }
 
 function rememberCookies(jar, response) {
@@ -110,14 +115,16 @@ function assertNoLegacyAuthenticationCookies(response) {
   }
 }
 
+const password = newBootstrapPassword();
+const permanentPassword = newBootstrapPassword();
+const plaintextCredential = "plaintext-credential-canary";
+const plaintextBody = "plaintext-body-canary";
+const cookies = new Map();
+let resetPassword;
+
 try {
-  const password = newBootstrapPassword();
-  const permanentPassword = newBootstrapPassword();
-  const plaintextCredential = "plaintext-credential-canary";
-  const plaintextBody = "plaintext-body-canary";
-  const version = process.env.COURTSIDE_UAT_VERSION;
   const startArguments = ["uat", "--no-credential-output", ...(version ? ["--version", version] : ["--skip-verify"])];
-  cli(startArguments, { ...process.env, COURTSIDE_UAT_BOOTSTRAP_PASSWORD: password });
+  cli(startArguments, { ...smokeEnvironment, COURTSIDE_UAT_BOOTSTRAP_PASSWORD: password });
   const appBefore = composeRun("ps", "-q", "app");
   const image = composeRun("images", "app", "--format", "json");
   const accountCount = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from user_account");
@@ -214,7 +221,6 @@ try {
   [session, sharedSession, login].forEach(assertNoLegacyAuthenticationCookies);
   assert.notEqual(accountCount, "0");
 
-  const cookies = new Map();
   await logIn(cookies, password);
   const passwordChange = await requestWithCookies(cookies, {
     path: "/api/account/initial-password", method: "PUT",
@@ -321,10 +327,22 @@ try {
   assert.equal(run("docker", ["volume", "ls", "--quiet", "--filter", "name=^courtside-uat_db$"]), "");
   assert.equal(run("docker", ["volume", "ls", "--quiet", "--filter", "name=^courtside-uat_caddy-data$"]), "courtside-uat_caddy-data");
 
-  process.env.COURTSIDE_UAT_ADMIN_PASSWORD = newBootstrapPassword();
+  resetPassword = newBootstrapPassword();
+  smokeEnvironment.COURTSIDE_UAT_ADMIN_PASSWORD = resetPassword;
   composeRun("up", "-d", "--wait", "app", "proxy");
   composeRun("cp", "proxy:/data/caddy/pki/authorities/local/root.crt", join(build, "root-after.crt"));
   assert.deepEqual(readFileSync(join(build, "root-after.crt")), readFileSync(join(build, "root-before.crt")));
+} catch (failure) {
+  try {
+    const secrets = [
+      password, permanentPassword, resetPassword, plaintextCredential, plaintextBody, ...cookies.values()
+    ];
+    const logs = redactUatDiagnostics(composeRun("logs", "--no-color"), secrets);
+    writeFileSync(join(build, "container-logs.txt"), `${logs}\n`);
+  } catch {
+    writeFileSync(join(build, "container-logs.txt"), "Container logs were unavailable before cleanup.\n");
+  }
+  throw failure;
 } finally {
   cli(["uat-reset", "courtside-uat", "--all"]);
 }

@@ -23,6 +23,35 @@ would write. Merge it when a nightly has verified the commit it sits on, and the
 A second pull request follows each release and moves `pom.xml` on to the next `-SNAPSHOT`. It
 carries no release and no tag; merge it and forget it.
 
+## What the nightly image proves
+
+The `nightly image` workflow takes the newest complete first-attempt scheduled `build` result on
+`main`, packages that verified revision and builds one amd64/arm64 image. It runs the same reference
+deployment smoke, Trivy scan and `release-image-amd64` or `release-image-arm64` policy that the
+release uses. A red nightly image therefore predicts a release failure while there is still no
+version tag to spend. The scheduled failure tracker opens the same blocking `nightly` issue it does
+for every other scheduled workflow.
+
+This does not replace the release gate. A release stamps its version, runs its complete build,
+active assessment, upgrade and restore checks, and publishes a different digest under versioned
+tags. The nightly image is an acceptance artifact for the current code. The release workflow still
+proves the tagged code and image itself.
+
+If the selected revision already labels the published `nightly` image, the workflow skips package,
+image and qualification work and runs retention only. Otherwise it publishes `nightly` and one
+dated tag only after SBOM and provenance attestations, signing, and verification have succeeded.
+The registry keeps the newest seven dated nightlies plus every non-nightly image and the complete
+manifest closure each retained digest needs.
+
+### Nightly source attestation v1
+
+The nightly workflow's standard provenance identifies the workflow revision that performed the
+publication. Because that revision can be newer than the scheduled build selected for the image,
+a separate signed predicate binds the image digest to the selected repository commit and the
+scheduled verification run. Its JSON object contains `schemaVersion` 1, the HTTPS `repository`, the
+40-character `commit`, and the numeric `verificationRunId`. Publication verifies both that claim
+and the workflow identity before moving either nightly tag.
+
 **What the merge writes.** Merging the release pull request writes the tag and a *draft* GitHub
 release. A draft is visible to whoever may write to this repository and to nobody else, and `publish`
 is what turns it into the release a club sees — after every gate above it has passed. A run that

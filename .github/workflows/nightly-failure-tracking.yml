@@ -7,6 +7,7 @@ on:
       - build
       - mail smoke
       - mutation testing
+      - nightly image
       - npm audit
       - performance smoke
       - release plan sync
