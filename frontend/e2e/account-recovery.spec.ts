@@ -29,7 +29,10 @@ test("a member who forgot their password gets back in without asking the board",
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
 
     // when — the member redeems the code with a password of their own
-    await page.goto("/account-recovery");
+    await page.getByTestId("preferences-menu").click();
+    await page.getByTestId("logout").click();
+    await expect(page.getByTestId("login-view")).toBeVisible();
+    await page.getByTestId("forgotten-credentials-link").click();
     await page.getByTestId("recovery-code").fill(code);
     await page.getByTestId("recovery-new-password").fill("the-one-they-picked-alone");
     await page.getByTestId("recovery-redeem-submit").click();
