@@ -786,7 +786,7 @@ const resources = {
     "messages.kind.BOOKING_PLAYER_WITHDREW": "Austragung aus einer Buchung",
     "messages.kind.CREDENTIALS_NEW_ACCOUNT": "Zugangsdaten für ein neues Konto",
     "messages.kind.CREDENTIALS_PASSWORD_RESET": "Neue Zugangsdaten",
-    "messages.kind.ACCOUNT_USERNAME_REMINDER": "Benutzername",
+    "messages.kind.ACCOUNT_USERNAME_REMINDER": "Erinnerung an den Benutzernamen",
     "messages.state.QUEUED": "In Arbeit",
     "messages.state.HANDED_OVER": "Übergeben",
     "messages.state.REFUSED": "Vom Mailserver abgelehnt",

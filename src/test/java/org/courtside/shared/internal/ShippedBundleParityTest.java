@@ -7,6 +7,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -102,7 +103,7 @@ class ShippedBundleParityTest {
         try (InputStream source = ShippedBundleParityTest.class.getClassLoader()
                 .getResourceAsStream(name)) {
             assertThat(source).as("%s is on the classpath", name).isNotNull();
-            properties.load(new java.io.InputStreamReader(source, StandardCharsets.UTF_8));
+            properties.load(new InputStreamReader(source, StandardCharsets.UTF_8));
         }
         return properties;
     }

@@ -712,6 +712,15 @@ after `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` requests), that it stops no sign-in
 operation, and that the roster path (section 10) stays open the whole time — a board can issue the
 credential while the window is shut.
 
+Asking by username is also enough to **end the password a member chose**, because that is what
+issuing a credential does — so somebody who knows or guesses a username can lock that member out
+of a session they were in the middle of, without ever reading the mail that results. This is the
+price every self-service reset pays, and it is paid deliberately: the alternative is a member who
+cannot get back in without their board. What bounds it is the per-account issuing window
+(`COURTSIDE_CREDENTIAL_ISSUE_MAX_PER_WINDOW`, five per hour by default), that the new password
+reaches only the address on the account, and that the member is told what happened and that they
+did not ask for it.
+
 The roster path stays anyway, for a member who cannot reach their own mailbox.
 
 A **guardian relation** (a parent seeing their children's bookings) falls out of this model
