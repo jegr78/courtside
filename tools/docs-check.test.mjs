@@ -5,6 +5,42 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { checkDocumentation } from "./docs-check.mjs";
 
+test("given an image on a page, when checking it, then a missing file or a missing alt text fails closed", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-docs-image-"));
+  mkdirSync(join(directory, "site"));
+  mkdirSync(join(directory, "site", "screenshots"));
+  writeFileSync(join(directory, "site", "screenshots", "court-plan.png"), "");
+  const inventory = () => ["site/guide.md"];
+  const page = (body) => writeFileSync(join(directory, "site", "guide.md"), `# Guide\n\n${body}\n`);
+
+  try {
+    // when / then
+    page("![The week of a public court plan](screenshots/court-plan.png)");
+    assert.doesNotThrow(() => checkDocumentation(directory, inventory));
+    page("![The week of a public court plan](screenshots/missing.png)");
+    assert.throws(() => checkDocumentation(directory, inventory), /does not exist/);
+    page("![](screenshots/court-plan.png)");
+    assert.throws(() => checkDocumentation(directory, inventory), /alt text/);
+    page("![   ](screenshots/court-plan.png)");
+    assert.throws(() => checkDocumentation(directory, inventory), /alt text/);
+    page("![Reference style][plan]\n\n[plan]: screenshots/court-plan.png");
+    assert.doesNotThrow(() => checkDocumentation(directory, inventory));
+    page("![][plan]\n\n[plan]: screenshots/court-plan.png");
+    assert.throws(() => checkDocumentation(directory, inventory), /alt text/);
+    page("`![](screenshots/court-plan.png)`");
+    assert.doesNotThrow(() => checkDocumentation(directory, inventory));
+    page("[](screenshots/missing.png)");
+    assert.throws(() => checkDocumentation(directory, inventory), /does not exist/);
+    page("[][nowhere]");
+    assert.throws(() => checkDocumentation(directory, inventory), /undefined link reference/);
+    page("[][plan]\n\n[plan]: screenshots/court-plan.png");
+    assert.doesNotThrow(() => checkDocumentation(directory, inventory));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("given a documentation tree, when checking it, then broken structure and references fail closed", () => {
   // given
   const directory = mkdtempSync(join(tmpdir(), "courtside-docs-check-"));

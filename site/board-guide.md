@@ -41,6 +41,8 @@ und zeigt je Schritt, ob er abgeschlossen, noch offen oder optional ist:
 Sie können jeden Schritt öffnen und später hierher zurückkehren; die Übersicht merkt sich nichts,
 sondern liest jedes Mal neu, was tatsächlich da ist.
 
+![Die Einrichtungsübersicht mit den fünf Schritten untereinander, jeder mit seinem Zustand abgeschlossen, offen oder optional.](screenshots/de/admin-setup.png)
+
 ## Verein → Konfiguration
 
 Hier steht alles, was den ganzen Verein betrifft.
@@ -50,6 +52,8 @@ Courtside, ob sie mit dunklem oder hellem Text den Kontrast 4,5:1 erreicht — d
 Text auch für schwache Augen und auf schlechten Bildschirmen lesbar bleibt. Das Logo laden Sie als
 PNG oder JPEG hoch, höchstens 1 MiB und 2048 mal 2048 Pixel; solange keine Datei hochgeladen ist,
 gilt die Logo-URL.
+
+![Primär- und Akzentfarbe nebeneinander, jede mit Hexwert, Farbwähler, einer Beispiel-Schaltfläche und dem gemessenen Kontrast, darunter das Feld für das Vereinslogo.](screenshots/de/club-appearance.png)
 
 **Impressum und Datenschutz** sind zwei URLs. Sie zeigen auf die Seiten Ihres Vereins, denn
 Courtside kennt Ihre Rechtsform nicht.
@@ -173,6 +177,8 @@ einen Zugang und sein Einmalpasswort per E-Mail. Bestehende Zugänge bleiben unb
 
 Die Liste zeigt Name, Benutzername, Kontostatus und Mitgliedsart, mit Suche und Filter. Eine Person
 legen Sie mit Vorname, Nachname und E-Mail-Adresse an; alles davon ist später korrigierbar.
+
+![Die Personenliste mit Name, Benutzername, Kontostatus und Mitgliedsart je Zeile, darüber Suche und Filter.](screenshots/de/admin-roster.png)
 
 Öffnen Sie eine Person, finden Sie drei Bereiche:
 

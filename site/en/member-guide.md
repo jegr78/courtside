@@ -18,6 +18,8 @@ Whether somebody else's booking shows the name of its kind or only *Occupied* is
 club decides per kind of booking. How many people belong to a booking is public as well; who they
 are is not. Names appear on the plan only on your own bookings.
 
+![A week of the court plan: one column per court, occupancy as coloured blocks, and the legend of states below it.](../screenshots/en/court-plan.png)
+
 ## Signing in
 
 Your board creates the account. The username and a one-time password then reach you by email rather
@@ -103,6 +105,8 @@ that becomes the start of your booking. The *Create booking* dialog then shows:
 database itself, not by a check the application ran first that a concurrent request could overtake.
 If somebody beats you to it, Courtside tells you instead of placing two bookings side by side.
 
+![The Create booking dialogue with duration, court, kind of booking, the member search and the expandable More details section.](../screenshots/en/booking-dialog.png)
+
 ## What a kind of booking means
 
 Everything that occupies a court is the same thing in Courtside: a member's game, a training block,
@@ -174,6 +178,8 @@ beforehand it would have been possible.
 
 A cancelled booking frees the court again immediately. That is also what the reminder before your
 booking asks of you: if you cannot play, cancel, so that somebody else can.
+
+![My bookings with its sections for upcoming and past bookings; an upcoming one carries the cancel button.](../screenshots/en/my-bookings.png)
 
 ## Series
 

@@ -354,7 +354,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         <form noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5">
           <h2 className="text-2xl font-bold">{t("admin.config.club")}</h2>
           <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />
-          <div className="grid gap-5 [&>*]:min-w-0 sm:grid-cols-2">
+          <div data-testid="club-appearance" className="grid gap-5 [&>*]:min-w-0 sm:grid-cols-2">
             <BrandColorField kind="primary" label={t("admin.config.primaryColor")} value={config.primaryColor} changed={(primaryColor) => changeConfig({ primaryColor })} />
             <BrandColorField kind="accent" label={t("admin.config.accentColor")} value={config.accentColor} changed={(accentColor) => changeConfig({ accentColor })} />
             <fieldset className="min-w-0 grid gap-3 rounded-xl border p-4 sm:col-span-2">

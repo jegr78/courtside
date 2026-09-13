@@ -41,6 +41,8 @@ per step, whether it is complete, still to do, or optional:
 Open any step and return here later; the overview remembers nothing and reads what is actually
 there each time.
 
+![The setup overview with its five steps beneath one another, each showing whether it is complete, open or optional.](../screenshots/en/admin-setup.png)
+
 ## Club → Configuration
 
 Everything that concerns the whole club lives here.
@@ -49,6 +51,8 @@ Everything that concerns the whole club lives here.
 shows whether it reaches a contrast of 4.5:1 with dark or with light text — the threshold at which
 text stays readable for weaker eyes and on poor screens. The logo is a PNG or JPEG, up to 1 MiB and
 2048 by 2048 pixels; the logo URL is used while no file is uploaded.
+
+![The primary and accent colour side by side, each with its hex value, a colour picker, a sample button and the measured contrast, with the club logo field below.](../screenshots/en/club-appearance.png)
 
 **Imprint and privacy policy** are two URLs. They point at your club's own pages, because Courtside
 does not know your legal form.
@@ -166,6 +170,8 @@ account and mailed their own one-time password. Accounts that already exist are 
 The list shows name, username, account status and membership type, with a search and a filter. You
 create a person with a first name, a last name and an email address; all of it can be corrected
 later.
+
+![The people list with name, username, account status and membership type per row, and the search and filter above it.](../screenshots/en/admin-roster.png)
 
 Opening a person shows three areas:
 

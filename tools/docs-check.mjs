@@ -55,14 +55,19 @@ function validateLinks(root, sourcePath, source, documents) {
     .map((match) => [match[1].trim().toLowerCase(), match[2] ?? match[3]]));
   const withoutDefinitions = source.replace(/^\s{0,3}\[[^\]]+\]:.*$/gm, "");
   const targets = [];
-  for (const match of withoutDefinitions.matchAll(/!?\[([^\]]+)\](?:\((?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\)|\[([^\]]*)\])?/g)) {
-    if (match[2] !== undefined || match[3] !== undefined) {
-      targets.push(match[2] ?? match[3]);
+  for (const match of withoutDefinitions.matchAll(/(!)?\[([^\]]*)\](?:\((?:<([^>]+)>|([^\s)]+))(?:\s+"[^"]*")?\)|\[([^\]]*)\])?/g)) {
+    const [, image, text, angled, plain, reference] = match;
+    // An image a reader cannot see is one a screen reader has to read out instead.
+    if (image && text.trim() === "") {
+      throw new Error(`${sourcePath} shows an image without alt text`);
+    }
+    if (angled !== undefined || plain !== undefined) {
+      targets.push(angled ?? plain);
       continue;
     }
-    const reference = (match[4] || match[1]).trim().toLowerCase();
-    const target = definitions.get(reference);
-    if (target === undefined && match[4] === undefined) continue;
+    const label = (reference || text).trim().toLowerCase();
+    const target = definitions.get(label);
+    if (target === undefined && match[5] === undefined) continue;
     if (target === undefined) throw new Error(`${sourcePath} uses an undefined link reference`);
     targets.push(target);
   }
