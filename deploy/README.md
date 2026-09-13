@@ -103,6 +103,10 @@ manifests. With daily changes to `main`, that is a seven-day availability window
 new fully verified commit creates no dated image, so the seven retained publications may span
 longer. `nightly-candidate` is the unqualified staging tag and must not be deployed.
 
+A direct `nightly image` dispatch on a pull-request branch runs the same package, multi-architecture
+image, UAT and image-security jobs against that branch head. It never moves either published nightly
+tag. After a commit or rebase, dispatch it again so the recorded run still names the current head.
+
 The nightly workflow signs a digest only after amd64 and arm64 qualification. Verify its distinct
 identity before testing it:
 

@@ -1,12 +1,21 @@
 name: nightly image
 
 on:
-  schedule:
-    - cron: '17 3 * * *'
+  workflow_call:
+    inputs:
+      commit:
+        required: true
+        type: string
+      verification_run:
+        required: true
+        type: string
+      publish:
+        required: true
+        type: boolean
   workflow_dispatch:
 
 concurrency:
-  group: nightly-image-${{ github.ref }}
+  group: nightly-image-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
@@ -38,47 +47,45 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        if: inputs.verification_run != ''
+        with:
+          name: nightly-verification-${{ inputs.verification_run }}-1
+          path: ${{ runner.temp }}/nightly-verification
+
       - id: selection
         name: Select an immutable verified revision
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ github.token }}
           IMAGE: ghcr.io/${{ github.repository }}
+          REQUESTED_COMMIT: ${{ inputs.commit }}
+          REQUESTED_PUBLISH: ${{ inputs.publish }}
+          REQUESTED_VERIFICATION_RUN: ${{ inputs.verification_run }}
         run: |
-          set -o pipefail
-          verification_run=""
-          if [[ "${{ github.event_name }}" == 'workflow_dispatch' && "$GITHUB_REF" != 'refs/heads/main' ]]; then
+          set -euo pipefail
+          commit="$REQUESTED_COMMIT"
+          verification_run="$REQUESTED_VERIFICATION_RUN"
+          publish="$REQUESTED_PUBLISH"
+          if [[ -z "$verification_run" ]]; then
             commit="$GITHUB_SHA"
+            publish=false
           else
+            [[ "$commit" =~ ^[a-f0-9]{40}$ ]]
+            [[ "$verification_run" =~ ^[1-9][0-9]*$ ]]
+            [[ "$verification_run" = "$GITHUB_RUN_ID" ]]
+            if [[ "$publish" = true && "$GITHUB_REF" != 'refs/heads/main' ]]; then
+              echo "::error::nightly publication requires a verified build from refs/heads/main"
+              exit 1
+            fi
             git fetch --no-tags origin "$DEFAULT_BRANCH"
-            gh api --paginate \
-              "repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?event=schedule&status=success&per_page=100" \
-              --slurp | jq -r --arg branch "$DEFAULT_BRANCH" '
-                map(.workflow_runs[]) | sort_by(.created_at) | reverse | .[] |
-                select(.run_attempt == 1) | select(.head_branch == $branch) |
-                select(.head_sha | test("^[a-f0-9]{40}$")) | "\(.id) \(.head_sha)"' \
-              > "$RUNNER_TEMP/nightly-build-runs.txt"
-            commit=""
-            while read -r run_id head; do
-              git cat-file -e "${head}^{commit}" 2>/dev/null || continue
-              git merge-base --is-ancestor "$head" "origin/$DEFAULT_BRANCH" || continue
-              evidence="$RUNNER_TEMP/nightly-verification-$run_id"
-              rm -rf "$evidence"
-              if ! gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
-                --name "nightly-verification-${run_id}-1" --dir "$evidence"; then
-                continue
-              fi
-              if jq -e --arg commit "$head" --argjson runId "$run_id" '
-                .schemaVersion == 1 and .releaseReadiness == "complete" and
-                .commit == $commit and .runId == $runId and .attempt == 1 and .firstAttempt == true' \
-                "$evidence/verification.json" > /dev/null; then
-                commit="$head"
-                verification_run="$run_id"
-                break
-              fi
-            done < "$RUNNER_TEMP/nightly-build-runs.txt"
-            test -n "$commit" \
-              || { echo "::error::no complete first-attempt scheduled build on main was found"; exit 1; }
+            git cat-file -e "${commit}^{commit}"
+            git merge-base --is-ancestor "$commit" "origin/$DEFAULT_BRANCH"
+            evidence="$RUNNER_TEMP/nightly-verification"
+            jq -e --arg commit "$commit" --argjson runId "$verification_run" '
+              .schemaVersion == 1 and .releaseReadiness == "complete" and
+              .commit == $commit and .runId == $runId and .attempt == 1 and .firstAttempt == true' \
+              "$evidence/verification.json" > /dev/null
           fi
           published_revision=""
           if docker pull "$IMAGE:nightly" > /dev/null 2>&1; then
@@ -90,10 +97,6 @@ jobs:
           build=true
           if [[ "$published_revision" = "$commit" ]]; then
             build=false
-          fi
-          publish=false
-          if [[ "$GITHUB_REF" = 'refs/heads/main' ]]; then
-            publish=true
           fi
           {
             echo "build=$build"

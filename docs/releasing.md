@@ -25,12 +25,18 @@ carries no release and no tag; merge it and forget it.
 
 ## What the nightly image proves
 
-The `nightly image` workflow takes the newest complete first-attempt scheduled `build` result on
-`main`, packages that verified revision and builds one amd64/arm64 image. It runs the same reference
-deployment smoke, Trivy scan and `release-image-amd64` or `release-image-arm64` policy that the
-release uses. A red nightly image therefore predicts a release failure while there is still no
-version tag to spend. The scheduled failure tracker opens the same blocking `nightly` issue it does
-for every other scheduled workflow.
+Every complete first-attempt scheduled `build` calls the reusable `nightly image` workflow with its
+own commit and verification run. A manually dispatched full build follows the same path. The image
+workflow validates that exact evidence, packages that revision and builds one amd64/arm64 image. It
+runs the same reference deployment smoke, Trivy scan and `release-image-amd64` or
+`release-image-arm64` policy that the release uses. A red image job predicts a release failure while
+there is still no version tag to spend. The scheduled failure tracker records it as part of the
+failed scheduled build.
+
+The image workflow also accepts a direct dispatch from a pull-request branch. That dispatch builds
+and qualifies the real multi-architecture candidate from the selected branch head, but cannot sign,
+publish or apply retention. Its evidence counts only while its commit equals the current pull-request
+head; a commit or rebase makes the earlier dispatch obsolete.
 
 This does not replace the release gate. A release stamps its version, runs its complete build,
 active assessment, upgrade and restore checks, and publishes a different digest under versioned
@@ -46,11 +52,10 @@ manifest closure each retained digest needs.
 ### Nightly source attestation v1
 
 The nightly workflow's standard provenance identifies the workflow revision that performed the
-publication. Because that revision can be newer than the scheduled build selected for the image,
-a separate signed predicate binds the image digest to the selected repository commit and the
-scheduled verification run. Its JSON object contains `schemaVersion` 1, the HTTPS `repository`, the
-40-character `commit`, and the numeric `verificationRunId`. Publication verifies both that claim
-and the workflow identity before moving either nightly tag.
+publication. A separate signed predicate binds the image digest to the repository commit and the
+build verification run that called it. Its JSON object contains `schemaVersion` 1, the HTTPS
+`repository`, the 40-character `commit`, and the numeric `verificationRunId`. Publication verifies
+both that claim and the workflow identity before moving either nightly tag.
 
 **What the merge writes.** Merging the release pull request writes the tag and a *draft* GitHub
 release. A draft is visible to whoever may write to this repository and to nobody else, and `publish`

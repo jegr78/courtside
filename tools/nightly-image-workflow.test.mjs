@@ -11,9 +11,12 @@ const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8
 const workflow = yaml.load(source);
 const triggers = workflow.on ?? workflow[true];
 
-test("given the nightly image workflow, when its authority is read, then only schedule and dispatch can start it", () => {
+test("given the nightly image workflow, when its authority is read, then a verified build and a dispatch can start it", () => {
   // when / then
-  assert.deepEqual(Object.keys(triggers).sort(), ["schedule", "workflow_dispatch"]);
+  assert.deepEqual(Object.keys(triggers).sort(), ["workflow_call", "workflow_dispatch"]);
+  assert.equal(triggers.workflow_call.inputs.commit.required, true);
+  assert.equal(triggers.workflow_call.inputs.verification_run.required, true);
+  assert.equal(triggers.workflow_call.inputs.publish.required, true);
   assert.deepEqual(workflow.permissions, {});
   for (const [name, job] of Object.entries(workflow.jobs)) {
     assert.ok(job.permissions && Object.keys(job.permissions).length > 0,
@@ -21,18 +24,40 @@ test("given the nightly image workflow, when its authority is read, then only sc
   }
 });
 
-test("given a main run, when a source revision is selected, then only complete first-attempt main evidence counts", () => {
+test("given a verified build call, when its source revision is selected, then only its exact evidence counts", () => {
   // when / then
   const select = source.slice(source.indexOf("  select:"), source.indexOf("\n  package:"));
-  assert.match(select, /event=schedule&status=success&per_page=100/);
-  assert.match(select, /select\(\.run_attempt == 1\)/);
-  assert.match(select, /select\(\.head_branch == \$branch\)/);
-  assert.match(select, /nightly-verification-\$\{run_id\}-1/);
+  assert.doesNotMatch(select, /actions\/workflows\/build\.yml\/runs/);
+  assert.match(select, /REQUESTED_COMMIT: \$\{\{ inputs\.commit \}\}/);
+  assert.match(select, /REQUESTED_VERIFICATION_RUN: \$\{\{ inputs\.verification_run \}\}/);
+  assert.match(select, /nightly-verification-\$\{\{ inputs\.verification_run \}\}-1/);
+  assert.doesNotMatch(select, /path:.*inputs\.verification_run/);
+  assert.match(select, /evidence="\$RUNNER_TEMP\/nightly-verification"/);
+  assert.match(select, /set -euo pipefail/);
+  assert.match(select, /"\$verification_run" = "\$GITHUB_RUN_ID"/);
   assert.match(select, /\.releaseReadiness == "complete"/);
   assert.match(select, /\.commit == \$commit and \.runId == \$runId and \.attempt == 1/);
-  assert.match(select,
-    /github\.event_name \}\}" == 'workflow_dispatch' && "\$GITHUB_REF" != 'refs\/heads\/main'/);
+  assert.match(select, /if \[\[ -z "\$verification_run" \]\]/);
   assert.match(select, /commit="\$GITHUB_SHA"/);
+  assert.match(select, /REQUESTED_PUBLISH: \$\{\{ inputs\.publish \}\}/);
+});
+
+test("given a complete build, when it finishes, then it calls the image workflow with the same revision and evidence", () => {
+  // given
+  const buildSource = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
+  const buildWorkflow = yaml.load(buildSource);
+  const image = buildWorkflow.jobs["nightly-image"];
+
+  // when / then
+  assert.equal(image.needs, "build");
+  assert.match(String(image.if), /github\.event_name == 'schedule'/);
+  assert.match(String(image.if), /github\.event_name == 'workflow_dispatch'/);
+  assert.match(String(image.if), /github\.ref == 'refs\/heads\/main'/);
+  assert.equal(image.uses, "./.github/workflows/nightly-image.yml");
+  assert.equal(image.with.commit, "${{ github.sha }}");
+  assert.equal(image.with.verification_run, "${{ github.run_id }}");
+  assert.equal(image.with.publish, "${{ github.ref == 'refs/heads/main' }}");
+  assert.equal(workflow.concurrency.group, "nightly-image-${{ github.repository }}");
 });
 
 test("given the current nightly already carries a revision, when selection finishes, then image work is skipped", () => {
@@ -58,6 +83,16 @@ test("given a new verified revision, when its image is built, then one candidate
   assert.match(image, /org\.opencontainers\.image\.source=https:\/\/github\.com\/\$\{\{ github\.repository \}\}/);
   const tags = workflow.jobs.image.steps.find((step) => step.uses?.startsWith("docker/build-push-action")).with.tags;
   assert.equal(tags, "ghcr.io/${{ github.repository }}:nightly-candidate");
+});
+
+test("given a pull-request branch dispatch, when the candidate runs, then it uses the real image and qualification jobs without publishing", () => {
+  // when / then
+  assert.deepEqual(workflow.jobs.package.needs, "select");
+  assert.deepEqual(workflow.jobs.image.needs, ["select", "package"]);
+  assert.deepEqual(workflow.jobs.qualify.needs, ["select", "image"]);
+  assert.match(source, /publish=false/);
+  assert.match(String(workflow.jobs.publish.if), /needs\.select\.outputs\.publish == 'true'/);
+  assert.match(String(workflow.jobs.retention.if), /needs\.select\.outputs\.publish == 'true'/);
 });
 
 test("given a candidate digest, when it is qualified, then both architectures run deployment and image security gates", () => {
@@ -87,7 +122,7 @@ test("given a qualified main image, when it is published, then verified evidence
   const publish = source.slice(source.indexOf("\n  publish:\n"), source.indexOf("\n  retention:\n"));
 
   // when / then
-  assert.match(source, /if \[\[ "\$GITHUB_REF" = 'refs\/heads\/main' \]\]/);
+  assert.match(source, /if \[\[ "\$publish" = true && "\$GITHUB_REF" != 'refs\/heads\/main' \]\]/);
   assert.match(String(workflow.jobs.publish.if), /needs\.select\.outputs\.publish == 'true'/);
   assert.match(publish, /actions\/attest-build-provenance@[0-9a-f]{40}/);
   assert.match(publish, /actions\/attest-sbom@[0-9a-f]{40}/);
