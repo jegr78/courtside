@@ -105,6 +105,10 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             Map.entry("org/courtside/identity/internal/InvalidSessionCookieFilter.java",
                     new Boundary("the session the request already carries, beside the session cookie"
                             + " the document declares as a security scheme", List.of("getSession"))),
+            Map.entry("org/courtside/identity/internal/AccountRecoveryController.java",
+                    new Boundary("the peer address the recovery window counts, read the same way"
+                            + " and through the same reverse proxy as the login limit's",
+                            List.of("getRemoteAddr"))),
             Map.entry("org/courtside/identity/internal/LoginAttemptFilter.java",
                     new Boundary("the peer address the rate limit counts, which is whatever"
                             + " ForwardedHeaderFilter read out of X-Forwarded-For, so the reverse"

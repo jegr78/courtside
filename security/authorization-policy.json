@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-12",
+  "reviewedAt": "2026-09-13",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "8478141579450f2acbf3e5c7bfd59d7872ea8e5b4e838fbf2aa97e66972bf0e8",
-  "protectedFieldInventorySha256": "c0e22b77ed63cd3eb0ab9650426128dacc44abd03cf7b4fb1a349c1052249774",
-  "productionAuthorizationSha256": "a45d52fd6e98dac9bf524cc037285a12e26fee264e9bba801239ab9e471d9762",
+  "openApiFieldInventorySha256": "9b987859e30d0a22db1a0118c29a9a49cc4b15b16674d6cb964ca8362bd8bef8",
+  "protectedFieldInventorySha256": "8f64b1b837045c8d85cdeb7262f30a8775fbf9465ce7bc88d6928c693aba6ec7",
+  "productionAuthorizationSha256": "c73b736c7fcae06ec8716a3eaadea0fb118bd98fba960756663c02842fa5e832",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1364,6 +1364,24 @@
     "requestAccountCredentials:response:Violation.code",
     "requestAccountCredentials:response:Violation.params",
     "requestAccountCredentials:response:Violation.params.*",
+    "requestPasswordReset:response:$response.header.Accept",
+    "requestPasswordReset:response:$response.header.Retry-After",
+    "requestPasswordReset:response:FieldError.code",
+    "requestPasswordReset:response:FieldError.field",
+    "requestPasswordReset:response:FieldError.params",
+    "requestPasswordReset:response:FieldError.params.*",
+    "requestPasswordReset:response:Violation.code",
+    "requestPasswordReset:response:Violation.params",
+    "requestPasswordReset:response:Violation.params.*",
+    "requestUsernameReminder:response:$response.header.Accept",
+    "requestUsernameReminder:response:$response.header.Retry-After",
+    "requestUsernameReminder:response:FieldError.code",
+    "requestUsernameReminder:response:FieldError.field",
+    "requestUsernameReminder:response:FieldError.params",
+    "requestUsernameReminder:response:FieldError.params.*",
+    "requestUsernameReminder:response:Violation.code",
+    "requestUsernameReminder:response:Violation.params",
+    "requestUsernameReminder:response:Violation.params.*",
     "searchParticipantMembers:request:ParticipantMemberSearchRequest.query",
     "searchParticipantMembers:response:$response.header.Accept",
     "searchParticipantMembers:response:FieldError.code",
@@ -1783,6 +1801,49 @@
       "decisions": [
         "request-boundary",
         "credential-write-only"
+      ]
+    },
+    {
+      "id": "public-password-recovery-boundary",
+      "description": "Account recovery by name issues a credential to the address on the account and returns nothing about it, so the answer is the same whether or not the name belongs to anybody.",
+      "operationIds": [
+        "requestPasswordReset"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "request-boundary",
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "public-username-reminder-boundary",
+      "description": "The address path reminds each account registered to an address of its own name by mail and changes no credential, session or account state.",
+      "operationIds": [
+        "requestUsernameReminder"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "request-boundary"
       ]
     },
     {
@@ -2315,11 +2376,12 @@
         "request-field"
       ],
       "productionPaths": [
-        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#loginEndpoint",
         "src/main/java/org/courtside/identity/internal/AccountController.java#changeInitialPassword",
         "src/main/java/org/courtside/identity/internal/AccountController.java#changeOwnPassword",
+        "src/main/java/org/courtside/identity/internal/AccountRecoveryService.java#sendNewPassword",
         "src/main/java/org/courtside/identity/internal/PermanentPasswordService.java#change",
         "src/main/java/org/courtside/identity/internal/ReauthenticationService.java#reauthenticate",
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#loginEndpoint",
         "src/main/java/org/courtside/member/web/RosterAdminController.java#createAccount"
       ],
       "positiveTests": [
@@ -3354,6 +3416,65 @@
         "administrator-gate",
         "import-preview-read-projection",
         "administrative-projection"
+      ]
+    },
+    {
+      "id": "account-recovery-name",
+      "access": "write",
+      "description": "The name a caller submits to recover an account. It is written and never read back: the operation returns no body, so a caller learns nothing about whom it matched.",
+      "fields": [
+        "PasswordResetRequest.username"
+      ],
+      "operationIds": [
+        "requestPasswordReset"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "route",
+        "request-field"
+      ],
+      "decisions": [
+        "request-boundary",
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "account-recovery-address",
+      "access": "write",
+      "description": "The address a caller submits to be reminded of the names registered to it. The names travel to that address and never into the response.",
+      "fields": [
+        "UsernameReminderRequest.email"
+      ],
+      "operationIds": [
+        "requestUsernameReminder"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "route",
+        "request-field"
+      ],
+      "decisions": [
+        "request-boundary"
       ]
     }
   ]

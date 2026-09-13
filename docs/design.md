@@ -186,8 +186,7 @@ no message per occurrence. Of section 6's table, the booking confirmation is the
 the rest are designed.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
-container image scanning, the reports beyond court utilisation, and the self-service password reset
-of section 4 — a board member has the instance send new credentials through the roster instead.
+container image scanning, and the reports beyond court utilisation.
 
 ---
 
@@ -689,16 +688,22 @@ that grants or restores access travels by mail — the first password, and both 
 so an account without an address is one nobody could ever recover. The roster therefore refuses to
 create one, and refuses to take the address away from a person who already holds an account.
 
-**Consequence for password reset.** The standard "enter your email" flow does not work. Two
-paths, both supported:
+**Consequence for password reset.** The standard "enter your email" flow does not work, because
+an address does not name one account. Two paths, and only one of them issues anything:
 
-1. Reset via **username** — single account, single link.
-2. Reset via **email** — the message lists *all* accounts registered to that address, each
-   with its own reset link ("Accounts for this address: *doe.jane*, *roe.john*").
+1. **By username** — the instance sends a new one-time password, the same credential a
+   board-issued reset produces, and the first sign-in with it can do nothing except replace it.
+2. **By email address** — every account registered to that address is sent its own name, and
+   nothing else changes. Issuing a credential per account would let a child who forgot their
+   password invalidate their parent's, which is what a shared family address makes of the
+   obvious design.
 
-This is a case standard frameworks do not provide and must be built explicitly. Until it is, the
-roster is the only remedy: a board member has the instance send new credentials (section 10),
-which reaches the member without the board seeing anything, but still needs somebody to ask.
+Neither path answers differently for a subject that exists and one that does not, and the
+per-account issuing window is not allowed to surface either, so asking is not a way to learn who
+belongs to this club. What is answered `429` is a window on the caller's own address and on the
+submitted subject, which describes the caller rather than any account.
+
+The roster path (section 10) stays, for a member who cannot reach their own mailbox.
 
 A **guardian relation** (a parent seeing their children's bookings) falls out of this model
 almost for free. It is noted as a candidate for a later release, not Release 1.

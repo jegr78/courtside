@@ -30,6 +30,7 @@ class ProblemTypeUriTest {
     private static final List<String> KNOWN_FAILURE_SLUGS = List.of(
             "urn:courtside:error:account-address-missing",
             "urn:courtside:error:account-deactivated",
+            "urn:courtside:error:account-recovery-rate-limited",
             "urn:courtside:error:account-session-not-found",
             "urn:courtside:error:credential-issue-rate-limited",
             "urn:courtside:error:account-not-found",
