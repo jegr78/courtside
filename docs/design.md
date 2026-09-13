@@ -128,10 +128,12 @@ administrator-only — who was written to and when is personal data, and no offi
 and the administration surface shows it as a log of its own and as the last message beside the
 credential state on the person's page. There is no control anywhere that sends the same message
 again: a credential exists only as a hash once it has gone out, so the remedy for a refusal is to
-correct the address and ask for new credentials. What raises the
-event is the roster: creating an account asks for a credential at once, and one action sends a new
-one afterwards, for a message that never arrived, a deadline that passed, or a member who no longer
-knows their own password. Nobody on the board chooses it, sees it, or has to pass it on, and it
+correct the address and ask for new credentials. Two things raise the
+event. The roster does: creating an account asks for a credential at once, and one action sends a
+new one afterwards, for a message that never arrived, a deadline that passed, or a member who no
+longer knows their own password. Since the sign-in page offers recovery, an unauthenticated caller
+does too, by submitting a username — and that path issues the credential at the moment it is asked
+for, which section 10 records as a defect rather than a property. Nobody on the board chooses it, sees it, or has to pass it on, and it
 appears in no response, log or problem detail. Which of the two lifetimes applies is read from the
 account rather than chosen by the caller; how often credentials may be requested for one account is
 limited; and an account with no address or a deactivated one is refused where the board can see it,
@@ -696,6 +698,9 @@ an address does not name one account. Two paths, and only one of them issues any
 
 1. **By username** — the instance sends a new one-time password, the same credential a
    board-issued reset produces, and the first sign-in with it can do nothing except replace it.
+   Reusing the board's credential here is wrong and section 10 records why: it invalidates when the
+   request arrives rather than when somebody redeems what was sent. The subject stays the username;
+   what travels has to become a single-use token.
 2. **By email address** — every account registered to that address is sent its own name, and
    nothing else changes. Issuing a credential per account would let a child who forgot their
    password invalidate their parent's, which is what a shared family address makes of the
@@ -1757,11 +1762,23 @@ whether it is built or designed. **Designed means absent today.**
   and one mailing usernames to an address. *Built.* Section 4 says why the shape is what it is;
   what a board is being asked to accept is this.
 
-  **A guessed username ends the password its holder chose.** Issuing a credential is what the
-  operation does, so anybody who knows or guesses a name can end that member's sessions and force
-  them through the one-time password again, without reading the mail that results. That is the
-  price of not needing a board, and it is bounded by the per-account issuing window, by the
-  credential going only to the address on the account, and by the member being told.
+  **A guessed username ends the password its holder chose. This is a defect, not a trade.** The
+  operation issues the credential when it is asked for, so anybody who knows or guesses a name
+  replaces that account's password hash and ends its sessions immediately, without ever reading the
+  mail that results. The member is signed out mid-use and can only return through their mailbox.
+
+  An earlier revision of this entry called that the price every self-service reset pays. It is not.
+  The established shape mails a single-use, time-bounded token and changes nothing until somebody
+  redeems it, so an unsolicited request costs its target one email. What is built here is the
+  board-issued reset — where immediate invalidation is correct, because a person has asserted that
+  the member cannot get in — placed behind an endpoint that asserts nothing. The shared family
+  address decides that the username is the subject rather than the address; it has never had any
+  bearing on whether a password or a token is what travels.
+
+  This is therefore recorded to be replaced, not to be accepted. Until it is, the exposure is
+  bounded by the per-account issuing window, by the credential reaching only the address on the
+  account, and by the member being told what happened. No release carries it: nothing is tagged and
+  no image is published.
 
   **The anonymous path spends the same issuing budget as the board's.** That is deliberate: the
   window protects the *mailbox*, and a mailbox does not care who caused the mail — splitting the
