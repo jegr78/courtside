@@ -286,7 +286,7 @@ public class ReferenceDeploymentSecurityTest {
                 "plaintext", List.of("reverse_proxy app:8080 {", "import applicationHeaders"),
                 "serve", List.of("reverse_proxy https://app:8080 {", "import applicationHeaders",
                         "transport http {",
-                        "tls_trusted_ca_certs /etc/courtside/tls/app-authority/authority.pem"),
+                        "tls_trust_pool file /etc/courtside/tls/app-authority/authority.pem"),
                 "production", List.of("encode zstd gzip", "request_body {", "max_size 2MB", "header {",
                         "+Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"",
                         "Strict-Transport-Security \"max-age=31536000; includeSubDomains\"",

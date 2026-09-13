@@ -26,7 +26,7 @@
 	reverse_proxy https://app:8080 {
 		import applicationHeaders
 		transport http {
-			tls_trusted_ca_certs /etc/courtside/tls/app-authority/authority.pem
+			tls_trust_pool file /etc/courtside/tls/app-authority/authority.pem
 		}
 	}
 }
