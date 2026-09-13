@@ -33,6 +33,9 @@ test("given a board that keeps its members in another system, when they describe
       await page.getByTestId(`column-${column}`).selectOption(heading);
     }
     await page.getByTestId("source-default-type").selectOption({ index: 1 });
+    // A column the board does not hand to the export stays the club's own on people it already
+    // holds, so the address this list owns has to be said once, here.
+    await activate(page.getByTestId("owned-EMAIL"));
     await activate(page.getByTestId("save-source"));
 
     // then
