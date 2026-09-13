@@ -90,6 +90,10 @@ class LoginAttemptProtection {
                 SecurityEventLog.ControlTrigger.ACCOUNT_RECOVERY_SUBJECT_LIMIT);
         recordAttempt(Scope.ADDRESS, source, properties.address(),
                 SecurityEventLog.ControlTrigger.ACCOUNT_RECOVERY_ADDRESS_LIMIT);
+        // Recovery is the one anonymous surface that reaches an account, so a campaign spread
+        // thin enough to miss both buckets still has to move the instance-wide count.
+        lock(Scope.GLOBAL, hash("all"));
+        observeGlobalAttempt();
         return Optional.empty();
     }
 

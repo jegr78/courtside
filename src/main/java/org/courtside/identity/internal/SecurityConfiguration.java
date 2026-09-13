@@ -167,7 +167,8 @@ public class SecurityConfiguration {
                                 "/manifest.webmanifest", "/sw.js",
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
-                        .requestMatchers("/api/account-recovery/**").permitAll()
+                        .requestMatchers("/api/account-recovery/password",
+                                "/api/account-recovery/usernames").permitAll()
                         .requestMatchers("/api/session/logout").authenticated()
                         .requestMatchers("/api/account/initial-password").access(
                                 (authentication, context) -> new AuthorizationDecision(

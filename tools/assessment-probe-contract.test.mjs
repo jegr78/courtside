@@ -38,11 +38,12 @@ const METHOD_BEFORE = new RegExp("(?:method:\\s*\"([A-Za-z]+)\"|http\\.(get|post
 // whose method this file cannot read cannot join it unnoticed.
 // Not a path but the start of several: `operationExpectations` tests it with `startsWith`.
 const PREFIX_PREDICATES = new Map([
-  ["/api/account-recovery", "decides which operations the matrix expects an anonymous caller to reach"],
   ["/api/admin", "decides which operations the matrix expects only an administrator to reach"]
 ]);
 
 const NO_METHOD_BESIDE_IT = new Map([
+  ["/api/account-recovery/password", "an expectation predicate in operationExpectations"],
+  ["/api/account-recovery/usernames", "an expectation predicate in operationExpectations"],
   ["/api/account/initial-password", "an expectation predicate in operationExpectations"],
   ["/api/admin/audit", "a fuzz input case whose method its helper carries"],
   ["/api/admin/courts", "a fuzz input case whose method its helper carries"],

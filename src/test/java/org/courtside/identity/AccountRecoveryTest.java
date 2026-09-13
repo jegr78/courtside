@@ -159,10 +159,78 @@ class AccountRecoveryTest extends AbstractIntegrationTest {
                 .andReturn().getResponse();
 
         // then
+        MockHttpServletResponse guessed = askForAPassword("nobody.here", "192.0.2.19")
+                .andReturn().getResponse();
         assertThat(atTheLimit.getStatus())
                 .as("a name whose mailbox has had enough must not read differently from one nobody holds")
-                .isEqualTo(202);
-        assertThat(atTheLimit.getContentAsString()).isEmpty();
+                .isEqualTo(guessed.getStatus()).isEqualTo(202);
+        assertThat(atTheLimit.getContentAsString()).isEqualTo(guessed.getContentAsString()).isEmpty();
+        assertThat(new TreeSet<>(atTheLimit.getHeaderNames()))
+                .as("a header only one of them carries would answer the question the body refuses")
+                .isEqualTo(new TreeSet<>(guessed.getHeaderNames()));
+    }
+
+    @Test
+    void givenAnAccountNothingCanBeSentTo_whenItsNameIsAsked_thenItReadsLikeANameNobodyHolds()
+            throws Exception {
+        // given
+        UserAccount deactivated = accounts.findById(account("doe.jane", "jane.doe@example.org"))
+                .orElseThrow();
+        deactivated.disable();
+        accounts.save(deactivated);
+        UUID withoutAnAddress = account("roe.john", "");
+        String before = accounts.findById(withoutAnAddress).orElseThrow().getPasswordHash();
+
+        // when
+        MockHttpServletResponse disabled = askForAPassword("doe.jane", "192.0.2.20")
+                .andReturn().getResponse();
+        MockHttpServletResponse unreachable = askForAPassword("roe.john", "192.0.2.21")
+                .andReturn().getResponse();
+        MockHttpServletResponse guessed = askForAPassword("nobody.here", "192.0.2.22")
+                .andReturn().getResponse();
+
+        // then
+        for (MockHttpServletResponse answer : List.of(disabled, unreachable)) {
+            assertThat(answer.getStatus()).isEqualTo(guessed.getStatus()).isEqualTo(202);
+            assertThat(answer.getContentAsString()).isEqualTo(guessed.getContentAsString()).isEmpty();
+            assertThat(new TreeSet<>(answer.getHeaderNames()))
+                    .isEqualTo(new TreeSet<>(guessed.getHeaderNames()));
+        }
+        assertThat(issuedCredentials())
+                .as("an account nothing can be sent to is answered the same way and sent nothing")
+                .isEmpty();
+        assertThat(accounts.findById(withoutAnAddress).orElseThrow().getPasswordHash())
+                .isEqualTo(before);
+    }
+
+    @Test
+    void givenARecoveryRequest_whenItIsAdmitted_thenItCountsTowardsTheInstanceWideObservation()
+            throws Exception {
+        // given
+        account("doe.jane", "jane.doe@example.org");
+        int before = globalAttempts();
+
+        // when
+        askForAPassword("doe.jane", "192.0.2.23").andExpect(status().isAccepted());
+        askForNames("stranger@example.org", "192.0.2.24").andExpect(status().isAccepted());
+
+        // then
+        assertThat(globalAttempts())
+                .as("a campaign thin enough to miss both buckets still has to move this count")
+                .isEqualTo(before + 2);
+    }
+
+    private int globalAttempts() {
+        return jdbc.sql("SELECT attempt_count FROM login_attempt_limit WHERE scope = 'GLOBAL'")
+                .query(Integer.class).optional().orElse(0);
+    }
+
+    private List<UUID> issuedCredentials() {
+        return jdbc.sql("""
+                        SELECT account_id FROM message_record
+                        WHERE kind IN ('CREDENTIALS_NEW_ACCOUNT', 'CREDENTIALS_PASSWORD_RESET')
+                        """)
+                .query(UUID.class).list();
     }
 
     private List<UUID> remindedAccounts() {
