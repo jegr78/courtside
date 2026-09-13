@@ -3,6 +3,7 @@ FROM eclipse-temurin:25-jre@sha256:f9e65324a37f28209ce7dd0e5149a7aa954520ed936fb
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/* \
+ && rm -f /usr/bin/pebble \
  && groupadd --system --gid 10001 courtside \
  && useradd --system --uid 10001 --gid 10001 --no-create-home courtside
 

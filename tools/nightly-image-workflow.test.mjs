@@ -7,6 +7,7 @@ const require = createRequire(new URL("../frontend/package.json", import.meta.ur
 const yaml = require("js-yaml");
 const path = new URL("../.github/workflows/nightly-image.yml", import.meta.url);
 const source = readFileSync(path, "utf8");
+const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
 const workflow = yaml.load(source);
 const triggers = workflow.on ?? workflow[true];
 
@@ -74,6 +75,11 @@ test("given a candidate digest, when it is qualified, then both architectures ru
   assert.match(text, /--scope release-image-\$\{\{ matrix\.architecture \}\}/);
   assert.match(text, /ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ needs\.image\.outputs\.digest \}\}/);
   assert.match(text, /if \[\[ ! -s build\/uat-smoke\/container-logs\.txt \]\]/);
+});
+
+test("given the runtime base image, when the Courtside image is assembled, then its unused ACME test server is removed", () => {
+  // when / then
+  assert.match(dockerfile, /rm -f \/usr\/bin\/pebble/);
 });
 
 test("given a qualified main image, when it is published, then verified evidence precedes the two nightly tags", () => {
