@@ -52,6 +52,13 @@ test("given a board that keeps its members in another system, when they describe
     // when — the club sends the list again with a row changed and one added
     await page.getByTestId("snapshot-file").setInputFiles(journeyFile("members-changed.csv"));
     await activate(page.getByTestId("upload-snapshot"));
+
+    // then — the club reads what the second list would do before it does it
+    await activate(page.getByTestId("changes-heading"));
+    await expect(page.getByTestId("change-UPDATE-9004")).toBeVisible();
+    await expect(page.getByTestId("change-CREATE-9007")).toBeVisible();
+
+    // when
     await activate(page.getByTestId("execute-preview"));
     await activate(page.getByTestId("confirm-execute"));
 

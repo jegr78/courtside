@@ -1,8 +1,10 @@
 import { expect, test } from "../../fixtures";
+import { messageTo } from "../../mailbox";
 import { activate, openTheApplication, reachAdministration, rewrite, signIn, walks, writeDate, writeInto } from "../../journey-walking";
 
 test("given a board that has taken on a new member, when they record the person, correct the name they mistyped, give them an account and later end the membership, then every step is one the board can take without a database console",
-  walks("session-and-own-account", "roster-membership-and-account-administration"), async ({ page, language }) => {
+  walks("session-and-own-account", "roster-membership-and-account-administration"),
+  async ({ page, language, journeyService }) => {
     // given
     await openTheApplication(page, language);
     await signIn(page, "configuration-admin");
@@ -33,9 +35,11 @@ test("given a board that has taken on a new member, when they record the person,
     await activate(page.getByTestId("new-account-role-MEMBER"));
     await activate(page.getByTestId("create-account"));
 
-    // then — the one-time password went to the member, and the board never saw it
+    // then — the one-time password went to the member, and the board never saw it. The instance
+    // hands that message over after it has answered, and the account is written again when it does.
     await expect(page.getByTestId("account-username")).toHaveValue("major.mary");
     await expect(page.getByTestId("credential-destination")).toContainText("mary.major@example.org");
+    await messageTo(journeyService.mailboxURL, "mary.major@example.org");
 
     // when — the club records what the person joined as
     await page.getByTestId("membership-type").selectOption({ index: 1 });

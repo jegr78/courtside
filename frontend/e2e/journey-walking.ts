@@ -102,6 +102,17 @@ export function journeyFile(name: string): string {
   return fileURLToPath(new URL(`journey-files/${name}`, import.meta.url));
 }
 
+// A booking is a difference in the plan at one slot, and a member may already hold others, so a
+// journey holds on to the slot it opened and asks the plan about that one afterwards.
+export async function openTheSlot(page: Page, slot: Locator): Promise<Locator> {
+  const [date, court, period] = await Promise.all(["data-date", "data-court-number", "data-slot"]
+    .map((attribute) => slot.getAttribute(attribute)));
+  await activate(slot);
+  await expect(page.getByTestId("booking-dialog")).toBeVisible();
+  return page.locator(`[data-testid="free-slot"][data-date="${date}"][data-court-number="${court}"]`
+    + `[data-slot="${period}"]`);
+}
+
 // A member already holds what the club recorded for them, so a journey that gives one booking back
 // names the booking it made rather than trusting the order of the list.
 export async function bookingsHeld(page: Page, control: "personal-cancel" | "managed-cancel"): Promise<string[]> {
