@@ -92,11 +92,12 @@ describe("AccountRecoveryView", () => {
     show();
 
     // when
-    await userEvent.type(screen.getByTestId("recovery-code"), "ABCD-EFGH");
+    await userEvent.type(screen.getByTestId("recovery-code"), "  ABCD-EFGH ");
     await userEvent.type(screen.getByTestId("recovery-new-password"), "clay-court-evening");
     await userEvent.click(screen.getByTestId("recovery-redeem-submit"));
 
-    // then
+    // then — the contract pattern is anchored, so a code pasted with its surrounding blanks would
+    // be refused as a malformed request rather than compared
     expect(redeemed).toHaveBeenCalledWith("ABCD-EFGH", "clay-court-evening");
     expect(await screen.findByTestId("recovery-sent"))
       .toHaveTextContent("The password is set. You can sign in with it now.");

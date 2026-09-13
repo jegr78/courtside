@@ -159,7 +159,7 @@
     "publication-registry": "Deleted once its consumers finish, so nothing accumulates for a job to clean up.",
     "attempt-window": "Replaced when the next attempt window opens.",
     "club-configuration": "Lives as long as the club keeps it; a board changes it in the product and no person's lifecycle reaches it.",
-    "reset-code": "Deleted when the code is redeemed, when a redemption finds it expired, and by the identity cleanup sweep; removed with the account it belongs to."
+    "reset-code": "Deleted when the code is redeemed or replaced by a new request, and by the identity cleanup sweep once it has expired; removed with the account it belongs to."
   },
   "inMemoryState": {
     "BookingController": {

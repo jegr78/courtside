@@ -51,7 +51,7 @@ export function AccountRecoveryView() {
       <Button variant="primary" type="submit" data-testid="recovery-password-submit" disabled={pending}>{t("recovery.password.submit")}</Button>
     </form>
     <form className="mt-10 grid gap-4" onSubmit={(event) => void submit(
-      (form) => api.redeemPasswordReset(text(form, "code"), text(form, "new-password")), "recovery.redeem.done")(event)}>
+      (form) => api.redeemPasswordReset(text(form, "code").trim(), text(form, "new-password")), "recovery.redeem.done")(event)}>
       <h2 className="text-xl font-bold">{t("recovery.redeem.title")}</h2>
       <p className="text-muted">{t("recovery.redeem.hint")}</p>
       <TextField id="recovery-code" name="code" label={t("recovery.redeem.code")} data-testid="recovery-code" autoComplete="one-time-code" required />

@@ -59,8 +59,9 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
     void redeem(String code, String password) {
         PasswordResetToken token = tokens.findByCodeHash(ResetCodes.fingerprint(code))
                 .orElseThrow(ResetCodeInvalidException::new);
+        // The row outlives the refusal on purpose: it is what lets a member who retries be told
+        // their code ran out rather than that it never existed. The sweep removes it.
         if (token.hasExpiredBy(clock.instant())) {
-            tokens.deleteForAccount(token.getAccountId());
             throw new ResetCodeExpiredException();
         }
         UserAccount account = accounts.findById(token.getAccountId())

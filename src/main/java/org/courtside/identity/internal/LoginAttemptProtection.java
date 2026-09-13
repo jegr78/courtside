@@ -52,6 +52,23 @@ class LoginAttemptProtection {
         return Optional.empty();
     }
 
+    // An anonymous caller has no account to bound, and the one bucket every such caller would share
+    // is a bucket somebody else's guessing could hold shut for everybody.
+    @Transactional
+    Optional<LoginBlock> registerAnonymousCredentialAttempt(String address) {
+        String source = "credential-address:" + normalizeAddress(address);
+        lock(Scope.ADDRESS, hash(source));
+
+        Optional<LoginBlock> retryAfter = retryAfter(Scope.ADDRESS, source);
+        if (retryAfter.isPresent()) {
+            return retryAfter;
+        }
+
+        recordAttempt(Scope.ADDRESS, source, properties.address(),
+                SecurityEventLog.ControlTrigger.PASSWORD_VERIFICATION_ADDRESS_LIMIT);
+        return Optional.empty();
+    }
+
     @Transactional
     Optional<LoginBlock> registerCredentialAttempt(String accountId, String address) {
         String account = "credential-account:" + accountId;
