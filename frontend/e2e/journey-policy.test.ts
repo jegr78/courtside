@@ -1,23 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { shortcutsTaken } from "./journey-policy";
 
 const JOURNEYS = join(__dirname, "journeys");
 
-// A journey is the record of what a member can do, so it may only do what a member could. Each of
-// these reaches past the interface into the page, the network or Playwright's own escape hatches.
-const SHORTCUTS = [
-  { pattern: /\.goto\s*\(/, why: "navigate by activating what is on the screen; openTheApplication is the one entry" },
-  { pattern: /\.fill\s*\(/, why: "writeInto sends keystrokes, fill replaces them with one input event" },
-  { pattern: /\.click\s*\(/, why: "activate clicks or taps according to the device the journey runs on" },
-  { pattern: /\.tap\s*\(/, why: "activate clicks or taps according to the device the journey runs on" },
-  { pattern: /\.evaluate\s*\(/, why: "a member cannot run script in the page" },
-  { pattern: /dispatchEvent\s*\(/, why: "a member cannot raise an event the interface did not" },
-  { pattern: /force\s*:\s*true/, why: "force skips the checks that refuse a covered or disabled control" },
-  { pattern: /\.setInputFiles\s*\(/, why: "an upload belongs to a journey that opens the picker" },
-  { pattern: /\brequest\s*\./, why: "state is built through the interface, not through the API" },
-  { pattern: /\bfetch\s*\(/, why: "state is built through the interface, not through the API" },
-  { pattern: /executeSql\s*\(/, why: "state is built through the interface, not through the database" }
+const REACHES_PAST_THE_INTERFACE = [
+  ["navigating by address", 'await page.goto("/bookings");'],
+  ["writing without keystrokes", 'await page.getByTestId("username").fill("doe.jane");'],
+  ["clicking regardless of the device", 'await page.getByTestId("sign-in-link").click();'],
+  ["tapping regardless of the device", 'await page.getByTestId("sign-in-link").tap();'],
+  ["running script in the page", 'await page.evaluate(() => localStorage.clear());'],
+  ["raising an event the interface did not", 'element.dispatchEvent(new Event("input"));'],
+  ["clicking past actionability", 'await activate(covered, { force: true });'],
+  ["building the uploaded file in the test", 'await input.setInputFiles({ name: "m.csv", buffer: Buffer.from("a,b") });'],
+  ["issuing its own requests", 'await page.request.post("/api/bookings", { data: {} });'],
+  ["reading the mailbox itself", 'const messages = await fetch(`${mailbox}/api/v1/messages`);'],
+  ["reaching the database", 'await executeSql("DELETE FROM booking");']
+];
+
+const A_MEMBER_COULD_DO_THIS = [
+  ["entering through the one opening", "await openTheApplication(page);"],
+  ["typing", 'await writeInto(page.getByTestId("username"), "doe.jane");'],
+  ["activating what is on the screen", 'await activate(page.getByTestId("sign-in-link"));'],
+  ["choosing from a select the interface shows", 'await choose(page.locator("#locale-preference"), "en");'],
+  ["choosing a file the picker would have chosen", 'await input.setInputFiles(fixturePath("members.csv"));'],
+  ["reading the mail through the helper", 'const mail = await messageTo(mailboxURL, "jane.doe@example.org");'],
+  ["waiting for what the screen says", 'await expect(page.getByTestId("court-plan-view")).toBeVisible();']
 ];
 
 function journeys(): string[] {
@@ -30,6 +39,18 @@ describe("the journey policy", () => {
     expect(journeys().length).toBeGreaterThan(0);
   });
 
+  it.each(REACHES_PAST_THE_INTERFACE)("given a journey %s, when the policy reads it, then it is refused",
+    (_what, source) => {
+      // when / then
+      expect(shortcutsTaken(source)).not.toEqual([]);
+    });
+
+  it.each(A_MEMBER_COULD_DO_THIS)("given a journey %s, when the policy reads it, then it is allowed",
+    (_what, source) => {
+      // when / then
+      expect(shortcutsTaken(source)).toEqual([]);
+    });
+
   it("given every journey, when it is read, then none reaches past the interface", () => {
     // given
     const taken: string[] = [];
@@ -37,9 +58,7 @@ describe("the journey policy", () => {
     // when
     for (const journey of journeys()) {
       const source = readFileSync(join(JOURNEYS, journey), "utf8");
-      for (const { pattern, why } of SHORTCUTS) {
-        if (pattern.test(source)) taken.push(`${journey}: ${pattern.source} — ${why}`);
-      }
+      taken.push(...shortcutsTaken(source).map((refusal) => `${journey}: ${refusal}`));
     }
 
     // then
