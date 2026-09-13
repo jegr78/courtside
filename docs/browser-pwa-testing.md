@@ -75,6 +75,11 @@ fixture file in the repository, and the mailbox helper reads the one-time passwo
 sends. Building the uploaded file in the test and fetching the mailbox from a journey both stay
 refused.
 
+A date and a time field are the one place a journey hands a value over rather than typing it. Their
+segments are read in the order the browser prints them, and that order comes from the browser's own
+locale and not the product's, so digits typed into them measure which build the container holds
+rather than what the club did.
+
 Each journey declares the production workflow or workflows it walks as a Playwright annotation.
 `journey-coverage.test.ts` reads that declaration out of `--list --reporter=json`, so the guard
 sees what Playwright resolves rather than a list kept beside it, and it fails when a workflow in
