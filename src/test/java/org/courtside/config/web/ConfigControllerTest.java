@@ -417,7 +417,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                                 {"clubName": "Example Tennis Club", "primaryColor": "#1f6feb",
                                  "accentColor": "#f78166", "defaultLocale": "en",
                                  "timeZone": "Pacific/Auckland", "slotMinutes": 45,
-                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
+                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24,
+                                 "passwordResetTokenMinutes": 60, "bookingReminderHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isConflict())
@@ -469,7 +470,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "blue",
                                  "accentColor": "#f78166", "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
+                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24,
+                                 "passwordResetTokenMinutes": 60, "bookingReminderHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -487,7 +489,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "accentColor": "#f78166",
                                  "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24,
+                 "passwordResetTokenMinutes": 60, "bookingReminderHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -506,7 +509,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24,
+                 "passwordResetTokenMinutes": 60, "bookingReminderHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -525,7 +529,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
+                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24,
+                                 "passwordResetTokenMinutes": 60, "bookingReminderHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -545,7 +550,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "logoUrl": "javascript:alert(1)",
                                  "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24,
+                 "passwordResetTokenMinutes": 60, "bookingReminderHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -598,7 +604,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .content("""
                                 {"clubName": "%s", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
+                                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24,
+                                 "passwordResetTokenMinutes": 60, "bookingReminderHours": 24}
                                 """.formatted("A".repeat(101)))
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -620,7 +627,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "logoUrl": "//evil.example/x.png",
                                  "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24,
+                 "passwordResetTokenMinutes": 60, "bookingReminderHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -670,7 +678,8 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                                 {"clubName": "Example Tennis Club", "primaryColor": "#004f2d",
                                  "accentColor": "#f78166", "logoUrl": "/\\\\evil.example",
                                  "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24,
+                 "passwordResetTokenMinutes": 60, "bookingReminderHours": 24}
                                 """)
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
@@ -876,13 +885,30 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("passwordResetCredentialHours"));
     }
 
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAResetCodeLifetimeBeyondADay_whenChangingTheConfig_thenItIsRefusedByName()
+            throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace(
+                                "\"passwordResetTokenMinutes\": 60",
+                                "\"passwordResetTokenMinutes\": 1441"))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("passwordResetTokenMinutes"));
+    }
+
     private static String configJson(String clubName) {
         return """
                 {"clubName": "%s", "primaryColor": "#004f2d", "accentColor": "#c8a415",
                  "logoUrl": "/branding/logo.svg", "imprintUrl": "https://example-tennis-club.example/imprint",
                  "privacyUrl": "https://example-tennis-club.example/privacy",
                  "defaultLocale": "de", "timeZone": "Europe/Berlin", "slotMinutes": 30,
-                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24, "bookingReminderHours": 24}
+                 "newAccountCredentialHours": 168, "passwordResetCredentialHours": 24,
+                 "passwordResetTokenMinutes": 60, "bookingReminderHours": 24}
                 """.formatted(clubName);
     }
 
