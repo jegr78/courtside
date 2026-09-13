@@ -49,8 +49,14 @@ anderer als gedacht, oder die hinterlegte Adresse ist nicht die, in die du gerad
 hilft dein Vorstand weiter.
 
 Nach zu vielen Versuchen in kurzer Zeit sagt Courtside das ausdrücklich und lässt eine Weile
-warten. Gezählt wird dabei der Netzanschluss, von dem die Versuche kommen, nicht dein Konto:
-niemand kann dich aussperren, indem er dein Passwort oft genug falsch rät.
+warten. Beim **Anmelden** zählt dabei der Netzanschluss, von dem die Versuche kommen, nicht dein
+Konto: niemand kann dich aussperren, indem er dein Passwort oft genug falsch rät.
+
+Bei den beiden Formularen oben ist es anders, und das ist der Preis dafür, dass sie ohne Anmeldung
+auskommen: dort zählt auch der eingegebene Name oder die eingegebene Adresse, über alle Absender
+hinweg. Jemand anderes kann dir die Wiederherstellung also eine Weile zuhalten, indem er oft genug
+deinen Benutzernamen einträgt. Das Fenster ist kurz, deine Anmeldung ist davon nicht betroffen, und
+dein Vorstand kann dir die Zugangsdaten die ganze Zeit über zuschicken.
 
 ## Das Einmalpasswort ersetzen
 

@@ -45,9 +45,14 @@ could work through a list to find out who holds an account in your club. If no m
 the name is not the one you thought or the address held for you is not the inbox you are looking
 at, and your board can help.
 
-After too many attempts in a short time Courtside says exactly that and makes you wait a while. It
-counts the network connection the attempts come from, not your account: nobody can lock you out by
-guessing your password often enough.
+After too many attempts in a short time Courtside says exactly that and makes you wait a while. For
+**signing in** it counts the network connection the attempts come from, not your account: nobody
+can lock you out by guessing your password often enough.
+
+The two forms above are different, and that is the price of their working without a sign-in: there
+the submitted name or address is counted too, across everybody who submits it. So somebody else can
+hold your recovery shut for a while by entering your username often enough. The window is short,
+your sign-in is unaffected, and your board can send you credentials throughout.
 
 ## Replacing the one-time password
 
