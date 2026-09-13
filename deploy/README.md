@@ -842,6 +842,9 @@ default.
 | `COURTSIDE_CREDENTIAL_ISSUE_MAX_PER_WINDOW` | `5` | How often credentials may be requested for one account within the window. It counts requests, not deliveries: a request whose handover fails still spends one. Counted per account, because the account is what a filled mailbox targets; a board sending twice in a row is nowhere near it. |
 | `COURTSIDE_CREDENTIAL_ISSUE_WINDOW` | `1h` | Counting window for one account's credentials. |
 | `COURTSIDE_CREDENTIAL_ISSUE_RETENTION` | `24h` | How long a counting row is kept after its window started, before the hourly cleanup deletes it. |
+| `COURTSIDE_PASSWORD_RESET_MAIL_MAX_PER_WINDOW` | `5` | How many reset codes may be mailed to one account within the window. A request beyond it is answered exactly like every other request and sends nothing, because a refusal a caller could see would confirm the username they typed. This is the budget the self-service route spends; the board's own reset spends the credential-issue budget above, and neither can exhaust the other. |
+| `COURTSIDE_PASSWORD_RESET_MAIL_WINDOW` | `1h` | Counting window for one account's reset codes. |
+| `COURTSIDE_PASSWORD_RESET_MAIL_RETENTION` | `24h` | How long a counting row is kept after its window started, before the hourly cleanup deletes it. It must not be shorter than the window: a row deleted while its window still runs restarts the count, and the instance refuses to start if it is. |
 | `COURTSIDE_OTLP_ENABLED` | `false` | Exports traces and metrics over OTLP/HTTP when enabled. Keep disabled until both collector endpoints are reachable from the application container. |
 | `COURTSIDE_OTLP_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` | Complete OTLP/HTTP trace endpoint. Set a container-network hostname when the collector runs in another container. |
 | `COURTSIDE_OTLP_METRICS_ENDPOINT` | `http://localhost:4318/v1/metrics` | Complete OTLP/HTTP metrics endpoint. |

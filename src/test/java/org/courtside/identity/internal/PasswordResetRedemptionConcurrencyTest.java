@@ -6,53 +6,88 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
-import java.util.List;
+import java.time.Instant;
 import java.util.UUID;
-import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Timeout(value = 60, unit = TimeUnit.SECONDS)
+@Timeout(value = 90, unit = TimeUnit.SECONDS)
 class PasswordResetRedemptionConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired
     private PasswordResetTokenService tokens;
 
     @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    @Autowired
     private JdbcClient jdbc;
 
     @Test
-    void givenOneCodeAndTwoRedemptionsAtOnce_whenTheyRun_thenOnlyOneOfThemSetsAPassword() {
+    void givenTwoRedemptionsInsideOneAnothersWindow_whenTheyRun_thenOnlyTheFirstSetsAPassword()
+            throws Exception {
         // given
         UUID account = account();
         String code = tokens.issueFor(account).code();
 
-        // when
-        List<Callable<Boolean>> redemptions = List.of(
-                () -> redeemed(code, "a-password-nobody-guessed"),
-                () -> redeemed(code, "another-password-entirely"));
-        List<Boolean> outcomes;
-        try (var executor = Executors.newFixedThreadPool(2)) {
-            outcomes = redemptions.stream().map(executor::submit).map(future -> {
-                try {
-                    return PostgresDiagnostics.await(future, Duration.ofSeconds(30), jdbc,
-                            "Concurrent redemption");
-                } catch (Exception exception) {
-                    throw new IllegalStateException("Concurrent redemption failed", exception);
-                }
-            }).toList();
+        // when — the second reads the row and reaches the delete while the first still holds it
+        Future<Boolean> second;
+        try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+            second = redeemWhileTheFirstIsStillOpen(code, executor);
         }
+        boolean secondSucceeded = PostgresDiagnostics.await(
+                second, Duration.ofSeconds(30), jdbc, "The second redemption");
 
         // then
-        assertThat(outcomes)
-                .as("a code spent twice at once would set a password its holder never chose")
-                .containsExactlyInAnyOrder(true, false);
+        assertThat(secondSucceeded)
+                .as("a code spent twice inside one window would set a password nobody was sent")
+                .isFalse();
         assertThat(codesFor(account)).isZero();
         assertThat(passwordHashFor(account)).isNotNull();
+    }
+
+    private Future<Boolean> redeemWhileTheFirstIsStillOpen(String code, ExecutorService executor) {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        Future<Boolean>[] second = newHolder();
+        template.executeWithoutResult(status -> {
+            tokens.redeem(code, "a-password-nobody-guessed");
+            second[0] = executor.submit(() -> redeemed(code, "another-password-entirely"));
+            awaitTheSecondBlockingOnTheRow();
+        });
+        return second[0];
+    }
+
+    @SuppressWarnings("unchecked")
+    private Future<Boolean>[] newHolder() {
+        return new Future[1];
+    }
+
+    private void awaitTheSecondBlockingOnTheRow() {
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(20));
+        while (Instant.now().isBefore(deadline)) {
+            if (blockedBackends() > 0) {
+                return;
+            }
+            Thread.onSpinWait();
+        }
+        throw new AssertionError("The second redemption never reached the token row. PostgreSQL: "
+                + PostgresDiagnostics.waitsAndLocks(jdbc));
+    }
+
+    private int blockedBackends() {
+        return jdbc.sql("""
+                        SELECT count(*) FROM pg_locks
+                        WHERE NOT granted AND pid <> pg_backend_pid()
+                        """)
+                .query(Integer.class).single();
     }
 
     private boolean redeemed(String code, String password) {
