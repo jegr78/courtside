@@ -201,7 +201,7 @@ that was not running, and Courtside neither reads nor migrates it by hand.
 
 | Table | Holds |
 |---|---|
-| `login_attempt_limit` | Failed sign-in counts per scope and hashed subject, and how long that subject stays blocked |
+| `login_attempt_limit` | Sign-in failures and accepted recovery requests counted per scope and hashed subject, and how long that subject stays blocked |
 | `credential_issue_limit` | How often a credential was issued for an account inside the current window |
 | `spring_session` | Server-side sign-in sessions, including creation, last access, expiry and the associated principal |
 | `spring_session_attributes` | The serialized attributes belonging to a server-side session |
