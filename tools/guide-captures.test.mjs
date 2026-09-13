@@ -17,7 +17,10 @@ test("given the captured surfaces, when the guides are read, then each page show
   for (const { name, pages } of catalogue.captures) {
     for (const locale of catalogue.locales) {
       const page = pages[locale];
-      assert.ok(page, `capture ${name} names no page for ${locale}`);
+      // The catalogue builds the paths this test reads, so it carries its own bound rather than
+      // borrowing one from whichever test node:test happens to run first.
+      assert.match(page ?? "", /^site\/(?:[a-z]{2}\/)?[a-z-]+\.md$/,
+        `capture ${name} names no guide page for ${locale}`);
       if (!expected.has(page)) expected.set(page, { locale, images: [] });
       assert.equal(expected.get(page).locale, locale,
         `${page} is claimed for two locales`);
@@ -43,7 +46,9 @@ test("given the catalogue, when the capture files are read, then every locale ca
   + "surface", () => {
   // when / then
   for (const { name } of catalogue.captures) {
+    assert.match(name, /^[a-z0-9-]+$/, `capture ${name} is not a plain name`);
     for (const locale of catalogue.locales) {
+      assert.match(locale, /^[a-z]{2}$/, `locale ${locale} is not a plain language tag`);
       const file = `site/screenshots/${locale}/${name}.png`;
       assert.ok(existsSync(resolve(repository, file)), `${file} was never captured`);
     }

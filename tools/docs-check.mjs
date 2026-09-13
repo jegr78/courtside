@@ -61,7 +61,6 @@ function validateLinks(root, sourcePath, source, documents) {
     if (image && text.trim() === "") {
       throw new Error(`${sourcePath} shows an image without alt text`);
     }
-    if (!image && text === "") continue;
     if (angled !== undefined || plain !== undefined) {
       targets.push(angled ?? plain);
       continue;

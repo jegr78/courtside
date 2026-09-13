@@ -1,5 +1,5 @@
 {
-  "purpose": "Which guide passage shows which captured surface, so that a surface somebody changes names the pages that have to be looked at again. The capture run writes site/screenshots/<locale>/<name>.png; the pages reference it from there.",
+  "purpose": "Which guide passage shows which captured surface, so that a surface somebody changes names the pages that have to be looked at again. The capture run writes site/screenshots/<locale>/<name>.png; the pages reference it from there. A surface names the block a passage describes rather than a whole view: these images are published, so the smaller the frame, the less a field added later can wander into it unnoticed.",
   "locales": ["de", "en"],
   "captures": [
     {

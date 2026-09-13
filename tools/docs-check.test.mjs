@@ -30,6 +30,12 @@ test("given an image on a page, when checking it, then a missing file or a missi
     assert.throws(() => checkDocumentation(directory, inventory), /alt text/);
     page("`![](screenshots/court-plan.png)`");
     assert.doesNotThrow(() => checkDocumentation(directory, inventory));
+    page("[](screenshots/missing.png)");
+    assert.throws(() => checkDocumentation(directory, inventory), /does not exist/);
+    page("[][nowhere]");
+    assert.throws(() => checkDocumentation(directory, inventory), /undefined link reference/);
+    page("[][plan]\n\n[plan]: screenshots/court-plan.png");
+    assert.doesNotThrow(() => checkDocumentation(directory, inventory));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
