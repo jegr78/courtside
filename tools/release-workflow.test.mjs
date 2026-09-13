@@ -10,7 +10,8 @@ const workflow = readFileSync(
 
 test("given a release image, when publishing it, then the same digest is qualified on every architecture first", () => {
   // when / then
-  assert.match(workflow, /jobs:\n  build:[\s\S]+\n  image:/);
+  assert.match(workflow, /jobs:\n  nightly-evidence:[\s\S]+\n  build:[\s\S]+\n  image:/);
+  assert.match(workflow, /\n  build:\n    needs: nightly-evidence/);
   assert.match(workflow, /\n  qualify:\n    needs: image/);
   assert.match(workflow, /architecture: amd64[\s\S]+runs-on: ubuntu-latest/);
   assert.match(workflow, /architecture: arm64[\s\S]+runs-on: ubuntu-24\.04-arm/);
@@ -60,13 +61,21 @@ test("given a qualified manifest, when publishing it, then tags and signatures a
 });
 
 test("given a tag, when the release runs, then it demands a nightly that verified the commit", () => {
+  // given
+  const gate = workflow.slice(workflow.indexOf("  nightly-evidence:"), workflow.indexOf("\n  build:"));
+
   // when / then
-  assert.match(workflow, /actions\/workflows\/build\.yml\/runs\?event=schedule&status=success/);
-  assert.match(workflow, /select\(\.run_attempt == 1\)/);
-  assert.match(workflow, /git merge-base --is-ancestor "\$head" "\$GITHUB_SHA"/);
-  assert.match(workflow, /releaseReadiness == "complete"/);
-  assert.match(workflow, /no green first-attempt nightly verified a commit this tag builds on/);
-  assert.match(workflow, /actions: read/);
+  assert.match(gate, /actions\/workflows\/build\.yml\/runs\?branch=\$\{DEFAULT_BRANCH\}&status=success/);
+  assert.match(gate, /select\(\.event == "schedule" or \.event == "workflow_dispatch"\)/);
+  assert.match(gate, /select\(\.run_attempt == 1\)/);
+  assert.match(gate, /git merge-base --is-ancestor "\$head" "\$GITHUB_SHA"/);
+  assert.match(gate, /nightly-release-evidence-\$\{id\}-1/);
+  assert.match(gate, /node tools\/nightly-release-evidence\.mjs/);
+  assert.match(gate, /--commit "\$head" --run-id "\$id"/);
+  assert.ok(gate.indexOf("gh run download") < gate.indexOf("node tools/nightly-release-evidence.mjs"));
+  assert.ok(gate.indexOf("node tools/nightly-release-evidence.mjs") < gate.indexOf('verified="$id"'));
+  assert.match(gate, /no green first-attempt build with a completed coupled nightly-image run verified a commit this tag builds on/);
+  assert.match(gate, /actions: read/);
 });
 
 const WORKFLOWS = "../.github/workflows";

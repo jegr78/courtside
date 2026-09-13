@@ -738,3 +738,35 @@ jobs:
       commit: ${{ github.sha }}
       verification_run: ${{ github.run_id }}
       publish: ${{ github.ref == 'refs/heads/main' }}
+
+  nightly-release-evidence:
+    needs: [build, nightly-image]
+    if: ${{ always() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Record the completed build and image contract
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          NIGHTLY_IMAGE_RESULT: ${{ needs.nightly-image.result }}
+        run: |
+          mkdir -p build/nightly-release
+          jq -n \
+            --arg commit "${{ github.sha }}" \
+            --argjson runId "${{ github.run_id }}" \
+            --argjson attempt "${{ github.run_attempt }}" \
+            --arg build "$BUILD_RESULT" \
+            --arg nightlyImage "$NIGHTLY_IMAGE_RESULT" \
+            '{schemaVersion: 1, contract: "coupled-nightly-image-v1", commit: $commit,
+              runId: $runId, attempt: $attempt, firstAttempt: ($attempt == 1),
+              jobs: {build: $build, nightlyImage: $nightlyImage},
+              releaseReadiness: (if $attempt == 1 and $build == "success" and $nightlyImage == "success"
+                then "complete" else "incomplete" end)}' > build/nightly-release/evidence.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: nightly-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/nightly-release/evidence.json
+          retention-days: 90
+          if-no-files-found: error

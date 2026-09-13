@@ -105,11 +105,13 @@ name. The tag is spent at that point — *When a release fails* below applies to
 other.
 
 **A nightly must already have verified an ancestor of this commit.** The release looks for a
-scheduled `build` run that succeeded on its *first* attempt, whose head commit is an ancestor of
-the tag, and whose recorded evidence says `releaseReadiness: complete`. A run that went green on its
-second attempt does not count. Note what this does and does not establish: some ancestor was
-verified in full, not the tagged commit. What verifies the tagged commit is the release's own
-`build` job.
+scheduled or manually dispatched `build` run on `main` that succeeded on its *first* attempt, whose
+head commit is an ancestor of the tag, and whose coupled evidence says both the complete build and
+the nightly-image workflow succeeded (`releaseReadiness: complete`). Build-only evidence from
+before that coupling does not count, nor does a run that went green on its second attempt. Note what
+this does and does not establish:
+some ancestor was verified in full and produced or revalidated the nightly image, not necessarily
+the tagged commit. What verifies the tagged commit is the release's own `build` job.
 
 **No tracker-written `nightly` failure issue may be open.** The check counts open issues carrying
 the `nightly` label whose title starts with `[nightly] ` and whose body holds the tracker's
@@ -146,6 +148,7 @@ Permission failures and malformed evidence still stop the build.
 
 | Job | What it establishes |
 |---|---|
+| `nightly-evidence` | A first-attempt build on `main` and its coupled nightly-image workflow completed for an ancestor of the tag, and no tracker-written nightly failure remains open |
 | `build` | Dependency-remediation deadlines hold, the version is stamped, the full suite passes on the tagged commit, CodeQL analyses the sources, npm audit evidence is captured, and the release-build security policy holds |
 | `image` | One multi-architecture image is built and pushed as `release-candidate-<sha>` |
 | `qualify` | That exact digest is brought up through the reference deployment on `amd64` and `arm64`, and its vulnerabilities are checked against the candidate-image policy |
