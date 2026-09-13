@@ -9,6 +9,7 @@ public enum MessageKind {
     CREDENTIALS_NEW_ACCOUNT("credentials.newAccount", false),
     CREDENTIALS_PASSWORD_RESET("credentials.passwordReset", false),
     ACCOUNT_USERNAME_REMINDER("account.usernameReminder", false),
+    ACCOUNT_PASSWORD_RESET_CODE("account.passwordResetCode", false),
     BOOKING_CONFIRMED("booking.confirmed", true),
     BOOKING_PLAYER_RECORDED("booking.playerRecorded", false),
     BOOKING_PLAYER_WITHDREW("booking.playerWithdrew", true),

@@ -3,6 +3,7 @@ package org.courtside.config.internal;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
+import org.courtside.config.ResetTokenLifetime;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,7 +28,7 @@ class ChangeClubConfigurationCommandTest {
         // when / then
         assertThatCode(() -> new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d",
                 "#c8a415", null, null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24), new ReminderLeadTime(24), null))
+                new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null))
                 .doesNotThrowAnyException();
     }
 
@@ -36,7 +37,7 @@ class ChangeClubConfigurationCommandTest {
         // when / then
         assertThatThrownBy(() -> new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d",
                 "#c8a415", null, null, null, "de", null, "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24), new ReminderLeadTime(24), null))
+                new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("slotDuration");
     }
@@ -46,7 +47,7 @@ class ChangeClubConfigurationCommandTest {
         // when / then
         assertThatThrownBy(() -> new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d",
                 "#c8a415", null, null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
-                null, new CredentialLifetime(24), new ReminderLeadTime(24), null))
+                null, new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("newAccountCredential");
     }
@@ -56,7 +57,7 @@ class ChangeClubConfigurationCommandTest {
         // when / then
         assertThatThrownBy(() -> new ChangeClubConfigurationCommand(null, "#004f2d",
                 "#c8a415", null, null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24), new ReminderLeadTime(24), null))
+                new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("clubName");
     }
@@ -66,6 +67,6 @@ class ChangeClubConfigurationCommandTest {
                 "/branding/logo.svg", "https://example-tennis-club.example/imprint",
                 "https://example-tennis-club.example/privacy", "de",
                 new BookingSlotDuration(30), "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24), new ReminderLeadTime(24), null);
+                new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null);
     }
 }

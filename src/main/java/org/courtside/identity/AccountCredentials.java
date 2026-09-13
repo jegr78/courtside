@@ -26,16 +26,6 @@ public class AccountCredentials {
         events.publishEvent(new CredentialsRequested(accountId, reasonFor(account)));
     }
 
-    @Transactional
-    public boolean issueToIfWithinWindow(UUID accountId) {
-        UserAccount account = issuable(accountId);
-        if (!issuing.register(accountId)) {
-            return false;
-        }
-        events.publishEvent(new CredentialsRequested(accountId, reasonFor(account)));
-        return true;
-    }
-
     private UserAccount issuable(UUID accountId) {
         UserAccount account = accounts.findById(accountId).orElseThrow(() ->
                 new IllegalStateException("No account to issue a credential for: " + accountId));

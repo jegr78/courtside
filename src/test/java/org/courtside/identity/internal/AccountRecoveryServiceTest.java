@@ -1,10 +1,10 @@
 package org.courtside.identity.internal;
 
-import org.courtside.identity.AccountCredentials;
 import org.courtside.identity.Person;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.PasswordResetRequested;
 import org.courtside.shared.UsernameReminderRequested;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,19 +32,21 @@ class AccountRecoveryServiceTest {
     private static final String CALLER = "192.0.2.44";
 
     private final UserAccountRepository accounts = mock(UserAccountRepository.class);
-    private final AccountCredentials credentials = mock(AccountCredentials.class);
+    private final PasswordResetMailLimit mailLimit = mock(PasswordResetMailLimit.class);
+    private final PasswordResetTokenService resetTokens = mock(PasswordResetTokenService.class);
     private final LoginAttemptProtection protection = mock(LoginAttemptProtection.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final AccountRecoveryService recovery =
-            new AccountRecoveryService(accounts, credentials, protection, events);
+            new AccountRecoveryService(accounts, mailLimit, resetTokens, protection, events);
 
     @BeforeEach
     void allowTheCaller() {
         when(protection.registerRecoveryAttempt(any(), any())).thenReturn(Optional.empty());
+        when(mailLimit.recordWithinWindow(any())).thenReturn(true);
     }
 
     @Test
-    void givenAMemberWhoForgotTheirPassword_whenTheyAskByName_thenACredentialIsIssuedToThem() {
+    void givenAMemberWhoForgotTheirPassword_whenTheyAskByName_thenACodeIsMailedToThem() {
         // given
         UserAccount account = known("doe.jane", "jane.doe@example.org");
 
@@ -52,7 +54,11 @@ class AccountRecoveryServiceTest {
         recovery.sendNewPassword("doe.jane", CALLER);
 
         // then
-        verify(credentials).issueToIfWithinWindow(account.getId());
+        ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
+        verify(events).publishEvent(published.capture());
+        assertThat(published.getValue())
+                .isEqualTo(new PasswordResetRequested(account.getId()));
+        verifyNoInteractions(resetTokens);
     }
 
     @Test
@@ -63,7 +69,7 @@ class AccountRecoveryServiceTest {
         // when / then
         assertThatCode(() -> recovery.sendNewPassword("nobody.here", CALLER))
                 .doesNotThrowAnyException();
-        verifyNoInteractions(credentials, events);
+        verifyNoInteractions(mailLimit, resetTokens, events);
     }
 
     @Test
@@ -78,7 +84,7 @@ class AccountRecoveryServiceTest {
         recovery.sendNewPassword("doe.jane", CALLER);
 
         // then
-        verifyNoInteractions(credentials);
+        verifyNoInteractions(mailLimit, resetTokens, events);
     }
 
     @Test
@@ -90,18 +96,19 @@ class AccountRecoveryServiceTest {
         recovery.sendNewPassword("doe.jane", CALLER);
 
         // then
-        verifyNoInteractions(credentials);
+        verifyNoInteractions(mailLimit, resetTokens, events);
     }
 
     @Test
-    void givenTheAccountWasSentEnoughAlready_whenItsMemberAsks_thenTheRefusalStaysInside() {
+    void givenTheMailboxHasHadEnoughAlready_whenItsMemberAsks_thenTheRefusalStaysInside() {
         // given
         UserAccount account = known("doe.jane", "jane.doe@example.org");
-        when(credentials.issueToIfWithinWindow(account.getId())).thenReturn(false);
+        when(mailLimit.recordWithinWindow(account.getId())).thenReturn(false);
 
         // when / then — a 429 here would say the guessed name belongs to somebody
         assertThatCode(() -> recovery.sendNewPassword("doe.jane", CALLER))
                 .doesNotThrowAnyException();
+        verifyNoInteractions(events);
     }
 
     @Test
@@ -121,7 +128,7 @@ class AccountRecoveryServiceTest {
         assertThat(published.getAllValues())
                 .containsExactly(new UsernameReminderRequested(parent.getId()),
                         new UsernameReminderRequested(child.getId()));
-        verifyNoInteractions(credentials);
+        verifyNoInteractions(mailLimit, resetTokens);
     }
 
     @Test
@@ -133,7 +140,7 @@ class AccountRecoveryServiceTest {
         // when / then
         assertThatThrownBy(() -> recovery.sendNewPassword("doe.jane", CALLER))
                 .isInstanceOf(AccountRecoveryRateLimitedException.class);
-        verifyNoInteractions(accounts, credentials, events);
+        verifyNoInteractions(accounts, mailLimit, resetTokens, events);
     }
 
     @Test

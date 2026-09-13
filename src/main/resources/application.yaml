@@ -95,6 +95,10 @@ courtside:
     max-per-window: ${COURTSIDE_CREDENTIAL_ISSUE_MAX_PER_WINDOW:5}
     window: ${COURTSIDE_CREDENTIAL_ISSUE_WINDOW:1h}
     retention: ${COURTSIDE_CREDENTIAL_ISSUE_RETENTION:24h}
+  password-reset-mail:
+    max-per-window: ${COURTSIDE_PASSWORD_RESET_MAIL_MAX_PER_WINDOW:5}
+    window: ${COURTSIDE_PASSWORD_RESET_MAIL_WINDOW:1h}
+    retention: ${COURTSIDE_PASSWORD_RESET_MAIL_RETENTION:24h}
   login-protection:
     verification-concurrency: ${COURTSIDE_LOGIN_VERIFICATION_CONCURRENCY:2}
     address:

@@ -4,6 +4,7 @@ import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
+import org.courtside.config.ResetTokenLifetime;
 import org.courtside.shared.UnsupportedLanguageException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
@@ -84,7 +85,7 @@ class ConfigServiceTest {
         service.update(new ChangeClubConfigurationCommand(
                 "Example Tennis Club", "#004f2d", "#c8a415", null, null, null, "en",
                 new BookingSlotDuration(45), "Pacific/Auckland",
-                new CredentialLifetime(168), new CredentialLifetime(24), new ReminderLeadTime(24), null));
+                new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null));
 
         // then
         var slotDuration = org.mockito.ArgumentCaptor.forClass(BookingSlotDuration.class);
@@ -105,7 +106,7 @@ class ConfigServiceTest {
         assertThatThrownBy(() -> service.update(new ChangeClubConfigurationCommand(
                 "Example Tennis Club", "#004f2d", "#c8a415", null, null, null, "fr",
                 new BookingSlotDuration(30), "Europe/Berlin",
-                new CredentialLifetime(168), new CredentialLifetime(24), new ReminderLeadTime(24), null)))
+                new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null)))
                 .isInstanceOf(UnsupportedLanguageException.class)
                 .extracting(failure -> ((UnsupportedLanguageException) failure).getParams())
                 .isEqualTo(Map.of("locale", "fr", "supported", List.of("de", "en")));

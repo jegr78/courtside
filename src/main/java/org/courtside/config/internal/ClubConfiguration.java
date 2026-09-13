@@ -64,6 +64,9 @@ public class ClubConfiguration {
     @Column(name = "password_reset_credential_hours", nullable = false)
     private int passwordResetCredentialHours;
 
+    @Column(name = "password_reset_token_minutes", nullable = false)
+    private int passwordResetTokenMinutes;
+
     @Column(name = "booking_reminder_hours", nullable = false)
     private int bookingReminderHours;
 
@@ -84,9 +87,11 @@ public class ClubConfiguration {
         this.timeZone = timeZone;
     }
 
-    public void changeCredentialValidity(int newAccountHours, int passwordResetHours) {
+    public void changeCredentialValidity(int newAccountHours, int passwordResetHours,
+                                         int resetTokenMinutes) {
         this.newAccountCredentialHours = newAccountHours;
         this.passwordResetCredentialHours = passwordResetHours;
+        this.passwordResetTokenMinutes = resetTokenMinutes;
     }
 
     public void remindBookingsAfter(int hours) {

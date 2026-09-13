@@ -238,6 +238,24 @@ components:
           maxLength: 60
           pattern: "^[a-z0-9._-]+$"
 
+    PasswordResetRedemptionRequest:
+      type: object
+      description: |
+        The code from the message and the password to set with it. The code's alphabet leaves out
+        every glyph that can be read as another one, so a member retyping it from a mail cannot
+        produce a different code by choosing wrongly between them; the separator and the case are
+        optional because neither carries meaning.
+      required: [code, password]
+      properties:
+        code:
+          type: string
+          pattern: "^[2-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{4}[- ]?[2-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{4}$"
+        password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 256
+
     UsernameReminderRequest:
       type: object
       description: |
@@ -513,8 +531,8 @@ components:
       allOf:
         - $ref: "#/components/schemas/ClubConfig"
         - type: object
-          required: [newAccountCredentialHours, passwordResetCredentialHours, bookingReminderHours,
-                     logoUploaded]
+          required: [newAccountCredentialHours, passwordResetCredentialHours,
+                     passwordResetTokenMinutes, bookingReminderHours, logoUploaded]
           properties:
             logoUploaded:
               type: boolean
@@ -526,6 +544,7 @@ components:
               description: The configured URL used again after an uploaded logo is removed.
             newAccountCredentialHours: { type: integer, minimum: 1, maximum: 168 }
             passwordResetCredentialHours: { type: integer, minimum: 1, maximum: 168 }
+            passwordResetTokenMinutes: { type: integer, minimum: 15, maximum: 1440 }
             bookingReminderHours: { type: integer, minimum: 0, maximum: 168 }
             noMembershipTypeRuleSetId:
               type: [string, "null"]
@@ -539,7 +558,8 @@ components:
     ClubConfigRequest:
       type: object
       required: [clubName, primaryColor, accentColor, defaultLocale, slotMinutes, timeZone,
-                 newAccountCredentialHours, passwordResetCredentialHours, bookingReminderHours]
+                 newAccountCredentialHours, passwordResetCredentialHours,
+                 passwordResetTokenMinutes, bookingReminderHours]
       properties:
         clubName: { type: string, maxLength: 100, pattern: ".*\\S.*" }
         primaryColor: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
@@ -595,6 +615,16 @@ components:
             instance generated and mailed is not a password the member chose, so it expires
             whether or not it was ever used.
           example: 168
+        passwordResetTokenMinutes:
+          type: integer
+          minimum: 15
+          maximum: 1440
+          description: |
+            How long a self-service reset code stays redeemable. Minutes rather than hours,
+            because the code is not access — it is permission to replace a password, and the
+            shorter that permission lies in a mailbox the better. A club whose mail takes its time
+            raises it; a day is the ceiling.
+          example: 60
         passwordResetCredentialHours:
           type: integer
           minimum: 1
@@ -2533,10 +2563,14 @@ paths:
       summary: Ask the instance to send a new password.
       description: |
         The unauthenticated counterpart to the request a board makes through the roster. A member
-        who cannot sign in asks here, and the instance sends a one-time password to the address on
-        the account. It is the same credential a board-issued reset produces: whatever was issued
-        before stops working, the account's sessions end with it, and the first sign-in that uses
-        it can do nothing except replace it.
+        who cannot sign in asks here, and the instance mails a single-use code to the address on
+        the account. **Nothing about the account changes.** The password it has keeps working, its
+        sessions keep running, and only `/api/account-recovery/password/redemption` — which needs
+        the code — changes anything. So an unsolicited request costs its target one message and
+        nothing else.
+
+        The code is eight characters, mailed grouped as `ABCD-EFGH`, and it expires after a period
+        the club configures. Asking again replaces whatever code was outstanding.
 
         The answer is `202` whether or not the name belongs to an account, and it carries no body.
         Asking must not be a way to learn who belongs to this club, so status, headers and body say
@@ -2546,10 +2580,10 @@ paths:
         A member who knows their address but not their name asks
         `/api/account-recovery/usernames` first. That operation issues no credential.
 
-        Three limits bound this operation and only two of them are visible. The account keeps the
-        issuing window a board-issued request already meets; reaching it is answered `202` like
-        everything else, because a `429` from it would confirm that the submitted name belongs to
-        somebody. The other two are answered `429` with
+        Three limits bound this operation and only two of them are visible. An account may be
+        mailed a limited number of codes per window; reaching it is answered `202` like everything
+        else, because a `429` from it would confirm that the submitted name belongs to somebody.
+        The other two are answered `429` with
         `urn:courtside:error:account-recovery-rate-limited` and carry `Retry-After`: one counts
         what the caller's own address submits, the other counts what anybody submits for this
         subject, so a name that matches nothing still meets a limit. Neither reads the account, so
@@ -2572,6 +2606,51 @@ paths:
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":
           $ref: "#/components/responses/RateLimited"
+
+  /api/account-recovery/password/redemption:
+    post:
+      tags: [account-recovery]
+      operationId: redeemPasswordReset
+      summary: Set a new password with the code that was mailed.
+      description: |
+        The only operation of this pair that changes an account, and the reason the request above
+        changes none. Presenting the code proves that whoever asks reads the address the account
+        carries; the new password is set in the same request, the account's sessions all end, and
+        the code is gone afterwards.
+
+        An account that had never chosen a password is served too: redeeming clears the
+        requirement to replace an issued credential and the expiry that went with it, so a member
+        whose invitation expired before they used it does not need their board.
+
+        A code nobody holds, a code already redeemed and a code whose account can no longer be
+        reached all answer `urn:courtside:error:account-recovery-code-invalid`. One that was valid
+        and is past its expiry answers `urn:courtside:error:account-recovery-code-expired`,
+        because "ask for another one" is different advice from "check what you typed".
+
+        The password is held to the same rules as every other password this instance stores, and
+        answered with the same types: `urn:courtside:error:password-too-guessable` names no
+        individual rule, `urn:courtside:error:password-reuses-credential` says the member chose
+        the password the account already has, and a breach lookup that does not answer refuses the
+        change with `503` rather than storing something unchecked. **A password these rules refuse
+        does not spend the code** — the member corrects it and sends again.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordResetRedemptionRequest" }
+      responses:
+        "204":
+          description: The password is set and every session for the account has ended.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/account-recovery/usernames:
     post:

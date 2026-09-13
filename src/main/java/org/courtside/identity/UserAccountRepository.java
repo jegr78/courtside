@@ -26,6 +26,20 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
             """)
     int changeInitialPassword(@Param("id") UUID id, @Param("passwordHash") String passwordHash);
 
+    // No guard on the state it replaces: a reset serves the member who chose a password and the
+    // one whose invitation expired before they ever used it.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE VERSIONED UserAccount account
+            SET account.passwordHash = :passwordHash,
+                account.passwordChangeRequired = false,
+                account.credentialsExpireAt = null,
+                account.securityEpoch = account.securityEpoch + 1
+            WHERE account.id = :id
+            """)
+    int replacePasswordAfterReset(@Param("id") UUID id,
+                                  @Param("passwordHash") String passwordHash);
+
     @Query("SELECT account.securityEpoch FROM UserAccount account WHERE account.id = :id")
     Optional<Long> findSecurityEpochById(@Param("id") UUID id);
 
