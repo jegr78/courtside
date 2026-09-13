@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 import { declaredWorkflows, walkedJourneys } from "./journey-catalogue";
 
 // Its two operations are the build identifier and the web manifest, which no club performs as a
@@ -6,9 +8,21 @@ import { declaredWorkflows, walkedJourneys } from "./journey-catalogue";
 const NO_CLUB_PERFORMS_THIS = "build-and-source-discovery";
 
 describe("the journey catalogue", () => {
-  it("given every journey, when it is listed, then each one declares the workflow it walks", () => {
+  it("given the journey directory, when the listing is read, then every journey in it is walked by a project", () => {
+    // given
+    const written = readdirSync(join(__dirname, "journeys"), { recursive: true, encoding: "utf8" })
+      .filter((name) => name.endsWith(".spec.ts")).map((name) => `journeys/${name}`);
+
     // when
-    const undeclared = walkedJourneys().filter((journey) => journey.workflows.length !== 1);
+    const listed = new Set(walkedJourneys().map((journey) => journey.file));
+
+    // then — a journey no project matches is a journey nobody walks
+    expect(written.filter((journey) => !listed.has(journey))).toEqual([]);
+  });
+
+  it("given every journey, when it is listed, then each one declares what it walks", () => {
+    // when
+    const undeclared = walkedJourneys().filter((journey) => journey.workflows.length === 0);
 
     // then
     expect(undeclared.map((journey) => journey.file)).toEqual([]);

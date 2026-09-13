@@ -27,6 +27,7 @@ interface JourneyCommand {
   projectName?: string;
   testPosition?: number;
   phase?: string;
+  start?: string;
 }
 
 interface JourneyResponse {
@@ -118,7 +119,7 @@ async function executeCommand(command: JourneyCommand, service: JourneyService,
       return undefined;
     }
     case "publishServiceWorkerUpdate": return service.publishServiceWorkerUpdate();
-    case "reset": return service.reset();
+    case "reset": return service.reset(command.start === "empty" ? "empty" : "seeded");
     case "restart": return service.restart();
     default: throw new Error("Unknown journey control operation");
   }
@@ -216,7 +217,7 @@ export function connectJourneyService(reference: JourneyControlReference): Journ
       };
     },
     publishServiceWorkerUpdate: () => command(reference, { operation: "publishServiceWorkerUpdate" }),
-    reset: () => command(reference, { operation: "reset" }),
+    reset: (start) => command(reference, { operation: "reset", start }),
     restart: () => command(reference, { operation: "restart" })
   };
 }

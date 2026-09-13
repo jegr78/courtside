@@ -1,0 +1,46 @@
+import { expect, test } from "../../fixtures";
+import { activate, openTheApplication, rewrite, signIn, walks, writeInto } from "../../journey-walking";
+
+test("given a board that has taken on a new member, when they record the person, correct the name they mistyped, give them an account and later end the membership, then every step is one the board can take without a database console",
+  walks("session-and-own-account", "roster-membership-and-account-administration"), async ({ page, language }) => {
+    // given
+    await openTheApplication(page, language);
+    await signIn(page, "configuration-admin");
+    await activate(page.getByTestId("administration-link"));
+    await expect(page.getByTestId("admin-setup-view")).toBeVisible();
+
+    // when — the person is recorded, with a first name that goes in wrong
+    await activate(page.getByTestId("admin-roster-link"));
+    await expect(page.getByTestId("admin-roster-view")).toBeVisible();
+    await writeInto(page.getByTestId("new-person-first-name"), "Mray");
+    await writeInto(page.getByTestId("new-person-last-name"), "Major");
+    await writeInto(page.getByTestId("new-person-email"), "mary.major@example.org");
+    await activate(page.getByTestId("create-person"));
+
+    // then
+    await expect(page.getByTestId("admin-person-view")).toBeVisible();
+
+    // when — and the club corrects it in the product
+    await rewrite(page.getByTestId("person-first-name"), "Mary");
+    await activate(page.getByTestId("save-person"));
+
+    // then — the field holds what was typed before the club has stored it, so the answer is what
+    // the journey waits for
+    await expect(page.getByTestId("admin-save-success")).toBeVisible();
+
+    // when — the member is given a way in
+    await writeInto(page.getByTestId("new-account-username"), "major.mary");
+    await activate(page.getByTestId("new-account-role-MEMBER"));
+    await activate(page.getByTestId("create-account"));
+
+    // then — the one-time password went to the member, and the board never saw it
+    await expect(page.getByTestId("account-username")).toHaveValue("major.mary");
+    await expect(page.getByTestId("credential-destination")).toContainText("mary.major@example.org");
+
+    // when — the membership ends and the sessions with it
+    await activate(page.getByTestId("end-membership"));
+    await activate(page.getByTestId("confirm-end-membership"));
+
+    // then
+    await expect(page.getByTestId("membership-ended-on")).toBeVisible();
+  });

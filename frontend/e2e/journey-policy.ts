@@ -8,6 +8,7 @@ const SHORTCUTS = [
   { pattern: /\.evaluate\s*\(/, why: "a member cannot run script in the page" },
   { pattern: /dispatchEvent\s*\(/, why: "a member cannot raise an event the interface did not" },
   { pattern: /force\s*:\s*true/, why: "force skips the checks that refuse a covered or disabled control" },
+  { pattern: /\.clear\s*\(/, why: "rewrite selects the value and types over it, clear empties the field with no keystroke" },
   { pattern: /\bBuffer\b|\bbuffer\s*:/, why: "a journey hands the picker a fixture path; the file is not built in the test" },
   { pattern: /\brequest\s*\./, why: "state is built through the interface, not through the API" },
   { pattern: /\bfetch\s*\(/, why: "state is built through the interface, not through the API" },

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { expect, test as base, type Browser, type BrowserContext, type Metadata, type Page } from "@playwright/test";
-import { journeyInstant, type JourneyService } from "./global-setup";
+import { journeyInstant, type JourneyService, type JourneyStart } from "./global-setup";
 import { connectJourneyService, type JourneyControlReference } from "./journey-control";
 import { diagnoseUnexpectedBrowserTest, observeBrowserDisconnect } from "./browser-diagnostics";
 import { browserFixtureScope, browserIsolationVariant } from "./browser-isolation";
@@ -21,6 +21,7 @@ export type JourneyLanguage = "de" | "en";
 
 export interface JourneyOptions {
   language: JourneyLanguage;
+  start: JourneyStart;
 }
 
 interface TestFixtures {
@@ -83,6 +84,7 @@ async function pinnedBrowserFixture(
 
 export const test = base.extend<TestFixtures & JourneyOptions, WorkerFixtures>({
   language: ["de", { option: true }],
+  start: ["seeded", { option: true }],
   journeyService: [async ({ browserName }, provide) => {
     void browserName;
     const serialized = process.env.COURTSIDE_JOURNEY_CONTROL;
@@ -140,8 +142,8 @@ export const test = base.extend<TestFixtures & JourneyOptions, WorkerFixtures>({
       errors: testInfo.errors.map((error) => error.message ?? error.value ?? "")
     }));
   }, { auto: true }],
-  resetJourney: [async ({ journeyService }, provide) => {
-    await journeyService.reset();
+  resetJourney: [async ({ journeyService, start }, provide) => {
+    await journeyService.reset(start);
     await provide();
   }, { auto: true }]
 });

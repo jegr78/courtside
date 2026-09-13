@@ -16,12 +16,14 @@ const REACHES_PAST_THE_INTERFACE = [
   ["building the uploaded file in the test", 'await input.setInputFiles({ name: "m.csv", buffer: Buffer.from("a,b") });'],
   ["issuing its own requests", 'await page.request.post("/api/bookings", { data: {} });'],
   ["reading the mailbox itself", 'const messages = await fetch(`${mailbox}/api/v1/messages`);'],
-  ["reaching the database", 'await executeSql("DELETE FROM booking");']
+  ["reaching the database", 'await executeSql("DELETE FROM booking");'],
+  ["emptying a field without a keystroke", 'await page.getByTestId("person-first-name").clear();']
 ];
 
 const A_MEMBER_COULD_DO_THIS = [
   ["entering through the one opening", "await openTheApplication(page);"],
   ["typing", 'await writeInto(page.getByTestId("username"), "doe.jane");'],
+  ["typing over what was there", 'await rewrite(page.getByTestId("person-first-name"), "Mary");'],
   ["activating what is on the screen", 'await activate(page.getByTestId("sign-in-link"));'],
   ["choosing from a select the interface shows", 'await choose(page.locator("#locale-preference"), "en");'],
   ["choosing a file the picker would have chosen", 'await input.setInputFiles(fixturePath("members.csv"));'],
@@ -29,8 +31,11 @@ const A_MEMBER_COULD_DO_THIS = [
   ["waiting for what the screen says", 'await expect(page.getByTestId("court-plan-view")).toBeVisible();']
 ];
 
+// The tiers are directories, so a reader that does not descend sees an empty catalogue and says
+// every journey is clean.
 function journeys(): string[] {
-  return readdirSync(JOURNEYS).filter((name) => name.endsWith(".spec.ts"));
+  return readdirSync(JOURNEYS, { recursive: true, encoding: "utf8" })
+    .filter((name) => name.endsWith(".spec.ts"));
 }
 
 describe("the journey policy", () => {
