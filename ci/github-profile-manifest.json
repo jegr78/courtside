@@ -138,6 +138,13 @@
       "validators": []
     },
     {
+      "path": ".github/workflows/nightly-image.yml",
+      "profiles": [
+        "full"
+      ],
+      "validators": []
+    },
+    {
       "path": ".github/workflows/npm-audit.yml",
       "profiles": [
         "full"
