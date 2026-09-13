@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { expect, test as base, type Browser, type BrowserContext, type Metadata, type Page } from "@playwright/test";
+import { expect, test as base, type Browser, type BrowserContext, type BrowserContextOptions, type Metadata, type Page } from "@playwright/test";
 import { journeyInstant, type JourneyService, type JourneyStart } from "./global-setup";
 import { connectJourneyService, type JourneyControlReference } from "./journey-control";
 import { diagnoseUnexpectedBrowserTest, observeBrowserDisconnect } from "./browser-diagnostics";
@@ -31,21 +31,29 @@ interface TestFixtures {
 }
 
 export async function journeyContext(browser: Browser): Promise<BrowserContext> {
-  const context = await browser.newContext(recordedVideo());
+  const context = await browser.newContext(asTheProjectDeclares());
   await pinJourneyClock(context);
   return context;
 }
 
-// The runner records video for the context it owns; this one is created here, so it has to ask.
-// Without a size the recording is fitted into 800x800, which halves a desktop viewport.
-function recordedVideo(): { recordVideo?: { dir: string; size?: { width: number; height: number } } } {
+// The runner applies a project's device and its recording to the context it owns; this one is
+// created here, so a phone journey has to ask for the screen and the touch the project declared.
+function asTheProjectDeclares(): BrowserContextOptions {
   try {
     const info = base.info();
-    if (info.project.use.video !== "on") return {};
-    return { recordVideo: { dir: info.outputDir, size: info.project.use.viewport ?? undefined } };
+    const { userAgent, viewport, deviceScaleFactor, isMobile, hasTouch, video } = info.project.use;
+    // Without a size the recording is fitted into 800x800, which halves a desktop viewport.
+    const recordVideo = video === "on" ? { dir: info.outputDir, size: viewport ?? undefined } : undefined;
+    return declared({ userAgent, viewport, deviceScaleFactor, isMobile, hasTouch, recordVideo });
   } catch {
     return {};
   }
+}
+
+// A key that is present and undefined is still an answer: the runner stops applying its own option
+// for it, so a spec that asked for a viewport with test.use would silently lose it.
+function declared(options: BrowserContextOptions): BrowserContextOptions {
+  return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined));
 }
 
 const browserScope = browserFixtureScope(browserIsolationVariant());

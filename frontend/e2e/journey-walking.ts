@@ -45,15 +45,23 @@ export async function activate(target: Locator): Promise<void> {
 
 // A member types; a debounced search, an input mask and a maxlength all see the keystrokes that
 // locator.fill() would have replaced with a single input event.
-export async function writeInto(target: Locator, text: string): Promise<void> {
+async function keystrokes(target: Locator, text: string): Promise<void> {
   await target.pressSequentially(text, { delay: 60 });
+}
+
+// A person puts the caret in the field before typing, and a journey has to as well: keystrokes go
+// to whatever holds focus, so a render that moved it sends them nowhere and leaves the field empty.
+export async function writeInto(target: Locator, text: string): Promise<void> {
+  await activate(target);
+  await keystrokes(target, text);
 }
 
 // Correcting a typed value is select-all and type over it, the way a person does it; clear()
 // empties the field without a keystroke reaching the page.
 export async function rewrite(target: Locator, text: string): Promise<void> {
+  await activate(target);
   await target.press("ControlOrMeta+a");
-  await writeInto(target, text);
+  await keystrokes(target, text);
 }
 
 export async function signIn(page: Page, username: string, password = "temporary-password"): Promise<void> {
@@ -67,13 +75,16 @@ export async function signIn(page: Page, username: string, password = "temporary
   await activate(page.getByTestId("login-submit"));
 }
 
-// A date field takes digits in the order the browser prints, not the order the value is stored in.
-// The value it produces is always ISO, so the assertion says which order was actually typed.
+// A date or a time field reads typed digits in the order its segments are printed, and that order
+// follows the browser's own locale rather than the product's, so a journey hands it the value.
 export async function writeDate(target: Locator, isoDate: string): Promise<void> {
-  const [year, month, day] = isoDate.split("-");
-  await target.press("ControlOrMeta+a");
-  await writeInto(target, `${month}${day}${year}`);
+  await target.fill(isoDate);
   await expect(target).toHaveValue(isoDate);
+}
+
+export async function writeTime(target: Locator, time: string): Promise<void> {
+  await target.fill(time);
+  await expect(target).toHaveValue(time);
 }
 
 // The operating system's picker cannot be driven, so a journey hands the input a path to a file
@@ -82,10 +93,12 @@ export function journeyFile(name: string): string {
   return fileURLToPath(new URL(`journey-files/${name}`, import.meta.url));
 }
 
-export async function writeTime(target: Locator, time: string): Promise<void> {
-  await target.press("ControlOrMeta+a");
-  await writeInto(target, time.replace(":", ""));
-  await expect(target).toHaveValue(time);
+// A member already holds what the club recorded for them, so a journey that gives one booking back
+// names the booking it made rather than trusting the order of the list.
+export async function bookingsHeld(page: Page, control: "personal-cancel" | "managed-cancel"): Promise<string[]> {
+  const rows = await page.getByTestId(control).all();
+  const ids = await Promise.all(rows.map((row) => row.getAttribute("data-booking-id")));
+  return ids.filter((id): id is string => id !== null);
 }
 
 // Account and appearance sit behind one control in the header, so what it holds is out of reach
