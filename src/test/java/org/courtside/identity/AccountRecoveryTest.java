@@ -26,7 +26,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@TestPropertySource(properties = "courtside.login-protection.address.max-failures=3")
+@TestPropertySource(properties = {"courtside.login-protection.address.max-failures=3",
+        "courtside.credential-issue.max-per-window=1"})
 class AccountRecoveryTest extends AbstractIntegrationTest {
 
     private static final String SHARED_ADDRESS = "roe@example.org";
@@ -144,6 +145,24 @@ class AccountRecoveryTest extends AbstractIntegrationTest {
         askForAPassword("Jane Doe", "192.0.2.16")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"));
+    }
+
+    @Test
+    void givenAnAccountAtItsIssuingLimit_whenItIsAskedForAgain_thenTheAnswerStillSaysNothing()
+            throws Exception {
+        // given
+        account("doe.jane", "jane.doe@example.org");
+        askForAPassword("doe.jane", "192.0.2.17").andExpect(status().isAccepted());
+
+        // when
+        MockHttpServletResponse atTheLimit = askForAPassword("doe.jane", "192.0.2.18")
+                .andReturn().getResponse();
+
+        // then
+        assertThat(atTheLimit.getStatus())
+                .as("a name whose mailbox has had enough must not read differently from one nobody holds")
+                .isEqualTo(202);
+        assertThat(atTheLimit.getContentAsString()).isEmpty();
     }
 
     private List<UUID> remindedAccounts() {

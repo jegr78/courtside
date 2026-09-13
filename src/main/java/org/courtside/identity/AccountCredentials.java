@@ -21,6 +21,22 @@ public class AccountCredentials {
 
     @Transactional
     public void issueTo(UUID accountId) {
+        UserAccount account = issuable(accountId);
+        issuing.registerOrRefuse(accountId);
+        events.publishEvent(new CredentialsRequested(accountId, reasonFor(account)));
+    }
+
+    @Transactional
+    public boolean issueToIfWithinWindow(UUID accountId) {
+        UserAccount account = issuable(accountId);
+        if (!issuing.register(accountId)) {
+            return false;
+        }
+        events.publishEvent(new CredentialsRequested(accountId, reasonFor(account)));
+        return true;
+    }
+
+    private UserAccount issuable(UUID accountId) {
         UserAccount account = accounts.findById(accountId).orElseThrow(() ->
                 new IllegalStateException("No account to issue a credential for: " + accountId));
         if (!account.isEnabled()) {
@@ -31,8 +47,7 @@ public class AccountCredentials {
         if (account.getPerson().getEmail() == null || account.getPerson().getEmail().isBlank()) {
             throw new AccountAddressMissingException();
         }
-        issuing.registerOrRefuse(accountId);
-        events.publishEvent(new CredentialsRequested(accountId, reasonFor(account)));
+        return account;
     }
 
     // Everything short of a password the member chose themselves is still the invitation, so the

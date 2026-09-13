@@ -43,9 +43,7 @@ class AccountRecoveryService {
     // The per-account window spares a mailbox, it does not answer questions: letting it reach an
     // unauthenticated caller would tell them the name they guessed belongs to somebody.
     private void issueUnlessTheAccountHasHadEnough(UserAccount account) {
-        try {
-            credentials.issueTo(account.getId());
-        } catch (CredentialIssueRateLimitedException alreadySentEnough) {
+        if (!credentials.issueToIfWithinWindow(account.getId())) {
             log.debug("Recovery found the issuing window already met for account {}",
                     account.getId());
         }

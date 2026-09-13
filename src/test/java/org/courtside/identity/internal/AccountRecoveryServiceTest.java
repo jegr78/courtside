@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -53,7 +52,7 @@ class AccountRecoveryServiceTest {
         recovery.sendNewPassword("doe.jane", CALLER);
 
         // then
-        verify(credentials).issueTo(account.getId());
+        verify(credentials).issueToIfWithinWindow(account.getId());
     }
 
     @Test
@@ -98,8 +97,7 @@ class AccountRecoveryServiceTest {
     void givenTheAccountWasSentEnoughAlready_whenItsMemberAsks_thenTheRefusalStaysInside() {
         // given
         UserAccount account = known("doe.jane", "jane.doe@example.org");
-        doThrow(new CredentialIssueRateLimitedException(3))
-                .when(credentials).issueTo(account.getId());
+        when(credentials.issueToIfWithinWindow(account.getId())).thenReturn(false);
 
         // when / then — a 429 here would say the guessed name belongs to somebody
         assertThatCode(() -> recovery.sendNewPassword("doe.jane", CALLER))

@@ -6,4 +6,6 @@ import java.util.UUID;
 public interface CredentialIssuing {
 
     void registerOrRefuse(UUID accountId);
+
+    boolean register(UUID accountId);
 }
