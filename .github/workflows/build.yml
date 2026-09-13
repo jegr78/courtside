@@ -723,3 +723,18 @@ jobs:
           path: build/coverage/changed.md
           if-no-files-found: error
           retention-days: 14
+
+  nightly-image:
+    needs: build
+    if: ${{ always() && needs.build.result == 'success' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) }}
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    uses: ./.github/workflows/nightly-image.yml
+    with:
+      commit: ${{ github.sha }}
+      verification_run: ${{ github.run_id }}
+      publish: ${{ github.ref == 'refs/heads/main' }}
