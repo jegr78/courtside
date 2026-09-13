@@ -1,0 +1,19 @@
+name: nightly image
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  available:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Confirm the dispatch entry point
+        run: echo "The nightly image workflow is available for branch qualification."
