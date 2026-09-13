@@ -73,6 +73,26 @@ class LoginAttemptProtection {
         return Optional.empty();
     }
 
+    @Transactional
+    Optional<LoginBlock> registerRecoveryAttempt(String asked, String address) {
+        String subject = "recovery-subject:" + normalizeAddress(asked);
+        String source = "recovery-address:" + normalizeAddress(address);
+        lock(Scope.ACCOUNT, hash(subject));
+        lock(Scope.ADDRESS, hash(source));
+
+        Optional<LoginBlock> retryAfter = retryAfter(Scope.ACCOUNT, subject)
+                .or(() -> retryAfter(Scope.ADDRESS, source));
+        if (retryAfter.isPresent()) {
+            return retryAfter;
+        }
+
+        recordAttempt(Scope.ACCOUNT, subject, properties.address(),
+                SecurityEventLog.ControlTrigger.ACCOUNT_RECOVERY_SUBJECT_LIMIT);
+        recordAttempt(Scope.ADDRESS, source, properties.address(),
+                SecurityEventLog.ControlTrigger.ACCOUNT_RECOVERY_ADDRESS_LIMIT);
+        return Optional.empty();
+    }
+
     private Optional<LoginBlock> retryAfter(String address) {
         Instant now = clock.instant();
         return retryAfter(Scope.ADDRESS, address);

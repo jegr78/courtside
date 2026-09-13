@@ -150,7 +150,7 @@ public class SecurityConfiguration {
                                 new AuthorizationDecision(performanceTelemetryEnabled))
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
                         .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
-                                "/my-messages", "/account/security",
+                                "/my-messages", "/account/security", "/account-recovery",
                                 "/admin", "/admin/setup",
                                 "/admin/configuration", "/admin/facility",
                                 "/admin/facility/courts", "/admin/facility/opening-hours",
@@ -167,6 +167,7 @@ public class SecurityConfiguration {
                                 "/manifest.webmanifest", "/sw.js",
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
+                        .requestMatchers("/api/account-recovery/**").permitAll()
                         .requestMatchers("/api/session/logout").authenticated()
                         .requestMatchers("/api/account/initial-password").access(
                                 (authentication, context) -> new AuthorizationDecision(

@@ -29,6 +29,12 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
     @Query("SELECT account.securityEpoch FROM UserAccount account WHERE account.id = :id")
     Optional<Long> findSecurityEpochById(@Param("id") UUID id);
 
+    @Query("""
+            SELECT account FROM UserAccount account
+            WHERE lower(account.person.email) = lower(:email)
+            """)
+    List<UserAccount> findByPersonEmailIgnoringCase(@Param("email") String email);
+
     Optional<UserAccount> findByPersonId(UUID personId);
 
     List<UserAccount> findByPersonIdIn(List<UUID> personIds);
