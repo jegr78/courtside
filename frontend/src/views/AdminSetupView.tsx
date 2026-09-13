@@ -32,6 +32,7 @@ const factoryConfiguration = {
   timeZone: "Europe/Berlin",
   newAccountCredentialHours: 168,
   passwordResetCredentialHours: 24,
+  passwordResetTokenMinutes: 60,
   bookingReminderHours: 24,
   logoUploaded: false,
   noMembershipTypeRuleSetId: null

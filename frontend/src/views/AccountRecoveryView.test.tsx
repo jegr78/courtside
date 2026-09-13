@@ -86,6 +86,71 @@ describe("AccountRecoveryView", () => {
     expect(screen.queryByTestId("recovery-sent")).not.toBeInTheDocument();
   });
 
+  it("given a code and a new password, when they are redeemed, then the page says the password is set", async () => {
+    // given
+    const redeemed = vi.spyOn(api, "redeemPasswordReset").mockResolvedValue(undefined);
+    show();
+
+    // when
+    await userEvent.type(screen.getByTestId("recovery-code"), "  ABCD-EFGH ");
+    await userEvent.type(screen.getByTestId("recovery-new-password"), "clay-court-evening");
+    await userEvent.click(screen.getByTestId("recovery-redeem-submit"));
+
+    // then — the contract pattern is anchored, so a code pasted with its surrounding blanks would
+    // be refused as a malformed request rather than compared
+    expect(redeemed).toHaveBeenCalledWith("ABCD-EFGH", "clay-court-evening");
+    expect(await screen.findByTestId("recovery-sent"))
+      .toHaveTextContent("The password is set. You can sign in with it now.");
+  });
+
+  it("given a code the instance refuses, when it is redeemed, then the refusal names the code and not the password", async () => {
+    // given
+    vi.spyOn(api, "redeemPasswordReset").mockRejectedValue(new ApiError(400, {
+      type: "urn:courtside:error:account-recovery-code-expired",
+      title: "The code has expired",
+      status: 400,
+      violations: [{ code: "identity.recovery.codeExpired", params: {} }]
+    }));
+    show();
+
+    // when
+    await userEvent.type(screen.getByTestId("recovery-code"), "ABCD-EFGH");
+    await userEvent.type(screen.getByTestId("recovery-new-password"), "clay-court-evening");
+    await userEvent.click(screen.getByTestId("recovery-redeem-submit"));
+
+    // then
+    expect(await screen.findByRole("alert"))
+      .toHaveTextContent("That code has expired. Ask for a new one above.");
+    expect(screen.queryByTestId("recovery-sent")).not.toBeInTheDocument();
+  });
+
+  it("given a password the rules reject, when the same code is redeemed again, then the second attempt reaches the instance", async () => {
+    // given
+    const redeemed = vi.spyOn(api, "redeemPasswordReset")
+      .mockRejectedValueOnce(new ApiError(400, {
+        type: "urn:courtside:error:password-too-guessable",
+        title: "The password is too guessable",
+        status: 400,
+        violations: [{ code: "identity.password.tooGuessable", params: {} }]
+      }))
+      .mockResolvedValue(undefined);
+    show();
+    await userEvent.type(screen.getByTestId("recovery-code"), "ABCD-EFGH");
+    await userEvent.type(screen.getByTestId("recovery-new-password"), "password1234");
+    await userEvent.click(screen.getByTestId("recovery-redeem-submit"));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    // when
+    await userEvent.clear(screen.getByTestId("recovery-new-password"));
+    await userEvent.type(screen.getByTestId("recovery-new-password"), "clay-court-evening");
+    await userEvent.click(screen.getByTestId("recovery-redeem-submit"));
+
+    // then
+    expect(redeemed).toHaveBeenNthCalledWith(2, "ABCD-EFGH", "clay-court-evening");
+    expect(await screen.findByTestId("recovery-sent"))
+      .toHaveTextContent("The password is set. You can sign in with it now.");
+  });
+
   it("given somebody who has asked too often, when they ask again, then the refusal is shown", async () => {
     // given
     vi.spyOn(api, "requestPasswordReset").mockRejectedValue(new ApiError(429, {

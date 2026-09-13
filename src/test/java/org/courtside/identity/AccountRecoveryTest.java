@@ -1,9 +1,13 @@
 package org.courtside.identity;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.shared.IssuedResetCode;
+import org.courtside.identity.internal.LoginVerificationCapacity;
+import org.courtside.shared.PasswordResetCodeIssuer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -13,6 +17,10 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -27,7 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @TestPropertySource(properties = {"courtside.login-protection.address.max-failures=3",
-        "courtside.credential-issue.max-per-window=1"})
+        "courtside.login-protection.verification-concurrency=1",
+        "courtside.password-reset-mail.max-per-window=1"})
 class AccountRecoveryTest extends AbstractIntegrationTest {
 
     private static final String SHARED_ADDRESS = "roe@example.org";
@@ -37,6 +46,12 @@ class AccountRecoveryTest extends AbstractIntegrationTest {
     @Autowired private UserAccountRepository accounts;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JdbcClient jdbc;
+    @Autowired private PasswordResetCodeIssuer codes;
+    @Autowired private Clock clock;
+
+    @Autowired
+    @Qualifier("credentialVerificationCapacity")
+    private LoginVerificationCapacity credentialCapacity;
 
     private MockMvc mockMvc;
 
@@ -46,23 +61,26 @@ class AccountRecoveryTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAMemberWhoForgotTheirPassword_whenTheyAskByName_thenTheInstanceIssuesANewOne()
+    void givenAMemberWhoForgotTheirPassword_whenTheyAskByName_thenNothingAboutTheirAccountChanges()
             throws Exception {
         // given
         UUID account = account("doe.jane", "jane.doe@example.org");
-        String before = accounts.findById(account).orElseThrow().getPasswordHash();
+        UserAccount before = accounts.findById(account).orElseThrow();
+        String hashBefore = before.getPasswordHash();
+        long epochBefore = before.getSecurityEpoch();
 
         // when
         askForAPassword("doe.jane", "192.0.2.10").andExpect(status().isAccepted());
 
         // then
-        UserAccount reissued = accounts.findById(account).orElseThrow();
-        assertThat(reissued.getPasswordHash())
-                .as("the member signs in with something the board never saw")
-                .isNotEqualTo(before);
-        assertThat(reissued.isPasswordChangeRequired())
-                .as("the first sign-in with it can do nothing except replace it")
-                .isTrue();
+        UserAccount after = accounts.findById(account).orElseThrow();
+        assertThat(after.getPasswordHash())
+                .as("asking must cost the member nothing: the password they chose keeps working")
+                .isEqualTo(hashBefore);
+        assertThat(after.getSecurityEpoch())
+                .as("and every session they hold keeps running")
+                .isEqualTo(epochBefore);
+        assertThat(after.isPasswordChangeRequired()).isFalse();
     }
 
     @Test
@@ -148,10 +166,10 @@ class AccountRecoveryTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnAccountAtItsIssuingLimit_whenItIsAskedForAgain_thenTheAnswerStillSaysNothing()
+    void givenAnAccountAtItsMailWindow_whenItIsAskedForAgain_thenTheAnswerStillSaysNothing()
             throws Exception {
         // given
-        account("doe.jane", "jane.doe@example.org");
+        UUID account = account("doe.jane", "jane.doe@example.org");
         askForAPassword("doe.jane", "192.0.2.17").andExpect(status().isAccepted());
 
         // when
@@ -168,6 +186,9 @@ class AccountRecoveryTest extends AbstractIntegrationTest {
         assertThat(new TreeSet<>(atTheLimit.getHeaderNames()))
                 .as("a header only one of them carries would answer the question the body refuses")
                 .isEqualTo(new TreeSet<>(guessed.getHeaderNames()));
+        assertThat(mailedCodes())
+                .as("the window protects the mailbox, so the second request has to cost it nothing")
+                .containsExactly(account);
     }
 
     @Test
@@ -196,7 +217,7 @@ class AccountRecoveryTest extends AbstractIntegrationTest {
             assertThat(new TreeSet<>(answer.getHeaderNames()))
                     .isEqualTo(new TreeSet<>(guessed.getHeaderNames()));
         }
-        assertThat(issuedCredentials())
+        assertThat(mailedCodes())
                 .as("an account nothing can be sent to is answered the same way and sent nothing")
                 .isEmpty();
         assertThat(accounts.findById(withoutAnAddress).orElseThrow().getPasswordHash())
@@ -220,15 +241,304 @@ class AccountRecoveryTest extends AbstractIntegrationTest {
                 .isEqualTo(before + 2);
     }
 
+    @Test
+    void givenACodeThatWasMailed_whenItIsRedeemed_thenThePasswordIsSetAndEverySessionEnds()
+            throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        UserAccount before = accounts.findById(account).orElseThrow();
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when
+        redeem(issued.code(), "a-password-nobody-guessed").andExpect(status().isNoContent());
+
+        // then
+        UserAccount after = accounts.findById(account).orElseThrow();
+        assertThat(after.getPasswordHash())
+                .as("the member signs in with what they typed, not with what was mailed")
+                .isNotEqualTo(before.getPasswordHash());
+        assertThat(after.getSecurityEpoch()).isGreaterThan(before.getSecurityEpoch());
+        assertThat(after.isPasswordChangeRequired())
+                .as("a password the member chose is not one they have to replace")
+                .isFalse();
+        assertThat(outstandingCodes()).isEmpty();
+    }
+
+    @Test
+    void givenAnAnonymousRedemption_whenItIsMade_thenItCountsTowardsTheInstanceWideObservation()
+            throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+        int before = globalAttempts();
+
+        // when
+        redeem("ZZZZ-ZZZZ", "a-password-nobody-guessed")
+                .andExpect(status().isBadRequest());
+        redeem(issued.code(), "a-password-nobody-guessed").andExpect(status().isNoContent());
+
+        // then
+        assertThat(globalAttempts())
+                .as("the metric an operator watches must not go blind on the one anonymous route")
+                .isEqualTo(before + 2);
+    }
+
+    @Test
+    void givenACodeThatWasRedeemed_whenItIsPresentedAgain_thenItReadsLikeACodeNobodyHolds()
+            throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+        redeem(issued.code(), "a-password-nobody-guessed").andExpect(status().isNoContent());
+
+        // when / then
+        redeem(issued.code(), "another-password-entirely")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:account-recovery-code-invalid"));
+    }
+
+    @Test
+    void givenAPasswordTheRulesRefuse_whenItIsSubmitted_thenTheCodeIsStillGood() throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when — the username is a context term, so the rules refuse this one
+        redeem(issued.code(), "doe.jane-doe.jane")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:password-too-guessable"));
+
+        // then
+        assertThat(outstandingCodes())
+                .as("a member who has to correct their password still holds the code they were sent")
+                .containsExactly(account);
+        redeem(issued.code(), "a-password-nobody-guessed").andExpect(status().isNoContent());
+    }
+
+    @Test
+    void givenACodeNobodyWasEverSent_whenItIsPresented_thenItIsRefusedAsInvalid() throws Exception {
+        // when / then
+        redeem("ABCD-EFGH", "a-password-nobody-guessed")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:account-recovery-code-invalid"));
+    }
+
+    @Test
+    void givenASecondRequest_whenItIsMade_thenTheCodeFromTheFirstStopsWorking() throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode first = codes.issueFor(account);
+
+        // when
+        IssuedResetCode second = codes.issueFor(account);
+
+        // then
+        redeem(first.code(), "a-password-nobody-guessed")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:account-recovery-code-invalid"));
+        redeem(second.code(), "a-password-nobody-guessed").andExpect(status().isNoContent());
+    }
+
+    @Test
+    void givenACodeAndThenAChangedAddress_whenItIsRedeemed_thenItIsRefused() throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when — a message already sent cannot be recalled from a mailbox that was never theirs
+        UserAccount held = accounts.findById(account).orElseThrow();
+        held.getPerson().changeEmail("somebody.else@example.org");
+        persons.save(held.getPerson());
+
+        // then
+        redeem(issued.code(), "a-password-nobody-guessed")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:account-recovery-code-invalid"));
+    }
+
+    @Test
+    void givenACodeAndThenABoardIssuedCredential_whenItIsRedeemed_thenItIsRefused() throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when — anything that changed the way into the account withdraws what was outstanding
+        UserAccount held = accounts.findById(account).orElseThrow();
+        held.credentialsIssued(passwordEncoder.encode("issued-by-the-board"),
+                clock.instant().plusSeconds(3600));
+        accounts.save(held);
+
+        // then
+        redeem(issued.code(), "a-password-nobody-guessed")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:account-recovery-code-invalid"));
+    }
+
+    @Test
+    void givenACodeWhoseWindowHasPassed_whenItIsRedeemed_thenItIsToldApartFromAnUnknownOne()
+            throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when
+        expire(account);
+
+        // then
+        redeem(issued.code(), "a-password-nobody-guessed")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:account-recovery-code-expired"));
+        // a member who tries the same code twice is told the same thing twice, not that it never was
+        redeem(issued.code(), "a-password-nobody-guessed")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:account-recovery-code-expired"));
+    }
+
+    @Test
+    void givenTheCredentialVerificationCapacityIsOccupied_whenACodeIsRedeemed_thenItIsRefusedLikeAnyOtherCredentialWork()
+            throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when / then
+        try (LoginVerificationCapacity.Permit ignored = credentialCapacity.tryAcquire().orElseThrow()) {
+            redeem(issued.code(), "a-password-nobody-guessed")
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.type")
+                            .value("urn:courtside:error:password-verification-rate-limited"));
+        }
+        assertThat(outstandingCodes())
+                .as("work the instance never did cannot have spent the code")
+                .containsExactly(account);
+        redeem(issued.code(), "a-password-nobody-guessed").andExpect(status().isNoContent());
+    }
+
+    @Test
+    void givenAnAddressGuessingCodes_whenAMemberRedeemsTheirOwn_thenOnlyTheGuessersAddressIsBlocked()
+            throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when — three wrong codes is the configured address budget for this test
+        for (int guess = 0; guess < 3; guess++) {
+            redeem("ABCD-EFGH", "a-password-nobody-guessed")
+                    .andExpect(status().isBadRequest());
+        }
+
+        // then
+        redeem("ABCD-EFGJ", "a-password-nobody-guessed")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:password-verification-rate-limited"));
+        redeemFrom("198.51.100.7", issued.code(), "a-password-nobody-guessed")
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void givenACodeAndThenADeactivation_whenItIsRedeemed_thenItIsRefused() throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when
+        UserAccount held = accounts.findById(account).orElseThrow();
+        held.disable();
+        accounts.save(held);
+
+        // then
+        redeem(issued.code(), "a-password-nobody-guessed")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:account-recovery-code-invalid"));
+    }
+
+    @Test
+    void givenAPasswordThatIsTheOneTheAccountAlreadyHolds_whenItIsRedeemed_thenNothingConfirmsIt()
+            throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when / then — a stolen code must not become a way to read the password it replaces
+        redeem(issued.code(), "a-password-they-forgot")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:password-too-guessable"));
+    }
+
+    @Test
+    void givenACodeAskedForAndRedeemed_whenTheLogIsRead_thenTheTwoMomentsAreTold() throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        askForAPassword("doe.jane", "192.0.2.24").andExpect(status().isAccepted());
+
+        // when
+        assertThat(loggedSubjects("identity.account.passwordResetRequested"))
+                .as("asked for and never redeemed is the distinction the old flow could not make")
+                .containsExactly(account);
+        assertThat(loggedSubjects("identity.account.passwordResetRedeemed")).isEmpty();
+
+        // then — the mailed code is stored only as a hash, so redemption needs one this test holds
+        redeem(codes.issueFor(account).code(), "a-password-nobody-guessed")
+                .andExpect(status().isNoContent());
+        assertThat(loggedSubjects("identity.account.passwordResetRedeemed")).containsExactly(account);
+    }
+
+    private List<UUID> loggedSubjects(String eventType) {
+        return jdbc.sql("SELECT subject_id FROM domain_event WHERE event_type = :type")
+                .param("type", eventType)
+                .query(UUID.class).list();
+    }
+
+    // The instance reads its own clock, which the test fixes, so a window this test moves has to
+    // move against that one rather than against the database's.
+    private void expire(UUID account) {
+        Instant now = clock.instant();
+        int moved = jdbc.sql("""
+                        UPDATE password_reset_token
+                        SET created_at = :createdAt, expires_at = :expiresAt
+                        WHERE account_id = :account
+                        """)
+                .param("createdAt", now.minus(Duration.ofHours(2)).atOffset(ZoneOffset.UTC))
+                .param("expiresAt", now.minus(Duration.ofHours(1)).atOffset(ZoneOffset.UTC))
+                .param("account", account)
+                .update();
+        assertThat(moved).isEqualTo(1);
+    }
+
+    private List<UUID> outstandingCodes() {
+        return jdbc.sql("SELECT account_id FROM password_reset_token")
+                .query(UUID.class).list();
+    }
+
+    private ResultActions redeem(String code, String password) throws Exception {
+        return redeemFrom("192.0.2.30", code, password);
+    }
+
+    private ResultActions redeemFrom(String from, String code, String password) throws Exception {
+        return ask("/api/account-recovery/password/redemption",
+                "{\"code\":\"" + code + "\",\"password\":\"" + password + "\"}", from);
+    }
+
     private int globalAttempts() {
         return jdbc.sql("SELECT attempt_count FROM login_attempt_limit WHERE scope = 'GLOBAL'")
                 .query(Integer.class).optional().orElse(0);
     }
 
-    private List<UUID> issuedCredentials() {
+    private List<UUID> mailedCodes() {
         return jdbc.sql("""
                         SELECT account_id FROM message_record
-                        WHERE kind IN ('CREDENTIALS_NEW_ACCOUNT', 'CREDENTIALS_PASSWORD_RESET')
+                        WHERE kind = 'ACCOUNT_PASSWORD_RESET_CODE'
                         """)
                 .query(UUID.class).list();
     }

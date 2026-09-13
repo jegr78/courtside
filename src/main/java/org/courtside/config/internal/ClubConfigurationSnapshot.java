@@ -16,6 +16,7 @@ public record ClubConfigurationSnapshot(
         String timeZone,
         int newAccountCredentialHours,
         int passwordResetCredentialHours,
+        int passwordResetTokenMinutes,
         int bookingReminderHours,
         UUID noMembershipTypeRuleSetId) {
 
@@ -34,6 +35,7 @@ public record ClubConfigurationSnapshot(
                 configuration.getTimeZone(),
                 configuration.getNewAccountCredentialHours(),
                 configuration.getPasswordResetCredentialHours(),
+                configuration.getPasswordResetTokenMinutes(),
                 configuration.getBookingReminderHours(),
                 configuration.getNoMembershipTypeRuleSetId());
     }

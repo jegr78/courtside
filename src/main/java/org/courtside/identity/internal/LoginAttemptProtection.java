@@ -52,6 +52,24 @@ class LoginAttemptProtection {
         return Optional.empty();
     }
 
+    // An anonymous caller has no account to bound, so only its address is counted against it.
+    @Transactional
+    Optional<LoginBlock> registerAnonymousCredentialAttempt(String address) {
+        String source = "credential-address:" + normalizeAddress(address);
+        lock(Scope.ADDRESS, hash(source));
+
+        Optional<LoginBlock> retryAfter = retryAfter(Scope.ADDRESS, source);
+        if (retryAfter.isPresent()) {
+            return retryAfter;
+        }
+
+        recordAttempt(Scope.ADDRESS, source, properties.address(),
+                SecurityEventLog.ControlTrigger.PASSWORD_VERIFICATION_ADDRESS_LIMIT);
+        lock(Scope.GLOBAL, hash("all"));
+        observeGlobalAttempt();
+        return Optional.empty();
+    }
+
     @Transactional
     Optional<LoginBlock> registerCredentialAttempt(String accountId, String address) {
         String account = "credential-account:" + accountId;
@@ -90,8 +108,8 @@ class LoginAttemptProtection {
                 SecurityEventLog.ControlTrigger.ACCOUNT_RECOVERY_SUBJECT_LIMIT);
         recordAttempt(Scope.ADDRESS, source, properties.address(),
                 SecurityEventLog.ControlTrigger.ACCOUNT_RECOVERY_ADDRESS_LIMIT);
-        // Recovery is the one anonymous surface that reaches an account, so a campaign spread
-        // thin enough to miss both buckets still has to move the instance-wide count.
+        // A campaign spread thin enough to miss both buckets still has to move the instance-wide
+        // count, which is the only thing an operator watches for one.
         lock(Scope.GLOBAL, hash("all"));
         observeGlobalAttempt();
         return Optional.empty();

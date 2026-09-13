@@ -3,6 +3,7 @@ package org.courtside.config.internal;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
+import org.courtside.config.ResetTokenLifetime;
 
 import java.util.UUID;
 
@@ -18,6 +19,7 @@ public record ChangeClubConfigurationCommand(
         String timeZone,
         CredentialLifetime newAccountCredential,
         CredentialLifetime passwordResetCredential,
+        ResetTokenLifetime passwordResetToken,
         ReminderLeadTime bookingReminder,
         UUID noMembershipTypeRuleSetId) {
 
@@ -32,6 +34,7 @@ public record ChangeClubConfigurationCommand(
         requirePresent(timeZone, "timeZone");
         requirePresent(newAccountCredential, "newAccountCredential");
         requirePresent(passwordResetCredential, "passwordResetCredential");
+        requirePresent(passwordResetToken, "passwordResetToken");
         requirePresent(bookingReminder, "bookingReminder");
     }
 

@@ -22,7 +22,6 @@ class AuditedOperationCoverageTest {
 
     private static final List<String> KNOWN_OPERATIONS = List.of(
             "AccountCredentials#issueTo",
-            "AccountCredentials#issueToIfWithinWindow",
             "AccountSessions#endFor",
             "AccountSessions#endIfRevoked",
             "AccountSessions#revoke",
@@ -54,6 +53,7 @@ class AuditedOperationCoverageTest {
             "ConfigService#leadTime",
             "ConfigService#lock",
             "ConfigService#logo",
+            "ConfigService#resetCodeLifetime",
             "ConfigService#slotDuration",
             "ConfigService#update",
             "ConfigService#uploadLogo",

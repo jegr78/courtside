@@ -43,6 +43,7 @@ const PREFIX_PREDICATES = new Map([
 
 const NO_METHOD_BESIDE_IT = new Map([
   ["/api/account-recovery/password", "an expectation predicate in operationExpectations"],
+  ["/api/account-recovery/password/redemption", "an expectation predicate in operationExpectations"],
   ["/api/account-recovery/usernames", "an expectation predicate in operationExpectations"],
   ["/api/account/initial-password", "an expectation predicate in operationExpectations"],
   ["/api/admin/audit", "a fuzz input case whose method its helper carries"],

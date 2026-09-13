@@ -20,6 +20,10 @@ const loginAttemptCleanup = readFileSync(new URL(
   "../src/main/java/org/courtside/identity/internal/LoginAttemptCleanup.java", import.meta.url), "utf8");
 const identityCleanupSchedule = readFileSync(new URL(
   "../src/main/java/org/courtside/identity/internal/IdentityCleanupSchedule.java", import.meta.url), "utf8");
+const passwordResetMailLimit = readFileSync(new URL(
+  "../src/main/java/org/courtside/identity/internal/PasswordResetMailLimit.java", import.meta.url), "utf8");
+const passwordResetTokenService = readFileSync(new URL(
+  "../src/main/java/org/courtside/identity/internal/PasswordResetTokenService.java", import.meta.url), "utf8");
 const sessionCleanupCadence = readFileSync(new URL(
   "../src/main/java/org/courtside/identity/internal/SessionCleanupCadence.java", import.meta.url), "utf8");
 
@@ -62,8 +66,10 @@ test("given journey data is restored while the application stays live, when the 
   assert.match(previewExpirySchedule, /@Scheduled/);
   assert.doesNotMatch(credentialIssueLimit, /@Scheduled/);
   assert.doesNotMatch(loginAttemptCleanup, /@Scheduled/);
+  assert.doesNotMatch(passwordResetMailLimit, /@Scheduled/);
+  assert.doesNotMatch(passwordResetTokenService, /@Scheduled/);
   assert.match(identityCleanupSchedule, /@Profile\("!journey"\)/);
-  assert.equal(identityCleanupSchedule.match(/@Scheduled/g)?.length, 2);
+  assert.equal(identityCleanupSchedule.match(/@Scheduled/g)?.length, 4);
   assert.doesNotMatch(sessionCleanupCadence, /@Profile/);
   assert.doesNotMatch(setup, /COURTSIDE_SESSION_CLEANUP_CRON: "-"/);
   assert.match(setup, /Scheduled preview expiry ran in the shared journey world/);

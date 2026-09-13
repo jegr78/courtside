@@ -11,22 +11,18 @@ export function AccountRecoveryView() {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
-  const [asked, setAsked] = useState<"password" | "usernames">();
+  const [done, setDone] = useState<string>();
 
-  function submit(field: string, ask: (value: string) => Promise<void>,
-    outcome: "password" | "usernames") {
+  function submit(act: (form: FormData) => Promise<void>, outcome: string) {
     return async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const value = new FormData(event.currentTarget).get(field);
-      if (typeof value !== "string") {
-        return;
-      }
+      const form = new FormData(event.currentTarget);
       setPending(true);
       setError(undefined);
-      setAsked(undefined);
+      setDone(undefined);
       try {
-        await ask(value);
-        setAsked(outcome);
+        await act(form);
+        setDone(outcome);
       } catch (failure) {
         setError(problemMessage(failure, t));
       } finally {
@@ -35,20 +31,35 @@ export function AccountRecoveryView() {
     };
   }
 
+  function text(form: FormData, field: string) {
+    const value = form.get(field);
+    return typeof value === "string" ? value : "";
+  }
+
   return <section data-testid="account-recovery-view" className="surface-panel w-full max-w-md rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-2xl font-bold">{t("recovery.title")}</h1>
     <p className="text-muted mt-2">{t("recovery.description")}</p>
     {error && <div className="mt-6"><Alert>{error}</Alert></div>}
-    {asked && <div className="mt-6">
-      <Alert tone="success" testId="recovery-sent">{t(`recovery.${asked}.sent`)}</Alert>
+    {done && <div className="mt-6">
+      <Alert tone="success" testId="recovery-sent">{t(done)}</Alert>
     </div>}
-    <form className="mt-8 grid gap-4" onSubmit={(event) => void submit("username", api.requestPasswordReset, "password")(event)}>
+    <form className="mt-8 grid gap-4" onSubmit={(event) => void submit(
+      (form) => api.requestPasswordReset(text(form, "username")), "recovery.password.sent")(event)}>
       <h2 className="text-xl font-bold">{t("recovery.password.title")}</h2>
       <p className="text-muted">{t("recovery.password.hint")}</p>
       <TextField id="recovery-username" name="username" label={t("auth.username")} data-testid="recovery-username" autoComplete="username" required />
       <Button variant="primary" type="submit" data-testid="recovery-password-submit" disabled={pending}>{t("recovery.password.submit")}</Button>
     </form>
-    <form className="mt-10 grid gap-4" onSubmit={(event) => void submit("email", api.requestUsernameReminder, "usernames")(event)}>
+    <form className="mt-10 grid gap-4" onSubmit={(event) => void submit(
+      (form) => api.redeemPasswordReset(text(form, "code").trim(), text(form, "new-password")), "recovery.redeem.done")(event)}>
+      <h2 className="text-xl font-bold">{t("recovery.redeem.title")}</h2>
+      <p className="text-muted">{t("recovery.redeem.hint")}</p>
+      <TextField id="recovery-code" name="code" label={t("recovery.redeem.code")} data-testid="recovery-code" autoComplete="one-time-code" required />
+      <TextField id="recovery-new-password" name="new-password" type="password" label={t("recovery.redeem.password")} data-testid="recovery-new-password" autoComplete="new-password" minLength={12} maxLength={256} required />
+      <Button variant="primary" type="submit" data-testid="recovery-redeem-submit" disabled={pending}>{t("recovery.redeem.submit")}</Button>
+    </form>
+    <form className="mt-10 grid gap-4" onSubmit={(event) => void submit(
+      (form) => api.requestUsernameReminder(text(form, "email")), "recovery.usernames.sent")(event)}>
       <h2 className="text-xl font-bold">{t("recovery.usernames.title")}</h2>
       <p className="text-muted">{t("recovery.usernames.hint")}</p>
       <TextField id="recovery-email" name="email" label={t("recovery.email")} data-testid="recovery-email" type="email" autoComplete="email" required />

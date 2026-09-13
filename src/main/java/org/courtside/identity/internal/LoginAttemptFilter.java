@@ -45,12 +45,13 @@ class LoginAttemptFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         boolean login = kind == Kind.LOGIN;
         String address = request.getRemoteAddr();
-        String accountId = currentUser.accountId().map(Object::toString).orElse("anonymous");
+        Optional<String> accountId = currentUser.accountId().map(Object::toString);
         String loginAddress = "login:" + address;
         Optional<LoginBlock> blocked = login
                 ? protection.registerAttempt(loginAddress, true,
                         SecurityEventLog.ControlTrigger.LOGIN_ADDRESS_LIMIT)
-                : protection.registerCredentialAttempt(accountId, address);
+                : accountId.map(account -> protection.registerCredentialAttempt(account, address))
+                        .orElseGet(() -> protection.registerAnonymousCredentialAttempt(address));
         if (blocked.isPresent()) {
             handler.handle(response, blocked.orElseThrow().retryAfter(), login);
             return;
@@ -71,7 +72,7 @@ class LoginAttemptFilter extends OncePerRequestFilter {
                 if (login) {
                     protection.clear(loginAddress);
                 } else {
-                    protection.clearCredentialAccountAttempt(accountId);
+                    accountId.ifPresent(protection::clearCredentialAccountAttempt);
                 }
             }
         }

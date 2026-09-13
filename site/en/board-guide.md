@@ -66,6 +66,10 @@ is written to that many hours before it starts.
 **How long issued credentials stay valid**, separately for a new account and for a reset password.
 After that the one-time password is worthless and has to be issued again.
 
+**How long a reset code stays good**, in minutes, between a quarter of an hour and a day. That is
+how long a member has to redeem the code the sign-in page mails them; after that they ask for a new
+one. Short is safer, long is kinder to somebody who only opens their mailbox in the evening.
+
 **Rule set for people without a membership type** applies to somebody who currently holds none, for
 example after a membership ended. Without one, no membership-scoped rule binds them; opening hours
 and the grid still do.
@@ -180,8 +184,9 @@ the address beforehand and says when several people hold it.
 
 If the member already chose a password, Courtside warns before sending: new credentials delete that
 password and end every session they have open. That is the route for somebody who can no longer get
-in, and only for that. A member who still reaches the address held for them does not need you:
-the sign-in page issues a new password itself.
+in, and only for that. A member who still reaches the address held for them does not need you: the
+sign-in page mails them a code they set their own password with, and nothing about the account
+changes before they do.
 
 It does not protect an account against your own administration, and saying otherwise would be
 dishonest: whoever may change a person's email address can then have that person's credentials sent
@@ -217,8 +222,8 @@ retyping it. The path has three steps and the application walks you through them
 separator and character set of its export, the mapping of its columns and of its categories onto
 membership types, and the fields that source owns. **Every snapshot overwrites an owned field**;
 what you leave unticked belongs to the club and stays untouched. For the email address that carries
-weight: every one-time password goes there, so this tick moves your members' account recovery into
-the other system.
+weight: every one-time password and every reset code goes there, so this tick moves your members'
+account recovery into the other system.
 
 The tick binds *updates* to people who already exist. **A creation writes every field of the file**,
 ticked or not — and on the first run practically every row is one. To keep the addresses in the
@@ -251,8 +256,8 @@ Two things the preview needs from you:
 
 About possible duplicates Courtside does nothing: two members really are called the same sometimes,
 and only you can tell the difference. Shared mailboxes likewise — a parent registering for their
-children is deliberate; but whoever reads that mailbox receives every one-time password sent to it,
-and a first password is enough to keep an account.
+children is deliberate; but whoever reads that mailbox receives every one-time password and every
+reset code sent to it, and either is enough to take an account.
 
 **Run the import.** The reviewed change set is written in one transaction. If the share of ending
 memberships is above your threshold, Courtside demands an explicit confirmation — a truncated export

@@ -31,14 +31,6 @@ class CredentialIssueLimit implements CredentialIssuing {
         }
     }
 
-    // A caller that means to swallow a refusal cannot be handed one as an exception: leaving this
-    // proxy it would mark their transaction rollback-only and turn the swallowed refusal into a 500.
-    @Override
-    @Transactional
-    public boolean register(UUID accountId) {
-        return registerWithinWindow(accountId);
-    }
-
     private boolean registerWithinWindow(UUID accountId) {
         lock(accountId);
         Instant now = clock.instant();

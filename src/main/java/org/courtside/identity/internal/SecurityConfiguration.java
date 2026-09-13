@@ -50,6 +50,7 @@ import java.util.Set;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
+        PasswordResetMailProperties.class,
         LoginProtectionProperties.class, CourtsideSessionProperties.class, PasswordPolicyProperties.class})
 public class SecurityConfiguration {
 
@@ -70,9 +71,12 @@ public class SecurityConfiguration {
                 .matcher(HttpMethod.PUT, "/api/account/initial-password");
         RequestMatcher passwordChange = PathPatternRequestMatcher.withDefaults()
                 .matcher(HttpMethod.PUT, "/api/account/password");
+        RequestMatcher resetRedemption = PathPatternRequestMatcher.withDefaults()
+                .matcher(HttpMethod.POST, "/api/account-recovery/password/redemption");
         return request -> reauthentication.matches(request)
                 || initialPasswordChange.matches(request)
-                || passwordChange.matches(request);
+                || passwordChange.matches(request)
+                || resetRedemption.matches(request);
     }
 
     private static RequestMatcher loginEndpoint() {
@@ -168,6 +172,7 @@ public class SecurityConfiguration {
                                 "/workbox-*.js").permitAll()
                         .requestMatchers("/api/session").permitAll()
                         .requestMatchers("/api/account-recovery/password",
+                                "/api/account-recovery/password/redemption",
                                 "/api/account-recovery/usernames").permitAll()
                         .requestMatchers("/api/session/logout").authenticated()
                         .requestMatchers("/api/account/initial-password").access(

@@ -68,6 +68,11 @@ alle in einer Buchung so viele Stunden vorher eine Nachricht.
 **Gültigkeit ausgestellter Zugangsdaten**, getrennt für ein neues Konto und für ein zurückgesetztes
 Passwort. Danach ist das Einmalpasswort wertlos und muss neu ausgestellt werden.
 
+**Gültigkeit eines Codes zum Zurücksetzen** in Minuten, zwischen einer Viertelstunde und einem Tag.
+So lange kann ein Mitglied den Code einlösen, den es sich auf der Anmeldeseite selbst zuschickt;
+danach fordert es einen neuen an. Kurz ist sicherer, lang ist freundlicher zu jemandem, der erst am
+Abend in sein Postfach schaut.
+
 **Regelsatz für Personen ohne Beitragsart** greift, wenn jemand gerade keine Mitgliedsart hat, etwa
 nach dem Ende einer Mitgliedschaft. Ohne Regelsatz bindet diese Person keine mitgliedschaftsbezogene
 Regel; Öffnungszeiten und Raster gelten trotzdem.
@@ -189,7 +194,8 @@ Adresse liegen.
 Hat das Mitglied bereits ein eigenes Passwort, warnt Courtside vor dem Senden: neue Zugangsdaten
 löschen das gewählte Passwort und beenden alle laufenden Sitzungen. Das ist der Weg für jemanden, der
 nicht mehr hineinkommt — und nur dafür. Wer noch an seine hinterlegte Adresse kommt, braucht Sie
-dafür nicht: die Anmeldeseite stellt ein neues Passwort selbst zu.
+dafür nicht: die Anmeldeseite schickt einen Code zu, mit dem das Mitglied sein Passwort selbst
+setzt, ohne dass am Konto vorher etwas passiert.
 
 Gegen die eigene Verwaltung schützt das ein Konto nicht, und es wäre unehrlich, das zu verschweigen:
 wer die E-Mail-Adresse einer Person ändern darf, kann sich danach deren Zugangsdaten zustellen
@@ -227,8 +233,9 @@ abtippt. Der Weg hat drei Schritte, und die Anwendung führt Sie durch sie hindu
 Trennzeichen und Zeichensatz des Exports, die Zuordnung der Spalten und der Kategorien zu
 Mitgliedsarten, und die Felder, die diese Quelle führt. **Jede Momentaufnahme überschreibt ein
 geführtes Feld**; was Sie nicht ankreuzen, gehört dem Verein und bleibt unangetastet. Bei der
-E-Mail-Adresse hat das Gewicht: an sie geht jedes Einmalpasswort, Sie verlagern mit diesem Häkchen
-also die Kontowiederherstellung Ihrer Mitglieder in das fremde System.
+E-Mail-Adresse hat das Gewicht: an sie geht jedes Einmalpasswort und jeder Code zum Zurücksetzen,
+Sie verlagern mit diesem Häkchen also die Kontowiederherstellung Ihrer Mitglieder in das fremde
+System.
 
 Das Häkchen bindet allerdings nur *Änderungen* an bestehenden Personen. **Eine Neuanlage schreibt
 jedes Feld der Datei**, angekreuzt oder nicht — beim ersten Lauf ist das praktisch jede Zeile. Wer
@@ -262,7 +269,7 @@ Zwei Dinge muss die Vorschau von Ihnen wissen:
 Bei möglichen Dubletten unternimmt Courtside nichts: zwei Mitglieder heissen wirklich manchmal
 gleich, und nur Sie können das unterscheiden. Bei geteilten Postfächern ebenso — ein Elternteil
 meldet seine Kinder an, das ist gewollt; wer das Postfach liest, erhält aber jedes dorthin gesendete
-Einmalpasswort, und ein erstes Passwort genügt, um einen Zugang zu behalten.
+Einmalpasswort und jeden Code zum Zurücksetzen, und beides genügt, um einen Zugang zu übernehmen.
 
 **Import ausführen.** Die geprüfte Änderungsmenge wird in einem Zug geschrieben. Liegt der Anteil
 endender Mitgliedschaften über Ihrer Schwelle, verlangt Courtside eine ausdrückliche Bestätigung —

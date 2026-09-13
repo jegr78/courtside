@@ -2,9 +2,9 @@ package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.courtside.identity.AccountCredentials;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.courtside.shared.PasswordResetRequested;
 import org.courtside.shared.UsernameReminderRequested;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -19,16 +19,17 @@ import java.util.Optional;
 class AccountRecoveryService {
 
     private final UserAccountRepository accounts;
-    private final AccountCredentials credentials;
+    private final PasswordResetMailLimit mailLimit;
+    private final PasswordResetTokenService resetTokens;
     private final LoginAttemptProtection protection;
     private final ApplicationEventPublisher events;
 
     @Transactional
-    void sendNewPassword(String username, String callerAddress) {
+    void mailAResetCode(String username, String callerAddress) {
         refuseWhenLimited(username, callerAddress);
         accounts.findByUsername(username)
                 .filter(AccountRecoveryService::reachable)
-                .ifPresent(this::issueUnlessTheAccountHasHadEnough);
+                .ifPresent(this::mailACodeUnlessTheMailboxHasHadEnough);
     }
 
     @Transactional
@@ -40,13 +41,19 @@ class AccountRecoveryService {
                         events.publishEvent(new UsernameReminderRequested(account.getId())));
     }
 
+    void redeemPasswordReset(String code, String password) {
+        resetTokens.redeem(code, password);
+    }
+
     // The per-account window spares a mailbox, it does not answer questions: letting it reach an
     // unauthenticated caller would tell them the name they guessed belongs to somebody.
-    private void issueUnlessTheAccountHasHadEnough(UserAccount account) {
-        if (!credentials.issueToIfWithinWindow(account.getId())) {
-            log.debug("Recovery found the issuing window already met for account {}",
+    private void mailACodeUnlessTheMailboxHasHadEnough(UserAccount account) {
+        if (!mailLimit.recordWithinWindow(account.getId())) {
+            log.debug("Recovery found the reset-mail window already met for account {}",
                     account.getId());
+            return;
         }
+        events.publishEvent(new PasswordResetRequested(account.getId()));
     }
 
     private void refuseWhenLimited(String subject, String callerAddress) {

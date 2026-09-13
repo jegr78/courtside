@@ -33,13 +33,21 @@ Vorstand.
 
 ## Passwort oder Benutzername vergessen
 
-Die Seite hinter diesem Link hat zwei Formulare, und beide kommen ohne Anmeldung aus.
+Die Seite hinter diesem Link hat drei Formulare, und alle drei kommen ohne Anmeldung aus.
 
-Das erste nimmt deinen **Benutzernamen** und schickt dir ein neues Einmalpasswort an die Adresse,
-die für dein Konto hinterlegt ist. Dein bisheriges Passwort ist damit weg, ebenso alle offenen
-Sitzungen, und weiter geht es wie unten unter *Das Einmalpasswort ersetzen*.
+Das erste nimmt deinen **Benutzernamen** und schickt einen achtstelligen Code an die Adresse, die
+für dein Konto hinterlegt ist. An deinem Konto ändert sich dadurch nichts: Dein bisheriges Passwort
+gilt weiter, deine offenen Sitzungen bleiben offen.
 
-Das zweite nimmt deine **E-Mail-Adresse** und schickt dir deine Benutzernamen — Mehrzahl, denn auf
+Das zweite nimmt diesen **Code** und dein **neues Passwort**. Erst hier ändert sich etwas — das neue
+Passwort gilt ab sofort, und alle offenen Sitzungen deines Kontos enden. Der Code wird nur von einem
+Passwort verbraucht, das die Regeln annehmen: Lehnt Courtside dein Wunschpasswort ab, kannst du es
+mit demselben Code noch einmal versuchen. Groß- und Kleinschreibung spielen keine Rolle, der
+Bindestrich auch nicht. Wie lange ein Code gilt, legt dein Verein fest — mindestens eine
+Viertelstunde, höchstens einen Tag. Ist er abgelaufen, sagt Courtside genau das; dann fordere oben
+einen neuen an.
+
+Das dritte nimmt deine **E-Mail-Adresse** und schickt dir deine Benutzernamen — Mehrzahl, denn auf
 einer Familienadresse können mehrere Konten liegen, und dann bekommt jedes seine eigene Nachricht.
 Ein Passwort ändert dieses Formular nicht.
 
@@ -52,23 +60,31 @@ Nach zu vielen Versuchen in kurzer Zeit sagt Courtside das ausdrücklich und lä
 warten. Beim **Anmelden** zählt dabei der Netzanschluss, von dem die Versuche kommen, nicht dein
 Konto: niemand kann dich aussperren, indem er dein Passwort oft genug falsch rät.
 
-Bei den beiden Formularen oben ist es anders, und das ist der Preis dafür, dass sie ohne Anmeldung
-auskommen: dort zählt auch der eingegebene Name oder die eingegebene Adresse, über alle Absender
-hinweg. Jemand anderes kann dir die Wiederherstellung also eine Weile zuhalten, indem er oft genug
-deinen Benutzernamen einträgt. Das Fenster ist kurz, deine Anmeldung ist davon nicht betroffen, und
-dein Vorstand kann dir die Zugangsdaten die ganze Zeit über zuschicken.
+Beim Anfordern ist es anders, und das ist der Preis dafür, dass es ohne Anmeldung auskommt: dort
+zählt auch der eingegebene Name oder die eingegebene Adresse, über alle Absender hinweg. Jemand
+anderes kann dir das Anfordern also eine Weile zuhalten, indem er oft genug deinen Benutzernamen
+einträgt. Das Fenster ist kurz, deine Anmeldung ist davon nicht betroffen, und dein Vorstand kann
+dir die Zugangsdaten die ganze Zeit über zuschicken.
+
+Beim Einlösen zählt nur der Netzanschluss, von dem die Versuche kommen, nie dein Konto — niemand
+kann dir also die Wiederherstellung zuhalten, indem er Codes auf dich rät. Teilst du dir den
+Anschluss mit anderen Mitgliedern, landen deren Versuche allerdings im selben Topf wie deine.
 
 ## Das Einmalpasswort ersetzen
 
-Mit dem Einmalpasswort kommst du nur an eine einzige Seite: *Einmalpasswort ersetzen*. Solange du
-kein eigenes Passwort gesetzt hast, führt dich jede Seite der Anwendung dorthin zurück. Zeit hast
-du dafür nicht unbegrenzt: wie lange ein zugeschicktes Passwort gilt, legt dein Verein fest, und
-danach forderst du auf der Anmeldeseite ein neues an.
+Das betrifft das Passwort, das dein Vorstand dir zuschickt — beim ersten Zugang oder wenn du
+selbst nicht mehr an dein Postfach kommst. Damit kommst du nur an eine einzige Seite:
+*Einmalpasswort ersetzen*. Solange du kein eigenes Passwort gesetzt hast, führt dich jede Seite der
+Anwendung dorthin zurück. Zeit hast du dafür nicht unbegrenzt: wie lange ein zugeschicktes Passwort
+gilt, legt dein Verein fest. Läuft es ab, bevor du es benutzt hast, brauchst du deinen Vorstand
+dafür nicht — fordere auf der Anmeldeseite einen Code an und löse ihn ein; damit setzt du dein
+Passwort und das zugeschickte verfällt im selben Schritt.
 
 Das neue Passwort braucht mindestens zwölf und höchstens 256 Zeichen. Courtside lehnt es ausserdem
 ab, wenn es auf einer mitgelieferten Liste häufiger Passwörter steht, wenn es deinen Namen, deinen
 Benutzernamen, deine E-Mail-Adresse, den Vereinsnamen oder einen Begriff enthält, den dein Verein
 zusätzlich gesperrt hat, und wenn es dem aktuellen oder dem zugeschickten Passwort entspricht.
+Dieselben Regeln gelten für das Passwort, das du beim Einlösen eines Codes setzt.
 
 Dazu fragt Courtside einen öffentlichen Dienst, ob dieses Passwort schon einmal in einem Datenleck
 aufgetaucht ist. Dein Passwort verlässt die Instanz dabei nicht: übertragen werden fünf Zeichen

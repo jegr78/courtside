@@ -11,6 +11,8 @@ import org.courtside.config.BookingGridConstraint;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.BookingReminderPolicy;
 import org.courtside.config.CredentialLifetime;
+import org.courtside.config.PasswordResetTokenValidity;
+import org.courtside.config.ResetTokenLifetime;
 import org.courtside.config.ReminderLeadTime;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubTimeZone;
@@ -28,13 +30,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.time.Duration;
 import java.time.ZoneId;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ConfigService implements BookingGridSettings, BookingGridCoordination, ClubTimeZone,
-        CredentialValidity, ClubIdentity, BookingReminderPolicy {
+        CredentialValidity, PasswordResetTokenValidity, ClubIdentity, BookingReminderPolicy {
 
     private static final String RULE_SET_CONSTRAINT = "club_config_no_membership_type_rule_set";
 
@@ -84,6 +87,11 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         return new CredentialLifetime(reason == CredentialsRequested.Reason.NEW_ACCOUNT
                 ? configuration.newAccountCredentialHours()
                 : configuration.passwordResetCredentialHours()).toDuration();
+    }
+
+    @Override
+    public Duration resetCodeLifetime() {
+        return new ResetTokenLifetime(current().passwordResetTokenMinutes()).toDuration();
     }
 
     @Override
@@ -209,6 +217,8 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                 configuration.getNewAccountCredentialHours(), command.newAccountCredential().hours());
         addIfChanged(fields, "passwordResetCredentialHours",
                 configuration.getPasswordResetCredentialHours(), command.passwordResetCredential().hours());
+        addIfChanged(fields, "passwordResetTokenMinutes",
+                configuration.getPasswordResetTokenMinutes(), command.passwordResetToken().minutes());
         addIfChanged(fields, "bookingReminderHours",
                 configuration.getBookingReminderHours(), command.bookingReminder().hours());
         addIfChanged(fields, "noMembershipTypeRuleSetId",
@@ -231,6 +241,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                 command.slotDuration().minutes(), command.timeZone());
         configuration.changeCredentialValidity(command.newAccountCredential().hours(),
                 command.passwordResetCredential().hours());
+        configuration.expireResetCodesAfter(command.passwordResetToken().minutes());
         configuration.remindBookingsAfter(command.bookingReminder().hours());
         configuration.bindPeopleWithoutAMembershipTypeTo(command.noMembershipTypeRuleSetId());
     }

@@ -296,7 +296,7 @@ describe("AppRoutes", () => {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       logoUrl: null, imprintUrl: null, privacyUrl: null, defaultLocale: "en", supportedLocales: ["de", "en"],
       slotMinutes: 30, timeZone: "Europe/Berlin", newAccountCredentialHours: 168,
-      passwordResetCredentialHours: 24, bookingReminderHours: 24, logoUploaded: false,
+      passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60, bookingReminderHours: 24, logoUploaded: false,
       logoFallbackUrl: null, noMembershipTypeRuleSetId: null
     });
     vi.spyOn(api, "adminCourts").mockResolvedValue([]);
@@ -381,7 +381,7 @@ describe("App build identity", () => {
     defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin"
   };
   const adminClub = {
-    ...club, newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+    ...club, newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
     bookingReminderHours: 24, logoUploaded: false
   };
 

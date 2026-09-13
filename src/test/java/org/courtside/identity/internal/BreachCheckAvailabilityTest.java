@@ -42,6 +42,7 @@ class BreachCheckAvailabilityTest extends AbstractIntegrationTest {
     @Autowired private UserAccountRepository accounts;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private JdbcClient jdbc;
+    @Autowired private PasswordResetTokenService resetCodes;
     @MockitoBean private BreachedPasswordLookup breachedPasswords;
 
     private MockMvc mockMvc;
@@ -98,6 +99,24 @@ class BreachCheckAvailabilityTest extends AbstractIntegrationTest {
                         .param("username", "doe.jane").param("password", "current-password").with(csrf()))
                 .andExpect(status().isOk());
         assertThat(globalAttempts()).isEqualTo(globalAttempts + 1);
+    }
+
+    @Test
+    void givenAnUnavailableBreachService_whenAResetCodeIsRedeemed_thenTheCodeIsNotSpent()
+            throws Exception {
+        // given
+        String code = resetCodes.issueFor(account.getId()).code();
+
+        // when / then
+        mockMvc.perform(post("/api/account-recovery/password/redemption").with(csrf())
+                        .contentType("application/json")
+                        .content("{\"code\":\"" + code + "\",\"password\":\"lattice-marmoset-vellum\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:password-breach-check-unavailable"));
+
+        // then — an outage the member did not cause must not cost them the code they were sent
+        assertThat(outstandingCodes()).isOne();
     }
 
     @Test
@@ -176,6 +195,10 @@ class BreachCheckAvailabilityTest extends AbstractIntegrationTest {
                         .content("{\"currentPassword\":\"" + currentPassword
                                 + "\",\"newPassword\":\"" + replacement + "\"}"))
                 .andReturn().getResponse().getStatus();
+    }
+
+    private int outstandingCodes() {
+        return jdbc.sql("SELECT count(*) FROM password_reset_token").query(Integer.class).single();
     }
 
     private int globalAttempts() {

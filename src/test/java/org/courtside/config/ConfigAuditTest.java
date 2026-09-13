@@ -1,5 +1,7 @@
 package org.courtside.config;
 
+import org.courtside.config.ResetTokenLifetime;
+
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.audit.testfixture.AuditTestFixture;
 import org.courtside.audit.testfixture.AuditTestFixture.RecordedEvent;
@@ -194,7 +196,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 current.defaultLocale(), new BookingSlotDuration(current.slotMinutes()),
                 current.timeZone(), new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
-                new ReminderLeadTime(current.bookingReminderHours()),
+                new ResetTokenLifetime(60), new ReminderLeadTime(current.bookingReminderHours()),
                 current.noMembershipTypeRuleSetId());
     }
 
@@ -211,7 +213,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                 current.logoFallbackUrl(), current.imprintUrl(), current.privacyUrl(), locale,
                 new BookingSlotDuration(minutes), timeZone,
                 new CredentialLifetime(current.newAccountCredentialHours()),
-                new CredentialLifetime(current.passwordResetCredentialHours()), new ReminderLeadTime(24),
+                new CredentialLifetime(current.passwordResetCredentialHours()), new ResetTokenLifetime(60), new ReminderLeadTime(24),
                 noMembershipTypeRuleSetId);
     }
 }

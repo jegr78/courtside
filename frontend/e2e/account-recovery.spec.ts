@@ -19,25 +19,47 @@ test("a member who forgot their password gets back in without asking the board",
     expect((await asked).status()).toBe(202);
     await expect(page.getByTestId("recovery-sent")).toBeVisible();
 
-    // when — the member reads what the instance sent and signs in with it
+    // then — the password the member still holds keeps working, because asking changed nothing
     const mailed = await messageTo(journeyService.mailboxURL, "jane.doe@example.org");
-    const credential = credentialIn(mailed, "Password:");
+    const code = credentialIn(mailed, "Code:");
     await page.getByTestId("recovery-back-to-login").click();
     await page.getByTestId("username").fill("doe.jane");
-    await page.getByTestId("password").fill(credential);
+    await page.getByTestId("password").fill("temporary-password");
     await page.getByTestId("login-submit").click();
+    await expect(page.getByTestId("court-plan-view")).toBeVisible();
 
-    // then — what arrived is a one-time password, so the session can do nothing else first
-    await expect(page.getByTestId("initial-password-view")).toBeVisible();
-    await page.getByTestId("new-password").fill("the-one-they-picked-alone");
-    await page.getByTestId("confirm-password").fill("the-one-they-picked-alone");
-    await page.getByTestId("password-submit").click();
+    // when — the member redeems the code with a password of their own
+    await page.getByTestId("preferences-menu").click();
+    await page.getByTestId("logout").click();
     await expect(page.getByTestId("login-view")).toBeVisible();
+    await page.getByTestId("forgotten-credentials-link").click();
+    await page.getByTestId("recovery-code").fill(code);
+    await page.getByTestId("recovery-new-password").fill("the-one-they-picked-alone");
+    await page.getByTestId("recovery-redeem-submit").click();
+    await expect(page.getByTestId("recovery-sent")).toBeVisible();
+
+    // then — that password signs them in, and it is not one they are made to replace
+    await page.goto("/login");
     await page.getByTestId("username").fill("doe.jane");
     await page.getByTestId("password").fill("the-one-they-picked-alone");
     await page.getByTestId("login-submit").click();
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
   });
+
+test("a code the instance never sent is refused, and says so", async ({ page }) => {
+  // given
+  await page.goto("/account-recovery");
+
+  // when
+  await page.getByTestId("recovery-code").fill("ABCD-EFGH");
+  await page.getByTestId("recovery-new-password").fill("the-one-they-picked-alone");
+  await page.getByTestId("recovery-redeem-submit").click();
+
+  // then — the refusal names the code rather than its shape, so the contract accepted the shape
+  await expect(page.getByRole("alert"))
+    .toContainText("Dieser Code stimmt nicht.");
+  await expect(page.getByTestId("recovery-sent")).toBeHidden();
+});
 
 test("a name nobody holds is answered exactly like one that exists", async ({ page }) => {
   // given

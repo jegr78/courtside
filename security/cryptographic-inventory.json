@@ -38,6 +38,7 @@
         "src/main/java/org/courtside/identity/internal/ReauthenticationService.java",
         "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java",
         "src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java",
+        "src/main/java/org/courtside/identity/internal/PasswordResetTokenService.java",
         "src/main/java/org/courtside/identity/internal/UnusablePassword.java",
         "src/main/java/org/courtside/**/*DataSeeder.java"
       ]
@@ -70,6 +71,63 @@
       ],
       "locations": [
         "src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java"
+      ]
+    },
+    {
+      "id": "password-reset-code",
+      "purpose": "The single-use code an instance mails a member who asked to set a new password themselves",
+      "algorithm": "SecureRandom",
+      "parameters": {
+        "alphabetSymbols": 30,
+        "characters": 8
+      },
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 39,
+        "basis": "Eight characters drawn from a thirty-symbol alphabet, which is what a member can retype from a mail without having to choose between two glyphs that look alike. Thirty-nine bits is far below what a secret standing on its own would need, and it does not stand on its own: what bounds guessing is the budget an attacker gets, not the size of the value. Every attempt spends the credential-verification limit on the caller's own address and a permit in the verification pool, the code lives for a club setting of at most a day, and redeeming one deletes it."
+      },
+      "class": "rate-bounded-secret",
+      "owner": "club-operator",
+      "storageBoundary": "Generated in memory, mailed to the member, and kept only as its SHA-256 in the outstanding-code row. The plaintext is never written to the database, a log or an administrative screen. Section 10 of the design specification records what that digest is worth to somebody who reads the database, and why it is not a keyed one.",
+      "permittedUse": "One redemption, which sets the password the member typed and ends every session of the account. It never becomes the password, and it authorises nothing else.",
+      "rotation": "Asking for a code again replaces the outstanding one, and the code that was replaced stops working at that moment.",
+      "revocation": "Redemption, expiry and the retention sweep each delete the row. Anything that moves the account's security epoch or its address leaves the row in place and makes it unredeemable, because redemption compares both against the account as it is then; the sweep removes it once its deadline passes. After any of them the code reads as one nobody holds.",
+      "recovery": "None: a code a member no longer has is asked for again, never recovered.",
+      "retirement": "Retired with the account, whose deactivation withdraws any code still outstanding.",
+      "evidence": "src/test/java/org/courtside/identity/internal/ResetCodesTest.java, src/test/java/org/courtside/identity/AccountRecoveryTest.java",
+      "detects": [
+        "SecureRandom",
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/ResetCodes.java"
+      ]
+    },
+    {
+      "id": "password-reset-address-fingerprint",
+      "purpose": "Tell whether the address a reset code went to is still the address the account holds, without the outstanding-code table keeping an address",
+      "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output. The digest keeps an address out of the table that holds outstanding codes; it is not offered as protection against somebody who already knows the address."
+      },
+      "class": "pseudonymisation",
+      "owner": "club-operator",
+      "storageBoundary": "The instance database, as the address fingerprint on the outstanding-code row. It is written when a code is mailed and removed with the row.",
+      "permittedUse": "Comparing the address a code was mailed to against the one the account holds at redemption, so that correcting an address withdraws the code that went to the old one. It is not an authenticator and it names nobody on its own.",
+      "rotation": "Not applicable: no key exists. A row is replaced when a new code is asked for.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed: the row is deleted rather than repaired.",
+      "retirement": "A successor digest changes what the stored fingerprints mean, so outstanding rows are cleared with the change rather than migrated. Nothing outside the redemption path reads them.",
+      "evidence": "src/test/java/org/courtside/identity/AccountRecoveryTest.java, src/main/resources/db/migration/V46__password_reset_token.sql",
+      "detects": [
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/identity/internal/ResetCodes.java"
       ]
     },
     {

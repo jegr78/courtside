@@ -12,6 +12,8 @@ class IdentityCleanupSchedule {
 
     private final CredentialIssueLimit credentialIssues;
     private final LoginAttemptCleanup loginAttempts;
+    private final PasswordResetMailLimit resetMails;
+    private final PasswordResetTokenService resetTokens;
 
     @Scheduled(initialDelayString = "PT1H", fixedDelayString = "PT1H")
     void deleteExpiredCredentialIssues() {
@@ -21,5 +23,15 @@ class IdentityCleanupSchedule {
     @Scheduled(initialDelayString = "PT1H", fixedDelayString = "PT1H")
     void deleteExpiredLoginAttempts() {
         loginAttempts.deleteExpiredAttempts();
+    }
+
+    @Scheduled(initialDelayString = "PT1H", fixedDelayString = "PT1H")
+    void deleteExpiredResetMailWindows() {
+        resetMails.deleteExpiredWindows();
+    }
+
+    @Scheduled(initialDelayString = "PT1H", fixedDelayString = "PT1H")
+    void deleteExpiredResetTokens() {
+        resetTokens.deleteExpired();
     }
 }

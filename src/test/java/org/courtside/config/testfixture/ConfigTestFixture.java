@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.config.BookingSlotDuration;
 import org.courtside.config.CredentialLifetime;
 import org.courtside.config.ReminderLeadTime;
+import org.courtside.config.ResetTokenLifetime;
 import org.courtside.config.internal.ChangeClubConfigurationCommand;
 import org.courtside.config.internal.ClubConfigurationSnapshot;
 import org.courtside.config.internal.ConfigService;
@@ -41,6 +42,6 @@ public class ConfigTestFixture {
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
-                new ReminderLeadTime(reminderHours), ruleSetId);
+                new ResetTokenLifetime(60), new ReminderLeadTime(reminderHours), ruleSetId);
     }
 }

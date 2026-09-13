@@ -131,11 +131,11 @@ again: a credential exists only as a hash once it has gone out, so the remedy fo
 correct the address and ask for new credentials. Two things raise the event. The roster does:
 creating an account asks for a credential at once, and one action sends a new one afterwards, for a
 message that never arrived, a deadline that passed, or a member who no longer knows their own
-password. Since the sign-in page offers recovery, an unauthenticated caller does too, by submitting
-a username — which section 10 records as a defect rather than a property, because the credential it
-issues replaces one the member chose without anybody having asked them. The same page answers an
-email address with the usernames registered to it, in a message of its own kind, and issues
-nothing. Nobody on the board chooses a credential, sees it, or has to pass it on, and it appears in
+password. The sign-in page offers recovery to an unauthenticated caller, but it issues no
+credential: submitting a username mails a single-use code and touches nothing, and a second
+operation takes that code and the password the member chose for themselves. The same page answers
+an email address with the usernames registered to it, in a message of its own kind, and changes
+nothing either. Nobody on the board chooses a credential, sees it, or has to pass it on, and it appears in
 no response, log or problem detail. Which of the two lifetimes applies is read from the
 account rather than chosen by the caller; how often credentials may be requested for one account is
 limited; and an account with no address or a deactivated one is refused where the board can see it,
@@ -696,17 +696,32 @@ so an account without an address is one nobody could ever recover. The roster th
 create one, and refuses to take the address away from a person who already holds an account.
 
 **Consequence for password reset.** The standard "enter your email" flow does not work, because
-an address does not name one account. Two paths, and only one of them issues anything:
+an address does not name one account. Two paths, and neither of them changes an account when it is
+asked:
 
-1. **By username** — the instance sends a new one-time password, the same credential a
-   board-issued reset produces, and the first sign-in with it can do nothing except replace it.
-   Reusing the board's credential here is wrong and section 10 records why: it invalidates when the
-   request arrives rather than when somebody redeems what was sent. The subject stays the username;
-   what travels has to become a single-use token.
+1. **By username** — the instance mails a single-use code and touches nothing. A second operation
+   takes that code and a new password, and it is the only one that writes: it sets the password,
+   clears the password-change-required state and the credential expiry, raises the security epoch
+   and ends every session. A password the rules refuse does not spend the code. *Built.*
 2. **By email address** — every account registered to that address is sent its own name, and
-   nothing else changes. Issuing a credential per account would let a child who forgot their
+   nothing else changes. Mailing a credential per account would let a child who forgot their
    password invalidate their parent's, which is what a shared family address makes of the
    obvious design.
+
+The code is eight characters from `23456789ABCDEFGHJKMNPQRSTVWXYZ` — no glyph that can be read as
+another — drawn from `SecureRandom`, mailed grouped as `ABCD-EFGH`, compared without regard to case
+or separator, and stored only as SHA-256. That is about 6.6·10¹¹ combinations against a route that
+carries the credential-verification limit. How long a code stays redeemable is a club setting in
+minutes, between 15 and 1440.
+
+At most one code is outstanding per account: the account is the table's primary key, so the schema
+cannot hold two, and issuing deletes what was there before inserting under an advisory lock on the
+account, so two requests arriving together cannot leave a member holding a code that was never
+stored. The row also carries the account's
+security epoch and a fingerprint of the address the code went to, and redemption compares both
+against the account as it is then. That is how a board-issued credential, a password the member
+chose, a deactivation or an address correction withdraws an outstanding code without `identity`
+having to listen for events from modules it does not depend on.
 
 Neither path answers a subject that exists with a different status, header set or body than one
 that does not, and the per-account issuing window is not allowed to surface either, so asking is not
@@ -722,12 +737,13 @@ after `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` requests), that it stops no sign-in
 operation, and that the roster path (section 10) stays open the whole time — a board can issue the
 credential while the window is shut.
 
-Asking by username is also enough to **end the password a member chose**, because that is what
-issuing a credential does — so somebody who knows or guesses a username can lock that member out of
-a session they were in the middle of, without ever reading the mail that results. An earlier
+Asking by username costs its subject one email and nothing else. It was once enough to **end the
+password a member chose**, because the request issued the board's own credential; an earlier
 revision of this paragraph called that the price every self-service reset pays and said it was paid
-deliberately. It is neither: a reset that mails a single-use token changes nothing until somebody
-redeems it. Section 10 records this as a defect to be replaced, with what bounds it until then.
+deliberately. It was neither, and it is now gone: nothing about the account moves until somebody
+redeems what was mailed. What remains is the mailbox, which a separate per-account window bounds at
+five reset mails an hour, swallowed rather than reported — a refusal that reached the caller would
+confirm the name.
 
 The roster path stays anyway, for a member who cannot reach their own mailbox.
 
@@ -1022,7 +1038,8 @@ All templates are i18n message bundles and editable per instance:
 |---|---|
 | Registration submitted | Member (confirmation) + admins (approval request) |
 | Account approved or rejected | Member |
-| Password reset requested | Member — lists all accounts for that address (section 4) |
+| Password reset code requested | Member — a single-use code for the account named (section 4) |
+| Username reminder requested | Member — lists all accounts for that address (section 4) |
 | Booking confirmed | Booking member + participating members |
 | Booking cancelled | Booking member + participating members |
 | Booking cancelled by an admin | Affected members, with reason |
@@ -1541,7 +1558,8 @@ whether it is built or designed. **Designed means absent today.**
   failed login.
 - **What a permanent password may be:** twelve to 256 characters, neither on a public list of
   common passwords nor built from something this instance already shows the member, and never the
-  one-time password the instance issued. *Built.* The list is SecLists' `Pwdb_top-100000`, pinned
+  one-time password the instance issued. *Built.* The same rules decide a password set by redeeming
+  a reset code, and a password they refuse leaves the code unspent. The list is SecLists' `Pwdb_top-100000`, pinned
   by tag and hash in `NOTICE` and refreshed by fetching that path again and comparing the two
   hashes. The terms are the member's username, their first and last name, the local part of the address the account carries now, and
   the club name, each taken whole and split on its non-alphanumeric boundaries, with tokens under
@@ -1745,7 +1763,10 @@ whether it is built or designed. **Designed means absent today.**
   still keep both verification slots busy; operators should investigate the metric and restrict
   abusive sources at the reverse proxy or network edge. Reauthentication and password changes use
   both an account-wide bucket and a source-address bucket, plus a verification-capacity pool
-  isolated from sign-in. Changing an address cannot reset a stolen account's attempt budget,
+  isolated from sign-in. Redeeming a reset code shares that pool and that source bucket but has no
+  account-wide bucket: the caller is anonymous, so the only account bucket available would be one
+  every anonymous caller shared, and holding a shared bucket shut is cheaper than guessing a code.
+  Changing an address cannot reset a stolen account's attempt budget,
   while a successful proof clears only that account's account-wide bucket. Authorization decides
   first: a request the account may not make at all is refused before either bucket is touched, so
   it cannot spend what bounds a password guess. The source bucket measures request volume and
@@ -1755,57 +1776,74 @@ whether it is built or designed. **Designed means absent today.**
   rather than login.
 - **Credential issuing:** limited per account over a configurable window, counted in PostgreSQL.
   *Built.* The account is the unit because the account is what the abuse targets: one member's
-  mailbox filled with credentials that each invalidate the last. Anybody can now aim that,
-  authenticated or not — see the next entry. A board sending twice in a row is nowhere near the
-  limit, and the refusal says how many went out rather than who sent them.
-- **Self-service recovery:** two unauthenticated operations, one issuing a credential by username
-  and one mailing usernames to an address. *Built.* Section 4 says why the shape is what it is;
-  what a board is being asked to accept is this.
+  mailbox filled with credentials that each invalidate the last. Only a board can aim it; the
+  anonymous recovery path has its own mail budget and cannot spend this one. A board sending twice
+  in a row is nowhere near the limit, and the refusal says how many went out rather than who sent
+  them.
+- **Self-service recovery:** three unauthenticated operations — one mailing a single-use code by
+  username, one redeeming that code, and one mailing usernames to an address. *Built.* Section 4
+  says why the shape is what it is; what a board is being asked to accept is this.
 
-  **A guessed username ends the password its holder chose. This is a defect, not a trade.** The
-  operation issues a credential for whatever username is submitted, so anybody who knows or guesses
-  a name has that account's password hash replaced and its sessions ended, without ever reading the
-  mail that results. Issuing and sending are one transaction on the mail pool, as section 0
-  describes, so this lands a moment after the request rather than during it, and a relay that
-  refuses the message rolls it back and leaves the password standing. Nothing the member does is
-  part of it either way: they are signed out mid-use and can only return through their mailbox.
+  **Asking costs its subject one email.** Neither the request nor a guess at somebody's username
+  changes anything about the account: not the password hash, not the security epoch, not a session.
+  An earlier revision of this entry recorded the opposite — a request issued the board's own
+  credential, so a guessed username ended the password its holder chose — and called that the price
+  every self-service reset pays. It was not, and it is gone. What writes is the redemption, and the
+  redemption needs a code that went to the address on the account.
 
-  An earlier revision of this entry called that the price every self-service reset pays. It is not.
-  The established shape mails a single-use, time-bounded token and changes nothing until somebody
-  redeems it, so an unsolicited request costs its target one email. What is built here is the
-  board-issued reset — where immediate invalidation is correct, because a person has asserted that
-  the member cannot get in — placed behind an endpoint that asserts nothing. The shared family
-  address decides that the username is the subject rather than the address; it has never had any
-  bearing on whether a password or a token is what travels.
+  **A code is the only thing that reaches an account anonymously.** Eight characters from a
+  thirty-symbol alphabet is about 6.6·10¹¹ combinations, valid for a club setting between fifteen
+  minutes and a day, spent by the first password the rules accept and by nothing else. Guessing is
+  bounded by the caller's own address: an anonymous credential attempt is counted against the
+  address that made it and against no account, because the only account bucket available would be
+  one every anonymous caller shared — and holding a shared bucket shut is far cheaper than guessing
+  a code. Twenty wrong codes a minute would otherwise have closed the recovery path for the whole
+  club.
 
-  This is therefore recorded to be replaced, not to be accepted. Until it is, the exposure is
-  bounded by the per-account issuing window, by the credential reaching only the address on the
-  account, and by the member being told what happened. No *release* carries it — nothing is tagged —
-  but that is a smaller bound than it sounds: the nightly image workflow publishes signed
-  acceptance tags for the newest verified revision of `main`, and `main` has carried this since it
-  landed. Anybody running a nightly candidate is running it. Replacing this is therefore
-  release-blocking and nightly-relevant, not optional.
+  **What that leaves is an address, and an address is not a person.** Two things follow, and both
+  are accepted rather than solved. A guesser behind a carrier NAT or a corporate proxy closes the
+  `credential-address:` bucket for everybody sharing that egress — not only their redemption, but
+  their password change and their reauthentication, because it is one bucket. And the
+  two-permit verification pool that bounds this instance's Argon2 work is, for the first time,
+  reachable without signing in: an anonymous caller holding both permits makes every member's
+  password change and reauthentication answer `429` for as long as it holds them. And because that
+  bucket is now the only blocking limit in front of an anonymous operation that writes a password,
+  the requirement in the reference deployment that the edge discard inbound forwarded headers
+  carries more than it used to: the application reads the caller's address from what the proxy
+  sets, so an edge that passes a client's own `X-Forwarded-For` through lets a guesser choose which
+  bucket to spend. Both are the
+  price of a route that has to work for somebody who cannot identify themselves. What bounds them
+  is that the block is a minute, that neither stops a sign-in, that the roster path stays open, and
+  that the instance-wide observation counts this surface — anonymous credential attempts move
+  `courtside.login.distributed.thresholds` exactly as recovery requests do, so the metric an
+  operator is told to watch does not go blind on the one route anybody can reach.
 
-  Nothing caps it over a lifetime, though. The issuing window rolls, so five requests an hour,
-  indefinitely, end whatever session the previous hour's one-time password bought. Against the
-  club's own `ADMIN` account that is a sustained lockout of its administration and not one bad
-  afternoon, which is the account the second-factor entry below already names as the one where it
-  costs most.
+  **A stored code hash is worth cracking, and SHA-256 does not stop that.** `code_hash` is a plain
+  SHA-256 of a secret worth about 2^39, so anybody who reaches the database read-only — a dump, a
+  restored snapshot, a backup — can recover an outstanding code on commodity hardware in minutes
+  and turn read access into a password change, which no other secret in this schema allows: every
+  password is Argon2id. What bounds it is how little there is to steal at any moment: a row exists
+  only between a request and its redemption, it is deleted the moment a code is spent, and the
+  default lifetime is an hour, so a dump yields only the codes outstanding when it was taken. The
+  answer would be a keyed hash, and it is not taken. The key would be an instance secret this
+  deployment does not have, so it would mean a required environment variable, a rotation
+  procedure and a migration for the rows hashed under the old scheme — a standing operating cost
+  for a volunteer board, against a window this narrow. A deployment a club can run is worth more
+  here than a hash a club would have to key, and this paragraph is what that costs.
 
-  **The anonymous path spends the same issuing budget as the board's.** That is deliberate: the
-  window protects the *mailbox*, and a mailbox does not care who caused the mail — splitting the
-  budget would raise what one mailbox can receive. The cost is that a sustained anonymous attack
-  can leave a board's own reset refused until the window reopens. An operator whose members report
-  repeated forced resets should restrict the source at the reverse proxy, which is the same answer
-  the distributed-login observation gives.
+  **The mailbox has its own budget: five reset codes per account per hour**, refused silently,
+  because a refusal that reached the caller would confirm the name. It is separate from the board's
+  issuing budget on purpose, so anonymous asking cannot spend what a board needs to answer with.
+  The cost of swallowing it is that a member asking a sixth time within the hour is told a message
+  is on its way and gets none.
 
   **The submitted subject has a shared window.** It has to be shared, or a caller rotating source
   addresses would meet no limit at all; the consequence is that somebody else's traffic can hold a
   named member's recovery shut for as long as it continues. Blocks do not extend, the roster path
   stays open throughout, and no other operation is affected.
 
-  **Response time still separates the cases the status code merges.** A matched name writes an
-  issuing row and a domain event before the `202`; an unmatched one writes neither, and the address
+  **Response time still separates the cases the status code merges.** A matched name writes a
+  mailing row and a domain event before the `202`; an unmatched one writes neither, and the address
   path does that work once per account it found. Status, headers and body are identical and are
   tested to be; the timing is not, and is not claimed to be. What bounds it: every request for one
   subject serialises on the same advisory lock, so the difference cannot be sampled in parallel,
@@ -1817,30 +1855,29 @@ whether it is built or designed. **Designed means absent today.**
   full the next handover runs inline on the thread serving the request — and a handover is not one
   SMTP attempt but up to four, with five, fifteen and forty-five seconds of waiting between them and
   a ten-second timeout on each. That policy is older than this surface and it is kept, because the
-  alternative is discarding a credential mail that nothing would then record.
+  alternative is discarding a mail that nothing would then record.
 
-  The password path reaches it slowly: five mails per known username per hour, so roughly twenty
-  known usernames to fill the queue, and a name nobody holds queues nothing. The reminder path does
-  not. It issues no credential, so no issuing window applies to it, and it publishes one message per
-  account registered to the submitted address — a family address holding four accounts is four
-  tasks, at whatever rate the caller's own window allows. Only the two `login_attempt_limit` buckets
-  bound it, and they are sized for sign-in rather than for this. An anonymous caller can therefore
-  hold request threads, which is a heavier exposure than the sentence this paragraph replaces
-  described, and it is a second reason the recovery surface is recorded here as unfinished.
+  The code path reaches it slowly: five mails per known username per hour, so roughly twenty known
+  usernames to fill the queue, and a name nobody holds queues nothing. The reminder path does not.
+  It publishes one message per account registered to the submitted address — a family address
+  holding four accounts is four tasks, at whatever rate the caller's own window allows. Only the two
+  `login_attempt_limit` buckets bound it, and they are sized for sign-in rather than for this. An
+  anonymous caller can therefore hold request threads. This one is accepted rather than solved: a
+  budget on the reminder would have to be keyed on the address somebody typed, which is the one
+  thing this path must not confirm.
 
   What an observer has: the two recovery buckets in `login_attempt_limit`, which retain the caller
   address and the submitted subject as unsalted SHA-256 for the window's lifetime. That keeps both
   out of an operator's incidental view and out of a database dump; it does not withstand somebody
   who sets out to reconstruct them, because the IPv4 space is small enough to enumerate against a
   fixed prefix and a username is a dictionary away. Beside them: one `courtside.control.triggered`
-  line when a bucket closes, carrying neither the address nor the subject; one
-  `courtside.control.refused` line naming the account whenever a request met that account's issuing
-  window, which is the one observable that says anonymous pressure reached a real member; the
-  instance-wide observation, which recovery now enters; and, for a request that issued something,
-  the same `TEMPORARY_CREDENTIAL_ISSUED` and `identity.account.credentialsRequested` records a board
-  reset writes. What separates the two is the absent roster event and nothing else — the actor is
-  `null` on both, because the issuer passes `null` whichever path reached it. There is no
-  per-request record naming the source, by design: an address is personal data and this log
+  line when a bucket closes, carrying neither the address nor the subject; the instance-wide
+  observation, which recovery enters; `identity.account.passwordResetRequested` when a code is
+  mailed and `identity.account.passwordResetRedeemed` when one is spent, which is the distinction
+  the issuing flow could not make because there the request was the effect; and a
+  `PERMANENT_PASSWORD_REPLACED` credential-change record on redemption, with a `null` actor, because
+  the member who redeemed is not signed in and the instance will not guess who they were. There is
+  no per-request record naming the source, by design: an address is personal data and this log
   deliberately holds none.
 - **Admin roles:** optional TOTP second factor. **Designed, not built** — there is no second
   factor of any kind today. Since recovery is self-service, whoever reads the mailbox on an account
@@ -2427,7 +2464,7 @@ Each club is its own controller. Courtside cannot take that responsibility away,
 deliver the implementation.
 
 - **Every stored field has one protection level and one lifecycle.**
-  `security/data-protection-inventory.json` classifies all 215 columns of the schema as `personal`,
+  `security/data-protection-inventory.json` classifies all 225 columns of the schema as `personal`,
   `pseudonymous`, `secret` or `operational`, and names for each the mechanism below that ends it.
   The list is derived rather than maintained: `DataProtectionInventoryTest` reads
   `information_schema.columns` after Flyway has run, so a migration that adds a column fails the

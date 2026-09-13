@@ -32,7 +32,7 @@ describe("AdminConfigurationView", () => {
       slotMinutes: 30,
       timeZone: "Europe/Berlin",
       newAccountCredentialHours: 168,
-      passwordResetCredentialHours: 24,
+      passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24,
       logoUploaded: false
     });
@@ -88,7 +88,7 @@ describe("AdminConfigurationView", () => {
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, logoUploaded: false,
       noMembershipTypeRuleSetId: "rule-set"
     });
@@ -109,7 +109,7 @@ describe("AdminConfigurationView", () => {
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, logoUploaded: false, privacyUrl: "/privacy"
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
@@ -154,7 +154,7 @@ describe("AdminConfigurationView", () => {
     const uploaded = {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, logoUploaded: true, logoFallbackUrl: "/fallback.svg",
       logoUrl: `/api/public/config/logo?v=${"a".repeat(64)}`
     };
@@ -199,14 +199,14 @@ describe("AdminConfigurationView", () => {
     vi.spyOn(api, "adminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, logoUploaded: true, logoFallbackUrl: "/fallback.svg",
       logoUrl: `/api/public/config/logo?v=${"a".repeat(64)}`
     });
     const removed = {
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, logoUploaded: false, logoFallbackUrl: "/fallback.svg",
       logoUrl: "/fallback.svg"
     };
@@ -265,13 +265,13 @@ describe("AdminConfigurationView", () => {
     vi.spyOn(api, "adminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, logoUploaded: false, privacyUrl: "/privacy"
     });
     const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, logoUploaded: false
     });
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
@@ -295,7 +295,7 @@ describe("AdminConfigurationView", () => {
     vi.spyOn(api, "adminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, logoUploaded: false,
       noMembershipTypeRuleSetId: "retired"
     });
@@ -506,7 +506,7 @@ describe("AdminConfigurationView", () => {
       slotMinutes: 15,
       timeZone: "Pacific/Auckland",
       newAccountCredentialHours: 168,
-      passwordResetCredentialHours: 24,
+      passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, logoUploaded: false
     });
     const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
@@ -671,7 +671,7 @@ describe("AdminConfigurationView", () => {
       slotMinutes: 30,
       timeZone: "US/Eastern",
       newAccountCredentialHours: 168,
-      passwordResetCredentialHours: 24,
+      passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
       bookingReminderHours: 24, logoUploaded: false
     });
 
@@ -788,7 +788,7 @@ it("given the configuration is edited, when the edit is taken back, then nothing
   vi.spyOn(api, "adminConfig").mockResolvedValue({
     clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
     defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
-    timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+    timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
     bookingReminderHours: 24, logoUploaded: false, privacyUrl: "/privacy"
   });
   render(<MemoryRouter><UnsavedChangesProvider>

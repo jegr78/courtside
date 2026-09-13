@@ -47,12 +47,22 @@ Sigstore issues a keyless signing key, Stalwart generates the DKIM keys and Spri
 the CSRF token, and a number written here would be a claim about somebody else's build. The basis
 names them and says what is known.
 
-`class` `identifier` is the one class the 128-bit minimum does not reach, because an identifier
-answers to uniqueness rather than to secrecy. Its entries still state their bits and still say what
-the bits buy. Where a literal in the code determines those bits, moving an entry into that class to
-escape the minimum changes nothing, because the recomputation still reads what the code draws.
-Where no literal does, the class is what a reader has to weigh, and moving one is a change to the
-entry that the diff shows.
+Two classes do not reach the 128-bit minimum. `identifier` does not, because an identifier answers
+to uniqueness rather than to secrecy. `rate-bounded-secret` does not, because the value is short on
+purpose — a person retypes it from a mail — and what makes it hard to spend is the budget an
+attacker gets rather than the size of the value. Entries in both still state their bits and still
+say what the bits buy. Where a literal in the code determines those bits, moving an entry into
+either class to escape the minimum changes nothing, because the recomputation still reads what the
+code draws.
+
+For `rate-bounded-secret` that is not a happy accident but the condition: an entry in it has to be
+one the strength test recomputes from the source, so a wider alphabet or a longer value fails the
+build rather than leaving a stale number behind. Its `basis` names the bound, and its `evidence`
+names the tests that measure the bound rather than describing it. A class is a hole the moment it
+exempts something without asking for anything back.
+
+For `identifier`, where no literal decides the bits, the class is what a reader has to weigh, and
+moving one is a change to the entry that the diff shows.
 
 `owner` is a role, never a person. Two exist: `club-operator` for anything an instance holds, and
 `repository-maintainer` for anything this repository holds.
@@ -81,6 +91,8 @@ guarantee and cryptography that does not:
 
 - `credential-protection` — protects a secret. Argon2id, the issued credential, the unusable
   password.
+- `rate-bounded-secret` — is a secret, but a short one a member types, so it leans on a guessing
+  budget instead of its own size. The mailed password-reset code.
 - `confidentiality` — keeps content from a reader. The security-evidence envelope.
 - `signing` — lets somebody else verify an origin. The release signature, DKIM.
 - `transport` — protects a connection, or records what one guarantees when that is less than
