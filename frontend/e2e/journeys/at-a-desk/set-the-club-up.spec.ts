@@ -66,8 +66,9 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     await writeInto(page.getByTestId("new-card-label"), "Club evening");
     await activate(page.getByTestId("create-card"));
 
-    // then
-    await expect(page.locator('[data-testid^="card-row-"]').first()).toBeVisible();
+    // then — the club is put on the card it just made, which is where it would go on to describe it
+    await expect(page.getByTestId("admin-booking-card-view")).toBeVisible();
+    await expect(page.getByTestId("card-label")).toHaveValue("Club evening");
 
     // when — and what else may be on a court
     await reachAdministration(page, "admin-slot-fillers-link");
