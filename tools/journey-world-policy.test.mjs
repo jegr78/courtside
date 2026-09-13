@@ -51,8 +51,12 @@ test("given Playwright starts browsers in a container, when its package changes,
 });
 
 test("given a mutable PWA asset and database, when the next test starts, then both return to their baseline", () => {
+  // The club a journey installs into and the club it books in are different starts, and both are
+  // snapshots the world captured rather than states a test builds.
+  assert.match(setup, /snapshotJourneyData\(postgres, JOURNEY_EMPTY\)/);
+  assert.match(setup, /snapshotJourneyData\(postgres, JOURNEY_SEEDED\)/);
   assert.match(setup, /resetStaticAssets\(\)/);
-  assert.match(setup, /resetJourneyData\(postgres!, tables\)/);
+  assert.match(setup, /resetJourneyData\(postgres!, tables, [^)]+\)/);
 });
 
 test("given journey data is restored while the application stays live, when the test world starts, then scheduled database work never falls due", () => {

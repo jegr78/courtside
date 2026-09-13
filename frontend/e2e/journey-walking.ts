@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { JourneyLanguage } from "./fixtures";
 
@@ -79,7 +79,7 @@ export async function writeDate(target: Locator, isoDate: string): Promise<void>
 // The operating system's picker cannot be driven, so a journey hands the input a path to a file
 // that is in the repository the way a member's own export is on their disk.
 export function journeyFile(name: string): string {
-  return join(__dirname, "journey-files", name);
+  return fileURLToPath(new URL(`journey-files/${name}`, import.meta.url));
 }
 
 export async function writeTime(target: Locator, time: string): Promise<void> {
