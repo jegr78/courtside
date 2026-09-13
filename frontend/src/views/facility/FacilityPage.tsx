@@ -19,7 +19,7 @@ export function FacilityPage({ testId, title, error, success, children }: Facili
     {error && <Alert>{error}</Alert>}
     {children
       ? <>
-        {success && <SuccessFeedback>{success}</SuccessFeedback>}
+        {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
         {children}
       </>
       : !error && <p role="status">{t("status.loading")}</p>}

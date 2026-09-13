@@ -102,7 +102,7 @@ export function AdminMembershipTypesView() {
       ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert>{error}</Alert>}
-        {success && <SuccessFeedback>{success}</SuccessFeedback>}
+        {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
         <section className="grid gap-4">
           {types.length === 0 && <p data-testid="membership-types-empty">{t("admin.membershipTypes.empty")}</p>}
           {types.map((type) => <MembershipTypeCard

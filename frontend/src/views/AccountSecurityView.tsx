@@ -124,10 +124,10 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
     </Modal>}
     <form className="grid gap-4" onSubmit={(event) => void changePassword(event)}>
       <h2 className="text-xl font-bold">{t("accountSecurity.password.title")}</h2>
-      <TextField id="current-password" name="current-password" type="password" autoComplete="current-password" required label={t("accountSecurity.password.current")} />
-      <TextField id="new-password" name="new-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} required label={t("password.new")} />
-      <TextField id="confirm-password" name="confirm-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} required label={t("password.confirm")} />
-      <div><Button variant="primary" disabled={pending} type="submit">{t("password.submit")}</Button></div>
+      <TextField id="current-password" name="current-password" data-testid="current-password" type="password" autoComplete="current-password" required label={t("accountSecurity.password.current")} />
+      <TextField id="new-password" name="new-password" data-testid="new-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} required label={t("password.new")} />
+      <TextField id="confirm-password" name="confirm-password" data-testid="confirm-password" type="password" autoComplete="new-password" minLength={12} maxLength={256} required label={t("password.confirm")} />
+      <div><Button variant="primary" data-testid="password-submit" disabled={pending} type="submit">{t("password.submit")}</Button></div>
     </form>
   </section>;
 }
