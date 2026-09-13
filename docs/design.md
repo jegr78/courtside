@@ -186,8 +186,7 @@ no message per occurrence. Of section 6's table, the booking confirmation is the
 the rest are designed.
 
 Designed and not built: observability alerts and the reference collector stack of section 9,
-container image scanning, the reports beyond court utilisation, and the self-service password reset
-of section 4 — a board member has the instance send new credentials through the roster instead.
+container image scanning, and the reports beyond court utilisation.
 
 ---
 
@@ -689,16 +688,40 @@ that grants or restores access travels by mail — the first password, and both 
 so an account without an address is one nobody could ever recover. The roster therefore refuses to
 create one, and refuses to take the address away from a person who already holds an account.
 
-**Consequence for password reset.** The standard "enter your email" flow does not work. Two
-paths, both supported:
+**Consequence for password reset.** The standard "enter your email" flow does not work, because
+an address does not name one account. Two paths, and only one of them issues anything:
 
-1. Reset via **username** — single account, single link.
-2. Reset via **email** — the message lists *all* accounts registered to that address, each
-   with its own reset link ("Accounts for this address: *doe.jane*, *roe.john*").
+1. **By username** — the instance sends a new one-time password, the same credential a
+   board-issued reset produces, and the first sign-in with it can do nothing except replace it.
+2. **By email address** — every account registered to that address is sent its own name, and
+   nothing else changes. Issuing a credential per account would let a child who forgot their
+   password invalidate their parent's, which is what a shared family address makes of the
+   obvious design.
 
-This is a case standard frameworks do not provide and must be built explicitly. Until it is, the
-roster is the only remedy: a board member has the instance send new credentials (section 10),
-which reaches the member without the board seeing anything, but still needs somebody to ask.
+Neither path answers a subject that exists with a different status, header set or body than one
+that does not, and the per-account issuing window is not allowed to surface either, so asking is not
+a way to learn who belongs to this club. Two windows answer `429`: one on the caller's own address,
+and one on the submitted subject.
+
+The second is shared by everyone who submits that subject, which is what makes it useful — an
+attacker rotating addresses still meets it — and is also its cost: **somebody else can hold a
+member's recovery shut by asking for their username repeatedly.** That is accepted rather than
+solved, because the alternative is a per-caller window that a rotating source walks straight past.
+What bounds it is that the block is short (`COURTSIDE_LOGIN_ADDRESS_BLOCK`, one minute by default,
+after `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` requests), that it stops no sign-in and no other
+operation, and that the roster path (section 10) stays open the whole time — a board can issue the
+credential while the window is shut.
+
+Asking by username is also enough to **end the password a member chose**, because that is what
+issuing a credential does — so somebody who knows or guesses a username can lock that member out
+of a session they were in the middle of, without ever reading the mail that results. This is the
+price every self-service reset pays, and it is paid deliberately: the alternative is a member who
+cannot get back in without their board. What bounds it is the per-account issuing window
+(`COURTSIDE_CREDENTIAL_ISSUE_MAX_PER_WINDOW`, five per hour by default), that the new password
+reaches only the address on the account, and that the member is told what happened and that they
+did not ask for it.
+
+The roster path stays anyway, for a member who cannot reach their own mailbox.
 
 A **guardian relation** (a parent seeing their children's bookings) falls out of this model
 almost for free. It is noted as a candidate for a later release, not Release 1.
@@ -1723,12 +1746,62 @@ whether it is built or designed. **Designed means absent today.**
   therefore cannot consume sign-in capacity, and their typed `429` names password verification
   rather than login.
 - **Credential issuing:** limited per account over a configurable window, counted in PostgreSQL.
-  *Built.* The account is the unit because the account is what the abuse targets: somebody holding a
-  board member's session filling one member's mailbox with credentials that each invalidate the
-  last. A board sending twice in a row is nowhere near the limit, and the refusal says how many went
-  out rather than who sent them.
+  *Built.* The account is the unit because the account is what the abuse targets: one member's
+  mailbox filled with credentials that each invalidate the last. Anybody can now aim that,
+  authenticated or not — see the next entry. A board sending twice in a row is nowhere near the
+  limit, and the refusal says how many went out rather than who sent them.
+- **Self-service recovery:** two unauthenticated operations, one issuing a credential by username
+  and one mailing usernames to an address. *Built.* Section 4 says why the shape is what it is;
+  what a board is being asked to accept is this.
+
+  **A guessed username ends the password its holder chose.** Issuing a credential is what the
+  operation does, so anybody who knows or guesses a name can end that member's sessions and force
+  them through the one-time password again, without reading the mail that results. That is the
+  price of not needing a board, and it is bounded by the per-account issuing window, by the
+  credential going only to the address on the account, and by the member being told.
+
+  **The anonymous path spends the same issuing budget as the board's.** That is deliberate: the
+  window protects the *mailbox*, and a mailbox does not care who caused the mail — splitting the
+  budget would raise what one mailbox can receive. The cost is that a sustained anonymous attack
+  can leave a board's own reset refused until the window reopens. An operator whose members report
+  repeated forced resets should restrict the source at the reverse proxy, which is the same answer
+  the distributed-login observation gives.
+
+  **The submitted subject has a shared window.** It has to be shared, or a caller rotating source
+  addresses would meet no limit at all; the consequence is that somebody else's traffic can hold a
+  named member's recovery shut for as long as it continues. Blocks do not extend, the roster path
+  stays open throughout, and no other operation is affected.
+
+  **Response time still separates the cases the status code merges.** A matched name writes an
+  issuing row and a domain event before the `202`; an unmatched one writes neither, and the address
+  path does that work once per account it found. Status, headers and body are identical and are
+  tested to be; the timing is not, and is not claimed to be. What bounds it: every request for one
+  subject serialises on the same advisory lock, so the difference cannot be sampled in parallel,
+  and both visible windows meter how often it can be sampled at all. Equalising it would mean
+  doing the writes for a name nobody holds, which is a worse trade than saying this plainly.
+
+  **A credential mail can run on the request thread.** The mail pool answers saturation with
+  `CallerRunsPolicy`, so once its four threads and hundred queued tasks are full the next handover
+  — an Argon2id encode and an SMTP attempt — runs inline on the thread serving the request. That is
+  older than this surface and it is kept, because the alternative is discarding a credential mail
+  nothing would then record. What reaches it from here is bounded by the issuing window rather than
+  by the request rate: an anonymous caller gets five mails per known username per hour, so filling
+  that queue needs roughly twenty usernames somebody already knows, and a name nobody holds queues
+  nothing at all.
+
+  What an observer has: the two recovery buckets in `login_attempt_limit`, which retain the caller
+  address as a SHA-256 hash for the window's lifetime, so a suspected address can be confirmed but
+  not read out; one `courtside.control.triggered` line when a bucket closes, carrying neither the
+  address nor the subject; the instance-wide observation, which recovery now enters; and, for a
+  request that issued something, the same `TEMPORARY_CREDENTIAL_ISSUED` and
+  `identity.account.credentialsRequested` records a board reset writes, distinguished from it by
+  having no actor and no accompanying roster event. There is no per-request record naming the
+  source, by design — an address is personal data and this log deliberately holds none.
 - **Admin roles:** optional TOTP second factor. **Designed, not built** — there is no second
-  factor of any kind today.
+  factor of any kind today. Since recovery is self-service, whoever reads the mailbox on an account
+  and knows its username can take that account, `ADMIN` included, with nobody at the club in the
+  way. Before self-service a board member had to act; now the mailbox is the only factor there is,
+  which is worth knowing when deciding which address an administrator's account carries.
 - **Booking authorization:** every booking mutation has an authenticated account as its actor.
   Booking and participant cards carry no shared credentials; account roles decide which cards the
   actor may use. Anonymous access is read-only. *Built.*

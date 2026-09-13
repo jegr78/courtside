@@ -56,6 +56,8 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "ruleType", "ADVANCE_WINDOW");
 
     private static final Set<String> ANONYMOUS_ALLOWED_PATHS = Set.of(
+            "/api/account-recovery/password",
+            "/api/account-recovery/usernames",
             "/api/openapi.yaml",
             "/api/public/booking-grid",
             "/api/public/config",
@@ -375,6 +377,10 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                 mockMvc.perform(request)
                         .andExpect(status().isNotFound())
                         .andExpect(jsonPath("$.type").value("urn:courtside:error:club-logo-not-found"));
+            } else if (endpoint.answersWithoutABody()) {
+                mockMvc.perform(request)
+                        .andExpect(status().is2xxSuccessful())
+                        .andExpect(content().string(""));
             } else {
                 mockMvc.perform(request)
                         .andExpect(status().is2xxSuccessful())
@@ -503,8 +509,22 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
     private record MappedEndpoint(HttpMethod method, String pattern, MediaType produces,
                                   MediaType consumes) {
 
+        // Recovery refuses an empty body before the route is reached, and names nobody holds keep
+        // the probe from issuing anything to a member.
         String probeBody() {
+            if (pattern.equals("/api/account-recovery/password")) {
+                return "{\"username\":\"nobody.here\"}";
+            }
+            if (pattern.equals("/api/account-recovery/usernames")) {
+                return "{\"email\":\"nobody@example.org\"}";
+            }
             return MediaType.APPLICATION_JSON.includes(consumes) ? "{}" : "";
+        }
+
+        // Nothing answers a problem document on the way out, so declaring it as the only content
+        // is how the contract says this operation succeeds without a body.
+        boolean answersWithoutABody() {
+            return MediaType.APPLICATION_PROBLEM_JSON.equals(produces);
         }
 
         String concretePath() {

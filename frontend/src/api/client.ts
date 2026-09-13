@@ -200,6 +200,12 @@ export const api = {
     `/api/account/sessions/${encodeURIComponent(handle)}`, { method: "DELETE" }
   ),
   endOwnSessions: () => request<void>("/api/account/sessions", { method: "DELETE" }),
+  requestPasswordReset: (username: string) => request<void>("/api/account-recovery/password", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username })
+  }),
+  requestUsernameReminder: (email: string) => request<void>("/api/account-recovery/usernames", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email })
+  }),
   reauthenticate: (password: string) => request<void>("/api/session/reauthentication", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password })
   }),

@@ -8,6 +8,7 @@ public enum MessageKind {
     // written into something they never hear about.
     CREDENTIALS_NEW_ACCOUNT("credentials.newAccount", false),
     CREDENTIALS_PASSWORD_RESET("credentials.passwordReset", false),
+    ACCOUNT_USERNAME_REMINDER("account.usernameReminder", false),
     BOOKING_CONFIRMED("booking.confirmed", true),
     BOOKING_PLAYER_RECORDED("booking.playerRecorded", false),
     BOOKING_PLAYER_WITHDREW("booking.playerWithdrew", true),

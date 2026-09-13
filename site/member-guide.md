@@ -27,7 +27,26 @@ E-Mail zu dir, nicht über den Vorstand: niemand dort sieht oder wählt dein ers
 
 Über *Anmelden* kommst du zum Formular mit Benutzername und Passwort. Wird die Anmeldung
 abgelehnt, obwohl du dich nicht vertippt hast, können die Zugangsdaten abgelaufen oder nie
-angekommen sein, oder das Konto ist deaktiviert. In allen drei Fällen hilft dein Vorstand weiter.
+angekommen sein, oder das Konto ist deaktiviert. Für die ersten beiden Fälle steht unter dem
+Formular *Passwort oder Benutzername vergessen?*; ist das Konto deaktiviert, hilft nur dein
+Vorstand.
+
+## Passwort oder Benutzername vergessen
+
+Die Seite hinter diesem Link hat zwei Formulare, und beide kommen ohne Anmeldung aus.
+
+Das erste nimmt deinen **Benutzernamen** und schickt dir ein neues Einmalpasswort an die Adresse,
+die für dein Konto hinterlegt ist. Dein bisheriges Passwort ist damit weg, ebenso alle offenen
+Sitzungen, und weiter geht es wie unten unter *Das Einmalpasswort ersetzen*.
+
+Das zweite nimmt deine **E-Mail-Adresse** und schickt dir deine Benutzernamen — Mehrzahl, denn auf
+einer Familienadresse können mehrere Konten liegen, und dann bekommt jedes seine eigene Nachricht.
+Ein Passwort ändert dieses Formular nicht.
+
+Beide antworten gleich, egal ob es den Namen oder die Adresse gibt: sonst könnte jeder Fremde
+durchprobieren, wer in deinem Verein ein Konto hat. Kommt keine E-Mail, ist entweder der Name ein
+anderer als gedacht, oder die hinterlegte Adresse ist nicht die, in die du gerade schaust; dann
+hilft dein Vorstand weiter.
 
 Nach zu vielen Versuchen in kurzer Zeit sagt Courtside das ausdrücklich und lässt eine Weile
 warten. Gezählt wird dabei der Netzanschluss, von dem die Versuche kommen, nicht dein Konto:
@@ -38,7 +57,7 @@ niemand kann dich aussperren, indem er dein Passwort oft genug falsch rät.
 Mit dem Einmalpasswort kommst du nur an eine einzige Seite: *Einmalpasswort ersetzen*. Solange du
 kein eigenes Passwort gesetzt hast, führt dich jede Seite der Anwendung dorthin zurück. Zeit hast
 du dafür nicht unbegrenzt: wie lange ein zugeschicktes Passwort gilt, legt dein Verein fest, und
-danach braucht es ein neues vom Vorstand.
+danach forderst du auf der Anmeldeseite ein neues an.
 
 Das neue Passwort braucht mindestens zwölf und höchstens 256 Zeichen. Courtside lehnt es ausserdem
 ab, wenn es auf einer mitgelieferten Liste häufiger Passwörter steht, wenn es deinen Namen, deinen

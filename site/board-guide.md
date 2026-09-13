@@ -188,7 +188,8 @@ Adresse liegen.
 
 Hat das Mitglied bereits ein eigenes Passwort, warnt Courtside vor dem Senden: neue Zugangsdaten
 löschen das gewählte Passwort und beenden alle laufenden Sitzungen. Das ist der Weg für jemanden, der
-nicht mehr hineinkommt — und nur dafür.
+nicht mehr hineinkommt — und nur dafür. Wer noch an seine hinterlegte Adresse kommt, braucht Sie
+dafür nicht: die Anmeldeseite stellt ein neues Passwort selbst zu.
 
 Gegen die eigene Verwaltung schützt das ein Konto nicht, und es wäre unehrlich, das zu verschweigen:
 wer die E-Mail-Adresse einer Person ändern darf, kann sich danach deren Zugangsdaten zustellen

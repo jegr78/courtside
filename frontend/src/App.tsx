@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { AccountRecoveryView } from "./views/AccountRecoveryView";
 import { api, type ClubConfig, type SessionStatus, type SourceOffer } from "./api/client";
 import { Alert } from "./components/Alert";
 import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
@@ -64,6 +65,9 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <Routes>
     <Route path="/" element={<HomeView session={session} clubName={clubName} />} />
     <Route path="/courts" element={<HomeView session={session} clubName={clubName} />} />
+    <Route path="/account-recovery" element={session.authenticated
+      ? <Navigate to="/" replace />
+      : <AccountRecoveryView />} />
     <Route path="/login" element={session.authenticated
       ? <Navigate to={passwordChanged && session.roles.includes("ADMIN") ? "/admin/setup" : "/"} replace />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />

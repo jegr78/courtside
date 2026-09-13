@@ -26,6 +26,20 @@ class CredentialIssueLimit implements CredentialIssuing {
     @Override
     @Transactional
     public void registerOrRefuse(UUID accountId) {
+        if (!registerWithinWindow(accountId)) {
+            throw new CredentialIssueRateLimitedException(properties.maxPerWindow());
+        }
+    }
+
+    // A caller that means to swallow a refusal cannot be handed one as an exception: leaving this
+    // proxy it would mark their transaction rollback-only and turn the swallowed refusal into a 500.
+    @Override
+    @Transactional
+    public boolean register(UUID accountId) {
+        return registerWithinWindow(accountId);
+    }
+
+    private boolean registerWithinWindow(UUID accountId) {
         lock(accountId);
         Instant now = clock.instant();
         Window current = currentWindow(accountId);
@@ -34,10 +48,11 @@ class CredentialIssueLimit implements CredentialIssuing {
         if (!windowExpired && current.issuedCount() >= properties.maxPerWindow()) {
             securityEvents.controlRefused(accountId,
                     SecurityEventLog.ControlRefusal.CREDENTIAL_ISSUE_LIMIT);
-            throw new CredentialIssueRateLimitedException(properties.maxPerWindow());
+            return false;
         }
         record(accountId, windowExpired ? 1 : current.issuedCount() + 1,
                 windowExpired ? now : current.startedAt());
+        return true;
     }
 
     @Transactional

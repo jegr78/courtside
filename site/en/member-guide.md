@@ -25,7 +25,25 @@ than through the board: nobody there sees or chooses your first password.
 
 *Sign in* takes you to the form with username and password. If the sign-in is refused although you
 typed everything correctly, the credentials may have expired or never arrived, or the account is
-deactivated. Your board can help in all three cases.
+deactivated. For the first two, *Forgotten your password or username?* sits under the form; if the
+account is deactivated, only your board can help.
+
+## Forgotten password or username
+
+The page behind that link holds two forms, and neither needs you to be signed in.
+
+The first takes your **username** and mails a new one-time password to the address held for your
+account. Your previous password is gone with it, as are any sessions you have open, and you carry
+on under *Replacing the one-time password* below.
+
+The second takes your **email address** and mails you your usernames — plural, because a family
+address can carry several accounts, and each of them then gets its own message. This form changes
+no password.
+
+Both answer the same way whether or not the name or the address exists: otherwise any stranger
+could work through a list to find out who holds an account in your club. If no mail arrives, either
+the name is not the one you thought or the address held for you is not the inbox you are looking
+at, and your board can help.
 
 After too many attempts in a short time Courtside says exactly that and makes you wait a while. It
 counts the network connection the attempts come from, not your account: nobody can lock you out by
@@ -36,7 +54,7 @@ guessing your password often enough.
 The one-time password gets you to one page and no further: *Replace one-time password*. Until you
 have chosen a password of your own, every page of the application leads back there. You do not have
 unlimited time for it: how long an issued password stays valid is your club's setting, and after
-that the board has to send a new one.
+that you ask for a new one on the sign-in page.
 
 The new password needs at least twelve characters and at most 256. Courtside also refuses it if it
 is on a list of common passwords shipped with the application, if it contains your name, your

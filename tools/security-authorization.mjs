@@ -93,6 +93,9 @@ function operationExpectations(path, method, security) {
   if (path === "/api/session" && ["get", "post"].includes(method)) {
     return Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"]));
   }
+  if (["/api/account-recovery/password", "/api/account-recovery/usernames"].includes(path)) {
+    return Object.fromEntries(authorizationActors.map((actor) => [actor, "allow"]));
+  }
   if (path === "/api/session/logout") {
     expectations.ANONYMOUS = "allow";
     for (const role of roles) expectations[role] = "allow";

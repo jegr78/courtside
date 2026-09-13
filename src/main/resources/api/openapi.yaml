@@ -224,6 +224,33 @@ components:
           minLength: 1
           maxLength: 256
 
+    PasswordResetRequest:
+      type: object
+      description: |
+        The name the member signs in with. Its shape is the one `UsernameRequest` states, so a
+        name this instance could never have issued is refused on its shape rather than answered
+        as though it had been looked up.
+      required: [username]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 60
+          pattern: "^[a-z0-9._-]+$"
+
+    UsernameReminderRequest:
+      type: object
+      description: |
+        The address the member gave the club. It names no single account, which is why this
+        request can only produce a reminder.
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 3
+          maxLength: 120
+
     BrowserFamily:
       type: string
       enum: [CHROME, EDGE, FIREFOX, SAFARI, OTHER]
@@ -2003,7 +2030,8 @@ components:
       description: |
         What a message was. The client resolves its label from this; the value is the message's own
         name, not the reason another part of the instance had for asking.
-      enum: [CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, BOOKING_CONFIRMED,
+      enum: [CREDENTIALS_NEW_ACCOUNT, CREDENTIALS_PASSWORD_RESET, ACCOUNT_USERNAME_REMINDER,
+             BOOKING_CONFIRMED,
              BOOKING_PLAYER_RECORDED, BOOKING_PLAYER_WITHDREW, BOOKING_DISPLACED,
              BOOKING_REMINDER]
 
@@ -2493,6 +2521,91 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/account-recovery/password:
+    post:
+      tags: [account-recovery]
+      operationId: requestPasswordReset
+      summary: Ask the instance to send a new password.
+      description: |
+        The unauthenticated counterpart to the request a board makes through the roster. A member
+        who cannot sign in asks here, and the instance sends a one-time password to the address on
+        the account. It is the same credential a board-issued reset produces: whatever was issued
+        before stops working, the account's sessions end with it, and the first sign-in that uses
+        it can do nothing except replace it.
+
+        The answer is `202` whether or not the name belongs to an account, and it carries no body.
+        Asking must not be a way to learn who belongs to this club, so status, headers and body say
+        the same thing either way. A deactivated account and one whose person has no address are
+        answered the same way and send nothing.
+
+        A member who knows their address but not their name asks
+        `/api/account-recovery/usernames` first. That operation issues no credential.
+
+        Three limits bound this operation and only two of them are visible. The account keeps the
+        issuing window a board-issued request already meets; reaching it is answered `202` like
+        everything else, because a `429` from it would confirm that the submitted name belongs to
+        somebody. The other two are answered `429` with
+        `urn:courtside:error:account-recovery-rate-limited` and carry `Retry-After`: one counts
+        what the caller's own address submits, the other counts what anybody submits for this
+        subject, so a name that matches nothing still meets a limit. Neither reads the account, so
+        neither says whether one exists — but the second is shared, so it can also be met because
+        somebody else asked for the same name.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordResetRequest" }
+      responses:
+        "202":
+          description: |
+            The request was accepted. Whether a message follows is deliberately not said.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/account-recovery/usernames:
+    post:
+      tags: [account-recovery]
+      operationId: requestUsernameReminder
+      summary: Ask the instance which account names an address holds.
+      description: |
+        An email address is not an identifier here: a family enrols several children under one
+        parent's address, so one address can hold several accounts. Somebody who has forgotten
+        their password has usually forgotten the name they sign in with, and this operation
+        answers that without touching anything.
+
+        Every account registered to the address receives one message naming the account it belongs
+        to. No credential is issued, no session ends, and no account state changes, so a shared
+        address cannot cost a parent their password because a child asked.
+
+        The answer is `202` whether or not the address holds an account, and it carries no body,
+        for the same reason as the operation above. The same two visible windows bound it — one on
+        the caller's address, one on the submitted address as a subject — and both are answered
+        `429` with `urn:courtside:error:account-recovery-rate-limited`. There is no third: this
+        operation issues nothing, so no issuing window applies.
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UsernameReminderRequest" }
+      responses:
+        "202":
+          description: |
+            The request was accepted. Whether any message follows is deliberately not said.
+        "400":
+          $ref: "#/components/responses/Invalid"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":

@@ -184,9 +184,10 @@ board configures: `facility.court.added`, `card.bookingCard.changed`, `config.cl
 siblings. The other two arrive in the course of ordinary use, because the writer records every
 event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the four
 other booking entries, and `identity.account.credentialsRequested`, which names the account a
-credential was issued for. It is written beside `roster.account.credentialsRequested`, which names
-the person: `AccountCredentials` is reached from the roster and from nowhere else today, so one
-administrative call writes both and no self-service path writes either. Read the first segment as the publisher and not as a table — the `roster.`
+credential was issued for. A board's request is written beside
+`roster.account.credentialsRequested`, which names the person, because the roster reaches
+`AccountCredentials` and publishes its own event as well. A member who asked for the credential
+themselves produces the `identity.` entry alone, so the pair says which of the two happened. Read the first segment as the publisher and not as a table — the `roster.`
 entries come from `member`.
 
 `message_record.kind` and `message_optout.kind` are governed by CHECK constraints that have grown

@@ -110,6 +110,34 @@ class AccountCredentialsTest {
     }
 
     @Test
+    void givenTheWindowIsFull_whenIssuingWithinIt_thenTheRefusalIsReportedWithoutAnException() {
+        // given
+        UUID accountId = holding(awaiting());
+        when(issuing.register(accountId)).thenReturn(false);
+
+        // when
+        boolean issued = credentials.issueToIfWithinWindow(accountId);
+
+        // then
+        assertThat(issued).isFalse();
+        verifyNoInteractions(events);
+    }
+
+    @Test
+    void givenRoomInTheWindow_whenIssuingWithinIt_thenTheCredentialIsRequestedAsUsual() {
+        // given
+        UUID accountId = holding(awaiting());
+        when(issuing.register(accountId)).thenReturn(true);
+
+        // when
+        boolean issued = credentials.issueToIfWithinWindow(accountId);
+
+        // then
+        assertThat(issued).isTrue();
+        assertThat(published().accountId()).isEqualTo(accountId);
+    }
+
+    @Test
     void givenAnAccountWhosePersonHasNoAddress_whenIssuing_thenItIsRefusedWhereTheBoardCanSeeIt() {
         // given
         UserAccount account = enabled(UserAccount.awaitingCredentials(

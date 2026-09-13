@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
@@ -40,5 +41,8 @@ export function LoginView({ refreshSession, passwordChanged = false }: { refresh
       <TextField id="password" name="password" label={t("auth.password")} data-testid="password" type="password" autoComplete="current-password" required />
       <Button variant="primary" type="submit" data-testid="login-submit" disabled={pending}>{t("auth.submit")}</Button>
     </form>
+    <p className="mt-6">
+      <Link data-testid="forgotten-credentials-link" to="/account-recovery" className="font-semibold underline underline-offset-4">{t("auth.forgotten")}</Link>
+    </p>
   </section>;
 }

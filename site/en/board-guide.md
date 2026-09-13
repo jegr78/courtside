@@ -180,7 +180,8 @@ the address beforehand and says when several people hold it.
 
 If the member already chose a password, Courtside warns before sending: new credentials delete that
 password and end every session they have open. That is the route for somebody who can no longer get
-in, and only for that.
+in, and only for that. A member who still reaches the address held for them does not need you:
+the sign-in page issues a new password itself.
 
 It does not protect an account against your own administration, and saying otherwise would be
 dishonest: whoever may change a person's email address can then have that person's credentials sent

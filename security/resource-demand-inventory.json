@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-09",
+  "reviewedAt": "2026-09-13",
   "sources": {
     "openapi": "src/main/resources/api/openapi.yaml",
     "scheduledFiles": [
@@ -15,7 +15,8 @@
       "src/main/java/org/courtside/notification/internal/CredentialMailer.java",
       "src/main/java/org/courtside/notification/internal/DisplacementMailer.java",
       "src/main/java/org/courtside/notification/internal/ParticipationMailer.java",
-      "src/main/java/org/courtside/notification/internal/ReminderMailer.java"
+      "src/main/java/org/courtside/notification/internal/ReminderMailer.java",
+      "src/main/java/org/courtside/notification/internal/UsernameReminderMailer.java"
     ],
     "startupFiles": [
       "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java"
@@ -104,7 +105,9 @@
       "id": "ordinary-startup",
       "kind": "ordinary",
       "rationale": "Bootstrap checks one database-wide existence condition and can create exactly one initial administrator; its Argon2 work is constant and startup-only.",
-      "entryPoints": ["BootstrapAdminInitializer#run"]
+      "entryPoints": [
+        "BootstrapAdminInitializer#run"
+      ]
     },
     {
       "id": "password-and-credential-work",
@@ -115,7 +118,9 @@
         "createAccount",
         "logIn",
         "reauthenticate",
-        "requestAccountCredentials"
+        "requestAccountCredentials",
+        "requestPasswordReset",
+        "requestUsernameReminder"
       ],
       "growthDrivers": "Argon2id memory and CPU work, a bounded HIBP range response, and credential delivery work dominate these paths.",
       "inputOrDataBound": "Passwords and account fields have contract limits; HIBP responses stop at 256 KiB and their request deadline defaults to three seconds.",
@@ -136,7 +141,10 @@
     {
       "id": "roster-import",
       "kind": "demanding",
-      "entryPoints": ["createImportPreview", "executeImportPreview"],
+      "entryPoints": [
+        "createImportPreview",
+        "executeImportPreview"
+      ],
       "growthDrivers": "CSV decoding, matching and change application grow with the uploaded rows and the existing rows linked to that source.",
       "inputOrDataBound": "The application accepts at most 8 MiB directly and the reference proxy at most 2 MiB; preview execution can touch only rows retained from that bounded upload.",
       "concurrencyOrRateBound": "A database advisory lock serializes execution per import source; different sources may execute concurrently within the application and database resource limits.",
@@ -156,14 +164,19 @@
     {
       "id": "booking-write",
       "kind": "demanding",
-      "entryPoints": ["cancelBooking", "createBooking"],
+      "entryPoints": [
+        "cancelBooking",
+        "createBooking"
+      ],
       "growthDrivers": "Availability checks and allocation writes grow with requested courts, while participant validation grows with the bounded request body.",
       "inputOrDataBound": "One request names at most 999 distinct courts and the reference proxy caps the complete body at 2 MiB; configured slot and rule limits also apply.",
       "concurrencyOrRateBound": "There is no request-rate gate; deterministic database locks, the five-second lock wait and deployment resource limits bound competing writers.",
       "executionModel": "The synchronous transaction authorizes, validates rules, locks courts in order and stores one booking plus its allocations before publishing events.",
       "failureBehavior": "A conflict or validation failure rolls back the complete booking; an idempotency key returns the original result or rejects a changed replay.",
       "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller uncertain about the outcome can repeat the same idempotency key without creating another booking.",
-      "productionPaths": ["src/main/java/org/courtside/booking/BookingService.java"],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/BookingService.java"
+      ],
       "evidence": [
         "src/test/java/org/courtside/booking/BookingServiceTest.java#givenAnIdempotentReplay_whenCreating_thenOnlyThePersistedBookingIsCounted",
         "src/test/java/org/courtside/booking/BookingConcurrencyTest.java#givenAnUncommittedBookingForTheSlot_whenASecondSessionBooksTheSameSlot_thenItWaitsForTheFirstAndIsRejected"
@@ -206,7 +219,13 @@
     {
       "id": "booking-series",
       "kind": "demanding",
-      "entryPoints": ["cancelSeries", "createSeries", "moveSeries", "previewSeries", "previewSeriesMove"],
+      "entryPoints": [
+        "cancelSeries",
+        "createSeries",
+        "moveSeries",
+        "previewSeries",
+        "previewSeriesMove"
+      ],
       "growthDrivers": "Schedule expansion, rule evaluation and row locking grow with occurrences and the distinct courts selected for a series.",
       "inputOrDataBound": "A series expands to at most 200 occurrences, lasts at most 1,440 minutes per occurrence and names at most 999 distinct courts.",
       "concurrencyOrRateBound": "There is no separate request-rate gate; database locks, the five-second lock wait and the application container budget bound concurrent writers.",
@@ -225,7 +244,12 @@
     {
       "id": "bulk-report-and-export",
       "kind": "demanding",
-      "entryPoints": ["exportBookings", "exportPersonData", "exportRoster", "facilityUtilisation"],
+      "entryPoints": [
+        "exportBookings",
+        "exportPersonData",
+        "exportRoster",
+        "facilityUtilisation"
+      ],
       "growthDrivers": "Roster export grows with matching members, subject access with one person's retained history, and booking export and reporting with allocations in the selected period.",
       "inputOrDataBound": "Booking periods stop at 366 days and subject access stops at one person. Roster and retained person history have no row ceiling beyond the club's own data set.",
       "concurrencyOrRateBound": "These administrator-only synchronous reads have no per-operation concurrency gate; container, database pool and deployment resource limits are the outer bound.",
@@ -246,14 +270,18 @@
     {
       "id": "logo-normalization",
       "kind": "demanding",
-      "entryPoints": ["uploadClubLogo"],
+      "entryPoints": [
+        "uploadClubLogo"
+      ],
       "growthDrivers": "Image decoding, normalization and hashing grow with compressed bytes and decoded pixel dimensions.",
       "inputOrDataBound": "The parser rejects input above 1 MiB before decoding and dimensions above 2,048 by 2,048; the reference proxy caps the complete request at 2 MiB.",
       "concurrencyOrRateBound": "Only an administrator can invoke the synchronous operation; no separate image-normalization concurrency gate exists beyond deployment resources.",
       "executionModel": "The request decodes and normalizes one PNG or JPEG in memory, hashes it and stores the bounded result in one transaction.",
       "failureBehavior": "Malformed, oversized or over-dimensioned images fail before configuration is replaced; active SVG content is not decoded as an accepted logo.",
       "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A failed or abandoned request cannot leave a partially replaced logo transaction.",
-      "productionPaths": ["src/main/java/org/courtside/config/internal/ClubLogo.java"],
+      "productionPaths": [
+        "src/main/java/org/courtside/config/internal/ClubLogo.java"
+      ],
       "evidence": [
         "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenMoreThanOneMebibyte_whenParsing_thenItIsRejectedBeforeDecoding",
         "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenAnImageAboveTheDimensionLimit_whenParsing_thenItIsRejected"
@@ -262,14 +290,20 @@
     {
       "id": "administrative-impact-analysis",
       "kind": "demanding",
-      "entryPoints": ["bookingCardImpact", "courtImpact", "openingHoursImpact"],
+      "entryPoints": [
+        "bookingCardImpact",
+        "courtImpact",
+        "openingHoursImpact"
+      ],
       "growthDrivers": "The affected-count query grows with future allocations for the court, booking card or weekday whose configuration may change.",
       "inputOrDataBound": "Visible identifiers are paged at 100 by the API; the accompanying affected count still spans all matching future allocations.",
       "concurrencyOrRateBound": "These administrator-only reads have no per-operation rate gate and share the application and database resource limits.",
       "executionModel": "Interactive impact previews synchronously execute one count and one bounded identifier page; announcement pages deliberately omit the count query.",
       "failureBehavior": "Unknown resources and invalid page sizes return typed failures; a query failure produces no configuration mutation because impact operations are read-only.",
       "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller that leaves loses the preview response and may safely repeat the read.",
-      "productionPaths": ["src/main/java/org/courtside/booking/internal/ImpactService.java"],
+      "productionPaths": [
+        "src/main/java/org/courtside/booking/internal/ImpactService.java"
+      ],
       "evidence": [
         "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnAnnouncementPage_whenReadingIt_thenItOmitsTheInteractiveCountQuery",
         "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnInteractivePreview_whenReadingIt_thenItStillComputesTheAffectedCount"
@@ -278,15 +312,21 @@
     {
       "id": "global-session-revocation",
       "kind": "demanding",
-      "entryPoints": ["endAllSessions"],
+      "entryPoints": [
+        "endAllSessions"
+      ],
       "growthDrivers": "Revocation touches the active sessions of every account and therefore grows with the club's signed-in population.",
       "inputOrDataBound": "Each account retains at most five concurrent sessions by default, but the administrator operation has no club-wide row ceiling.",
       "concurrencyOrRateBound": "Only an administrator can invoke the synchronous operation; no separate per-operation rate or concurrency gate is installed.",
       "executionModel": "One synchronous transactional database mutation revokes the stored sessions before the successful response is produced.",
       "failureBehavior": "A database failure rolls the transaction back; the operation cannot report success with only part of the selected session state committed.",
       "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller can repeat revocation safely because already-ended sessions stay ended.",
-      "productionPaths": ["src/main/java/org/courtside/identity/GlobalSessionAdministration.java"],
-      "evidence": ["src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenSeveralAccounts_whenAllSessionsAreEnded_thenTheCallingAdminAlsoLosesAuthority"]
+      "productionPaths": [
+        "src/main/java/org/courtside/identity/GlobalSessionAdministration.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenSeveralAccounts_whenAllSessionsAreEnded_thenTheCallingAdminAlsoLosesAuthority"
+      ]
     },
     {
       "id": "asynchronous-notifications",
@@ -301,7 +341,8 @@
         "DisplacementMailer#on(BookingDisplaced)",
         "ParticipationMailer#on(ParticipantRecorded)",
         "ParticipationMailer#on(ParticipantWithdrew)",
-        "ReminderMailer#on(BookingReminderDue)"
+        "ReminderMailer#on(BookingReminderDue)",
+        "UsernameReminderMailer#on(UsernameReminderRequested)"
       ],
       "growthDrivers": "Mail work fans out with booking participants, reminders and displaced future bookings; relay latency holds worker threads during delivery.",
       "inputOrDataBound": "A booking has at most twenty participant positions, closure discovery pages by 100, and each SMTP connect and read wait stops after ten seconds.",
