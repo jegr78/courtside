@@ -14,6 +14,7 @@ import org.testcontainers.Testcontainers;
 import org.testcontainers.containers.ContainerLaunchException;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.ToStringConsumer;
+import org.testcontainers.containers.output.WaitingConsumer;
 import org.testcontainers.containers.startupcheck.OneShotStartupCheckStrategy;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
@@ -29,6 +30,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -138,15 +141,16 @@ class ServerTlsTransportTest {
             throws Exception {
         // given
         TestCertificate foreign = TestCertificate.issuedFor(UPSTREAM);
+        WaitingConsumer refusal = new WaitingConsumer();
 
         // when
-        try (GenericContainer<?> proxy = proxy(foreign.authority(), "serve")) {
+        try (GenericContainer<?> proxy = proxy(foreign.authority(), "serve", SERVED_PORT, refusal)) {
             HttpResponse<String> answer = get(proxy);
 
             // then
             assertThat(answer.statusCode()).isEqualTo(502);
             assertThat(answer.body()).doesNotContain(MARKER);
-            assertThat(proxy.getLogs()).contains("x509").contains("unknown authority");
+            assertRefusalWasLogged(proxy, refusal, "unknown authority");
         }
     }
 
@@ -254,7 +258,15 @@ class ServerTlsTransportTest {
 
     private static GenericContainer<?> proxy(String authority, String mode, int servedPort)
             throws IOException {
+        return proxy(authority, mode, servedPort, null);
+    }
+
+    private static GenericContainer<?> proxy(String authority, String mode, int servedPort,
+                                              WaitingConsumer output) throws IOException {
         GenericContainer<?> proxy = built(authority, mode, servedPort);
+        if (output != null) {
+            proxy.withLogConsumer(output);
+        }
         proxy.start();
         return proxy;
     }
@@ -328,14 +340,29 @@ class ServerTlsTransportTest {
     @Test
     void givenACertificateForAnotherName_whenTheProxyDialsTheApplication_thenItRefuses()
             throws Exception {
+        // given
+        WaitingConsumer refusal = new WaitingConsumer();
+
         // when
-        try (GenericContainer<?> proxy = proxy(misnamed.authority(), "serve", MISNAMED_PORT)) {
+        try (GenericContainer<?> proxy = proxy(
+                misnamed.authority(), "serve", MISNAMED_PORT, refusal)) {
             HttpResponse<String> answer = get(proxy);
 
             // then
             assertThat(answer.statusCode()).isEqualTo(502);
             assertThat(answer.body()).doesNotContain(MARKER);
-            assertThat(proxy.getLogs()).contains("x509").contains("certificate is valid for");
+            assertRefusalWasLogged(proxy, refusal, "certificate is valid for");
+        }
+    }
+
+    private static void assertRefusalWasLogged(GenericContainer<?> proxy, WaitingConsumer output,
+                                                String reason) throws TimeoutException {
+        try {
+            output.waitUntil(frame -> frame.getUtf8String().contains("x509")
+                    && frame.getUtf8String().contains(reason), 5, TimeUnit.SECONDS);
+        } catch (TimeoutException missingEvent) {
+            throw new AssertionError("The proxy emitted no TLS refusal for " + reason
+                    + ". Its complete log was:\n" + proxy.getLogs(), missingEvent);
         }
     }
 
