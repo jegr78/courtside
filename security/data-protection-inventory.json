@@ -158,7 +158,8 @@
     "append-only-log": "Never rewritten. Removing the person the id names is what makes the entry anonymous.",
     "publication-registry": "Deleted once its consumers finish, so nothing accumulates for a job to clean up.",
     "attempt-window": "Replaced when the next attempt window opens.",
-    "club-configuration": "Lives as long as the club keeps it; a board changes it in the product and no person's lifecycle reaches it."
+    "club-configuration": "Lives as long as the club keeps it; a board changes it in the product and no person's lifecycle reaches it.",
+    "reset-code": "Deleted when the code is redeemed, when a redemption finds it expired, and by the identity cleanup sweep; removed with the account it belongs to."
   },
   "inMemoryState": {
     "BookingController": {
@@ -568,6 +569,10 @@
         "lifecycle": "club-configuration"
       },
       "password_reset_credential_hours": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "password_reset_token_minutes": {
         "level": "operational",
         "lifecycle": "club-configuration"
       },
@@ -1084,6 +1089,46 @@
       "label": {
         "level": "operational",
         "lifecycle": "club-configuration"
+      }
+    },
+    "password_reset_mail_limit": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
+      "mailed_count": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "window_started_at": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      }
+    },
+    "password_reset_token": {
+      "account_id": {
+        "level": "pseudonymous",
+        "lifecycle": "reset-code"
+      },
+      "address_hash": {
+        "level": "pseudonymous",
+        "lifecycle": "reset-code"
+      },
+      "code_hash": {
+        "level": "secret",
+        "lifecycle": "reset-code"
+      },
+      "created_at": {
+        "level": "operational",
+        "lifecycle": "reset-code"
+      },
+      "expires_at": {
+        "level": "operational",
+        "lifecycle": "reset-code"
+      },
+      "security_epoch": {
+        "level": "operational",
+        "lifecycle": "reset-code"
       }
     },
     "person": {

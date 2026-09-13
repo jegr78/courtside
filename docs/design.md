@@ -2427,7 +2427,7 @@ Each club is its own controller. Courtside cannot take that responsibility away,
 deliver the implementation.
 
 - **Every stored field has one protection level and one lifecycle.**
-  `security/data-protection-inventory.json` classifies all 215 columns of the schema as `personal`,
+  `security/data-protection-inventory.json` classifies all 225 columns of the schema as `personal`,
   `pseudonymous`, `secret` or `operational`, and names for each the mechanism below that ends it.
   The list is derived rather than maintained: `DataProtectionInventoryTest` reads
   `information_schema.columns` after Flyway has run, so a migration that adds a column fails the

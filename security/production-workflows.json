@@ -60,6 +60,7 @@
         "logOut",
         "reauthenticate",
         "requestPasswordReset",
+        "redeemPasswordReset",
         "requestUsernameReminder",
         "changeInitialPassword",
         "changeOwnPassword",
@@ -76,6 +77,9 @@
         "CredentialMailer#on(CredentialsRequested)",
         "IdentityCleanupSchedule#deleteExpiredCredentialIssues",
         "IdentityCleanupSchedule#deleteExpiredLoginAttempts",
+        "IdentityCleanupSchedule#deleteExpiredResetMailWindows",
+        "IdentityCleanupSchedule#deleteExpiredResetTokens",
+        "PasswordResetCodeMailer#on(PasswordResetRequested)",
         "UsernameReminderMailer#on(UsernameReminderRequested)"
       ],
       "stateTransitions": [

@@ -119,6 +119,7 @@
         "logIn",
         "reauthenticate",
         "requestAccountCredentials",
+        "redeemPasswordReset",
         "requestPasswordReset",
         "requestUsernameReminder"
       ],
@@ -341,6 +342,7 @@
         "DisplacementMailer#on(BookingDisplaced)",
         "ParticipationMailer#on(ParticipantRecorded)",
         "ParticipationMailer#on(ParticipantWithdrew)",
+        "PasswordResetCodeMailer#on(PasswordResetRequested)",
         "ReminderMailer#on(BookingReminderDue)",
         "UsernameReminderMailer#on(UsernameReminderRequested)"
       ],
@@ -368,6 +370,8 @@
         "BookingReminderSchedule#remindWhatIsDue",
         "IdentityCleanupSchedule#deleteExpiredCredentialIssues",
         "IdentityCleanupSchedule#deleteExpiredLoginAttempts",
+        "IdentityCleanupSchedule#deleteExpiredResetMailWindows",
+        "IdentityCleanupSchedule#deleteExpiredResetTokens",
         "PreviewExpirySchedule#sweepNow"
       ],
       "growthDrivers": "Cleanup grows with expired rows, while reminder work grows with due bookings and the messages their participants receive.",

@@ -109,6 +109,7 @@ whether a court is free.
 | `membership_type` | A kind of membership, the rule set it is measured against, and whether it opens an account on import | `rule_set` |
 | `user_account` | Credentials and sign-in state for a person | `person` |
 | `user_account_role` | One row per role the account holds | `user_account` |
+| `password_reset_token` | The one outstanding reset code an account has: its hash, the address it was mailed to, the epoch it was issued under and when it expires | `user_account` |
 
 **`person` and `user_account` are separate** because not every person has an account — a child, a
 name that arrived through a roster import. `user_account.username` is unique; `person.email` is not.
@@ -123,6 +124,13 @@ honours.
 
 `security_epoch` invalidates every session an account holds; `version` is the optimistic lock;
 `credentials_expire_at` bounds an issued one-time credential.
+
+**`password_reset_token` holds at most one row per account**, because `account_id` is its primary
+key: asking again replaces the code that was outstanding. Neither the code nor the address is
+stored, only their SHA-256. The row also carries the account's `security_epoch` and the fingerprint
+of the address the code went to, and redemption compares both against the account as it is then, so
+a board-issued credential, a self-service password change, a deactivation or an address correction
+withdraws an outstanding code without anything having to listen for those events.
 
 ## Rules
 
@@ -142,7 +150,8 @@ holding none — from `club_config.no_membership_type_rule_set_id`.
 `club_config` is a single row, pinned by `club_config_single_row` to one fixed id. It carries what a
 board can change without a deployment: the club name, the two brand colours, an uploaded logo, the
 imprint and privacy links, the default locale, the time zone, the booking slot length, how long
-issued credentials stay valid, and how many hours before a booking the reminder goes out.
+issued credentials stay valid, how many minutes a mailed reset code stays redeemable, and how many
+hours before a booking the reminder goes out.
 
 The time zone is checked against `pg_timezone_names` by a trigger, so a typo is refused where it is
 written rather than at the next reminder. The logo is stored in the row itself — content, media type
@@ -203,13 +212,16 @@ that was not running, and Courtside neither reads nor migrates it by hand.
 |---|---|
 | `login_attempt_limit` | Sign-in failures and accepted recovery requests counted per scope and hashed subject, and how long that subject stays blocked |
 | `credential_issue_limit` | How often a credential was issued for an account inside the current window |
+| `password_reset_mail_limit` | How many reset codes were mailed to an account inside the current window |
 | `spring_session` | Server-side sign-in sessions, including creation, last access, expiry and the associated principal |
 | `spring_session_attributes` | The serialized attributes belonging to a server-side session |
 
-Both are rate-limit bookkeeping and both are expired by their `window_started_at`. They are keyed
-differently on purpose: a sign-in attempt is counted against a *hash* of its subject, because the
-subject is an address somebody typed, while a credential is issued for an `account_id` that is
-already in the database. Nothing outside the mechanism they protect reads either table.
+The first three are rate-limit bookkeeping and all three are expired by their `window_started_at`.
+They are keyed differently on purpose: a sign-in attempt is counted against a *hash* of its subject,
+because the subject is an address somebody typed, while a credential or a reset code is for an
+`account_id` that is already in the database. The two account-keyed budgets are separate so that
+anonymous asking cannot spend what a board needs to answer with. Nothing outside the mechanism they
+protect reads any of these tables.
 
 Spring Session manages `spring_session` and `spring_session_attributes`; Courtside migrates their
 schema so the bounded runtime identity never needs DDL authority. Removing a session cascades to its

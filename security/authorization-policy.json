@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-09-13",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "9b987859e30d0a22db1a0118c29a9a49cc4b15b16674d6cb964ca8362bd8bef8",
-  "protectedFieldInventorySha256": "8f64b1b837045c8d85cdeb7262f30a8775fbf9465ce7bc88d6928c693aba6ec7",
-  "productionAuthorizationSha256": "52c68eb711cc41462bca30343d4f8663e54d49c40d0f70a92d567a7e7e702dff",
+  "openApiFieldInventorySha256": "0c498663e13b75da41fe2cb3dd0b6b37347298918a248304dc4b06e89b1b80c7",
+  "protectedFieldInventorySha256": "81c927f1d1117fdbf8db29f645b163c1fad53c4a05cb3b4917ec423b71bb3795",
+  "productionAuthorizationSha256": "e3885c9ea5b890bb20b1faa5247994f4e10000102bab347b71409b4fa533cbfd",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -124,6 +124,7 @@
     "changeClubConfig:request:ClubConfigRequest.defaultLocale",
     "changeClubConfig:request:ClubConfigRequest.imprintUrl",
     "changeClubConfig:request:ClubConfigRequest.logoUrl",
+    "changeClubConfig:request:ClubConfigRequest.passwordResetTokenMinutes",
     "changeClubConfig:request:ClubConfigRequest.primaryColor",
     "changeClubConfig:request:ClubConfigRequest.privacyUrl",
     "changeClubConfig:request:ClubConfigRequest.slotMinutes",
@@ -131,6 +132,7 @@
     "changeClubConfig:response:$response.header.Accept",
     "changeClubConfig:response:AdminClubConfig.logoFallbackUrl",
     "changeClubConfig:response:AdminClubConfig.logoUploaded",
+    "changeClubConfig:response:AdminClubConfig.passwordResetTokenMinutes",
     "changeClubConfig:response:ClubConfig.accentColor",
     "changeClubConfig:response:ClubConfig.clubName",
     "changeClubConfig:response:ClubConfig.defaultLocale",
@@ -523,6 +525,7 @@
     "createSeries:response:Violation.params.*",
     "deleteClubLogo:response:AdminClubConfig.logoFallbackUrl",
     "deleteClubLogo:response:AdminClubConfig.logoUploaded",
+    "deleteClubLogo:response:AdminClubConfig.passwordResetTokenMinutes",
     "deleteClubLogo:response:ClubConfig.accentColor",
     "deleteClubLogo:response:ClubConfig.clubName",
     "deleteClubLogo:response:ClubConfig.defaultLocale",
@@ -723,6 +726,7 @@
     "getClubConfig:response:ClubConfig.timeZone",
     "getClubConfigForAdmin:response:AdminClubConfig.logoFallbackUrl",
     "getClubConfigForAdmin:response:AdminClubConfig.logoUploaded",
+    "getClubConfigForAdmin:response:AdminClubConfig.passwordResetTokenMinutes",
     "getClubConfigForAdmin:response:ClubConfig.accentColor",
     "getClubConfigForAdmin:response:ClubConfig.clubName",
     "getClubConfigForAdmin:response:ClubConfig.defaultLocale",
@@ -1330,6 +1334,15 @@
     "reauthenticate:response:Violation.code",
     "reauthenticate:response:Violation.params",
     "reauthenticate:response:Violation.params.*",
+    "redeemPasswordReset:response:$response.header.Accept",
+    "redeemPasswordReset:response:$response.header.Retry-After",
+    "redeemPasswordReset:response:FieldError.code",
+    "redeemPasswordReset:response:FieldError.field",
+    "redeemPasswordReset:response:FieldError.params",
+    "redeemPasswordReset:response:FieldError.params.*",
+    "redeemPasswordReset:response:Violation.code",
+    "redeemPasswordReset:response:Violation.params",
+    "redeemPasswordReset:response:Violation.params.*",
     "removeMembership:parameter:$parameter.path.personId",
     "removeMembership:response:FieldError.code",
     "removeMembership:response:FieldError.field",
@@ -1534,6 +1547,7 @@
     "uploadClubLogo:response:$response.header.Accept",
     "uploadClubLogo:response:AdminClubConfig.logoFallbackUrl",
     "uploadClubLogo:response:AdminClubConfig.logoUploaded",
+    "uploadClubLogo:response:AdminClubConfig.passwordResetTokenMinutes",
     "uploadClubLogo:response:ClubConfig.accentColor",
     "uploadClubLogo:response:ClubConfig.clubName",
     "uploadClubLogo:response:ClubConfig.defaultLocale",
@@ -1805,9 +1819,31 @@
     },
     {
       "id": "public-password-recovery-boundary",
-      "description": "Account recovery by name issues a credential to the address on the account and returns nothing about it, so the answer is the same whether or not the name belongs to anybody.",
+      "description": "Account recovery by name mails a single-use code to the address on the account and changes nothing, so the answer is the same whether or not the name belongs to anybody.",
       "operationIds": [
         "requestPasswordReset"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "decisions": [
+        "request-boundary",
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "public-password-redemption-boundary",
+      "description": "Redeeming a reset code is the only anonymous operation that changes an account. The code names the account, so no caller identity is read and none is required; an unknown, spent or withdrawn code is refused with the same problem type.",
+      "operationIds": [
+        "redeemPasswordReset"
       ],
       "actors": [
         "ANONYMOUS",
@@ -3427,6 +3463,37 @@
       ],
       "operationIds": [
         "requestPasswordReset"
+      ],
+      "actors": [
+        "ANONYMOUS",
+        "MEMBER",
+        "TRAINER",
+        "SPORT_DIRECTOR",
+        "YOUTH_DIRECTOR",
+        "GROUNDSKEEPER",
+        "TREASURER",
+        "ADMIN",
+        "INITIAL_PASSWORD"
+      ],
+      "attributes": [
+        "route",
+        "request-field"
+      ],
+      "decisions": [
+        "request-boundary",
+        "credential-write-only"
+      ]
+    },
+    {
+      "id": "account-recovery-redemption",
+      "access": "never-read",
+      "description": "The code a caller redeems and the password it sets. Both are written only: the operation returns no body, and neither field occurs in any response projection.",
+      "fields": [
+        "PasswordResetRedemptionRequest.code",
+        "PasswordResetRedemptionRequest.password"
+      ],
+      "operationIds": [
+        "redeemPasswordReset"
       ],
       "actors": [
         "ANONYMOUS",
