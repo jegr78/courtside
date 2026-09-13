@@ -53,6 +53,8 @@ Text auch für schwache Augen und auf schlechten Bildschirmen lesbar bleibt. Das
 PNG oder JPEG hoch, höchstens 1 MiB und 2048 mal 2048 Pixel; solange keine Datei hochgeladen ist,
 gilt die Logo-URL.
 
+![Primär- und Akzentfarbe nebeneinander, jede mit Hexwert, Farbwähler, einer Beispiel-Schaltfläche und dem gemessenen Kontrast, darunter das Feld für das Vereinslogo.](screenshots/de/club-appearance.png)
+
 **Impressum und Datenschutz** sind zwei URLs. Sie zeigen auf die Seiten Ihres Vereins, denn
 Courtside kennt Ihre Rechtsform nicht.
 
@@ -78,8 +80,6 @@ Abend in sein Postfach schaut.
 **Regelsatz für Personen ohne Beitragsart** greift, wenn jemand gerade keine Mitgliedsart hat, etwa
 nach dem Ende einer Mitgliedschaft. Ohne Regelsatz bindet diese Person keine mitgliedschaftsbezogene
 Regel; Öffnungszeiten und Raster gelten trotzdem.
-
-![Die Konfigurationsseite mit den Abschnitten für Verein und Darstellung, Sprache und Zeitzone sowie den Kontoeinstellungen.](screenshots/de/admin-configuration.png)
 
 ## Anlage → Plätze
 

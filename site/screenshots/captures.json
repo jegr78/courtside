@@ -23,8 +23,8 @@
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {
-      "name": "admin-configuration",
-      "surface": "admin-configuration-view",
+      "name": "club-appearance",
+      "surface": "club-appearance",
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {

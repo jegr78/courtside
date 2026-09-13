@@ -52,6 +52,8 @@ shows whether it reaches a contrast of 4.5:1 with dark or with light text — th
 text stays readable for weaker eyes and on poor screens. The logo is a PNG or JPEG, up to 1 MiB and
 2048 by 2048 pixels; the logo URL is used while no file is uploaded.
 
+![The primary and accent colour side by side, each with its hex value, a colour picker, a sample button and the measured contrast, with the club logo field below.](../screenshots/en/club-appearance.png)
+
 **Imprint and privacy policy** are two URLs. They point at your club's own pages, because Courtside
 does not know your legal form.
 
@@ -75,8 +77,6 @@ one. Short is safer, long is kinder to somebody who only opens their mailbox in 
 **Rule set for people without a membership type** applies to somebody who currently holds none, for
 example after a membership ended. Without one, no membership-scoped rule binds them; opening hours
 and the grid still do.
-
-![The configuration page with its sections for club and appearance, language and time zone, and the account settings.](../screenshots/en/admin-configuration.png)
 
 ## Facility → Courts
 

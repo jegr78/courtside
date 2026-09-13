@@ -47,7 +47,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("administration-link").click();
     await expect(page.getByTestId("setup-progress")).toBeVisible();
   },
-  "admin-configuration": async (page) => {
+  "club-appearance": async (page) => {
     await page.getByTestId("admin-configuration-link").click();
     await expect(page.getByTestId("save-club-config")).toBeVisible();
   },
@@ -75,7 +75,7 @@ test("every administration surface the guides show is captured", async ({ page, 
 
   // when / then
   await capture(page, "admin-setup", journeyService.visualDate);
-  await capture(page, "admin-configuration", journeyService.visualDate);
+  await capture(page, "club-appearance", journeyService.visualDate);
   await capture(page, "admin-roster", journeyService.visualDate);
 });
 
