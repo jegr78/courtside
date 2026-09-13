@@ -700,10 +700,19 @@ an address does not name one account. Two paths, and only one of them issues any
 
 Neither path answers a subject that exists with a different status, header set or body than one
 that does not, and the per-account issuing window is not allowed to surface either, so asking is not
-a way to learn who belongs to this club. What is answered `429` is a window on the caller's own address and on the
-submitted subject, which describes the caller rather than any account.
+a way to learn who belongs to this club. Two windows answer `429`: one on the caller's own address,
+and one on the submitted subject.
 
-The roster path (section 10) stays, for a member who cannot reach their own mailbox.
+The second is shared by everyone who submits that subject, which is what makes it useful — an
+attacker rotating addresses still meets it — and is also its cost: **somebody else can hold a
+member's recovery shut by asking for their username repeatedly.** That is accepted rather than
+solved, because the alternative is a per-caller window that a rotating source walks straight past.
+What bounds it is that the block is short (`COURTSIDE_LOGIN_ADDRESS_BLOCK`, one minute by default,
+after `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` requests), that it stops no sign-in and no other
+operation, and that the roster path (section 10) stays open the whole time — a board can issue the
+credential while the window is shut.
+
+The roster path stays anyway, for a member who cannot reach their own mailbox.
 
 A **guardian relation** (a parent seeing their children's bookings) falls out of this model
 almost for free. It is noted as a candidate for a later release, not Release 1.

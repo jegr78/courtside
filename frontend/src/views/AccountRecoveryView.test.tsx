@@ -62,6 +62,30 @@ describe("AccountRecoveryView", () => {
       .toHaveTextContent("If any accounts belong to that address, a message is on its way.");
   });
 
+  it("given a request that was sent, when the next one is refused, then the page no longer says it was sent", async () => {
+    // given
+    vi.spyOn(api, "requestPasswordReset").mockResolvedValue(undefined);
+    vi.spyOn(api, "requestUsernameReminder").mockRejectedValue(new ApiError(429, {
+      type: "urn:courtside:error:account-recovery-rate-limited",
+      title: "Too many recovery requests",
+      status: 429,
+      violations: [{ code: "identity.recovery.rateLimited", params: {} }]
+    }));
+    show();
+    await userEvent.type(screen.getByTestId("recovery-username"), "doe.jane");
+    await userEvent.click(screen.getByTestId("recovery-password-submit"));
+    expect(await screen.findByTestId("recovery-sent")).toBeInTheDocument();
+
+    // when
+    await userEvent.type(screen.getByTestId("recovery-email"), "roe@example.org");
+    await userEvent.click(screen.getByTestId("recovery-usernames-submit"));
+
+    // then
+    expect(await screen.findByRole("alert"))
+      .toHaveTextContent("That has been asked too often. Try again later.");
+    expect(screen.queryByTestId("recovery-sent")).not.toBeInTheDocument();
+  });
+
   it("given somebody who has asked too often, when they ask again, then the refusal is shown", async () => {
     // given
     vi.spyOn(api, "requestPasswordReset").mockRejectedValue(new ApiError(429, {

@@ -23,6 +23,7 @@ export function AccountRecoveryView() {
       }
       setPending(true);
       setError(undefined);
+      setAsked(undefined);
       try {
         await ask(value);
         setAsked(outcome);
