@@ -2546,11 +2546,15 @@ paths:
         A member who knows their address but not their name asks
         `/api/account-recovery/usernames` first. That operation issues no credential.
 
-        Two windows bound this operation. The account keeps the limit a board-issued request
-        already meets, and the caller's own address meets a second one, so names that match
-        nothing still run into a limit rather than none. Either is answered `429` with
-        `urn:courtside:error:account-recovery-rate-limited`, which describes the caller and
-        therefore still says nothing about the account.
+        Three limits bound this operation and only two of them are visible. The account keeps the
+        issuing window a board-issued request already meets; reaching it is answered `202` like
+        everything else, because a `429` from it would confirm that the submitted name belongs to
+        somebody. The other two are answered `429` with
+        `urn:courtside:error:account-recovery-rate-limited` and carry `Retry-After`: one counts
+        what the caller's own address submits, the other counts what anybody submits for this
+        subject, so a name that matches nothing still meets a limit. Neither reads the account, so
+        neither says whether one exists — but the second is shared, so it can also be met because
+        somebody else asked for the same name.
       security:
         - csrfToken: []
       requestBody:
@@ -2585,9 +2589,10 @@ paths:
         address cannot cost a parent their password because a child asked.
 
         The answer is `202` whether or not the address holds an account, and it carries no body,
-        for the same reason as the operation above. It is bounded by the same window on the
-        caller's address and answered `429` with
-        `urn:courtside:error:account-recovery-rate-limited`.
+        for the same reason as the operation above. The same two visible windows bound it — one on
+        the caller's address, one on the submitted address as a subject — and both are answered
+        `429` with `urn:courtside:error:account-recovery-rate-limited`. There is no third: this
+        operation issues nothing, so no issuing window applies.
       security:
         - csrfToken: []
       requestBody:
