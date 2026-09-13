@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { type AddressInfo } from "node:net";
-import type { DatabaseLock, JourneyService, PeerLoginAttempt, PeerLoginSubjects } from "./global-setup";
+import type { DatabaseLock, JourneyService, JourneyStart, PeerLoginAttempt, PeerLoginSubjects } from "./global-setup";
 import { browserFailureReasons, type BrowserDiagnostics, type BrowserFailureReason, type FailedTest } from "./browser-diagnostics";
 
 export interface JourneyControlReference {
@@ -89,6 +89,13 @@ function requiredLifecyclePhase(value: string | undefined): "start" | "end" {
   return value;
 }
 
+// A start nobody offers would otherwise walk a journey through the club it did not ask for.
+function journeyStart(start: string | undefined): JourneyStart {
+  if (start === undefined) return "seeded";
+  if (start === "seeded" || start === "empty") return start;
+  throw new Error(`Unknown journey start: ${start}`);
+}
+
 async function executeCommand(command: JourneyCommand, service: JourneyService,
   locks: Map<string, DatabaseLock>, signal: AbortSignal): Promise<unknown> {
   switch (command.operation) {
@@ -119,7 +126,7 @@ async function executeCommand(command: JourneyCommand, service: JourneyService,
       return undefined;
     }
     case "publishServiceWorkerUpdate": return service.publishServiceWorkerUpdate();
-    case "reset": return service.reset(command.start === "empty" ? "empty" : "seeded");
+    case "reset": return service.reset(journeyStart(command.start));
     case "restart": return service.restart();
     default: throw new Error("Unknown journey control operation");
   }

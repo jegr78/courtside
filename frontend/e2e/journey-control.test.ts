@@ -187,4 +187,47 @@ describe("journey control", () => {
       await control.close();
     }
   });
+
+  it("given the two clubs a journey may start in, when a worker asks for one, then the reset is the one it asked for", async () => {
+    // given
+    const { service, calls } = journeyService();
+    const control = await startJourneyControl(service);
+
+    try {
+      // when
+      const remote = connectJourneyService(control.reference);
+      await remote.reset("empty");
+      await remote.reset("seeded");
+      await remote.reset();
+
+      // then
+      expect(calls.reset.mock.calls).toEqual([["empty"], ["seeded"], ["seeded"]]);
+    } finally {
+      await control.close();
+    }
+  });
+
+  it("given a start no club offers, when it arrives at the control endpoint, then it is refused rather than seeded", async () => {
+    // given
+    const { service, calls } = journeyService();
+    const control = await startJourneyControl(service);
+
+    try {
+      // when
+      const response = await fetch(control.reference.endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${control.reference.token}`
+        },
+        body: JSON.stringify({ operation: "reset", start: "half-empty" })
+      });
+
+      // then
+      expect(response.status).toBe(500);
+      expect(calls.reset).not.toHaveBeenCalled();
+    } finally {
+      await control.close();
+    }
+  });
 });
