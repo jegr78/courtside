@@ -1820,9 +1820,11 @@ whether it is built or designed. **Designed means absent today.**
   password is Argon2id. What bounds it is how little there is to steal at any moment: a row exists
   only between a request and its redemption, it is deleted the moment a code is spent, and the
   default lifetime is an hour, so a dump yields only the codes outstanding when it was taken. The
-  fix is a keyed hash, and this instance has no secret to key it with; introducing one is a change
-  to the deployment contract rather than to this surface, and it is recorded here so that whoever
-  makes that change knows what it is worth.
+  answer would be a keyed hash, and it is not taken. The key would be an instance secret this
+  deployment does not have, so it would mean a required environment variable, a rotation
+  procedure and a migration for the rows hashed under the old scheme — a standing operating cost
+  for a volunteer board, against a window this narrow. A deployment a club can run is worth more
+  here than a hash a club would have to key, and this paragraph is what that costs.
 
   **The mailbox has its own budget: five reset codes per account per hour**, refused silently,
   because a refusal that reached the caller would confirm the name. It is separate from the board's
