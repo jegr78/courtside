@@ -57,6 +57,48 @@ changes remain compatible with an already open client. A breaking published API 
 compatibility policy and requires an explicit client reload path before release; it cannot be
 qualified by silently mixing incompatible assets.
 
+## The journey catalogue
+
+Nineteen journeys walk a club's way through the product, one per case: installing the instance,
+importing a member list, booking as a member, a trainer, a sport director and a groundskeeper,
+looking after an account, and reading what the club did. Ten of them are things somebody does at
+the club with a phone in their hand and run on the desktop and on both emulated phones; the nine a
+board does at a desk run on the desktop alone. Every journey runs in German and in English, which
+is 78 runs, executed serially.
+
+A journey may only open the application, activate something a person can see, and type into
+something a person can type into. `journey-policy.ts` refuses navigation by address, `fill`,
+`click`, `tap`, evaluating script, raising events, forcing a click, its own requests and reaching
+the database, and `journey-policy.test.ts` proves both directions of each rule against a corpus.
+Two steps happen outside the browser and are narrow: a journey hands the file picker a path to a
+fixture file in the repository, and the mailbox helper reads the one-time password an instance
+sends. Building the uploaded file in the test and fetching the mailbox from a journey both stay
+refused.
+
+A date and a time field are the one place a journey hands a value over rather than typing it. Their
+segments are read in the order the browser prints them, and that order comes from the browser's own
+locale and not the product's, so digits typed into them measure which build the container holds
+rather than what the club did.
+
+Each journey declares the production workflow or workflows it walks as a Playwright annotation.
+`journey-coverage.test.ts` reads that declaration out of `--list --reporter=json`, so the guard
+sees what Playwright resolves rather than a list kept beside it, and it fails when a workflow in
+`security/production-workflows.json` is walked by nothing. `build-and-source-discovery` is the one
+exemption: its two operations are the build identifier and the web manifest, which no club performs
+as a task.
+
+The merge gate runs the catalogue once, on the desktop, in German, recording nothing. The full
+matrix runs only behind `COURTSIDE_JOURNEY_RUN`, and the way to produce it is:
+
+```bash
+node tools/journey-run.mjs
+```
+
+That writes video, trace and screenshots per journey into `build/journeys/<timestamp>/`, which is
+git-ignored and carries the moment of the run so a later one cannot overwrite the one a release
+cites. It generates `index.md` from the run's own report — journey, device, language, outcome,
+duration and a link to each artefact — and prints the absolute path of both.
+
 ## Physical-device evidence
 
 Before 1.0, every major UI release and every release that changes the PWA lifecycle, run this short

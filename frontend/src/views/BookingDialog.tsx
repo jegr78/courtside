@@ -197,7 +197,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         <legend className="font-semibold">{t("booking.participantCards")}</legend>
         {participantCardIds.map((participantCardId, index) => <label key={index} className="grid gap-2 font-medium">
           {index === 0 ? t("booking.participantCard") : t("booking.participantCardNumber", { number: index + 1 })}
-          <select value={participantCardId} onChange={(event) => setParticipantCardIds((current) => current.map((id, currentIndex) => currentIndex === index ? event.target.value : id))} className="form-control rounded-lg border px-3 py-3">
+          <select data-testid="participant-card" value={participantCardId} onChange={(event) => setParticipantCardIds((current) => current.map((id, currentIndex) => currentIndex === index ? event.target.value : id))} className="form-control rounded-lg border px-3 py-3">
             <option value="">{t("booking.none")}</option>
             {participantCards.map((card) => <option key={card.id} value={card.id}>{card.label}</option>)}
           </select>

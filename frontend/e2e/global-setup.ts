@@ -44,6 +44,11 @@ import {
 
 const executeFile = promisify(execFile);
 
+export type JourneyStart = "seeded" | "empty";
+
+const JOURNEY_EMPTY = "journey_empty";
+const JOURNEY_SEEDED = "journey_baseline";
+
 const PINNED_BROWSER_IMAGE =
   "mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27";
 // The name the certificate is issued for, so browsers reach the proxy the way a member reaches a club.
@@ -258,11 +263,20 @@ async function seedJourneyData(postgres: StartedTestContainer, visualDate: strin
     SELECT '00000000-0000-0000-0000-000000000113',
       '00000000-0000-0000-0000-000000000112', 'keeper.roe', password_hash, 'en', true, false
     FROM user_account WHERE username = 'bootstrap-admin';
+    INSERT INTO person (id, first_name, last_name, email)
+    VALUES ('00000000-0000-0000-0000-000000000118', 'John', 'Doe', 'trainer.doe@example.org');
+    INSERT INTO user_account
+      (id, person_id, username, password_hash, locale, enabled, password_change_required)
+    SELECT '00000000-0000-0000-0000-000000000119',
+      '00000000-0000-0000-0000-000000000118', 'trainer.doe', password_hash, 'en', true, false
+    FROM user_account WHERE username = 'bootstrap-admin';
     INSERT INTO user_account_role (user_account_id, role) VALUES
       ('00000000-0000-0000-0000-000000000110', 'SPORT_DIRECTOR'),
       ('00000000-0000-0000-0000-000000000111', 'YOUTH_DIRECTOR'),
       ('00000000-0000-0000-0000-000000000113', 'GROUNDSKEEPER'),
-      ('00000000-0000-0000-0000-000000000113', 'MEMBER');
+      ('00000000-0000-0000-0000-000000000113', 'MEMBER'),
+      ('00000000-0000-0000-0000-000000000119', 'TRAINER'),
+      ('00000000-0000-0000-0000-000000000119', 'MEMBER');
     INSERT INTO member (id, person_id, membership_type_id, started_on)
     VALUES ('00000000-0000-0000-0000-000000000105',
       '00000000-0000-0000-0000-000000000101', 'cccccccc-0000-0000-0000-000000000001', DATE '2026-01-01');
@@ -385,7 +399,7 @@ export interface JourneyService {
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string, signal?: AbortSignal): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): Promise<void>;
-  reset(): Promise<void>;
+  reset(start?: JourneyStart): Promise<void>;
   restart(): Promise<void>;
 }
 
@@ -493,7 +507,7 @@ async function startBreachCheckStub(): Promise<{ endpoint: string; close: () => 
   };
 }
 
-async function snapshotJourneyData(postgres: StartedTestContainer): Promise<string[]> {
+async function snapshotJourneyData(postgres: StartedTestContainer, schema: string): Promise<string[]> {
   const tablesResult = await postgres.exec([
     "psql", "-U", "courtside", "-d", "courtside", "-At", "-c",
     "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'flyway_schema_history' ORDER BY tablename"
@@ -502,8 +516,8 @@ async function snapshotJourneyData(postgres: StartedTestContainer): Promise<stri
     throw new Error(`Could not inspect the journey schema: ${tablesResult.stderr}`);
   }
   const tables = tablesResult.stdout.trim().split("\n").filter(Boolean);
-  const snapshot = `CREATE SCHEMA journey_baseline; ${tables.map((table) =>
-    `CREATE TABLE journey_baseline.${table} AS TABLE public.${table};`).join(" ")}`;
+  const snapshot = `CREATE SCHEMA ${schema}; ${tables.map((table) =>
+    `CREATE TABLE ${schema}.${table} AS TABLE public.${table};`).join(" ")}`;
   const snapshotResult = await postgres.exec([
     "psql", "-U", "courtside", "-d", "courtside", "-v", "ON_ERROR_STOP=1", "-c", snapshot
   ]);
@@ -513,11 +527,11 @@ async function snapshotJourneyData(postgres: StartedTestContainer): Promise<stri
   return tables;
 }
 
-async function resetJourneyData(postgres: StartedTestContainer, tables: string[]): Promise<void> {
+async function resetJourneyData(postgres: StartedTestContainer, tables: string[], schema: string): Promise<void> {
   const sql = `
     TRUNCATE TABLE ${tables.map((table) => `public.${table}`).join(", ")} RESTART IDENTITY CASCADE;
     SET session_replication_role = replica;
-    ${tables.map((table) => `INSERT INTO public.${table} SELECT * FROM journey_baseline.${table};`).join(" ")}
+    ${tables.map((table) => `INSERT INTO public.${table} SELECT * FROM ${schema}.${table};`).join(" ")}
     SET session_replication_role = origin;
   `;
   const result = await postgres.exec([
@@ -821,8 +835,11 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       return lock;
     };
     await startApplication();
+    // Journey 1 installs a club: what it must find is the state the migrations ship and nothing a
+    // seed added, so the empty snapshot is taken before the seeding rather than derived from it.
+    await snapshotJourneyData(postgres, JOURNEY_EMPTY);
     await seedJourneyData(postgres, visualDate);
-    const tables = await snapshotJourneyData(postgres);
+    const tables = await snapshotJourneyData(postgres, JOURNEY_SEEDED);
     clubNetwork = await new Network().start();
     clubProxy = await new GenericContainer(deployedProxyImage())
       .withNetwork(clubNetwork)
@@ -988,11 +1005,11 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         appendFileSync(resolve(staticDirectory!, "sw.js"), `\nself.addEventListener("message",event=>{if(event.data==="COURTSIDE_TEST_VERSION")event.source.postMessage({courtsideVersion:2})});\n`);
         return Promise.resolve();
       },
-      reset: async () => {
+      reset: async (start) => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
         resetStaticAssets();
         await emptyMailbox(mailboxURL);
-        await resetJourneyData(postgres!, tables);
+        await resetJourneyData(postgres!, tables, start === "empty" ? JOURNEY_EMPTY : JOURNEY_SEEDED);
       },
       restart: async () => {
         // The same port again, not a new one: the club proxy is already configured against it.

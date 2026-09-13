@@ -1,5 +1,6 @@
-import { expect, test as base, type Browser, type BrowserContext, type Metadata, type Page } from "@playwright/test";
-import { journeyInstant, type JourneyService } from "./global-setup";
+import { join } from "node:path";
+import { expect, test as base, type Browser, type BrowserContext, type BrowserContextOptions, type Metadata, type Page } from "@playwright/test";
+import { journeyInstant, type JourneyService, type JourneyStart } from "./global-setup";
 import { connectJourneyService, type JourneyControlReference } from "./journey-control";
 import { diagnoseUnexpectedBrowserTest, observeBrowserDisconnect } from "./browser-diagnostics";
 import { browserFixtureScope, browserIsolationVariant } from "./browser-isolation";
@@ -14,6 +15,15 @@ interface WorkerFixtures {
   pinnedBrowser: Browser;
 }
 
+// The catalogue's two tiers and its two languages are project options, so a journey reads which
+// language it walks in rather than deciding one.
+export type JourneyLanguage = "de" | "en";
+
+export interface JourneyOptions {
+  language: JourneyLanguage;
+  start: JourneyStart;
+}
+
 interface TestFixtures {
   browserLifecycle: void;
   failureDiagnostics: void;
@@ -21,9 +31,29 @@ interface TestFixtures {
 }
 
 export async function journeyContext(browser: Browser): Promise<BrowserContext> {
-  const context = await browser.newContext();
+  const context = await browser.newContext(asTheProjectDeclares());
   await pinJourneyClock(context);
   return context;
+}
+
+// The runner applies a project's device and its recording to the context it owns; this one is
+// created here, so a phone journey has to ask for the screen and the touch the project declared.
+function asTheProjectDeclares(): BrowserContextOptions {
+  try {
+    const info = base.info();
+    const { userAgent, viewport, deviceScaleFactor, isMobile, hasTouch, video } = info.project.use;
+    // Without a size the recording is fitted into 800x800, which halves a desktop viewport.
+    const recordVideo = video === "on" ? { dir: info.outputDir, size: viewport ?? undefined } : undefined;
+    return declared({ userAgent, viewport, deviceScaleFactor, isMobile, hasTouch, recordVideo });
+  } catch {
+    return {};
+  }
+}
+
+// A key that is present and undefined is still an answer: the runner stops applying its own option
+// for it, so a spec that asked for a viewport with test.use would silently lose it.
+function declared(options: BrowserContextOptions): BrowserContextOptions {
+  return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined));
 }
 
 const browserScope = browserFixtureScope(browserIsolationVariant());
@@ -60,7 +90,9 @@ async function pinnedBrowserFixture(
   }
 }
 
-export const test = base.extend<TestFixtures, WorkerFixtures>({
+export const test = base.extend<TestFixtures & JourneyOptions, WorkerFixtures>({
+  language: ["de", { option: true }],
+  start: ["seeded", { option: true }],
   journeyService: [async ({ browserName }, provide) => {
     void browserName;
     const serialized = process.env.COURTSIDE_JOURNEY_CONTROL;
@@ -73,12 +105,19 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       ? journeyService.plainBaseURL
       : journeyService.baseURL);
   },
-  context: async ({ pinnedBrowser }, provide) => {
+  context: async ({ pinnedBrowser }, provide, testInfo) => {
     const context = await journeyContext(pinnedBrowser);
     try {
       await provide(context);
     } finally {
+      const recordings = context.pages().map((open) => open.video());
       await context.close();
+      for (const [index, recording] of recordings.entries()) {
+        if (!recording) continue;
+        const path = join(testInfo.outputDir, `journey-${index + 1}.webm`);
+        await recording.saveAs(path);
+        await testInfo.attach(`journey-${index + 1}`, { path, contentType: "video/webm" });
+      }
     }
   },
   browserLifecycle: [async ({ pinnedBrowser, browserName, journeyService }, provide, testInfo) => {
@@ -111,8 +150,8 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       errors: testInfo.errors.map((error) => error.message ?? error.value ?? "")
     }));
   }, { auto: true }],
-  resetJourney: [async ({ journeyService }, provide) => {
-    await journeyService.reset();
+  resetJourney: [async ({ journeyService, start }, provide) => {
+    await journeyService.reset(start);
     await provide();
   }, { auto: true }]
 });

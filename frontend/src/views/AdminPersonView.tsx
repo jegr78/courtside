@@ -164,7 +164,7 @@ export function AdminPersonView() {
       ? (problem ? <Alert>{problem}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
         {problem && <Alert>{problem}</Alert>}
-        {success && <SuccessFeedback>{success}</SuccessFeedback>}
+        {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
         {retry && <Modal labelledBy="admin-reauthentication-title" closed={() => {
           setRetry(undefined);
           setReauthenticationFailure(undefined);

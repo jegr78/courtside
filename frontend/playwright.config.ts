@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import type { JourneyOptions } from "./e2e/fixtures";
 
 delete process.env.NO_COLOR;
 process.env.FORCE_COLOR = "0";
@@ -18,8 +19,32 @@ const qualificationProjects = process.env.COURTSIDE_WEBKIT_AXE === "true" ? [
   { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" as const } }
 ] : [];
 
+// The catalogue's two tiers: whoever does this at the club with a phone is walked on all three
+// devices, whoever does it at a desk on the desktop only.
+const EVERY_JOURNEY = /journeys\/.+\.spec\.ts$/;
+const WITH_A_PHONE = /journeys\/with-a-phone\/.+\.spec\.ts$/;
+const atADesk = { browserName: "chromium" as const, viewport: { width: 1440, height: 900 } };
+
+// The record a release reads, not a gate: video, trace and a screenshot for every journey, which
+// no pull request should pay for.
+const recorded = { video: "on" as const, trace: "on" as const, screenshot: "on" as const };
+const journeyRun = process.env.COURTSIDE_JOURNEY_RUN === "true";
+
+const journeyProjects = journeyRun ? [
+  { name: "journey-desktop-de", testMatch: EVERY_JOURNEY, use: { ...atADesk, language: "de" as const, ...recorded } },
+  { name: "journey-desktop-en", testMatch: EVERY_JOURNEY, use: { ...atADesk, language: "en" as const, ...recorded } },
+  { name: "journey-iphone-de", testMatch: WITH_A_PHONE, use: { ...devices["iPhone 15"], language: "de" as const, ...recorded } },
+  { name: "journey-iphone-en", testMatch: WITH_A_PHONE, use: { ...devices["iPhone 15"], language: "en" as const, ...recorded } },
+  { name: "journey-android-de", testMatch: WITH_A_PHONE, use: { ...devices["Pixel 7"], language: "de" as const, ...recorded } },
+  { name: "journey-android-en", testMatch: WITH_A_PHONE, use: { ...devices["Pixel 7"], language: "en" as const, ...recorded } }
+] : [
+  // The gate walks the whole catalogue once and records nothing, so a journey that stops working
+  // is a red pull request rather than a discovery made while a release is being cut.
+  { name: "journey-gate", testMatch: EVERY_JOURNEY, use: { ...atADesk, language: "de" as const } }
+];
+
 const configuredProjects = [
-  { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts|guide-screenshots\.spec\.ts/, use: { browserName: "chromium" as const } },
+  { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts|guide-screenshots\.spec\.ts|journeys\//, use: { browserName: "chromium" as const } },
   { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "chromium" as const } },
   { name: "visual", testMatch: /visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
   // The guides' captures are snapshots too, so a surface that moves fails them and the pages that
@@ -33,14 +58,15 @@ const configuredProjects = [
   { name: "iphone", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["iPhone 15"] } },
   { name: "android", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["Pixel 7"] } },
   ...qualificationProjects,
-  ...periodicProjects
+  ...periodicProjects,
+  ...journeyProjects
 ];
 
 const projects = projectOrder === "reversed"
   ? [...configuredProjects].reverse()
   : configuredProjects;
 
-export default defineConfig({
+export default defineConfig<JourneyOptions>({
   testDir: "./e2e",
   testMatch: "**/*.spec.ts",
   snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}{ext}",
