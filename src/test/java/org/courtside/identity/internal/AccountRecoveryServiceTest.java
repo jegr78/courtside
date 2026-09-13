@@ -51,7 +51,7 @@ class AccountRecoveryServiceTest {
         UserAccount account = known("doe.jane", "jane.doe@example.org");
 
         // when
-        recovery.sendNewPassword("doe.jane", CALLER);
+        recovery.mailAResetCode("doe.jane", CALLER);
 
         // then
         ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
@@ -67,7 +67,7 @@ class AccountRecoveryServiceTest {
         when(accounts.findByUsername("nobody.here")).thenReturn(Optional.empty());
 
         // when / then
-        assertThatCode(() -> recovery.sendNewPassword("nobody.here", CALLER))
+        assertThatCode(() -> recovery.mailAResetCode("nobody.here", CALLER))
                 .doesNotThrowAnyException();
         verifyNoInteractions(mailLimit, resetTokens, events);
     }
@@ -81,7 +81,7 @@ class AccountRecoveryServiceTest {
         when(accounts.findByUsername("doe.jane")).thenReturn(Optional.of(account));
 
         // when
-        recovery.sendNewPassword("doe.jane", CALLER);
+        recovery.mailAResetCode("doe.jane", CALLER);
 
         // then
         verifyNoInteractions(mailLimit, resetTokens, events);
@@ -93,7 +93,7 @@ class AccountRecoveryServiceTest {
         known("doe.jane", "");
 
         // when
-        recovery.sendNewPassword("doe.jane", CALLER);
+        recovery.mailAResetCode("doe.jane", CALLER);
 
         // then
         verifyNoInteractions(mailLimit, resetTokens, events);
@@ -106,7 +106,7 @@ class AccountRecoveryServiceTest {
         when(mailLimit.recordWithinWindow(account.getId())).thenReturn(false);
 
         // when / then — a 429 here would say the guessed name belongs to somebody
-        assertThatCode(() -> recovery.sendNewPassword("doe.jane", CALLER))
+        assertThatCode(() -> recovery.mailAResetCode("doe.jane", CALLER))
                 .doesNotThrowAnyException();
         verifyNoInteractions(events);
     }
@@ -138,7 +138,7 @@ class AccountRecoveryServiceTest {
                 .thenReturn(Optional.of(new LoginBlock("ADDRESS", Duration.ofSeconds(90))));
 
         // when / then
-        assertThatThrownBy(() -> recovery.sendNewPassword("doe.jane", CALLER))
+        assertThatThrownBy(() -> recovery.mailAResetCode("doe.jane", CALLER))
                 .isInstanceOf(AccountRecoveryRateLimitedException.class);
         verifyNoInteractions(accounts, mailLimit, resetTokens, events);
     }

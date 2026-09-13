@@ -72,13 +72,14 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
                 .filter(token::stillDescribes)
                 .orElseThrow(ResetCodeInvalidException::new);
         requireAcceptable(password, account);
-        if (tokens.deleteForAccount(account.getId()) != 1) {
+        // Keyed on the code and not on its account: a request that replaced this code while the
+        // rules ran must not have its replacement deleted by the code it replaced.
+        if (tokens.deleteByCodeHash(token.getCodeHash()) != 1) {
             throw new ResetCodeInvalidException();
         }
-        if (accounts.replacePasswordAfterReset(account.getId(),
+        if (accounts.replacePasswordAfterReset(account.getId(), token.getSecurityEpoch(),
                 passwordEncoder.encode(password)) != 1) {
-            throw new IllegalStateException(
-                    "The account a redeemed code named went away mid-redemption: " + account.getId());
+            throw new ResetCodeInvalidException();
         }
         sessions.endFor(account.getUsername());
         securityEvents.credentialChangedAfterCommit(account.getId(), null,

@@ -26,7 +26,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
             """)
     int changeInitialPassword(@Param("id") UUID id, @Param("passwordHash") String passwordHash);
 
-    // Deliberately without the passwordChangeRequired predicate its sibling above carries.
+    // Deliberately without the passwordChangeRequired predicate its sibling above carries. The
+    // epoch predicate is what makes a withdrawal that lands mid-redemption win the race.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE VERSIONED UserAccount account
@@ -35,8 +36,11 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
                 account.credentialsExpireAt = null,
                 account.securityEpoch = account.securityEpoch + 1
             WHERE account.id = :id
+              AND account.enabled = true
+              AND account.securityEpoch = :securityEpoch
             """)
     int replacePasswordAfterReset(@Param("id") UUID id,
+                                  @Param("securityEpoch") long securityEpoch,
                                   @Param("passwordHash") String passwordHash);
 
     @Query("SELECT account.securityEpoch FROM UserAccount account WHERE account.id = :id")

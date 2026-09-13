@@ -1806,7 +1806,12 @@ whether it is built or designed. **Designed means absent today.**
   their password change and their reauthentication, because it is one bucket. And the
   two-permit verification pool that bounds this instance's Argon2 work is, for the first time,
   reachable without signing in: an anonymous caller holding both permits makes every member's
-  password change and reauthentication answer `429` for as long as it holds them. Both are the
+  password change and reauthentication answer `429` for as long as it holds them. And because that
+  bucket is now the only blocking limit in front of an anonymous operation that writes a password,
+  the requirement in the reference deployment that the edge discard inbound forwarded headers
+  carries more than it used to: the application reads the caller's address from what the proxy
+  sets, so an edge that passes a client's own `X-Forwarded-For` through lets a guesser choose which
+  bucket to spend. Both are the
   price of a route that has to work for somebody who cannot identify themselves. What bounds them
   is that the block is a minute, that neither stops a sign-in, that the roster path stays open, and
   that the instance-wide observation counts this surface — anonymous credential attempts move

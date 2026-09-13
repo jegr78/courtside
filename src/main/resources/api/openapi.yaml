@@ -2560,7 +2560,7 @@ paths:
     post:
       tags: [account-recovery]
       operationId: requestPasswordReset
-      summary: Ask the instance to send a new password.
+      summary: Ask the instance to mail a code for setting a new password.
       description: |
         The unauthenticated counterpart to the request a board makes through the roster. A member
         who cannot sign in asks here, and the instance mails a single-use code to the address on
@@ -2578,7 +2578,8 @@ paths:
         answered the same way and send nothing.
 
         A member who knows their address but not their name asks
-        `/api/account-recovery/usernames` first. That operation issues no credential.
+        `/api/account-recovery/usernames` first. That operation mails nothing an account can be
+        changed with.
 
         Three limits bound this operation and only two of them are visible. An account may be
         mailed a limited number of codes per window; reaching it is answered `202` like everything
@@ -2628,10 +2629,13 @@ paths:
         because "ask for another one" is different advice from "check what you typed".
 
         The password is held to the same rules as every other password this instance stores, and
-        answered with the same types: `urn:courtside:error:password-too-guessable` names no
-        individual rule, `urn:courtside:error:password-reuses-credential` says the member chose
-        the password the account already has, and a breach lookup that does not answer refuses the
-        change with `503` rather than storing something unchecked. **A password these rules refuse
+        answered with `urn:courtside:error:password-too-guessable`, which names no individual
+        rule. A password that is the one the account already holds is answered that way too, and
+        deliberately not with the `urn:courtside:error:password-reuses-credential` the
+        authenticated change uses: nobody proved the current password to reach this operation, so
+        a type of its own would tell whoever holds the code what that password is. A breach lookup
+        that does not answer refuses the change with `503` rather than storing something
+        unchecked, and leaves the code unspent like every other refusal. **A password these rules refuse
         does not spend the code** — the member corrects it and sends again.
       security:
         - csrfToken: []

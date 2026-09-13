@@ -18,7 +18,7 @@ class AccountRecoveryController implements AccountRecoveryApi {
 
     @Override
     public ResponseEntity<Void> requestPasswordReset(ApiPasswordResetRequest body) {
-        recovery.sendNewPassword(body.getUsername(), request.getRemoteAddr());
+        recovery.mailAResetCode(body.getUsername(), request.getRemoteAddr());
         return ResponseEntity.accepted().build();
     }
 

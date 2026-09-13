@@ -162,7 +162,7 @@ Passwords are accepted only by their dedicated credential workflows, never retur
 
 Attributes: `dedicated-workflow`, `request-field`.
 
-Production: `src/main/java/org/courtside/identity/internal/AccountController.java#changeInitialPassword`, `src/main/java/org/courtside/identity/internal/AccountController.java#changeOwnPassword`, `src/main/java/org/courtside/identity/internal/AccountRecoveryService.java#sendNewPassword`, `src/main/java/org/courtside/identity/internal/PermanentPasswordService.java#change`, `src/main/java/org/courtside/identity/internal/ReauthenticationService.java#reauthenticate`, `src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#loginEndpoint`, `src/main/java/org/courtside/member/web/RosterAdminController.java#createAccount`.
+Production: `src/main/java/org/courtside/identity/internal/AccountController.java#changeInitialPassword`, `src/main/java/org/courtside/identity/internal/AccountController.java#changeOwnPassword`, `src/main/java/org/courtside/identity/internal/AccountRecoveryService.java#mailAResetCode`, `src/main/java/org/courtside/identity/internal/PermanentPasswordService.java#change`, `src/main/java/org/courtside/identity/internal/ReauthenticationService.java#reauthenticate`, `src/main/java/org/courtside/identity/internal/SecurityConfiguration.java#loginEndpoint`, `src/main/java/org/courtside/member/web/RosterAdminController.java#createAccount`.
 
 Positive tests: `src/test/java/org/courtside/identity/PermanentPasswordChangeTest.java#givenTwoActiveSessions_whenThePasswordIsReplaced_thenBothEndAndOnlyTheReplacementSignsIn`.
 

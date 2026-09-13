@@ -25,7 +25,7 @@ class AccountRecoveryService {
     private final ApplicationEventPublisher events;
 
     @Transactional
-    void sendNewPassword(String username, String callerAddress) {
+    void mailAResetCode(String username, String callerAddress) {
         refuseWhenLimited(username, callerAddress);
         accounts.findByUsername(username)
                 .filter(AccountRecoveryService::reachable)

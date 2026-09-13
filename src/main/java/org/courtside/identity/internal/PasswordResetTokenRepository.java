@@ -17,6 +17,10 @@ interface PasswordResetTokenRepository extends JpaRepository<PasswordResetToken,
     @Query("DELETE FROM PasswordResetToken token WHERE token.accountId = :accountId")
     int deleteForAccount(@Param("accountId") UUID accountId);
 
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM PasswordResetToken token WHERE token.codeHash = :codeHash")
+    int deleteByCodeHash(@Param("codeHash") String codeHash);
+
     @Modifying
     @Query("DELETE FROM PasswordResetToken token WHERE token.expiresAt <= :cutoff")
     int deleteExpired(@Param("cutoff") Instant cutoff);
