@@ -15,6 +15,14 @@ interface WorkerFixtures {
   pinnedBrowser: Browser;
 }
 
+// The catalogue's two tiers and its two languages are project options, so a journey reads which
+// language it walks in rather than deciding one.
+export type JourneyLanguage = "de" | "en";
+
+export interface JourneyOptions {
+  language: JourneyLanguage;
+}
+
 interface TestFixtures {
   browserLifecycle: void;
   failureDiagnostics: void;
@@ -73,7 +81,8 @@ async function pinnedBrowserFixture(
   }
 }
 
-export const test = base.extend<TestFixtures, WorkerFixtures>({
+export const test = base.extend<TestFixtures & JourneyOptions, WorkerFixtures>({
+  language: ["de", { option: true }],
   journeyService: [async ({ browserName }, provide) => {
     void browserName;
     const serialized = process.env.COURTSIDE_JOURNEY_CONTROL;
