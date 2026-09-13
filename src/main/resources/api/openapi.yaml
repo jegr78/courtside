@@ -2539,9 +2539,9 @@ paths:
         it can do nothing except replace it.
 
         The answer is `202` whether or not the name belongs to an account, and it carries no body.
-        Asking must not be a way to learn who belongs to this club, so nothing about the outcome
-        reaches the caller. A deactivated account and one whose person has no address are answered
-        the same way and send nothing.
+        Asking must not be a way to learn who belongs to this club, so status, headers and body say
+        the same thing either way. A deactivated account and one whose person has no address are
+        answered the same way and send nothing.
 
         A member who knows their address but not their name asks
         `/api/account-recovery/usernames` first. That operation issues no credential.

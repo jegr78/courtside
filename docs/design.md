@@ -698,9 +698,9 @@ an address does not name one account. Two paths, and only one of them issues any
    password invalidate their parent's, which is what a shared family address makes of the
    obvious design.
 
-Neither path answers differently for a subject that exists and one that does not, and the
-per-account issuing window is not allowed to surface either, so asking is not a way to learn who
-belongs to this club. What is answered `429` is a window on the caller's own address and on the
+Neither path answers a subject that exists with a different status, header set or body than one
+that does not, and the per-account issuing window is not allowed to surface either, so asking is not
+a way to learn who belongs to this club. What is answered `429` is a window on the caller's own address and on the
 submitted subject, which describes the caller rather than any account.
 
 The roster path (section 10) stays, for a member who cannot reach their own mailbox.
