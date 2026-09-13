@@ -41,6 +41,8 @@ per step, whether it is complete, still to do, or optional:
 Open any step and return here later; the overview remembers nothing and reads what is actually
 there each time.
 
+![The setup overview with its five steps beneath one another, each showing whether it is complete, open or optional.](../screenshots/en/admin-setup.png)
+
 ## Club → Configuration
 
 Everything that concerns the whole club lives here.
@@ -73,6 +75,8 @@ one. Short is safer, long is kinder to somebody who only opens their mailbox in 
 **Rule set for people without a membership type** applies to somebody who currently holds none, for
 example after a membership ended. Without one, no membership-scoped rule binds them; opening hours
 and the grid still do.
+
+![The configuration page with its sections for club and appearance, language and time zone, and the account settings.](../screenshots/en/admin-configuration.png)
 
 ## Facility → Courts
 
@@ -166,6 +170,8 @@ account and mailed their own one-time password. Accounts that already exist are 
 The list shows name, username, account status and membership type, with a search and a filter. You
 create a person with a first name, a last name and an email address; all of it can be corrected
 later.
+
+![The people list with name, username, account status and membership type per row, and the search and filter above it.](../screenshots/en/admin-roster.png)
 
 Opening a person shows three areas:
 

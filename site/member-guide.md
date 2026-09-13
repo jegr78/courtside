@@ -20,6 +20,8 @@ Ob bei einer fremden Buchung die Bezeichnung ihrer Buchungsart steht oder nur *B
 dein Verein je Buchungsart. Öffentlich ist ausserdem, wie viele Personen zu einer Buchung gehören;
 wer sie sind, ist es nicht. Namen stehen im Platzplan nur an deinen eigenen Buchungen.
 
+![Der Platzplan einer Woche: je Platz eine Spalte, die Belegung als farbige Blöcke, darunter die Legende der Zustände.](screenshots/de/court-plan.png)
+
 ## Anmelden
 
 Dein Konto legt der Vorstand an. Benutzername und ein Einmalpasswort kommen anschliessend per
@@ -110,6 +112,8 @@ Datenbank selbst und nicht eine vorherige Prüfung, die ein gleichzeitiger Zugri
 Kommt dir jemand im selben Moment zuvor, sagt Courtside dir das, statt zwei Buchungen
 nebeneinander zu stellen.
 
+![Der Dialog Buchung anlegen mit Dauer, Platz, Art der Buchung, der Mitgliedersuche und dem aufklappbaren Bereich Weitere Angaben.](screenshots/de/booking-dialog.png)
+
 ## Was eine Buchungsart bedeutet
 
 Alles, was einen Platz belegt, ist in Courtside dieselbe Sache: das Spiel eines Mitglieds, ein
@@ -184,6 +188,8 @@ wäre.
 Eine stornierte Buchung gibt den Platz sofort wieder frei. Genau darum bittet dich auch die
 Erinnerung vor deiner Buchung: wenn du nicht spielen kannst, storniere, damit jemand anders
 spielen kann.
+
+![Meine Buchungen mit den Abschnitten für bevorstehende und vergangene Buchungen; an einer bevorstehenden steht die Schaltfläche zum Stornieren.](screenshots/de/my-bookings.png)
 
 ## Serientermine
 

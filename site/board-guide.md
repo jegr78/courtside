@@ -41,6 +41,8 @@ und zeigt je Schritt, ob er abgeschlossen, noch offen oder optional ist:
 Sie können jeden Schritt öffnen und später hierher zurückkehren; die Übersicht merkt sich nichts,
 sondern liest jedes Mal neu, was tatsächlich da ist.
 
+![Die Einrichtungsübersicht mit den fünf Schritten untereinander, jeder mit seinem Zustand abgeschlossen, offen oder optional.](screenshots/de/admin-setup.png)
+
 ## Verein → Konfiguration
 
 Hier steht alles, was den ganzen Verein betrifft.
@@ -76,6 +78,8 @@ Abend in sein Postfach schaut.
 **Regelsatz für Personen ohne Beitragsart** greift, wenn jemand gerade keine Mitgliedsart hat, etwa
 nach dem Ende einer Mitgliedschaft. Ohne Regelsatz bindet diese Person keine mitgliedschaftsbezogene
 Regel; Öffnungszeiten und Raster gelten trotzdem.
+
+![Die Konfigurationsseite mit den Abschnitten für Verein und Darstellung, Sprache und Zeitzone sowie den Kontoeinstellungen.](screenshots/de/admin-configuration.png)
 
 ## Anlage → Plätze
 
@@ -173,6 +177,8 @@ einen Zugang und sein Einmalpasswort per E-Mail. Bestehende Zugänge bleiben unb
 
 Die Liste zeigt Name, Benutzername, Kontostatus und Mitgliedsart, mit Suche und Filter. Eine Person
 legen Sie mit Vorname, Nachname und E-Mail-Adresse an; alles davon ist später korrigierbar.
+
+![Die Personenliste mit Name, Benutzername, Kontostatus und Mitgliedsart je Zeile, darüber Suche und Filter.](screenshots/de/admin-roster.png)
 
 Öffnen Sie eine Person, finden Sie drei Bereiche:
 

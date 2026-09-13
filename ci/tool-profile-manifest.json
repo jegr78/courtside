@@ -40,6 +40,7 @@
     { "path": "tools/fixture-artifact.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/github-metadata.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/github-template-metadata.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/guide-captures.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/i18n-bundle-parity.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/i18n-bundle.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/import-field-labels.test.mjs", "profiles": ["tooling"], "test": true },
