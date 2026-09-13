@@ -55,8 +55,9 @@ test("a code the instance never sent is refused, and says so", async ({ page }) 
   await page.getByTestId("recovery-new-password").fill("the-one-they-picked-alone");
   await page.getByTestId("recovery-redeem-submit").click();
 
-  // then
-  await expect(page.getByRole("alert")).toBeVisible();
+  // then — the refusal names the code, so the contract pattern accepting it is part of the proof
+  await expect(page.getByRole("alert"))
+    .toHaveText("That code does not match. Check what you entered, or ask for a new one above.");
   await expect(page.getByTestId("recovery-sent")).toBeHidden();
 });
 

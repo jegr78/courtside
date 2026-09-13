@@ -87,11 +87,13 @@ public class ClubConfiguration {
         this.timeZone = timeZone;
     }
 
-    public void changeCredentialValidity(int newAccountHours, int passwordResetHours,
-                                         int resetTokenMinutes) {
+    public void changeCredentialValidity(int newAccountHours, int passwordResetHours) {
         this.newAccountCredentialHours = newAccountHours;
         this.passwordResetCredentialHours = passwordResetHours;
-        this.passwordResetTokenMinutes = resetTokenMinutes;
+    }
+
+    public void expireResetCodesAfter(int minutes) {
+        this.passwordResetTokenMinutes = minutes;
     }
 
     public void remindBookingsAfter(int hours) {

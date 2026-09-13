@@ -11,10 +11,12 @@ class IdentityCleanupScheduleTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withBean(CredentialIssueLimit.class, () -> mock(CredentialIssueLimit.class))
             .withBean(LoginAttemptCleanup.class, () -> mock(LoginAttemptCleanup.class))
+            .withBean(PasswordResetMailLimit.class, () -> mock(PasswordResetMailLimit.class))
+            .withBean(PasswordResetTokenService.class, () -> mock(PasswordResetTokenService.class))
             .withUserConfiguration(IdentityCleanupSchedule.class);
 
     @Test
-    void whenAnInstanceRuns_thenExpiredCredentialWindowsAndLoginAttemptsAreSweptOnACadence() {
+    void whenAnInstanceRuns_thenEveryWindowAndOutstandingCodeIsSweptOnACadence() {
         // when / then
         contextRunner.run(context -> assertThat(context).hasSingleBean(IdentityCleanupSchedule.class));
     }

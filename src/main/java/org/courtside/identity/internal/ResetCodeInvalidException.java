@@ -6,8 +6,6 @@ import org.springframework.http.HttpStatus;
 
 import java.util.Map;
 
-// One type for a code nobody holds, one already redeemed and one whose account can no longer be
-// reached: telling them apart would answer questions the request endpoint refuses to answer.
 class ResetCodeInvalidException extends CodedDomainFailure {
 
     static final ProblemType PROBLEM_TYPE = new ProblemType(

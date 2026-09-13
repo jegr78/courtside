@@ -4,35 +4,39 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ResetCodesTest {
 
     @Test
-    void whenGeneratingACode_thenItReadsBackWithoutAGlyphThatCouldBeAnother() {
+    void whenGeneratingACode_thenItIsGroupedTheWayTheMailPrintsIt() {
         // when
         String code = ResetCodes.generate();
 
         // then
         assertThat(code).hasSize(9).matches("^[2-9A-HJKMNP-TV-Z]{4}-[2-9A-HJKMNP-TV-Z]{4}$");
-        assertThat(code)
-                .as("a member retyping from a mail must not have to choose between two readings")
-                .doesNotContain("0").doesNotContain("O")
-                .doesNotContain("1").doesNotContain("I").doesNotContain("L")
-                .doesNotContain("U");
     }
 
     @Test
-    void whenGeneratingManyCodes_thenTheyDiffer() {
+    void whenGeneratingManyCodes_thenTheyDifferAndNoGlyphCouldBeReadAsAnother() {
         // when
         Set<String> codes = new HashSet<>();
-        for (int drawn = 0; drawn < 500; drawn++) {
-            codes.add(ResetCodes.generate());
+        Set<Character> drawnCharacters = new TreeSet<>();
+        for (int drawn = 0; drawn < 2000; drawn++) {
+            String code = ResetCodes.generate();
+            codes.add(code);
+            code.chars().filter(character -> character != '-')
+                    .forEach(character -> drawnCharacters.add((char) character));
         }
 
-        // then
-        assertThat(codes).hasSize(500);
+        // then — one draw cannot see the alphabet, and the alphabet is where the property lives
+        assertThat(codes).hasSize(2000);
+        assertThat(drawnCharacters)
+                .as("a member retyping from a mail must not have to choose between two readings")
+                .containsExactlyElementsOf("23456789ABCDEFGHJKMNPQRSTVWXYZ".chars()
+                        .mapToObj(character -> (char) character).toList());
     }
 
     @Test

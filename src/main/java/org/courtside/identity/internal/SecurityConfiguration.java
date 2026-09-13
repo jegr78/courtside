@@ -71,8 +71,6 @@ public class SecurityConfiguration {
                 .matcher(HttpMethod.PUT, "/api/account/initial-password");
         RequestMatcher passwordChange = PathPatternRequestMatcher.withDefaults()
                 .matcher(HttpMethod.PUT, "/api/account/password");
-        // The only one of these an anonymous caller reaches, and the reason this list binds a
-        // filter rather than a role: it derives a key for whoever asks.
         RequestMatcher resetRedemption = PathPatternRequestMatcher.withDefaults()
                 .matcher(HttpMethod.POST, "/api/account-recovery/password/redemption");
         return request -> reauthentication.matches(request)

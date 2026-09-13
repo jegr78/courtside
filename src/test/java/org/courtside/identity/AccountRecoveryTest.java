@@ -417,8 +417,44 @@ class AccountRecoveryTest extends AbstractIntegrationTest {
         }
 
         // then
+        redeem("ABCD-EFGJ", "a-password-nobody-guessed")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:password-verification-rate-limited"));
         redeemFrom("198.51.100.7", issued.code(), "a-password-nobody-guessed")
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void givenACodeAndThenADeactivation_whenItIsRedeemed_thenItIsRefused() throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when
+        UserAccount held = accounts.findById(account).orElseThrow();
+        held.disable();
+        accounts.save(held);
+
+        // then
+        redeem(issued.code(), "a-password-nobody-guessed")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:account-recovery-code-invalid"));
+    }
+
+    @Test
+    void givenAPasswordThatIsTheOneTheAccountAlreadyHolds_whenItIsRedeemed_thenNothingConfirmsIt()
+            throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+
+        // when / then — a stolen code must not become a way to read the password it replaces
+        redeem(issued.code(), "a-password-they-forgot")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type")
+                        .value("urn:courtside:error:password-too-guessable"));
     }
 
     @Test

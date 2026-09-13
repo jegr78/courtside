@@ -61,16 +61,18 @@ name or address is counted too, across everybody who submits it. So somebody els
 asking shut for a while by entering your username often enough. The window is short, your sign-in is
 unaffected, and your board can send you credentials throughout.
 
-Redeeming counts only the network connection the attempts come from. Somebody guessing codes locks
-themselves out and nobody else.
+Redeeming counts only the network connection the attempts come from, never your account — so
+nobody can hold your recovery shut by guessing codes at you. If you share a connection with other
+members, though, their guesses and yours land in the same bucket.
 
 ## Replacing the one-time password
 
 This is about the password your board sends you — for your first sign-in, or when you cannot reach
 your own mailbox any more. It gets you to one page and no further: *Replace one-time password*.
 Until you have chosen a password of your own, every page of the application leads back there. You do
-not have unlimited time for it: how long an issued password stays valid is your club's setting, and
-after that you ask your board for a new one.
+not have unlimited time for it: how long an issued password stays valid is your club's setting. If
+it runs out before you use it, you do not need your board — ask for a code on the sign-in page and
+redeem it, which sets your password and clears the issued one in the same step.
 
 The new password needs at least twelve characters and at most 256. Courtside also refuses it if it
 is on a list of common passwords shipped with the application, if it contains your name, your

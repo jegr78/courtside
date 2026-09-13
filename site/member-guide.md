@@ -66,8 +66,9 @@ anderes kann dir das Anfordern also eine Weile zuhalten, indem er oft genug dein
 einträgt. Das Fenster ist kurz, deine Anmeldung ist davon nicht betroffen, und dein Vorstand kann
 dir die Zugangsdaten die ganze Zeit über zuschicken.
 
-Beim Einlösen zählt nur der Netzanschluss, von dem die Versuche kommen. Wer Codes rät, sperrt
-damit sich selbst aus und niemanden sonst.
+Beim Einlösen zählt nur der Netzanschluss, von dem die Versuche kommen, nie dein Konto — niemand
+kann dir also die Wiederherstellung zuhalten, indem er Codes auf dich rät. Teilst du dir den
+Anschluss mit anderen Mitgliedern, landen deren Versuche allerdings im selben Topf wie deine.
 
 ## Das Einmalpasswort ersetzen
 
@@ -75,7 +76,9 @@ Das betrifft das Passwort, das dein Vorstand dir zuschickt — beim ersten Zugan
 selbst nicht mehr an dein Postfach kommst. Damit kommst du nur an eine einzige Seite:
 *Einmalpasswort ersetzen*. Solange du kein eigenes Passwort gesetzt hast, führt dich jede Seite der
 Anwendung dorthin zurück. Zeit hast du dafür nicht unbegrenzt: wie lange ein zugeschicktes Passwort
-gilt, legt dein Verein fest, und danach bittest du deinen Vorstand um ein neues.
+gilt, legt dein Verein fest. Läuft es ab, bevor du es benutzt hast, brauchst du deinen Vorstand
+dafür nicht — fordere auf der Anmeldeseite einen Code an und löse ihn ein; damit setzt du dein
+Passwort und das zugeschickte verfällt im selben Schritt.
 
 Das neue Passwort braucht mindestens zwölf und höchstens 256 Zeichen. Courtside lehnt es ausserdem
 ab, wenn es auf einer mitgelieferten Liste häufiger Passwörter steht, wenn es deinen Namen, deinen

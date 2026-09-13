@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.HexFormat;
+import java.util.Locale;
 
 // The alphabet leaves out every glyph a member could read as another one, so retyping a code from a
 // mail cannot fail on a choice between 0 and O or 1 and l.
@@ -36,11 +37,11 @@ final class ResetCodes {
     // What the code was mailed to, kept as a fingerprint so that correcting an address withdraws
     // the code that went to the old one without this table holding an address of its own.
     static String fingerprintOfAddress(String address) {
-        return sha256(address.strip().toLowerCase(java.util.Locale.ROOT));
+        return sha256(address.strip().toLowerCase(Locale.ROOT));
     }
 
     private static String normalized(String code) {
-        return code.replaceAll("[\\s-]", "").toUpperCase(java.util.Locale.ROOT);
+        return code.replaceAll("[\\s-]", "").toUpperCase(Locale.ROOT);
     }
 
     private static String sha256(String value) {

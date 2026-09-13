@@ -714,8 +714,10 @@ or separator, and stored only as SHA-256. That is about 6.6·10¹¹ combinations
 carries the credential-verification limit. How long a code stays redeemable is a club setting in
 minutes, between 15 and 1440.
 
-At most one code is outstanding per account, enforced by the table's primary key rather than by
-application code, so asking again replaces what was sent. The row also carries the account's
+At most one code is outstanding per account: the account is the table's primary key, so the schema
+cannot hold two, and issuing deletes what was there before inserting under an advisory lock on the
+account, so two requests arriving together cannot leave a member holding a code that was never
+stored. The row also carries the account's
 security epoch and a fingerprint of the address the code went to, and redemption compares both
 against the account as it is then. That is how a board-issued credential, a password the member
 chose, a deactivation or an address correction withdraws an outstanding code without `identity`
@@ -1790,13 +1792,37 @@ whether it is built or designed. **Designed means absent today.**
   redemption needs a code that went to the address on the account.
 
   **A code is the only thing that reaches an account anonymously.** Eight characters from a
-  thirty-symbol alphabet is about 6.6·10¹¹ combinations, stored only as SHA-256, valid for a club
-  setting between fifteen minutes and a day, spent by the first password the rules accept. Guessing
-  is bounded by the caller's own address: an anonymous credential attempt is counted against the
-  address that made it and against nothing else, so one source guessing codes closes its own window
-  and leaves every other member's redemption open. That is a deliberate correction — keying every
-  anonymous caller to one shared bucket, as an account-keyed limit would, lets twenty requests a
-  minute hold the recovery path shut for the whole club.
+  thirty-symbol alphabet is about 6.6·10¹¹ combinations, valid for a club setting between fifteen
+  minutes and a day, spent by the first password the rules accept and by nothing else. Guessing is
+  bounded by the caller's own address: an anonymous credential attempt is counted against the
+  address that made it and against no account, because the only account bucket available would be
+  one every anonymous caller shared — and holding a shared bucket shut is far cheaper than guessing
+  a code. Twenty wrong codes a minute would otherwise have closed the recovery path for the whole
+  club.
+
+  **What that leaves is an address, and an address is not a person.** Two things follow, and both
+  are accepted rather than solved. A guesser behind a carrier NAT or a corporate proxy closes the
+  `credential-address:` bucket for everybody sharing that egress — not only their redemption, but
+  their password change and their reauthentication, because it is one bucket. And the
+  two-permit verification pool that bounds this instance's Argon2 work is, for the first time,
+  reachable without signing in: an anonymous caller holding both permits makes every member's
+  password change and reauthentication answer `429` for as long as it holds them. Both are the
+  price of a route that has to work for somebody who cannot identify themselves. What bounds them
+  is that the block is a minute, that neither stops a sign-in, that the roster path stays open, and
+  that the instance-wide observation counts this surface — anonymous credential attempts move
+  `courtside.login.distributed.thresholds` exactly as recovery requests do, so the metric an
+  operator is told to watch does not go blind on the one route anybody can reach.
+
+  **A stored code hash is worth cracking, and SHA-256 does not stop that.** `code_hash` is a plain
+  SHA-256 of a secret worth about 2^39, so anybody who reaches the database read-only — a dump, a
+  restored snapshot, a backup — can recover an outstanding code on commodity hardware in minutes
+  and turn read access into a password change, which no other secret in this schema allows: every
+  password is Argon2id. What bounds it is how little there is to steal at any moment: a row exists
+  only between a request and its redemption, it is deleted the moment a code is spent, and the
+  default lifetime is an hour, so a dump yields only the codes outstanding when it was taken. The
+  fix is a keyed hash, and this instance has no secret to key it with; introducing one is a change
+  to the deployment contract rather than to this surface, and it is recorded here so that whoever
+  makes that change knows what it is worth.
 
   **The mailbox has its own budget: five reset codes per account per hour**, refused silently,
   because a refusal that reached the caller would confirm the name. It is separate from the board's

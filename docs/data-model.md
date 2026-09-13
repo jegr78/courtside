@@ -126,7 +126,9 @@ honours.
 `credentials_expire_at` bounds an issued one-time credential.
 
 **`password_reset_token` holds at most one row per account**, because `account_id` is its primary
-key: asking again replaces the code that was outstanding. Neither the code nor the address is
+key. Asking again replaces the code that was outstanding — the delete and the insert are what do
+that, under an advisory lock on the account so two requests arriving together cannot mail a code
+that was never stored. Neither the code nor the address is
 stored, only their SHA-256. The row also carries the account's `security_epoch` and the fingerprint
 of the address the code went to, and redemption compares both against the account as it is then, so
 a board-issued credential, a self-service password change, a deactivation or an address correction

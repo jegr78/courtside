@@ -11,8 +11,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
-// The mailbox is the unit, as it is for a board-issued credential, and the budget is its own so
-// that anonymous asking cannot spend what a board needs to answer with.
 @Service
 @RequiredArgsConstructor
 class PasswordResetMailLimit {

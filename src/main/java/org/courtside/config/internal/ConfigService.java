@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.time.Duration;
 import java.time.ZoneId;
 
 @Service
@@ -89,7 +90,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     }
 
     @Override
-    public java.time.Duration resetCodeLifetime() {
+    public Duration resetCodeLifetime() {
         return new ResetTokenLifetime(current().passwordResetTokenMinutes()).toDuration();
     }
 
@@ -239,7 +240,8 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
                 command.logoUrl(), command.imprintUrl(), command.privacyUrl(), command.defaultLocale(),
                 command.slotDuration().minutes(), command.timeZone());
         configuration.changeCredentialValidity(command.newAccountCredential().hours(),
-                command.passwordResetCredential().hours(), command.passwordResetToken().minutes());
+                command.passwordResetCredential().hours());
+        configuration.expireResetCodesAfter(command.passwordResetToken().minutes());
         configuration.remindBookingsAfter(command.bookingReminder().hours());
         configuration.bindPeopleWithoutAMembershipTypeTo(command.noMembershipTypeRuleSetId());
     }

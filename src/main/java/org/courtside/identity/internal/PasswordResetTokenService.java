@@ -10,6 +10,7 @@ import org.courtside.shared.PasswordResetCodeIssuer;
 import org.courtside.shared.PasswordResetRedeemed;
 import org.courtside.shared.SecurityEventLog;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
     private final SecurityEventLog securityEvents;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final JdbcClient jdbc;
 
     @Override
     @Transactional
@@ -45,6 +47,9 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
         String code = ResetCodes.generate();
         Instant now = clock.instant();
         Instant expiresAt = now.plus(validity.resetCodeLifetime());
+        // Two requests for one account would otherwise both delete and both insert, and the one
+        // whose insert lost would already have handed its code to the relay.
+        lockIssuing(accountId);
         tokens.deleteForAccount(accountId);
         tokens.save(new PasswordResetToken(accountId, ResetCodes.fingerprint(code),
                 ResetCodes.fingerprintOfAddress(address), account.getSecurityEpoch(),
@@ -53,14 +58,12 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
                 account.getLocale(), account.getUsername(), code, expiresAt);
     }
 
-    // The code is spent by a password the rules accept and by nothing else, so a member who has to
-    // correct theirs still holds the one they were sent.
     @Transactional
     void redeem(String code, String password) {
         PasswordResetToken token = tokens.findByCodeHash(ResetCodes.fingerprint(code))
                 .orElseThrow(ResetCodeInvalidException::new);
-        // The row outlives the refusal on purpose: it is what lets a member who retries be told
-        // their code ran out rather than that it never existed. The sweep removes it.
+        // The row outlives the refusal: it is what lets a member who retries be told their code ran
+        // out rather than that it never existed.
         if (token.hasExpiredBy(clock.instant())) {
             throw new ResetCodeExpiredException();
         }
@@ -68,18 +71,36 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
                 .filter(UserAccount::isEnabled)
                 .filter(token::stillDescribes)
                 .orElseThrow(ResetCodeInvalidException::new);
-        policy.requireUnguessable(password, account);
-        accounts.replacePasswordAfterReset(account.getId(), passwordEncoder.encode(password));
-        tokens.deleteForAccount(account.getId());
+        requireAcceptable(password, account);
+        if (tokens.deleteForAccount(account.getId()) != 1) {
+            throw new ResetCodeInvalidException();
+        }
+        if (accounts.replacePasswordAfterReset(account.getId(),
+                passwordEncoder.encode(password)) != 1) {
+            throw new IllegalStateException(
+                    "The account a redeemed code named went away mid-redemption: " + account.getId());
+        }
         sessions.endFor(account.getUsername());
         securityEvents.credentialChangedAfterCommit(account.getId(), null,
                 SecurityEventLog.CredentialChange.PERMANENT_PASSWORD_REPLACED);
         events.publishEvent(new PasswordResetRedeemed(account.getId()));
     }
 
-    @Transactional
-    void withdrawFor(UUID accountId) {
-        tokens.deleteForAccount(accountId);
+    // Nobody proved the current password to get here, so telling a caller they guessed it would
+    // hand a stolen code more than the account it unlocks.
+    private void requireAcceptable(String password, UserAccount account) {
+        try {
+            policy.requireUnguessable(password, account);
+        } catch (ReusedCredentialException reused) {
+            throw new GuessablePasswordException();
+        }
+    }
+
+    private void lockIssuing(UUID accountId) {
+        jdbc.sql("SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))) lock")
+                .param("key", "PASSWORD_RESET_TOKEN:" + accountId)
+                .query(Long.class)
+                .single();
     }
 
     @Transactional
