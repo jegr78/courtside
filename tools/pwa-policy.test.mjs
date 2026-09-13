@@ -127,7 +127,7 @@ test("given shipped password inputs, when enforcing browser credential handling,
     jsxPasswordFields(path, source));
 
   // when / then
-  assert.equal(passwordFields.length, 9,
+  assert.equal(passwordFields.length, 10,
     "Every added or removed password field needs an explicit credential-handling review");
   for (const field of passwordFields) {
     assert.equal(field.type, "password", `${field.path}:${field.line} exposes a password as ${field.type}`);

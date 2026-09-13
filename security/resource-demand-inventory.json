@@ -15,6 +15,7 @@
       "src/main/java/org/courtside/notification/internal/CredentialMailer.java",
       "src/main/java/org/courtside/notification/internal/DisplacementMailer.java",
       "src/main/java/org/courtside/notification/internal/ParticipationMailer.java",
+      "src/main/java/org/courtside/notification/internal/PasswordResetCodeMailer.java",
       "src/main/java/org/courtside/notification/internal/ReminderMailer.java",
       "src/main/java/org/courtside/notification/internal/UsernameReminderMailer.java"
     ],

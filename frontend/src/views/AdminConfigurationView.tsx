@@ -81,6 +81,7 @@ function editable(loaded: AdminClubConfig): ClubConfigRequest {
     timeZone: loaded.timeZone,
     newAccountCredentialHours: loaded.newAccountCredentialHours,
     passwordResetCredentialHours: loaded.passwordResetCredentialHours,
+    passwordResetTokenMinutes: loaded.passwordResetTokenMinutes,
     bookingReminderHours: loaded.bookingReminderHours,
     noMembershipTypeRuleSetId: loaded.noMembershipTypeRuleSetId ?? null
   };
@@ -391,6 +392,10 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
           <TextField data-testid="new-account-credential-hours" type="number" min={1} max={168} label={t("admin.config.newAccountCredentialHours")} value={config.newAccountCredentialHours} onChange={(event) => changeConfig({ newAccountCredentialHours: Number(event.target.value) })} />
           <TextField data-testid="password-reset-credential-hours" type="number" min={1} max={168} label={t("admin.config.passwordResetCredentialHours")} value={config.passwordResetCredentialHours} onChange={(event) => changeConfig({ passwordResetCredentialHours: Number(event.target.value) })} />
+          <div className="grid gap-1">
+            <TextField data-testid="password-reset-token-minutes" type="number" min={15} max={1440} label={t("admin.config.passwordResetTokenMinutes")} value={config.passwordResetTokenMinutes} onChange={(event) => changeConfig({ passwordResetTokenMinutes: Number(event.target.value) })} />
+            <p className="text-muted text-sm">{t("admin.config.passwordResetTokenMinutesHelp")}</p>
+          </div>
           <div className="grid gap-1">
             <TextField data-testid="booking-reminder-hours" type="number" min={0} max={168} label={t("admin.config.bookingReminderHours")} value={config.bookingReminderHours} onChange={(event) => changeConfig({ bookingReminderHours: Number(event.target.value) })} />
             <p className="text-muted text-sm">{t("admin.config.bookingReminderHoursHelp")}</p>

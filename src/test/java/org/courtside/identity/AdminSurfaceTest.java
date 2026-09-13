@@ -374,7 +374,14 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             if (endpoint.method() == HttpMethod.GET && endpoint.pattern().equals("/api/bookings")) {
                 request.param("date", "2026-05-12");
             }
-            if (endpoint.pattern().equals("/api/public/config/logo")) {
+            if (endpoint.pattern().equals("/api/account-recovery/password/redemption")) {
+                // The only anonymous operation that needs a secret to succeed: the refusal it names
+                // is what shows the route and its authorization were both reached.
+                mockMvc.perform(request)
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.type")
+                                .value("urn:courtside:error:account-recovery-code-invalid"));
+            } else if (endpoint.pattern().equals("/api/public/config/logo")) {
                 mockMvc.perform(request)
                         .andExpect(status().isNotFound())
                         .andExpect(jsonPath("$.type").value("urn:courtside:error:club-logo-not-found"));

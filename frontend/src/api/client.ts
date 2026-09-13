@@ -203,6 +203,11 @@ export const api = {
   requestPasswordReset: (username: string) => request<void>("/api/account-recovery/password", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username })
   }),
+  redeemPasswordReset: (code: string, password: string) => request<void>(
+    "/api/account-recovery/password/redemption", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, password })
+    }),
   requestUsernameReminder: (email: string) => request<void>("/api/account-recovery/usernames", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email })
   }),
