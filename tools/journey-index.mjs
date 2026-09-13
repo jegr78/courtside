@@ -1,3 +1,5 @@
+import { relative } from "node:path";
+
 const DEVICES = { desktop: "Desktop", iphone: "iPhone", android: "Android" };
 const LANGUAGES = { de: "German", en: "English" };
 
@@ -32,15 +34,17 @@ export function journeyRows(report) {
     }));
 }
 
-function cell(row, kind) {
+// The index sits in the run's own directory, so a link from it is the artefact's place in that
+// directory rather than this machine's, which also keeps the home directory out of a pasted index.
+function cell(row, kind, directory) {
   const found = row.attachments.find((attachment) => attachment.name === kind
     || (kind === "video" && attachment.contentType === "video/webm")
     || (kind === "trace" && attachment.name === "trace")
     || (kind === "screenshot" && attachment.contentType === "image/png"));
-  return found ? `[${kind}](${encodeURI(found.path)})` : "—";
+  return found ? `[${kind}](${encodeURI(relative(directory, found.path))})` : "—";
 }
 
-export function journeyIndex(report, startedAt) {
+export function journeyIndex(report, startedAt, directory) {
   const rows = journeyRows(report);
   const failed = rows.filter((row) => row.outcome !== "expected").length;
   return [
@@ -51,7 +55,8 @@ export function journeyIndex(report, startedAt) {
     "| Journey | Device | Language | Outcome | Seconds | Video | Trace | Screenshot |",
     "|---|---|---|---|---|---|---|---|",
     ...rows.map((row) => `| ${row.journey} | ${row.device} | ${row.language} | ${row.outcome}`
-      + ` | ${row.seconds} | ${cell(row, "video")} | ${cell(row, "trace")} | ${cell(row, "screenshot")} |`),
+      + ` | ${row.seconds} | ${cell(row, "video", directory)} | ${cell(row, "trace", directory)}`
+      + ` | ${cell(row, "screenshot", directory)} |`),
     ""
   ].join("\n");
 }

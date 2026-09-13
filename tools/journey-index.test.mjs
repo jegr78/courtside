@@ -53,13 +53,13 @@ test("given a report of one run, when the rows are read, then each carries what 
 
 test("given a report, when the index is written, then every artefact the run left is linked from it", () => {
   // when
-  const index = journeyIndex(REPORT, "2026-09-13T20:00:00Z");
+  const index = journeyIndex(REPORT, "2026-09-13T20:00:00Z", "/runs");
 
   // then
   assert.match(index, /1 runs, 0 of them not as expected/);
-  assert.match(index, /\[video\]\(\/runs\/one\/journey-1\.webm\)/);
-  assert.match(index, /\[trace\]\(\/runs\/one\/trace\.zip\)/);
-  assert.match(index, /\[screenshot\]\(\/runs\/one\/finished\.png\)/);
+  assert.match(index, /\[video\]\(one\/journey-1\.webm\)/);
+  assert.match(index, /\[trace\]\(one\/trace\.zip\)/);
+  assert.match(index, /\[screenshot\]\(one\/finished\.png\)/);
 });
 
 test("given a run that did not do what was expected, when the index is written, then it is counted as such", () => {
@@ -68,7 +68,7 @@ test("given a run that did not do what was expected, when the index is written, 
   red.suites[0].suites[0].specs[0].tests[0].status = "unexpected";
 
   // when
-  const index = journeyIndex(red, "2026-09-13T20:00:00Z");
+  const index = journeyIndex(red, "2026-09-13T20:00:00Z", "/runs");
 
   // then
   assert.match(index, /1 runs, 1 of them not as expected/);
@@ -81,7 +81,7 @@ test("given a run that left nothing behind, when the index is written, then the 
   bare.suites[0].suites[0].specs[0].tests[0].results[0].attachments = [];
 
   // when
-  const index = journeyIndex(bare, "2026-09-13T20:00:00Z");
+  const index = journeyIndex(bare, "2026-09-13T20:00:00Z", "/runs");
 
   // then
   assert.match(index, /\| — \| — \| — \|/);

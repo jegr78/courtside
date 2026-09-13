@@ -30,7 +30,7 @@ const run = spawnSync(process.execPath, [cli, "test", "--reporter=list,json",
 let written = false;
 try {
   writeFileSync(resolve(directory, "index.md"),
-    journeyIndex(JSON.parse(readFileSync(report, "utf8")), startedAt));
+    journeyIndex(JSON.parse(readFileSync(report, "utf8")), startedAt, directory));
   written = true;
 } catch (unreadable) {
   console.error(`The run left no report to index: ${unreadable.message}`);
