@@ -265,6 +265,25 @@ class AccountRecoveryTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnAnonymousRedemption_whenItIsMade_thenItCountsTowardsTheInstanceWideObservation()
+            throws Exception {
+        // given
+        UUID account = account("doe.jane", "jane.doe@example.org");
+        IssuedResetCode issued = codes.issueFor(account);
+        int before = globalAttempts();
+
+        // when
+        redeem("ZZZZ-ZZZZ", "a-password-nobody-guessed")
+                .andExpect(status().isBadRequest());
+        redeem(issued.code(), "a-password-nobody-guessed").andExpect(status().isNoContent());
+
+        // then
+        assertThat(globalAttempts())
+                .as("the metric an operator watches must not go blind on the one anonymous route")
+                .isEqualTo(before + 2);
+    }
+
+    @Test
     void givenACodeThatWasRedeemed_whenItIsPresentedAgain_thenItReadsLikeACodeNobodyHolds()
             throws Exception {
         // given
