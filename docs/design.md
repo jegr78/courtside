@@ -1780,9 +1780,11 @@ whether it is built or designed. **Designed means absent today.**
 
   This is therefore recorded to be replaced, not to be accepted. Until it is, the exposure is
   bounded by the per-account issuing window, by the credential reaching only the address on the
-  account, and by the member being told what happened. No release carries it: nothing is tagged, and
-  the only workflow that publishes an image runs on a release — which makes replacing this
-  release-blocking rather than optional.
+  account, and by the member being told what happened. No *release* carries it — nothing is tagged —
+  but that is a smaller bound than it sounds: the nightly image workflow publishes signed
+  acceptance tags for the newest verified revision of `main`, and `main` has carried this since it
+  landed. Anybody running a nightly candidate is running it. Replacing this is therefore
+  release-blocking and nightly-relevant, not optional.
 
   Nothing caps it over a lifetime, though. The issuing window rolls, so five requests an hour,
   indefinitely, end whatever session the previous hour's one-time password bought. Against the
