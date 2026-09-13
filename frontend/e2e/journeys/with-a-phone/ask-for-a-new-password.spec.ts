@@ -26,6 +26,8 @@ test("given a member who cannot remember their password on a Sunday evening, whe
     await activate(page.getByTestId("recovery-redeem-submit"));
 
     // then
+    await expect(page.getByTestId("recovery-sent")).toBeVisible();
+    await activate(page.getByTestId("recovery-back-to-login"));
     await expect(page.getByTestId("login-view")).toBeVisible();
     await writeInto(page.getByTestId("username"), "doe.jane");
     await writeInto(page.getByTestId("password"), "the-one-they-chose-themselves");

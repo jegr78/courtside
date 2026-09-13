@@ -1,5 +1,5 @@
 import { expect, test } from "../../fixtures";
-import { activate, openTheApplication, signIn, walks, writeDate, writeInto, writeTime } from "../../journey-walking";
+import { activate, openTheApplication, rewrite, signIn, walks, writeDate, writeTime } from "../../journey-walking";
 
 test("given a trainer arranging the term, when they describe a weekly session once and look at what it would create before confirming it, then every appointment is in the list they manage",
   walks("session-and-own-account", "booking-participation-and-series"), async ({ page, language }) => {
@@ -16,7 +16,7 @@ test("given a trainer arranging the term, when they describe a weekly session on
     await writeDate(page.getByTestId("series-starts-on"), "2026-05-18");
     await writeTime(page.getByTestId("series-start-time"), "18:00");
     await activate(page.getByTestId("series-weekday-MONDAY"));
-    await writeInto(page.getByTestId("series-occurrence-count"), "3");
+    await rewrite(page.getByTestId("series-occurrence-count"), "3");
 
     // then — and what it would create is shown before anything is
     await activate(page.getByTestId("preview-series"));

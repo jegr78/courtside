@@ -26,8 +26,18 @@ test("given a member who wants their account in order, when they choose a new pa
     await activate(page.getByTestId("account-security-link"));
     await expect(page.getByTestId("account-security-view")).toBeVisible();
     await expect(page.getByTestId("end-current-session")).toHaveCount(1);
+    await activate(page.getByTestId("end-current-session"));
+
+    // then — ending the browser you are standing in is signing out of it
+    await expect(page.getByTestId("sign-in-link").or(page.getByTestId("login-view"))).toBeVisible();
 
     // when — and a password of the member's own replaces the one they were given
+    await signIn(page, "doe.jane");
+    await expect(page.getByTestId("court-plan-view")).toBeVisible();
+    await openTheAccountMenu(page);
+    await activate(page.getByTestId("account-security-link"));
+    await expect(page.getByTestId("account-security-view")).toBeVisible();
+    await writeInto(page.getByTestId("current-password"), "temporary-password");
     await writeInto(page.getByTestId("new-password"), "a-password-nobody-guesses");
     await writeInto(page.getByTestId("confirm-password"), "a-password-nobody-guesses");
     await activate(page.getByTestId("password-submit"));

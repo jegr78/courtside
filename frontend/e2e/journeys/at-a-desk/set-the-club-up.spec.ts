@@ -1,9 +1,11 @@
 import { expect, test } from "../../fixtures";
-import { activate, openTheApplication, rewrite, signIn, walks, writeInto, writeTime } from "../../journey-walking";
+import { activate, journeyFile, openTheApplication, rewrite, signIn, walks, writeInto, writeTime } from "../../journey-walking";
 
 // The club this journey installs into is the one the migrations ship and nothing else: a
 // bootstrap administrator holding a one-time password, the cards, one court, and no members.
 test.use({ start: "empty" });
+
+const WEEK = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
 
 test("given a volunteer installing Courtside for their club on the evening it arrives, when they replace the password they were given and describe the club, its courts, its hours, its cards and its rules, then the club is open for its members without anybody touching a database",
   walks("session-and-own-account", "booking-rules-and-club-configuration",
@@ -26,8 +28,9 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
     await rewrite(page.getByTestId("club-name"), "Example Racquet Club");
     await page.getByTestId("time-zone").selectOption("Europe/Berlin");
-    await writeInto(page.getByTestId("logo-url"), "/icon.svg");
+    await page.getByTestId("logo-file").setInputFiles(journeyFile("club-logo.png"));
     await activate(page.getByTestId("upload-logo"));
+    await expect(page.getByTestId("remove-logo")).toBeVisible();
     await activate(page.getByTestId("save-club-config"));
     await expect(page.getByTestId("admin-save-success")).toBeVisible();
 
@@ -47,8 +50,10 @@ test("given a volunteer installing Courtside for their club on the evening it ar
 
     // when — the hours it opens them
     await activate(page.getByTestId("admin-opening-hours-link"));
+    await expect(page.getByTestId("hours-open-MONDAY")).toBeVisible();
     await writeTime(page.getByTestId("apply-opens-at"), "08:00");
     await writeTime(page.getByTestId("apply-closes-at"), "22:00");
+    for (const day of WEEK) await activate(page.getByTestId(`apply-day-${day}`));
     await activate(page.getByTestId("apply-hours"));
     await activate(page.getByTestId("save-opening-hours"));
 
@@ -57,6 +62,7 @@ test("given a volunteer installing Courtside for their club on the evening it ar
 
     // when — a card of its own beside the ones it was shipped
     await activate(page.getByTestId("admin-booking-cards-link"));
+    await expect(page.getByTestId("admin-booking-cards-view")).toBeVisible();
     await writeInto(page.getByTestId("new-card-label"), "Club evening");
     await activate(page.getByTestId("create-card"));
 
@@ -65,6 +71,7 @@ test("given a volunteer installing Courtside for their club on the evening it ar
 
     // when — and what else may be on a court
     await activate(page.getByTestId("admin-slot-fillers-link"));
+    await expect(page.getByTestId("admin-slot-fillers-view")).toBeVisible();
     await writeInto(page.getByTestId("new-participant-card-label"), "Practice wall");
     await writeInto(page.getByTestId("new-participant-card-capacity"), "1");
     await activate(page.getByTestId("create-participant-card"));

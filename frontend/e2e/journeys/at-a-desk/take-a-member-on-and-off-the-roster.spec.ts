@@ -1,5 +1,5 @@
 import { expect, test } from "../../fixtures";
-import { activate, openTheApplication, rewrite, signIn, walks, writeInto } from "../../journey-walking";
+import { activate, openTheApplication, rewrite, signIn, walks, writeDate, writeInto } from "../../journey-walking";
 
 test("given a board that has taken on a new member, when they record the person, correct the name they mistyped, give them an account and later end the membership, then every step is one the board can take without a database console",
   walks("session-and-own-account", "roster-membership-and-account-administration"), async ({ page, language }) => {
@@ -37,10 +37,26 @@ test("given a board that has taken on a new member, when they record the person,
     await expect(page.getByTestId("account-username")).toHaveValue("major.mary");
     await expect(page.getByTestId("credential-destination")).toContainText("mary.major@example.org");
 
-    // when — the membership ends and the sessions with it
+    // when — the club records what the person joined as
+    await page.getByTestId("membership-type").selectOption({ index: 1 });
+    await writeDate(page.getByTestId("membership-started-on"), "2026-01-01");
+    await activate(page.getByTestId("save-membership"));
+
+    // then
+    await expect(page.getByTestId("end-membership")).toBeVisible();
+
+    // when — and the membership ends, with the sessions that account holds. A club records a
+    // departure that has happened, so a day the club has not reached yet is refused.
     await activate(page.getByTestId("end-membership"));
+    await writeDate(page.getByTestId("end-membership-date"), "2026-04-30");
     await activate(page.getByTestId("confirm-end-membership"));
 
     // then
-    await expect(page.getByTestId("membership-ended-on")).toBeVisible();
+    await expect(page.getByTestId("membership-ended-on")).toHaveValue("2026-04-30");
+
+    // when
+    await activate(page.getByTestId("end-account-sessions"));
+
+    // then
+    await expect(page.getByTestId("admin-save-success")).toBeVisible();
   });

@@ -13,7 +13,7 @@ test("given a board that keeps its members in another system, when they describe
     await writeInto(page.getByTestId("new-membership-type-name"), "Imported adults");
     await activate(page.getByTestId("new-membership-type-grants-account"));
     await activate(page.getByTestId("create-membership-type"));
-    await expect(page.getByTestId("membership-types-empty")).toHaveCount(0);
+    await expect(page.getByTestId("admin-save-success")).toBeVisible();
 
     // when — the board describes the export it already has
     await activate(page.getByTestId("admin-import-link"));
