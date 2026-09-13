@@ -32,6 +32,7 @@ test("given a candidate image, when qualifying it, then deployment and vulnerabi
   assert.match(workflow, /node tools\/security-findings\.mjs/);
   assert.match(workflow, /security\/exceptions\.json/);
   assert.match(workflow, /security-summary-\$\{\{ matrix\.architecture \}\}\.json/);
+  assert.match(workflow, /if \[\[ ! -s build\/uat-smoke\/container-logs\.txt \]\]/);
   assert.match(workflow, /release-security-record/);
 });
 

@@ -73,6 +73,7 @@ test("given a candidate digest, when it is qualified, then both architectures ru
   assert.match(text, /aquasecurity\/trivy-action@[0-9a-f]{40}/);
   assert.match(text, /--scope release-image-\$\{\{ matrix\.architecture \}\}/);
   assert.match(text, /ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ needs\.image\.outputs\.digest \}\}/);
+  assert.match(text, /if \[\[ ! -s build\/uat-smoke\/container-logs\.txt \]\]/);
 });
 
 test("given a qualified main image, when it is published, then verified evidence precedes the two nightly tags", () => {

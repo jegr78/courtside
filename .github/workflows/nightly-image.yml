@@ -254,7 +254,12 @@ jobs:
 
       - name: Capture deployment diagnostics
         if: failure()
-        run: docker compose -p courtside-uat -f deploy/compose.uat.yaml logs --no-color > build/uat-smoke/container-logs.txt 2>&1 || true
+        run: |
+          mkdir -p build/uat-smoke
+          if [[ ! -s build/uat-smoke/container-logs.txt ]]; then
+            docker compose -p courtside-uat -f deploy/compose.uat.yaml logs --no-color \
+              > build/uat-smoke/container-logs.txt 2>&1 || true
+          fi
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
