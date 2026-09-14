@@ -1,6 +1,6 @@
 import { expect, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { credentialIn, messagesTo, messageTo } from "./mailbox";
-import { MEMBER_BOOKING_CARD } from "./shipped-rows";
+import { MEMBER_BOOKING_CARD, STANDARD_RULE_SET } from "./shipped-rows";
 
 function freeSlot(page: import("@playwright/test").Page, court: number, slot: string) {
   return page.locator(`[data-testid="free-slot"][data-court-number="${court}"][data-slot="${slot}"][data-state="free"]`);
@@ -324,6 +324,10 @@ test("an admin changes club configuration and a booking rule through the browser
   await page.getByTestId("remove-logo").click();
   expect((await logoRemoved).status()).toBe(200);
   await expect(page.getByTestId("club-logo")).toHaveAttribute("src", "/icon.svg");
+  // The editor opens on whichever rule set sorts first, so the one this member is measured by is
+  // chosen rather than assumed: its own seeded window is what says the switch has landed.
+  await page.getByTestId("rule-set").selectOption(STANDARD_RULE_SET);
+  await expect(page.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue("7");
   await page.getByTestId("rule-ADVANCE_WINDOW-maxDays").fill("1");
   const ruleSaved = page.waitForResponse((response) =>
     response.url().includes("/api/admin/rule-sets/")
