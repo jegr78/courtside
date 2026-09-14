@@ -21,10 +21,31 @@ const git = (...arguments_) =>
 test("given a Java project, when a release is cut, then the pom carries the version and a snapshot follows",
   () => {
     // when / then — what the frontend shows comes from the pom by way of build-info.properties,
-    // so a version living anywhere else could disagree with what a club reads in the footer.
+    // so a version living anywhere else could disagree with what a club reads in the footer. npm
+    // records the root package version twice in its lockfile; leaving either one behind makes a
+    // release contain two answers even though npm ci accepts the stale metadata.
     assert.equal(config["release-type"], "maven");
-    assert.deepEqual(packageEntry["extra-files"],
-      [{ type: "json", path: "frontend/package.json", jsonpath: "$.version" }]);
+    assert.deepEqual(packageEntry["extra-files"], [
+      { type: "json", path: "frontend/package.json", jsonpath: "$.version" },
+      { type: "json", path: "frontend/package-lock.json", jsonpath: "$.version" },
+      { type: "json", path: "frontend/package-lock.json", jsonpath: "$.packages[''].version" }
+    ]);
+  });
+
+test("given frontend package metadata, when a release is proposed, then every root version is owned",
+  () => {
+    // given
+    const packageJson = JSON.parse(read("frontend/package.json"));
+    const lock = JSON.parse(read("frontend/package-lock.json"));
+
+    // when / then
+    assert.deepEqual([lock.version, lock.packages[""].version],
+      [packageJson.version, packageJson.version],
+      "package.json and npm's two root lockfile versions must describe the same release");
+    assert.deepEqual(new Set(packageEntry["extra-files"]
+      .filter((entry) => entry.path === "frontend/package-lock.json")
+      .map((entry) => entry.jsonpath)), new Set(["$.version", "$.packages[''].version"]),
+    "release-please must update both root package versions; npm ci does not reject stale values");
   });
 
 // Measured against release-please 17: without this, `0.2.0` plus one breaking change becomes
