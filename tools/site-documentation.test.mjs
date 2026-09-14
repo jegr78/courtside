@@ -76,7 +76,9 @@ test("given the deployment, when the workflow runs, then only main publishes and
     assert.equal(triggers.pull_request, undefined);
     assert.match(workflow.jobs.deploy.if, /github\.ref == 'refs\/heads\/main'/,
       "workflow_dispatch can start this run from any branch, so the deploy job says which one publishes");
-    assert.equal(workflow.permissions.contents, "read");
+    assert.deepEqual(workflow.permissions, {});
+    assert.equal(workflow.jobs.build.permissions.contents, "read");
+    assert.equal(workflow.jobs.deploy.permissions.contents, undefined);
     assert.equal(workflow.permissions["id-token"], undefined,
       "the token that proves the deployment belongs to the job that deploys, not to the workflow");
     assert.equal(workflow.jobs.deploy.permissions["id-token"], "write");

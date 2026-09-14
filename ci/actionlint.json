@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "version": "1.7.12",
+  "ignoredDiagnostics": [
+    "unknown permission scope \"vulnerability-alerts\""
+  ]
+}

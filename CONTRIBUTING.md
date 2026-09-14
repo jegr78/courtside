@@ -48,8 +48,10 @@ pull request is an expensive place to discover that the disagreement was about t
 
 ## Setting up
 
-JDK 25 (Eclipse Temurin), Node.js 24 or later, and Docker, which Testcontainers needs for
-PostgreSQL 17. Point Maven at the right JDK and start the development stack:
+JDK 25 (Eclipse Temurin), Node.js 24 or later, Docker, which Testcontainers needs for PostgreSQL
+17, and the `actionlint` version recorded in `ci/actionlint.json`. Install that linter through its
+[documented platform package or release binary](https://github.com/rhysd/actionlint/blob/main/docs/install.md).
+Point Maven at the right JDK and start the development stack:
 
 ```bash
 export JAVA_HOME=/path/to/temurin-25
@@ -58,6 +60,11 @@ node tools/courtside.mjs dev
 
 The application reads `build-info.properties` and `git.properties`, both written by Maven, so it
 starts only after a Maven build has run.
+
+The documentation site can be checked with `npm --prefix site ci` followed by
+`npm --prefix site run build`. Its deployment workflow requires GitHub Pages to use **GitHub
+Actions** as its build source. The repository currently has that setting; a fork must select it
+once under **Settings → Pages** before the first deployment can publish.
 
 ## Making the change
 

@@ -8,8 +8,7 @@ on:
     - cron: '37 0 * * *'
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   test-profile-plan:
@@ -149,6 +148,23 @@ jobs:
           # The release configuration is checked against the history it claims to cover.
           fetch-depth: 0
       - uses: ./.github/actions/tool-dependencies
+      - id: actionlint
+        name: Read the locked workflow linter version
+        run: node tools/workflow-lint.mjs --github-output "$GITHUB_OUTPUT"
+      - name: Install the attested workflow linter
+        env:
+          ACTIONLINT_VERSION: ${{ steps.actionlint.outputs.version }}
+          ACTIONLINT_ARCHIVE: ${{ steps.actionlint.outputs.archive }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          gh release download "v$ACTIONLINT_VERSION" --repo rhysd/actionlint \
+            --pattern "$ACTIONLINT_ARCHIVE" --dir "$RUNNER_TEMP/actionlint"
+          gh attestation verify "$RUNNER_TEMP/actionlint/$ACTIONLINT_ARCHIVE" --repo rhysd/actionlint
+          tar -xzf "$RUNNER_TEMP/actionlint/$ACTIONLINT_ARCHIVE" -C "$RUNNER_TEMP/actionlint" actionlint
+          echo "$RUNNER_TEMP/actionlint" >> "$GITHUB_PATH"
+      - name: Verify GitHub Actions workflows
+        run: node tools/workflow-lint.mjs --check
       - name: Verify repository tooling
         working-directory: frontend
         run: npm run test:tools

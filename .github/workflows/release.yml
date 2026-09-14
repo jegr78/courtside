@@ -109,9 +109,7 @@ jobs:
           -DnewVersion="$VERSION" -DgenerateBackupPoms=false
 
       - name: Build and test
-        env:
-          COURTSIDE_WEBKIT_AXE: 'true'
-        run: ./mvnw -B verify
+        run: ./mvnw -B verify -Dfrontend.e2e.skip=true
 
       - name: Extract the layers
         run: >
@@ -300,6 +298,48 @@ jobs:
           path: build/security/release-build.json
           retention-days: 14
           if-no-files-found: error
+
+  browser:
+    needs: nightly-evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+      - name: Take the version from the tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Package the release browser candidate
+        run: |
+          ./mvnw -B versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+          ./mvnw -B package -DskipTests -Dfrontend.test.skip=true
+      - name: Run the release browser journeys
+        working-directory: frontend
+        env:
+          COURTSIDE_WEBKIT_AXE: 'true'
+        run: ./node/node ./node/node_modules/npm/bin/npm-cli.js run test:e2e
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: release-browser-evidence-${{ github.run_id }}
+          path: |
+            frontend/test-results/visual-journeys
+            frontend/test-results/browser-security/browser-storage-evidence.json
+            frontend/test-results/browser-security/browser-csp-evidence.json
+            frontend/test-results/**/trace.zip
+            !frontend/test-results/browser-security-*/trace.zip
+            frontend/test-results/**/*.png
+            frontend/test-results/browser-diagnostics/*.json
+            frontend/test-results/browser-gate-outcome.json
+          if-no-files-found: warn
+          retention-days: 14
 
   image:
     needs: build
@@ -615,7 +655,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [build, image, qualify, security-record, upgrade, restore]
+    needs: [build, browser, image, qualify, security-record, upgrade, restore]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

@@ -115,6 +115,23 @@ jobs:
             echo "- Publication allowed: \`$publish\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  retention-plan:
+    needs: select
+    if: github.event_name == 'workflow_dispatch' && inputs.publish != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Exercise the bounded registry retention plan without deletion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/nightly-image-retention.mjs --repository "$GITHUB_REPOSITORY"
+
   package:
     needs: select
     if: needs.select.outputs.build == 'true'

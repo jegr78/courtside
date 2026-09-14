@@ -7,6 +7,7 @@ const workflow = readFileSync(
   fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)),
   "utf8"
 );
+const pom = readFileSync(fileURLToPath(new URL("../pom.xml", import.meta.url)), "utf8");
 
 test("given a release image, when publishing it, then the same digest is qualified on every architecture first", () => {
   // when / then
@@ -18,12 +19,18 @@ test("given a release image, when publishing it, then the same digest is qualifi
   assert.match(workflow, /COURTSIDE_UAT_VERSION: release-candidate-\$\{\{ github\.sha \}\}@\$\{\{ needs\.image\.outputs\.digest \}\}/);
   assert.match(workflow, /node tools\/courtside\.uat-smoke\.mjs --confirm courtside-uat/);
   assert.match(workflow, /\n  security-record:\n    needs: \[build, image, qualify, active-security\]/);
-  assert.match(workflow, /\n  publish:\n    needs: \[build, image, qualify, security-record, upgrade, restore\]/);
+  assert.match(workflow,
+    /\n  publish:\n    needs: \[build, browser, image, qualify, security-record, upgrade, restore\]/);
 });
 
 test("given a release build, when browser tests run, then WebKit axe qualification is required", () => {
   // when / then
-  assert.match(workflow, /- name: Build and test\n        env:\n          COURTSIDE_WEBKIT_AXE: 'true'\n        run: \.\/mvnw -B verify/);
+  assert.match(workflow,
+    /- name: Build and test\n        run: \.\/mvnw -B verify -Dfrontend\.e2e\.skip=true/);
+  assert.match(workflow, /\n  browser:\n    needs: nightly-evidence/);
+  assert.match(workflow,
+    /\n      - name: Run the release browser journeys\n        working-directory: frontend\n        env:\n          COURTSIDE_WEBKIT_AXE: 'true'\n        run: \.\/node\/node \.\/node\/node_modules\/npm\/bin\/npm-cli\.js run test:e2e/);
+  assert.match(pom, /<id>npm-e2e<\/id>[\s\S]+?<skip>\$\{frontend\.e2e\.skip\}<\/skip>/);
 });
 
 test("given a candidate image, when qualifying it, then deployment and vulnerability failures block publication", () => {

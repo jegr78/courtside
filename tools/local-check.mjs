@@ -15,6 +15,12 @@ const verificationOwnerFile = ".courtside-verification-owner.json";
 // full verification runs — which is also why the documentation gate is repeated instead of resolved.
 const protectedFullTasks = [
   {
+    label: "workflow-lint",
+    workingDirectory: "repository",
+    executable: "node",
+    arguments: ["tools/workflow-lint.mjs", "--check"]
+  },
+  {
     label: "docs-check",
     workingDirectory: "repository",
     executable: "node",

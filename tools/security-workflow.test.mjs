@@ -19,6 +19,12 @@ const frontendPackage = JSON.parse(readFileSync(join(repository, "frontend/packa
 const frontendLock = JSON.parse(readFileSync(join(repository, "frontend/package-lock.json"), "utf8"));
 const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 
+test("given a verified revision is assessed again, when its security image is prepared, then it is packaged without repeating the complete test suite", () => {
+  // when / then
+  assert.doesNotMatch(scheduled, /\.\/mvnw -B (?:clean )?(?:package|verify)/);
+  assert.match(scheduled, /courtside\.uat-smoke\.mjs --confirm courtside-uat/);
+});
+
 function jobsStartingASecurityTarget() {
   const directory = join(repository, ".github/workflows");
   return readdirSync(directory).filter((file) => file.endsWith(".yml")).flatMap((file) =>

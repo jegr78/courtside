@@ -29,10 +29,15 @@
     },
     "full": {
       "ciJobs": ["docs", "backend", "frontend", "tooling", "security"],
-      "localTasks": ["docs-check", "full"]
+      "localTasks": ["workflow-lint", "docs-check", "full"]
     }
   },
   "localTaskDefinitions": {
+    "workflow-lint": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/workflow-lint.mjs", "--check"]
+    },
     "docs-check": {
       "workingDirectory": "repository",
       "executable": "node",

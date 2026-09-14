@@ -197,6 +197,16 @@
       ]
     },
     {
+      "path": ".github/workflows/release-plan-sync-nightly.yml",
+      "profiles": [
+        "tooling"
+      ],
+      "validators": [
+        "tools/nightly-failure-workflow.test.mjs",
+        "tools/workflow-action-pinning.test.mjs"
+      ]
+    },
+    {
       "path": ".github/workflows/release-please.yml",
       "profiles": [
         "full"

@@ -46,8 +46,10 @@ proves the tagged code and image itself.
 If the selected revision already labels the published `nightly` image, the workflow skips package,
 image and qualification work and runs retention only. Otherwise it publishes `nightly` and one
 dated tag only after SBOM and provenance attestations, signing, and verification have succeeded.
-The registry keeps the newest seven dated nightlies plus every non-nightly image and the complete
-manifest closure each retained digest needs.
+The registry keeps the newest seven dated nightlies, every published version and the complete
+manifest closure each retained digest needs. A candidate-only digest follows the 14-day release
+evidence window; the daily nightly retention removes it after that window without touching a digest
+that also carries a published version.
 
 ### Nightly source attestation v1
 
@@ -152,7 +154,8 @@ Permission failures and malformed evidence still stop the build.
 | Job | What it establishes |
 |---|---|
 | `nightly-evidence` | A first-attempt build on `main` and its coupled nightly-image workflow completed for an ancestor of the tag, and no tracker-written nightly failure remains open |
-| `build` | Dependency-remediation deadlines hold, the version is stamped, the full suite passes on the tagged commit, CodeQL analyses the sources, npm audit evidence is captured, and the release-build security policy holds |
+| `build` | Dependency-remediation deadlines hold, the version is stamped, backend, frontend, tooling and artifact tests pass on the tagged commit, CodeQL analyses the sources, npm audit evidence is captured, and the release-build security policy holds |
+| `browser` | The packaged tagged source passes the complete Chromium and WebKit browser matrix; it runs beside `build` so browser duration cannot consume the security-analysis budget |
 | `image` | One multi-architecture image is built and pushed as `release-candidate-<sha>` |
 | `qualify` | That exact digest is brought up through the reference deployment on `amd64` and `arm64`, and its vulnerabilities are checked against the candidate-image policy |
 | `active-security` | The running candidate is exercised by the scanners of the `active` profile. The `destructive` profile — resource abuse — does not run here |
@@ -168,8 +171,9 @@ publication, so the digest a club pulls is the digest that was brought up twice.
 
 It stops at the job that refused, and nothing is published under a version tag: the release the
 merge created is still a draft and stays one. What stays behind is the `release-candidate-<sha>`
-image, unsigned and unqualified, in a public registry — nothing removes those, and no version tag
-resolves to one.
+image, unsigned and unqualified, in a public registry. Nightly retention removes a candidate-only
+digest after 14 days; a published version that shares the digest keeps it. No version tag resolves
+to a failed candidate.
 
 **The tag stays where it is.** A tag that once named a commit and later names another is the one
 thing a consumer cannot detect, and by the time a run has started, the tag has been observed. Fix

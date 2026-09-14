@@ -251,7 +251,7 @@ test("given dev debug with suspend, when planning processes, then JDWP waits on 
 test("given build and verify, when planning commands, then Maven remains the build entry point", () => {
   // when / then
   assert.deepEqual(processPlans(parseArguments(["build"]), "linux").single.args,
-    ["package", "-DskipTests"]);
+    ["package", "-DskipTests", "-Dfrontend.test.skip=true"]);
   assert.deepEqual(processPlans(parseArguments(["verify"]), "linux").single.args,
     ["clean", "verify"]);
 });

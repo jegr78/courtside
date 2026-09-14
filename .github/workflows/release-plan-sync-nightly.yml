@@ -1,0 +1,15 @@
+name: release plan sync nightly
+
+on:
+  schedule:
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  sync:
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/release-plan-sync.yml

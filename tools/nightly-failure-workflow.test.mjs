@@ -10,6 +10,8 @@ const directory = new URL("../.github/workflows/", import.meta.url);
 const workflow = readFileSync(new URL("nightly-failure-tracking.yml", directory), "utf8");
 const tracker = yaml.load(workflow);
 const release = readFileSync(new URL("release.yml", directory), "utf8");
+const releasePlanSync = readFileSync(new URL("release-plan-sync.yml", directory), "utf8");
+const releasePlanNightly = readFileSync(new URL("release-plan-sync-nightly.yml", directory), "utf8");
 const trackerSource = readFileSync(new URL("./nightly-failure-tracker.mjs", import.meta.url), "utf8");
 
 function scheduledWorkflowNames() {
@@ -34,6 +36,17 @@ test("given a workflow that runs on a schedule, when tracking is wired, then it 
 
   // then
   assert.deepEqual(watched, scheduledWorkflowNames());
+});
+
+test("given release-plan updates also react to issues, when nightly tracking is wired, then only its schedule-only wrapper is watched", () => {
+  // when / then
+  assert.doesNotMatch(releasePlanSync, /^\s+schedule:/m);
+  assert.match(releasePlanSync, /^\s+workflow_call:/m);
+  assert.match(releasePlanNightly, /^name: release plan sync nightly$/m);
+  assert.match(releasePlanNightly, /^\s+schedule:/m);
+  assert.match(releasePlanNightly, /uses: \.\/\.github\/workflows\/release-plan-sync\.yml/);
+  assert.ok(tracker.on.workflow_run.workflows.includes("release plan sync nightly"));
+  assert.equal(tracker.on.workflow_run.workflows.includes("release plan sync"), false);
 });
 
 test("given a workflow that runs on a schedule, when its runtime changes, then it can be qualified on demand", () => {

@@ -2,8 +2,10 @@ import { pathToFileURL } from "node:url";
 
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
 const datedTagPattern = /^nightly-\d{8}-[a-f0-9]{7}$/;
+const releaseCandidateTagPattern = /^release-candidate-[a-f0-9]{40}$/;
 const attachmentTagPattern = /^sha256-([a-f0-9]{64})(?:\.(?:att|sbom|sig))?$/;
 const oneDay = 86_400_000;
+const releaseEvidenceWindow = 14 * oneDay;
 
 function timestamp(value, field) {
   if (typeof value !== "string") throw new Error(`${field} is invalid`);
@@ -69,9 +71,13 @@ export function planNightlyImageRetention({ versions, manifests, now }) {
     .map(({ tag }) => tag);
   const keptDated = new Set(keptDatedTags);
   const byDigest = new Map(versions.map((version) => [version.digest, version]));
-  const keptDigests = new Set(versions.filter(({ tags }) => tags.some((tag) =>
+  const releaseCandidateCutoff = observedAt.valueOf() - releaseEvidenceWindow;
+  const keptDigests = new Set(versions.filter(({ tags, updatedAt }) => tags.some((tag) =>
     tag === "nightly" || tag === "nightly-candidate" || keptDated.has(tag)
-      || (!tag.startsWith("nightly") && !attachmentTagPattern.test(tag))))
+      || (releaseCandidateTagPattern.test(tag)
+        && timestamp(updatedAt, "version updatedAt").valueOf() >= releaseCandidateCutoff)
+      || (!tag.startsWith("nightly") && !tag.startsWith("release-candidate-")
+        && !attachmentTagPattern.test(tag))))
     .map(({ digest }) => digest));
 
   let changed = true;
