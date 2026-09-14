@@ -251,7 +251,7 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
   await page.getByTestId("create-card").click();
   const createdCard = await cardCreated;
   expect(createdCard.status()).toBe(201);
-  const restrictedEventCardId = (await createdCard.json()).id;
+  const restrictedEventCardId = ((await createdCard.json()) as { id: string }).id;
   await expect(page.getByRole("status")).toBeVisible();
   await page.goto("/");
   await page.getByTestId("preferences-menu").click();

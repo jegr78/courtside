@@ -52,8 +52,11 @@ const JOURNEY_SEEDED = "journey_baseline";
 
 // Every language the guides are published in, because a club's rows carry one name each and the
 // club a guide shows has to be one whose language that guide's reader would have chosen.
-const PUBLISHED_LANGUAGES: string[] = JSON.parse(readFileSync(
-  new URL("../../site/screenshots/captures.json", import.meta.url), "utf8")).locales;
+function publishedLanguages(): string[] {
+  return (JSON.parse(readFileSync(resolve("../site/screenshots/captures.json"), "utf8")) as {
+    locales: string[];
+  }).locales;
+}
 
 const PINNED_BROWSER_IMAGE =
   "mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27";
@@ -860,7 +863,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     const seededPerLanguage = new Map([[shippedLanguage, JOURNEY_SEEDED]]);
     // The rows an instance ships are named at startup, so a club that speaks another language is a
     // restart rather than an update - and taking it once here beats taking it before every capture.
-    for (const language of PUBLISHED_LANGUAGES.filter((named) => named !== shippedLanguage)) {
+    for (const language of publishedLanguages().filter((named) => named !== shippedLanguage)) {
       await executeSql(`UPDATE club_config SET default_locale = '${language}'`);
       await stopApplication();
       await startApplication();
