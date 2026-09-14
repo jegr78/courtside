@@ -107,14 +107,14 @@ The four catalog states mean:
 
 **A disposition is a rationale in this catalog, not an issue in the tracker.** A reading that cannot
 anchor a control writes down what the control asks, what this architecture actually does, and why
-the two do not meet — beside the control, where the next reader finds it. It does not open an issue,
+the two do not meet, beside the control, where the next reader finds it. It does not open an issue,
 and `blocked` does not require one.
 
 A `trackingIssue` is added only when a **product change** is what closes the gap: something a club
 would notice, that somebody will build. It names that change and it goes on the board like any other
 work. A control whose only remedy is an inventory, a map, a policy document or a restatement of
 evidence we already hold gets a rationale and nothing else. That kind of entry cannot be closed by
-building anything, so as an issue it is deferral wearing a ticket number — which the repository
+building anything, so as an issue it is deferral wearing a ticket number, which the repository
 rules forbid, and which this catalog exists to make unnecessary.
 
 The distinction is the remedy, never the severity. A P2 that changes a response a member sees is an
@@ -122,9 +122,9 @@ issue; a P2 that produces a document proving what the code already does is a rat
 
 An implemented entry can still be incomplete in a particular run. Catalog state describes capability; run outcome describes execution. Controls that require human judgment link to the concrete procedures in the [manual assessment runbook](security-manual-assessment.md). Their retained record is constrained by the closed [`manual-assessment-evidence.schema.json`](../security/manual-assessment-evidence.schema.json) rather than an unaudited checklist.
 
-A manual procedure covers whole chapters, so the procedure a control links to says nothing specific about that control. A control that has been reviewed against one named production path additionally carries `controlEvidence`: the production path it was read against, and one test, written as `<path>#<name>`, that goes red when the behavior stops. The contract test resolves both to readable files and requires either a declared code test or an automated assessment ID from the catalog, so an anchor pointing at a directory, a missing file or a mere substring fails the build. What the build cannot check is that the named test reaches the named path: that the anchor falsifies the control is the reviewer's finding, recorded with it, not something the contract derives.
+A manual procedure covers whole chapters, so the procedure a control links to says nothing specific about that control. A control that has been reviewed against one named production path also carries `controlEvidence`: the production path it was read against, and one test, written as `<path>#<name>`, that goes red when the behavior stops. The contract test resolves both to readable files and requires either a declared code test or an automated assessment ID from the catalog, so an anchor pointing at a directory, a missing file or a mere substring fails the build. What the build cannot check is that the named test reaches the named path: that the anchor falsifies the control is the reviewer's finding, recorded with it, not something the contract derives.
 
-That anchor is what a pass costs. `validateManualAssessmentEvidence` refuses `pass` for a control that carries no `controlEvidence`, so an outcome derived from a chapter-level template alone cannot be recorded. An automated assessment entry does not stand in for it: `v5.0.0-15.3.3` links to two of them and was still recorded blocked, because a surface-wide dynamic test is not a reading of that control. A control without an anchor can still be recorded `fail`, `not-applicable` or `blocked`; the first complete manual run had no anchors to read and recorded 146 controls as blocked, and [`manual-baseline-control-outcomes.json`](../security/manual-baseline-control-outcomes.json) names which. An anchor added since does not change what that run observed — outcomes come from runs, and the catalog says which controls an anchor is now available for. Run `manual-anchored-20260910` is the run that read them, and [`manual-anchored-control-outcomes.json`](../security/manual-anchored-control-outcomes.json) is what it recorded.
+That anchor is what a pass costs. `validateManualAssessmentEvidence` refuses `pass` for a control that carries no `controlEvidence`, so an outcome derived from a chapter-level template alone cannot be recorded. An automated assessment entry does not stand in for it: `v5.0.0-15.3.3` links to two of them and was still recorded blocked, because a surface-wide dynamic test is not a reading of that control. A control without an anchor can still be recorded `fail`, `not-applicable` or `blocked`; the first complete manual run had no anchors to read and recorded 146 controls as blocked, and [`manual-baseline-control-outcomes.json`](../security/manual-baseline-control-outcomes.json) names which. An anchor added since does not change what that run observed, outcomes come from runs, and the catalog says which controls an anchor is now available for. Run `manual-anchored-20260910` is the run that read them, and [`manual-anchored-control-outcomes.json`](../security/manual-anchored-control-outcomes.json) is what it recorded.
 
 A control-specific reading that finds the product does not meet the requirement carries a
 `findingReference` instead of `controlEvidence`. It resolves to the redacted finding in
@@ -178,7 +178,7 @@ pass against the application it repairs, and a gate that cannot accept such a br
 detector and the repair apart. The comparator refuses a pair whose application is not the candidate
 revision's. The previous toolchain therefore meets an application it predates: when the branch
 changes a behaviour that toolchain asserts, the base run fails, which the comparison tolerates and
-the job summary names — and tolerating it is a named decision: every base tool that ends `failed`
+the job summary names, and tolerating it is a named decision: every base tool that ends `failed`
 has to appear in `toleratedBaseFailures` in `security/tool-update-acknowledgement.json`, which puts
 it in the diff a reviewer reads. The previous toolchain is the one judgement in the pair the branch
 did not write, so discarding it silently is not available. Only a failed candidate run fails the
@@ -218,7 +218,7 @@ a failed candidate assessment fail the pull-request build. So does a finding the
 or lost that `security/tool-update-acknowledgement.json` does not name: the difference is what the
 run exists to produce, so it is written to the job summary and has to be recorded in the pull
 request before the branch passes. The run itself is triggered by the digest of what a paired run
-varies — the assessment's code and contract, the deployment description each side reads, and the
+varies, the assessment's code and contract, the deployment description each side reads, and the
 lockfile the tools resolve against. A dependency bump of the application is not a tool update. That
 decision is a job of its own, and the comparison is a second job started only by its answer, so a
 pull request that varies nothing shows the comparison as skipped rather than as a check that passed
@@ -247,7 +247,7 @@ continues with active as attempt 2 only after the safe attempt produced complete
 Both manifests are gated against the same image, commit and target identity. The schedule always selects `safe`; active traffic is
 never introduced by changing a default or cron expression.
 
-The assessment publishes its normalized records — the manifests and the gate summaries — and
+The assessment publishes its normalized records, the manifests and the gate summaries, and
 nothing else. It used to seal the underlying evidence directory into a CMS envelope addressed to a
 tracked recipient certificate. That envelope is gone: no private key for it was ever created, so
 every envelope it produced is unreadable and stays that way. The mechanism's only safeguard against
@@ -264,7 +264,7 @@ gh attestation verify manifest.json --repo jegr78/courtside
 
 Evidence that cannot be published in that form is not retained past the run. Reintroducing a
 protected channel means creating and holding a key first, and proving it usable by decrypting
-something the workflow encrypted — never by recording that somebody did.
+something the workflow encrypted, never by recording that somebody did.
 
 The release workflow runs the complete `active` profile after both architectures qualify the
 candidate and before the security record can be assembled. The active manifest, normalized gate,

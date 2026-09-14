@@ -110,7 +110,7 @@ test("a barred member sees the refusal before a booking dialog can open", async 
 
   // then
   const refusal = page.getByTestId("booking-eligibility");
-  await expect(refusal).toContainText("Booking a court is not open to you.");
+  await expect(refusal).toContainText("Your membership type does not allow you to book a court.");
   await expect(refusal.locator('[data-code="booking.rule.noCourtBooking"]')).toBeVisible();
   await selectJourneyDate(page, journeyService.visualDate);
   const targetSlot = freeSlot(page, 2, "12:00");
@@ -393,7 +393,7 @@ test("a court going out of service reaches the member whose booking is on it",
     // The newest message, because the confirmation of that same booking is already in the mailbox.
     await expect
       .poll(async () => (await messageTo(journeyService.mailboxURL, "jane.doe@example.org")).Text)
-      .toContain("out of service");
+      .toContain("A court in your booking has been deactivated.");
     expect((await messageTo(journeyService.mailboxURL, "jane.doe@example.org")).Text)
       .toContain("13:00");
   });
@@ -557,7 +557,7 @@ test("an admin adds a person, gives them an account, and that person signs in an
 
   // then — the board sees where the account stands, and never the password itself
   const mailed = await messageTo(journeyService.mailboxURL, "mary.roe@example.org");
-  const credential = credentialIn(mailed, "Passwort:");
+  const credential = credentialIn(mailed, "Einmalpasswort:");
   await expect(page.getByTestId("account-username")).toHaveValue("roe.mary");
   await expect(page.getByTestId("account-roles-MEMBER")).toBeChecked();
   await expect(page.getByTestId("admin-person-view")).not.toContainText(credential);

@@ -1,16 +1,13 @@
-# Courtside — Design Specification (Release 1)
+# Courtside design specification
 
 **Status:** Approved for planning
-**Scope:** Release 1 — court booking, members and accounts, admin backend, import/export and reports
+**Scope:** Release 1, court booking, members and accounts, admin backend, import/export and reports
 
-> **This document describes the design, not the build.** It is written in the present tense
-> throughout, which is how a specification reads — but the present tense here means *"this is how
-> Courtside is designed to work"*, not *"this is what today's code does"*. Nothing is released
-> yet. **What is built** is the section immediately below; everything else in this document is
-> the target. Where the difference matters for a decision — most of all in section 10, Security —
-> it is marked inline.
+> **This document describes the target design.** Present-tense statements do not by themselves
+> describe released behaviour. Section 0 records what the current build implements. Later sections
+> mark relevant differences between the build and the design, especially in section 10.
 >
-> Do not read a described property as a shipped guarantee.
+> Treat only implemented and tested behaviour as a product guarantee.
 
 ## 0. What is built today
 
@@ -25,8 +22,8 @@ Fifteen modules exist: `api`, `audit`, `booking`, `card`, `config`, `dataexchang
 `shared`. `api` holds the OpenAPI-generated request, response and controller-interface types and
 carries no logic of its own, which is why it is declared shared alongside `shared` rather than given
 `allowedDependencies` of its own. `demo`, `performance` and `securityassessment` seed disposable
-environments — a walkthrough dataset, a synthetic load-test dataset and the dataset a security
-assessment runs against — and each refuses to start unless its environment guard confirms the
+environments, a walkthrough dataset, a synthetic load-test dataset and the dataset a security
+assessment runs against, and each refuses to start unless its environment guard confirms the
 database it is about to fill is the disposable one it names (`courtside_dev` for `demo`,
 `courtside_perf` for `performance`, `courtside_security` for `securityassessment`), not whatever the
 deployment happens to point at. None of the three reaches a club: packaging writes them to a
@@ -35,13 +32,13 @@ developer's demo run starts from the compiled classes rather than from that imag
 environment runs an image with the fixture classes layered over the production one; and the security
 assessment seeds from a one-shot container built the same way, so the target it scans is the
 production image itself. The `reporting` and `integration` modules of section 3 are designed
-and not built. `audit` is built: every configuration change made through the admin API — facility,
-cards, config, rule sets, the roster and the import configuration — is recorded in the append-only
+and not built. `audit` is built: every configuration change made through the admin API, facility,
+cards, config, rule sets, the roster and the import configuration, is recorded in the append-only
 `domain_event` table before the commit that makes it: actor, time, entity, and, except for free
 text, the values. Which services that covers is derived from the admin API rather than listed, so a
 surface is covered on the day its controller is written instead of on the day somebody remembers to
-name it. A free-text field never carries its value — a create event omits it, a change event names
-it in `changedFields` (`fields` for `roster.person.corrected`) — which is what keeps section 11's
+name it. A free-text field never carries its value, a create event omits it, a change event names
+it in `changedFields` (`fields` for `roster.person.corrected`), which is what keeps section 11's
 erasure working, since the log then holds nothing personal to remove. Bookings reach it too, though
 not every one. The writer records every event a module publishes rather than a list it keeps, so
 `booking.booking.confirmed`, a participant recorded or withdrawn, a displacement and a reminder land
@@ -54,36 +51,36 @@ method of each against an event type or an explicit `none`. The log is read back
 /api/admin/audit`, a cursor-paged, administrator-only endpoint that resolves the subject and the
 acting account to the names they carry today. `ConfigurationSubjectNames` is the port interface that
 resolution uses: an adapter beside each of the six publishing modules, plus one in `identity` that
-resolves a person id — the subject of a roster event and of an import's link events — to that
+resolves a person id, the subject of a roster event and of an import's link events, to that
 person's display name, since `member` and `dataexchange` publish those but `identity` owns the
 person. `audit` depends on none of the six directly. Three gaps are accepted rather than closed: the
 bootstrap administrator's own account is created by writing `Person` and `UserAccount` straight to
 their repositories, bypassing the roster service, so that one write is never recorded at all; the
-demo seed does the same for its own two demo members — `Person`, `UserAccount` and `Member` written
-straight to their repositories — so those writes are not recorded either; and the demo seed's court
+demo seed does the same for its own two demo members, `Person`, `UserAccount` and `Member` written
+straight to their repositories, so those writes are not recorded either; and the demo seed's court
 changes, which do go through `FacilityService`, are recorded with no actor, because the seed runs as
 an `ApplicationRunner` before any session exists.
 
 Built and covered by tests: the booking core including the exclusion constraint, booking cards and
 participant cards, booking series and multi-court allocation, the rule engine, opening hours and
 courts, accounts, roles and session login, club configuration and branding, the audit log of every
-administrative change, the roster — the club's
+administrative change, the roster, the club's
 people, the account and roles a person holds, the membership they hold with the dates it runs
-between, correcting a username and resetting a password — and the admin surface for all of it. A
+between, correcting a username and resetting a password, and the admin surface for all of it. A
 club can also describe the systems it means to synchronise its roster from: the column mapping, the
 membership types a source's categories stand for, the fields that source owns and the share of the
-roster whose disappearance needs confirming — and it can say which member number of a source stands
+roster whose disappearance needs confirming, and it can say which member number of a source stands
 for which person, which is what makes a second snapshot an update rather than a second set of
-people. A club can upload a snapshot and see exactly what it would change — every creation, every
+people. A club can upload a snapshot and see exactly what it would change, every creation, every
 field of every update, every membership that would end, every row that could not be read and every
-creation that resembles somebody the roster already holds — and it can then execute exactly that
+creation that resembles somebody the roster already holds, and it can then execute exactly that
 reviewed change set, atomically, once per source at a time, refusing the run if anybody it would
 touch has changed in the meantime. A membership type can be marked as granting an account, and an
 execution then opens one for every person it covers who does not already hold one, holding `MEMBER`
 alone and with its one-time password mailed to that member rather than shown to anybody; the
 preview names per row whether an account would be opened and, where it would not, why, and it
 reports every row whose mailbox more than one person reads. A board can also answer, from a
-person's page, what the instance holds about that one person — the file described in section 11 —
+person's page, what the instance holds about that one person, the file described in section 11,
 and take the roster and a period's confirmed bookings out as CSV, in the separator and character
 set its own spreadsheet reads. The change log and the message log have no export yet.
 `/actuator/health` is exposed. The
@@ -99,12 +96,12 @@ the DNS a receiver looks at, and the application sends through it: the `notifica
 to an event and generates the credential at the moment it is sent. Both message bundles ship, and
 which one an account is written to in is the club's configured default at creation, the member's
 own choice afterwards, and an administrator's correction where a member cannot reach it. Mail
-configuration is mandatory — an instance without it refuses to start and names
-the variables it is missing — and `/actuator/health/mail` reports the sending path to an
+configuration is mandatory, an instance without it refuses to start and names
+the variables it is missing, and `/actuator/health/mail` reports the sending path to an
 administrator without ever opening it. The message names the date its password stops working, and
 sign-in enforces that date: once it has passed the credential no longer authenticates, and the
 board issues a new one. How long an invitation and a reset last is a club setting, one figure for
-each, so a board that knows its own members decides it rather than inheriting ours — up to a week
+each, so a board that knows its own members decides it rather than inheriting ours, up to a week
 each, because a credential this instance generated and mailed is not one the member chose, and it
 expires whether or not anybody used it. The date binds
 the issued credential only, so a member who has since chosen their own password keeps it. A message a
@@ -118,13 +115,13 @@ long as it runs.
 
 Every outgoing message leaves a record of its own, in `message_record`: which account, which kind of
 message, the `Message-ID` this instance set, when it was queued and what became of it. Four states,
-and none of them says delivered — `queued`, `handed_over`, `refused`, `failed` — because handing a
+and none of them says delivered, `queued`, `handed_over`, `refused`, `failed`, because handing a
 message to the club's mail server is the last thing this instance can observe, and a state claiming
 more would claim knowledge nobody has. A refusal carries the kinds of failure the mail library
 reported and the SMTP status code, never the relay's own words about an address. The record stands
 on its own transaction per state change, so the rollback that protects the credential above cannot
 take the row that explains it. `GET /api/admin/messages` reads it back, cursor-paged and
-administrator-only — who was written to and when is personal data, and no officer role needs it —
+administrator-only, who was written to and when is personal data, and no officer role needs it,
 and the administration surface shows it as a log of its own and as the last message beside the
 credential state on the person's page. There is no control anywhere that sends the same message
 again: a credential exists only as a hash once it has gone out, so the remedy for a refusal is to
@@ -152,30 +149,30 @@ path replaces: the credentials an account needs to sign in at all, the notice th
 displaced a booking, and being told somebody wrote you into one. The instance refuses those by name
 instead of ignoring the request, and the constraint that lists them is read back out of the database
 and compared against the enum at build time. A message somebody declined is not a message that
-failed, so it leaves no row in `message_record` and the log says it was not sent — which also means
+failed, so it leaves no row in `message_record` and the log says it was not sent, which also means
 the message log cannot tell a board that somebody declined, and is not meant to: what a member
 chose is the member's, not the board's.
 
 The web client is built and covered by tests too: the court plan as the public landing page, which
 names a club with no court open instead of drawing an empty grid, personal booking management,
-managed appointments for officers — including creating a recurring series, which is previewed
-before anything is written and reports what it had to skip — and the browser admin surface for
-configuration, facilities and the club's people — adding somebody, correcting their name or
+managed appointments for officers, including creating a recurring series, which is previewed
+before anything is written and reports what it had to skip, and the browser admin surface for
+configuration, facilities and the club's people, adding somebody, correcting their name or
 address, giving them an account, changing its roles, correcting its username, sending it new
 credentials and disabling it. Membership types are administered there as well, each showing how
 many people hold it and whether it opens an account on import, and the configuration names the rule
 set that measures a person holding none. A rule set can bar its holders from booking a court at all
 and can require its holders to cancel before a configured deadline. So is the whole import:
 describing a source, linking the people a file cannot match by number, uploading a member list,
-reading what it would change, and running it. Where in that a board stands is on screen — a source
-described, a snapshot read, a run ready — read from the source and the preview in hand rather than
+reading what it would change, and running it. Where in that a board stands is on screen, a source
+described, a snapshot read, a run ready, read from the source and the preview in hand rather than
 from a stored checklist, and every stage already reached takes the page back to it. Whether a
 preview may still run is decided by the instance and not by the page that says so. The column
 mapping is offered from the club's own export, read in the browser and never uploaded for that
 purpose. Before a court, a booking card or a day goes out of service, the facility view says which
-bookings sit on it — information beside the control, never a gate in front of it. No administrative
+bookings sit on it, information beside the control, never a gate in front of it. No administrative
 surface loses work by accident: an edited row, a described import source and a half-filled creation
-form each count as something to lose, and leaving asks first — the page, whether inside the
+form each count as something to lose, and leaving asks first, the page, whether inside the
 application or by closing the tab, and equally the editor on it when another rule set or another
 import source is opened in its place. A change that answers for one attribute leaves the rest of
 the row as it was typed, and a refused creation leaves the form as the board left it. What a board
@@ -228,7 +225,7 @@ later is additive rather than invasive.
 
 CSV **import** is in Release 1, and so is the export of the two lists a club is most likely to
 need outside the instance: the roster and a period's confirmed bookings. The lists that remain are
-records rather than data a club works with elsewhere — the change log and the message log — and
+records rather than data a club works with elsewhere, the change log and the message log, and
 their export follows in the release after it. The live, bidirectional sync stays deferred to its
 own project.
 
@@ -271,7 +268,7 @@ Every tagged release publishes:
 - Cosign signature and SBOM
 - The OpenAPI document, which is written by hand and is the source of truth the API is
   generated from, not a by-product of it. The release workflow attaches
-  `src/main/resources/api/openapi.yaml` to the tag unchanged — there is nothing to build, and a
+  `src/main/resources/api/openapi.yaml` to the tag unchanged, there is nothing to build, and a
   document assembled at release time would be a different document from the one the instance
   serves.
 - Release notes including explicit upgrade notes for breaking changes
@@ -292,7 +289,7 @@ startup; the upgrade path is explicitly tested (see section 10).
 ### Language and internationalisation
 
 Code, identifiers, comments, commit messages, documentation, API field names and the
-database schema are **English**. User-facing text — UI strings and email templates — goes
+database schema are **English**. User-facing text, UI strings and email templates, goes
 through message bundles. German is the default locale, English the second. Locale is
 stored per user account with a fallback to the instance setting. Switching it re-renders the text
 and nothing else: no view reloads, so a selection, a typed value and a page already fetched all
@@ -304,30 +301,31 @@ carries a `messages_<tag>` bundle for the screen, a `mail_<tag>` bundle for what
 translation of the same name; nothing lists the set anywhere, and an image that translates one
 surface but not the others refuses to start rather than writing to a member in a language they did
 not choose. `GET /api/public/config` serves the derived set as
-`supportedLocales`, and every surface that offers a language reads it from there — no client, no
-schema and no database constraint names a language. The contract states the *shape* of a language
+`supportedLocales`, and every surface that offers a language reads it from there. No client, schema
+or database constraint names a language. The contract states the *shape* of a language
 tag; a well-formed tag the instance ships no translation for is refused with
 `urn:courtside:error:language-unsupported`, at the boundary as a field error and again in the
 service that writes it.
 
 **The rows an instance ships with are named in the club's language, once.** A booking card, a slot
-filler, a rule set and a membership type are rows, not text a reader's browser translates, so they
-carry one name for the whole club — a member reading in English sees the same card name as the
+filler, a rule set and a membership type are rows, not text a reader's browser translates. They
+carry one name for the whole club. A member reading in English sees the same card name as the
 board that named it. The migrations seed them in the base language, and at startup and on a change
 of the club's language each module renames its own rows to what `seed_<tag>` calls them. A row is
 recognised by the id it was seeded with, and only while it still carries one of the names the image
 ships for it: a board that names a row something of its own has that name stand, because no
 language of this image gives the row that name. The converse is the accepted cost of recognising a
-row by its name rather than by a marker column — a board that renames a row to what *another*
-shipped language calls it has chosen a name the image still recognises, and the row goes on
+row by its name rather than by a marker column. A board that renames a row to what *another*
+shipped language calls it has chosen a name the image still recognises, so the row goes on
 following the club's language.
 
 Every one of those names is unique per table, so a row takes its new name only when that name is
 free; a name the club has already given to something else stays with the row that has it. A name
 already in use is never a reason for an instance not to start: at startup each row is renamed on its
 own, and one that cannot take its name leaves the others alone. Any other refusal from the database
-is this image's own defect rather than a club's data — a bundle that named a row something no row
-may carry at all — and the instance stops on it instead of filing it as a name in use. A *member* switching their own language still
+is this image's own defect rather than a club's data. This includes a bundle that named a row
+something no row may carry at all. The instance stops on such a defect instead of filing it as a
+name in use. A *member* switching their own language still
 re-renders the text and nothing else; what a row is called is the club's answer, not the reader's.
 
 Domain vocabulary:
@@ -346,18 +344,18 @@ Domain vocabulary:
 | Mitspieler | `Participant` |
 | Guthaben | `Balance` (deferred) |
 
-Structural vocabulary — terms that name a shape rather than a domain concept, and therefore
+Structural vocabulary, terms that name a shape rather than a domain concept, and therefore
 have no German counterpart in the user interface:
 
 | Term | Meaning |
 |---|---|
-| `DomainFailure` | The supertype every domain failure extends. It implements Spring's `ErrorResponse` and builds its own RFC 9457 body, so the mapping from a failure to its wire representation lives with the failure rather than in a `@RestControllerAdvice`. Deliberately **not** named `…Exception`: `CLAUDE.md` already separates the concept ("domain failures") from the mechanism ("are typed exceptions"), and this type names the concept. Concrete failures keep the suffix — `CourtNotFoundException extends DomainFailure`. |
-| `ProblemType` | The value type a `DomainFailure` carries: `slug`, `status`, `title`, `detail`. Held as a static constant per failure class so a test can read it without constructing an instance. `detail` lives here and never comes from the exception's message — a message may carry an id or a caller's input, and neither belongs in a response body. |
+| `DomainFailure` | The supertype every domain failure extends. It implements Spring's `ErrorResponse` and builds its own RFC 9457 body, so the mapping from a failure to its wire representation lives with the failure rather than in a `@RestControllerAdvice`. Deliberately **not** named `…Exception`: `CLAUDE.md` already separates the concept ("domain failures") from the mechanism ("are typed exceptions"), and this type names the concept. Concrete failures keep the suffix, `CourtNotFoundException extends DomainFailure`. |
+| `ProblemType` | The value type a `DomainFailure` carries: `slug`, `status`, `title`, `detail`. Held as a static constant per failure class so a test can read it without constructing an instance. `detail` lives here and never comes from the exception's message, a message may carry an id or a caller's input, and neither belongs in a response body. |
 | `CodedDomainFailure` | A `DomainFailure` that also carries an i18n `code` and named `params`. It emits them as a one-element `violations` array, which is the only shape a translatable failure travels in. The rest carry no code at all. |
 
 `ErrorResponse` is implemented for `getStatusCode()`, `getHeaders()` and `getBody()` only. Its
-`MessageSource` hooks — `getDetailMessageCode()` and the `MessageFormat` positional arguments
-behind it — are deliberately left unused: this API resolves messages in the frontend from a `code`
+`MessageSource` hooks, `getDetailMessageCode()` and the `MessageFormat` positional arguments
+behind it, are deliberately left unused: this API resolves messages in the frontend from a `code`
 and **named** parameters, and wiring Spring's positional mechanism alongside would give the same
 response body two competing sources of truth. A failure's `detail` is developer-facing English and
 is never what a member reads.
@@ -415,11 +413,11 @@ nothing about payment. Adding a new consumer is additive.
 The two consumers want different guarantees, and both are served from one publication. `audit`
 listens **before the commit** and writes its row in the same transaction: no commit without a row,
 which is the property that makes a log an audit log. That guarantee rests on the transaction, not
-on where a publish sits in a method — exactly one listener is registered at `BEFORE_COMMIT`, the
+on where a publish sits in a method, exactly one listener is registered at `BEFORE_COMMIT`, the
 audit writer, and a `RuntimeException` rolls the transaction back before it ever runs, so a change
 that never commits is a change never recorded. Everything else listens **after** it, through the
 event publication registry, which stores the publication in that same transaction and therefore
-delivers again after a restart that interrupted it — at least once, never never. A consumer that
+delivers again after a restart that interrupted it, at least once, never never. A consumer that
 waits on something outside the instance, as sending a message does, takes its own executor, so a
 mail server nothing can reach does not hold up the audit trail behind it. A producer knows
 neither consumer.
@@ -457,7 +455,7 @@ booking core.
 ### Event handling
 
 Spring Modulith's **Event Publication Registry** provides a persistent, in-process event
-bus with automatic retry of incomplete publications — this is the transactional outbox, and
+bus with automatic retry of incomplete publications, this is the transactional outbox, and
 it does not need to be hand-written.
 
 ```java
@@ -472,16 +470,16 @@ without the mail being safely queued.
 
 **Explicitly rejected: event sourcing as the persistence model.** In event sourcing, state
 is a projection, and a projection cannot enforce a database exclusion constraint. That
-would move the one guarantee this system must never break — non-overlapping court
-occupancy — from the database back into application code, reintroducing concurrency
+would move the one guarantee this system must never break, non-overlapping court
+occupancy, from the database back into application code, reintroducing concurrency
 problems that otherwise do not exist.
 
 **Explicitly rejected: an external broker (Kafka, RabbitMQ).** One instance serves one club, and
-a club's booking volume is bounded by the number of courts it has times the hours it opens them —
+a club's booking volume is bounded by the number of courts it has times the hours it opens them,
 a few hundred a day at the top end, which a single PostgreSQL handles without noticing. A broker
 adds no throughput that is needed but adds a component to operate and update per club instance.
 
-**Adopted instead:** an append-only `domain_event` table alongside state — not as the
+**Adopted instead:** an append-only `domain_event` table alongside state, not as the
 source of truth. It serves four purposes at once: the audit log for administrative
 changes, traceability for members ("why is my booking gone?"), a reporting data source that
 does not load the booking tables, and the natural attachment point for the future access
@@ -497,7 +495,7 @@ A member booking, a team training session, a league match and a court closed for
 differ in meaning but all exclusively occupy a time range on a court. Modelling this as cards
 on the grid, the way existing booking systems do, solves two problems at once:
 
-1. Every overlap becomes structurally impossible — including the one between a member
+1. Every overlap becomes structurally impossible, including the one between a member
    booking and a court closure, which would otherwise need application logic.
 2. The booking grid needs exactly **one** query for a whole day.
 
@@ -545,8 +543,8 @@ CREATE TABLE court_allocation (
 );
 ```
 
-A team training on courts 1–3 is **one** `booking` with three `court_allocation` rows: one
-logical unit, one cancellation, one entry in "my bookings" — while non-overlap remains
+A team training on courts 1 to 3 is **one** `booking` with three `court_allocation` rows: one
+logical unit, one cancellation, one entry in "my bookings", while non-overlap remains
 guaranteed by the database rather than by application code. Participants attach to
 `booking`, not to a court.
 
@@ -608,7 +606,7 @@ participant rules unexpressible.
 | **`participant_card`** | What fills a player slot? | one per slot |
 
 `Training`, `League match` and `Court closed` are booking cards. `Ball machine` and
-`Looking for a partner` are participant cards — they occupy a place on court without being a
+`Looking for a partner` are participant cards, they occupy a place on court without being a
 person. A guest is a third kind of filler, carried as a name rather than a card.
 
 ### Player slots have an exact configured count
@@ -639,7 +637,7 @@ booking_participant
 ```
 
 An empty `allowed_player_counts` means the card does not track players at all, which is right
-for training and closures — the club does not record who attended a junior session.
+for training and closures, the club does not record who attended a junior session.
 
 An array rather than a boolean, because a boolean could only say "at least one" and had no upper
 bound: nothing would stop twenty people being attached to one court, and "exactly four" would be
@@ -675,7 +673,7 @@ Deliberate decisions:
 - **`person` and `user_account` are separate.** Not every person has an account (children,
   dormant records from a membership import), and the future guardian/child relation needs
   this separation anyway. The column carries no unique person, so a second account is a row the
-  schema tolerates and the roster reads past — but the admin surface refuses to create one,
+  schema tolerates and the roster reads past, but the admin surface refuses to create one,
   because every write there names an account by its person and a second account would be
   unreachable through the surface that made it.
 - **`booking_participant`** references either a `person` (member) or carries a free-text
@@ -696,7 +694,7 @@ Deliberate decisions:
   **The dates record, they do not schedule.** Whether somebody is a member is decided by whether an
   end date is set, and no query compares a date with today. Neither date may therefore lie in the
   future: a start next month would make somebody a member now, and an end in December would stop
-  their membership today — seven months of a member measured against no membership-scoped rule at
+  their membership today, seven months of a member measured against no membership-scoped rule at
   all. The roster refuses a future date rather than storing one nothing honours. Scheduling a
   membership ahead needs date-aware currency in every reader, and that is the period model above.
 
@@ -707,12 +705,12 @@ Deliberate decisions:
 
 `email` is **optional on a person, mandatory on an account**, never unique, and changeable at any
 time. Clubs enrol children and juveniles under a parent's address, and a family with several
-children then shares one address across several accounts — so an email address cannot serve as the
+children then shares one address across several accounts, so an email address cannot serve as the
 identifier.
 
 A person may hold none. A club's own member list carries people it has no address for, and a roster
 that refused to record them would be refusing the club's own data. An account may not: everything
-that grants or restores access travels by mail — the first password, and both reset paths below —
+that grants or restores access travels by mail, the first password, and both reset paths below,
 so an account without an address is one nobody could ever recover. The roster therefore refuses to
 create one, and refuses to take the address away from a person who already holds an account.
 
@@ -720,17 +718,17 @@ create one, and refuses to take the address away from a person who already holds
 an address does not name one account. Two paths, and neither of them changes an account when it is
 asked:
 
-1. **By username** — the instance mails a single-use code and touches nothing. A second operation
+1. **By username**, the instance mails a single-use code and touches nothing. A second operation
    takes that code and a new password, and it is the only one that writes: it sets the password,
    clears the password-change-required state and the credential expiry, raises the security epoch
    and ends every session. A password the rules refuse does not spend the code. *Built.*
-2. **By email address** — every account registered to that address is sent its own name, and
+2. **By email address**, every account registered to that address is sent its own name, and
    nothing else changes. Mailing a credential per account would let a child who forgot their
    password invalidate their parent's, which is what a shared family address makes of the
    obvious design.
 
-The code is eight characters from `23456789ABCDEFGHJKMNPQRSTVWXYZ` — no glyph that can be read as
-another — drawn from `SecureRandom`, mailed grouped as `ABCD-EFGH`, compared without regard to case
+The code is eight characters from `23456789ABCDEFGHJKMNPQRSTVWXYZ`, no glyph that can be read as
+another, drawn from `SecureRandom`, mailed grouped as `ABCD-EFGH`, compared without regard to case
 or separator, and stored only as SHA-256. That is about 6.6·10¹¹ combinations against a route that
 carries the credential-verification limit. How long a code stays redeemable is a club setting in
 minutes, between 15 and 1440.
@@ -749,13 +747,13 @@ that does not, and the per-account issuing window is not allowed to surface eith
 a way to learn who belongs to this club. Two windows answer `429`: one on the caller's own address,
 and one on the submitted subject.
 
-The second is shared by everyone who submits that subject, which is what makes it useful — an
-attacker rotating addresses still meets it — and is also its cost: **somebody else can hold a
+The second is shared by everyone who submits that subject, which is what makes it useful, an
+attacker rotating addresses still meets it, and is also its cost: **somebody else can hold a
 member's recovery shut by asking for their username repeatedly.** That is accepted rather than
 solved, because the alternative is a per-caller window that a rotating source walks straight past.
 What bounds it is that the block is short (`COURTSIDE_LOGIN_ADDRESS_BLOCK`, one minute by default,
 after `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` requests), that it stops no sign-in and no other
-operation, and that the roster path (section 10) stays open the whole time — a board can issue the
+operation, and that the roster path (section 10) stays open the whole time, a board can issue the
 credential while the window is shut.
 
 Asking by username costs its subject one email and nothing else. It was once enough to **end the
@@ -763,7 +761,7 @@ password a member chose**, because the request issued the board's own credential
 revision of this paragraph called that the price every self-service reset pays and said it was paid
 deliberately. It was neither, and it is now gone: nothing about the account moves until somebody
 redeems what was mailed. What remains is the mailbox, which a separate per-account window bounds at
-five reset mails an hour, swallowed rather than reported — a refusal that reached the caller would
+five reset mails an hour, swallowed rather than reported, a refusal that reached the caller would
 confirm the name.
 
 The roster path stays anyway, for a member who cannot reach their own mailbox.
@@ -804,9 +802,9 @@ ending a membership loosens what its holder may book rather than tightening it, 
 ends memberships in bulk has to take the account's permission away in the same step.
 
 The configuration answers it: `club_config.no_membership_type_rule_set_id` names the rule set
-measured against a person who holds no current membership type, and every membership-scoped rule —
+measured against a person who holds no current membership type, and every membership-scoped rule,
 the advance window, the open-booking cap, the bound on one booking's length and the bar on booking
-at all — resolves through it. The obvious repair, reading "no membership" as "no booking", stays
+at all, resolves through it. The obvious repair, reading "no membership" as "no booking", stays
 rejected: it would change what every installation already permits
 and decide for the club rather than asking it. So the column is nullable and starts unset, and while
 it is unset the state below is what holds.
@@ -821,7 +819,7 @@ administrator can create an account, so nobody reaches the state without a board
 A membership type that names *no* rule set is a different answer and keeps it: the club said that
 category is measured by nothing, and the club-level set does not stand in for it.
 
-**Evaluation does not stop at the first violation.** All violations are collected —
+**Evaluation does not stop at the first violation.** All violations are collected,
 otherwise a member works through three error messages one at a time.
 
 A `RuleViolation` carries an **i18n key plus parameters**, never rendered text:
@@ -831,18 +829,18 @@ translatable and lets the frontend attach them to the right form field.
 Adding a rule type = one validator class + one configuration row.
 
 **A membership type may be barred from booking a court altogether.** *Built.* Clubs carry
-categories that pay dues without playing — passive, supporting, honorary — and every rule type
+categories that pay dues without playing, passive, supporting, honorary, and every rule type
 above answers *how much*, none of them *whether*. Forcing the question through a quantity would
 say the wrong thing out loud: a limit of zero reaches the member as "too many open bookings
 (limit 0, current 0)". The bar is therefore a rule type of its own, `NO_COURT_BOOKING`,
 parameterless like the opening hours and the slot grid, present in a rule set or absent from it,
 and its violation carries its own key. A club builds a "passive" rule set, switches it on, and
-points the membership type at it — a row, not a release.
+points the membership type at it, a row, not a release.
 
 It is an overridable rule, because it states who may book rather than what the grid is: an
 administrator recording a court for somebody is doing their job. Taking the membership away does not
 lift it *where a club has named a rule set for people holding no membership type and put the bar in
-it* — that set is measured exactly like a membership type's own, which is why it had to exist first.
+it*, that set is measured exactly like a membership type's own, which is why it had to exist first.
 Where a club has named none, such a person is bound by no membership-scoped rule at all, the bar
 included.
 
@@ -854,13 +852,13 @@ It also survives a move, which no other overridable rule does. A move neither cr
 adds a booking, so the quantity rules leave it alone and only the grid decides where an occurrence
 may land; the bar is a different question, and somebody who may not book must not be able to reshape
 what they already hold. `BookingRule.appliesToAMove` is where a rule says so, and it answers
-`!isOverridable()` unless a rule states otherwise — a move that stayed silent would only ever miss a
+`!isOverridable()` unless a rule states otherwise, a move that stayed silent would only ever miss a
 restriction, never accept one the grid cannot hold.
 
 What the bar does **not** govern is being named as a participant: a member barred from booking can
 still be recorded as somebody else's co-player, because participants are named inside the booking
 and only the booker is measured. A club that wants that closed as well is asking a different
-question — who may *play* — and the product does not answer it today.
+question, who may *play*, and the product does not answer it today.
 
 **A rule set may require cancellation before a deadline.** *Built.* `CANCELLATION_DEADLINE`
 stores the minimum whole minutes between cancellation and the first occupied slot. No rule means
@@ -876,14 +874,14 @@ Rules split along a line that matters more than it first appears:
 
 **Overridable rules restrict who may book.** Advance window, maximum open bookings, the longest a
 single booking may run, the bar on booking at all, and the roles a booking card allows are all
-statements about a person's entitlement. `ADMIN` sets them aside — no flag, no per-request opt-in,
+statements about a person's entitlement. `ADMIN` sets them aside, no flag, no per-request opt-in,
 the role itself is the override. An admin placing a training block six weeks out is doing their job,
 not circumventing anything.
 
 **Non-overridable rules describe the grid itself.** Opening hours and the slot granularity
 are properties of the facility, not of the person booking. The booking UI renders exactly
 the slots these rules permit, so a violating booking is one the interface cannot express and
-cannot display afterwards. Nobody creates one — not through the UI, not through the API, and
+cannot display afterwards. Nobody creates one, not through the UI, not through the API, and
 not as an admin.
 
 The escape hatch for the exceptional case is configuration, not override: a tournament that
@@ -944,18 +942,18 @@ Errors are returned as RFC 9457 Problem Details:
 ```
 
 **`violations` is the only shape a translatable failure travels in**, and it is an array even
-where only one entry is ever possible — a court that does not exist produces a one-element array,
+where only one entry is ever possible, a court that does not exist produces a one-element array,
 not a `code` on the problem itself. A client therefore resolves messages against the bundle in one
 place instead of branching on where the code happened to sit. The rule engine forces the plural
 case anyway, since evaluation collects every violation rather than stopping at the first.
 
 A second array, `fieldErrors`, carries what Bean Validation rejected. Its entries are
-`{ field, code, params }` — the same violation, plus the name of the input it came from — so a
+`{ field, code, params }`, the same violation, plus the name of the input it came from, so a
 client that can render a violation can render these by ignoring one key.
 
 **An omitted array is not the empty one.** A container the document requires arrives as `null` when
 a body leaves it out, so the generated `@NotNull` refuses the request and names the missing field
-rather than letting the omission act as "you chose nothing" — which for a list of opt-outs would
+rather than letting the omission act as "you chose nothing", which for a list of opt-outs would
 silently erase the choices already stored. One the document leaves optional arrives as an empty
 container instead, so the code that reads it needs no null check. One whose type admits `null`
 arrives as `null`, because absence there carries a meaning of its own: `MoveRequest.newCourtIds`
@@ -975,20 +973,20 @@ document permits.
 
 A misspelt field name never reaches that rule: `fail-on-unknown-properties` is on, so the request is
 refused naming the field nobody declared. The two defences answer `400` for different reasons and
-neither substitutes for the other — turning the setting off would leave a typo to be read as an
+neither substitutes for the other, turning the setting off would leave a typo to be read as an
 omission, and only the required container's `@NotNull` would still refuse it.
 
 **Every error carries that shape, including the ones no handler ever sees.** A method the servlet
 container refuses, a request the filter chain's firewall turns away before authentication runs, a
 filter that throws: none of them reach a `@RestControllerAdvice`, and the framework's own answer for
 them is an untyped JSON body. The application therefore answers the container's error dispatch
-itself, as `application/problem+json` with a `urn:courtside:error:` type —
+itself, as `application/problem+json` with a `urn:courtside:error:` type,
 `method-not-supported` for a refused method, `request-rejected` for a request the firewall rejected,
 `unmapped-path` for an address that does not exist and `internal-error` for a failure that got that
 far. That dispatch is permitted in the filter chain, because it is the tail of a request that has
 already been decided; re-authorising it would report a 405 as a 401. The same gap opens one
 layer further in, and stayed open longer: Spring answers a rejection it raises inside the
-dispatcher — a binding failure, a body it cannot write, a method-validation failure — from its own
+dispatcher, a binding failure, a body it cannot write, a method-validation failure, from its own
 list, and that answer carries no type either. Those are mapped onto the same status-to-type table
 the container dispatch uses, so a request refused before any operation ran reads the same whichever
 layer refused it. `FrameworkRejectionCoverageTest` reads Spring's list rather than this
@@ -996,7 +994,7 @@ repository's, so a rejection a future Spring version adds arrives as a failing b
 an untyped answer.
 
 One layer sits below even that. A request target carrying a character the HTTP grammar does not
-allow — `|`, `^`, `[`, a broken percent escape — is refused by the connector while it is still
+allow, `|`, `^`, `[`, a broken percent escape, is refused by the connector while it is still
 parsing the request line, so no dispatch of any kind follows and the server's own answer is an HTML
 page. The error report the connector falls back to is replaced with one that writes the same
 `request-rejected` problem detail, which is why the shape holds for every answer this application
@@ -1006,9 +1004,9 @@ gives and not only for the ones a servlet saw.
 on the operation that answers them, and build-time checks keep that true: an operation with a path
 parameter declares `400`, because a path parameter can always arrive malformed; one whose path
 parameter is not an enum declares `404`, because such a parameter names something that may not
-exist — a uuid names a row, a session handle names a session — and what names nothing is
-answered `404`; and one carrying a query parameter it can refuse — one whose schema states a type,
-a format, an enum or a bound — declares `400`. An enum path parameter is exempt from the `404` rule
+exist, a uuid names a row, a session handle names a session, and what names nothing is
+answered `404`; and one carrying a query parameter it can refuse, one whose schema states a type,
+a format, an enum or a bound, declares `400`. An enum path parameter is exempt from the `404` rule
 on purpose: every value it accepts exists, so there is no unknown one to answer. A declared status
 is never a bare key: every error this document declares answers `application/problem+json` with the
 `Problem` schema, so what a client is promised is the shape above.
@@ -1025,7 +1023,7 @@ OpenAPI response remains authoritative.
 ### Four failure modes that are easy to get wrong
 
 **Concurrent booking of the same slot.** Rule evaluation in step 3 cannot prevent this in
-principle — time passes between check and insert. The database decides: the constraint
+principle, time passes between check and insert. The database decides: the constraint
 violation is caught and translated into `409 Conflict` with "this court was just booked".
 No locking, no retry loop, no race condition.
 
@@ -1038,13 +1036,13 @@ the confirmation is written in the same transaction as an event, and a worker de
 with retry afterwards.
 
 **A paging cursor that outlives the caller's sight.** The booking lists are cursor-paged, and the
-cursor names a booking rather than an offset — so resolving it is itself a read, and it carries the
+cursor names a booking rather than an offset, so resolving it is itself a read, and it carries the
 same visibility predicate the list carries. A cursor naming a booking the caller may no longer see
 resolves against nothing and the page ends, which is the answer the personal list already promises
 in the API document. Resolving it unconditionally would answer two questions nobody asked: whether
 that id names a booking at all, and roughly when it starts, because the page boundary is that
 booking's first start instant. A cursor orders by start instant and breaks ties by id, so the naive
-clause is two comparisons that each repeat the predicate — and the tie-break is the half a repeat
+clause is two comparisons that each repeat the predicate, and the tie-break is the half a repeat
 forgets, silently leaving the disclosure open for bookings that start together. The clause is one
 row comparison instead, `(start, id) < (cursorStart, cursor)`, which states the predicate once and
 has no second branch to forget. It is also faster than the clause it replaces, which
@@ -1059,8 +1057,8 @@ All templates are i18n message bundles and editable per instance:
 |---|---|
 | Registration submitted | Member (confirmation) + admins (approval request) |
 | Account approved or rejected | Member |
-| Password reset code requested | Member — a single-use code for the account named (section 4) |
-| Username reminder requested | Member — lists all accounts for that address (section 4) |
+| Password reset code requested | Member, a single-use code for the account named (section 4) |
+| Username reminder requested | Member, lists all accounts for that address (section 4) |
 | Booking confirmed | Booking member + participating members |
 | Booking cancelled | Booking member + participating members |
 | Booking cancelled by an admin | Affected members, with reason |
@@ -1074,24 +1072,24 @@ other path replaces.
 **Built:** four things a booking says for itself. The member who made it gets a confirmation. A
 member somebody recorded as a co-player is told, and whoever booked is told when that member takes
 themselves out again. And a court, a booking card, a weekday going out of service or opening hours
-narrowed under a booking tells everybody in every future booking it displaces — the booker and the
-recorded players alike — naming what was closed; taking something out of service cancels nothing,
+narrowed under a booking tells everybody in every future booking it displaces, the booker and the
+recorded players alike, naming what was closed; taking something out of service cancels nothing,
 and the message says so, because the impact list beside the control is information for the board and
 the booking stands until the board acts on it. And a booking coming up reminds everybody in it, as
-many hours ahead as the club sets — zero switches reminders off, a booking made when it already
+many hours ahead as the club sets, zero switches reminders off, a booking made when it already
 stood inside that window keeps its confirmation instead of hearing the same thing twice, one that
 moves is reminded again for the appointment it now holds, and a booking is claimed before its
 reminder goes out, so a second sweep, or a second instance, finds nothing left to do.
 
 All of them are sent after the transaction that caused them commits, so a message never describes a
-court nobody holds, and nothing a member does is refused because a message could not go out — an
+court nobody holds, and nothing a member does is refused because a message could not go out, an
 account whose address is empty is logged by its id and nothing is sent. The events that carry them
 name the booking, the person and the closure by identifier; what a message says about them is read
 when the message is written, so neither the audit trail nor the message log learns where anybody
 plays. No message names more than its reader already has: the notice about being recorded names the
 booking and not the booker, and the notice about a withdrawal carries the name the booker chose from
 the directory. A member who holds no account is not written to, because the message log is keyed by
-the account that erases it, and neither is an account that has been deactivated — somebody who has
+the account that erases it, and neither is an account that has been deactivated, somebody who has
 left the club is refused a credential for the same reason.
 
 **Built:** a member chooses per kind what reaches them, on a page of their own. Booking
@@ -1105,7 +1103,7 @@ kind nobody chose about is received, so choosing once does not silence what the 
 ## 7. Series and Multi-Court Bookings
 
 Recurring bookings are a **must-have** for the recurring training blocks that run through
-the season. A single booking can also occupy **several courts at once** — a training block
+the season. A single booking can also occupy **several courts at once**, a training block
 spanning three adjacent courts is one `booking` with one `court_allocation` row per court,
 not three separate bookings that happen to share a time.
 
@@ -1119,7 +1117,7 @@ click from four checkboxes.
 `booking_series` stores the rule: frequency, interval, weekdays, start time and duration,
 and an end defined either by **date or by occurrence count**. `SeriesRule` rejects a rule
 that gives neither or both, that names no weekday, or whose occurrence count is zero or
-negative — an unbounded or empty series is not a valid recurrence, so these are rejected at
+negative, an unbounded or empty series is not a valid recurrence, so these are rejected at
 construction rather than left to silently expand into nothing.
 
 ### Series are materialised, not computed
@@ -1127,11 +1125,11 @@ construction rather than left to silently expand into nothing.
 On creation, all concrete `booking` rows are generated immediately. This is mandatory: a
 series that exists only virtually cannot be checked against collisions by the database, and
 that check is the entire point of the construction. A 30-week training block on 3 courts
-produces 30 bookings with 90 allocations — trivial for PostgreSQL.
+produces 30 bookings with 90 allocations, trivial for PostgreSQL.
 
 Two safeguards:
 
-- A configurable **horizon** — `courtside.booking.series-horizon-months`, 12 months by
+- A configurable **horizon**, `courtside.booking.series-horizon-months`, 12 months by
   default. `SeriesSchedule.expand` never generates an occurrence past `startsOn` plus that
   horizon, regardless of what the rule itself asks for.
 - A mandatory **preview step** before creation.
@@ -1141,27 +1139,27 @@ Two safeguards:
 `POST /api/booking-series-preview` lists every occurrence the rule produces up to the
 horizon, together with the court ids already occupied on that date, if any. Nothing is
 written; a preview is open to any authenticated user, including one who could not actually
-create the card in question — the card's allowed roles are enforced by `BookingWriter` at
+create the card in question, the card's allowed roles are enforced by `BookingWriter` at
 creation time, exactly as it is for a single booking.
 
 ```
-Series: Team training, weekly, 18:00–20:00
-Courts 1–3 · first to last occurrence · 10 occurrences
+Series: Team training, weekly, 18:00 to 20:00
+Courts 1 to 3 · first to last occurrence · 10 occurrences
 
   ✓ 8 occurrences can be created
   ⚠ occurrence 3   Court 2 occupied (League match)
-  ⚠ occurrence 7   Courts 1–3 closed (holiday)
+  ⚠ occurrence 7   Courts 1 to 3 closed (holiday)
 
   [ Create 8, skip 2 ]   [ Cancel ]
 ```
 
 The creator decides: `POST /api/booking-series` names exactly the confirmed occurrences
 (each an `Instant`, which must be one the preview actually offered), and the service creates
-what it can and reports what it skipped. Nothing happens unnoticed — including when the
+what it can and reports what it skipped. Nothing happens unnoticed, including when the
 horizon itself is the reason an occurrence never appeared in the preview to begin with. A
 club asking for 100 weekly occurrences, or for a rule that runs into 2028, gets however many
-the horizon allows and no more; the preview response says so explicitly —
-`truncatedByHorizon` and `horizonLimit` — rather than letting the count silently come up
+the horizon allows and no more; the preview response says so explicitly,
+`truncatedByHorizon` and `horizonLimit`, rather than letting the count silently come up
 short. This has to live in the preview and not in the create response: by the time `create`
 runs, a date the horizon dropped was never among the confirmed occurrences to report against
 in the first place. `SeriesSchedule.expand` is the only place that can tell whether it
@@ -1178,8 +1176,8 @@ single session is cancelled for a holiday.
 
 Creating a series is deliberately **not** transactional: it tolerates partial success. A
 user who previewed 26 occurrences and confirmed 24 already accepted that two dates were
-blocked; if one more collides in the moment between preview and create — or turns out to
-violate a booking rule the preview does not evaluate, such as an advance-booking window —
+blocked; if one more collides in the moment between preview and create, or turns out to
+violate a booking rule the preview does not evaluate, such as an advance-booking window,
 skipping that one occurrence and creating the rest is what they asked for. Nothing locks the
 calendar between the two calls, so the create path re-checks every occurrence against both
 the database's exclusion constraint and the rule engine, and reports collisions and rule
@@ -1187,11 +1185,11 @@ violations the same way: as a skipped date, not a failed request.
 
 Cancelling and moving a series are both, by contrast, **transactional and all-or-nothing**.
 A series cancelled from Tuesday onward either loses every one of those occurrences or none
-of them — a half-cancelled tail is a worse outcome than the cancellation simply failing. A
+of them, a half-cancelled tail is a worse outcome than the cancellation simply failing. A
 moved series is the sharper case: half the occurrences at the old time and half at the new
 one is actively wrong, not merely incomplete, so `SeriesService.move` previews the whole
 move first, refuses outright if any occurrence would collide (`409` with the blocked booking
-ids), and only then executes every remaining change inside a single transaction — the same
+ids), and only then executes every remaining change inside a single transaction, the same
 mid-flush exclusion-constraint race that a create tolerates instead rolls the whole move
 back.
 
@@ -1202,12 +1200,12 @@ back.
 **A confirmation appears where the action cannot be undone by repeating it.**
 
 By that rule, executing an import and ending a membership are confirmed, and so is deleting an
-import source. The toggles are not — account, court, booking card, membership type — because
+import source. The toggles are not, account, court, booking card, membership type, because
 clicking again restores exactly what the click removed. Unlinking an external reference is not
 confirmed either: linking it again puts back the same row.
 
 The rule exists so the dialog keeps meaning something. Confirming everything that takes something
-away trains people to click through, and then the dialog fails at the one place it was needed —
+away trains people to click through, and then the dialog fails at the one place it was needed,
 which, for this product, is a board about to end forty memberships because an export was truncated.
 That is also why the confirmation there does not merely ask: it states how many memberships would
 end, out of how many, and names the ordinary accident it guards against.
@@ -1230,13 +1228,13 @@ belongs in code.
 
 **Branding** is served from a public endpoint `/api/public/config` that the PWA fetches at
 startup: club name, primary and accent colour, logo URL, imprint link, privacy-policy link,
-default locale. Colours are applied as CSS custom properties on `:root` — no rebuild per club.
+default locale. Colours are applied as CSS custom properties on `:root`, no rebuild per club.
 The two legal links are rendered side by side in the footer, and each is left out where the club
 has set none. Both accept a root-relative path or an absolute HTTP or HTTPS URL: they are
 navigation targets rather than subresources, and a club serving Courtside without TLS still has
 to be able to link the pages it publishes. All three URL settings refuse tab, newline and carriage
 return anywhere in the value. A browser strips those three before it parses a URL, so `/<TAB>/host`
-would otherwise reach the same off-origin target as `//host` — the one thing the leading-slash rule
+would otherwise reach the same off-origin target as `//host`, the one thing the leading-slash rule
 exists to refuse.
 Logo URLs are either root-relative or HTTPS. A remote logo necessarily tells its operator the
 visitor's IP address and the Courtside origin, so clubs should serve the image from their own
@@ -1265,7 +1263,7 @@ to a club.
 
 ### System check
 
-An admin page — a common feature of existing booking systems, and essential for self-operated
+An admin page, a common feature of existing booking systems, and essential for self-operated
 instances:
 
 - Is the database at the expected schema version?
@@ -1285,7 +1283,7 @@ Reports read from `domain_event` and the booking tables, and every one of them i
 available as CSV. *Designed*, except the first row.
 
 The **court utilisation** report is *built*: a board picks an inclusive period in the club time
-zone, at most 366 days, and reads confirmed occupancy by court — the bookings, the occupied time,
+zone, at most 366 days, and reads confirmed occupancy by court, the bookings, the occupied time,
 and each court's share of the busiest one. Courts nobody booked are rows rather than omissions,
 because a board weighing a second court is asking about the quiet one. The same period, in the same
 shape, is what the bookings CSV export takes.
@@ -1305,9 +1303,9 @@ Import and export:
   that. Running the same file twice changes nothing the second time.
 - **A source** describes one system a club synchronises from and is configured once rather than
   chosen per file: which header holds which field, which category value means which membership
-  type, which fields that source owns — a field it does not own is the club's own and no snapshot
+  type, which fields that source owns, a field it does not own is the club's own and no snapshot
   overwrites it on somebody the roster already holds, while a creation writes every mapped column
-  because there is nothing of the club's there yet — and above what share of the roster
+  because there is nothing of the club's there yet, and above what share of the roster
   disappearing an execution needs confirming.
   Every part of it is correctable, and a change decides what the *next* snapshot means rather than
   touching the people an earlier one created.
@@ -1325,7 +1323,7 @@ Import and export:
 
   For a source nobody has described yet, the browser suggests a separator from the chosen file; once
   the club has confirmed one it stands, and a later file does not quietly replace it with a guess.
-  Detection alone was tried and is not enough — counting columns in a header row settles nothing for
+  Detection alone was tried and is not enough, counting columns in a header row settles nothing for
   a file with one column, and an export need not carry a header at all. A file read with the wrong character produces one enormous column and no way to tell why,
   so the answer belongs to the club rather than to a heuristic. Only what cannot work is refused:
   a line break ends a record and a quotation mark opens a cell, so neither can also divide one.
@@ -1335,24 +1333,24 @@ Import and export:
 
   Beyond that it is the source's stored answer, and the reason it is stored rather than derived is
   that it cannot be derived. The 8-bit character sets share their byte ranges and differ in a
-  handful of code points, so no library detects them — it guesses, and a guess that lands wrong
+  handful of code points, so no library detects them, it guesses, and a guess that lands wrong
   imports mangled names with nothing said. The source therefore carries the *name* of a character
   set, defaulting to UTF-8, and a file that is neither marked nor valid UTF-8 is refused while the
   name in force says UTF-8 rather than being read as something nobody chose.
 
   **A name and not an enumeration**, because which character sets exist is a property of the
   platform an instance runs on and not a decision this product may freeze into a release. The
-  instance reports what it can read — `Charset.availableCharsets()`, 173 of them on a current JVM —
+  instance reports what it can read, `Charset.availableCharsets()`, 173 of them on a current JVM,
   and the browser offers that list. A club whose export tool writes a Central European or Cyrillic
   one imports its members on the image it already runs; nobody waits for us. `StandardCharsets`
   would not do: it is itself a fixed set of nine that does not contain Windows-1252.
 - **The roster filters by membership type across a module boundary.** `identity` owns the people
-  and `member` owns the memberships, and the dependency runs from `member` to `identity` — so the
+  and `member` owns the memberships, and the dependency runs from `member` to `identity`, so the
   filtered listing loads the type's current holders and passes their ids into the person query
   rather than joining, because a join in that direction is the cycle the module rules forbid. The
   cost is a parameter list that grows with the club, which PostgreSQL bounds at 65535 bindings per
   statement; a membership type with more holders than that would fail, and no single club has one.
-  The alternative — a second paged query in `member` — would duplicate the cursor ordering, and two
+  The alternative, a second paged query in `member`, would duplicate the cursor ordering, and two
   places that must agree on an ordering exactly is the heavier risk of the two.
 
 - **An email address is optional, for a person and for a snapshot.** A real member list carries
@@ -1362,7 +1360,7 @@ Import and export:
 - **An export without a header row is not supported.** *Accepted, not closed.* A column mapping
   names headers, so a file that carries none cannot be described at all: the club exports one with
   headers or the import is not for them. Mapping by position instead would be the repair, and it is
-  a different feature rather than a correction — the position of a column is exactly the kind of
+  a different feature rather than a correction, the position of a column is exactly the kind of
   thing that changes silently between two versions of an export tool, which is what naming avoids.
 
 - **A record is matched by the source and the member number it carries**, never by a name and never
@@ -1373,30 +1371,30 @@ Import and export:
   systems without the second one duplicating everybody.
 - **The column mapping is offered from the club's own file, and that file is not uploaded for it.**
   A source has to be described before any snapshot is accepted, and no board knows its export's
-  headers by heart. The browser therefore reads the club's file locally — the header row for the
+  headers by heart. The browser therefore reads the club's file locally, the header row for the
   columns, and the distinct values of the category column once that column is named, because the
   categories a club exports live in its rows and not in its header. Nothing is sent. An endpoint
   that accepted a file of personal data in order to learn a handful of words would be the worst of
   the options, and reading locally costs a club nothing.
 
   Reading it there is also what keeps the encoding answer honest. A board cannot be expected to know
-  what its software wrote, and a blind answer would be worse than none — so the field stands beside
+  what its software wrote, and a blind answer would be worse than none, so the field stands beside
   the separator carrying what the source already says, an explanation appears when the chosen file
   turns out not to be UTF-8, which the browser can tell before anything is sent, and neither answer
   is ever blind: the columns on offer are re-read as each changes, so a wrong one shows itself
   immediately as headers nobody recognises. The club sees the consequence of both answers before it
   saves either. A browser decodes fewer character sets
-  than a server does, so where it cannot read one it says so and offers no columns — the import
+  than a server does, so where it cannot read one it says so and offers no columns, the import
   itself still runs, because the instance knows the set even where the browser does not.
 - **A preview writes nothing and is never edited.** It resolves the whole file and answers with the
   change set a later execution would apply, so what a board approves is what runs. A header problem
   fails the file, because nothing in it can then be trusted; a cell problem fails one row and is
-  reported beside the rest. Correcting a mistake means uploading the corrected file — an editable
+  reported beside the rest. Correcting a mistake means uploading the corrected file, an editable
   preview would no longer be what anybody reviewed. Above the source's own threshold, the share of
   its memberships that would end is flagged as needing a deliberate confirmation, which is what
   stands between a truncated export and a club that has lost half its roster.
-- **An execution applies the reviewed change set and nothing else.** It is one transaction — a
-  change set whose last row fails leaves no person, no membership and no reference behind — and if
+- **An execution applies the reviewed change set and nothing else.** It is one transaction, a
+  change set whose last row fails leaves no person, no membership and no reference behind, and if
   anybody it would touch changed between the preview and the run, it is refused rather than writing
   over a roster it no longer describes. Executions of one source serialise, and a successful one
   supersedes every preview of that source, so a stale change set cannot be applied afterwards.
@@ -1414,13 +1412,13 @@ Import and export:
   may hand out a role that administers the club. Its username is generated as `lastname.firstname`,
   the same shape registration suggests, numbered on collision and correctable afterwards like every
   other name a club enters. Its first password is generated, never displayed, and mailed to the
-  member — a board that could read 131 passwords is the outcome this exists to avoid.
+  member, a board that could read 131 passwords is the outcome this exists to avoid.
 
   **The transliteration follows the language the club runs in**, because there is no neutral answer:
   German writes `Jörg` as `joerg` and a Scandinavian club writing `Jørgen` is not served by the same
   substitution. Where the club's language has no rule for a character, the accent is stripped and
-  what remains is kept. A name that leaves nothing a login name can hold — a script this rule cannot
-  transliterate at all — falls back to `member.<the member number the club's own system uses>`,
+  what remains is kept. A name that leaves nothing a login name can hold, a script this rule cannot
+  transliterate at all, falls back to `member.<the member number the club's own system uses>`,
   which is never nothing and is a name that club already recognises. None of this has to be right
   the first time: a username is editable afterwards like every other field an administrative
   surface writes.
@@ -1433,25 +1431,25 @@ Import and export:
   **The preview answers per row, not only in total.** Each row says whether an account would be
   opened and, where none would be, which of four reasons applies: the membership type grants none,
   the row carries no address to send a credential to, the row looks like somebody the roster already
-  holds, or that person already signs in. A possible duplicate is deliberately among them — the
+  holds, or that person already signs in. A possible duplicate is deliberately among them, the
   person is still created, but an account for somebody who may already have one waits for a board
   to look. The count sits above the list, so what a board approves is what runs.
 
   **A shared mailbox is named, not refused.** Where a row would open an account on an address more
   than one person holds, the preview reports it with the number of people who would be on it once
-  the run is done — those the roster already has plus those this run puts there. The account is
+  the run is done, those the roster already has plus those this run puts there. The account is
   still opened, because a shared address is the case the schema exists to serve, and refusing it
   would take the import away from exactly the clubs that enrol children under a parent's address.
   What must not happen is that it goes unsaid: one mailbox receiving twenty one-time passwords is
   the risk section 10 accepts, and it accepts it on the condition that a board sees the count
-  first. A row that moves somebody onto the address counts twice at worst — the error runs towards
+  first. A row that moves somebody onto the address counts twice at worst, the error runs towards
   reporting more sharing rather than less, which is the direction a warning may err in.
 
 - **A synchronisation can take a membership away; it can never hand one out.** When a membership
   ends, an account that held `MEMBER` and nothing else is disabled and its sessions end; an account
   holding another role keeps it and loses `MEMBER` only, so a card requiring `MEMBER` refuses it.
   No snapshot ever *re*-enables an account, because a board disabled it for a reason no membership
-  system knows — creating one that never existed is the separate thing described above, and the two
+  system knows, creating one that never existed is the separate thing described above, and the two
   must not be confused. None can disable the club's own administration either: an account holding
   `ADMIN` keeps that role and stays enabled. An import cannot lock a club out of its instance.
 - **CSV export** of the roster and of a period's confirmed bookings, in the separator and
@@ -1500,7 +1498,7 @@ The versioned event catalogue and operator boundary are documented in
 authentication, authorization, session and security-control decisions. They contain immutable
 account IDs where an account is known, never submitted identifiers or request content.
 
-**JavaMelody is not used** — it does not fit the OTLP model and offers nothing Actuator plus
+**JavaMelody is not used**, it does not fit the OTLP model and offers nothing Actuator plus
 Micrometer does not do better.
 
 **Spring Boot Admin is planned**, for a different purpose than Grafana: fleet overview across
@@ -1516,7 +1514,7 @@ alerting.
 | `courtside.bookings.rejected` | Built | Counter (**rule**) | Which rule actually bites in daily use |
 | `courtside.bookings.conflicts` | Built | Counter | How often concurrent occupancy prevents a booking |
 | `courtside.password.rehash.failed` | Built | Counter (stage) | A rehash that only logs still leaves hashes at the old cost |
-| `courtside.outbox.pending` | Planned with outbox | Gauge | Are emails backing up — the key leading indicator |
+| `courtside.outbox.pending` | Planned with outbox | Gauge | Are emails backing up, the key leading indicator |
 | `courtside.messages` | Built | Counter (**state**) | What became of what this instance sent, without opening the table |
 | `courtside.login.failed` | Planned | Counter | Attack detection and UX signal |
 | `courtside.backup.age.seconds` | Planned with backup automation | Gauge | The alert everyone forgets |
@@ -1542,7 +1540,7 @@ shipping to one central instance running Grafana, Loki and Prometheus, alongside
 Admin and Uptime Kuma. Clubs that want no monitoring at all rely on the system check plus an
 uptime ping.
 
-**Logs must never contain personal data** — no names, email addresses or IBANs. Security events name
+**Logs must never contain personal data**, no names, email addresses or IBANs. Security events name
 known accounts only by immutable account ID. Courtside defines no log-retention period: storage,
 access, retention, alerting and escalation belong to the operator of each installation.
 
@@ -1589,7 +1587,7 @@ whether it is built or designed. **Designed means absent today.**
   says which one matched. The original password remains unchanged for hashing.
   Keeping the issued credential is refused under its own type, because it is known to whoever read
   the message that carried it and because an account that keeps it can no longer withdraw it.
-  Nothing about composition or alphabet is required — a 64-character passphrase outside ASCII is a
+  Nothing about composition or alphabet is required, a 64-character passphrase outside ASCII is a
   password this accepts. Only a small share of the list reaches twelve characters, which is what
   choosing it was measured against: nearly every entry is already refused by the length minimum, so
   against a long password the list is the weaker of the two guards and the breached-password check
@@ -1602,7 +1600,7 @@ whether it is built or designed. **Designed means absent today.**
   longer exists fails it too. The list separates what carries a guarantee from what does not: a
   booking fingerprint and an artefact digest are content hashes and are never evidence that
   something was not tampered with. Each entry also names the maintained implementation that computes
-  it and who decides its strength — this repository, with a number of bits, or the operator, Sigstore,
+  it and who decides its strength, this repository, with a number of bits, or the operator, Sigstore,
   Stalwart or Spring Security where the choice is not ours. Everything this repository selects in
   order to protect something reaches 128 bits, and the number is read back out of the literal the code
   draws it from rather than copied into the file, so a shortened credential, a narrower truncation or
@@ -1616,8 +1614,8 @@ whether it is built or designed. **Designed means absent today.**
   `verify-full` requires a certificate that chains to an operator-supplied authority and names the
   host the connection URL names. It refuses to start when that authority is missing, unreadable or
   holds no certificate, when no connection pool was configured with it at all, and when the
-  connection URL or the pool carries anything whose name says it decides the transport — `ssl…`
-  and `gssEnc…` alike — or a `service` name that pulls in a file of them. The driver lets a URL
+  connection URL or the pool carries anything whose name says it decides the transport, `ssl…`
+  and `gssEnc…` alike, or a `service` name that pulls in a file of them. The driver lets a URL
   argument beat the pool's own property, so `?sslmode=disable` would otherwise connect in plaintext
   with verification configured and say nothing. An unknown, expired, not-yet-valid or wrong-name
   certificate is reported at startup as a sentence naming which of the four it was rather than a
@@ -1644,11 +1642,11 @@ whether it is built or designed. **Designed means absent today.**
   rotation timing, revocation, destruction, database-owner recovery, and any vault remain the
   operator's. The overlay requires none of those systems and is not a condition for normal use.
 - **The default database connection is still unverified.** *Accepted, not closed.* `prefer` is what
-  the driver does on its own — encrypted when the database offers it, verified never — and the
+  the driver does on its own, encrypted when the database offers it, verified never, and the
   reference deployment ships no certificate, so nothing changes for a club that does not act.
   Session rows, password hashes and the hashed login subjects travel that connection. What an
   observer needs is a position on the host's own container network, which on a single-host
-  deployment means the host itself — and an attacker with that already reads the database's files.
+  deployment means the host itself, and an attacker with that already reads the database's files.
   What bounds it: no database port is published, the network is private to the compose project, and
   both ends live on one machine. It stays accepted rather than closed because requiring a
   certificate means requiring a club to run an authority, which is a larger imposition than the
@@ -1661,7 +1659,7 @@ whether it is built or designed. **Designed means absent today.**
 - **Whether the reverse proxy's connection to the application is verified:** *Built, and off unless
   an operator turns it on.* `courtside.server.tls.mode` is `plaintext` or `serve`. Under `serve` the
   application serves a certificate the operator supplies, and the proxy dials it over TLS trusting
-  nothing but the authority the operator names — an application that authority does not vouch for is
+  nothing but the authority the operator names, an application that authority does not vouch for is
   refused with a bad gateway rather than retried in plain text. One variable sets both ends, so they
   cannot disagree about which the hop is, and a value no snippet is defined for stops the proxy at
   startup rather than leaving the hop unencrypted. The application refuses to start when the
@@ -1692,12 +1690,12 @@ whether it is built or designed. **Designed means absent today.**
   the readable double-submit token is `__Host-XSRF-TOKEN` under the same host boundary. Local
   plain HTTP uses explicit unprefixed development names because a conforming browser rejects a
   `__Host-` cookie without `Secure`. How many sessions an account may hold at a time is the
-  deployment's to set, five by default, and a sign-in past that is not refused — it succeeds and
+  deployment's to set, five by default, and a sign-in past that is not refused, it succeeds and
   ends the least recently active session or sessions, whose stored rows go with them, so a member is
   never locked out by a device out of reach. Sign-ins that arrive at the same moment can pass the
   bound, because each reads the count before the others are stored, and the next sign-in takes back
   what they added: it tidies what accumulates on devices, and it does not contain somebody who
-  already holds the credential — a password change, an account status change or the removal of a
+  already holds the credential, a password change, an account status change or the removal of a
   role still ends every session of the account at once. A store that refuses one of these deletions
   does not fail the sign-in that caused it; the bound slides by one until the next one. Two expiries
   bound one, and they are different promises: an inactivity window of 30 minutes that every request
@@ -1706,27 +1704,27 @@ whether it is built or designed. **Designed means absent today.**
   deployment's to set, both are stated rather than inherited from a framework default that can move,
   and an absolute lifetime shorter than the inactivity window is refused at startup because the
   window could then never be reached. Neither may fall below a minute, so that a value meant as a
-  bound cannot be one in name only — and a negative inactivity window, which Spring Session reads
+  bound cannot be one in name only, and a negative inactivity window, which Spring Session reads
   as an interval that never expires, is refused with them. The absolute one is counted from the creation time stored with
   the session, so restarting the application does not hand a live session a fresh lifetime,
   and signing in starts a session of its own so that a browser two members share hands the
   second of them a full lifetime rather than what the first had left. The identifier itself is 216
   bits drawn from `SecureRandom` rather than a UUID's 122, and it is replaced at both moments trust
-  is re-established — a sign-in and a password proof — so one somebody else already holds stops
+  is re-established, a sign-in and a password proof, so one somebody else already holds stops
   authorizing there. A proof replaces the whole session rather than renaming it, because every
   request carrying a session cookie rewrites that row from its own copy, and one in flight would
   otherwise put the retired identifier back. The principal and the recorded browser travel across,
   and the absolute lifetime starts again exactly as a sign-in's does. That gives nothing to somebody
   holding only a stolen cookie: the bound is on a session held without a fresh password, and whoever
   can supply one could sign in instead. Reaching
-  the absolute bound ends the session and nothing more — the request carries on without authority,
+  the absolute bound ends the session and nothing more, the request carries on without authority,
   so what needed it is refused the way every unauthenticated request is, and signing in again is not
   something an expired session stands in the way of; past the inactivity bound there is nothing left
   to end, because the store no longer returns the session at all. *Built.*
-  **No JWT** — the PWA and API share an
+  **No JWT**, the PWA and API share an
   origin, so no token gymnastics are needed, and an admin can terminate a session
   immediately, which JWT cannot do. A role, membership or account-status change must terminate
-  that account's active sessions in the same operation — a role or an account status because
+  that account's active sessions in the same operation, a role or an account status because
   cached authorities must not outlive the change, a membership because what its holder may book
   changes with it and neither direction of that change is harmless. Every path that ends an
   account's sessions deletes the stored rows and raises a persisted account security epoch, and the
@@ -1741,8 +1739,8 @@ whether it is built or designed. **Designed means absent today.**
   disabling an account, removing one of its roles, correcting its username, resetting its password
   and changing the membership of the person it belongs to each raise that account's epoch, so its
   next request is refused rather than served with the rights or the credential it was signed in
-  with. A membership is not a role, and no session carries a stale copy of one — a booking resolves
-  the membership as it evaluates the rules — so the epoch moves here for the second reason above
+  with. A membership is not a role, and no session carries a stale copy of one, a booking resolves
+  the membership as it evaluates the rules, so the epoch moves here for the second reason above
   and not the first. Neither direction is harmless: the advance window, the open-booking cap and the
   bound on one booking's length are looked up through a membership type and, unless the club named a
   rule set for people holding none, are found for nobody without one; and a person without one drops
@@ -1757,7 +1755,7 @@ whether it is built or designed. **Designed means absent today.**
   that account at that moment is answered 409 and re-reads rather than overwriting the new hash.
   Members can list their active sessions and end one or all of them from account security. The list
   exposes creation and last-activity time, whether it is the current browser, and a normalized
-  browser family — never the source address, raw user-agent or stored session id. Its revocation
+  browser family, never the source address, raw user-agent or stored session id. Its revocation
   handle is a one-way truncated SHA-256 value rather than a credential. Administrators can end one
   account's sessions or every session in the instance; the global action also ends their own.
   Ending another browser or using either administrative control requires a full password proof no
@@ -1801,14 +1799,14 @@ whether it is built or designed. **Designed means absent today.**
   anonymous recovery path has its own mail budget and cannot spend this one. A board sending twice
   in a row is nowhere near the limit, and the refusal says how many went out rather than who sent
   them.
-- **Self-service recovery:** three unauthenticated operations — one mailing a single-use code by
+- **Self-service recovery:** three unauthenticated operations, one mailing a single-use code by
   username, one redeeming that code, and one mailing usernames to an address. *Built.* Section 4
   says why the shape is what it is; what a board is being asked to accept is this.
 
   **Asking costs its subject one email.** Neither the request nor a guess at somebody's username
   changes anything about the account: not the password hash, not the security epoch, not a session.
-  An earlier revision of this entry recorded the opposite — a request issued the board's own
-  credential, so a guessed username ended the password its holder chose — and called that the price
+  An earlier revision of this entry recorded the opposite, a request issued the board's own
+  credential, so a guessed username ended the password its holder chose, and called that the price
   every self-service reset pays. It was not, and it is gone. What writes is the redemption, and the
   redemption needs a code that went to the address on the account.
 
@@ -1817,13 +1815,13 @@ whether it is built or designed. **Designed means absent today.**
   minutes and a day, spent by the first password the rules accept and by nothing else. Guessing is
   bounded by the caller's own address: an anonymous credential attempt is counted against the
   address that made it and against no account, because the only account bucket available would be
-  one every anonymous caller shared — and holding a shared bucket shut is far cheaper than guessing
+  one every anonymous caller shared, and holding a shared bucket shut is far cheaper than guessing
   a code. Twenty wrong codes a minute would otherwise have closed the recovery path for the whole
   club.
 
   **What that leaves is an address, and an address is not a person.** Two things follow, and both
   are accepted rather than solved. A guesser behind a carrier NAT or a corporate proxy closes the
-  `credential-address:` bucket for everybody sharing that egress — not only their redemption, but
+  `credential-address:` bucket for everybody sharing that egress, not only their redemption, but
   their password change and their reauthentication, because it is one bucket. And the
   two-permit verification pool that bounds this instance's Argon2 work is, for the first time,
   reachable without signing in: an anonymous caller holding both permits makes every member's
@@ -1835,20 +1833,20 @@ whether it is built or designed. **Designed means absent today.**
   bucket to spend. Both are the
   price of a route that has to work for somebody who cannot identify themselves. What bounds them
   is that the block is a minute, that neither stops a sign-in, that the roster path stays open, and
-  that the instance-wide observation counts this surface — anonymous credential attempts move
+  that the instance-wide observation counts this surface, anonymous credential attempts move
   `courtside.login.distributed.thresholds` exactly as recovery requests do, so the metric an
   operator is told to watch does not go blind on the one route anybody can reach.
 
   **A stored code hash is worth cracking, and SHA-256 does not stop that.** `code_hash` is a plain
-  SHA-256 of a secret worth about 2^39, so anybody who reaches the database read-only — a dump, a
-  restored snapshot, a backup — can recover an outstanding code on commodity hardware in minutes
+  SHA-256 of a secret worth about 2^39, so anybody who reaches the database read-only, a dump, a
+  restored snapshot, a backup, can recover an outstanding code on commodity hardware in minutes
   and turn read access into a password change, which no other secret in this schema allows: every
   password is Argon2id. What bounds it is how little there is to steal at any moment: a row exists
   only between a request and its redemption, it is deleted the moment a code is spent, and the
   default lifetime is an hour, so a dump yields only the codes outstanding when it was taken. The
   answer would be a keyed hash, and it is not taken. The key would be an instance secret this
   deployment does not have, so it would mean a required environment variable, a rotation
-  procedure and a migration for the rows hashed under the old scheme — a standing operating cost
+  procedure and a migration for the rows hashed under the old scheme, a standing operating cost
   for a volunteer board, against a window this narrow. A deployment a club can run is worth more
   here than a hash a club would have to key, and this paragraph is what that costs.
 
@@ -1873,14 +1871,14 @@ whether it is built or designed. **Designed means absent today.**
 
   **A mail can run on the request thread, and the reminder path can fill the queue.** The mail pool
   answers saturation with `CallerRunsPolicy`, so once its four threads and hundred queued tasks are
-  full the next handover runs inline on the thread serving the request — and a handover is not one
+  full the next handover runs inline on the thread serving the request, and a handover is not one
   SMTP attempt but up to four, with five, fifteen and forty-five seconds of waiting between them and
   a ten-second timeout on each. That policy is older than this surface and it is kept, because the
   alternative is discarding a mail that nothing would then record.
 
   The code path reaches it slowly: five mails per known username per hour, so roughly twenty known
   usernames to fill the queue, and a name nobody holds queues nothing. The reminder path does not.
-  It publishes one message per account registered to the submitted address — a family address
+  It publishes one message per account registered to the submitted address, a family address
   holding four accounts is four tasks, at whatever rate the caller's own window allows. Only the two
   `login_attempt_limit` buckets bound it, and they are sized for sign-in rather than for this. An
   anonymous caller can therefore hold request threads. This one is accepted rather than solved: a
@@ -1900,7 +1898,7 @@ whether it is built or designed. **Designed means absent today.**
   the member who redeemed is not signed in and the instance will not guess who they were. There is
   no per-request record naming the source, by design: an address is personal data and this log
   deliberately holds none.
-- **Admin roles:** optional TOTP second factor. **Designed, not built** — there is no second
+- **Admin roles:** optional TOTP second factor. **Designed, not built**, there is no second
   factor of any kind today. Since recovery is self-service, whoever reads the mailbox on an account
   and knows its username can take that account, `ADMIN` included, with nobody at the club in the
   way. Before self-service a board member had to act; now the mailbox is the only factor there is,
@@ -1924,7 +1922,7 @@ whether it is built or designed. **Designed means absent today.**
   password of at least sixteen characters and the Compose-local `courtside_security` schema. That
   guard left the artifact with the seeders, so nothing now refuses a deployment that sets the
   designation. What an observer then gains is two response headers repeating the host and scheme
-  that same client just sent — no request body, no session, no header it did not write itself. The
+  that same client just sent, no request body, no session, no header it did not write itself. The
   designation itself is already public through `GET /api/source` and the build identity panel, so
   switching it does not disclose anything the response did not already carry, though the frontend's
   banner marks only `UAT` and `PERFORMANCE` and would stay silent. `NonProductionProfileTest` bounds
@@ -1934,7 +1932,7 @@ whether it is built or designed. **Designed means absent today.**
   fixed. The reference proxy answers `TRACE`, `CONNECT` and `TRACK` itself with 405 and forwards
   nothing else it does not relay. Every other method reaches the application, which answers 405 with
   the `Allow` header RFC 9110 requires when the route does not declare it, and 400 when the request
-  firewall does not recognise it at all — as it does for a request target the HTTP grammar does not
+  firewall does not recognise it at all, as it does for a request target the HTTP grammar does not
   allow, which the connector refuses before any dispatch. All of those answers are RFC 9457, so a
   club running without the reference proxy loses nothing: the application is what answers. *Built.*
 - **A safe method changes nothing.** *Built.* This is what makes CSRF's exemption of `GET`, `HEAD`
@@ -1947,15 +1945,15 @@ whether it is built or designed. **Designed means absent today.**
   operation nothing probes.
 - **Uploads carry a documented type boundary, and the content is what decides it.** *Built.* Two
   endpoints accept a file. A roster snapshot is read as CSV: the name must end in `.csv` or `.txt`,
-  the declared part type must be one a browser actually sends for such a file — `text/csv`,
-  `text/plain`, `application/vnd.ms-excel`, `application/octet-stream`, or none at all — and the
+  the declared part type must be one a browser actually sends for such a file, `text/csv`,
+  `text/plain`, `application/vnd.ms-excel`, `application/octet-stream`, or none at all, and the
   bytes must be text. A container, image, workbook or executable signature is refused, and so is
   anything that decodes into a C0 control character other than tab, carriage return or line feed,
   because `ISO-8859-1` maps every byte and would otherwise read a binary as a roster. C1
-  (U+0080–U+009F) is deliberately not refused: a club configured `ISO-8859-1` whose export is
+  (U+0080 to U+009F) is deliberately not refused: a club configured `ISO-8859-1` whose export is
   really Windows-1252 decodes its typographic quotes into that range. The refusal happens before
   any preview exists, so a rejected file supersedes nothing and this application persists nothing
-  of it — what a preview keeps is the file's name, its SHA-256 digest and the change set parsed
+  of it, what a preview keeps is the file's name, its SHA-256 digest and the change set parsed
   from it, never the uploaded bytes. The servlet container still buffers the part it received to
   its own temporary directory before the application sees it, and removes it with the request. A club logo is refused unless
   its own bytes are PNG or JPEG within 1 MiB and 2048 pixels, and what is stored is the re-encode
@@ -1986,8 +1984,8 @@ whether it is built or designed. **Designed means absent today.**
   condition and is what the booking form draws its idempotency key from. *Built.*
 - **What a browser may fetch from this instance outside the API, in one list:** every resource the
   frontend build ships, and every address outside `/api` that answers without a session, is recorded
-  in `security/published-web-resources.json`. *Built.* The API has its own inventory — the OpenAPI
-  document, `ApiContractCoverageTest` and `surfaceless-endpoints.json` — and this list neither
+  in `security/published-web-resources.json`. *Built.* The API has its own inventory, the OpenAPI
+  document, `ApiContractCoverageTest` and `surfaceless-endpoints.json`, and this list neither
   repeats nor covers it, so the anonymous surface is the two together and not this one alone. A file
   the build produces that no entry names fails the build, and so does a comment, an origin or a
   credential form that no entry reviewed; the shipped bundle carries no comment at all today, which
@@ -2016,14 +2014,14 @@ whether it is built or designed. **Designed means absent today.**
   operation, so a header, query, path or form parameter, a request body or a supported encoding on
   either side alone fails the build; a handler parameter Spring resolves some other way fails until
   it is a recorded decision, and so does a documented operation no handler serves. *Built.* The
-  framework registers further handler mappings — the shell routes, the built resources, the exposed
-  actuator endpoint — and each is classified by what it binds rather than left unmentioned. None of
+  framework registers further handler mappings, the shell routes, the built resources, the exposed
+  actuator endpoint, and each is classified by what it binds rather than left unmentioned. None of
   them binds an input this comparison reads, which is a narrower statement than that they read
   nothing: a resource handler reads `Accept` and `If-None-Match` as any static server does. Their
   addresses are inventoried in `security/published-web-resources.json`. Three things sit outside the
   document contract and are therefore inventoried by name: every filter that can see a request,
   derived at once from the running filter beans, from the registrations a servlet container is
-  handed, from every security chain and from the classes `src/main` declares — four sources,
+  handed, from every security chain and from the classes `src/main` declares, four sources,
   because a filter that reaches production through any one of them alone is invisible to the other
   three, which is how the forwarded-header filter and the one that exists only where
   `courtside.environment` is `SECURITY` were found; every class under
@@ -2060,15 +2058,15 @@ whether it is built or designed. **Designed means absent today.**
   them green and turns the behavior test red, which is why the inventory binds to behavior and not
   to either of them.
 - **A parameter is named once.** *Built.* A repeated query or form parameter used to be accepted
-  and its values joined into one comma-separated string, so `?query=aa&query=bb` bound `aa,bb`, and a
+  and its values joined into one comma-separated string, so `?query=aa&query=bb` bound `aa, bb`, and a
   sign-in naming `username` twice would have been decided by whichever of the two the reading reached
   first. The document declares no array parameter, so a name carries one value by contract, and a
   request repeating one is refused as `urn:courtside:error:ambiguous-parameter`. It is refused in
   front of the security filter chain, because that chain reads parameters of its own, the CSRF token
-  among them, and `getParameterMap` merges the query string with the form body — a name appearing
+  among them, and `getParameterMap` merges the query string with the form body, a name appearing
   once in each is the same ambiguity and gets the same answer. The cost is that a form body is parsed
-  before authentication. What can be parsed is what the connector accepts at all — a body of three
-  megabytes is refused and the connection closed before any parameter exists — and the reference
+  before authentication. What can be parsed is what the connector accepts at all, a body of three
+  megabytes is refused and the connection closed before any parameter exists, and the reference
   deployment caps a request body at 2 MB in front of that. The parameter map holds nothing of a multipart body, which was
   measured rather than assumed: a logo uploaded with two parts named `file` reached the handler.
   Reading that map nevertheless *parses* such a body and spools every part to disk, which the first
@@ -2079,10 +2077,10 @@ whether it is built or designed. **Designed means absent today.**
   request carries no token header. An upload carrying more parts than the connector accepts answers
   403 rather than 413 when that header is present, which is what measures the difference.
 - **One request means one message.** *Built.* Thirteen ambiguously framed messages, beside one that
-  is not — among them two lengths that agree and two that disagree, a length beside a chunked body,
+  is not, among them two lengths that agree and two that disagree, a length beside a chunked body,
   a chunked body named twice and named with a companion encoding, an encoding neither hop
   implements, a chunk size that is not a number, a bare newline ending the request line, a carriage
-  return inside a header value, a second host, a space before a header colon — are sent as raw bytes
+  return inside a header value, a second host, a space before a header colon, are sent as raw bytes
   both straight at the connector and
   through the reference proxy, which is started from `deploy/Caddyfile` with the upstream address as
   the only substitution. Every one of them is answered exactly once at both hops, which is the
@@ -2092,7 +2090,7 @@ whether it is built or designed. **Designed means absent today.**
   and frames a new one, and it admits two `Content-Length` headers that agree where the connector
   alone refuses them. That admission is allowed only because those fields state one boundary, and
   the corpus checks that rather than asserting it. An encoding the connector does not implement is
-  answered 501, which the error controller used to label an internal error — reporting a framing the
+  answered 501, which the error controller used to label an internal error, reporting a framing the
   caller chose as a fault of ours; 501 now carries a type of its own.
 - **Every response header says where its value came from.** *Built.* The eight places `src/main`
   writes a response header are derived from the sources and each is classified: two `Location`
@@ -2107,7 +2105,7 @@ whether it is built or designed. **Designed means absent today.**
   contract that declares it and escaped by the encoder that places it.
 - **Supply chain:** Dependabot, container image scanning, cosign signatures and SBOM per
   release. *Dependabot is configured, and the build submits the tree Maven resolves so its alerts
-  reach the transitive Java dependencies a POM does not name — the graph carried the declared ones
+  reach the transitive Java dependencies a POM does not name, the graph carried the declared ones
   alone until then, and an advisory against anything the Spring Boot BOM brought in was seen by the
   nightly source scan and by nothing else. The release workflow signs each image keylessly with
   cosign and attaches an SBOM attestation. Trivy scans the application's extracted layers and the
@@ -2125,29 +2123,29 @@ whether it is built or designed. **Designed means absent today.**
   evidence preserves confirmed blocks through alert-API outages; unavailable data stays visibly
   skipped and is never treated as a clean scan.*
 - **Accepted: a long-lived token can publish under this project's name.** release-please cuts every
-  release, and it holds a fine-grained personal access token scoped to this repository alone —
+  release, and it holds a fine-grained personal access token scoped to this repository alone,
   contents (push the release branch and the tag), pull requests (open and update the release pull
   request), issues (the autorelease labels use that API) and the metadata every fine-grained token
-  needs — nothing else, and no permission over workflows or actions. It exists because a tag pushed
+  needs, nothing else, and no permission over workflows or actions. It exists because a tag pushed
   with the workflow's own token starts no pipeline, so a release cut without it would carry no
   image, no qualification and no signature; the workflow refuses to run rather than produce one.
   A fine-grained token acts as the person who issued it, so its ceiling is that person's: a
   maintainer holding the repository-admin bypass can write to `main` without a pull request, and so
-  can this token. It cannot change what runs — no permission reaches a workflow file — and it cannot
+  can this token. It cannot change what runs, no permission reaches a workflow file, and it cannot
   make a release visible: `publish` does that, after every gate above it. What bounds the rest is
   that the workflow is triggered by a push to `main` only, so no pull request's code ever runs
   beside it. Rotating it is a maintainer's task; nothing in the repository can observe that it has
   gone stale, only that it is absent.
-- **A release candidate carries what a release carries.** *Built.* A tag with a prerelease suffix —
-  `v0.3.0-alpha.1`, `v0.3.0-rc.1` — travels the same pipeline: the same nightly verification of a
+- **A release candidate carries what a release carries.** *Built.* A tag with a prerelease suffix,
+  `v0.3.0-alpha.1`, `v0.3.0-rc.1`, travels the same pipeline: the same nightly verification of a
   commit it builds on, the same qualification of the exact manifest that is published, the same
   keyless cosign signature and SBOM attestation. A candidate exists so that a club can run it, and
   proving it less than a release would make the same signature mean two different things. What
   differs is reach, not proof: a candidate is published under its own version only, no floating tag
   follows it, and its GitHub release is marked a prerelease, so a club that pinned `latest` or a
   major line never receives one without asking for it by exact version.
-- **Security assessment evidence:** hosted assessments upload their normalized public records — the
-  manifests and the gate summaries — and nothing else, with GitHub artifact attestation over them.
+- **Security assessment evidence:** hosted assessments upload their normalized public records, the
+  manifests and the gate summaries, and nothing else, with GitHub artifact attestation over them.
   They used to seal the underlying evidence into a CMS envelope addressed to a tracked recipient
   certificate. That is withdrawn: no private key for that certificate was ever created, so every
   envelope it produced is unreadable and cannot be recovered. What stood between that and its
@@ -2155,12 +2153,12 @@ whether it is built or designed. **Designed means absent today.**
   proved the existence of a key to nobody. The accepted consequence is that evidence which cannot be
   published in normalized form is not retained past the run. A protected channel returns only when a
   key exists, is held by a named custodian, and is proven usable by decrypting what the workflow
-  encrypted — never by recording that somebody did. *Built.*
+  encrypted, never by recording that somebody did. *Built.*
 - **The servlet container runs a version the platform does not manage.** Spring Boot 4.1.1 manages
   Tomcat 11.0.24, and `pom.xml` overrides that to 11.0.25 through the property Spring Boot documents
-  for it. The earlier reading of this — that the advisories Apache published on 2026-08-25 reached
+  for it. The earlier reading of this, that the advisories Apache published on 2026-08-25 reached
   nothing this application configures, and that overriding a managed version is how a dependency
-  falls behind the platform instead — held for that batch: no HTTP/2, no container realm, no client
+  falls behind the platform instead, held for that batch: no HTTP/2, no container realm, no client
   certificate, no rewrite valve, no `web.xml` and no security constraint, because every
   authorization decision is made by the Spring Security filter chain. It did not survive the next
   batch. CVE-2026-65182, CVE-2026-65905 and CVE-2026-68525 are critical, they are improper access
@@ -2175,7 +2173,7 @@ whether it is built or designed. **Designed means absent today.**
   resolved against the advisory databases, and a Boot release that manages 11.0.25 or later makes
   the property removable. *Built, as described.*
 - **Accepted: the mail server fetches its admin interface unpinned.** The reference deployment
-  pins every image it names by digest, and the mail image is no exception — but on first start
+  pins every image it names by digest, and the mail image is no exception, but on first start
   that image downloads its own web interface from the latest GitHub release, outside the digest
   the deployment pinned. An operator watching the container's first start sees the download; an
   observer wanting more needs read access to the volume it lands in. It stays open because the
@@ -2185,9 +2183,9 @@ whether it is built or designed. **Designed means absent today.**
   reached only during setup and recovery. *Built, as described.*
 - **Mail hop authentication:** everything that grants access travels by mail, so the credential and
   the password the instance authenticates with both cross the hop to the mail server, and that hop
-  is authenticated in both halves. It is required to be encrypted — STARTTLS is required and not
+  is authenticated in both halves. It is required to be encrypted, STARTTLS is required and not
   merely enabled, so a relay that stops offering it fails the handover rather than carrying a
-  password in the clear — and the certificate is checked, both the chain up to an authority the
+  password in the clear, and the certificate is checked, both the chain up to an authority the
   runtime already holds and the name on it. The reference deployment reaches the relay under
   `COURTSIDE_MAIL_HOSTNAME`, the name Caddy issued the certificate for, which the mail server
   answers to as a second name on a network shared with the instance and nothing else, so nothing
@@ -2200,21 +2198,21 @@ whether it is built or designed. **Designed means absent today.**
   application requires is exercised without an authority in the loop. The failure direction in a
   deployment is closed rather than open: a relay serving the wrong name, an unknown issuer, an
   expired certificate or a chain that stops short of its issuer stops the handover. What that costs
-  is recorded rather than hidden — the message is attempted four times across about a minute and is
+  is recorded rather than hidden, the message is attempted four times across about a minute and is
   then settled `FAILED` with its reason, and the event behind it stays outstanding and is replayed
   when the instance restarts, which writes a second row and issues a fresh credential. Repairing
   the certificate releases nothing that has already failed. *Built.*
 - **Accepted: a reload the mail server refuses leaves it serving a certificate it made itself.**
   A renewed certificate reaches the running listener without a restart: the helper publishes the
   pair, a reloader asks the mail server to load it, and the listener answers with the new one.
-  Stalwart 0.16.20 does not keep the pair it had when it refuses that load — it answers
-  `notCreated`, drops the certificate and falls back to a self-signed one — so a refused reload
+  Stalwart 0.16.20 does not keep the pair it had when it refuses that load, it answers
+  `notCreated`, drops the certificate and falls back to a self-signed one, so a refused reload
   downgrades the hop rather than leaving it as it was. An observer needs to watch container health
   or the reloader's log, both of which say so:
   a reload stays owed until one is accepted, so a refused one is named, retried, and reported by a
   container that stays unhealthy rather than by one a later read-back turns green again, and
   `deploy/README.md` names every state either container reports and what to do about it. The
-  fallback is refused on its own terms too — it is valid from 1975 to 4096, and the reloader treats
+  fallback is refused on its own terms too, it is valid from 1975 to 4096, and the reloader treats
   a certificate outliving what any authority issues as one the mail server made for itself. It
   stays open because keeping the previous pair is the mail server's decision and not this
   deployment's. What bounds it: `current` is swapped only after Caddy has validated the pair behind
@@ -2224,7 +2222,7 @@ whether it is built or designed. **Designed means absent today.**
   it in reach of whoever caused the fallback.
   *Built, as described.*
 - **Accepted: whoever holds a mailbox can take over every account registered to it.** One address
-  serving several people is deliberate — a parent registering for their children — so the same
+  serving several people is deliberate, a parent registering for their children, so the same
   inbox receives each of their credentials, and a first credential is enough to set a password and
   keep the account. That was already true when a board member handed the password over; what
   changed is that no person stands between the address a club typed and the message. What bounds it:
@@ -2233,13 +2231,13 @@ whether it is built or designed. **Designed means absent today.**
   people share the address a message is about to go to, and an import preview says the same per row
   before a run opens any account, because a snapshot sends at a scale no per-person click reaches;
   the subject names the person it is for, so a
-  shared inbox can tell two apart; and nothing else about an account can be reached this way — a
+  shared inbox can tell two apart; and nothing else about an account can be reached this way, a
   credential grants the roles that account already had and no others. It stays open because closing
   it would mean forbidding a shared address, which is the case the schema exists to serve.
   *Built, as described.*
 - **A booking a caller may not reach answers as though it did not exist.** Authorisation on a
   booking runs after it is loaded, so refusing it could have said `403` where an unknown id says
-  `404` — and the difference is itself an answer, given to anybody authenticated, about an id they
+  `404`, and the difference is itself an answer, given to anybody authenticated, about an id they
   hold but should not be able to confirm. Both now answer `404` on the managed-appointment detail,
   on cancellation and on the three series operations, which is what
   `DELETE /api/my/participations/{id}` already did for its three cases. The series operations
@@ -2254,15 +2252,15 @@ whether it is built or designed. **Designed means absent today.**
 - **What this does not hide.** `GET /api/bookings` is anonymous by design and carries the booking id
   of every confirmed allocation, so the existence of a booking that occupies a court on a known day
   was never a secret and is not one now. What the change withholds is existence for cancelled
-  bookings, for bookings holding no court, and for any id whose day an observer cannot guess — and,
+  bookings, for bookings holding no court, and for any id whose day an observer cannot guess, and,
   on every one of them, the start instant. Inside a series a caller who manages the occurrence they
   named is still refused with `404` when a *different* occurrence of that series is beyond them; the
   answer is then imprecise rather than disclosing, and correcting it would either distort the
   single-booking cancellation that shares the code path or hand back the difference this section
   exists to remove.
 - **Accepted: a change to the application alone is not measured against the active suites until
-  somebody starts them.** The paired comparison is triggered by the digest of what a paired run varies — the
-  assessment's code, its contract, the deployment description and the lockfile — so a pull request
+  somebody starts them.** The paired comparison is triggered by the digest of what a paired run varies, the
+  assessment's code, its contract, the deployment description and the lockfile, so a pull request
   that only changes the application skips it, and the authorization suite's assertions about
   concrete answers are not re-checked against what that pull request built. What an observer needs:
   nothing. This is a gap in when a weakness would be noticed, not one a caller can reach. What
@@ -2281,7 +2279,7 @@ whether it is built or designed. **Designed means absent today.**
   today: eleven dismissals and one that names the unexpired acceptance in
   `security/exceptions.json`. What an observer needs: nothing, both files ship with the source and
   the published evidence repeats the reason beside every alert it dismissed. What it does not say:
-  whether the reasoning is right — that is a review of the record, and a code owner is required on
+  whether the reasoning is right, that is a review of the record, and a code owner is required on
   `security/` so no such record lands unread. What bounds it: a record covers an alert only when
   the rule, method, route template, risk, confidence, pinned scanner version and rule-specific
   observation all match, and the fingerprint it names is recomputed from its own rule and route; a
@@ -2291,16 +2289,16 @@ whether it is built or designed. **Designed means absent today.**
   that can never go green while a scanner reports anything at all, which is the state this
   assessment was in until now. *Built, as described.*
 - **Accepted: the leftover-file probes measure anonymous exposure only.** The passive assessment
-  requests ten representative paths — five with a sensitive extension, five that look like a backup
-  or an editor leftover — without a session, and the application authenticates before it routes, so
+  requests ten representative paths, five with a sensitive extension, five that look like a backup
+  or an editor leftover, without a session, and the application authenticates before it routes, so
   all ten answer `401` whether or not a file of that name exists. That order is the stronger
   behaviour, because no status distinguishes a leftover file from a path that never existed; its
   consequence is that the check proves nothing is served to an anonymous caller and cannot prove
   that nothing is served at all. What an observer needs: nothing, the paths and the rule are in the
   source. What it does not say: what an authenticated member would receive from such a path. What
-  bounds it: the reference deployment has no filesystem document root at all — Caddy only reverse
+  bounds it: the reference deployment has no filesystem document root at all, Caddy only reverse
   proxies and serves no file of its own, the application's static content is the frontend build
-  inside the published image, and its container runs read-only — so a leftover file would have to
+  inside the published image, and its container runs read-only, so a leftover file would have to
   be a committed file, and the published-web-resources inventory above refuses one that reaches the
   browser build or the application's own resource root. It stays open because closing it means
   either refusing those patterns at the edge, which changes what the reference deployment serves,
@@ -2308,20 +2306,20 @@ whether it is built or designed. **Designed means absent today.**
   have. *Built, as described.*
 - **Accepted: a red scheduled gate names itself in a public issue.** The failure tracker watches
   every workflow that runs on a schedule, so a red `security assessment` opens an issue in this
-  repository — which is public — naming the workflow, the job, its primary failed step, the commit
+  repository, which is public, naming the workflow, the job, its primary failed step, the commit
   range and any later failed steps from that job. A manually dispatched diagnostic run never opens
   or reopens one. Where the workflow carries the required check, the issue says that the failure
   blocks every open pull request. The issue is assigned to the repository owner, whose account
   already owns the repository publicly. What an observer needs: nothing, an issue list is readable
   by anybody. What it does not say: the finding, its severity and the code it concerns stay in the
-  run's retained evidence. On a public repository that evidence is not privileged — any GitHub
+  run's retained evidence. On a public repository that evidence is not privileged, any GitHub
   account can read the run and download its artefacts, not only somebody with access to this
-  repository — and everything the assessment retains, the manifests and the summaries, is
+  repository, and everything the assessment retains, the manifests and the summaries, is
   uploaded in the clear. The issue says a gate is red, not why. Part of this was
   already true, because the required build's `security` job is visible on every pull request; what
   changed is that a scheduled security run now says so on its own rather than only to whoever opens
   the Actions tab. It stays open because the alternative is the defect the tracker exists to
-  remove — a red gate nobody is told about. What bounds it: the window is the time between the
+  remove, a red gate nobody is told about. What bounds it: the window is the time between the
   scheduled run and the fix, and a reader of the issue learns that a gate failed, which the run
   history already showed them. *Built, as described.*
 - **Accepted: a reduced pull-request build carries no evidence that it was enough.** A pull request
@@ -2331,7 +2329,7 @@ whether it is built or designed. **Designed means absent today.**
   every run recorded whether a job outside the reduced selection had failed, and a reduced selection
   was permitted only after twenty first attempts had produced no such miss. That measurement is gone,
   because it was observable only while every run executed everything, so keeping it meant paying for
-  the full set in order to prove the reduced one — and requalifying after any policy change, which
+  the full set in order to prove the reduced one, and requalifying after any policy change, which
   at this repository's rate of change was unreachable rather than strict. What an observer needs:
   nothing; the selection is visible in every run's summary. What it means: if a mapping is wrong, no
   pull-request gate says so. What bounds it: pushes to `main` and every scheduled run execute all
@@ -2354,8 +2352,8 @@ whether it is built or designed. **Designed means absent today.**
   against one will find controls whose evidence is an argument rather than a test. What bounds it:
   the rationale is mandatory and a build gate refuses a disposition without one, so an unprovable
   control is visible rather than silently `implemented`; and where the remedy *is* a product change,
-  it becomes a tracked issue and ordinary work instead. It stays open because the alternative — an
-  issue per unprovable phrasing — produces a backlog nobody can close, which is deferral wearing a
+  it becomes a tracked issue and ordinary work instead. It stays open because the alternative, an
+  issue per unprovable phrasing, produces a backlog nobody can close, which is deferral wearing a
   ticket number and buys a club nothing. *Built, as described.*
 
 ### Roles
@@ -2368,7 +2366,7 @@ whether it is built or designed. **Designed means absent today.**
 | Sport director | Place training, league match and configured event blocks |
 | Youth director | Place training, league match and configured event blocks |
 | Groundskeeper | Close courts |
-| Treasurer | Financial reports and exports — **no** passwords, no access rights |
+| Treasurer | Financial reports and exports, **no** passwords, no access rights |
 | Admin | Master data, user accounts, configuration |
 
 The treasurer role exists in Release 1 but has limited scope until the billing project
@@ -2404,7 +2402,7 @@ from an accompanying guest entered as a participant. Anonymous visitors remain r
 
 ### Name visibility in the grid
 
-**Participant names are never shown for someone else's booking — not to guests, and not to
+**Participant names are never shown for someone else's booking, not to guests, and not to
 logged-in members.** Three surfaces resolve names: a member's own booking, the administrative
 views (Admin, and Treasurer where a report requires it), and the managed-appointment view of the
 roles a booking card names as managing. The last exists because an officer answerable for an
@@ -2413,13 +2411,13 @@ responsibility. The grid itself is none of them: it is not an instance setting a
 switch it on.
 
 Data minimisation is the reason. A booking grid that names players publishes, to every member,
-who plays with whom and when — a movement and social profile that the booking function does not
+who plays with whom and when, a movement and social profile that the booking function does not
 need. The club's legitimate interest is that a court is occupied, not by whom.
 
 What the grid shows instead of a name is a neutral localised **booked** label, optionally followed
 by the numeric participant count. The count is not mapped to a sport-specific term. Named special
 occupancy keeps its configured booking-card label. This answers the only question the grid has to
-answer — is this court taken, and for how long — without carrying personal data.
+answer, is this court taken, and for how long, without carrying personal data.
 
 Consequences for the model and the API:
 
@@ -2435,13 +2433,13 @@ Consequences for the model and the API:
   member knows of it. `GET /api/my/participations` is how they find out and
   `DELETE /api/my/participations/{bookingId}` is how they object; neither needs the booker's
   agreement. Withdrawing takes the member's place out and leaves the booking, its court and its
-  other participants standing — a booking left below its card's player count is not corrected,
+  other participants standing, a booking left below its card's player count is not corrected,
   because an objection is not a rebooking. The list resolves no name at all, not the booker's and
   not the other participants', so exercising the objection reveals nothing the grid would not.
   Being recorded now reaches the member as a message, and it names the booking rather than the
-  booker — the same nothing the list resolves. **Built.**
+  booker, the same nothing the list resolves. **Built.**
 - **The objection has no time limit and no card exception.** It reaches a booking that has already
-  happened as readily as one still ahead — a member usually learns of the record after the fact, so
+  happened as readily as one still ahead, a member usually learns of the record after the fact, so
   the past is the case it exists for. It reaches whatever card recorded them, though as shipped only
   the member booking card records anybody: `allowed_player_counts` is empty for training, league
   match and court closure, so those carry no roster to leave. A club that gives a managed card
@@ -2492,13 +2490,13 @@ deliver the implementation.
   build until the column is classified. The same file classifies every path and query parameter the
   API declares, which is what makes the next point testable rather than aspirational. **Built.**
 - **Nothing that names a person travels in a request URL.** A response body is read once by the
-  client that asked for it; a URL is written down — by the browser's history, by whatever sits
+  client that asked for it; a URL is written down, by the browser's history, by whatever sits
   between the member and the instance, and by an operator's diagnostics. So a name fragment, and a
   member number a club's own source system holds, travel in a request body. Searching the roster and
   searching the member directory are `POST` for that reason and for no other, and they are held to
   changing nothing by the same test that holds every safe method to it. Two guards keep it: no
   parameter classified `personal` or `secret` may sit in a path or a query, and no path or query
-  parameter may be a string the document leaves unconstrained — which is the shape a name arrives
+  parameter may be a string the document leaves unconstrained, which is the shape a name arrives
   in, whatever anyone classified it as. **Built.**
 - **Accepted: a person-scoped identifier stays in the URL.** `personId` addresses every operation
   about one person and `subjectId` filters the change log; `sessionHandle`, `bookingId`,
@@ -2526,15 +2524,15 @@ deliver the implementation.
 - **The audit log is covered by that job rather than exempt from it.** `domain_event` is
   append-only and is never rewritten to erase somebody: it holds ids and values that are not
   personal, so removing the person the id names is what makes the entry anonymous. What the log
-  keeps is that a change happened, when, and which account made it — never a name, an address or a
+  keeps is that a change happened, when, and which account made it, never a name, an address or a
   credential. An id another system assigned is not among the ids it holds: the member number an
   import links by is recorded as the source it was linked against, because erasing the person here
   would not reach the system that number still names. The event publication registry beside it
   holds an event only until its consumers finish: a completed publication is deleted rather than
   retained, so nothing accumulates there for a job to clean up later.
 - **A sign-in session's row goes when the session does.** A session stops working the moment it
-  expires, but its row — and the attributes cascading from it, which carry the username, the account
-  id, the roles and the security epoch it was signed in with — is deleted on the cadence of
+  expires, but its row, and the attributes cascading from it, which carry the username, the account
+  id, the roles and the security epoch it was signed in with, is deleted on the cadence of
   `COURTSIDE_SESSION_CLEANUP_CRON`, a minute by default. Both ways of dying are swept on it: the
   store deletes what passed its inactivity window, and Courtside deletes what passed its absolute
   lifetime, because the stored expiry is built from the inactivity window alone and a session that
@@ -2543,18 +2541,18 @@ deliver the implementation.
   be widened but not switched off, and an instance configured to switch it off refuses to
   start. **Built.**
 - **An import never keeps the file it was given.** What a preview holds is the SHA-256 of the
-  uploaded bytes and the change set resolved from them — a club's whole membership list, in other
-  words — and that change set is bounded by `COURTSIDE_IMPORT_PREVIEW_RETENTION`. What survives
-  past it is the row, the name of the uploaded file, its SHA-256 and the counts — what an audit of
+  uploaded bytes and the change set resolved from them, a club's whole membership list, in other
+  words, and that change set is bounded by `COURTSIDE_IMPORT_PREVIEW_RETENTION`. What survives
+  past it is the row, the name of the uploaded file, its SHA-256 and the counts, what an audit of
   *what was executed* needs, and no member's name, address or number. A scheduled sweep enforces the
   bound, a preview past it answers without its change set, and a swept preview is refused rather
   than executed against one that is no longer there. **Built.**
 - **An import outlives whoever ran it.** A run and the preview it came from record the account that
-  took the action, and neither carries a foreign key to it — the same arrangement `domain_event`
+  took the action, and neither carries a foreign key to it, the same arrangement `domain_event`
   uses and for the same reason. Removing the account no longer has to take the record with it, which
   is what cascading would have done: what an audit of the roster needs is that an import happened,
   when, and with which counts, and none of that is personal data about the person who pressed the
-  button. The id beside it stops naming anybody on the same terms as the log above — when the
+  button. The id beside it stops naming anybody on the same terms as the log above, when the
   *person* goes, not when the account does, because the log itself still holds the pair. This says
   nothing about the rest of a preview: its change set is a club's membership list and is bounded by
   the retention in the point above, not by this one. **Built.**
@@ -2564,9 +2562,9 @@ deliver the implementation.
   the one above and a separate one: the snapshot a club later uploads *is* sent, and is then bound
   by the retention. Configuring the source that receives it is not. **Built.**
 - **A message record goes when the account it explains goes.** `message_record` holds no address,
-  no name and no body — an account id, a kind, a state, a `Message-ID`, two instants, the order it
+  no name and no body, an account id, a kind, a state, a `Message-ID`, two instants, the order it
   was written in, and, where a handover failed, the kinds of failure the mail library reported and
-  the SMTP status code, neither of which carries the relay's own words about an address — and it is
+  the SMTP status code, neither of which carries the relay's own words about an address, and it is
   removed with the account by `ON DELETE CASCADE`. There is no second retention setting for it: a
   row that outlived the account would explain a message to nobody, and one that vanished earlier
   would leave the club unable to answer why a member never heard from the instance. **Built.**
@@ -2576,12 +2574,12 @@ deliver the implementation.
   period it ran, the bookings they made and the bookings somebody else recorded them in, the
   recurring bookings they set up, what became of every message this instance addressed to them
   and which kinds they asked not to receive, the member numbers an import linked them by, and the
-  change log from both sides — what was done to them, and what they did. The club is the
+  change log from both sides, what was done to them, and what they did. The club is the
   controller and a request may arrive by letter, so the board is who produces the answer; people
   exist in the roster without an account, and self-service would leave them with no way to ask.
 
   **The answer is produced whole.** No section of it is paged or capped, because a subject access
-  answer that stops at a hundred entries is not one — a board member who has administered the club
+  answer that stops at a hundred entries is not one, a board member who has administered the club
   for years is the actor of every configuration change it ever recorded, and all of them are
   theirs. The cost is a single response held in memory, bounded by one club's own history and
   reachable only by an administrator asking about one person.
@@ -2601,8 +2599,8 @@ deliver the implementation.
   screen, and that the file names no account and no booking. What it costs is that a club cannot
   answer, from its own instance, who took the member list out and when.
 
-  The reason is not preference. Every entry in the change log names the entity it changed —
-  `subject_id` is required — and an export changes nothing and names no entity; the subject access
+  The reason is not preference. Every entry in the change log names the entity it changed,
+  `subject_id` is required, and an export changes nothing and names no entity; the subject access
   answer is recorded because the law attaches that activity to *one person*, which is a reason
   about the person and not about producing a file. Recording a bulk export needs a subject the log
   does not have yet, and inventing one to satisfy the column would put an export under whichever
@@ -2661,7 +2659,7 @@ foundation of the overlap guarantee; MySQL and MariaDB cannot express them.
 
 1. Exact rule types to ship in Release 1. The four categories in section 5 are fixed; which
    concrete rules make the first cut is a sequencing decision for the plan.
-2. Migration path from whatever a club runs today — which exports such systems offer and what is
+2. Migration path from whatever a club runs today, which exports such systems offer and what is
    worth carrying over.
 3. A public domain, should the project ever want one. Nothing depends on it: the base package
    is `org.courtside` and the error types in section 6 are URNs, which name a problem without

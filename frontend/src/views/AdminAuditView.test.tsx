@@ -180,7 +180,7 @@ describe("AdminAuditView", () => {
   });
 
   it.each([
-    ["facility.openingHours.set", { dayOfWeek: 1, opensAt: "08:00:00", closesAt: "22:00:00" }, "Opening hours set: Monday, 08:00–22:00"],
+    ["facility.openingHours.set", { dayOfWeek: 1, opensAt: "08:00:00", closesAt: "22:00:00" }, "Opening hours set: Monday, 08:00 to 22:00"],
     ["facility.openingHours.closed", { dayOfWeek: 7 }, "Sunday closed"],
     ["card.participantCard.added", { capacity: 4 }, "Participant card with capacity 4 added"],
     ["card.participantCard.added", { capacity: null }, "Participant card with no capacity limit added"],

@@ -99,7 +99,7 @@ bounded documentation profile, which checks every tracked Markdown file and the 
 contracts. Deleting, renaming or otherwise changing their structure still selects `full`.
 
 The tooling profile installs the locked Node dependencies and runs every repository tool, policy
-and contract test without Java integration tests, Vitest or Playwright. Selecting it additionally
+and contract test without Java integration tests, Vitest or Playwright. Selecting it also
 requires the security job in CI; hosted CodeQL has no local equivalent. The tooling job itself also
 runs for the documentation, backend and frontend profiles, and a documentation-only change is the
 one selection that runs it without the security job beside it. A closed manifest assigns every tracked
@@ -249,7 +249,7 @@ The blocking Chromium pixel suite fixes locale, theme, viewport, timezone, journ
 animations, caret rendering, and dynamic-field masks. Each assertion captures the surface under test
 rather than the whole page, so a change to one surface cannot move a neighbour's baseline: the
 series-preview and booking dialogs are captured as dialogs, not as dialogs over the page behind
-them. Build identity needs no mask — the footer carrying it sits outside every captured surface. It
+them. Build identity needs no mask, the footer carrying it sits outside every captured surface. It
 covers the court plan, booking and validation dialogs, personal bookings, series preview, and both
 administration surfaces.
 
@@ -303,12 +303,12 @@ the other green.
 
 A failed test retains what an analysis needs after the run is over: which test failed, its errors as
 text rather than as the colour codes Playwright writes them in, the last lines the application
-logged, and the state of the browser, proxy and database containers — one JSON file per failure
+logged, and the state of the browser, proxy and database containers, one JSON file per failure
 under `frontend/test-results/browser-diagnostics`, uploaded with the run. The application log is
 kept in memory while the run proceeds and passes the same redaction a container log does before it
 is written: URLs lose their path and query, a value behind a password, token, cookie or
 authorization key is replaced, and any opaque run of 24 characters or more goes. That covers what
-the application itself prints, not every shape a browser harness can quote — the suite signs in with
+the application itself prints, not every shape a browser harness can quote, the suite signs in with
 fixtures this repository publishes, so what it types is not a secret to begin with. A run that goes
 red for reasons nobody can reproduce is answered from that file, not from a rerun.
 

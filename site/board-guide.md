@@ -1,346 +1,295 @@
-# Anleitung für Vorstände
+# Handbuch für Vorstände
 
-Diese Seite beschreibt, was ein Vorstand in Courtside einrichtet und pflegt: die Anlage, die
-Buchungsregeln, die Mitglieder und ihre Zugänge. Sie richtet sich an jemanden mit einem Abend Zeit,
-nicht an eine Administratorin von Beruf.
-
-Zahlen stehen hier keine. Öffnungszeiten, Fristen, Obergrenzen und Raster legt Ihr Verein selbst
-fest — die Anleitung sagt, wo, und was die Einstellung bewirkt.
+Dieses Handbuch führt durch die Einrichtung und laufende Verwaltung einer Courtside-Instanz. Die
+Namen von Menüpunkten und Schaltflächen stehen *kursiv*. Öffnungszeiten, Fristen und Obergrenzen
+bestimmt jeder Verein selbst.
 
 ## Wer die Verwaltung sieht
 
-Die Verwaltung öffnet sich nur einem Konto mit der Rolle **Administrator**. Wer sie hat, findet
-*Verwaltung* in der Navigation; alle anderen sehen sie nicht und kommen auch über die Adresse nicht
-hinein.
+Nur aktive Konten mit der Rolle **Administrator** können die Verwaltung öffnen. Für diese Konten
+erscheint *Verwaltung* in der Hauptnavigation. Andere Konten erhalten auch über eine direkt
+eingegebene Adresse keinen Zugriff.
 
-Innerhalb der Verwaltung führt eine Leiste an der linken Seite durch vier Gruppen:
+Die Seitenleiste ordnet die Verwaltung in vier Bereiche:
 
-| Gruppe | Was darin liegt |
+| Bereich | Inhalt |
 |---|---|
-| **Verein** | Einrichtung, Konfiguration |
-| **Anlage** | Plätze, Öffnungszeiten, Buchungskarten, Platzfüller |
-| **Mitglieder** | Personen und Konten, Mitgliedsarten, Import |
-| **Nachweise** | Auslastung, Datenexport, Änderungsprotokoll, Nachrichtenprotokoll |
+| **Verein** | Einrichtung und Konfiguration |
+| **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
+| **Mitglieder** | Personen, Konten, Mitgliedsarten und Import |
+| **Nachweise** | Auslastung, Datenexport, Änderungsprotokoll und Nachrichtenprotokoll |
 
-Der Weg zurück zum Platzplan steht in derselben Leiste.
+Über dieselbe Leiste kehrst du zum Platzplan zurück.
 
-![Die Leiste der Verwaltung mit den Gruppen Verein, Anlage, Mitglieder und Nachweise und dem Weg zurück zum Platzplan.](screenshots/de/admin-navigation.png)
+![Die Verwaltungsnavigation mit den vier Bereichen und dem Link zum Platzplan.](screenshots/de/admin-navigation.png)
 
 ## Der geführte Weg: Einrichtung
 
-*Verein → Einrichtung* ist die Übersicht für den Anfang. Sie liest den aktuellen Stand der Instanz
-und zeigt je Schritt, ob er abgeschlossen, noch offen oder optional ist:
+Öffne *Verein → Einrichtung*. Die Übersicht prüft den aktuellen Stand und kennzeichnet jeden
+Schritt als abgeschlossen, offen oder optional.
 
-1. **Verein konfigurieren** — die Werkseinstellungen durch Name, Darstellung, Sprache, Zeitzone und
-   Kontoeinstellungen ersetzen.
-2. **Anlage vorbereiten** — mindestens ein aktiver Platz und ein geöffneter Wochentag machen den
-   Platzplan nutzbar.
-3. **Mitgliedsarten anbieten** — sie verbinden Personen mit ihren Buchungsregeln und Kontorechten.
-4. **Mitglieder aufnehmen** — abgeschlossen, sobald eine Person eine laufende Mitgliedschaft hat.
-5. **Mitglieder importieren** — optional, und nur sinnvoll, wenn eine bestehende
-   Mitgliederverwaltung die Liste führt.
+Arbeite die Schritte in dieser Reihenfolge ab:
 
-Sie können jeden Schritt öffnen und später hierher zurückkehren; die Übersicht merkt sich nichts,
-sondern liest jedes Mal neu, was tatsächlich da ist.
+1. **Verein konfigurieren.** Hinterlege Name, Farben, Logo, Sprache, Zeitzone und
+   Kontoeinstellungen.
+2. **Anlage vorbereiten.** Lege mindestens einen aktiven Platz und einen geöffneten Wochentag
+   an.
+3. **Mitgliedsarten anbieten.** Verbinde Mitgliedsarten mit Buchungsregeln und Kontorechten.
+4. **Mitglieder aufnehmen.** Erfasse mindestens eine laufende Mitgliedschaft.
+5. **Mitglieder importieren.** Dieser Schritt ist nur nötig, wenn eine andere
+   Mitgliederverwaltung die führende Liste enthält.
 
-![Die Einrichtungsübersicht mit den fünf Schritten untereinander, jeder mit seinem Zustand abgeschlossen, offen oder optional.](screenshots/de/admin-setup.png)
+Du kannst die Übersicht jederzeit verlassen. Beim nächsten Öffnen ermittelt Courtside den Stand
+neu.
+
+![Die Einrichtungsübersicht mit fünf Schritten und deren Status.](screenshots/de/admin-setup.png)
 
 ## Verein → Konfiguration
 
-Hier steht alles, was den ganzen Verein betrifft.
+Öffne *Verein → Konfiguration* und bearbeite die Einstellungen für die gesamte Instanz.
 
-**Verein und Darstellung.** Vereinsname, Primär- und Akzentfarbe, Logo. Neben jeder Farbe zeigt
-Courtside, ob sie mit dunklem oder hellem Text den Kontrast 4,5:1 erreicht — die Schwelle, ab der
-Text auch für schwache Augen und auf schlechten Bildschirmen lesbar bleibt. Das Logo laden Sie als
-PNG oder JPEG hoch, höchstens 1 MiB und 2048 mal 2048 Pixel; solange keine Datei hochgeladen ist,
-gilt die Logo-URL.
+### Verein und Darstellung
 
-![Primär- und Akzentfarbe nebeneinander, jede mit Hexwert, Farbwähler, einer Beispiel-Schaltfläche und dem gemessenen Kontrast, darunter das Feld für das Vereinslogo.](screenshots/de/club-appearance.png)
+Trage Vereinsname, Primärfarbe, Akzentfarbe und Logo ein. Courtside zeigt für jede Farbe den
+Kontrast zu hellem und dunklem Text. Für normalen Text gilt ein Verhältnis von mindestens 4,5 zu 1.
 
-**Impressum und Datenschutz** sind zwei URLs. Sie zeigen auf die Seiten Ihres Vereins, denn
-Courtside kennt Ihre Rechtsform nicht.
+Logos müssen als PNG oder JPEG vorliegen. Die Datei darf höchstens 1 MiB groß sein und 2048 mal
+2048 Pixel messen. Eine hochgeladene Datei ersetzt die Logo-URL, bis du die Datei entfernst.
 
-**Standardsprache** ist die Sprache für alle, die keine eigene gewählt haben.
+![Primär- und Akzentfarbe mit Kontrastwert, Vorschau und Vereinslogo.](screenshots/de/club-appearance.png)
 
-**Zeitzone** wird gegen die Zeitzonendatenbank geprüft, ein Tippfehler wird also sofort abgelehnt.
-Ändern lässt sie sich nur, solange es keine zukünftige Buchung gibt — sonst würde eine bestehende
-Buchung ihre Uhrzeit wechseln.
+### Links, Sprache und Zeit
 
-**Buchungsraster in Minuten** bestimmt das Raster des Platzplans und die zulässigen Anfangszeiten.
+* Hinterlege unter **Impressum** und **Datenschutz** die Seiten des Vereins.
+* Die **Standardsprache** gilt für Personen ohne eigene Sprachauswahl.
+* Gib eine gültige IANA-Zeitzone ein, zum Beispiel `Europe/Berlin`. Du kannst die Zeitzone
+  nur ändern, solange keine zukünftige Buchung vorhanden ist.
+* Das **Buchungsraster** bestimmt die Zeilen im Platzplan und die zulässigen Startzeiten.
 
-**Erinnerung vor einer Buchung** in Stunden. Der Wert 0 schaltet Erinnerungen ab; sonst bekommen
-alle in einer Buchung so viele Stunden vorher eine Nachricht.
+### Nachrichten und Zugangsdaten
 
-**Gültigkeit ausgestellter Zugangsdaten**, getrennt für ein neues Konto und für ein zurückgesetztes
-Passwort. Danach ist das Einmalpasswort wertlos und muss neu ausgestellt werden.
+* Der Wert 0 bei **Erinnerung vor einer Buchung** schaltet Erinnerungen aus. Ein anderer Wert legt
+  den Abstand in Stunden fest.
+* Stelle getrennt ein, wie lange Einmalpasswörter für neue und zurückgesetzte Konten gelten.
+* Der Code zum Zurücksetzen darf zwischen 15 Minuten und einem Tag gültig sein. Nach Ablauf muss das
+  Mitglied einen neuen Code anfordern.
 
-**Gültigkeit eines Codes zum Zurücksetzen** in Minuten, zwischen einer Viertelstunde und einem Tag.
-So lange kann ein Mitglied den Code einlösen, den es sich auf der Anmeldeseite selbst zuschickt;
-danach fordert es einen neuen an. Kurz ist sicherer, lang ist freundlicher zu jemandem, der erst am
-Abend in sein Postfach schaut.
+### Personen ohne Mitgliedsart
 
-**Regelsatz für Personen ohne Beitragsart** greift, wenn jemand gerade keine Mitgliedsart hat, etwa
-nach dem Ende einer Mitgliedschaft. Ohne Regelsatz bindet diese Person keine mitgliedschaftsbezogene
-Regel; Öffnungszeiten und Raster gelten trotzdem.
+Wähle ein Regelwerk für Personen ohne aktuelle Mitgliedsart, wenn auch für diese Gruppe
+mitgliedschaftsbezogene Regeln gelten sollen. Ohne Auswahl gelten weiterhin Öffnungszeiten und
+Buchungsraster.
 
 ## Anlage → Plätze
 
-Ein Platz hat eine Nummer und einen Namen; die Nummer ist eindeutig, eine bereits vergebene wird
-abgelehnt. Nummer und Name lassen sich jederzeit ändern.
+Ein Platz braucht eine eindeutige Nummer und einen Namen. Beides kannst du später ändern.
 
-Statt einen Platz zu löschen, deaktivieren Sie ihn. Er verschwindet aus dem Platzplan, seine
-Vergangenheit bleibt in den Auswertungen, und bestehende Buchungen darauf sind nicht plötzlich
-verschwunden — betroffene Mitglieder bekommen eine Nachricht, dass ein Platz ihrer Buchung ausser
-Betrieb genommen wurde.
+Deaktiviere einen Platz, den der Verein nicht mehr nutzt. Der Platz verschwindet aus dem
+Platzplan, bleibt aber in vergangenen Buchungen und Auswertungen erhalten. Courtside benachrichtigt
+Mitglieder mit betroffenen zukünftigen Buchungen.
 
-![Die Platzliste mit Nummer und Name je Zeile, der Schaltfläche zum Deaktivieren und dem Formular für einen neuen Platz.](screenshots/de/courts.png)
+![Die Platzliste mit Nummer, Name, Status und dem Formular für einen neuen Platz.](screenshots/de/courts.png)
 
 ## Anlage → Öffnungszeiten
 
-Je Wochentag tragen Sie eine Öffnungs- und eine Schliesszeit ein oder markieren den Tag als
-geschlossen. Ein Tag mit nur einer der beiden Zeiten wird nicht gespeichert; Courtside markiert die
-Zeile und sagt, was fehlt.
+1. Trage für jeden geöffneten Wochentag eine Öffnungs- und eine Schließzeit ein.
+2. Markiere Tage ohne Spielbetrieb als geschlossen.
+3. Nutze *Gleiche Zeiten übernehmen*, um ein Zeitfenster auf mehrere Tage anzuwenden.
+4. Speichere die gesamte Woche.
 
-Für die übliche Woche gibt es *Gleiche Zeiten übernehmen*: Zeiten eintragen, die Tage auswählen,
-übernehmen, und die ganze Woche mit einem Klick speichern.
+Courtside speichert keinen Tag, bei dem eine der beiden Zeiten fehlt. Außerhalb der Öffnungszeiten
+sind keine Buchungen möglich. Wenn du Öffnungszeiten später verkürzt, benachrichtigt Courtside
+die Mitglieder mit betroffenen Buchungen.
 
-Ausserhalb der Öffnungszeit ist keine Buchung möglich, und eine nachträgliche Verkürzung meldet sich
-bei den Mitgliedern, deren Buchung dadurch nicht mehr abgedeckt ist.
-
-![Die Öffnungszeiten je Wochentag mit Öffnungs- und Schliesszeit, der Markierung geschlossen und dem Bereich Gleiche Zeiten übernehmen.](screenshots/de/opening-hours.png)
+![Die Öffnungszeiten für alle Wochentage und die Funktion zum Übernehmen gleicher Zeiten.](screenshots/de/opening-hours.png)
 
 ## Anlage → Buchungskarten
 
-Alles, was einen Platz belegt, ist in Courtside dieselbe Sache — ein Mitgliederspiel, ein Training,
-ein Punktspiel, eine Sperrung. Was sie unterscheidet, ist die **Buchungskarte**. Eine neue Art von
-Belegung ist deshalb eine neue Karte, keine neue Version der Anwendung.
+Buchungskarten unterscheiden die Arten einer Platzbelegung, etwa Mitgliederspiel, Training,
+Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 
-Eine Karte trägt:
+| Einstellung | Wirkung |
+|---|---|
+| **Bezeichnung und Farbe** | Darstellung im Platzplan |
+| **Berechtigte Rollen** | Rollen, die mit der Karte buchen dürfen. Ohne Auswahl dürfen alle angemeldeten Personen buchen |
+| **Verantwortliche Rollen** | Rollen, die jede Buchung dieser Karte öffnen, einsehen und stornieren dürfen |
+| **Erlaubte Spielerzahlen** | Zulässige Zahl von Teilnehmenden. Ohne Wert erfasst die Karte keine Teilnehmenden |
+| **Zählt gegen Buchungslimits** | Rechnet die Buchung auf die Obergrenze offener Buchungen an |
+| **Gäste erlaubt** | Erlaubt namentlich erfasste Gäste |
+| **Neutral anzeigen** | Zeigt im öffentlichen Platzplan *Belegt* statt der Kartenbezeichnung |
 
-* **Bezeichnung und Farbe** — so erscheint sie im Platzplan, mit Vorschau im Formular.
-* **Berechtigte Rollen** — wer auf dieser Karte buchen darf. Eine der gewählten Rollen genügt. Ohne
-  Auswahl darf jede angemeldete Person buchen; die Administration darf immer.
-* **Verantwortliche Rollen** — wer jede Buchung auf dieser Karte öffnen, die Namen der Teilnehmenden
-  sehen und sie stornieren darf. Ohne Auswahl nur die Administration.
-* **Erlaubte Spielerzahlen** — genau diese Zahlen darf eine Buchung haben. Ohne Angabe hält die
-  Karte keine Teilnehmenden fest; so ist es beim Training und bei einer Sperrung.
-* **Zählt gegen Buchungslimits** — ob eine Buchung auf dieser Karte auf die Obergrenze offener
-  Buchungen des Mitglieds angerechnet wird.
-* **Gäste erlaubt** — ob ein namentlich genannter Gast einen Spielerplatz füllen darf.
-* **Im Platzplan neutral als gebucht anzeigen** — ob der Platzplan die Bezeichnung der Karte
-  anzeigt oder ein neutrales *Belegt* mit der Zahl der Teilnehmenden. Das ist eine Entscheidung der
-  Darstellung und keine Geheimhaltung: die Schnittstelle, aus der der öffentliche Platzplan liest,
-  führt die Bezeichnung mit. Eine Karte, deren Name niemanden etwas angeht, benennen Sie besser
-  neutral.
+Administratoren dürfen jede Karte verwenden und verwalten. Eine neutrale Anzeige schützt die
+Bezeichnung nicht vor technischem Zugriff, da die öffentliche Schnittstelle sie weiterhin liefert.
+Verwende deshalb keine vertraulichen Bezeichnungen.
 
-Zur Verfügbarkeit gilt dasselbe wie beim Platz: deaktivieren statt löschen.
+Deaktiviere nicht mehr benötigte Karten. Bestehende Buchungen bleiben erhalten.
 
-![Eine Buchungskarte im Formular: Bezeichnung und Farbe mit Vorschau, berechtigte und verantwortliche Rollen, erlaubte Spielerzahlen und die Schalter der Karte.](screenshots/de/booking-card.png)
+![Eine Buchungskarte mit Bezeichnung, Farbe, Rollen, Spielerzahlen und weiteren Optionen.](screenshots/de/booking-card.png)
 
 ## Anlage → Platzfüller
 
-Ein Platzfüller belegt einen Spielplatz, ohne eine Person zu sein — eine Ballmaschine etwa, oder ein
-Aushang „Spielpartner gesucht“. Die Anzahl sagt, wie viele davon der Verein besitzt; leer heisst
-beliebig viele. Ist zur gebuchten Zeit alles vergeben, sagt Courtside dem buchenden Mitglied, wie
-viele es insgesamt gibt.
+Platzfüller belegen einen Spielerplatz, ohne eine Person zu sein. Beispiele sind eine Ballmaschine
+oder der Eintrag "Spielpartner gesucht".
 
-![Die Liste der Platzfüller mit Bezeichnung und Anzahl, darunter das Formular für einen neuen.](screenshots/de/slot-fillers.png)
+Gib eine Bezeichnung und optional die verfügbare Anzahl ein. Ein leeres Anzahlfeld erlaubt
+beliebig viele gleichzeitige Verwendungen. Ist die begrenzte Anzahl belegt, lehnt Courtside weitere
+Auswahlen für denselben Zeitraum ab.
+
+![Die Liste der Platzfüller mit Bezeichnung, Anzahl und Formular.](screenshots/de/slot-fillers.png)
 
 ## Buchungsregeln
 
-Die Regeln stehen in *Verein → Konfiguration*, und die Mitgliedsarten verweisen darauf. Regeln sind
-Daten: ein **Regelwerk** ist eine benannte Sammlung, und jede Regel darin hat höchstens einen
-Eintrag.
+Öffne die Buchungsregeln unter *Verein → Konfiguration*. Eine Mitgliedsart verweist auf ein
+Regelwerk. Jedes Regelwerk kann diese Regeln höchstens einmal enthalten:
 
-Zwei Regeln gelten für den ganzen Verein und stehen nicht im Regelwerk: die **Öffnungszeiten** unter
-*Anlage → Öffnungszeiten* und das **Zeitraster** in dieser Konfiguration. Das Regelwerk verlinkt
-beide an ihren Platz. Die übrigen Regeln gehören hinein:
-
-| Regel | Was sie einstellt |
+| Regel | Einstellung |
 |---|---|
-| Buchungsvorlauf | Wie viele Tage im Voraus höchstens gebucht werden darf |
-| Offene Buchungen | Wie viele Buchungen gleichzeitig offen sein dürfen |
-| Maximale Buchungsdauer | Wie viele Minuten eine Buchung höchstens dauert |
-| Stornierungsfrist | Wie viele Minuten vor Beginn spätestens storniert wird |
-| Buchen gesperrt | Keine Einstellung: wer nach diesem Regelwerk gemessen wird, bucht und verschiebt nicht selbst. Die Administration bucht weiterhin auch für andere |
+| Buchungsvorlauf | Höchste Zahl von Tagen im Voraus |
+| Offene Buchungen | Höchste Zahl gleichzeitig offener Buchungen |
+| Maximale Buchungsdauer | Höchste Dauer in Minuten |
+| Stornierungsfrist | Mindestabstand zur Buchung in Minuten |
+| Buchen gesperrt | Verbietet Mitgliedern das Buchen und Verschieben ohne weitere Einstellung |
 
-Zu jeder Zahl nennt das Formular den erlaubten Bereich. Beim Buchen prüft Courtside **alle** Regeln
-und zeigt dem Mitglied jeden Verstoss auf einmal, nicht einen nach dem anderen.
+Öffnungszeiten und Buchungsraster gelten für den ganzen Verein. Sie stehen deshalb außerhalb der
+Regelwerke. Administratoren können das Buchungsverbot für Verwaltungsaufgaben übergehen. Das
+Zeit- und Platzraster gilt auch für sie.
 
-Ein Regelwerk wird **stillgelegt**, nicht gelöscht. Zeigt keine Mitgliedsart darauf, ändert das für
-niemanden etwas; zeigen welche darauf, nimmt Stilllegen es nur aus der Auswahl — für diese Mitglieder
-gelten die Regeln unverändert weiter, bis Sie ihnen ein anderes Regelwerk zuweisen. Courtside sagt
-Ihnen vorher, welcher Fall vorliegt.
+Beim Stilllegen bleibt ein Regelwerk für bereits zugeordnete Mitgliedsarten wirksam. Es steht nur
+nicht mehr für neue Zuordnungen bereit. Weise den betroffenen Mitgliedsarten zuerst ein anderes
+Regelwerk zu, wenn sich ihre Regeln ändern sollen.
 
-![Der Abschnitt Buchungsregeln mit der Auswahl des Regelwerks und den Regeln darunter, jede mit ihrem erlaubten Bereich.](screenshots/de/booking-rules.png)
+![Die Buchungsregeln mit Regelwerk, erlaubten Bereichen und Verweisen auf globale Einstellungen.](screenshots/de/booking-rules.png)
 
 ## Mitglieder → Mitgliedsarten
 
-Eine Mitgliedsart verbindet drei Dinge: eine Bezeichnung, ein Regelwerk und die Frage, ob ein Import
-für diese Art einen Zugang anlegt.
+Eine Mitgliedsart hat eine Bezeichnung, ein Regelwerk und eine Einstellung für den Import.
 
-**Stilllegen** verhindert nur neue Zuordnungen. Wer die Art hält, behält sie, und ihre Buchungsregeln
-gelten für diese Mitglieder unverändert weiter.
+Aktiviere **Zugang beim Import anlegen**, wenn importierte Mitglieder dieser Art automatisch
+ein Konto erhalten sollen. Courtside sendet das Einmalpasswort an die hinterlegte E-Mail-Adresse.
+Bestehende Konten bleiben unverändert.
 
-**Zugang beim Import anlegen** heisst: führen Sie einen Import aus, bekommt jedes Mitglied dieser Art
-einen Zugang und sein Einmalpasswort per E-Mail. Bestehende Zugänge bleiben unberührt.
+Beim Stilllegen bleiben bestehende Zuordnungen und deren Buchungsregeln erhalten. Die Mitgliedsart
+kann danach nicht mehr neu vergeben werden.
 
-![Die Mitgliedsarten mit Bezeichnung, Regelwerk und dem Häkchen, das beim Import einen Zugang anlegt.](screenshots/de/membership-types.png)
+![Die Mitgliedsarten mit Regelwerk, Status und der Kontoeinstellung für Importe.](screenshots/de/membership-types.png)
 
 ## Mitglieder → Personen und Konten
 
-Die Liste zeigt Name, Benutzername, Kontostatus und Mitgliedsart, mit Suche und Filter. Eine Person
-legen Sie mit Vorname, Nachname und E-Mail-Adresse an; alles davon ist später korrigierbar.
+Die Übersicht zeigt Name, Benutzername, Kontostatus und Mitgliedsart. Nutze Suche und Filter,
+um einen Eintrag zu finden. Vorname, Nachname und E-Mail-Adresse kannst du später korrigieren.
 
-![Die Personenliste mit Name, Benutzername, Kontostatus und Mitgliedsart je Zeile, darüber Suche und Filter.](screenshots/de/admin-roster.png)
+![Die Personenliste mit Suche, Filter und den wichtigsten Kontodaten.](screenshots/de/admin-roster.png)
 
-Öffnen Sie eine Person, finden Sie drei Bereiche:
+Nach dem Öffnen einer Person stehen drei Bereiche bereit:
 
-**Person** — die Stammdaten und die Sprache, in der Benachrichtigungen an sie gehen.
+* Unter **Person** bearbeitest du Stammdaten und die Sprache der Benachrichtigungen.
+* Unter **Mitgliedschaft** bearbeitest du Mitgliedsart, Beginn und Ende. Beende eine
+  Mitgliedschaft, statt sie zu löschen. Das Enddatum bleibt korrigierbar.
+* Unter **Konto** verwaltest du Benutzername, Rollen, Status und Zugangsdaten. Für ein Konto ist
+  eine E-Mail-Adresse erforderlich.
 
-**Mitgliedschaft** — Mitgliedsart, Beginn, Ende. Eine Mitgliedschaft wird **beendet**, nicht
-gelöscht: sie endet mit dem gewählten Datum, der Eintrag bleibt, und das Datum lässt sich danach
-korrigieren.
+### Zugangsdaten senden
 
-**Konto** — Benutzername, Rollen und die Zugangsdaten. Ein Konto braucht eine E-Mail-Adresse, denn
-über sie wird es erreicht; fehlt sie, sagt Courtside das und lässt kein Konto anlegen.
+Vor dem Senden zeigt Courtside die Zieladresse und weist auf gemeinsam verwendete Adressen hin. Das
+Einmalpasswort geht direkt an das Mitglied und wird dem Vorstand nicht angezeigt.
 
-Der Zustand des Zugangs steht immer dabei: noch nichts ausgestellt, Zugangsdaten unterwegs,
-ausgestellte Zugangsdaten abgelaufen, oder das Mitglied hat ein eigenes Passwort gewählt. *Zugangsdaten
-senden* stellt ein Einmalpasswort aus, **das an das Mitglied geht und das niemand im Vorstand sieht
-oder wählt.** Courtside nennt vorher die Adresse und sagt, wenn mehrere Personen auf derselben
-Adresse liegen.
+Neue Zugangsdaten ersetzen ein bereits gesetztes Passwort und beenden alle Sitzungen des Kontos.
+Verwende diese Funktion nur, wenn das Mitglied sein Konto nicht selbst wiederherstellen kann.
 
-Hat das Mitglied bereits ein eigenes Passwort, warnt Courtside vor dem Senden: neue Zugangsdaten
-löschen das gewählte Passwort und beenden alle laufenden Sitzungen. Das ist der Weg für jemanden, der
-nicht mehr hineinkommt — und nur dafür. Wer noch an seine hinterlegte Adresse kommt, braucht Sie
-dafür nicht: die Anmeldeseite schickt einen Code zu, mit dem das Mitglied sein Passwort selbst
-setzt, ohne dass am Konto vorher etwas passiert.
+Administratoren können die E-Mail-Adresse ändern und anschließend neue Zugangsdaten anfordern. Das
+Änderungsprotokoll hält beide Vorgänge mit Zeitpunkt und ausführendem Konto fest, aber weder die
+Adresse noch das Passwort. Organisatorische Kontrolle, etwa mehrere verantwortliche Personen,
+bleibt Aufgabe des Vereins.
 
-Gegen die eigene Verwaltung schützt das ein Konto nicht, und es wäre unehrlich, das zu verschweigen:
-wer die E-Mail-Adresse einer Person ändern darf, kann sich danach deren Zugangsdaten zustellen
-lassen. Das Änderungsprotokoll hält beide Schritte fest — *dass* Personendaten korrigiert und *dass*
-für dieses Konto Zugangsdaten angefordert wurden, je mit Zeitpunkt und ausführender Person. Werte
-stehen dort nicht: weder die Adresse, an die sie gingen, noch das Passwort selbst. Das Protokoll
-zeigt also, dass etwas geschah, nicht wohin. Eine echte Grenze ist erst eine Absprache im Verein,
-etwa dass die Administratorrolle nicht bei einer einzelnen Person liegt.
+### Konto deaktivieren
 
-Verlässt jemand den Verein, wird sein Konto **deaktiviert**, nicht gelöscht: die Schaltfläche
-daneben schaltet es ab und ebenso wieder an. Ein deaktiviertes Konto meldet sich nicht mehr an, und
-seine offenen Sitzungen enden sofort mit; alles, was die Person gebucht hat, bleibt in den
-Auswertungen richtig.
+Deaktiviere das Konto, wenn eine Person keinen Zugriff mehr erhalten soll. Courtside beendet
+alle Sitzungen. Buchungen und Auswertungen bleiben erhalten. Das Konto kann später wieder aktiviert
+werden.
 
-Weiter finden Sie dort: die Sitzungen dieses Kontos beenden, alle Sitzungen der Instanz beenden
-(auch Ihre eigene), die Änderungen an dieser Person im Protokoll, und die **Auskunft über
-gespeicherte Daten**. Fragt ein Mitglied, was der Verein über es gespeichert hat, erzeugt diese
-Schaltfläche die Antwort als Datei: die Person mit ihrer Adresse, jedes Konto mit Rollen und
-Zustand, die Mitgliedschaft und ihre Laufzeit, die Buchungen, die sie gemacht hat, und die, in die
-jemand anders sie eingetragen hat, ihre Serientermine, was aus jeder Nachricht an sie wurde und
-welche Arten sie abbestellt hat, die Mitgliedsnummern eines Imports und das Änderungsprotokoll von
-beiden Seiten — was an ihr geändert wurde und was sie selbst geändert hat. Sehen Sie die Datei an,
-bevor Sie sie herausgeben: sie enthält mehr, als ein Vorstand in der Oberfläche über eine Person
-sieht. Über andere Personen steht nichts
-darin, und dass die Auskunft erzeugt wurde, steht danach im Protokoll.
+### Daten einer Person ausgeben
 
-Die ganze Liste lässt sich als CSV exportieren, wahlweise mit den Mitgliedsnummern einer Importquelle.
+*Auskunft über gespeicherte Daten* erstellt eine Datei mit den Daten dieser Person. Sie enthält
+Personen- und Kontodaten, Mitgliedschaft, Buchungen, Serien, Nachrichten, Abwahlen,
+Importreferenzen und zugehörige Einträge im Änderungsprotokoll. Prüfe die Datei vor der
+Weitergabe. Die Erstellung selbst erscheint danach im Änderungsprotokoll.
+
+Die gesamte Personenliste kannst du als CSV exportieren. Optional enthält sie die
+Mitgliedsnummern einer Importquelle.
 
 ## Mitglieder → Import
 
-Führt Ihr Verein die Mitglieder anderswo, liest Courtside deren Export ein, statt dass jemand
-abtippt. Der Weg hat drei Schritte, und die Anwendung führt Sie durch sie hindurch.
+Nutze den Import, wenn eine andere Mitgliederverwaltung die führende Liste des Vereins
+enthält. Der Ablauf besteht aus Quelle, Vorschau und Ausführung.
 
-**Quelle beschreiben.** Eine Quelle ist die Beschreibung *einer* Mitgliederverwaltung: Bezeichnung,
-Trennzeichen und Zeichensatz des Exports, die Zuordnung der Spalten und der Kategorien zu
-Mitgliedsarten, und die Felder, die diese Quelle führt. **Jede Momentaufnahme überschreibt ein
-geführtes Feld**; was Sie nicht ankreuzen, gehört dem Verein und bleibt unangetastet. Bei der
-E-Mail-Adresse hat das Gewicht: an sie geht jedes Einmalpasswort und jeder Code zum Zurücksetzen,
-Sie verlagern mit diesem Häkchen also die Kontowiederherstellung Ihrer Mitglieder in das fremde
-System.
+### 1. Quelle beschreiben
 
-Das Häkchen bindet allerdings nur *Änderungen* an bestehenden Personen. **Eine Neuanlage schreibt
-jedes Feld der Datei**, angekreuzt oder nicht — beim ersten Lauf ist das praktisch jede Zeile. Wer
-die Adressen in der Hand des Vereins behalten will, korrigiert sie nach dem Import; das Häkchen
-entscheidet nur, ob die nächste Momentaufnahme sie wieder überschreibt. Ausserdem stellen Sie hier
-die Schwelle ein, ab welchem Anteil wegfallender Mitgliedschaften nachgefragt wird.
+Hinterlege Bezeichnung, Trennzeichen, Zeichensatz und Spaltenzuordnung. Ordne externe
+Kategorien den Mitgliedsarten in Courtside zu.
 
-Zum Zuordnen der Spalten wählen Sie eine Beispieldatei aus. **Diese Datei bleibt in Ihrem Browser**
-und wird nur gelesen, um Ihnen Ihre eigenen Spalten anzubieten.
+Markiere außerdem die Felder, die die Quelle künftig führen soll. Bei bestehenden Personen
+überschreibt jeder Import diese Felder. Nicht markierte Felder bleiben unverändert. Neue Personen
+erhalten beim ersten Import trotzdem alle zugeordneten Werte aus der Datei.
 
-![Die Beschreibung einer Quelle: Bezeichnung, Trennzeichen und Zeichensatz, die Zuordnung der Spalten und die Häkchen der Felder, die diese Quelle führt.](screenshots/de/import-source.png)
+Prüfe diese Entscheidung besonders für die E-Mail-Adresse. An diese Adresse gehen
+Einmalpasswörter und Codes zur Kontowiederherstellung.
 
-**Datei einlesen.** Der Upload erzeugt eine Vorschau, keine Änderung: Dateiname, Zeilenzahl und
-Prüfsumme, dann die Änderungsmenge nach Art getrennt — neu, geändert, Mitgliedschaft endet —, die
-übersprungenen Zeilen, die möglichen Dubletten und die geteilten Postfächer. Dazu steht dort, wie
-viele Zugänge angelegt würden und warum ein Zugang gegebenenfalls ausbleibt.
+Die Beispieldatei für die Spaltenzuordnung bleibt im Browser und wird nicht hochgeladen.
 
-An der Mitgliederliste ändert eine Vorschau nichts. Sie liegt aber in der Instanz: die Datei selbst
-wird nie gespeichert, die daraus gelesene Änderungsmenge mit Namen, Adressen und Mitgliedsnummern
-schon, bis ihre Aufbewahrungsfrist abläuft. Wer nach dem Verbleib gefragt wird, sollte das wissen.
+![Die Importquelle mit Dateiformat, Spaltenzuordnung und den von der Quelle geführten Feldern.](screenshots/de/import-source.png)
 
-Zwei Dinge muss die Vorschau von Ihnen wissen:
+### 2. Datei prüfen
 
-* **Was die Datei bedeutet.** Eine *Teilliste* ändert nur, was in ihr steht; wer fehlt, bleibt
-  unangetastet. Eine *vollständige Liste* ist die ganze Wahrheit dieser Quelle — wessen Zeile fehlt,
-  dessen Mitgliedschaft endet. Das trifft auch das Konto, und zwar auf zwei Arten: hält es nur die
-  Mitgliedsrolle, wird es deaktiviert; hält es eine weitere — Kassenwart, Administrator —, bleibt es
-  aktiv und verliert still die Mitgliedsrolle. In beiden Fällen enden seine Sitzungen sofort.
-* **Wer schon da ist.** Eine Momentaufnahme erkennt eine Person an ihrer Mitgliedsnummer, nie am
-  Namen. Wen Sie eingetragen haben, bevor Sie diese Quelle einlesen, ist der Datei unbekannt —
-  verknüpfen Sie beide von Hand, sonst legt der Import eine zweite Person an.
+Der Upload erzeugt zuerst eine Vorschau. Noch ändert sich keine Person. Die Vorschau zeigt
+Dateiname, Zeilenzahl, Prüfsumme, Änderungen, übersprungene Zeilen, mögliche Dubletten, gemeinsam
+verwendete E-Mail-Adressen und geplante Konten.
 
-Bei möglichen Dubletten unternimmt Courtside nichts: zwei Mitglieder heissen wirklich manchmal
-gleich, und nur Sie können das unterscheiden. Bei geteilten Postfächern ebenso — ein Elternteil
-meldet seine Kinder an, das ist gewollt; wer das Postfach liest, erhält aber jedes dorthin gesendete
-Einmalpasswort und jeden Code zum Zurücksetzen, und beides genügt, um einen Zugang zu übernehmen.
+Die Datei selbst wird nicht gespeichert. Die ermittelte Änderungsmenge mit Namen, Adressen und
+Mitgliedsnummern bleibt bis zum Ende ihrer Aufbewahrungsfrist in der Instanz.
 
-**Import ausführen.** Die geprüfte Änderungsmenge wird in einem Zug geschrieben. Liegt der Anteil
-endender Mitgliedschaften über Ihrer Schwelle, verlangt Courtside eine ausdrückliche Bestätigung —
-eine abgeschnittene Ausfuhr sieht genau so aus wie ein Verein, der geschrumpft ist. Jeder Lauf steht
-danach mit seinem Ergebnis in der Liste der bisherigen Läufe.
+Wähle den passenden Modus:
 
-**Ein erneutes Ausführen macht nichts rückgängig**, und ein späterer richtiger Lauf holt nicht alles
-zurück. Die Mitgliedschaften kommen wieder, die Konten nicht: eine Synchronisation schaltet ein Konto
-nie ein und gibt auch keine Rolle zurück, weil ein Vorstand beides aus einem Grund geändert haben
-kann, den keine Mitgliederverwaltung kennt.
+* Eine **Teilliste** ändert nur enthaltene Personen.
+* Eine **vollständige Liste** beendet Mitgliedschaften, deren Zeilen fehlen. Reine Mitgliedskonten
+  werden deaktiviert. Konten mit zusätzlichen Rollen bleiben aktiv, verlieren aber die
+  Mitgliedsrolle. In beiden Fällen enden die Sitzungen.
 
-Wer versehentlich eine abgeschnittene Datei ausgeführt hat, hat deshalb zweierlei zu tun, beides auf
-der Personenseite: die deaktivierten Konten wieder aktivieren, und den übrigen die Mitgliedsrolle
-zurückgeben. Der zweite Fall fällt nicht auf — diese Konten sind aktiv und sehen unauffällig aus,
-aber ihre Inhaber buchen auf keiner Karte mehr, die die Mitgliedsrolle verlangt.
+Ein Import erkennt Personen nur an Mitgliedsnummer und Quelle. Verknüpfe bereits erfasste
+Personen vor der Ausführung, sonst entstehen Dubletten. Prüfe gleichnamige Personen und
+gemeinsam verwendete E-Mail-Adressen von Hand.
+
+### 3. Import ausführen
+
+Prüfe die Zusammenfassung und wähle *Import ausführen*. Überschreitet der Anteil
+endender Mitgliedschaften die eingestellte Schwelle, verlangt Courtside eine zusätzliche
+Bestätigung. Die gesamte Änderungsmenge wird in einer Datenbanktransaktion gespeichert.
+
+Ein späterer korrekter Import stellt deaktivierte Konten oder entfernte Mitgliedsrollen nicht
+automatisch wieder her. Nach einer versehentlich unvollständigen Liste musst du betroffene Konten
+aktivieren und Mitgliedsrollen neu vergeben.
 
 ## Nachweise
 
-**Auslastung** zeigt, wie viel bestätigte Spielzeit jeder Platz in einem Zeitraum gehalten hat.
-Plätze ohne Buchung stehen mit dabei; sie sind Teil der Antwort.
+Unter **Nachweise** findest du vier Ansichten.
 
-![Die Auslastung je Platz über einen Zeitraum mit der Zahl der Buchungen, der belegten Zeit und dem Anteil.](screenshots/de/utilisation.png)
+* **Auslastung** zeigt bestätigte Spielzeit je Platz. Plätze ohne Buchung sind enthalten.
+* **Datenexport** erstellt CSV-Dateien für Buchungen oder Mitglieder. Der Buchungsexport enthält
+  keine buchende Person. Der Mitgliederexport enthält personenbezogene Daten und erzeugt keinen
+  Eintrag im Änderungsprotokoll.
+* **Änderungsprotokoll** zeigt administrative Änderungen mit Zeitpunkt, Gegenstand und
+  ausführendem Konto.
+* **Nachrichtenprotokoll** zeigt den Versandstatus. *Übergeben* bedeutet nur, dass der Mailserver
+  die Nachricht angenommen hat. Die endgültige Zustellung steht allein in dessen Protokoll.
 
-**Datenexport** gibt die Listen des Vereins als CSV. Trennzeichen und Zeichensatz entscheiden
-darüber, ob Ihre Tabellenkalkulation die Datei richtig öffnet. Der Buchungsexport nennt Platz,
-Zeitfenster und Buchungsart Tag für Tag — wer gebucht hat, steht nicht in der Datei.
-
-Der Mitgliederexport ist der andere Fall: er trägt Namen und Adressen des ganzen Vereins, und er
-hinterlässt **keinen** Eintrag im Änderungsprotokoll. Ihre Instanz kann Ihnen später nicht sagen, wer
-die Liste herausgezogen hat und wann. Was das begrenzt, ist allein, wem Sie die Administratorrolle
-geben.
-
-**Änderungsprotokoll** führt die administrativen Änderungen mit Zeitpunkt, Änderung, betroffenem
-Gegenstand und ausführender Person. Wer eine Platznummer ändert, eine Regel setzt oder eine
-Mitgliedschaft beendet, findet es hier wieder.
-
-**Nachrichtenprotokoll** zeigt, was die Instanz verschickt hat, wahlweise nur das, was schiefging.
-Hier lohnt eine Feinheit: *übergeben* heisst, Courtside hat die Nachricht an den Mailserver des
-Vereins übergeben und der hat sie angenommen. Ob sie zugestellt wurde, weiss diese Anwendung nicht —
-das steht im Protokoll des Mailservers.
+![Die Auslastung je Platz mit Buchungszahl, belegter Zeit und Anteil.](screenshots/de/utilisation.png)
 
 ## Zwei Regeln, die überall gelten
 
-**Nichts wird gelöscht, was der Verein einmal eingetragen hat.** Plätze, Karten, Regelwerke und
-Mitgliedsarten werden deaktiviert oder stillgelegt, Mitgliedschaften beendet. Die Vergangenheit
-bleibt lesbar, und die Auswertungen bleiben richtig.
+Courtside bewahrt fachliche Historie auf. Deaktiviere Plätze, Buchungskarten und Konten oder lege
+Regelwerke und Mitgliedsarten still. Beende Mitgliedschaften. Lösche diese Daten
+nicht, wenn die Vergangenheit weiterhin nachvollziehbar bleiben soll.
 
-**Alles, was Sie eintragen, können Sie korrigieren.** Ein Tippfehler im Namen, ein falscher
-Benutzername, ein falsches Enddatum: dafür braucht es keine Datenbankkonsole und keine Anfrage bei
-uns.
+Eingabefehler bleiben korrigierbar. Ändere Namen, Benutzernamen und Datumsangaben in der
+jeweiligen Verwaltung. Dafür ist kein direkter Datenbankzugriff nötig.
 
-![Der Bereich Mitgliedschaft einer Person: Mitgliedsart, Beginn und Ende jederzeit korrigierbar, daneben die Schaltfläche, die die Mitgliedschaft beendet statt sie zu löschen.](screenshots/de/person-membership.png)
+![Die bearbeitbare Mitgliedschaft mit Typ, Beginn, Ende und der Funktion zum Beenden.](screenshots/de/person-membership.png)

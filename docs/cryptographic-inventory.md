@@ -12,7 +12,7 @@ reference deployment that no entry names fails the build.
 `strength`, `class`, `owner`, `storageBoundary`, `permittedUse`, `rotation`, `revocation`,
 `recovery`, `retirement`, `evidence` and `locations`.
 
-`parameters` records what **this project decided** — the Argon2id cost, how many bytes a generated
+`parameters` records what **this project decided**, the Argon2id cost, how many bytes a generated
 credential carries, a content-encryption algorithm the workflow names. It never records what the
 platform moves underneath us: an image digest, a library version, a cipher suite the reverse proxy
 picks. A dependency bump must not require an inventory edit, or the inventory becomes a changelog
@@ -32,8 +32,8 @@ boundary means.
 
 Where this repository decides, the entry states `bits`, and unless it is an identifier they have to
 reach 128. The number is not
-taken on trust: where a literal in the code determines it — the bytes a generator draws, the
-truncation a digest is cut to, the modulus a key pair is generated with — the test reads that
+taken on trust: where a literal in the code determines it, the bytes a generator draws, the
+truncation a digest is cut to, the modulus a key pair is generated with, the test reads that
 literal and recomputes. Raising or lowering the literal without moving the entry fails the build,
 and so does the reverse.
 
@@ -49,7 +49,7 @@ names them and says what is known.
 
 Two classes do not reach the 128-bit minimum. `identifier` does not, because an identifier answers
 to uniqueness rather than to secrecy. `rate-bounded-secret` does not, because the value is short on
-purpose — a person retypes it from a mail — and what makes it hard to spend is the budget an
+purpose, a person retypes it from a mail, and what makes it hard to spend is the budget an
 attacker gets rather than the size of the value. Entries in both still state their bits and still
 say what the bits buy. Where a literal in the code determines those bits, moving an entry into
 either class to escape the minimum changes nothing, because the recomputation still reads what the
@@ -80,7 +80,7 @@ That leniency stops at keys. A digest or a random value may be matched by a patt
 generated key pair or a signature has to be named by an entry file by file, so a new one cannot
 arrive under a glob nobody re-read.
 
-Documentation is not scanned — a paragraph about TLS is not a use of it — and neither is the
+Documentation is not scanned, a paragraph about TLS is not a use of it, and neither is the
 shipped common-password list, whose hundred thousand lines contain words like `cipher` that would
 read as cryptography.
 
@@ -89,29 +89,29 @@ read as cryptography.
 The distinction that matters most in this file is between cryptography that carries a security
 guarantee and cryptography that does not:
 
-- `credential-protection` — protects a secret. Argon2id, the issued credential, the unusable
+- `credential-protection`: protects a secret. Argon2id, the issued credential, the unusable
   password.
-- `rate-bounded-secret` — is a secret, but a short one a member types, so it leans on a guessing
+- `rate-bounded-secret`: a short secret that a member types, so it relies on a guessing
   budget instead of its own size. The mailed password-reset code.
-- `confidentiality` — keeps content from a reader. The security-evidence envelope.
-- `signing` — lets somebody else verify an origin. The release signature, DKIM.
-- `transport` — protects a connection, or records what one guarantees when that is less than
+- `confidentiality`: keeps content from a reader. The security-evidence envelope.
+- `signing`: lets somebody else verify an origin. The release signature, DKIM.
+- `transport`: protects a connection, or records what one guarantees when that is less than
   protection. Public TLS and the mail relay are encrypted; the connection to PostgreSQL is
   encrypted and verified only when an operator requires it, as is the reverse proxy's connection to
   the application. Each of those entries says which value of its mode means which rather than
   claiming the strongest one.
-- `integrity` — recognises one expected party or artefact and refuses anything else. Certificate
+- `integrity`: recognises one expected party or artefact and refuses anything else. Certificate
   pinning. Unlike a `content-hash`, a mismatch here stops the operation.
-- `pseudonymisation` — replaces an identifier with a digest so a counter need not hold the
+- `pseudonymisation`: replaces an identifier with a digest so a counter need not hold the
   original. The login-attempt subject.
-- `content-hash` — names content so two things can be compared. A booking fingerprint, a logo's
+- `content-hash`: names content so two things can be compared. A booking fingerprint, a logo's
   ETag, an artefact digest in the harness. **These protect nothing.** A `content-hash` entry is not
   evidence that content was not tampered with by a party who could write it, and no assessment may
   present it as such.
-- `identifier` — a value that only has to be unique. An idempotency key, a scratch name in a test.
+- `identifier`: a value that only has to be unique. An idempotency key, a scratch name in a test.
 
 Reading a `content-hash` or an `identifier` as an integrity control is the mistake this
-classification exists to prevent — and the reverse, filing a real control under `content-hash`
+classification exists to prevent, and the reverse, filing a real control under `content-hash`
 because it also computes a digest, is the same mistake from the other side. Certificate pinning
 computes SHA-256 exactly as a cache tag does, and only one of the two refuses a connection.
 
@@ -130,7 +130,7 @@ never by a flag day. The inventory carries both entries during that period, and 
 `retirement` says what has to be true before it is removed.
 
 **A key or certificate** is replaced by the owner the entry names, following its `rotation`. Where
-Courtside neither issues nor holds the material — public TLS, the mail relay, DKIM — the entry says
+Courtside neither issues nor holds the material, public TLS, the mail relay, DKIM, the entry says
 so plainly instead of describing a procedure this product does not perform.
 
 **Where nothing can be lost, the entry says that** rather than inventing a recovery procedure. A
@@ -146,7 +146,7 @@ could be derived, and a test refuses both if either looks like it does. They rec
 lives and who holds it.
 
 It is also not a complete list of every secret an instance handles, only of the ones this project
-generates or configures. A value the framework produces — the CSRF token — has an entry that says
+generates or configures. A value the framework produces, the CSRF token, has an entry that says
 what it is and who owns its lifecycle, but no parameters, because this project does not choose
 them. The session identifier used to be one of those and no longer is: this project draws and
 formats it, so its entry records the parameters like any other.

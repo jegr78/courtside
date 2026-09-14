@@ -1,46 +1,45 @@
 # Running a Courtside instance
 
-Every club runs its own instance. This directory is the deployment the maintainer runs, published
-so that yours is the same thing rather than a reconstruction of it. Copy the directory, fill in
-`.env`, and adapt what your infrastructure requires — you are not expected to send changes back.
+This guide describes the production reference deployment. Each club runs its own Courtside
+instance. Copy this directory, configure `.env` and adapt the deployment to your infrastructure.
 
-You need Docker with Compose 2.33.1 or newer. The minimum is declared in `compose.yaml`; older
-versions do not understand the gateway selection that keeps external traffic on the dedicated
-egress networks and reject the deployment instead of choosing an arbitrary internal gateway. The
-same file's `x-courtside-production-overlays` list is the closed machine-readable inventory of
-supported production overlays; repository checks reject a manifest entry omitted from the
-architecture map. The
-application container is capped at 1 GiB and an idle
-instance with an empty database sits at roughly 450 MiB of that; raise `COURTSIDE_MEMORY` if your
-club outgrows it.
+You need Docker with Compose 2.33.1 or newer. `compose.yaml` declares this minimum because older
+versions cannot select the dedicated egress networks safely. The file also lists every supported
+production overlay under `x-courtside-production-overlays`; repository checks keep that list in
+sync with the architecture map.
+
+The application container may use up to 1 GiB of memory. An idle instance with an empty database
+uses about 450 MiB. Increase `COURTSIDE_MEMORY` if the instance reaches its limit.
 
 For the repository's local Dev and UAT environments, use the
 [local environment guide](../docs/local-environments.md). This document covers the production
 reference deployment only.
 
-## First start
+## Start the instance for the first time
+
+### 1. Create the environment file
 
 ```sh
 cp .env.example .env
 ```
 
-Fill in `.env`:
+Set these values in `.env`:
 
-- `COURTSIDE_VERSION` — an exact release, for example `0.1.0-alpha.1`. Do not use a floating tag;
+- `COURTSIDE_VERSION`: an exact release, for example `0.1.0-alpha.1`. Do not use a floating tag;
   an unattended upgrade of a booking system is not a feature. To pin harder, append the digest:
   `0.1.0-alpha.1@sha256:…`. Registry tags are mutable, digests are not.
-- `POSTGRES_PASSWORD` — generate one, for example with `openssl rand -base64 32`. It is only ever
+- `POSTGRES_PASSWORD`: generate one, for example with `openssl rand -base64 32`. It is only ever
   used between the two containers.
-- `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` — the username of the first local administrator.
-- `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` — a one-time password of at least 12 characters. The first
+- `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME`: the username of the first local administrator.
+- `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD`: a one-time password of at least 12 characters. The first
   login can do nothing except replace it.
-- `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` — the administrator's first and last name.
-- `COURTSIDE_DOMAIN` — the name your members will type. Only needed for the reverse proxy below.
+- `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME`: the administrator's first and last name.
+- `COURTSIDE_DOMAIN`: the name your members will type. This is required only for the reverse proxy.
 
 The initial club time zone is `Europe/Berlin`. Change it to the club's IANA zone in the admin
 configuration before members create bookings.
 
-Then start it:
+### 2. Start the containers
 
 ```sh
 docker compose --profile proxy up -d
@@ -60,6 +59,8 @@ Flyway runs the migrations on startup. On an empty account table, startup create
 enabled local account with the `ADMIN` role. Missing bootstrap values stop startup instead of
 leaving an instance that nobody can enter. `docker compose ps` shows the application as `healthy`,
 and `docker compose logs -f app` shows it reporting `Started CourtsideApplication`.
+
+### 3. Replace the bootstrap password
 
 Sign in with the bootstrap username and password. The response carries
 `X-Courtside-Password-Change-Required: true`; until `PUT /api/account/initial-password` replaces
@@ -164,7 +165,7 @@ Three things this path costs you, all worth knowing before you choose it:
 - **The application trusts forwarded headers.** Funnel or any replacement must discard incoming
   `Forwarded` and `X-Forwarded-*` values and supply its own. Never forward arbitrary client values.
 
-This is an option, not part of the reference deployment — the project must not depend on one
+This is an option, not part of the reference deployment, the project must not depend on one
 vendor, and everything here works without it.
 
 ## The club's own mail server
@@ -183,13 +184,13 @@ docker compose --profile mail up -d
 
 Nothing starts it otherwise. The application sends every credential and every notification through
 it, so a member's first password waits until this server delivers. Bring it up when you are ready to
-work through the DNS below, not before — a server that starts is not a server whose mail arrives.
+work through the DNS below, not before, a server that starts is not a server whose mail arrives.
 
 ### Setting it up without touching a wizard
 
 Stalwart normally asks for its configuration through a setup wizard in the browser. This deployment
-does not: `deploy/mail/` holds the configuration as two plans in NDJSON — one operation per line,
-readable and diffable — and `stalwart-cli apply` loads them. The values that differ between clubs
+does not: `deploy/mail/` holds the configuration as two plans in NDJSON, one operation per line,
+readable and diffable, and `stalwart-cli apply` loads them. The values that differ between clubs
 come from `.env`, so `.env` is the only place any of it is written down.
 
 ```sh
@@ -209,16 +210,16 @@ certificate for <hostname>` once the pair has arrived, and until then there is n
 `COURTSIDE_MAIL_HOSTNAME` must resolve to this host by then, or Caddy has no way to prove the name.
 
 Two applies with a restart between them, because the first one answers the questions the wizard
-would have asked — hostname, domain, whether to generate DKIM keys — and the server only leaves
+would have asked, hostname, domain, whether to generate DKIM keys, and the server only leaves
 setup mode on the next start. The second one loads the listeners, the delivery routes, the
-administrator account, the certificate and the account the reloader signs in with — which is why
+administrator account, the certificate and the account the reloader signs in with, which is why
 `mail-reload` starts last: before that apply there is nothing for it to authenticate as.
 
 Before the first command, `.env` needs five values: `COURTSIDE_MAIL_HOSTNAME`,
 `COURTSIDE_MAIL_DOMAIN`, `COURTSIDE_MAIL_ADMIN_PASSWORD` for the club's mail administrator,
 `COURTSIDE_MAIL_RELOAD_PASSWORD` for the account that loads renewed certificates, and
 `COURTSIDE_MAIL_SETUP_PASSWORD` together with
-`COURTSIDE_MAIL_RECOVERY_ADMIN=admin:$COURTSIDE_MAIL_SETUP_PASSWORD` — the credential the setup
+`COURTSIDE_MAIL_RECOVERY_ADMIN=admin:$COURTSIDE_MAIL_SETUP_PASSWORD`, the credential the setup
 commands authenticate with while the server has no accounts yet.
 
 **Clear `COURTSIDE_MAIL_RECOVERY_ADMIN` when you are done**, which the last command above picks up.
@@ -238,16 +239,16 @@ Two of those four grant full control of the mail server and both live in `.env` 
 that file is a secret in its own right: give it to the account that runs Compose and to nobody else
 (`chmod 600`), and keep it out of whatever backs up the rest of this host in the clear.
 
-Afterwards the mail administrator signs in at `http://127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT}/` —
+Afterwards the mail administrator signs in at `http://127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT}/`,
 over an SSH tunnel if the host is remote, because the port is bound to the loopback interface and
-belongs on no public address — as `${COURTSIDE_MAIL_ADMIN_USERNAME}@${COURTSIDE_MAIL_DOMAIN}`.
+belongs on no public address, as `${COURTSIDE_MAIL_ADMIN_USERNAME}@${COURTSIDE_MAIL_DOMAIN}`.
 
 ### What the plans do and do not carry
 
 **The DKIM key is never ours.** The plan declares that the domain manages DKIM automatically; the
 server then generates its own key pair on first start and rotates it on its own schedule. Nothing
 about your signing key comes from this repository, and the selector to publish is the one the
-server shows — which is also why `COURTSIDE_MAIL_DKIM_SELECTOR` in `.env` has to be updated after a
+server shows, which is also why `COURTSIDE_MAIL_DKIM_SELECTOR` in `.env` has to be updated after a
 rotation.
 
 **No secret is in them either.** `stalwart-cli snapshot`, which is how these plans were produced,
@@ -309,7 +310,7 @@ without changing its listener.
 **A renewal reaches the listener with nobody present.** Caddy renews at a third of the lifetime
 remaining. `mail-certificate` watches the store and publishes within seconds of a renewal landing;
 `mail-reload` watches `current` and reloads on the swap. It also re-reads what the server holds
-every `COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL` seconds — an hour by default — because a
+every `COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL` seconds, an hour by default, because a
 certificate nobody renews expires quietly between two swaps, and no swap would ever wake anything.
 An hour is therefore the worst case for noticing a problem that arrives without a swap, and the
 best case for a renewal is seconds.
@@ -351,7 +352,7 @@ openssl s_client -starttls smtp -connect "$name:25" </dev/null 2>/dev/null \
 
 `Verify return code: 0 (ok)` is the answer, and it is the question the instance asks before it
 hands over a message: chain and name, both, against a public trust store. Anything else names the
-disagreement — `62` is a certificate that does not carry this name, `20` a chain that does not reach
+disagreement, `62` is a certificate that does not carry this name, `20` a chain that does not reach
 a known authority, `18` a self-signed one. The second command prints who issued the certificate,
 which names it carries and when it runs out, which is what to compare against a `close to expiry`
 line in the log. Ask it for the names and not for the subject: Caddy leaves the subject empty and
@@ -385,7 +386,7 @@ is the confirmation.
 |---|---|
 | `the certificate helper has published no pair for <hostname> yet` | `mail-reload` started before `mail-certificate` got anywhere. Look at the helper, not at this. |
 | `the mail server answered the reload request with <status>` | `401` is a credential the server does not accept: `COURTSIDE_MAIL_RELOAD_PASSWORD` was changed in `.env` without `mail-configure` being run again, or the server was left in recovery mode, where that account does not exist. No status at all is an admin port that did not answer. |
-| `the mail server refused the reload: <reason>` | `forbidden` is the reload account missing the permission to reload, which leaves the listener serving the pair it already had. `validationFailed` is a pair the server read and could not parse, and **it is the one state with a consequence beyond the certificate** — see below. |
+| `the mail server refused the reload: <reason>` | `forbidden` is the reload account missing the permission to reload, which leaves the listener serving the pair it already had. `validationFailed` is a pair the server read and could not parse, and **it is the one state with a consequence beyond the certificate**, see below. |
 | `the mail server answered with <status> when asked what it loaded` | The reload was accepted and the read-back was not. Same causes as the request failure above. |
 | `the mail server holds more than one certificate, so this cannot say which it checked` | Somebody added a second certificate through the admin interface. The reloader refuses to guess which one the listener uses; remove the other. |
 | `the mail server loaded a certificate that does not name <hostname>` | The listener is serving something else entirely. Compare it with the second command above. |
@@ -420,26 +421,26 @@ Six records, all published by you, none of them optional if the mail is to arriv
 | `A` / `AAAA` | `COURTSIDE_MAIL_HOSTNAME` | The address the server sends from. |
 | `PTR` | that address, **at your hosting provider only** | Receivers reject a host whose reverse name disagrees with its forward one. |
 | `MX` | `COURTSIDE_MAIL_DOMAIN` | Where bounces and DMARC reports come back to. |
-| `SPF`, a `TXT` record | `COURTSIDE_MAIL_DOMAIN` | Names this host as allowed to send, ending in `-all`. `mail-check` reads the sender mechanisms and never the `all` at the end, so `+all` — which authorises the whole internet to send as your domain — passes it. |
+| `SPF`, a `TXT` record | `COURTSIDE_MAIL_DOMAIN` | Names this host as allowed to send, ending in `-all`. `mail-check` reads the sender mechanisms and never the `all` at the end, so `+all`, which authorises the whole internet to send as your domain, passes it. |
 | `DKIM`, a `TXT` record | `<selector>._domainkey.<domain>` | The public half of the key Stalwart signs with. |
 | `DMARC`, a `TXT` record | `_dmarc.<domain>` | What a receiver should do when the first two disagree. |
 
 Three of them have a catch that costs an evening if nobody says it first:
 
 - **`PTR` is not yours to publish.** It lives in the reverse zone of whoever owns the address, which
-  is your hosting provider — a field in their control panel, or a support request, and some ask why.
+  is your hosting provider, a field in their control panel, or a support request, and some ask why.
   A missing or generic reverse name is the single most common reason a small machine's mail is
   refused outright rather than filed as spam, and no amount of SPF and DKIM makes up for it.
 - **`DKIM` names a selector you do not choose.** Stalwart generates its own key and shows the
   selector in the admin interface; `COURTSIDE_MAIL_DKIM_SELECTOR` follows it rather than setting it.
   The key lives in the `mail-data` volume with everything else the server stores, so losing that
-  volume means a new key, a new selector and a new record — see the backup section below. The
+  volume means a new key, a new selector and a new record, see the backup section below. The
   selector also changes on its own every 90 days, and this deployment publishes DNS by hand:
   after a rotation the server signs with a new selector while `.env` and DNS still describe the
   retired one, and `mail-check` reports `ok` for a record nothing signs with any more. Read the
   selector out of the admin interface, not out of the last green check.
 - **`DMARC` is a policy, and starting strict punishes you, not a forger.** Publish
-  `v=DMARC1; p=none; rua=mailto:<a mailbox you read>` first — a mailbox somebody opens, not an
+  `v=DMARC1; p=none; rua=mailto:<a mailbox you read>` first, a mailbox somebody opens, not an
   address at this instance, which receives reports and has nobody to read them. Leave it there long
   enough to read what it brings, and tighten to `p=quarantine` and then `p=reject` once they show
   your own mail passing. `mail-check` asks only whether a `v=DMARC1` record is there and never
@@ -448,12 +449,12 @@ Three of them have a catch that costs an evening if nobody says it first:
 
 A seventh thing is not DNS and is the one that most often ends the exercise: **most hosting
 providers block outbound port 25** until you ask them to unblock it, and some never will. Find out
-before a member depends on it rather than after — `mail-check` below opens a connection to a public
+before a member depends on it rather than after, `mail-check` below opens a connection to a public
 MX and tells you in one line, and it costs nothing to run on the day the instance is installed.
 
 If the answer is no, the mail still has somewhere to go: give the server a relay host under
-*MTA → Outbound → Routes* in the admin interface — the club's provider, or any server that will
-accept authenticated submission — and point the outbound routing strategy at it. That route lives
+*MTA → Outbound → Routes* in the admin interface, the club's provider, or any server that will
+accept authenticated submission, and point the outbound routing strategy at it. That route lives
 in the interface and **no environment variable carries it**. `COURTSIDE_MAIL_RELAY_HOST` is a
 different hop, the one the application uses to hand a message to this server. Delivery straight to
 the recipient is what this deployment does by default, not what it requires.
@@ -462,11 +463,11 @@ the recipient is what this deployment does by default, not what it requires.
 
 `25:25` binds every interface. That is what an MTA is for, but it is also the one published port in
 `compose.yaml` that is not pinned to `127.0.0.1`, and Docker installs its forwarding rules ahead of
-`ufw` or `nftables` — a host firewall rule will not close it. If you need it restricted, do it in
+`ufw` or `nftables`, a host firewall rule will not close it. If you need it restricted, do it in
 your provider's security groups or in Stalwart's own configuration.
 
-Inbound port 25 is here so that bounces and DMARC reports arrive at all. What to do with them —
-read them, forward them, act on them — has no answer in this deployment yet.
+Inbound port 25 is here so that bounces and DMARC reports arrive at all. What to do with them,
+read them, forward them, act on them, has no answer in this deployment yet.
 
 **Everything else stays off the public interface, and that is deliberate.** Submission, IMAP and
 POP3 have no published port at all: the application reaches submission over the compose network, and
@@ -480,12 +481,12 @@ nobody holds a mailbox here to collect. The admin interface is published on `127
 docker compose --profile mail-check run --rm mail-check
 ```
 
-Every record it names — `PTR`, `MX`, `SPF`, `DKIM` and `DMARC` — is a row in the table above, in
+Every record it names, `PTR`, `MX`, `SPF`, `DKIM` and `DMARC`, is a row in the table above, in
 the same word, so a failing line says which row to go back to.
 
 That resolves every record above, compares each address's reverse name against the forward one,
 opens a connection to a public MX to see whether outbound 25 leaves the host, and asks the mail
-server to relay a message for a foreign domain — the one state in which a mail
+server to relay a message for a foreign domain, the one state in which a mail
 server harms people who are not its members. One line per check, non-zero exit if any failed, so it
 also works as a cron job that tells you the day a record expires.
 
@@ -497,7 +498,7 @@ domain the relay test asks about.
 
 `node tools/courtside.mail-smoke.mjs` brings this same mail server up on a scratch Compose project,
 renders and applies these same plans, and hands it a message over the submission port the way the
-application will — authenticated, over STARTTLS — then reads that message back out of a local sink.
+application will, authenticated, over STARTTLS, then reads that message back out of a local sink.
 Before that it offers the same server somebody else's mail on port 25, unauthenticated and with the
 transcript `mail-check.sh` sends, and requires it to refuse: an open relay is the one state in which
 an instance harms people who are not its members, and it is not a state anybody should have to take
@@ -507,7 +508,7 @@ changes, so the configuration a club applies is configuration that has been appl
 
 One thing the run does differently on purpose: its Caddy issues from a local authority rather than
 from Let's Encrypt, because a smoke world has no public name to prove. Everything after that is the
-shipped path — the same site block, the same helper, the same volume — so the certificate the run's
+shipped path, the same site block, the same helper, the same volume, so the certificate the run's
 mail server presents arrived the way yours does.
 
 ### The test that counts is a message that arrived somewhere else
@@ -519,7 +520,7 @@ the message has been read.
 
 **Not your own administrator account.** Issuing a credential replaces that account's password
 immediately and ends its sessions, and the instance can only see that it handed the message to this
-server — which is the very thing under test. If it is then refused out there, the password is gone,
+server, which is the very thing under test. If it is then refused out there, the password is gone,
 and an instance whose only administrator is locked out has no way back that does not go through the
 database.
 
@@ -541,7 +542,7 @@ answer is usually the reverse name or outbound port 25 rather than anything in t
 ### Back up the mail volumes too
 
 The backup below covers PostgreSQL. Neither mail volume is in it, and the two are not alike:
-`mail-config` holds one small file naming where the store lives, and **`mail-data` is the store** —
+`mail-config` holds one small file naming where the store lives, and **`mail-data` is the store**,
 the private DKIM key, every account and its credentials. Losing it means generating a new key and
 publishing a new selector; leaking it means somebody can sign mail as your domain until you notice.
 Include both volumes in whatever backs this host up, and treat `mail-data` as a secret when you do.
@@ -552,7 +553,7 @@ Set `COURTSIDE_MAIL_RECOVERY_ADMIN` to `admin:${COURTSIDE_MAIL_SETUP_PASSWORD}` 
 `mail` service, then sign in as `admin`. Any password works to sign in, but the setup commands read
 that one variable, so choosing anything else means they can no longer authenticate.
 
-**The server stops accepting and delivering mail while that variable is set** — it runs in recovery
+**The server stops accepting and delivering mail while that variable is set**, it runs in recovery
 mode and serves only its admin port. Clear it and recreate the container once you are back in.
 
 To change the administrator password instead, edit `COURTSIDE_MAIL_ADMIN_PASSWORD` and run
@@ -598,12 +599,12 @@ COURTSIDE_DB_TLS_AUTHORITY=/srv/courtside/tls/authority
 ```
 
 A directory rather than the file itself, because a bind mount of a single file pins the inode it had
-when the container started: renewal that writes a new file and renames it over the old one — which
-is what most renewal does — would leave the container reading the file it first saw.
+when the container started: renewal that writes a new file and renames it over the old one, which
+is what most renewal does, would leave the container reading the file it first saw.
 
 Put nothing else in that directory. The application container can read everything it holds, and the
-one thing the application needs is the authority. A private key kept beside it — the database's
-own, for instance — would be readable by whatever a flaw in the application can be made to read,
+one thing the application needs is the authority. A private key kept beside it, the database's
+own, for instance, would be readable by whatever a flaw in the application can be made to read,
 and whoever holds the database's key can be the database.
 
 ```bash
@@ -617,15 +618,15 @@ the `db` service if this host no longer runs one. The certificate that host serv
 host the URL names.
 
 Do not put an `ssl` or `gssEncMode` argument, or a `service` name, in that URL, and do not set one
-as a driver property on the pool. Each decides the transport behind the verification — a URL
+as a driver property on the pool. Each decides the transport behind the verification, a URL
 argument beats the pool's own configuration, a service name pulls in a file of properties, and GSS
-encryption is negotiated before TLS is — so the application refuses to start rather than let one
+encryption is negotiated before TLS is, so the application refuses to start rather than let one
 quietly undo it.
 
 ### Making this deployment's own database serve one
 
 `compose.database-tls-local.yaml` adds the server side. Issue a certificate whose subject
-alternative name includes `DNS:db` — `db` is the name the application connects to on the compose
+alternative name includes `DNS:db`, `db` is the name the application connects to on the compose
 network, and `verify-full` checks exactly that name. Name the pair in `.env`:
 
 ```
@@ -742,7 +743,7 @@ Courtside ships no authority and generates no production key material.
 
 ### Turning it on
 
-Issue a certificate whose subject alternative name includes `DNS:app` — `app` is the name the proxy
+Issue a certificate whose subject alternative name includes `DNS:app`, `app` is the name the proxy
 dials on the compose network, and that name is checked. Name the directory holding the pair and the
 authority file itself in `.env`:
 
@@ -753,7 +754,7 @@ COURTSIDE_APP_TLS_AUTHORITY=/srv/courtside/tls/app-authority/authority.pem
 
 The directory holds `server.crt` and `server.key`. The authority is named as the one file it is and
 mounted as that file, so a directory you happened to keep the key in cannot hand that key to the
-proxy along with what it has to trust — and a key readable by whatever a flaw in the proxy can be
+proxy along with what it has to trust, and a key readable by whatever a flaw in the proxy can be
 made to read is a key somebody else can serve with.
 
 The image runs as `10001:10001`, and nothing in the overlay changes ownership, so the key has to be
@@ -811,7 +812,7 @@ default.
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
 | `COURTSIDE_DOMAIN` | *required with the proxy* | The public name Caddy obtains a certificate for. |
 | `COURTSIDE_MAIL_DOMAIN` | *required with the mail server* | The domain Courtside sends from, and the domain SPF, DKIM and DMARC are published for. |
-| `COURTSIDE_MAIL_HOSTNAME` | *required with the proxy and with the mail server* | The mail server's own name. Its forward and reverse DNS must agree, and Caddy obtains a certificate for it, so it must point at this host. **Running the proxy without this deployment's mail server?** Delete that site block from `Caddyfile` and the variable's line from the `proxy` service — Caddy would otherwise retry forever for a name it cannot prove, and Compose would refuse to start without a value. The rest of the proxy is unaffected. |
+| `COURTSIDE_MAIL_HOSTNAME` | *required with the proxy and with the mail server* | The mail server's own name. Its forward and reverse DNS must agree, and Caddy obtains a certificate for it, so it must point at this host. **Running the proxy without this deployment's mail server?** Delete that site block from `Caddyfile` and the variable's line from the `proxy` service, Caddy would otherwise retry forever for a name it cannot prove, and Compose would refuse to start without a value. The rest of the proxy is unaffected. |
 | `COURTSIDE_MAIL_DKIM_SELECTOR` | *required with the mail server* | The selector of the DKIM key the setup wizard generated, as it appears in the admin interface. |
 | `COURTSIDE_MAIL_ADMIN_PASSWORD` | *required with the mail server* | Password for the club's mail administrator, written into the account by `mail-configure`. |
 | `COURTSIDE_MAIL_SETUP_PASSWORD` | *required with the mail server* | Password the setup commands authenticate with while the server still has no accounts. Pair it with `COURTSIDE_MAIL_RECOVERY_ADMIN`. |
@@ -822,12 +823,12 @@ default.
 | `COURTSIDE_MAIL_RELOAD_USERNAME` | `certificate-reload` | Local part of that account's address. |
 | `COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE` | `6` | `mail-reload` reports unhealthy once less than this share of the certificate's own lifetime is left. Relative rather than a number of days, so it means the same for a ninety-day certificate and a twelve-hour one. Caddy renews at a third of the lifetime, so a sixth leaves the renewal a full window of its own to fail in first. |
 | `COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL` | `3600` | Seconds between two read-backs of what the mail server holds. A swap wakes `mail-reload` immediately; this is what notices a certificate that expires with no swap to announce it, so it bounds how long a problem can stay invisible. |
-| `COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME` | `34560000` | Seconds. A loaded certificate valid for longer than this is not one an authority issued — the mail server's own fallback runs to the year 4096 — and `mail-reload` reports unhealthy rather than accepting it. 400 days is the longest any public authority issues for. |
+| `COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME` | `34560000` | Seconds. A loaded certificate valid for longer than this is not one an authority issued, the mail server's own fallback runs to the year 4096, and `mail-reload` reports unhealthy rather than accepting it. 400 days is the longest any public authority issues for. |
 | `COURTSIDE_MAIL_REPLY_TO` | *required with the mail server* | The club's real mailbox, so a member who answers a message reaches somebody. |
 | `COURTSIDE_MAIL_SENDER_USERNAME` | `courtside` | Local part of the address the instance sends from and authenticates as, in `COURTSIDE_MAIL_DOMAIN`. |
 | `COURTSIDE_MAIL_RELAY_HOST` | `COURTSIDE_MAIL_HOSTNAME` | Where the instance hands its messages in. The mail server on the compose network by default, reached under the name on its certificate rather than under the service name, because the instance authenticates what answers. Point it at the club's provider instead if this deployment runs without one. |
 | `COURTSIDE_MAIL_RELAY_PORT` | `587` | Submission port on that host. |
-| `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `false` | Accept the certificate the relay presents without authenticating it — neither its issuer nor the name on it. Nothing here needs it: the mail server serves Caddy's certificate for `COURTSIDE_MAIL_HOSTNAME` and the instance dials exactly that name. Set it only for a relay whose certificate the instance cannot check, such as one issued by a private authority the container does not hold, and know that whoever can redirect the connection then reads the mail. |
+| `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `false` | Accept the certificate the relay presents without authenticating it, neither its issuer nor the name on it. Nothing here needs it: the mail server serves Caddy's certificate for `COURTSIDE_MAIL_HOSTNAME` and the instance dials exactly that name. Set it only for a relay whose certificate the instance cannot check, such as one issued by a private authority the container does not hold, and know that whoever can redirect the connection then reads the mail. |
 | `COURTSIDE_MAIL_ADMIN_PORT` | `8081` | Host port on the loopback interface for the mail server's admin interface. |
 | `COURTSIDE_MAIL_RECOVERY_ADMIN` | *unset* | Temporary credential for the mail server's administrator, as `admin:<password>`. Needed for the initial setup, and a way back in afterwards. **The server serves no mail while it is set.** |
 | `COURTSIDE_MAIL_OUTBOUND_PROBE` | `gmail-smtp-in.l.google.com` | The host `mail-check` opens port 25 to when testing whether outbound mail leaves at all. A third party by default; point it at a server of your own if you would rather not tell one. |
@@ -853,22 +854,22 @@ default.
 | `COURTSIDE_OTLP_METRICS_ENDPOINT` | `http://localhost:4318/v1/metrics` | Complete OTLP/HTTP metrics endpoint. |
 | `COURTSIDE_TRACING_SAMPLING_PROBABILITY` | `0.1` | Share of new traces sampled, from `0.0` to `1.0`. Parent sampling decisions are retained. |
 | `COURTSIDE_SESSION_CLEANUP_CRON` | `0 * * * * *` | How often sign-in sessions that are over are deleted from `spring_session`, as a Spring cron expression. It covers both ways of being over: past the inactivity window, and past `COURTSIDE_SESSION_ABSOLUTE_LIFETIME`, whose bound the stored expiry does not carry. A session already stops working the moment it expires; this is what stops its row and the attributes cascading from it from being kept. The cleanup cannot be switched off: `-`, which Spring Session reads as *never*, is refused at startup. |
-| `COURTSIDE_SESSION_INACTIVITY_TIMEOUT` | `30m` | How long a sign-in survives without a request. This is the window a member notices: it restarts with every request, so an active session is never interrupted by it. At least one minute, the same floor `COURTSIDE_SESSION_ABSOLUTE_LIFETIME` is held to; below that it is refused at startup. A negative value is not merely short — Spring Session reads it as an interval that never expires. Stated here rather than inherited, because an unset value is whatever the framework defaults to and that can change under an installation. |
-| `COURTSIDE_SESSION_ABSOLUTE_LIFETIME` | `24h` | How long a sign-in may live at all, counted from when it began and not restarted by activity. A session past it is ended on its next request and the member signs in again, however busy the session was — the sign-in itself is never what gets refused. The count survives a restart, because it is stored with the session rather than held in memory. It runs from the sign-in, which starts a session of its own even when the browser already carried one, so nobody inherits what a previous sign-in on that browser already spent. At least one minute and at most 30 days; outside that it is refused at startup. It may not be shorter than `COURTSIDE_SESSION_INACTIVITY_TIMEOUT`; that combination is refused at startup, because the inactivity window could then never be reached and setting it would say nothing. |
-| `COURTSIDE_SESSION_MAX_CONCURRENT` | `5` | How many sign-ins one account may hold at the same time — a phone, a tablet and a club laptop are three of them. A further sign-in is not refused: it succeeds and the account's least recently active session is ended instead — or sessions, if simultaneous sign-ins had pushed the count past the limit — so nobody is locked out by a device they cannot reach. Sign-ins arriving at the same moment can pass it, because each reads the count before the others are stored. Between 1 and 50; outside that it is refused at startup, because a limit no account reaches is the policy switched off while the variable still reads as if it were set. |
+| `COURTSIDE_SESSION_INACTIVITY_TIMEOUT` | `30m` | How long a sign-in survives without a request. This is the window a member notices: it restarts with every request, so an active session is never interrupted by it. At least one minute, the same floor `COURTSIDE_SESSION_ABSOLUTE_LIFETIME` is held to; below that it is refused at startup. A negative value is not merely short, Spring Session reads it as an interval that never expires. Stated here rather than inherited, because an unset value is whatever the framework defaults to and that can change under an installation. |
+| `COURTSIDE_SESSION_ABSOLUTE_LIFETIME` | `24h` | How long a sign-in may live at all, counted from when it began and not restarted by activity. A session past it is ended on its next request and the member signs in again, however busy the session was, the sign-in itself is never what gets refused. The count survives a restart, because it is stored with the session rather than held in memory. It runs from the sign-in, which starts a session of its own even when the browser already carried one, so nobody inherits what a previous sign-in on that browser already spent. At least one minute and at most 30 days; outside that it is refused at startup. It may not be shorter than `COURTSIDE_SESSION_INACTIVITY_TIMEOUT`; that combination is refused at startup, because the inactivity window could then never be reached and setting it would say nothing. |
+| `COURTSIDE_SESSION_MAX_CONCURRENT` | `5` | How many sign-ins one account may hold at the same time, a phone, a tablet and a club laptop are three of them. A further sign-in is not refused: it succeeds and the account's least recently active session is ended instead, or sessions, if simultaneous sign-ins had pushed the count past the limit, so nobody is locked out by a device they cannot reach. Sign-ins arriving at the same moment can pass it, because each reads the count before the others are stored. Between 1 and 50; outside that it is refused at startup, because a limit no account reaches is the policy switched off while the variable still reads as if it were set. |
 | `COURTSIDE_SESSION_REAUTHENTICATION_WINDOW` | `5m` | How long a successful sign-in or explicit password proof authorizes a security-sensitive account or administrator action. Between one and five minutes; outside that range startup fails, so an installation cannot weaken the approved five-minute maximum. |
 | `COURTSIDE_PASSWORD_BREACH_TIMEOUT` | `3s` | Connection and response timeout for the Have I Been Pwned password range request, between 100 ms and ten seconds. If the service cannot answer correctly, password creation and replacement fail closed with `503`; existing sign-ins remain independent of it. The application container therefore needs outbound HTTPS access to `api.pwnedpasswords.com` for password changes. |
 | `COURTSIDE_PASSWORD_BREACH_CACHE_ENTRIES` | `128` | Maximum number of successful HIBP prefix ranges retained in memory, between 1 and 512. Failures are never cached. |
 | `COURTSIDE_PASSWORD_BREACH_CACHE_LIFETIME` | `24h` | Lifetime of a successful HIBP prefix range in memory, between one minute and 30 days. |
 | `COURTSIDE_PASSWORD_TERMS_FILE` | unset | Optional absolute path to a readable UTF-8 file containing one additional forbidden password term per line. Mount the file into the application container separately when used. An unset value is healthy; a configured missing, unreadable or empty file fails startup so an intended local policy cannot silently disappear. |
 | `COURTSIDE_IMPORT_MAX_FILE_SIZE` | `8MB` | Largest roster snapshot an upload may carry. An upload above it is answered `413` with a problem document rather than a container error page. |
-| `COURTSIDE_IMPORT_PREVIEW_RETENTION` | `7d` | How long a roster-import preview keeps the change set it resolved. The uploaded file itself is never kept — only its SHA-256. Past this bound the row, the file's name and hash and the counts survive, and the change set does not. At most 30 days. |
+| `COURTSIDE_IMPORT_PREVIEW_RETENTION` | `7d` | How long a roster-import preview keeps the change set it resolved. The uploaded file itself is never kept, only its SHA-256. Past this bound the row, the file's name and hash and the counts survive, and the change set does not. At most 30 days. |
 | `COURTSIDE_IMPORT_SWEEP_INTERVAL` | `1h` | How often previews past their retention are swept, between a minute and a day. The sweep drops the resolved change set and the person fingerprints, and keeps the row, the file's name and hash, and the counts. |
 | `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` | `500` | Logs Hibernate queries slower than this threshold in milliseconds. Bind values are not logged. |
 | `COURTSIDE_LOG_LEVEL` | `INFO` | Log level of the application's ordinary loggers. `DEBUG` adds an `Answering` line for every error one of its exception handlers answers. The security-event logger remains at `INFO`, so changing this setting cannot silently remove its successful authentication, session, credential or administrative events. |
 | `COURTSIDE_PORT` | `8080` | Host port on the loopback interface. |
 | `COURTSIDE_SOURCE_URL` | required | The absolute HTTP or HTTPS address without embedded credentials returned by `GET /api/source`. Point an unchanged installation here and a modified fork at the corresponding source for that fork. Compose refuses to start without this choice. |
-| `COURTSIDE_ENVIRONMENT` | `PRODUCTION` | Public environment designation: `PRODUCTION`, `UAT`, `DEVELOPMENT`, `PERFORMANCE` or `SECURITY`. `UAT` and `PERFORMANCE` are visibly marked in the frontend. `SECURITY` belongs to the disposable assessment target and additionally answers every request with the host and scheme the application observed; a club has no reason to set it. |
+| `COURTSIDE_ENVIRONMENT` | `PRODUCTION` | Public environment designation: `PRODUCTION`, `UAT`, `DEVELOPMENT`, `PERFORMANCE` or `SECURITY`. `UAT` and `PERFORMANCE` are visibly marked in the frontend. `SECURITY` belongs to the disposable assessment target and also answers every request with the host and scheme the application observed; a club has no reason to set it. |
 | `COURTSIDE_CLOCK_FIXED_INSTANT` | *unset* | Freezes the clock at an ISO-8601 instant so an automated suite reads the same date on every run. A club never sets this: the instance starts with it only while `COURTSIDE_ENVIRONMENT` names `UAT`, `DEVELOPMENT` or `PERFORMANCE`, so a misspelt designation refuses rather than unlocks. |
 
 `COURTSIDE_LOGIN_GLOBAL_MAX_FAILURES` and `COURTSIDE_LOGIN_GLOBAL_BLOCK` are no longer read. The
@@ -882,7 +883,7 @@ PostgreSQL 17 and will not run on anything else.
 ## Diagnose slow requests and queries
 
 Enable OTLP export only after a collector is reachable. Standard Spring HTTP, JVM and HikariCP
-metrics then identify the affected endpoint and resource pressure. Courtside additionally exports
+metrics then identify the affected endpoint and resource pressure. Courtside also exports
 the counters `courtside.bookings.created`, `courtside.bookings.rejected` and
 `courtside.bookings.conflicts`, plus `courtside.login.distributed.thresholds` when the configured
 global login observation threshold is crossed. Rejected bookings carry only the stable rule code as
@@ -912,14 +913,14 @@ thresholds for the installation.
 ## When a member reports an error
 
 An error a member causes leaves no `Answering` line at `INFO`: the handler that answers the request
-says nothing about it. A failure on the instance's own side is louder — a 5xx at `WARN`, with the
+says nothing about it. A failure on the instance's own side is louder, a 5xx at `WARN`, with the
 exception attached because that is an incident and not a member's mistake, and an error no handler
-claims at `ERROR` — but a member's mistake stays invisible until you lower the level.
+claims at `ERROR`, but a member's mistake stays invisible until you lower the level.
 Set `COURTSIDE_LOG_LEVEL=DEBUG` in `.env`, run `docker compose up -d app`, and ask the member to
 repeat what they did. Every error one of the application's exception handlers answers then adds one
 entry. The log is JSON, so `docker compose logs app | grep Answering` is the quickest way to read
-them. Each line names the status and the problem type — the same `type` URN the member's error
-carries, so the line and the response share one token to search on — and then whatever that
+them. Each line names the status and the problem type, the same `type` URN the member's error
+carries, so the line and the response share one token to search on, and then whatever that
 response holds beyond it: the violation code and its parameters where it reports one, the names of
 the request fields where validation rejected them, and nothing where the response adds nothing to
 say. That is enough to tell a member's mistake from the instance's. Restore the level and restart
@@ -929,7 +930,7 @@ Signing in and authorization decisions use the separate security-event inventory
 application log level. Search for `"logger":"org.courtside.security.events"` and select the stable
 `event.code`, `event.reason` or `event.action`; the records deliberately contain no submitted
 username, address, credential or request body. A rejected request still carries the member-facing
-detail — including its problem `type` and a rate limit's `Retry-After` — while the event supplies
+detail, including its problem `type` and a rate limit's `Retry-After`, while the event supplies
 the privacy-safe operational correlation.
 
 `DEBUG` is for diagnosis and not a level to run a club on. It is loud, it pushes the record of
@@ -938,13 +939,13 @@ private. What it does not add is anyone's data. Every line it adds is built from
 handler is about to return, never from the exception's message, which is free text a throw site
 may have assembled from what the request submitted. A line can therefore hold nothing the member
 on the other end has not already been shown, which leaves out a name, an address and a rejected
-password alike. Tests drive each place such a value is known to arrive — a failed validation, a
+password alike. Tests drive each place such a value is known to arrive, a failed validation, a
 body the JSON parser could not read, a constraint the database rejected, and a domain failure
-whose own message names what it turned down — and assert that it stays out of the line.
+whose own message names what it turned down, and assert that it stays out of the line.
 
 ## Upgrading
 
-Raise `COURTSIDE_VERSION`, then — with the reverse proxy:
+Raise `COURTSIDE_VERSION`, then, with the reverse proxy:
 
 ```sh
 docker compose pull app
@@ -991,13 +992,13 @@ database and do not combine the archive with an image or configuration from a di
 
 ## Image updates between releases
 
-Every image `compose.yaml` names other than Courtside itself — `postgres:17-alpine`,
-`caddy:2-alpine`, `stalwartlabs/stalwart` and `alpine:3` — is pinned by digest, not by floating tag,
+Every image `compose.yaml` names other than Courtside itself, `postgres:17-alpine`,
+`caddy:2-alpine`, `stalwartlabs/stalwart` and `alpine:3`, is pinned by digest, not by floating tag,
 so `docker compose pull` alone will never change them. That is deliberate: a club's database, its
 reverse proxy and its mail server should not change without anyone deciding they should. It also
 means the digests do not update themselves. Dependabot opens a pull request against this repository
 when one of them gets a new patch release; a maintainer bumping the digest here is how it reaches
-your instance — take the updated `compose.yaml` and run `docker compose up -d` to apply it.
+your instance, take the updated `compose.yaml` and run `docker compose up -d` to apply it.
 Until then, you can raise it yourself: look up the current tag's digest with
 `docker buildx imagetools inspect postgres:17-alpine` (or any of the others) and replace the
 `@sha256:…` suffix in `compose.yaml`.
@@ -1019,12 +1020,12 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
 - **Inbound mail arrives and nothing reads it.** Port 25 is open so bounces and DMARC reports
   reach the instance rather than vanishing, but nothing acts on them. The instance records that it
   handed a message to this server and learns nothing after that, so a bounce arriving here
-  afterwards is the answer nobody reads — and DMARC reports have no reader either.
+  afterwards is the answer nobody reads, and DMARC reports have no reader either.
 - **A reload the mail server refuses leaves it serving a certificate it generated itself.**
   Stalwart 0.16.20 does not keep the pair it had when a reload fails: it answers `notCreated`, drops
   the certificate, and the listener falls back to a self-signed one valid from 1975 to 4096. Nothing
-  about the fallback is silent here — the reload stays owed until one is accepted, so `mail-reload`
-  names the refusal, retries it, and stays unhealthy while it is owed — and the instance stops
+  about the fallback is silent here, the reload stays owed until one is accepted, so `mail-reload`
+  names the refusal, retries it, and stays unhealthy while it is owed, and the instance stops
   handing messages over rather than handing them to something it cannot authenticate. That is
   visible in two places, neither of them a queue: `mail-reload` stays unhealthy, and every message
   settles `FAILED` with its reason in the admin message list. Repairing the pair resends none of

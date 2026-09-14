@@ -1,329 +1,282 @@
-# A guide for boards
+# Board handbook
 
-This page describes what a board sets up and maintains in Courtside: the facility, the booking
-rules, the members and their accounts. It is written for somebody with an evening to spare, not for
-a professional administrator.
-
-It names no numbers. Opening hours, deadlines, limits and the time grid are your club's own
-settings — this guide says where they live and what each one does.
+This handbook covers initial setup and routine administration of a Courtside instance. Button and
+menu names appear in *italics*. Each club chooses its own opening hours, deadlines and limits.
 
 ## Who sees the administration
 
-The administration opens only for an account holding the **Administrator** role. Those who hold it
-find *Administration* in the navigation; everybody else does not see it and cannot reach it by
-typing the address either.
+Only enabled accounts with the **Administrator** role can open the administration. These accounts
+see *Administration* in the main navigation. Other accounts cannot enter by typing the address
+directly.
 
-Inside, a bar down the left leads through four groups:
+The sidebar divides administration into four areas:
 
-| Group | What it holds |
+| Area | Contents |
 |---|---|
-| **Club** | Setup, Configuration |
-| **Facility** | Courts, Opening hours, Booking cards, Slot fillers |
-| **People** | People and accounts, Membership types, Import |
-| **Records** | Utilisation, Data export, Change log, Message log |
+| **Club** | Setup and configuration |
+| **Facility** | Courts, opening hours, booking cards and slot fillers |
+| **People** | People, accounts, membership types and imports |
+| **Records** | Utilisation, data exports, change log and message log |
 
-The way back to the court plan sits in the same bar.
+The same sidebar returns you to the court plan.
 
-![The administration bar with its groups Club, Facility, People and Records, and the way back to the court plan.](../screenshots/en/admin-navigation.png)
+![The administration navigation with four areas and the link to the court plan.](../screenshots/en/admin-navigation.png)
 
 ## The guided path: Setup
 
-*Club → Setup* is the overview for the beginning. It reads the instance's current state and shows,
-per step, whether it is complete, still to do, or optional:
+Open *Club → Setup*. The overview checks the current state and marks every step as complete, open or
+optional.
 
-1. **Configure the club** — replace the factory settings with the club's name, appearance, language,
-   time zone and account settings.
-2. **Prepare the facility** — at least one active court and one open weekday make the court plan
-   usable.
-3. **Offer membership types** — they connect people to their booking rules and account rights.
-4. **Add members** — complete once at least one person holds a current membership.
-5. **Import members** — optional, and worth it only when an existing membership system holds the
+Complete the steps in this order:
+
+1. **Configure the club.** Enter its name, colours, logo, language, time zone and account settings.
+2. **Prepare the facility.** Add at least one enabled court and one open weekday.
+3. **Offer membership types.** Connect membership types to booking rules and account rights.
+4. **Add members.** Record at least one current membership.
+5. **Import members.** This is only needed when another membership system holds the authoritative
    list.
 
-Open any step and return here later; the overview remembers nothing and reads what is actually
-there each time.
+You can leave the overview at any time. Courtside recalculates its state when you return.
 
-![The setup overview with its five steps beneath one another, each showing whether it is complete, open or optional.](../screenshots/en/admin-setup.png)
+![The setup overview with five steps and their current state.](../screenshots/en/admin-setup.png)
 
 ## Club → Configuration
 
-Everything that concerns the whole club lives here.
+Open *Club → Configuration* to edit settings for the whole instance.
 
-**Club and appearance.** Club name, primary and accent colour, logo. Beside each colour Courtside
-shows whether it reaches a contrast of 4.5:1 with dark or with light text — the threshold at which
-text stays readable for weaker eyes and on poor screens. The logo is a PNG or JPEG, up to 1 MiB and
-2048 by 2048 pixels; the logo URL is used while no file is uploaded.
+### Club and appearance
 
-![The primary and accent colour side by side, each with its hex value, a colour picker, a sample button and the measured contrast, with the club logo field below.](../screenshots/en/club-appearance.png)
+Enter the club name, primary colour, accent colour and logo. Courtside shows each colour's contrast
+against light and dark text. Normal text requires a ratio of at least 4.5 to 1.
 
-**Imprint and privacy policy** are two URLs. They point at your club's own pages, because Courtside
-does not know your legal form.
+Logos must be PNG or JPEG files. The file may be at most 1 MiB and 2048 by 2048 pixels. An uploaded
+file replaces the logo URL until you remove it.
 
-**Default language** is the language for everybody who has not chosen one.
+![Primary and accent colours with contrast values, a preview and the club logo.](../screenshots/en/club-appearance.png)
 
-**Time zone** is checked against the time-zone database, so a typo is refused where it is typed. It
-can only be changed while no future booking exists — otherwise an existing booking would move.
+### Links, language and time
 
-**Booking grid in minutes** sets the grid of the court plan and the start times a booking may have.
+* Enter the club's own pages under **Imprint** and **Privacy policy**.
+* The **Default language** applies to people who have not selected one.
+* Enter a valid IANA time zone such as `Europe/Berlin`. You can only change it while there are no
+  future bookings.
+* The **Booking grid** determines the rows in the court plan and the permitted start times.
 
-**Reminder before a booking**, in hours. 0 switches reminders off; otherwise everybody in a booking
-is written to that many hours before it starts.
+### Messages and credentials
 
-**How long issued credentials stay valid**, separately for a new account and for a reset password.
-After that the one-time password is worthless and has to be issued again.
+* Set **Reminder before a booking** to 0 to disable reminders. Any other value sets the interval in
+  hours.
+* Set separate lifetimes for one-time passwords issued to new and reset accounts.
+* A password reset code may remain valid for between 15 minutes and one day. The member must
+  request a new code after it expires.
 
-**How long a reset code stays good**, in minutes, between a quarter of an hour and a day. That is
-how long a member has to redeem the code the sign-in page mails them; after that they ask for a new
-one. Short is safer, long is kinder to somebody who only opens their mailbox in the evening.
+### People without a membership type
 
-**Rule set for people without a membership type** applies to somebody who currently holds none, for
-example after a membership ended. Without one, no membership-scoped rule binds them; opening hours
-and the grid still do.
+Select a rule set for people without a current membership type if membership-related rules should
+still apply to them. Opening hours and the booking grid apply even without this selection.
 
 ## Facility → Courts
 
-A court has a number and a name; the number is unique and one already taken is refused. Both can be
-changed at any time.
+A court needs a unique number and a name. You can edit both later.
 
-Rather than deleting a court, deactivate it. It leaves the court plan, its past stays in the
-reports, and bookings on it do not simply vanish — the members holding them are written to and told
-that a court of their booking was taken out of service.
+Deactivate a court that the club no longer uses. It disappears from the court plan but remains in
+past bookings and reports. Courtside notifies members whose future bookings are affected.
 
-![The court list with number and name per row, the button that deactivates a court, and the form for a new one.](../screenshots/en/courts.png)
+![The court list with number, name, state and the form for a new court.](../screenshots/en/courts.png)
 
 ## Facility → Opening hours
 
-Per weekday you enter an opening and a closing time, or mark the day closed. A day carrying only one
-of the two is not saved; Courtside marks the row and says what is missing.
+1. Enter an opening and closing time for every open weekday.
+2. Mark days without play as closed.
+3. Use *Apply the same times* to copy one period to several days.
+4. Save the whole week.
 
-For the ordinary week there is *Apply the same times*: enter the times, pick the days, apply, and
-save the week with one click.
+Courtside does not save a day when either time is missing. Members cannot book outside the opening
+hours. If you shorten opening hours later, Courtside notifies members with affected bookings.
 
-Outside the opening hours no booking is possible, and shortening them afterwards writes to the
-members whose booking is no longer covered.
-
-![The opening hours per weekday with opening and closing time, the closed marker, and the Apply the same times area.](../screenshots/en/opening-hours.png)
+![Opening hours for every weekday and the control for applying the same times.](../screenshots/en/opening-hours.png)
 
 ## Facility → Booking cards
 
-Everything that occupies a court is the same thing in Courtside — a members' game, a training block,
-a league match, a closure. What tells them apart is the **booking card**. A new kind of occupancy is
-therefore a new card, not a new version of the application.
+Booking cards distinguish types of court occupancy, such as a member game, training, league match
+or closure. Add one card for every type the club needs.
 
-A card carries:
+| Setting | Effect |
+|---|---|
+| **Label and colour** | Appearance in the court plan |
+| **Allowed roles** | Roles that may book with the card. With no selection, every signed-in person may book |
+| **Managing roles** | Roles that may open, inspect and cancel every booking made with this card |
+| **Allowed player counts** | Permitted participant counts. With no value, the card records no participants |
+| **Counts against booking limits** | Counts the booking towards the member's open-booking limit |
+| **Guests allowed** | Allows named guests |
+| **Show neutral occupancy** | Shows *Occupied* instead of the card label in the public plan |
 
-* **Label and colour** — how it appears in the court plan, with a preview in the form.
-* **Allowed roles** — who may book on this card. Any selected role is sufficient. With none
-  selected, every signed-in person may book; administrators may always.
-* **Managing roles** — who may open every booking made on this card, see the participant names and
-  cancel it. With none selected, only administrators may.
-* **Allowed player counts** — exactly these counts are allowed. With none given, the card records no
-  participants at all; that is the case for training and for a closure.
-* **Counts against booking limits** — whether a booking on this card counts towards the member's
-  limit of open bookings.
-* **Guests allowed** — whether a named guest may fill a player slot.
-* **Show as neutrally booked in the court plan** — whether the plan shows the card's label or a
-  neutral *Occupied* with the number of participants. That is a rendering choice, not secrecy: the
-  interface the public court plan reads from carries the label. A card whose name is nobody else's
-  business is better given a neutral one.
+Administrators may use and manage every card. A neutral display does not hide the label from
+technical access because the public API still returns it. Do not use confidential labels.
 
-Availability works as it does for a court: deactivate rather than delete.
+Deactivate cards that are no longer needed. Existing bookings remain in place.
 
-![A booking card in the form: label and colour with a preview, allowed and managing roles, allowed player counts and the card's switches.](../screenshots/en/booking-card.png)
+![A booking card with label, colour, roles, player counts and further options.](../screenshots/en/booking-card.png)
 
 ## Facility → Slot fillers
 
-A slot filler takes a player slot without being a person — a ball machine, say, or a "looking for a
-partner" notice. The count is how many of them the club owns; empty means any number. When they are
-all taken at the booked time, Courtside tells the booking member how many there are in total.
+A slot filler occupies a player slot without representing a person. Examples include a ball
+machine or a "looking for a partner" entry.
 
-![The list of slot fillers with label and count, and the form for a new one below it.](../screenshots/en/slot-fillers.png)
+Enter a label and an optional available count. An empty count allows any number of simultaneous
+uses. If all limited items are booked, Courtside refuses further selections for that period.
+
+![The slot filler list with labels, counts and the form.](../screenshots/en/slot-fillers.png)
 
 ## Booking rules
 
-The rules live in *Club → Configuration*, and the membership types point at them. Rules are data: a
-**rule set** is a named collection, and each rule appears in it at most once.
+Open the booking rules under *Club → Configuration*. A membership type points to a rule set. Each
+rule set may contain these rules once:
 
-Two rules apply to the whole club and are not in the rule set: the **opening hours** under
-*Facility → Opening hours* and the **time grid** in this configuration. The rule set links to both
-where they belong. The rest go into the set:
-
-| Rule | What it sets |
+| Rule | Setting |
 |---|---|
-| Advance booking window | How many days ahead a booking may be made |
-| Open bookings | How many bookings may be open at once |
-| Maximum booking duration | How many minutes a booking may run |
-| Cancellation deadline | How many minutes before the start a cancellation must arrive |
-| Booking barred | No setting: whoever is measured by this set books and moves nothing themselves. Administrators still book and move on somebody else's behalf |
+| Advance booking window | Highest number of days in advance |
+| Open bookings | Highest number of open bookings at the same time |
+| Maximum booking duration | Highest duration in minutes |
+| Cancellation deadline | Minimum number of minutes before the booking |
+| Booking barred | Prevents members from booking and moving without another setting |
 
-Each number's form names the range it accepts. When a member books, Courtside checks **every** rule
-and shows all violations at once, not one after another.
+Opening hours and the booking grid apply across the club, so they sit outside rule sets.
+Administrators may override the booking prohibition for administrative work. Time and court
+constraints still apply to them.
 
-A rule set is **retired**, not deleted. If no membership type points at it, retiring changes nothing
-for anybody; if some do, retiring only takes it out of the choices — their rules keep applying
-unchanged until you point them at another set. Courtside tells you which case you are in before you
-act.
+Retiring a rule set does not stop it from applying to membership types already assigned to it. It
+only removes the set from new selections. Assign another rule set first if the affected members
+should receive different rules.
 
-![The Booking rules section with the rule set chooser and the rules below it, each with its allowed range.](../screenshots/en/booking-rules.png)
+![Booking rules with a rule set, permitted ranges and links to global settings.](../screenshots/en/booking-rules.png)
 
 ## People → Membership types
 
-A membership type ties three things together: a name, a rule set, and whether an import opens an
-account for that type.
+A membership type has a label, a rule set and an import setting.
 
-**Retiring** only stops new assignments. Whoever holds the type keeps it, and its booking rules keep
-applying to those members unchanged.
+Enable **Open an account on import** if imported members of this type should receive an account.
+Courtside sends the one-time password to the recorded email address. Existing accounts remain
+unchanged.
 
-**Open an account on import** means: when an import runs, every member of this type is given an
-account and mailed their own one-time password. Accounts that already exist are left alone.
+Retiring a type preserves existing assignments and booking rules. The type can no longer be
+assigned to new memberships.
 
-![The membership types with name, rule set and the tick that opens an account on import.](../screenshots/en/membership-types.png)
+![Membership types with rule set, state and the account setting for imports.](../screenshots/en/membership-types.png)
 
 ## People → People and accounts
 
-The list shows name, username, account status and membership type, with a search and a filter. You
-create a person with a first name, a last name and an email address; all of it can be corrected
-later.
+The overview shows name, username, account state and membership type. Use search and filters to
+find an entry. You can correct first name, last name and email address later.
 
-![The people list with name, username, account status and membership type per row, and the search and filter above it.](../screenshots/en/admin-roster.png)
+![The people list with search, filters and the main account details.](../screenshots/en/admin-roster.png)
 
-Opening a person shows three areas:
+After opening a person, you can edit three areas:
 
-**Person** — the details, and the language notifications to them are written in.
+* **Person** contains personal details and the language used for notifications.
+* **Membership** contains type, start and end. End a membership instead of deleting it. You can
+  correct the end date later.
+* **Account** contains username, roles, state and credentials. An account requires an email address.
 
-**Membership** — type, start, end. A membership is **ended**, not deleted: it ends on the date you
-choose, the record stays, and the date can be corrected afterwards.
+### Send credentials
 
-**Account** — username, roles and credentials. An account needs an email address, because that is
-how it is reached; without one Courtside says so and opens no account.
+Before sending, Courtside shows the destination address and warns about shared addresses. The
+one-time password goes directly to the member and is not displayed to the board.
 
-The state of the access is always shown: nothing issued yet, credentials out, issued credentials
-expired, or the member has chosen a password of their own. *Send credentials* issues a one-time
-password **that goes to the member and that nobody on the board sees or chooses.** Courtside names
-the address beforehand and says when several people hold it.
+New credentials replace an existing password and end every session for the account. Only use this
+function when the member cannot recover the account without help.
 
-If the member already chose a password, Courtside warns before sending: new credentials delete that
-password and end every session they have open. That is the route for somebody who can no longer get
-in, and only for that. A member who still reaches the address held for them does not need you: the
-sign-in page mails them a code they set their own password with, and nothing about the account
-changes before they do.
+Administrators can change an email address and then request new credentials. The change log records
+both actions with their time and acting account, but it records neither the address nor the
+password. Organisational controls, such as sharing responsibility between several people, remain
+the club's responsibility.
 
-It does not protect an account against your own administration, and saying otherwise would be
-dishonest: whoever may change a person's email address can then have that person's credentials sent
-to it. The change log holds both steps — *that* the person's details were corrected and *that*
-credentials were requested for this account, each with its time and its actor. Values are not in
-there: neither the address they went to nor the password itself. The log shows that something
-happened, not where it went. A real limit is an arrangement in the club, such as not leaving the
-administrator role with a single person.
+### Deactivate an account
 
-When somebody leaves the club, their account is **deactivated** rather than deleted: the button
-beside it switches the account off, and on again. A deactivated account cannot sign in and its open
-sessions end at once; everything that person booked stays right in the reports.
+Deactivate the account when a person should no longer have access. Courtside ends every session.
+Bookings and reports remain intact. You can enable the account again later.
 
-The same page ends this account's sessions, ends every session in the instance (yours included),
-links to this person's changes in the log, and produces the **answer to a data-access request**.
-When a member asks what the club holds about them, that button produces the answer as a file: the
-person and their address, every account with its roles and its state, the membership and the period
-it ran, the bookings they made and the ones somebody else recorded them in, their series, what
-became of every message addressed to them and which kinds they asked not to receive, the member
-numbers an import linked them by, and the change log from both sides — what was done to them and
-what they did. Look at the file before handing it over: it holds more than a board sees about a
-person in the interface. It holds nothing about anybody else, and that the answer was produced is itself written
-to the log.
+### Export one person's data
 
-The whole list exports as CSV, optionally carrying the member numbers of an import source.
+*Answer a data access request* creates a file containing data about this person. It includes person
+and account details, membership, bookings, series, messages, opt-outs, import references and
+related change-log entries. Inspect the file before sharing it. Creating the file is itself written
+to the change log.
+
+You can export the whole people list as CSV. It may also include member numbers from one import
+source.
 
 ## People → Import
 
-If your club holds its members elsewhere, Courtside reads that system's export instead of somebody
-retyping it. The path has three steps and the application walks you through them.
+Use the import when another membership system holds the club's authoritative list. The process has
+three stages: source, preview and execution.
 
-**Describe the source.** A source is the description of *one* membership system: a name, the
-separator and character set of its export, the mapping of its columns and of its categories onto
-membership types, and the fields that source owns. **Every snapshot overwrites an owned field**;
-what you leave unticked belongs to the club and stays untouched. For the email address that carries
-weight: every one-time password and every reset code goes there, so this tick moves your members'
-account recovery into the other system.
+### 1. Describe the source
 
-The tick binds *updates* to people who already exist. **A creation writes every field of the file**,
-ticked or not — and on the first run practically every row is one. To keep the addresses in the
-club's hands, correct them after the import; the tick only decides whether the next snapshot
-overwrites them again. Here you also set the share of ending memberships above which Courtside asks
-before executing.
+Enter the label, separator, character set and column mapping. Map external categories to membership
+types in Courtside.
 
-To map the columns you pick an example file. **That file stays in your browser** and is read only to
-offer you your own columns.
+Mark the fields that this source should own. Every later import overwrites owned fields on existing
+people. Unmarked fields remain unchanged. New people still receive every mapped value from the
+file during their first import.
 
-![The description of a source: name, separator and character set, the mapping of its columns, and the ticks for the fields that source owns.](../screenshots/en/import-source.png)
+Review this choice carefully for the email address. Courtside sends one-time passwords and account
+recovery codes there.
 
-**Read the file.** The upload produces a preview, not a change: file name, row count and checksum,
-then the change set by kind — new, changed, membership ends — the skipped rows, the possible
-duplicates and the shared mailboxes. Beside it stands how many accounts would be opened, and why one
-would not be.
+The example file used for mapping stays in the browser and is not uploaded.
 
-A preview changes nothing about the roster. It does live in the instance, though: the file itself is
-never stored, but the change set read out of it — names, addresses, member numbers — is, until its
-retention runs out. Anyone asked where the data went should know that.
+![The import source with file format, column mapping and fields owned by the source.](../screenshots/en/import-source.png)
 
-Two things the preview needs from you:
+### 2. Review the file
 
-* **What the file means.** A *partial list* changes only what it contains; whoever is missing is left
-  alone. A *complete list* is the whole truth about this source — whoever is missing has their
-  membership ended. It reaches the account too, in one of two ways: an account holding only the
-  member role is deactivated; one holding another — treasurer, administrator — stays active and
-  quietly loses the member role. Either way its sessions end at once.
-* **Who is already there.** A snapshot recognises a person by their member number, never by their
-  name. Anyone you entered before reading this source in is unknown to the file — link the two by
-  hand, or the import creates a second person.
+An upload first creates a preview and does not change any person. The preview shows the file name,
+row count, checksum, changes, skipped rows, possible duplicates, shared email addresses and planned
+accounts.
 
-About possible duplicates Courtside does nothing: two members really are called the same sometimes,
-and only you can tell the difference. Shared mailboxes likewise — a parent registering for their
-children is deliberate; but whoever reads that mailbox receives every one-time password and every
-reset code sent to it, and either is enough to take an account.
+Courtside does not store the file itself. It keeps the calculated changes, including names,
+addresses and member numbers, until the preview expires.
 
-**Run the import.** The reviewed change set is written in one transaction. If the share of ending
-memberships is above your threshold, Courtside demands an explicit confirmation — a truncated export
-looks exactly like a club that shrank. Every run is then listed with its result.
+Choose the correct mode:
 
-**Running it again does not undo it**, and a later correct run does not bring everything back. The
-memberships return; the accounts do not. A synchronisation never switches an account on and never
-gives a role back, because a board may have changed either for a reason no membership system knows
-about.
+* A **partial list** only changes people contained in the file.
+* A **complete list** ends memberships whose rows are missing. Accounts with only the member role
+  are deactivated. Accounts with additional roles remain enabled but lose the member role. Both
+  cases end their sessions.
 
-After executing a truncated file by mistake there are two things to do, both on the person page:
-switch the deactivated accounts back on, and give the others their member role back. The second
-group is the one that does not catch the eye — those accounts are active and look untouched, but
-their holders can no longer book on any card that asks for the member role.
+An import identifies people only by source and member number. Link people who already exist before
+execution, or the import will create duplicates. Review similar names and shared email addresses by
+hand.
+
+### 3. Run the import
+
+Review the summary and select *Run import*. If the share of ending memberships exceeds the source's
+threshold, Courtside requires another confirmation. It saves the complete set of changes in one
+database transaction.
+
+A later correct import does not automatically reactivate accounts or restore removed member roles.
+After importing an incomplete file by mistake, enable affected accounts and assign their member
+roles again.
 
 ## Records
 
-**Utilisation** shows how much confirmed playing time each court held over a period. Courts nobody
-booked are listed too; they are part of the answer.
+The **Records** area has four views.
 
-![Utilisation per court over a period with the number of bookings, the time held and the share.](../screenshots/en/utilisation.png)
+* **Utilisation** shows confirmed playing time by court. It includes courts without bookings.
+* **Data export** creates CSV files for bookings or members. The booking export omits the person who
+  booked. The member export contains personal data and creates no change-log entry.
+* **Change log** lists administrative changes with time, subject and acting account.
+* **Message log** shows delivery state. *Handed over* only means that the mail server accepted the
+  message. Final delivery is recorded by the mail server, not Courtside.
 
-**Data export** gives the club's lists as CSV. The separator and character set decide whether your
-spreadsheet opens the file correctly. The booking export names the court, the slot and the kind of
-booking day by day — who booked is not in the file.
-
-The roster export is the other case: it carries every member's name and address, and it leaves **no**
-entry in the change log. Your instance cannot tell you afterwards who took the list out, or when.
-What bounds that is only who you give the administrator role to.
-
-**Change log** carries the administrative changes with their time, the change, the subject and the
-person who made it. Changing a court number, setting a rule, ending a membership: all of it is here.
-
-**Message log** shows what the instance sent, optionally only what went wrong. One subtlety is worth
-knowing: *handed over* means Courtside passed the message to the club's mail server and it accepted
-it. Whether it was delivered is something this application cannot know — that is in the mail
-server's own log.
+![Utilisation by court with booking count, occupied time and share.](../screenshots/en/utilisation.png)
 
 ## Two rules that hold everywhere
 
-**Nothing a club once entered is deleted.** Courts, cards, rule sets and membership types are
-deactivated or retired, memberships are ended. The past stays readable and the reports stay right.
+Courtside keeps the domain history. Deactivate or retire courts, booking cards, rule sets,
+membership types and accounts. End memberships. Do not delete these records if past activity must
+remain traceable.
 
-**Everything you enter, you can correct.** A typo in a name, a wrong username, a wrong end date:
-none of it needs a database console or a request to us.
+Input mistakes remain correctable. Edit names, usernames and dates in the relevant administration
+page. No direct database access is needed.
 
-![The Membership area of a person: type, start and end correctable at any time, beside the button that ends the membership rather than deleting it.](../screenshots/en/person-membership.png)
+![An editable membership with type, start, end and the action for ending it.](../screenshots/en/person-membership.png)

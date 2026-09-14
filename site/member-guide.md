@@ -1,276 +1,251 @@
-# Anleitung für Mitglieder
+# Handbuch für Mitglieder
 
-Diese Seite beschreibt Courtside aus der Sicht eines Mitglieds: anmelden, einen freien Platz
-finden, buchen, Mitspieler eintragen, absagen. Sie nennt keine Uhrzeiten, keine Fristen und keine
-Obergrenzen, denn das legt dein Verein in seiner eigenen Instanz fest. Alles andere hier gilt
-unabhängig davon.
+Dieses Handbuch erklärt die Funktionen, die du als Mitglied brauchst. Die Namen von Schaltflächen
+und Menüpunkten stehen *kursiv*. Öffnungszeiten, Fristen und Obergrenzen legt dein Verein fest.
 
 ## Der Platzplan ist öffentlich
 
-Die Startseite deiner Vereinsinstanz zeigt die Platzbelegung, auch ohne Anmeldung. Du siehst, wann
-welcher Platz belegt ist. Buchen kannst du erst, wenn du angemeldet bist.
+Die Startseite zeigt den Platzplan auch ohne Anmeldung. Auf einem großen Bildschirm siehst du eine
+Woche, auf einem schmalen Bildschirm einen Tag.
 
-Der Plan zeigt eine Woche, auf einem schmalen Bildschirm einen Tag. Über *Vorherige Woche* und
-*Nächste Woche* bewegst du dich vor und zurück, *Zur aktuellen Zeit* bringt dich zum Jetzt zurück.
-Die Legende unter dem Plan erklärt die Zustände: **Frei**, **Belegt**, **Deine Buchung**,
-**Nicht verfügbar** und **Vergangen**. An einem Tag ohne Öffnungszeit steht statt des Rasters,
-dass die Anlage an diesem Tag geschlossen ist.
+1. Wähle *Vorherige Woche* oder *Nächste Woche*, um den Zeitraum zu wechseln.
+2. Wähle *Zur aktuellen Zeit*, um zum heutigen Tag zurückzukehren.
+3. Lies in der Legende, ob ein Zeitraum **Frei**, **Belegt**, **Deine Buchung**,
+   **Nicht verfügbar** oder **Vergangen** ist.
 
-Ob bei einer fremden Buchung die Bezeichnung ihrer Buchungsart steht oder nur *Belegt*, entscheidet
-dein Verein je Buchungsart. Öffentlich ist ausserdem, wie viele Personen zu einer Buchung gehören;
-wer sie sind, ist es nicht. Namen stehen im Platzplan nur an deinen eigenen Buchungen.
+An geschlossenen Tagen zeigt Courtside kein Raster. Bei fremden Buchungen siehst du entweder die
+Buchungsart oder den neutralen Text *Belegt*. Das stellt der Verein für jede Buchungsart ein. Die
+Anzahl der Teilnehmenden ist öffentlich, ihre Namen sind es nicht. Namen siehst du nur bei deinen
+eigenen Buchungen.
 
-![Der Platzplan einer Woche: je Platz eine Spalte, die Belegung als farbige Blöcke, darunter die Legende der Zustände.](screenshots/de/court-plan.png)
+![Der Platzplan einer Woche mit einer Spalte je Platz, farbigen Buchungen und der Legende darunter.](screenshots/de/court-plan.png)
 
 ## Anmelden
 
-Dein Konto legt der Vorstand an. Benutzername und ein Einmalpasswort kommen anschliessend per
-E-Mail zu dir, nicht über den Vorstand: niemand dort sieht oder wählt dein erstes Passwort.
+Der Vorstand legt dein Konto an. Courtside sendet dir den Benutzernamen und ein Einmalpasswort per
+E-Mail. Niemand im Vorstand sieht oder bestimmt dieses Passwort.
 
-Über *Anmelden* kommst du zum Formular mit Benutzername und Passwort. Wird die Anmeldung
-abgelehnt, obwohl du dich nicht vertippt hast, können die Zugangsdaten abgelaufen oder nie
-angekommen sein, oder das Konto ist deaktiviert. Für die ersten beiden Fälle steht unter dem
-Formular *Passwort oder Benutzername vergessen?*; ist das Konto deaktiviert, hilft nur dein
-Vorstand.
+1. Wähle *Anmelden*.
+2. Gib deinen Benutzernamen und dein Passwort ein.
+3. Wähle erneut *Anmelden*.
 
-![Das Anmeldeformular mit Benutzername und Passwort, darunter der Verweis für vergessene Zugangsdaten.](screenshots/de/sign-in.png)
+Prüfe bei einer Ablehnung zuerst die Eingabe. Vielleicht sind die Zugangsdaten abgelaufen oder die
+E-Mail ist nicht angekommen. Nutze dann *Passwort oder Benutzername vergessen?*. Bei einem
+deaktivierten Konto kann nur der Vorstand helfen.
+
+![Das Anmeldeformular mit Benutzername, Passwort und dem Link für vergessene Zugangsdaten.](screenshots/de/sign-in.png)
 
 ## Passwort oder Benutzername vergessen
 
-Die Seite hinter diesem Link hat drei Formulare, und alle drei kommen ohne Anmeldung aus.
+Die Wiederherstellung funktioniert ohne Anmeldung. Auf der Seite stehen drei getrennte Formulare.
 
-Das erste nimmt deinen **Benutzernamen** und schickt einen achtstelligen Code an die Adresse, die
-für dein Konto hinterlegt ist. An deinem Konto ändert sich dadurch nichts: Dein bisheriges Passwort
-gilt weiter, deine offenen Sitzungen bleiben offen.
+### Code anfordern
 
-Das zweite nimmt diesen **Code** und dein **neues Passwort**. Erst hier ändert sich etwas — das neue
-Passwort gilt ab sofort, und alle offenen Sitzungen deines Kontos enden. Der Code wird nur von einem
-Passwort verbraucht, das die Regeln annehmen: Lehnt Courtside dein Wunschpasswort ab, kannst du es
-mit demselben Code noch einmal versuchen. Groß- und Kleinschreibung spielen keine Rolle, der
-Bindestrich auch nicht. Wie lange ein Code gilt, legt dein Verein fest — mindestens eine
-Viertelstunde, höchstens einen Tag. Ist er abgelaufen, sagt Courtside genau das; dann fordere oben
-einen neuen an.
+1. Gib deinen Benutzernamen ein.
+2. Wähle *Code zuschicken*.
+3. Öffne die E-Mail mit dem achtstelligen Code.
 
-Das dritte nimmt deine **E-Mail-Adresse** und schickt dir deine Benutzernamen — Mehrzahl, denn auf
-einer Familienadresse können mehrere Konten liegen, und dann bekommt jedes seine eigene Nachricht.
-Ein Passwort ändert dieses Formular nicht.
+Das bisherige Passwort bleibt gültig. Offene Sitzungen bleiben angemeldet.
 
-Beide antworten gleich, egal ob es den Namen oder die Adresse gibt: sonst könnte jeder Fremde
-durchprobieren, wer in deinem Verein ein Konto hat. Kommt keine E-Mail, ist entweder der Name ein
-anderer als gedacht, oder die hinterlegte Adresse ist nicht die, in die du gerade schaust; dann
-hilft dein Vorstand weiter.
+### Code einlösen
 
-Nach zu vielen Versuchen in kurzer Zeit sagt Courtside das ausdrücklich und lässt eine Weile
-warten. Beim **Anmelden** zählt dabei der Netzanschluss, von dem die Versuche kommen, nicht dein
-Konto: niemand kann dich aussperren, indem er dein Passwort oft genug falsch rät.
+1. Gib den Code aus der E-Mail ein.
+2. Lege ein neues Passwort fest.
+3. Wähle *Passwort setzen*.
 
-Beim Anfordern ist es anders, und das ist der Preis dafür, dass es ohne Anmeldung auskommt: dort
-zählt auch der eingegebene Name oder die eingegebene Adresse, über alle Absender hinweg. Jemand
-anderes kann dir das Anfordern also eine Weile zuhalten, indem er oft genug deinen Benutzernamen
-einträgt. Das Fenster ist kurz, deine Anmeldung ist davon nicht betroffen, und dein Vorstand kann
-dir die Zugangsdaten die ganze Zeit über zuschicken.
+Danach gilt nur noch das neue Passwort. Courtside beendet alle offenen Sitzungen des Kontos. Ein
+abgelehntes Passwort verbraucht den Code nicht. Groß- und Kleinschreibung sowie Bindestriche im
+Code spielen keine Rolle. Abgelaufene Codes musst du neu anfordern.
 
-Beim Einlösen zählt nur der Netzanschluss, von dem die Versuche kommen, nie dein Konto — niemand
-kann dir also die Wiederherstellung zuhalten, indem er Codes auf dich rät. Teilst du dir den
-Anschluss mit anderen Mitgliedern, landen deren Versuche allerdings im selben Topf wie deine.
+### Benutzernamen anfordern
 
-![Die Seite hinter dem Verweis mit ihren drei Formularen: Code anfordern, Code einlösen, Benutzernamen zuschicken.](screenshots/de/account-recovery.png)
+Gib deine E-Mail-Adresse ein und wähle *Benutzernamen zuschicken*. Courtside sendet für jedes Konto
+an dieser Adresse eine eigene Nachricht. Passwörter bleiben unverändert.
+
+Courtside antwortet immer gleich, auch wenn der Benutzername oder die Adresse unbekannt ist. So
+kann niemand über das Formular nach Konten suchen. Wenn keine E-Mail eintrifft, prüfe den
+Benutzernamen und das richtige Postfach. Danach hilft der Vorstand weiter.
+
+Zu viele Versuche führen zu einer Wartezeit. Bei Anmeldung und Code-Eingabe zählt die gemeinsame
+Internetverbindung. Beim Anfordern zählt zusätzlich der eingegebene Benutzername oder die Adresse.
+Andere Personen im selben Netz können deshalb dieselbe Begrenzung erreichen. Dein bestehendes
+Passwort bleibt davon unberührt.
+
+![Die Wiederherstellungsseite mit den Formularen für Code, neues Passwort und Benutzernamen.](screenshots/de/account-recovery.png)
 
 ## Das Einmalpasswort ersetzen
 
-Das betrifft das Passwort, das dein Vorstand dir zuschickt — beim ersten Zugang oder wenn du
-selbst nicht mehr an dein Postfach kommst. Damit kommst du nur an eine einzige Seite:
-*Einmalpasswort ersetzen*. Solange du kein eigenes Passwort gesetzt hast, führt dich jede Seite der
-Anwendung dorthin zurück. Zeit hast du dafür nicht unbegrenzt: wie lange ein zugeschicktes Passwort
-gilt, legt dein Verein fest. Läuft es ab, bevor du es benutzt hast, brauchst du deinen Vorstand
-dafür nicht — fordere auf der Anmeldeseite einen Code an und löse ihn ein; damit setzt du dein
-Passwort und das zugeschickte verfällt im selben Schritt.
+Ein Einmalpasswort gilt nur für den ersten Zugang oder für ein vom Vorstand zurückgesetztes Konto.
+Nach der Anmeldung führt Courtside dich direkt zu *Einmalpasswort ersetzen*. Andere Funktionen
+bleiben gesperrt, bis du ein eigenes Passwort gesetzt hast.
 
-Das neue Passwort braucht mindestens zwölf und höchstens 256 Zeichen. Courtside lehnt es ausserdem
-ab, wenn es auf einer mitgelieferten Liste häufiger Passwörter steht, wenn es deinen Namen, deinen
-Benutzernamen, deine E-Mail-Adresse, den Vereinsnamen oder einen Begriff enthält, den dein Verein
-zusätzlich gesperrt hat, und wenn es dem aktuellen oder dem zugeschickten Passwort entspricht.
-Dieselben Regeln gelten für das Passwort, das du beim Einlösen eines Codes setzt.
+1. Gib das neue Passwort zweimal ein.
+2. Wähle *Passwort speichern*.
+3. Melde dich mit dem neuen Passwort erneut an.
 
-Dazu fragt Courtside einen öffentlichen Dienst, ob dieses Passwort schon einmal in einem Datenleck
-aufgetaucht ist. Dein Passwort verlässt die Instanz dabei nicht: übertragen werden fünf Zeichen
-eines Prüfwerts, aus denen es sich nicht zurückrechnen lässt. Antwortet der Dienst nicht, lehnt
-Courtside die Änderung ab, statt ungeprüft zu speichern; dann versuchst du es später noch einmal.
-Sonst meldest du dich einmal neu an und bist drin.
+Das Passwort muss 12 bis 256 Zeichen lang sein. Courtside lehnt häufig verwendete Passwörter ab.
+Das gilt auch für Passwörter mit deinem Namen, Benutzernamen, deiner E-Mail-Adresse, dem
+Vereinsnamen oder einem vom Verein gesperrten Begriff. Das neue Passwort darf außerdem nicht dem
+bisherigen oder dem ausgestellten Passwort entsprechen.
 
-![Die Seite Einmalpasswort ersetzen mit dem neuen Passwort und seiner Wiederholung.](screenshots/de/initial-password.png)
+Courtside prüft über einen öffentlichen Dienst, ob das Passwort aus einem bekannten Datenleck
+stammt. Dabei verlassen nur die ersten fünf Zeichen eines Prüfwerts die Instanz. Der Dienst erhält
+das Passwort nicht. Ist die Prüfung nicht erreichbar, speichert Courtside das Passwort nicht.
+Versuche es später erneut.
+
+Ist das Einmalpasswort bereits abgelaufen, fordere über die Anmeldeseite einen Code an. Mit diesem
+Code kannst du selbst ein neues Passwort setzen.
+
+![Die Seite zum Ersetzen des Einmalpassworts mit zwei Feldern für das neue Passwort.](screenshots/de/initial-password.png)
 
 ## Eine Buchung anlegen
 
-Im Platzplan klickst du auf die freie Zelle, in der du spielen willst. Sie nennt Platz und Uhrzeit,
-und daraus wird der Anfang deiner Buchung. Der Dialog *Buchung anlegen* zeigt dann:
+1. Wähle im Platzplan eine freie Zelle. Sie bestimmt Platz und Beginn.
+2. Wähle eine erlaubte **Dauer**.
+3. Wähle die **Art der Buchung**.
+4. Füge bei Bedarf Mitglieder hinzu.
+5. Öffne *Weitere Angaben*, wenn du Gäste, Platzfüller oder eine Notiz eintragen möchtest.
+6. Wähle *Jetzt buchen*.
 
-* **Dauer**, als Auswahl der Längen, die die Regeln deines Vereins zulassen.
-* Den **Platz**, den du angeklickt hast. Die Auswahl mehrerer Plätze auf einmal bietet die
-  Anwendung nur einem Konto mit einer Rolle über die Mitgliedschaft hinaus an, etwa für ein
-  Training über drei Plätze; allen anderen nennt sie den gewählten Platz.
-* **Art der Buchung**. Zur Auswahl steht, was deine Rolle benutzen darf.
-* **Mitglieder**: über die Suche findest du sie und trägst sie als Mitspieler ein.
-* Unter **Weitere Angaben**: Gäste, *Was mitspielt* und eine Notiz.
+Normale Mitgliedskonten buchen den gewählten Platz. Konten mit zusätzlichen Rollen können mehrere
+Plätze auswählen, zum Beispiel für ein Training.
 
-*Jetzt buchen* legt die Buchung an. Ob ein Platz zu dieser Zeit noch frei ist, entscheidet die
-Datenbank selbst und nicht eine vorherige Prüfung, die ein gleichzeitiger Zugriff überholen könnte.
-Kommt dir jemand im selben Moment zuvor, sagt Courtside dir das, statt zwei Buchungen
-nebeneinander zu stellen.
+Die Datenbank prüft beim Speichern, ob der Platz noch frei ist. Hat jemand denselben Zeitraum kurz
+zuvor gebucht, lehnt Courtside deine Buchung ab. Eine Doppelbelegung entsteht nicht.
 
-![Der Dialog Buchung anlegen mit Dauer, Platz, Art der Buchung, der Mitgliedersuche und dem aufklappbaren Bereich Weitere Angaben.](screenshots/de/booking-dialog.png)
+![Der Buchungsdialog mit Dauer, Platz, Buchungsart, Mitgliedersuche und weiteren Angaben.](screenshots/de/booking-dialog.png)
 
 ## Was eine Buchungsart bedeutet
 
-Alles, was einen Platz belegt, ist in Courtside dieselbe Sache: das Spiel eines Mitglieds, ein
-Training, ein Punktspiel, eine Sperrung. Was sie voneinander unterscheidet, ist ihre **Buchungsart**.
+Eine Buchungsart legt fest, wie eine Belegung behandelt wird. Das kann ein Spiel, ein Training, ein
+Punktspiel oder eine Sperrung sein.
 
-Die Buchungsart entscheidet mit,
+Die Buchungsart bestimmt:
 
-* wie viele Spieler die Buchung erfasst, und ob sie überhaupt welche erfasst,
+* wie viele Personen eingetragen werden können,
 * ob Gäste erlaubt sind,
 * ob die Buchung gegen deine Obergrenze offener Buchungen zählt,
-* wer sie überhaupt anlegen darf.
+* welche Rollen diese Buchungsart verwenden dürfen.
 
-Buchungsarten sind Zeilen in der Datenbank deines Vereins, keine feste Liste aus dem Programm. Was
-du im Dialog zur Auswahl hast, hat dein Vorstand so eingerichtet.
+Der Vorstand richtet die Buchungsarten ein. Im Buchungsdialog erscheinen nur die Arten, die du
+verwenden darfst.
 
-![Das Feld Art der Buchung im Buchungsdialog mit der Buchungsart, die der Verein eingerichtet hat.](screenshots/de/booking-kind.png)
+![Die Auswahl der Buchungsart im Buchungsdialog.](screenshots/de/booking-kind.png)
 
 ## Mitspieler und Gäste
 
-Erfasst die gewählte Art Spieler, zeigt der Dialog mit, wie viele von wie vielen du schon
-eingetragen hast. Drei Arten von Mitspielern gibt es:
+Der Buchungsdialog zeigt, wie viele Spielerplätze bereits belegt sind.
 
-* **Mitglieder** suchst du über den Namen und fügst sie hinzu. Ein Mitglied kann nur einen Platz
-  derselben Buchung belegen.
-* **Gäste** trägst du unter *Weitere Angaben* mit Namen ein. Erlaubt eine Buchungsart keine Gäste,
-  sagt sie das beim Buchen.
-* ***Was mitspielt*** ist für alles, was einen Spielplatz belegt, ohne eine Person zu sein: eine
-  Ballmaschine etwa, oder ein Aushang „Spielpartner gesucht“. Wie viele der Verein davon besitzt,
-  legt er selbst fest, und er kann es auch offen lassen. Ist zu deiner Zeit schon alles vergeben,
-  nennt Courtside die Anzahl, die es insgesamt gibt.
+* Suche **Mitglieder** nach ihrem Namen und füge sie hinzu. Jedes Mitglied kann in einer Buchung
+  nur einen Spielerplatz belegen.
+* Trage **Gäste** unter *Weitere Angaben* namentlich ein. Das Feld erscheint nur bei passenden
+  Buchungsarten.
+* Wähle unter ***Was mitspielt*** einen Platzfüller, zum Beispiel eine Ballmaschine oder einen
+  Eintrag "Spielpartner gesucht". Courtside meldet, wenn zur gewählten Zeit kein Exemplar frei ist.
 
-Wen du einträgst, erfährt davon: das eingetragene Mitglied bekommt eine E-Mail. Gefragt wird es
-nicht, zustimmen muss es nicht, und es kann sich selbst wieder austragen.
+Eingetragene Mitglieder erhalten eine E-Mail. Sie müssen der Eintragung nicht zustimmen und können
+sich selbst wieder austragen.
 
-![Der Teil des Buchungsdialogs für Mitspieler: die Zahl der belegten Spielerplätze, die Mitgliedersuche und die aufgeklappten Felder für Gäste und Was mitspielt.](screenshots/de/booking-participants.png)
+![Der Bereich für Mitspieler, Gäste und Platzfüller im Buchungsdialog.](screenshots/de/booking-participants.png)
 
 ## Als Mitspieler eingetragen
 
-Unter *Meine Buchungen* steht ein eigener Abschnitt **Als Mitspieler eingetragen**. Dort landen die
-Buchungen anderer Mitglieder, in denen dein Name steht. Niemand hat dich vorher gefragt, und genau
-dort trägst du dich wieder aus, ohne jemanden um Erlaubnis zu bitten. Wer die Buchung angelegt hat,
-bekommt eine Nachricht davon; die Buchung selbst bleibt bestehen.
+Öffne *Meine Buchungen* und gehe zu **Als Mitspieler eingetragen**. Dort stehen Buchungen, die
+andere Mitglieder mit deinem Namen angelegt haben.
 
-![Der Abschnitt Als Mitspieler eingetragen unter Meine Buchungen, an jedem Eintrag die Schaltfläche zum Austragen.](screenshots/de/participations.png)
+Mit *Austragen* entfernst du dich aus der Buchung. Die Buchung bleibt bestehen. Courtside
+benachrichtigt die Person, die sie angelegt hat.
+
+![Die als Mitspieler eingetragenen Buchungen mit der Schaltfläche zum Austragen.](screenshots/de/participations.png)
 
 ## Wenn eine Regel die Buchung ablehnt
 
-Buchungsregeln sind Daten, keine festen Zeilen im Programm, und welche für dich gelten, hängt an
-deiner Mitgliedsart. Courtside sammelt beim Buchen **alle** Verstösse ein und zeigt jeden bei dem
-Feld an, um das es geht. Du korrigierst also nicht einen Grund nach dem anderen, sondern siehst auf
-einmal, was fehlt.
+Die Mitgliedsart bestimmt, welche Buchungsregeln für dich gelten. Courtside zeigt alle erkannten
+Verstöße gleichzeitig am jeweiligen Feld an.
 
-Diese Ablehnungen gibt es:
-
-| Was Courtside sagt | Was dahinter steht |
+| Meldung | Bedeutung |
 |---|---|
-| An diesem Tag ist die Anlage geschlossen | Der Tag hat keine Öffnungszeit |
-| Buchungen sind nur zwischen zwei Uhrzeiten möglich | Deine Zeit liegt ausserhalb der Öffnungszeit |
-| Buchungen beginnen im Minuten-Raster | Der Beginn passt nicht in das Raster deines Vereins |
-| Die Buchungsdauer muss ein Vielfaches der Rasterlänge sein | Die Dauer passt nicht in dasselbe Raster |
-| Du kannst höchstens so viele Tage im Voraus buchen | Der Vorlauf ist begrenzt |
-| Eine Buchung darf höchstens so viele Minuten dauern | Die Dauer ist begrenzt |
-| Du hast bereits so viele von so vielen möglichen offenen Buchungen | Mehr gleichzeitig offene Buchungen sind nicht vorgesehen |
-| Du musst mindestens so viele Minuten vor Buchungsbeginn stornieren | Für das Stornieren gilt eine Frist |
-| Eine Buchung darf nicht in der Vergangenheit beginnen | Der Zeitpunkt liegt hinter dir |
-| Platzbuchungen sind für dich nicht freigegeben | Deine Mitgliedsart bucht nicht selbst |
+| An diesem Tag ist die Anlage geschlossen | Für den Tag ist keine Öffnungszeit hinterlegt |
+| Buchungen sind nur zwischen zwei Uhrzeiten möglich | Die Buchung liegt außerhalb der Öffnungszeit |
+| Buchungen beginnen im Minutenraster | Der Beginn passt nicht in das Raster des Vereins |
+| Die Dauer muss ein Vielfaches der Rasterlänge sein | Die Dauer passt nicht in das Raster |
+| Du kannst höchstens eine bestimmte Zahl von Tagen im Voraus buchen | Der erlaubte Vorlauf ist überschritten |
+| Eine Buchung darf höchstens eine bestimmte Zahl von Minuten dauern | Die gewählte Dauer ist zu lang |
+| Du hast die erlaubte Zahl offener Buchungen erreicht | Du musst zuerst eine offene Buchung beenden oder stornieren |
+| Du musst eine bestimmte Zahl von Minuten vor Beginn stornieren | Die Stornierungsfrist ist abgelaufen |
+| Eine Buchung darf nicht in der Vergangenheit beginnen | Der gewählte Beginn liegt in der Vergangenheit |
+| Platzbuchungen sind für dich nicht freigegeben | Deine Mitgliedsart darf selbst keine Plätze buchen |
 
-Wie viele Tage, wie viele Minuten, wie viele Buchungen: das steht in den Regeln deines Vereins, und
-Courtside nennt die Zahl in der Meldung selbst.
+Die konkrete Zahl steht in der Meldung. Ändere die markierten Angaben und sende die Buchung erneut.
 
-![Der Buchungsdialog nach einer abgelehnten Buchung: die Meldung steht bei dem Feld, um das es geht, und nennt die Zahl aus der Regel.](screenshots/de/refused-booking.png)
+![Ein abgelehnter Buchungsdialog mit Meldungen an den betroffenen Feldern.](screenshots/de/refused-booking.png)
 
 ## Stornieren
 
-Unter *Meine Buchungen* liegen deine **bevorstehenden** und deine **vergangenen** Buchungen. Bei
-einer bevorstehenden gibt es *Stornieren*. Ist die Frist deines Vereins schon verstrichen, lehnt
-Courtside die Stornierung ab und sagt, wie viele Minuten vor Buchungsbeginn sie möglich gewesen
-wäre.
+1. Öffne *Meine Buchungen*.
+2. Wähle bei einer bevorstehenden Buchung *Stornieren*.
+3. Bestätige die Stornierung.
 
-Eine stornierte Buchung gibt den Platz sofort wieder frei. Genau darum bittet dich auch die
-Erinnerung vor deiner Buchung: wenn du nicht spielen kannst, storniere, damit jemand anders
-spielen kann.
+Courtside gibt den Platz sofort frei. Ist die Stornierungsfrist abgelaufen, bleibt die Buchung
+bestehen und Courtside nennt dir die geltende Frist.
 
-![Meine Buchungen mit den Abschnitten für bevorstehende und vergangene Buchungen; an einer bevorstehenden steht die Schaltfläche zum Stornieren.](screenshots/de/my-bookings.png)
+![Bevorstehende und vergangene Buchungen mit der Schaltfläche zum Stornieren.](screenshots/de/my-bookings.png)
 
 ## Serientermine
 
-Ein Serientermin ist ein Rezept: erster Termin, Uhrzeit, Dauer, Wochentage, Abstand in Wochen und
-ein Ende. Daraus entstehen ganz normale Buchungen. Das Formular dafür steht unter *Meine
-Buchungen*, und die Anwendung zeigt es nur einem Konto mit einer Rolle über die Mitgliedschaft
-hinaus, etwa für ein Training. Eine Serie erfasst keine Spieler, also wirst du in ihr auch nicht
-eingetragen; du begegnest ihr im Platzplan als belegte Zeit.
+Konten mit einer zusätzlichen Rolle können unter *Meine Buchungen* Serien anlegen. Eine Serie legt
+gewöhnliche Buchungen nach einem Plan an. Du bestimmst den ersten Termin, die Uhrzeit, Dauer,
+Wochentage, den Abstand in Wochen und das Ende der Serie.
 
-Zwei Dinge sind dabei wichtig:
+Beachte dabei:
 
-* **Eine Serie verdrängt keine bestehende Buchung.** Fällt ein Termin auf einen Platz, der zu
-  dieser Zeit schon belegt ist, entsteht dieser eine Termin gar nicht erst. Er wird beim Anlegen
-  als übersprungen aufgeführt, der Rest der Serie entsteht.
-* **Ein einzelner Termin ist änderbar, ohne die Serie anzufassen.** Wer eine Serie verwaltet, wählt
-  beim Stornieren und Verschieben zwischen *Nur dieser Termin*, *Dieser und folgende Termine*
-  und *Ganze Serie*. Vor dem Verschieben zeigt Courtside, welche Termine betroffen wären und welche
-  davon nicht verschoben werden können, weil ihr Platz dann belegt oder nicht verfügbar ist.
+* Bereits belegte Termine werden übersprungen. Die übrigen Termine legt Courtside an.
+* Beim Stornieren oder Verschieben kannst du *Nur dieser Termin*, *Dieser und folgende Termine*
+  oder *Ganze Serie* wählen.
+* Vor einer Verschiebung zeigt Courtside die betroffenen Termine und mögliche Konflikte.
+* Serien enthalten keine Spielerlisten. Im Platzplan erscheinen sie als belegte Zeit.
 
-![Das Formular für einen Serientermin mit Plätzen, Buchungsart, erstem Termin, Uhrzeit, Dauer, Wochentagen und Ende.](screenshots/de/series-form.png)
+![Das Formular für eine Terminserie mit Plätzen, Buchungsart, Zeitraum und Wochentagen.](screenshots/de/series-form.png)
 
 ## Wenn sich unter deiner Buchung etwas ändert
 
-Es kann passieren, dass sich die Grundlage deiner Buchung nachträglich ändert: ein Platz wird
-ausser Betrieb genommen, eine Buchungsart wird nicht mehr angeboten, der Verein schliesst an diesem
-Tag, oder die Öffnungszeiten decken deine Buchung nicht mehr ab.
+Eine spätere Änderung kann deine Buchung betreffen. Beispiele sind ein deaktivierter Platz, eine
+stillgelegte Buchungsart oder verkürzte Öffnungszeiten.
 
-Courtside sagt dir das per E-Mail und nennt den Grund. Abgesagt ist deine Buchung damit nicht. Was
-mit ihr geschieht, entscheidet dein Verein.
+Courtside sendet dir eine E-Mail mit dem Grund. Die Buchung wird dadurch nicht automatisch
+storniert. Der Verein entscheidet, wie er mit ihr umgeht.
 
 ## Benachrichtigungen
 
-Unter *Benachrichtigungen* entscheidest du, was der Verein dir schickt. Abgewählt heisst: diese
-eine Nachricht bekommst du nicht mehr, alle anderen weiterhin.
+Öffne *Benachrichtigungen*, um optionale Nachrichten ein- oder auszuschalten.
 
-Abwählen kannst du:
+Du kannst diese Nachrichten abwählen:
 
-* die Bestätigung deiner Buchung,
-* die Erinnerung vor deiner Buchung,
-* die Nachricht, dass sich jemand aus deiner Buchung ausgetragen hat.
+* Buchungsbestätigung,
+* Erinnerung vor der Buchung,
+* Nachricht über den Austritt einer Person aus deiner Buchung.
 
-Immer geschickt werden:
+Diese Nachrichten sendet Courtside immer:
 
-* deine Zugangsdaten für ein neues Konto,
-* deine Zugangsdaten nach einem Zurücksetzen,
-* die Nachricht, dass jemand dich als Mitspieler eingetragen hat,
-* die Nachricht, dass sich unter deiner Buchung etwas geändert hat.
+* Zugangsdaten für ein neues oder zurückgesetztes Konto,
+* Mitteilung über deine Eintragung als Mitspieler,
+* Mitteilung über eine Änderung, die deine Buchung betrifft.
 
-Ohne diese vier kommst du nicht an dein Konto, erfährst nichts von einer Sperrung unter deiner
-Buchung und nichts davon, dass jemand dich eingetragen hat. Deshalb lassen sie sich nicht
-abschalten.
+Speichere die Auswahl. Die Einstellung gilt nur für künftige Nachrichten.
 
-![Die Seite Benachrichtigungen mit den abwählbaren Nachrichten und denen, die immer geschickt werden.](screenshots/de/notification-choices.png)
+![Die Benachrichtigungseinstellungen mit optionalen und verpflichtenden Nachrichten.](screenshots/de/notification-choices.png)
 
 ## Dein Konto
 
-Unter *Kontosicherheit* änderst du dein Passwort und siehst, in welchen Browsern dein Konto
-angemeldet ist, seit wann und wann sie zuletzt aktiv waren. Für die Änderung des Passworts gibst du
-dein aktuelles mit ein. Sie beendet anschliessend alle Sitzungen deines Kontos, auch die, in der du
-sie vorgenommen hast.
+Öffne *Kontosicherheit*, um dein Passwort und deine Sitzungen zu verwalten.
 
-Du kannst eine einzelne Sitzung beenden oder alle auf einmal. Beendest du eine andere Sitzung als
-die, in der du gerade arbeitest, oder alle, und liegt deine Anmeldung schon eine Weile zurück,
-fragt Courtside vorher dein Passwort noch einmal ab. Die Sitzung, in der du gerade bist, beendest
-du ohne diese Rückfrage.
+Beim Ändern des Passworts musst du das aktuelle Passwort eingeben. Nach dem Speichern beendet
+Courtside alle Sitzungen, auch die gerade verwendete. Melde dich danach mit dem neuen Passwort an.
 
-Vertippt sich der Vorstand bei deinem Namen oder deinem Benutzernamen, ist das kein Dauerzustand:
-alles, was ein Verein einträgt, kann er auch wieder korrigieren.
+Du kannst außerdem eine einzelne Sitzung oder alle Sitzungen beenden. Bei älteren Anmeldungen fragt
+Courtside vor dem Beenden anderer Sitzungen erneut nach deinem Passwort. Die aktuelle Sitzung
+kannst du ohne diese Rückfrage beenden.
 
-![Die Kontosicherheit mit der Passwortänderung und der Liste der Browser, in denen das Konto angemeldet ist.](screenshots/de/account-security.png)
+Fehler in deinem Namen oder Benutzernamen korrigiert der Vorstand in der Personenverwaltung.
+
+![Die Kontosicherheit mit Passwortänderung und der Liste aktiver Sitzungen.](screenshots/de/account-security.png)

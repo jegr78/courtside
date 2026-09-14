@@ -40,7 +40,7 @@ Outcome is exactly `pass`, `fail`, `not-applicable` or `blocked`. `not-applicabl
 require a control-specific rationale and owner and may omit evidence when none exists. `fail`
 requires redacted evidence and a private lifecycle candidate. Only `pass` may omit a rationale.
 
-`pass` additionally requires that the control carries `controlEvidence` in the catalog. Reading the
+`pass` also requires that the control carries `controlEvidence` in the catalog. Reading the
 chapters this procedure covers is not evidence that this control holds, so a control nobody has
 anchored to a named production path and a falsifying test is recorded `blocked` rather than passed.
 Validation refuses the record otherwise.
@@ -74,7 +74,7 @@ authorized production origin. Production authorization names the origin, digest,
 expiry; it does not authorize login attempts, mutation, discovery outside that origin or load.
 
 `active` permits curated mutations only in the disposable SECURITY environment after target and
-seed verification. `destructive` additionally requires its distinct confirmation and the resource
+seed verification. `destructive` also requires its distinct confirmation and the resource
 budgets, telemetry, emergency stop and recovery proof. Never reinterpret a safe authorization as
 active or destructive authorization.
 
@@ -215,7 +215,7 @@ the category procedure is incomplete.
 ### MAN-CLIENT-001 Browser, accessibility and physical-device review
 
 - Prerequisites: supported desktop browsers and test assistive technology. A release that claims
-  real-device evidence additionally requires the physical iOS and Android smoke defined by #217;
+  real-device evidence also requires the physical iOS and Android smoke defined by #217;
   browser emulation must not be reported as that evidence.
 - Steps: inspect focus, announcements, clipboard, autofill, browser storage, back/forward cache,
   service-worker update and offline states around login and sensitive mutations; repeat critical

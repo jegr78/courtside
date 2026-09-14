@@ -232,7 +232,7 @@ it("given a barred member, when showing the plan, then the coded refusal appears
   // then
   const refusal = await screen.findByTestId("booking-eligibility");
   expect(refusal).toHaveRole("alert");
-  expect(refusal).toHaveTextContent("Booking a court is not open to you.");
+  expect(refusal).toHaveTextContent("Your membership type does not allow you to book a court.");
   expect(refusal.querySelector('[data-code="booking.rule.noCourtBooking"]')).toBeInTheDocument();
   expect(freeSlot(1, "12:30").tagName).toBe("DIV");
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
