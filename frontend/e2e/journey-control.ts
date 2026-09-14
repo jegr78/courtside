@@ -18,6 +18,7 @@ interface JourneyCommand {
     | "releaseLock" | "publishServiceWorkerUpdate" | "reset" | "restart"
     | "peerLoginSubjects" | "failedLoginFromSecondPeer";
   browserName?: string;
+  locale?: string;
   forwardedFor?: string;
   reason?: string;
   failedTest?: unknown;
@@ -49,6 +50,12 @@ async function requestBody(request: IncomingMessage): Promise<JourneyCommand> {
 
 function requiredString(value: string | undefined, name: string): string {
   if (!value) throw new Error(`Journey control command requires ${name}`);
+  return value;
+}
+
+function optionalLocale(value: string | undefined): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") throw new Error("Journey control command requires locale to be a string");
   return value;
 }
 
@@ -99,7 +106,8 @@ function journeyStart(start: string | undefined): JourneyStart {
 async function executeCommand(command: JourneyCommand, service: JourneyService,
   locks: Map<string, DatabaseLock>, signal: AbortSignal): Promise<unknown> {
   switch (command.operation) {
-    case "pinnedBrowser": return service.pinnedBrowser(requiredString(command.browserName, "browserName"));
+    case "pinnedBrowser": return service.pinnedBrowser(requiredString(command.browserName, "browserName"),
+      optionalLocale(command.locale));
     case "releasePinnedBrowser": return service.releasePinnedBrowser(requiredString(command.browserName, "browserName"));
     case "browserDiagnostics": return service.browserDiagnostics(requiredString(command.browserName, "browserName"),
       requiredBrowserFailureReason(command.reason), optionalFailedTest(command.failedTest));
@@ -205,7 +213,7 @@ export function connectJourneyService(reference: JourneyControlReference): Journ
     plainBaseURL: reference.plainBaseURL,
     mailboxURL: reference.mailboxURL,
     visualDate: reference.visualDate,
-    pinnedBrowser: (browserName) => command(reference, { operation: "pinnedBrowser", browserName }),
+    pinnedBrowser: (browserName, locale) => command(reference, { operation: "pinnedBrowser", browserName, locale }),
     releasePinnedBrowser: (browserName) => command(reference, { operation: "releasePinnedBrowser", browserName }),
     browserDiagnostics: (browserName, reason, failedTest) => command<BrowserDiagnostics>(reference,
       { operation: "browserDiagnostics", browserName, reason, failedTest }),

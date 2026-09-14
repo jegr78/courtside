@@ -29,7 +29,8 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
 
 test("given visual baselines, when running them on different hosts, then their path and rendering controls stay deterministic", () => {
   assert.doesNotMatch(playwright, /snapshotPathTemplate:.*\{platform\}/);
-  assert.match(fixtures, /journeyService\.pinnedBrowser\(browserName\)/);
+  assert.match(fixtures, /journeyService\.pinnedBrowser\(browserName, info\.project\.use\.locale\)/);
+  assert.match(setup, /\.withEnvironment\(language\.environment\)/);
   assert.match(playwright, /name: "visual"/);
   assert.match(setup, /mcr\.microsoft\.com\/playwright:[^"]*@sha256:/);
   // Browsers reach the application through the same reverse proxy a club runs, read from the

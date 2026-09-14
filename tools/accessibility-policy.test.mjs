@@ -25,7 +25,7 @@ test("given the required accessibility gate, when inspecting its browser coverag
   assert.doesNotMatch(pom, /COURTSIDE_WEBKIT_AXE/);
   // Every browser draws in the pinned image, so the build installs none of them.
   assert.doesNotMatch(pom, /playwright install/);
-  assert.match(fixtures, /connect\(await journeyService\.pinnedBrowser\(browserName\)\)/);
+  assert.match(fixtures, /connect\(await journeyService\.pinnedBrowser\(browserName, info\.project\.use\.locale\)\)/);
   assert.match(fixtures, /observeBrowserDisconnect\(pinned/);
   assert.match(fixtures, /journeyService\.browserDiagnostics\(browserName, "browser-disconnected"\)/);
   assert.match(fixtures, /failureDiagnostics: \[async \(\{ pinnedBrowser, browserName, journeyService, page \}/);

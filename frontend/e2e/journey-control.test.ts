@@ -49,7 +49,7 @@ describe("journey control", () => {
 
     try {
       // when
-      const browser = await remote.pinnedBrowser("webkit");
+      const browser = await remote.pinnedBrowser("webkit", "de-DE");
       const diagnostics = await remote.browserDiagnostics("webkit", "browser-disconnected");
       await remote.recordBrowserTest("webkit", "webkit-accessibility", 1, "start");
       await remote.releasePinnedBrowser("webkit");
@@ -75,7 +75,7 @@ describe("journey control", () => {
       expect(peerAttempt).toEqual({ status: 401, type: "urn:courtside:error:unauthenticated" });
       expect(sql).toBe("result");
       expect(waiters).toBe("waiting");
-      expect(calls.pinnedBrowser).toHaveBeenCalledWith("webkit");
+      expect(calls.pinnedBrowser).toHaveBeenCalledWith("webkit", "de-DE");
       expect(calls.browserDiagnostics).toHaveBeenCalledWith("webkit", "browser-disconnected", undefined);
       expect(calls.recordBrowserTest).toHaveBeenCalledWith("webkit", "webkit-accessibility", 1, "start");
       expect(calls.releasePinnedBrowser).toHaveBeenCalledWith("webkit");
