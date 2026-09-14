@@ -55,7 +55,9 @@ The nightly workflow's standard provenance identifies the workflow revision that
 publication. A separate signed predicate binds the image digest to the repository commit and the
 build verification run that called it. Its JSON object contains `schemaVersion` 1, the HTTPS
 `repository`, the 40-character `commit`, and the numeric `verificationRunId`. Publication verifies
-both that claim and the workflow identity before moving either nightly tag.
+both that claim and the workflow identity before moving either nightly tag. The custom source
+attestation is read directly from the image registry because GitHub's API filter rejects the
+fragment-bearing predicate identifier; its signature and exact predicate type remain mandatory.
 
 **What the merge writes.** Merging the release pull request writes the tag and a *draft* GitHub
 release. A draft is visible to whoever may write to this repository and to nobody else, and `publish`

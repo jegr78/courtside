@@ -362,6 +362,7 @@ jobs:
             --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
             --predicate-type https://spdx.dev/Document/v2.3 > /dev/null
           gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
+            --bundle-from-oci \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
             --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
             --predicate-type "$NIGHTLY_SOURCE_PREDICATE" --format json \

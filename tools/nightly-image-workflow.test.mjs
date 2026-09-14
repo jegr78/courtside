@@ -144,6 +144,9 @@ test("given a qualified main image, when it is published, then verified evidence
     [...publish.matchAll(/--signer-workflow "([^"]+)"/g)].map((match) => match[1]),
     Array(3).fill("$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml"),
   );
+  assert.equal([...publish.matchAll(/--bundle-from-oci/g)].length, 1);
+  assert.match(publish,
+    /gh attestation verify "oci:\/\/\$IMAGE" --repo "\$GITHUB_REPOSITORY" \\\s+--bundle-from-oci \\\s+--signer-workflow "\$GITHUB_REPOSITORY\/\.github\/workflows\/nightly-image\.yml"[\s\S]+?--predicate-type "\$NIGHTLY_SOURCE_PREDICATE"/);
   assert.doesNotMatch(publish, /--signer-workflow "\$GITHUB_SERVER_URL/);
   assert.ok(publish.indexOf("cosign verify") < publish.indexOf("docker buildx imagetools create"));
   assert.ok(publish.indexOf("gh attestation verify") < publish.indexOf("docker buildx imagetools create"));
@@ -182,6 +185,7 @@ test("given acceptance image documentation, when users read it, then it cannot b
   assert.match(deployment, /digest/i);
   assert.match(releasing, /nightly image/);
   assert.match(releasing, /predicts a release failure/i);
+  assert.match(releasing, /custom source[\s\S]+attestation is read directly from the image registry/i);
   assert.match(design, /newest fully verified\s+nightly revision/);
   assert.match(design, /nightly-only identity/);
   assert.ok(inventory.entries.some(({ id }) => id === "nightly-image-signature"));
