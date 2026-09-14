@@ -61,7 +61,7 @@ export function validateContract(contract) {
   }
   if (JSON.stringify(contract.profiles.full.ciJobs) !== JSON.stringify(contract.ciJobOrder)
       || JSON.stringify(contract.profiles.full.localTasks)
-        !== JSON.stringify(["workflow-lint", "docs-check", "full"])) {
+        !== JSON.stringify(["workflow-lint", "docs-check", "full", "webkit-reliability"])) {
     throw new Error("Full test profile coverage is incomplete");
   }
   for (const [label, task] of Object.entries(contract.localTaskDefinitions)) {

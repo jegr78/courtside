@@ -31,6 +31,14 @@ const protectedFullTasks = [
     workingDirectory: "repository",
     executable: "maven",
     arguments: ["clean", "verify"]
+  },
+  // Last, because it walks the browsers against the jar the run above builds - and here at all
+  // because the scheduled workflow that owns it is the one gate a branch cannot answer locally.
+  {
+    label: "webkit-reliability",
+    workingDirectory: "frontend",
+    executable: "npm",
+    arguments: ["run", "reliability:webkit", "--", "--order", "configured"]
   }
 ];
 
@@ -139,7 +147,8 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
 
 export function localCheckPrerequisites(tasks) {
   const java = tasks.some((task) => task !== "docs-check");
-  const docker = tasks.some((task) => ["backend", "frontend-e2e", "full"].includes(task));
+  const docker = tasks.some((task) =>
+    ["backend", "frontend-e2e", "full", "webkit-reliability"].includes(task));
   return { java, docker };
 }
 

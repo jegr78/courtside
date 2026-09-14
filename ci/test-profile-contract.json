@@ -29,7 +29,7 @@
     },
     "full": {
       "ciJobs": ["docs", "backend", "frontend", "tooling", "security"],
-      "localTasks": ["workflow-lint", "docs-check", "full"]
+      "localTasks": ["workflow-lint", "docs-check", "full", "webkit-reliability"]
     }
   },
   "localTaskDefinitions": {
@@ -100,6 +100,11 @@
       "workingDirectory": "repository",
       "executable": "maven",
       "arguments": ["clean", "verify"]
+    },
+    "webkit-reliability": {
+      "workingDirectory": "frontend",
+      "executable": "npm",
+      "arguments": ["run", "reliability:webkit", "--", "--order", "configured"]
     }
   },
   "coverageDifferences": [
