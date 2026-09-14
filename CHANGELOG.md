@@ -2,6 +2,14 @@
 
 ## 0.1.0 (2026-09-14)
 
+### Notable changes
+
+* a club that points COURTSIDE_MAIL_RELAY_HOST at a relay whose certificate this instance cannot verify must now set COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE=true itself. Until it does, every handover over that hop fails: a message is attempted four times across about a minute and is then settled FAILED with its reason, and the event behind it is replayed only when the instance restarts — which writes a second row and issues a fresh credential, because the first exists only as a hash.
+* load a renewed mail certificate into the running server ([#779](https://github.com/jegr78/courtside/issues/779))
+* the proxy service now requires COURTSIDE_MAIL_HOSTNAME and Caddy obtains a certificate for it, so that name has to point at this host. A deployment that runs the proxy without this deployment's mail server deletes the new site block from Caddyfile; the README says so on the variable's own row.
+* have the instance issue and send every credential, so no board member sees one ([#454](https://github.com/jegr78/courtside/issues/454))
+* **api:** validation codes in fieldErrors entries change for missing, blank, non-positive and unknown-enum values, and field names now carry array indices. The problem type, the status and the fieldErrors shape are unchanged.
+
 ### Features
 
 * add a dedicated tooling test profile ([#625](https://github.com/jegr78/courtside/issues/625)) ([2722b3d](https://github.com/jegr78/courtside/commit/2722b3d4325a38e8e1bafc30865138134c2ff6b9))
