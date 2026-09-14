@@ -1,17 +1,15 @@
 # Cutting a release
 
-A release is a tag `v<version>` on this repository. Nobody types it: release-please keeps a release
-pull request open, and merging it writes the version, the changelog and the tag. Everything after
-that is automatic, and almost everything the automation does is a refusal — it would rather not
-publish than publish something nobody verified.
+A release is a `v<version>` tag in this repository. Release Please maintains the release pull
+request. Merging that pull request updates the version and changelog, creates the tag and starts the
+release workflow. Do not create the tag manually.
 
-This document says what to do in what order, and what the release does *not* guarantee, which is the
-half a workflow file cannot tell you. `CLAUDE.md` remains the policy for branches, commits and pull
-requests; this is the part that happens after the last one is merged.
+This document describes the release steps and the guarantees behind their gates. `CLAUDE.md`
+defines the policy for branches, commits and pull requests.
 
 **Merging the release pull request is signing a release.** `publish` signs the image with cosign
 under this repository's own identity, keyless, and attests its provenance and SBOM. No human
-approves anything in between. Whoever may merge that pull request — or push a `v*` tag by hand —
+approves anything in between. Whoever may merge that pull request, or push a `v*` tag by hand,
 may publish under this project's name.
 
 ## The short version
@@ -67,12 +65,12 @@ fragment-bearing predicate identifier; its signature and exact predicate type re
 
 **What the merge writes.** Merging the release pull request writes the tag and a *draft* GitHub
 release. A draft is visible to whoever may write to this repository and to nobody else, and `publish`
-is what turns it into the release a club sees — after every gate above it has passed. A run that
+is what turns it into the release a club sees, after every gate above it has passed. A run that
 stops earlier leaves the draft standing, which is why a failed release is invisible from the outside
 rather than merely unsigned.
 
 **Where the version lives.** `pom.xml` carries it between releases: release-please writes it, Maven
-writes `build-info.properties` from it, and `GET /api/source` reports that to the browser — so the
+writes `build-info.properties` from it, and `GET /api/source` reports that to the browser, so the
 version a member reads in the footer is the one that was released. `frontend/package.json` and both
 root-package version fields in `frontend/package-lock.json` move in the same pull request. There is
 no snapshot transition between releases: a snapshot pull request writes `0.1.0-rc.2-SNAPSHOT` into
@@ -90,7 +88,7 @@ Candidates are opened and closed with one line of configuration, not with a hand
    request proposes `v0.3.0-rc`, and every merge after it raises `rc.1`, `rc.2`.
 2. To open an `alpha` line instead, land a commit carrying a `Release-As:` footer naming
    `0.3.0-alpha.1`; the strategy counts that suffix onwards by itself. That footer names the version
-   outright and overrides everything else, `bump-minor-pre-major` included — it is the one way to
+   outright and overrides everything else, `bump-minor-pre-major` included, it is the one way to
    reach 1.0 without a decision, so read the version in the release pull request's own title before
    merging it.
 3. Set `"prerelease": false` again to graduate. The suffix is stripped and the next release pull
@@ -105,7 +103,7 @@ for both candidate and stable GitHub release notes.
 
 None of that applies to the very first release, because there is nothing to bump from: with no
 release in the history release-please never asks the versioning strategy at all and takes
-`initial-version` verbatim — which is `1.0.0` unless the configuration says otherwise, whatever the
+`initial-version` verbatim, which is `1.0.0` unless the configuration says otherwise, whatever the
 manifest holds and however many breaking changes the history carries. A candidate for the first
 release is therefore opened by writing it there, as `0.1.0-rc.1`, and `"prerelease": true` belongs
 in the same change: without it the release after that candidate strips the suffix and graduates.
@@ -124,7 +122,7 @@ what that means.
 Three checks run before a single compilation, and each fails the run rather than warning.
 
 **The tag has to sit on `main`.** A tag on a branch, or on a commit that never landed, is refused by
-name. The tag is spent at that point — *When a release fails* below applies to this refusal like any
+name. The tag is spent at that point, *When a release fails* below applies to this refusal like any
 other.
 
 **A nightly must already have verified an ancestor of this commit.** The release looks for a
@@ -138,7 +136,7 @@ the tagged commit. What verifies the tagged commit is the release's own `build` 
 
 **No tracker-written `nightly` failure issue may be open.** The check counts open issues carrying
 the `nightly` label whose title starts with `[nightly] ` and whose body holds the tracker's
-fingerprint — the issues the scheduled-run tracker wrote. An issue a human opened about a failing
+fingerprint, the issues the scheduled-run tracker wrote. An issue a human opened about a failing
 night does not stop a release. Issues reporting `npm audit` are excluded by name, because those
 findings arrive from outside the repository and are tracked on their own.
 
@@ -176,7 +174,7 @@ Permission failures and malformed evidence still stop the build.
 | `browser` | The packaged tagged source passes the complete Chromium and WebKit browser matrix; it runs beside `build` so browser duration cannot consume the security-analysis budget |
 | `image` | One multi-architecture image is built and pushed as `release-candidate-<sha>` |
 | `qualify` | That exact digest is brought up through the reference deployment on `amd64` and `arm64`, and its vulnerabilities are checked against the candidate-image policy |
-| `active-security` | The running candidate is exercised by the scanners of the `active` profile. The `destructive` profile — resource abuse — does not run here |
+| `active-security` | The running candidate is exercised by the scanners of the `active` profile. The `destructive` profile, resource abuse, does not run here |
 | `upgrade` | The database upgrade path from each resolved origin is executed against the candidate |
 | `restore` | A backup taken from the candidate is restored into it |
 | `security-record` | The build, image, qualify and active-security evidence is collected into one file. `upgrade` and `restore` are not in it |
@@ -197,14 +195,14 @@ to a failed candidate.
 thing a consumer cannot detect, and by the time a run has started, the tag has been observed. Fix
 the cause on `main` through the usual pull request; the next release pull request then proposes the
 patch after it, so a `v0.2.0` that failed is followed by `v0.2.1`. The version that failed is
-skipped rather than retried, and the manifest already names it — worth knowing before somebody
+skipped rather than retried, and the manifest already names it, worth knowing before somebody
 looks for a `v0.2.0` that never appeared.
 
-Only a tag no run ever saw is free to move, and under a `v*` trigger that is rarer than it sounds —
+Only a tag no run ever saw is free to move, and under a `v*` trigger that is rarer than it sounds,
 a misspelling that keeps the leading `v` still starts a run.
 
-A failed tag costs the next release nothing. Both things the release reads from its history — the
-supported upgrade origins and the range the upgrade notes cover — come from the releases this
+A failed tag costs the next release nothing. Both things the release reads from its history, the
+supported upgrade origins and the range the upgrade notes cover, come from the releases this
 repository has **published**, not from the tags that exist. A tag whose run stopped before `publish`
 therefore names a draft and no published release, is no origin, and shortens no range. It stays
 where it is, and nothing has to be deleted to move on.
@@ -219,7 +217,7 @@ footer, which is what the title lint reads and what the version bump follows.
 **The upgrade note is your commit message.** `build` collects every `BREAKING CHANGE:` footer and
 every `!:` subject between the previous published release and this one and puts them verbatim into
 the release body under *Upgrade notes*; with none it writes that no published surface changed and a
-club may raise `COURTSIDE_VERSION` and restart. The footer is not paperwork, then — it is the text a
+club may raise `COURTSIDE_VERSION` and restart. The footer is not paperwork, then, it is the text a
 club reads before pulling the image, and `BREAKING CHANGE: renamed a variable` is a sentence that
 helps nobody at 22:00.
 
@@ -227,12 +225,12 @@ The first public release has no upgrade origin, so its release body says that di
 turning development-time breaking markers into upgrade instructions.
 
 What no automation covers is the upgrade path itself. `upgrade` executes the origins it resolved
-from the published release history, so a release that breaks one of those is refused — but only
+from the published release history, so a release that breaks one of those is refused, but only
 those.
 
 ## Candidates
 
-A tag may carry a prerelease suffix — `v0.3.0-alpha.1`, `v0.3.0-rc.1` — and it travels the same
+A tag may carry a prerelease suffix, `v0.3.0-alpha.1`, `v0.3.0-rc.1`, and it travels the same
 pipeline as any other release: the same nightly verification, the same qualification, the same
 signature. A candidate exists so that a club can *run* it, and a candidate proved less than a
 release would be an image whose signature means less than the same signature on a release.
@@ -245,7 +243,7 @@ nobody can describe in one sentence is a stage that means nothing.
 the release it is a candidate for upgrades from it, and so does every later candidate for that same
 release. Candidates of another line are not origins: a club is expected to reach a candidate's
 release before following the next one. A candidate whose run never reached `publish` is not an
-origin either — it named no image, and the release reads its history from what was published rather
+origin either, it named no image, and the release reads its history from what was published rather
 than from the tags that happen to exist.
 
 A version is read as semantic versioning defines it. Build metadata (`v0.3.0+build.1`) is refused
@@ -268,9 +266,9 @@ the GitHub release is marked as a prerelease, so a club that pinned `latest` or 
 one by accident. Reaching a candidate is a deliberate act: pinning its exact version.
 
 The GitHub release carries two files: the `openapi.yaml` this version answers to, and
-`security-record.json`. That record is an ordinary release asset — neither signed nor attested,
-unlike the image itself — so it reports what the passes found rather than proving it.
+`security-record.json`. That record is an ordinary release asset, neither signed nor attested,
+unlike the image itself, so it reports what the passes found rather than proving it.
 
 `deploy/.env.example` names `COURTSIDE_VERSION`, and a club moves by editing that one line and
-recreating the container — the deployment reference in `deploy/README.md` is what they follow, not
+recreating the container, the deployment reference in `deploy/README.md` is what they follow, not
 this file.

@@ -70,7 +70,7 @@ describe("AdminMessagesView", () => {
       .toHaveTextContent("Credentials for a new account");
     expect(within(entryRow).getByTestId("message-id")).toHaveTextContent("<a-message-id@example.org>");
     expect(screen.getByTestId("messages-handover-note")).toHaveTextContent(
-      /passed the message to the club’s mail server.*cannot know/s);
+      /club's mail server accepted the message.*confirm final delivery/s);
   });
 
   it.each(["en", "de"])("given the state labels in %s, when they are read, then none of them claims delivery",
@@ -112,7 +112,7 @@ async (language) => {
     // then
     expect(within(row(refused.id)).getByTestId("message-person-link"))
       .toHaveAttribute("href", `/admin/roster/${refused.personId}`);
-    expect(screen.getByTestId("messages-refused-hint")).toHaveTextContent(/correct the address/i);
+    expect(screen.getByTestId("messages-refused-hint")).toHaveTextContent(/check and correct it/i);
   });
 
   it("given a refusal on the page, when it is read, then nothing on it offers to send the message again", async () => {

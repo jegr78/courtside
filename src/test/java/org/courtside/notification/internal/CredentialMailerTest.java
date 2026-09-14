@@ -59,7 +59,7 @@ class CredentialMailerTest {
         mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
 
         // then — the club default is German, so only the account's own language can produce this
-        assertThat(subjectSent()).isEqualTo("Example Tennis Club: access for Jane");
+        assertThat(subjectSent()).isEqualTo("Example Tennis Club: Courtside account for Jane");
         assertThat(bodySent()).contains("Hello Jane").contains("May 1, 2026");
     }
 
@@ -73,7 +73,7 @@ class CredentialMailerTest {
         mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.PASSWORD_RESET));
 
         // then
-        assertThat(subjectSent()).isEqualTo("Example Tennis Club: ein neues Passwort für Jane");
+        assertThat(subjectSent()).isEqualTo("Example Tennis Club: neue Zugangsdaten für Jane");
         assertThat(bodySent()).contains("Hallo Jane").contains("1. Mai 2026");
     }
 
@@ -87,7 +87,7 @@ class CredentialMailerTest {
         mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
 
         // then
-        assertThat(subjectSent()).isEqualTo("Example Tennis Club: Zugang für Jane");
+        assertThat(subjectSent()).isEqualTo("Example Tennis Club: Courtside-Konto für Jane");
     }
 
     @Test
@@ -108,8 +108,8 @@ class CredentialMailerTest {
         verify(dispatch, times(2)).send(eq(ADDRESS), subjects.capture(), anyString(), anyString());
         assertThat(subjects.getAllValues())
                 .as("one inbox holds both, so the subject is what separates them")
-                .containsExactly("Example Tennis Club: Zugang für Jane",
-                        "Example Tennis Club: Zugang für John");
+                .containsExactly("Example Tennis Club: Courtside-Konto für Jane",
+                        "Example Tennis Club: Courtside-Konto für John");
     }
 
     private void issuesTo(UUID accountId, String firstName, String username) {

@@ -1,264 +1,249 @@
-# A guide for members
+# Member handbook
 
-This page describes Courtside from a member's point of view: signing in, finding a free court,
-booking one, recording players, cancelling. It names no times, no deadlines and no limits, because
-your club sets those in its own instance. Everything else here holds regardless.
+This handbook explains the features you need as a member. Button and menu names appear in
+*italics*. Your club sets its own opening hours, deadlines and limits.
 
 ## The court plan is public
 
-Your club's home page shows court occupancy without signing in. You can see when each court is
-taken. Booking is what needs an account.
+The home page shows the court plan without requiring you to sign in. A wide screen shows one week.
+A narrow screen shows one day.
 
-The plan shows a week, or a single day on a narrow screen. *Previous week* and *Next week* move you
-back and forth, *Return to current time* brings you back to now. The legend under the plan explains
-the states: **Available**, **Occupied**, **Your booking**, **Unavailable** and **Past**. On a day
-the club is closed, the plan says so instead of showing a grid.
+1. Select *Previous week* or *Next week* to change the period.
+2. Select *Return to current time* to return to today.
+3. Use the legend to identify **Available**, **Occupied**, **Your booking**, **Unavailable** and
+   **Past** periods.
 
-Whether somebody else's booking shows the name of its kind or only *Occupied* is something your
-club decides per kind of booking. How many people belong to a booking is public as well; who they
-are is not. Names appear on the plan only on your own bookings.
+Courtside does not show a grid on days when the club is closed. Another member's booking displays
+either its booking type or the neutral label *Occupied*. The club chooses this for each booking
+type. The number of participants is public, but their names are not. You only see names on your
+own bookings.
 
-![A week of the court plan: one column per court, occupancy as coloured blocks, and the legend of states below it.](../screenshots/en/court-plan.png)
+![A week in the court plan with one column per court, coloured bookings and the legend below.](../screenshots/en/court-plan.png)
 
 ## Signing in
 
-Your board creates the account. The username and a one-time password then reach you by email rather
-than through the board: nobody there sees or chooses your first password.
+The board creates your account. Courtside emails you the username and a one-time password. Nobody
+on the board sees or chooses that password.
 
-*Sign in* takes you to the form with username and password. If the sign-in is refused although you
-typed everything correctly, the credentials may have expired or never arrived, or the account is
-deactivated. For the first two, *Forgotten your password or username?* sits under the form; if the
-account is deactivated, only your board can help.
+1. Select *Sign in*.
+2. Enter your username and password.
+3. Select *Sign in* again.
 
-![The sign-in form with username and password, and the link for forgotten credentials below it.](../screenshots/en/sign-in.png)
+Check the values first if Courtside refuses the sign-in. Your credentials may have expired, or the
+email may not have arrived. In either case, use *Forgotten your password or username?*. Only the
+board can reactivate a deactivated account.
+
+![The sign-in form with username, password and the link for forgotten credentials.](../screenshots/en/sign-in.png)
 
 ## Forgotten password or username
 
-The page behind that link holds three forms, and none of them needs you to be signed in.
+Account recovery does not require you to sign in. The page has three separate forms.
 
-The first takes your **username** and mails an eight-character code to the address held for your
-account. Nothing about your account changes: your current password keeps working and your open
-sessions stay open.
+### Request a code
 
-The second takes that **code** and your **new password**. This is where something changes — the new
-password works from that moment and every open session of your account ends. Only a password the
-rules accept spends the code, so if Courtside turns yours down you can try again with the same code.
-Upper and lower case make no difference, and neither does the hyphen. How long a code stays good is
-your club's setting, between a quarter of an hour and a day. Once it has run out Courtside says so,
-and you ask for a new one above.
+1. Enter your username.
+2. Select *Send code*.
+3. Open the email containing the eight-character code.
 
-The third takes your **email address** and mails you your usernames — plural, because a family
-address can carry several accounts, and each of them then gets its own message. This form changes
-no password.
+Your current password remains valid. Open sessions stay signed in.
 
-Both answer the same way whether or not the name or the address exists: otherwise any stranger
-could work through a list to find out who holds an account in your club. If no mail arrives, either
-the name is not the one you thought or the address held for you is not the inbox you are looking
-at, and your board can help.
+### Redeem a code
 
-After too many attempts in a short time Courtside says exactly that and makes you wait a while. For
-**signing in** it counts the network connection the attempts come from, not your account: nobody
-can lock you out by guessing your password often enough.
+1. Enter the code from the email.
+2. Choose a new password.
+3. Select *Set password*.
 
-Asking is different, and that is the price of its working without a sign-in: there the submitted
-name or address is counted too, across everybody who submits it. So somebody else can hold your
-asking shut for a while by entering your username often enough. The window is short, your sign-in is
-unaffected, and your board can send you credentials throughout.
+Only the new password works afterwards. Courtside ends every open session for the account. A
+rejected password does not consume the code. The code is not case-sensitive, and you may omit its
+hyphen. Request a new code if the old one has expired.
 
-Redeeming counts only the network connection the attempts come from, never your account — so
-nobody can hold your recovery shut by guessing codes at you. If you share a connection with other
-members, though, their guesses and yours land in the same bucket.
+### Request your usernames
 
-![The page behind that link with its three forms: ask for a code, redeem a code, send the usernames.](../screenshots/en/account-recovery.png)
+Enter your email address and select *Send usernames*. Courtside sends a separate message for every
+account registered to that address. Passwords remain unchanged.
+
+Courtside gives the same response when a username or address is unknown. This prevents visitors
+from using the form to search for accounts. If no email arrives, check the username and the inbox.
+Ask the board if you still cannot recover the account.
+
+Too many attempts cause a waiting period. Sign-in and code redemption count attempts from the
+shared internet connection. Code requests also count the submitted username or address. Other
+people on the same network can therefore reach the same limit. Your current password remains
+unaffected.
+
+![The recovery page with forms for a code, a new password and usernames.](../screenshots/en/account-recovery.png)
 
 ## Replacing the one-time password
 
-This is about the password your board sends you — for your first sign-in, or when you cannot reach
-your own mailbox any more. It gets you to one page and no further: *Replace one-time password*.
-Until you have chosen a password of your own, every page of the application leads back there. You do
-not have unlimited time for it: how long an issued password stays valid is your club's setting. If
-it runs out before you use it, you do not need your board — ask for a code on the sign-in page and
-redeem it, which sets your password and clears the issued one in the same step.
+A one-time password is only for first access or an account reset by the board. After signing in,
+Courtside opens *Replace one-time password*. Other features remain unavailable until you set your
+own password.
 
-The new password needs at least twelve characters and at most 256. Courtside also refuses it if it
-is on a list of common passwords shipped with the application, if it contains your name, your
-username, your email address, the club name or a term your club added to that list, and if it
-matches your current or the issued password. The same rules decide the password you set by
-redeeming a code.
+1. Enter the new password twice.
+2. Select *Save password*.
+3. Sign in again with the new password.
 
-On top of that, Courtside asks a public service whether this password has appeared in a known data
-breach. Your password does not leave the instance for that: what travels is five characters of a
-checksum, which the password cannot be recovered from. If the service does not answer, Courtside
-refuses the change rather than storing something unchecked, and you try again later. Otherwise you
-sign in once more and you are in.
+The password must contain between 12 and 256 characters. Courtside rejects common passwords and
+passwords containing your name, username, email address, the club name or a term blocked by the
+club. It must also differ from your current or issued password.
 
-![The Replace one-time password page with the new password and its repetition.](../screenshots/en/initial-password.png)
+Courtside asks a public service whether the password appears in a known data breach. Only the first
+five characters of a checksum leave the instance. The service does not receive your password. If
+the check is unavailable, Courtside does not save the password. Try again later.
+
+If the one-time password has expired, request a code from the sign-in page. You can use that code
+to set a new password yourself.
+
+![The page for replacing a one-time password with two fields for the new password.](../screenshots/en/initial-password.png)
 
 ## Creating a booking
 
-On the court plan, click the free cell you want to play in. It names the court and the time, and
-that becomes the start of your booking. The *Create booking* dialog then shows:
+1. Select an available cell in the court plan. This sets the court and start time.
+2. Choose an allowed **Duration**.
+3. Choose the **Booking type**.
+4. Add members if needed.
+5. Open *More details* to add guests, slot fillers or a note.
+6. Select *Book now*.
 
-* **Duration**, as the lengths your club's rules allow.
-* The **court** you clicked. The choice of several courts at once is offered only to an account
-  holding a role beyond membership, for a training block across three courts for instance;
-  everyone else is told which court they picked.
-* **Kind of booking**, offering what your own role may use.
-* **Members**: the search finds them and adds them as players.
-* Under **More details**: guests, *What plays* and a note.
+A normal member account books the selected court. Accounts with additional roles may choose
+several courts, for example for a training session.
 
-*Book now* creates the booking. Whether a court is still free at that moment is decided by the
-database itself, not by a check the application ran first that a concurrent request could overtake.
-If somebody beats you to it, Courtside tells you instead of placing two bookings side by side.
+The database checks that the court is still available when it saves the booking. If somebody
+booked the same period moments earlier, Courtside refuses your request. It never creates two
+bookings for the same court and time.
 
-![The Create booking dialogue with duration, court, kind of booking, the member search and the expandable More details section.](../screenshots/en/booking-dialog.png)
+![The booking dialog with duration, court, booking type, member search and more details.](../screenshots/en/booking-dialog.png)
 
 ## What a kind of booking means
 
-Everything that occupies a court is the same thing in Courtside: a member's game, a training block,
-a league match, a closure. What tells them apart is their **kind of booking**.
+A booking type controls how Courtside handles an occupancy. It may represent a game, training,
+league match or closure.
 
-The kind decides, among other things,
+The booking type determines:
 
-* how many players the booking records, and whether it records any at all,
+* how many people can be recorded,
 * whether guests are allowed,
-* whether the booking counts against your limit of open bookings,
-* who may create one.
+* whether the booking counts against your open-booking limit,
+* which roles may use the booking type.
 
-Kinds of booking are rows in your club's database, not a fixed list inside the program. What you
-find in the dialog is what your board set up.
+The board configures the booking types. The booking dialog only offers the types you may use.
 
-![The Kind of booking field in the booking dialogue, showing the kind the club set up.](../screenshots/en/booking-kind.png)
+![The booking type selection in the booking dialog.](../screenshots/en/booking-kind.png)
 
 ## Players and guests
 
-If the chosen kind records players, the dialog shows how many of how many you have entered. There
-are three sorts of player:
+The booking dialog shows how many player slots are already filled.
 
-* **Members** you find by name and add. One member can occupy only one slot of the same booking.
-* **Guests** you enter by name under *More details*. If a kind of booking allows no guests, it says
-  so when you book.
-* ***What plays*** covers anything that takes a player slot without being a person: a ball machine,
-  say, or a "looking for a partner" notice. How many of them the club owns is the club's own
-  setting, and it may leave the number open. If they are all taken at your time, Courtside names
-  how many there are in total.
+* Search for **Members** by name and add them. Each member can occupy only one player slot in a
+  booking.
+* Enter **Guests** by name under *More details*. The field only appears for booking types that
+  allow guests.
+* Under ***What plays***, select a slot filler such as a ball machine or a "looking for a partner"
+  entry. Courtside reports when none are available at the chosen time.
 
-Whoever you enter is told, not asked: the member you recorded receives an email. They do not have
-to agree, and they can take themselves out again.
+Recorded members receive an email. They do not need to accept the booking and can remove
+themselves later.
 
-![The player part of the booking dialogue: how many slots are taken, the member search, and the expanded fields for guests and What plays.](../screenshots/en/booking-participants.png)
+![The booking fields for members, guests and slot fillers.](../screenshots/en/booking-participants.png)
 
 ## Recorded as a co-player
 
-*My bookings* carries a section of its own: **Recorded as a co-player**. It holds the bookings
-other members made with your name in them. Nobody asked you first, and that section is where you
-take yourself out, without needing anyone's permission. Whoever made the booking is told; the
-booking itself stays.
+Open *My bookings* and go to **Recorded as a co-player**. This section lists bookings that other
+members created with your name.
 
-![The Recorded as a co-player section under My bookings, each entry carrying the button that takes you out.](../screenshots/en/participations.png)
+Select *Withdraw* to remove yourself. The booking remains in place. Courtside notifies the person
+who created it.
+
+![Bookings where you are recorded as a co-player, with the withdrawal button.](../screenshots/en/participations.png)
 
 ## When a rule refuses the booking
 
-Booking rules are data rather than fixed lines in the program, and which ones apply to you follows
-from your membership type. When you book, Courtside collects **every** violation and shows each one
-next to the field it concerns. You do not correct one reason after another; you see at once what is
-missing.
+Your membership type determines which booking rules apply to you. Courtside shows all detected
+violations at once next to the relevant fields.
 
-These refusals exist:
-
-| What Courtside says | What lies behind it |
+| Message | Meaning |
 |---|---|
-| The facility is closed on this day | The day has no opening time |
-| Bookings are only possible between two times | Your time falls outside the opening hours |
-| Bookings start on the minute grid | The start does not fit your club's grid |
-| The duration must be a multiple of the grid | The duration does not fit the same grid |
-| You can book at most so many days in advance | How far ahead you may book is limited |
-| One booking may run at most so many minutes | The duration is limited |
-| You already have so many of so many possible open bookings | That many at once is not foreseen |
-| You must cancel at least so many minutes before the booking starts | Cancelling has a deadline |
-| A booking cannot start in the past | The moment is behind you |
-| Booking a court is not open to you | Your membership type does not book for itself |
+| The facility is closed on this day | The day has no opening hours |
+| Bookings are only possible between two times | The booking is outside the opening hours |
+| Bookings start on the minute grid | The start does not match the club's grid |
+| The duration must be a multiple of the grid | The duration does not match the grid |
+| You can only book a certain number of days ahead | The allowed advance period was exceeded |
+| A booking may only last a certain number of minutes | The selected duration is too long |
+| You have reached the number of open bookings | You must finish or cancel an open booking first |
+| You must cancel a certain number of minutes before the start | The cancellation deadline has passed |
+| A booking cannot start in the past | The selected start is in the past |
+| Court booking is not available to you | Your membership type cannot book courts directly |
 
-How many days, how many minutes, how many bookings: that lives in your club's rules, and Courtside
-names the number in the message itself.
+The message includes the applicable number. Correct the marked fields and submit the booking again.
 
-![The booking dialogue after a refused booking: the message sits next to the field it concerns and names the number from the rule.](../screenshots/en/refused-booking.png)
+![A refused booking with messages beside the affected fields.](../screenshots/en/refused-booking.png)
 
 ## Cancelling
 
-*My bookings* holds your **upcoming** and your **past** bookings. An upcoming one offers *Cancel*.
-If your club's deadline has already passed, Courtside refuses the cancellation and says how long
-beforehand it would have been possible.
+1. Open *My bookings*.
+2. Select *Cancel* on an upcoming booking.
+3. Confirm the cancellation.
 
-A cancelled booking frees the court again immediately. That is also what the reminder before your
-booking asks of you: if you cannot play, cancel, so that somebody else can.
+Courtside releases the court immediately. If the cancellation deadline has passed, the booking
+remains and Courtside tells you which deadline applied.
 
-![My bookings with its sections for upcoming and past bookings; an upcoming one carries the cancel button.](../screenshots/en/my-bookings.png)
+![Upcoming and past bookings with the cancellation button.](../screenshots/en/my-bookings.png)
 
 ## Series
 
-A series is a recipe: first appointment, time, duration, weekdays, interval in weeks and one kind
-of end. What it produces are ordinary bookings. The form for it sits under *My bookings*, and the
-application shows it only to an account holding a role beyond membership, for training for
-instance. A series records no players, so you are never entered in one; you meet it on the court
-plan as occupied time.
+Accounts with an additional role can create a series under *My bookings*. A series creates normal
+bookings from a schedule. You set the first date, time, duration, weekdays, interval in weeks and
+the end of the series.
 
-Two things matter about them:
+Keep these rules in mind:
 
-* **A series displaces no existing booking.** Where an appointment would fall on a court that is
-  already taken at that time, that one appointment is not created at all. It is listed as skipped,
-  and the rest of the series is created.
-* **A single appointment can change without touching the series.** Whoever manages a series chooses
-  between *This occurrence*, *This and following* and *Whole series* when cancelling or moving.
-  Before a move, Courtside shows which occurrences would be affected and which of them cannot move,
-  because their court would then be occupied or unavailable.
+* Courtside skips dates that are already occupied and creates the remaining bookings.
+* When cancelling or moving bookings, you can choose *This occurrence*, *This and following* or
+  *Whole series*.
+* Before a move, Courtside shows the affected bookings and any conflicts.
+* A series contains no player list. It appears as occupied time in the court plan.
 
-![The form for a series with courts, kind of booking, first appointment, time, duration, weekdays and end.](../screenshots/en/series-form.png)
+![The series form with courts, booking type, period and weekdays.](../screenshots/en/series-form.png)
 
 ## When something under your booking changes
 
-The ground your booking stands on can change afterwards: a court is taken out of service, a kind of
-booking is no longer offered, the club closes on that day, or the opening hours no longer cover
-your booking.
+A later configuration change may affect your booking. Examples include a deactivated court, a
+retired booking type or shorter opening hours.
 
-Courtside emails you and names the reason. That does not cancel your booking. What happens to it is
-your club's decision.
+Courtside emails you with the reason. This does not cancel the booking automatically. The club
+decides how to handle it.
 
 ## Notifications
 
-Under *Notifications* you choose what the club sends you. Unchecked means you no longer get that
-one message; everything else keeps arriving.
+Open *Notifications* to enable or disable optional messages.
 
-You can switch off:
+You can disable:
 
-* the confirmation of your booking,
-* the reminder before your booking,
-* the message that somebody withdrew from your booking.
+* booking confirmations,
+* reminders before a booking,
+* messages when somebody withdraws from your booking.
 
-Always sent are:
+Courtside always sends:
 
-* your credentials for a new account,
-* your credentials after a reset,
-* the message that somebody recorded you as a player,
-* the message that something under your booking has changed.
+* credentials for a new or reset account,
+* notice that somebody added you as a player,
+* notice of a change that affects your booking.
 
-Without those four you could not reach your account, you would not hear about a closure under your
-booking, and you would not hear that somebody recorded you in one. That is why they cannot be
-switched off.
+Save your choices. They apply to future messages only.
 
-![The Notifications page with the messages that can be switched off and those that are always sent.](../screenshots/en/notification-choices.png)
+![Notification settings with optional and required messages.](../screenshots/en/notification-choices.png)
 
 ## Your account
 
-Under *Account security* you change your password and see which browsers your account is signed in
-on, since when, and when they were last active. Changing the password asks for your current one.
-It then ends every session of your account, including the one you changed it in.
+Open *Account security* to manage your password and sessions.
 
-You can end a single session or all of them. If you end a session other than the one you are
-working in, or all of them, and your sign-in is no longer recent, Courtside asks for your password
-once more first. The session you are in ends without that question.
+You must enter the current password before changing it. After saving, Courtside ends every session,
+including the one you are using. Sign in with the new password.
 
-If the board mistyped your name or your username, that is not permanent: everything a club enters,
-a club can correct.
+You can also end one session or all sessions. If your sign-in is no longer recent, Courtside asks
+for your password before ending other sessions. You can end the current session without that extra
+check.
 
-![Account security with the password change and the list of browsers the account is signed in on.](../screenshots/en/account-security.png)
+The board can correct errors in your name or username from the people administration.
+
+![Account security with the password form and list of active sessions.](../screenshots/en/account-security.png)

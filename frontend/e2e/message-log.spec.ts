@@ -82,7 +82,7 @@ test("a board mistypes an address, the log shows the refusal, and the correction
 
   // then — the correction goes out, and the member holds what the log never shows
   const mailed = await messageTo(journeyService.mailboxURL, "richard.miles@example.org");
-  const credential = credentialIn(mailed, "Passwort:");
+  const credential = credentialIn(mailed, "Einmalpasswort:");
   await lastMessageOnThePerson(page, "HANDED_OVER");
   await openTheMessageLog(page);
   await statesInTheLog(page, ["HANDED_OVER", "REFUSED"]);

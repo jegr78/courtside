@@ -24,7 +24,7 @@ test("given a new member whose account the board has just opened, when they read
 
     // when — the member reads what reached their mailbox and signs in with it
     const mailed = await messageTo(journeyService.mailboxURL, "richard.roe@example.org");
-    await signIn(page, "roe.richard", credentialIn(mailed, "Passwort:"));
+    await signIn(page, "roe.richard", credentialIn(mailed, "Einmalpasswort:"));
 
     // then — the club refuses to go further until they have one of their own
     await expect(page.getByTestId("initial-password-view")).toBeVisible();

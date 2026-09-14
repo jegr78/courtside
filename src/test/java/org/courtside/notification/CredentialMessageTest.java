@@ -93,7 +93,7 @@ class CredentialMessageTest extends AbstractIntegrationTest {
         raise(accountId, CredentialsRequested.Reason.PASSWORD_RESET);
 
         // then
-        assertThat(body(theMessageHandedOver())).contains("neues Passwort ausgestellt");
+        assertThat(body(theMessageHandedOver())).contains("neues Einmalpasswort");
     }
 
     @Test
@@ -220,7 +220,7 @@ class CredentialMessageTest extends AbstractIntegrationTest {
     }
 
     private static String credentialIn(String body) {
-        String marker = "Passwort: ";
+        String marker = "Einmalpasswort: ";
         int start = body.indexOf(marker) + marker.length();
         return body.substring(start, body.indexOf('\n', start)).trim();
     }

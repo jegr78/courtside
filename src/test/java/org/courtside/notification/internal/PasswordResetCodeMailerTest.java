@@ -50,7 +50,7 @@ class PasswordResetCodeMailerTest {
         mailer.on(new PasswordResetRequested(ACCOUNT));
 
         // then — the club default is German, so only the account's own language can produce this
-        assertThat(subjectSent()).isEqualTo("Example Tennis Club: your reset code");
+        assertThat(subjectSent()).isEqualTo("Example Tennis Club: your password reset code");
         assertThat(bodySent())
                 .contains("Hello Jane")
                 .contains("Code: " + CODE)
@@ -84,8 +84,7 @@ class PasswordResetCodeMailerTest {
 
         // then — the message is the whole promise the endpoint makes, so it may not overstate it
         assertThat(bodySent())
-                .contains("Nothing has changed yet")
-                .contains("your password and your open sessions are untouched");
+                .contains("Your password and open sessions remain unchanged until the code is used");
     }
 
     @Test

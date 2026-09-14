@@ -1,20 +1,19 @@
 # Courtside
 
-Court booking system for sports clubs. Each club runs its own single-tenant instance:
-members book courts, trainers place training blocks, the groundskeeper closes courts —
-all of it the same booking entity, distinguished only by its booking card.
+Courtside is a court booking system for sports clubs. Each club runs a separate instance. Members
+book courts, trainers reserve training periods and groundskeepers close courts. Courtside stores all
+three as bookings and uses the booking type to apply the correct rules.
 
 Java 25, Spring Boot 4.1, Spring Modulith, PostgreSQL 17. Licensed under AGPL-3.0.
 
-**Status:** no tagged release yet, so no published container image. The reference deployment
-lives in [`deploy/`](deploy/) — Compose, Caddy and the documented environment — and it expects a
-released image to pull. Until the first tag, run it from source as below.
+**Status:** Courtside has no tagged release yet. The reference deployment in [`deploy/`](deploy/)
+expects a published image, so run Courtside from source until the first release.
 
 ## Requirements
 
 - JDK 25 (Eclipse Temurin)
 - Node.js 24 or later
-- Docker — for PostgreSQL and for the Testcontainers-backed test suite
+- Docker for PostgreSQL and the Testcontainers test suite
 - PostgreSQL 17. The non-overlap guarantee is a GiST exclusion constraint; no other database
   will do.
 
@@ -50,22 +49,21 @@ administrators.
 
 Once any local account exists, the variables are ignored: a restart can never create another
 administrator or reset a password. Remove them after the initial password has been changed. Because
-a restart cannot bring one back, the roster refuses the change that would leave the instance with no
-enabled account holding `ADMIN` — an officer may step down once a successor exists, and a board may
-demote a former one.
+a restart cannot restore one, the roster rejects any change that would leave the instance without an
+enabled `ADMIN` account. An administrator can step down after another enabled administrator exists.
 
 `POST /api/session` limits attempts by source address and bounds simultaneous Argon2 work in each
 application instance. Address counters live in PostgreSQL, survive restarts and apply across
 application instances; the verification slots are deliberately process-local capacity, not a
 renewable distributed lock. A limited request returns `429` with `Retry-After`; successful login
 clears its address counter. No username or whole instance can be locked independently, so anonymous
-failures cannot keep a known administrator—or every member—in a renewable lockout.
+failures cannot repeatedly lock a known administrator or every member out of the instance.
 
-`enabled` defaults to `false` — accounts normally wait for approval. The bootstrap path explicitly
-enables the first administrator because nobody exists to approve it.
+`enabled` defaults to `false`, so new accounts normally wait for approval. The bootstrap process
+enables the first administrator because no existing administrator can approve it.
 
-`ADMIN` alone is enough. It overrides the restrictions that say *who* may book — the role a
-booking card requires, the advance window, the limit on open bookings.
+`ADMIN` overrides restrictions on who may book, including required roles, advance windows and the
+limit on open bookings.
 
 It does not override what defines the grid. Opening hours and slot granularity bind everyone,
 because the booking UI shows exactly the slots they permit: a booking outside them is one the
@@ -107,8 +105,8 @@ admin operation is available then.
 
 Posting without the header returns `401`, not `403`: a missing CSRF token raises an
 `AccessDeniedException`, and for an anonymous caller Spring Security routes that to the
-authentication entry point. The response is therefore indistinguishable from a wrong password —
-if the login fails with `401` and the credentials are certainly right, the token is missing.
+authentication entry point. The response is therefore indistinguishable from a wrong password. If
+login returns `401` for known valid credentials, check the CSRF token.
 
 ## Tests
 
@@ -125,44 +123,40 @@ handling is the database's job and is tested as such.
 
 ## Documentation
 
-- Start here if the codebase is new to you: the
-  [wiki](https://github.com/jegr78/courtside/wiki). It is the introduction the files below
-  are not — what the modules are, and why they may not call each other freely. It orients;
-  the authority is `docs/` and the code, and the wiki ships with neither.
-- Design spec: `docs/design.md`
-- The data model: `docs/data-model.md`
-- How a release is cut: `docs/releasing.md`
+- Start with the [wiki](https://github.com/jegr78/courtside/wiki) for an introduction to the modules
+  and their boundaries. The code and the files in `docs/` remain authoritative.
+- Design specification: `docs/design.md`
+- Data model: `docs/data-model.md`
+- Release process: `docs/releasing.md`
 - Recorded decisions, known deviations and follow-ups: the issue tracker, labeled `decision`,
   `known-limit`, `operations` or `debt`. Completed decisions and accepted known limits are closed;
   pending choices use `question` and planned remediation uses a work label so both remain visible
   work.
 - How to contribute a change: `CONTRIBUTING.md`. The code of conduct that governs this
   repository is `CODE_OF_CONDUCT.md`.
-- Conventions for contributors: `CLAUDE.md`. Courtside is developed with AI assistance, and
-  that file is the ruleset it works under — architecture principles, migration policy, test
-  discipline. It is written for a contributor of either kind.
+- Contributor conventions: `CLAUDE.md`. These rules apply to human and AI contributors and cover
+  architecture, migrations and testing.
 
 ## Licence
 
 Copyright (C) 2026 The Courtside Contributors. Licensed under the GNU Affero General Public
-License, version 3 — see [LICENSE](LICENSE). The Maven wrapper (`mvnw`, `mvnw.cmd`,
+License, version 3. See [LICENSE](LICENSE). The Maven wrapper (`mvnw`, `mvnw.cmd`,
 `.mvn/wrapper/`) is Apache-2.0 code of the Apache Software Foundation and is not covered by
-that notice — see [NOTICE](NOTICE).
+that notice. See [NOTICE](NOTICE).
 
 For a club that runs Courtside, the clause worth knowing is **section 13**. If you modify
 Courtside and let people use it over a network, you owe those users the source of your
 modified version. Running it unmodified asks nothing of you beyond leaving the licence and
 notices intact.
 
-That network clause is what separates the AGPL from the GPL, and it is a deliberate choice
-here: a club's members should be able to see what handles their bookings.
+Courtside uses the AGPL so club members can inspect the modified software that handles their
+bookings.
 
 Every instance answers `GET /api/source` with the version it is running, the commit it was built
 from and where that source can be obtained. It needs no login, because the obligation runs to the
 people using the service. The reference deployment requires `COURTSIDE_SOURCE_URL` explicitly, so
 an unchanged installation points it here and a fork points it at that fork's corresponding source.
 
-That address must be one the members can actually open. An internal `https://git.intern.example/…`
-discharges nothing — the offer is to them — and publishes an internal hostname to anyone who asks.
-Courtside refuses to start on anything that is not an absolute `http` or `https` address without
-embedded credentials.
+Members must be able to open that address. Do not use an internal address such as
+`https://git.intern.example/…`; it does not provide members with the source and exposes an internal
+hostname. Courtside accepts only absolute `http` or `https` addresses without embedded credentials.

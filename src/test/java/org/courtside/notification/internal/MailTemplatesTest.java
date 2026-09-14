@@ -85,22 +85,22 @@ class MailTemplatesTest {
 
     @Test
     void givenEachKindOfClosure_whenRenderedInEitherLocale_thenItSaysWhatWentOutOfService() {
-        // when / then — one message, three reasons, and none of them may fall back to English
+        // when / then: one message, three reasons, and none of them may fall back to English
         assertThat(templates.render("booking.displaced.court", Locale.GERMAN, VALUES))
-                .isEqualTo("Ein Platz deiner Buchung ist außer Betrieb genommen worden");
+                .isEqualTo("Ein Platz deiner Buchung wurde deaktiviert");
         assertThat(templates.render("booking.displaced.card", Locale.GERMAN, VALUES))
                 .contains("Member booking");
         assertThat(templates.render("booking.displaced.day", Locale.ENGLISH, VALUES))
-                .isEqualTo("The club is closed on that day from now on");
+                .isEqualTo("The club is now closed on that day");
         assertThat(templates.render("booking.displaced.hours", Locale.ENGLISH, VALUES))
-                .isEqualTo("The opening hours on that day no longer cover your booking");
+                .isEqualTo("The opening hours no longer include your booking");
     }
 
     @Test
     void givenAReminder_whenRendered_thenItCarriesTheBookingAndTheWayOut() {
-        // when / then — a court nobody plays on is what a forgotten booking costs the club
+        // when / then: the reminder tells the member how to release the court
         assertThat(templates.render("booking.reminder.body", Locale.GERMAN, VALUES))
-                .contains("Wednesday, 13 May 2026").contains("Court 1").contains("Absage");
+                .contains("Wednesday, 13 May 2026").contains("Court 1").contains("storniere");
     }
 
     @Test

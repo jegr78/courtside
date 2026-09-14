@@ -179,7 +179,7 @@ is tagged with the run id and profile for dashboard correlation.
 The CLI verifies `/api/source` before starting k6 and refuses any target that does not identify as
 `PERFORMANCE`. Profiles, durations, VUs, stages, traffic mix, image digest, and thresholds come from
 the contract and cannot be overridden on the command line. Baseline, peak, stress, and soak require
-the disposable project confirmation; soak additionally requires an explicit assertion that the
+the disposable project confirmation; soak also requires an explicit assertion that the
 environment was freshly reset. Funnel uses a separate runner.
 
 The browser profile uses the pinned official Chromium image and is capped at five VUs for ten
@@ -269,7 +269,7 @@ duration caps are forbidden. Runtime credentials identify individual synthetic a
 share one generated environment password.
 
 Every result reports the two mandatory technical threshold outcomes. Reference load profiles
-additionally report read-only, login, and booking budgets; browser results report Web Vitals; Funnel
+also report read-only, login, and booking budgets; browser results report Web Vitals; Funnel
 smoke reports the read-only budget. The closed result schema rejects unknown threshold names,
 missing evidence, unrecorded load parameters, and profile/target/environment combinations outside
 the contract.

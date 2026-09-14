@@ -1,14 +1,13 @@
 # The data model
 
-What Courtside stores, table by table, and how the tables relate. This is the map; `docs/design.md`
-is the argument. Where a shape has a reason that took a paragraph to decide, this document names the
-reason in a clause and the design specification carries the rest.
+This document lists the data Courtside stores and the relationships between its tables. See
+`docs/design.md` for the decisions behind the schema.
 
-The schema is PostgreSQL 17 and is applied by Flyway from `src/main/resources/db/migration`. Those
-files are a history — the shape below is what you get after all of them have run, which is not the
-shape any single one of them declares.
+Courtside uses PostgreSQL 17. Flyway applies the migrations in
+`src/main/resources/db/migration`. The diagrams below show the schema after all migrations have
+run, not the state created by an individual migration.
 
-## The one idea the schema is built around
+## Core model
 
 **Everything that occupies a court is a booking.** A member's game, a training block, a league match
 and a court closure are the same row in the same table, differing by one foreign key.
@@ -21,14 +20,14 @@ booking_card ──< booking ──< court_allocation >── court
 | Table | Holds |
 |---|---|
 | `booking` | One occupancy: the card that classifies it, its status, who booked it, when it was created, cancelled, moved or reminded about |
-| `booking_card` | What kind of occupancy this is — its label, its colour, how many players it tracks, whether it counts against a member's limits, whether guests are allowed |
+| `booking_card` | What kind of occupancy this is, its label, its colour, how many players it tracks, whether it counts against a member's limits, whether guests are allowed |
 | `court_allocation` | One row per court the booking occupies, with its own start, end and status |
 | `booking_participant` | One row per player slot |
 
 A booking holds exactly one card and one `court_allocation` row per court it takes. Nothing in the
 schema insists it takes any: a booking series gets a trigger for that, a booking does not, and the
 API's own contract is what refuses an empty list of courts. A club that wants a new kind of
-occupancy — a tournament, a school session — inserts a `booking_card` row; it does not deploy
+occupancy, a tournament, a school session, inserts a `booking_card` row; it does not deploy
 anything.
 
 **`court_allocation` is where the product's central guarantee lives.** Two confirmed allocations
@@ -44,31 +43,31 @@ CONSTRAINT court_allocation_no_overlap EXCLUDE USING gist (
 `court_allocation_no_overlap` is a GiST exclusion constraint over a `tstzrange` expression,
 half-open so that a booking ending at 19:00 and one starting at 19:00 do not collide, and filtered
 so a cancelled allocation frees its slot. Concurrency is the database's problem, and every attempt
-to book a taken court arrives at the application as a constraint violation to translate — never as
+to book a taken court arrives at the application as a constraint violation to translate, never as
 a check the application ran first.
 
 ## The facility
 
 | Table | Holds | References |
 |---|---|---|
-| `court` | A court: its number, an optional name, whether it is active | — |
-| `opening_hours` | When the facility opens and closes, one row per weekday | — |
+| `court` | A court: its number, an optional name, whether it is active | None |
+| `opening_hours` | When the facility opens and closes, one row per weekday | None |
 
 `court.number` is unique and positive, and `active` is what takes a court out of service without
 losing it. `opening_hours` carries one row per `day_of_week`, numbered the way `java.time.DayOfWeek`
-numbers them — 1 is Monday — with `closes_at` after `opens_at`.
+numbers them, 1 is Monday, with `closes_at` after `opens_at`.
 
 ## Cards
 
 | Table | Holds | References |
 |---|---|---|
-| `booking_card` | A kind of occupancy | — |
+| `booking_card` | A kind of occupancy | None |
 | `booking_card_allowed_role` | Which roles may create a booking on this card | `booking_card` |
 | `booking_card_managing_role` | Which roles may manage somebody else's booking on this card | `booking_card` |
-| `participant_card` | Something that fills a player slot without being a person | — |
+| `participant_card` | Something that fills a player slot without being a person | None |
 
-The two card tables answer different questions — `booking_card` asks what kind of occupancy this
-is, `participant_card` asks what fills a slot — and conflating them is what makes the participant
+The two card tables answer different questions, `booking_card` asks what kind of occupancy this
+is, `participant_card` asks what fills a slot, and conflating them is what makes the participant
 rules unexpressible. `docs/design.md` argues that at length.
 
 `booking_card.allowed_player_counts` is a `smallint[]`: `{2,4}` for a member card, empty for a card
@@ -104,14 +103,14 @@ whether a court is free.
 
 | Table | Holds | References |
 |---|---|---|
-| `person` | A human being: name and email | — |
+| `person` | A human being: name and email | None |
 | `member` | A membership: its type and the dates it ran | `person`, `membership_type` |
 | `membership_type` | A kind of membership, the rule set it is measured against, and whether it opens an account on import | `rule_set` |
 | `user_account` | Credentials and sign-in state for a person | `person` |
 | `user_account_role` | One row per role the account holds | `user_account` |
 | `password_reset_token` | The one outstanding reset code an account has: its hash, the address it was mailed to, the epoch it was issued under and when it expires | `user_account` |
 
-**`person` and `user_account` are separate** because not every person has an account — a child, a
+**`person` and `user_account` are separate** because not every person has an account, a child, a
 name that arrived through a roster import. `user_account.username` is unique; `person.email` is not.
 
 **`user_account.password_hash` is nullable.** It is null until the instance has issued a credential,
@@ -126,7 +125,7 @@ honours.
 `credentials_expire_at` bounds an issued one-time credential.
 
 **`password_reset_token` holds at most one row per account**, because `account_id` is its primary
-key. Asking again replaces the code that was outstanding — the delete and the insert are what do
+key. Asking again replaces the code that was outstanding, the delete and the insert are what do
 that, under an advisory lock on the account so two requests arriving together cannot mail a code
 that was never stored. Neither the code nor the address is
 stored, only their SHA-256. The row also carries the account's `security_epoch` and the fingerprint
@@ -138,14 +137,14 @@ withdraws an outstanding code without anything having to listen for those events
 
 | Table | Holds | References |
 |---|---|---|
-| `rule_set` | A named set of booking rules | — |
+| `rule_set` | A named set of booking rules | None |
 | `rule_definition` | One rule: its type and its parameters as `jsonb` | `rule_set` |
 
 Rules are data. A rule type is a validator class plus a row rather than a column, and the parameters
 live in `params` so a new rule kind needs no migration. A rule set holds each type at most once.
 
-Which rule set applies to a booking comes from the booker's `membership_type`, or — for a person
-holding none — from `club_config.no_membership_type_rule_set_id`.
+Which rule set applies to a booking comes from the booker's `membership_type`, or, for a person
+holding none, from `club_config.no_membership_type_rule_set_id`.
 
 ## The club's own configuration
 
@@ -156,7 +155,7 @@ issued credentials stay valid, how many minutes a mailed reset code stays redeem
 hours before a booking the reminder goes out.
 
 The time zone is checked against `pg_timezone_names` by a trigger, so a typo is refused where it is
-written rather than at the next reminder. The logo is stored in the row itself — content, media type
+written rather than at the next reminder. The logo is stored in the row itself, content, media type
 and digest together or not at all, at most one megabyte, PNG or JPEG.
 
 ## Importing a roster
@@ -179,13 +178,13 @@ a different file than the one previewed is visible after the fact.
 
 | Table | Holds | References |
 |---|---|---|
-| `domain_event` | The change log: event type, the entity it concerns, the account that caused it, when, and the payload | — |
+| `domain_event` | The change log: event type, the entity it concerns, the account that caused it, when, and the payload | None |
 | `message_record` | One row per message the instance tried to deliver, and what became of it | `user_account` |
 | `message_optout` | A message kind an account has declined | `user_account` |
-| `event_publication` | Spring Modulith's transactional outbox for events between modules | — |
+| `event_publication` | Spring Modulith's transactional outbox for events between modules | None |
 
 `domain_event.subject_id` is `NOT NULL`, so every entry names something. An operation that concerns
-no single entity — a bulk export, for instance — therefore records nothing, which
+no single entity, a bulk export, for instance, therefore records nothing, which
 `docs/design.md` section 11 carries as an accepted risk rather than a gap.
 
 `domain_event.event_type` is a dotted name whose first segment says which module published it, and
@@ -198,7 +197,7 @@ other booking entries, and `identity.account.credentialsRequested`, which names 
 credential was issued for. A board's request is written beside
 `roster.account.credentialsRequested`, which names the person, because the roster reaches
 `AccountCredentials` and publishes its own event as well. A member who asked for the credential
-themselves produces the `identity.` entry alone, so the pair says which of the two happened. Read the first segment as the publisher and not as a table — the `roster.`
+themselves produces the `identity.` entry alone, so the pair says which of the two happened. Read the first segment as the publisher and not as a table, the `roster.`
 entries come from `member`.
 
 `message_record.kind` and `message_optout.kind` are governed by CHECK constraints that have grown
@@ -233,26 +232,26 @@ attributes, and the configured cleanup schedule removes expired rows.
 
 A database that has just been migrated is not empty. Flyway seeds a facility a club can start from:
 
-- one `court`, number 1, and opening hours of 08:00–22:00 on all seven days
+- one `court`, number 1, and opening hours of 08:00 to 22:00 on all seven days
 - four booking cards: **Member booking** (two or four players, guests allowed, counts against
   limits), **Training**, **League match** and **Court closed**
 - two participant cards: **Ball machine**, which fills one slot, and **Looking for a partner**,
   which fills one without capacity
 - two rule sets, **Standard** and **Youth**, each with an advance window and a limit on open
-  bookings, and two membership types — **Active** and a youth one — pointing at them
+  bookings, and two membership types, **Active** and a youth one, pointing at them
 - one `club_config` row named Courtside, in German, in `Europe/Berlin`
 
 Those names are not what a club reads. The migrations seed them in English, and at startup each
-module names its own seeded rows in the language `club_config.default_locale` holds — German on a
-fresh instance, so the four cards read *Mitgliederbuchung*, *Training*, *Punktspiel* and *Platz
+module names its own seeded rows in the language `club_config.default_locale` holds. A fresh
+instance uses German, so the four cards read *Mitgliederbuchung*, *Training*, *Punktspiel* and *Platz
 gesperrt*. A row is recognised by the id it was seeded with, and renamed only while it still carries
-one of the names this image ships for it and the new name is free — a board that gives a row a name
+one of the names this image ships for it and the new name is free. A board that gives a row a name
 of its own keeps it, and so does whatever already holds the name the row would take. Changing the
 language changes the rows that are still shipped-named, without a restart.
 
 What it does not seed is an account. The first one is created at startup from the
 `courtside.bootstrap-admin` configuration, which is why an instance has an administrator before
-anybody has signed in — see `deploy/README.md` for the variables that carry it.
+anybody has signed in, see `deploy/README.md` for the variables that carry it.
 
 Everything else in that list is a row a board changes in the admin surface: courts, opening hours,
 booking cards, participant cards, rule sets, membership types and the club configuration all have
@@ -260,8 +259,8 @@ one.
 
 ## What each column is, in protection terms
 
-This document says what a table holds and why. What each *column* counts as under data protection —
-one of `personal`, `pseudonymous`, `secret` or `operational` — and which mechanism ends its life is
+This document says what a table holds and why. What each *column* counts as under data protection,
+one of `personal`, `pseudonymous`, `secret` or `operational`, and which mechanism ends its life is
 in [`security/data-protection-inventory.json`](../security/data-protection-inventory.json), one
 entry per column, beside the same classification for every URL parameter the API declares.
 

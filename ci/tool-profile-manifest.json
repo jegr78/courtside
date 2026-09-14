@@ -148,6 +148,7 @@
     { "path": "tools/tool-tests.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/tool-tests.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/tracked-symlink-policy.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/user-copy-style.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/ui-selector-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/url-parameter-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/webkit-reliability.mjs", "profiles": ["full"], "test": false },

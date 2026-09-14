@@ -96,8 +96,8 @@ node tools/journey-run.mjs
 
 That writes video, trace and screenshots per journey into `build/journeys/<timestamp>/`, which is
 git-ignored and carries the moment of the run so a later one cannot overwrite the one a release
-cites. It generates `index.md` from the run's own report — journey, device, language, outcome,
-duration and a link to each artefact — and prints the absolute path of both.
+cites. It generates `index.md` from the run's own report, journey, device, language, outcome,
+duration and a link to each artefact, and prints the absolute path of both.
 
 ## Physical-device evidence
 
