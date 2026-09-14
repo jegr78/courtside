@@ -874,8 +874,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     const tables = await snapshotJourneyData(postgres, JOURNEY_SEEDED);
     const shippedLanguage = await executeSql("SELECT default_locale FROM club_config");
     const seededPerLanguage = new Map([[shippedLanguage, JOURNEY_SEEDED]]);
-    // The rows an instance ships are named at startup, so a club that speaks another language is a
-    // restart rather than an update - and taking it once here beats taking it before every capture.
+    // Writing the locale straight into the database reaches no listener, so the naming a club's
+    // language drives runs at startup - and taking each world once here beats once per capture.
     for (const language of publishedLanguages().filter((named) => named !== shippedLanguage)) {
       await executeSql(`UPDATE club_config SET default_locale = '${language}'`);
       await stopApplication();
