@@ -64,15 +64,19 @@ async function pinJourneyClock(context: BrowserContext): Promise<void> {
   await context.clock.setFixedTime(new Date(journeyInstant));
 }
 
+// A project that declares a locale is published in that language, so its browser process is started
+// in it too: the date, time and file controls follow the process and not the context.
 async function pinnedBrowserFixture(
   { playwright, browserName, journeyService }: {
     playwright: typeof import("playwright-core");
     browserName: "chromium" | "firefox" | "webkit";
     journeyService: JourneyService;
   },
-  provide: (browser: Browser) => Promise<void>
+  provide: (browser: Browser) => Promise<void>,
+  info: { project: { use: { locale?: string } } }
 ): Promise<void> {
-  const pinned = await playwright[browserName].connect(await journeyService.pinnedBrowser(browserName));
+  const pinned = await playwright[browserName]
+    .connect(await journeyService.pinnedBrowser(browserName, info.project.use.locale));
   const finishDiagnostics = observeBrowserDisconnect(pinned,
     () => journeyService.browserDiagnostics(browserName, "browser-disconnected"));
   try {

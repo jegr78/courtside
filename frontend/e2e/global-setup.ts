@@ -33,6 +33,7 @@ import {
   type ResourceObservation,
   type ResourceTarget
 } from "./resource-timeline";
+import { browserLanguage } from "./browser-language";
 import {
   browserContainerLabels,
   ObservableGenericContainer,
@@ -388,7 +389,7 @@ export interface JourneyService {
   plainBaseURL: string;
   mailboxURL: string;
   visualDate: string;
-  pinnedBrowser(browserName: string): Promise<string>;
+  pinnedBrowser(browserName: string, locale?: string): Promise<string>;
   releasePinnedBrowser(browserName: string): Promise<void>;
   browserDiagnostics(browserName: string, reason: BrowserFailureReason,
     failedTest?: FailedTest): Promise<BrowserDiagnostics>;
@@ -556,7 +557,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const applicationLog = applicationLogBuffer(200);
   let staticDirectory: string | undefined;
   const journeyId = randomUUID();
-  const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string }>();
+  const browserServers = new Map<string, { container: StartedTestContainer; endpoint: string; locale?: string }>();
   const browserLifecycle = new BrowserLifecycleRecorder();
   const browserLifecyclePath = resolve("test-results", "browser-lifecycle.json");
   const resourceTimeline = new ResourceTimelineRecorder(1_000);
@@ -874,11 +875,17 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         });
       return startingSecondPeer;
     };
-    const startPinnedBrowser = async (browserName: string): Promise<string> => {
+    const startPinnedBrowser = async (browserName: string, locale?: string): Promise<string> => {
       const running = browserServers.get(browserName);
       if (running) {
+        // A project owns its browser for as long as it runs, so a second language means the first
+        // container was not released and a capture would be taken in the wrong one.
+        if (running.locale !== locale) {
+          throw new Error(`A ${browserName} browser is already running for ${running.locale ?? "no locale"}`);
+        }
         return running.endpoint;
       }
+      const language = browserLanguage(locale);
       // Docker publishes the mapped port on every interface and the server has no authentication,
       // so the unguessable endpoint path is what keeps a reachable port from being a browser.
       const wsPath = `/${randomUUID()}`;
@@ -886,7 +893,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       const options = {
         port: 3000, host: "0.0.0.0", wsPath,
         args: browserName === "chromium"
-          ? [`--ignore-certificate-errors-spki-list=${servedKeys.join(",")}`] : []
+          ? [`--ignore-certificate-errors-spki-list=${servedKeys.join(",")}`] : [],
+        ...language.launchOptions
       };
       const startupDiagnostics = async (containerId: string, failureClass: BrowserStartupFailureClass) => {
         let networkAttachments: string[] | undefined;
@@ -923,6 +931,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
             { source: resolve("node_modules/playwright"), target: "/opt/courtside/node_modules/playwright" },
             { source: resolve("node_modules/playwright-core"), target: "/opt/courtside/node_modules/playwright-core" }
           ])
+          .withEnvironment(language.environment)
           .withCopyContentToContainer([
             { content: rootCertificate, target: "/usr/local/share/ca-certificates/courtside-club.crt" },
             { content: JSON.stringify(options), target: "/tmp/launch-options.json" }
@@ -940,7 +949,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         (containerId) => executeFile("docker", ["rm", "-f", containerId], { timeout: 5_000 })
       );
       const endpoint = `ws://${container.getHost()}:${container.getMappedPort(3000)}${wsPath}`;
-      browserServers.set(browserName, { container, endpoint });
+      browserServers.set(browserName, { container, endpoint, locale });
       browserLifecycle.start(browserName, container.getId(), new Date().toISOString());
       retainBrowserLifecycle();
       return endpoint;
