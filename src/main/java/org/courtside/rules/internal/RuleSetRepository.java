@@ -8,6 +8,4 @@ import java.util.UUID;
 public interface RuleSetRepository extends JpaRepository<RuleSet, UUID> {
 
     List<RuleSet> findAllByOrderByNameAsc();
-
-    boolean existsByName(String name);
 }

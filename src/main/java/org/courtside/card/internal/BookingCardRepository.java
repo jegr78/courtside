@@ -11,6 +11,4 @@ public interface BookingCardRepository extends JpaRepository<BookingCard, UUID> 
     List<BookingCard> findByActiveTrueOrderByLabelAsc();
 
     List<BookingCard> findAllByOrderByLabelAsc();
-
-    boolean existsByLabel(String label);
 }
