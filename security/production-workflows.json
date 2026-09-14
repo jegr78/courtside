@@ -80,6 +80,7 @@
         "IdentityCleanupSchedule#deleteExpiredResetMailWindows",
         "IdentityCleanupSchedule#deleteExpiredResetTokens",
         "PasswordResetCodeMailer#on(PasswordResetRequested)",
+        "SignInFailureLog#on(AbstractAuthenticationFailureEvent)",
         "UsernameReminderMailer#on(UsernameReminderRequested)"
       ],
       "stateTransitions": [
@@ -255,7 +256,11 @@
         "ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)",
         "ClosureAnnouncements#on(FacilityEvent.CourtAvailabilityChanged)",
         "ClosureAnnouncements#on(FacilityEvent.OpeningHoursClosed)",
-        "ClosureAnnouncements#on(FacilityEvent.OpeningHoursSet)"
+        "ClosureAnnouncements#on(FacilityEvent.OpeningHoursSet)",
+        "ShippedCardNaming#run",
+        "ShippedCardNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)",
+        "ShippedMembershipTypeNaming#run",
+        "ShippedMembershipTypeNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)"
       ],
       "stateTransitions": [
         "Administrators create and correct configuration records.",
@@ -301,7 +306,9 @@
         "assignMembership",
         "removeMembership"
       ],
-      "backgroundEntryPoints": [],
+      "backgroundEntryPoints": [
+        "RosterSecurityEventLog#record(RosterEvent)"
+      ],
       "stateTransitions": [
         "A person may gain or lose a current membership.",
         "An account may be created, corrected, enabled, disabled or assigned a new credential.",
@@ -394,7 +401,10 @@
         "setRule",
         "removeRule"
       ],
-      "backgroundEntryPoints": [],
+      "backgroundEntryPoints": [
+        "ShippedRuleSetNaming#run",
+        "ShippedRuleSetNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)"
+      ],
       "stateTransitions": [
         "Administrators create, correct, activate and retire rule sets.",
         "Rules are added, replaced or removed by declared type.",
@@ -433,7 +443,9 @@
         "readMessageLog",
         "readAuditLog"
       ],
-      "backgroundEntryPoints": [],
+      "backgroundEntryPoints": [
+        "DomainEventWriter#record(DomainEventRecord)"
+      ],
       "stateTransitions": [
         "No product state changes."
       ],

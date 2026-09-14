@@ -73,7 +73,14 @@ public class MemberTestFixture {
     }
 
     public void letMembershipTypeGrantAnAccount(UUID membershipTypeId, String name) {
-        memberships.changeMembershipType(membershipTypeId, name, null, true);
+        var type = memberships.requireMembershipType(membershipTypeId);
+        memberships.changeMembershipType(membershipTypeId, name, type.getRuleSetId(), true);
+    }
+
+    public void renameMembershipType(UUID membershipTypeId, String name) {
+        var type = memberships.requireMembershipType(membershipTypeId);
+        memberships.changeMembershipType(
+                membershipTypeId, name, type.getRuleSetId(), type.isGrantsAccount());
     }
 
     public UUID membershipTypeMeasuredBy(String name, UUID ruleSetId) {

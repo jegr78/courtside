@@ -19,6 +19,7 @@ interface JourneyCommand {
     | "peerLoginSubjects" | "failedLoginFromSecondPeer";
   browserName?: string;
   locale?: string;
+  language?: string;
   forwardedFor?: string;
   reason?: string;
   failedTest?: unknown;
@@ -96,6 +97,14 @@ function requiredLifecyclePhase(value: string | undefined): "start" | "end" {
   return value;
 }
 
+// A language the world was not taken in would otherwise be answered with the club it was, so the
+// club is named across the wire rather than defaulted to on the far side of it.
+function optionalLanguage(value: string | undefined): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") throw new Error("Journey control command requires language to be a string");
+  return value;
+}
+
 // A start nobody offers would otherwise walk a journey through the club it did not ask for.
 function journeyStart(start: string | undefined): JourneyStart {
   if (start === undefined) return "seeded";
@@ -134,7 +143,7 @@ async function executeCommand(command: JourneyCommand, service: JourneyService,
       return undefined;
     }
     case "publishServiceWorkerUpdate": return service.publishServiceWorkerUpdate();
-    case "reset": return service.reset(journeyStart(command.start));
+    case "reset": return service.reset(journeyStart(command.start), optionalLanguage(command.language));
     case "restart": return service.restart();
     default: throw new Error("Unknown journey control operation");
   }
@@ -232,7 +241,7 @@ export function connectJourneyService(reference: JourneyControlReference): Journ
       };
     },
     publishServiceWorkerUpdate: () => command(reference, { operation: "publishServiceWorkerUpdate" }),
-    reset: (start) => command(reference, { operation: "reset", start }),
+    reset: (start, language) => command(reference, { operation: "reset", start, language }),
     restart: () => command(reference, { operation: "restart" })
   };
 }

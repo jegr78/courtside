@@ -56,7 +56,8 @@ test("given a mutable PWA asset and database, when the next test starts, then bo
   assert.match(setup, /snapshotJourneyData\(postgres, JOURNEY_EMPTY\)/);
   assert.match(setup, /snapshotJourneyData\(postgres, JOURNEY_SEEDED\)/);
   assert.match(setup, /resetStaticAssets\(\)/);
-  assert.match(setup, /resetJourneyData\(postgres!, tables, [^)]+\)/);
+  // The world a project is restored to is the one its own language was taken in, never a default.
+  assert.match(setup, /resetJourneyData\(postgres!, tables,\s*journeyWorldIn\(start \?\? "seeded", seededPerLanguage, language, shippedLanguage\)\)/);
 });
 
 test("given journey data is restored while the application stays live, when the test world starts, then scheduled database work never falls due", () => {

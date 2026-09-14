@@ -19,8 +19,19 @@
       "src/main/java/org/courtside/notification/internal/ReminderMailer.java",
       "src/main/java/org/courtside/notification/internal/UsernameReminderMailer.java"
     ],
+    "listenerFiles": [
+      "src/main/java/org/courtside/audit/internal/DomainEventWriter.java",
+      "src/main/java/org/courtside/card/internal/ShippedCardNaming.java",
+      "src/main/java/org/courtside/identity/internal/SignInFailureLog.java",
+      "src/main/java/org/courtside/member/internal/RosterSecurityEventLog.java",
+      "src/main/java/org/courtside/member/internal/ShippedMembershipTypeNaming.java",
+      "src/main/java/org/courtside/rules/internal/ShippedRuleSetNaming.java"
+    ],
     "startupFiles": [
-      "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java"
+      "src/main/java/org/courtside/card/internal/ShippedCardNaming.java",
+      "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java",
+      "src/main/java/org/courtside/member/internal/ShippedMembershipTypeNaming.java",
+      "src/main/java/org/courtside/rules/internal/ShippedRuleSetNaming.java"
     ]
   },
   "classifications": [
@@ -105,9 +116,12 @@
     {
       "id": "ordinary-startup",
       "kind": "ordinary",
-      "rationale": "Bootstrap checks one database-wide existence condition and can create exactly one initial administrator; its Argon2 work is constant and startup-only.",
+      "rationale": "Bootstrap checks one database-wide existence condition and can create exactly one initial administrator; its Argon2 work is constant and startup-only. Naming the shipped rows reads ten rows by primary key and writes at most those ten, once, from a bundle already on the classpath.",
       "entryPoints": [
-        "BootstrapAdminInitializer#run"
+        "BootstrapAdminInitializer#run",
+        "ShippedCardNaming#run",
+        "ShippedMembershipTypeNaming#run",
+        "ShippedRuleSetNaming#run"
       ]
     },
     {
@@ -391,6 +405,19 @@
         "src/test/java/org/courtside/notification/BookingReminderTest.java#givenAReminderAlreadySent_whenTheSweepRunsAgain_thenNobodyIsRemindedTwice",
         "src/test/java/org/courtside/dataexchange/PreviewExpiryTest.java#givenASweptPreview_whenTheSweepRunsAgain_thenThereIsNothingLeftToDrop",
         "src/test/java/org/courtside/identity/internal/AgedSessionSweepTest.java#givenASessionPastItsLifetimeButNotIdle_whenTheSweepRuns_thenItsRowGoesAndAYoungOneStays"
+      ]
+    },
+    {
+      "id": "ordinary-synchronous-listeners",
+      "kind": "ordinary",
+      "rationale": "Each runs on the thread of the request that published its event and writes a bounded number of rows: one audit row, one security-event row, or the ten rows an instance is shipped with, each written by primary key in a single statement. SignInFailureLog looks one account up by username and writes one security-event row; it cannot run more often than a sign-in attempt reaches the authentication manager, and LoginAttemptFilter refuses an attempt past the per-address limit before that happens. None reads a collection that grows with the club, and none calls anything outside the database.",
+      "entryPoints": [
+        "DomainEventWriter#record(DomainEventRecord)",
+        "RosterSecurityEventLog#record(RosterEvent)",
+        "SignInFailureLog#on(AbstractAuthenticationFailureEvent)",
+        "ShippedCardNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)",
+        "ShippedMembershipTypeNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)",
+        "ShippedRuleSetNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)"
       ]
     }
   ]

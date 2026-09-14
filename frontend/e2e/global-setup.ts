@@ -50,6 +50,19 @@ export type JourneyStart = "seeded" | "empty";
 const JOURNEY_EMPTY = "journey_empty";
 const JOURNEY_SEEDED = "journey_baseline";
 
+// Every language the guides are published in, because a club's rows carry one name each and the
+// club a guide shows has to be one whose language that guide's reader would have chosen.
+function publishedLanguages(): string[] {
+  const locales = (JSON.parse(readFileSync(resolve("../site/screenshots/captures.json"), "utf8")) as {
+    locales: string[];
+  }).locales;
+  // A catalogue entry reaches a SQL statement and a schema name, so it is a language tag or nothing.
+  return locales.map((locale) => {
+    if (!/^[a-z]{2}$/.test(locale)) throw new Error(`Not a language the guides can publish: ${locale}`);
+    return locale;
+  });
+}
+
 const PINNED_BROWSER_IMAGE =
   "mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27";
 // The name the certificate is issued for, so browsers reach the proxy the way a member reaches a club.
@@ -400,7 +413,7 @@ export interface JourneyService {
   executeSql(sql: string): Promise<string>;
   holdDatabaseLock(sql: string, signal?: AbortSignal): Promise<DatabaseLock>;
   publishServiceWorkerUpdate(): Promise<void>;
-  reset(start?: JourneyStart): Promise<void>;
+  reset(start?: JourneyStart, language?: string): Promise<void>;
   restart(): Promise<void>;
 }
 
@@ -526,6 +539,24 @@ async function snapshotJourneyData(postgres: StartedTestContainer, schema: strin
     throw new Error(`Could not capture the journey baseline: ${snapshotResult.stderr}`);
   }
   return tables;
+}
+
+// Silently falling back would walk a journey through a club speaking another language than the one
+// the project publishes, which is exactly the thing these snapshots exist to prevent.
+export function journeyWorldIn(start: JourneyStart, worlds: ReadonlyMap<string, string>,
+                               language: string | undefined, shipped: string): string {
+  const wanted = language ?? shipped;
+  if (start === "empty") {
+    if (wanted !== shipped) {
+      throw new Error(`No empty journey world was taken for a club speaking ${wanted}`);
+    }
+    return JOURNEY_EMPTY;
+  }
+  const schema = worlds.get(wanted);
+  if (schema === undefined) {
+    throw new Error(`No journey world was taken for a club speaking ${wanted}`);
+  }
+  return schema;
 }
 
 async function resetJourneyData(postgres: StartedTestContainer, tables: string[], schema: string): Promise<void> {
@@ -841,6 +872,18 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     await snapshotJourneyData(postgres, JOURNEY_EMPTY);
     await seedJourneyData(postgres, visualDate);
     const tables = await snapshotJourneyData(postgres, JOURNEY_SEEDED);
+    const shippedLanguage = await executeSql("SELECT default_locale FROM club_config");
+    const seededPerLanguage = new Map([[shippedLanguage, JOURNEY_SEEDED]]);
+    // Writing the locale straight into the database reaches no listener, so the naming a club's
+    // language drives runs at startup - and taking each world once here beats once per capture.
+    for (const language of publishedLanguages().filter((named) => named !== shippedLanguage)) {
+      await executeSql(`UPDATE club_config SET default_locale = '${language}'`);
+      await stopApplication();
+      await startApplication();
+      const schema = `${JOURNEY_SEEDED}_${language}`;
+      await snapshotJourneyData(postgres, schema);
+      seededPerLanguage.set(language, schema);
+    }
     clubNetwork = await new Network().start();
     clubProxy = await new GenericContainer(deployedProxyImage())
       .withNetwork(clubNetwork)
@@ -1014,11 +1057,12 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         appendFileSync(resolve(staticDirectory!, "sw.js"), `\nself.addEventListener("message",event=>{if(event.data==="COURTSIDE_TEST_VERSION")event.source.postMessage({courtsideVersion:2})});\n`);
         return Promise.resolve();
       },
-      reset: async (start) => {
+      reset: async (start, language) => {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
         resetStaticAssets();
         await emptyMailbox(mailboxURL);
-        await resetJourneyData(postgres!, tables, start === "empty" ? JOURNEY_EMPTY : JOURNEY_SEEDED);
+        await resetJourneyData(postgres!, tables,
+          journeyWorldIn(start ?? "seeded", seededPerLanguage, language, shippedLanguage));
       },
       restart: async () => {
         // The same port again, not a new one: the club proxy is already configured against it.

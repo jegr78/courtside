@@ -146,7 +146,7 @@ test("given destructive or unknown changes, when planning the local check, then 
   // then
   assert.deepEqual(deleted.profiles, ["full"]);
   assert.deepEqual(unknown.profiles, ["full"]);
-  assert.deepEqual(deleted.tasks.map((task) => task.label), ["workflow-lint", "docs-check", "full"]);
+  assert.deepEqual(deleted.tasks.map((task) => task.label), ["workflow-lint", "docs-check", "full", "webkit-reliability"]);
 });
 
 // A documentation change selects the full profile through one path only — a file the classifier
@@ -158,10 +158,14 @@ test("given a full plan, when its tasks are planned, then the documentation gate
 
     // then
     assert.deepEqual(plan.profiles, ["full"]);
-    assert.deepEqual(plan.tasks.map((task) => task.label), ["workflow-lint", "docs-check", "full"]);
-    assert.deepEqual(plan.tasks.at(-1), {
+    assert.deepEqual(plan.tasks.map((task) => task.label), ["workflow-lint", "docs-check", "full", "webkit-reliability"]);
+    assert.deepEqual(plan.tasks.at(-2), {
       label: "full", workingDirectory: "repository", executable: "maven",
       arguments: ["clean", "verify"]
+    });
+    assert.deepEqual(plan.tasks.at(-1), {
+      label: "webkit-reliability", workingDirectory: "frontend", executable: "npm",
+      arguments: ["run", "reliability:webkit", "--", "--order", "configured"]
     });
   });
 
@@ -199,6 +203,10 @@ test("given no base commit, when the protected classification fails closed, then
       {
         label: "full", workingDirectory: "repository", executable: "maven",
         arguments: ["clean", "verify"]
+      },
+      {
+        label: "webkit-reliability", workingDirectory: "frontend", executable: "npm",
+        arguments: ["run", "reliability:webkit", "--", "--order", "configured"]
       }
     ]);
   });
@@ -590,10 +598,13 @@ test("given protected classification fails, when planning locally, then candidat
 
   // then
   assert.deepEqual(record.profiles, ["full"]);
-  assert.deepEqual(record.tasks, ["workflow-lint", "docs-check", "full"]);
+  assert.deepEqual(record.tasks, ["workflow-lint", "docs-check", "full", "webkit-reliability"]);
   const execution = localVerificationPlans(planTasks({ profiles: ["full"] }).tasks, "linux", "/repo");
-  assert.deepEqual(execution.map((plan) => plan.arguments),
+  assert.deepEqual(execution.slice(0, 3).map((plan) => plan.arguments),
     [["tools/workflow-lint.mjs", "--check"], ["tools/docs-check.mjs", "--check"], ["clean", "verify"]]);
+  // npm runs through the pinned node, so the CLI path leads the arguments the task itself declares.
+  assert.deepEqual(execution.at(-1).arguments.slice(-5),
+    ["run", "reliability:webkit", "--", "--order", "configured"]);
 });
 
 test("given the live tree changes after pinning, when finishing, then the verified commit remains valid", async () => {

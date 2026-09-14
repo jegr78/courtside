@@ -31,6 +31,30 @@ const backgroundFiles = () => productionJavaFiles()
   .filter((path) => readFileSync(`${repository}/${path}`, "utf8").includes("@Async"))
   .toSorted();
 
+// A listener's own annotations place it, not its file: with @Async the work runs on an executor and
+// is already counted as background, without it on the thread of whatever published the event.
+const ANNOTATED_METHOD =
+  /((?:@\w+(?:\((?:[^()]|\([^()]*\))*\))?\s*)+)(?:public\s+)?void\s+(\w+)\s*\(\s*([\w.]+)/g;
+const LISTENS = /@(?:Transactional)?EventListener\b/;
+
+const listenersIn = (className, source) => [...source.matchAll(ANNOTATED_METHOD)]
+  .filter(([, annotations]) => LISTENS.test(annotations))
+  .map(([, annotations, method, parameter]) => ({
+    entryPoint: `${className}#${method}(${parameter})`,
+    onItsOwnThread: /@Async\b/.test(annotations)
+  }));
+
+const listenerMethods = () => productionJavaFiles().flatMap((path) => {
+  const source = readFileSync(`${repository}/${path}`, "utf8");
+  return listenersIn(source.match(/\bclass\s+(\w+)/)?.[1], source)
+    .map((listener) => ({ ...listener, path }));
+});
+
+const synchronousListeners = () => listenerMethods().filter(({ onItsOwnThread }) => !onItsOwnThread);
+
+const listenerFiles = () =>
+  [...new Set(synchronousListeners().map(({ path }) => path))].toSorted();
+
 const scheduledEntryPoints = () => scheduledFiles().flatMap((path) => {
   const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   const className = source.match(/\bclass\s+(\w+)/)?.[1];
@@ -41,9 +65,12 @@ const scheduledEntryPoints = () => scheduledFiles().flatMap((path) => {
 const backgroundEntryPoints = () => backgroundFiles().flatMap((path) => {
   const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   const className = source.match(/\bclass\s+(\w+)/)?.[1];
-  return [...source.matchAll(/@Async\([^)]*\)\s+(?:@\w+(?:\([^)]*\))?\s+)*(?:public\s+)?void\s+(\w+)\s*\(\s*([\w.]+)/g)]
+  return [...source.matchAll(/@Async(?:\([^)]*\))?\s+(?:@\w+(?:\([^)]*\))?\s+)*(?:public\s+)?void\s+(\w+)\s*\(\s*([\w.]+)/g)]
     .map(([, method, parameter]) => `${className}#${method}(${parameter})`);
 }).toSorted();
+
+const listenerEntryPoints = () =>
+  synchronousListeners().map(({ entryPoint }) => entryPoint).toSorted();
 
 const startupFiles = () => productionJavaFiles()
   .filter((path) => {
@@ -63,7 +90,8 @@ const classified = (kind) => inventory.classifications
   .filter((entry) => entry.kind === kind)
   .flatMap((entry) => entry.entryPoints);
 const productionEntryPoints = () => [
-  ...operationIds(), ...scheduledEntryPoints(), ...backgroundEntryPoints(), ...startupEntryPoints()
+  ...operationIds(), ...scheduledEntryPoints(), ...backgroundEntryPoints(), ...listenerEntryPoints(),
+  ...startupEntryPoints()
 ].toSorted();
 const requireExactCoverage = (actual) => assert.deepEqual(actual.toSorted(), productionEntryPoints());
 const annotationCount = (paths, annotation) => paths.reduce((count, path) =>
@@ -84,6 +112,7 @@ test("given production entry points, when classifying resource demand, then ever
   // given
   const discoveredScheduledFiles = scheduledFiles();
   const discoveredBackgroundFiles = backgroundFiles();
+  const discoveredListenerFiles = listenerFiles();
   const discoveredStartupFiles = startupFiles();
 
   // when
@@ -92,13 +121,49 @@ test("given production entry points, when classifying resource demand, then ever
   // then
   assert.deepEqual(inventory.sources.scheduledFiles.toSorted(), discoveredScheduledFiles);
   assert.deepEqual(inventory.sources.backgroundFiles.toSorted(), discoveredBackgroundFiles);
+  assert.deepEqual(inventory.sources.listenerFiles.toSorted(), discoveredListenerFiles);
   assert.deepEqual(inventory.sources.startupFiles.toSorted(), discoveredStartupFiles);
   assert.equal(scheduledEntryPoints().length, annotationCount(discoveredScheduledFiles, "@Scheduled"));
   assert.equal(backgroundEntryPoints().length, annotationCount(discoveredBackgroundFiles, "@Async"));
+  assert.equal(listenerMethods().length,
+    annotationCount(productionJavaFiles(), "@TransactionalEventListener")
+      + annotationCount(productionJavaFiles(), "@EventListener"));
   requireExactCoverage(actual);
   assert.equal(new Set(actual).size, actual.length, "an entry point has more than one demand decision");
   const ids = inventory.classifications.map(({ id }) => id);
   assert.equal(new Set(ids).size, ids.length, "a demand decision id is duplicated");
+});
+
+test("given listeners of both kinds in one class, when deriving them, then each is placed by its own annotations", () => {
+  // given
+  const source = `
+    class Mailer {
+        @Async("bookingMailExecutor")
+        @TransactionalEventListener
+        void whenBooked(BookingEvent.Booked booked) {
+        }
+
+        @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+        void whenWritten(DomainEventRecord written) {
+        }
+
+        @EventListener
+        void onRefusal(AbstractAuthenticationFailureEvent refused) {
+        }
+
+        void notAListener(String plain) {
+        }
+    }`;
+
+  // when
+  const derived = listenersIn("Mailer", source);
+
+  // then
+  assert.deepEqual(derived, [
+    { entryPoint: "Mailer#whenBooked(BookingEvent.Booked)", onItsOwnThread: true },
+    { entryPoint: "Mailer#whenWritten(DomainEventRecord)", onItsOwnThread: false },
+    { entryPoint: "Mailer#onRefusal(AbstractAuthenticationFailureEvent)", onItsOwnThread: false }
+  ]);
 });
 
 test("given a demanding decision, when a required fact is removed or an unknown claim is added, then validation fails", () => {

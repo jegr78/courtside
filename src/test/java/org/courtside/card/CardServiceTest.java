@@ -17,8 +17,14 @@ class CardServiceTest extends AbstractIntegrationTest {
             UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID TRAINING_CARD =
             UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final UUID LEAGUE_MATCH_CARD =
+            UUID.fromString("33333333-3333-3333-3333-333333333333");
+    private static final UUID COURT_CLOSED_CARD =
+            UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID BALL_MACHINE =
             UUID.fromString("55555555-5555-5555-5555-555555555555");
+    private static final UUID PARTNER_WANTED =
+            UUID.fromString("66666666-6666-6666-6666-666666666666");
 
     @Autowired
     private CardService cardService;
@@ -29,9 +35,9 @@ class CardServiceTest extends AbstractIntegrationTest {
         var result = cardService.activeCards();
 
         // then
-        assertThat(result).extracting(BookingCard::getLabel)
-                .containsExactlyInAnyOrder(
-                        "Member booking", "Training", "League match", "Court closed");
+        assertThat(result).extracting(BookingCard::getId)
+                .containsExactlyInAnyOrder(MEMBER_BOOKING_CARD, TRAINING_CARD, LEAGUE_MATCH_CARD,
+                        COURT_CLOSED_CARD);
     }
 
     @Test
@@ -40,9 +46,9 @@ class CardServiceTest extends AbstractIntegrationTest {
         List<BookingCard> result = cardService.bookableCards(Set.of(Role.ADMIN));
 
         // then
-        assertThat(result).extracting(BookingCard::getLabel)
-                .containsExactlyInAnyOrder(
-                        "Member booking", "Training", "League match", "Court closed");
+        assertThat(result).extracting(BookingCard::getId)
+                .containsExactlyInAnyOrder(MEMBER_BOOKING_CARD, TRAINING_CARD, LEAGUE_MATCH_CARD,
+                        COURT_CLOSED_CARD);
     }
 
     @Test
@@ -52,10 +58,10 @@ class CardServiceTest extends AbstractIntegrationTest {
         List<BookingCard> youth = cardService.bookableCards(Set.of(Role.YOUTH_DIRECTOR));
 
         // then
-        assertThat(sport).extracting(BookingCard::getLabel)
-                .containsExactlyInAnyOrder("Member booking", "Training", "League match");
-        assertThat(youth).extracting(BookingCard::getLabel)
-                .containsExactlyInAnyOrder("Member booking", "Training", "League match");
+        assertThat(sport).extracting(BookingCard::getId)
+                .containsExactlyInAnyOrder(MEMBER_BOOKING_CARD, TRAINING_CARD, LEAGUE_MATCH_CARD);
+        assertThat(youth).extracting(BookingCard::getId)
+                .containsExactlyInAnyOrder(MEMBER_BOOKING_CARD, TRAINING_CARD, LEAGUE_MATCH_CARD);
     }
 
     @Test
@@ -64,8 +70,8 @@ class CardServiceTest extends AbstractIntegrationTest {
         List<BookingCard> result = cardService.bookableCards(Set.of(Role.MEMBER));
 
         // then
-        assertThat(result).extracting(BookingCard::getLabel)
-                .containsExactly("Member booking");
+        assertThat(result).extracting(BookingCard::getId)
+                .containsExactly(MEMBER_BOOKING_CARD);
     }
 
     @Test
@@ -98,17 +104,17 @@ class CardServiceTest extends AbstractIntegrationTest {
         List<BookingCard> result = cardService.activeCards();
 
         // then
-        assertThat(managingRolesOf(result, "Member booking")).isEmpty();
-        assertThat(managingRolesOf(result, "Training")).containsExactlyInAnyOrder(
+        assertThat(managingRolesOf(result, MEMBER_BOOKING_CARD)).isEmpty();
+        assertThat(managingRolesOf(result, TRAINING_CARD)).containsExactlyInAnyOrder(
                 Role.TRAINER, Role.SPORT_DIRECTOR, Role.YOUTH_DIRECTOR);
-        assertThat(managingRolesOf(result, "League match")).containsExactlyInAnyOrder(
+        assertThat(managingRolesOf(result, LEAGUE_MATCH_CARD)).containsExactlyInAnyOrder(
                 Role.SPORT_DIRECTOR, Role.YOUTH_DIRECTOR);
-        assertThat(managingRolesOf(result, "Court closed")).containsExactly(Role.GROUNDSKEEPER);
+        assertThat(managingRolesOf(result, COURT_CLOSED_CARD)).containsExactly(Role.GROUNDSKEEPER);
     }
 
-    private static Set<Role> managingRolesOf(List<BookingCard> cards, String label) {
+    private static Set<Role> managingRolesOf(List<BookingCard> cards, UUID cardId) {
         return cards.stream()
-                .filter(card -> card.getLabel().equals(label))
+                .filter(card -> card.getId().equals(cardId))
                 .findFirst().orElseThrow()
                 .getManagingRoles();
     }
@@ -119,8 +125,8 @@ class CardServiceTest extends AbstractIntegrationTest {
         List<ParticipantCard> participantCards = cardService.activeParticipantCards();
 
         // then
-        assertThat(participantCards).extracting(ParticipantCard::getLabel)
-                .containsExactly("Ball machine", "Looking for a partner");
+        assertThat(participantCards).extracting(ParticipantCard::getId)
+                .containsExactly(BALL_MACHINE, PARTNER_WANTED);
     }
 
     @Test
@@ -129,7 +135,7 @@ class CardServiceTest extends AbstractIntegrationTest {
         ParticipantCard card = cardService.findParticipantCard(BALL_MACHINE).orElseThrow();
 
         // then
-        assertThat(card.getLabel()).isEqualTo("Ball machine");
+        assertThat(card.getId()).isEqualTo(BALL_MACHINE);
         assertThat(card.isActive()).isTrue();
     }
 }

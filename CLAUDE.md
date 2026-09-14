@@ -138,6 +138,16 @@ fails on the missing `BuildProperties` bean.
   parser handles the scanner's real output. `docs/security-environment.md` describes the local run
   and it works on a developer machine: run it after the fix, not only before. A branch that could
   not run it says so in its pull request body instead of claiming the hosted behaviour changes.
+* **A guard over a file a generator writes is unverified until it has read that generator's own
+  output.** This is the rule above in another place, and it has now cost three red runs. A changelog
+  guard checked against a hand-collapsed `CHANGELOG.md` passed on `main` and made every release pull
+  request unmergeable the same hour, because release-please prepends a candidate heading the tree
+  does not carry yet. A version guard was read against files the release after a snapshot silently
+  declines to touch. A resource guard was read against a run that happened not to restart anything.
+  Each was checked against the tree as it looked at that moment and never against the state the next
+  actor produces. Pin the generator's real output as a case — `tools/prerelease-changelog.test.mjs`
+  runs release-please's own heading over this repository's own changelog — rather than a shape
+  chosen by hand, which is what every one of those three had.
 * **Cross-module test setup uses test fixtures.** A module exposes intent-revealing fixture
   operations from `src/test/java/org/courtside/<module>/testfixture`, and consuming integration
   tests register the required fixture explicitly with `@Import`. Fixtures return identifiers or

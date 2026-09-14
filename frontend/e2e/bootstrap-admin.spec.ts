@@ -1,5 +1,6 @@
 import { expect, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { credentialIn, messagesTo, messageTo } from "./mailbox";
+import { MEMBER_BOOKING_CARD, STANDARD_RULE_SET } from "./shipped-rows";
 
 function freeSlot(page: import("@playwright/test").Page, court: number, slot: string) {
   return page.locator(`[data-testid="free-slot"][data-court-number="${court}"][data-slot="${slot}"][data-state="free"]`);
@@ -180,17 +181,20 @@ test("a member who books a court is written to, so the booking outlives the dial
 
     // when
     await targetSlot.click();
+    const cardName = await page.getByTestId("booking-card")
+      .locator(`option[value="${MEMBER_BOOKING_CARD}"]`).textContent();
     await page.getByTestId("member-search").fill("Mary");
     await page.getByTestId("member-match").click();
     await page.getByTestId("booking-submit").click();
     await expect(page.getByTestId("own-allocation")).toBeVisible();
 
-    // then — the account is English, so the message is, and it carries the whole booking
+    // then — the account is English, so the message is; the card is named once, in the club's
+    // language, so the same name reaches every member whatever language they read in
     const confirmation = await messageTo(journeyService.mailboxURL, "jane.doe@example.org");
     expect(confirmation.Text).toContain("16:00");
     expect(confirmation.Text).toContain("16:30");
     expect(confirmation.Text).toContain("Court 3");
-    expect(confirmation.Text).toContain("Member booking");
+    expect(confirmation.Text).toContain(cardName);
   });
 
 test("a seeded member can book a free slot and cancel it again", async ({ page, journeyService }) => {
@@ -245,7 +249,9 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
     response.url().endsWith("/api/admin/booking-cards") && response.request().method() === "POST"
   );
   await page.getByTestId("create-card").click();
-  expect((await cardCreated).status()).toBe(201);
+  const createdCard = await cardCreated;
+  expect(createdCard.status()).toBe(201);
+  const restrictedEventCardId = ((await createdCard.json()) as { id: string }).id;
   await expect(page.getByRole("status")).toBeVisible();
   await page.goto("/");
   await page.getByTestId("preferences-menu").click();
@@ -255,7 +261,7 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
   await page.getByTestId("login-submit").click();
   await selectJourneyDate(page, journeyService.visualDate);
   await freeSlot(page, 3, "13:00").click();
-  await page.getByTestId("booking-card").selectOption({ label: "Restricted event" });
+  await page.getByTestId("booking-card").selectOption(restrictedEventCardId);
   await page.getByTestId("booking-more-summary").click();
   await page.getByTestId("guest-name").fill("John Roe");
 
@@ -318,6 +324,10 @@ test("an admin changes club configuration and a booking rule through the browser
   await page.getByTestId("remove-logo").click();
   expect((await logoRemoved).status()).toBe(200);
   await expect(page.getByTestId("club-logo")).toHaveAttribute("src", "/icon.svg");
+  // The editor opens on whichever rule set sorts first, so the one this member is measured by is
+  // chosen rather than assumed: its own seeded window is what says the switch has landed.
+  await page.getByTestId("rule-set").selectOption(STANDARD_RULE_SET);
+  await expect(page.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue("7");
   await page.getByTestId("rule-ADVANCE_WINDOW-maxDays").fill("1");
   const ruleSaved = page.waitForResponse((response) =>
     response.url().includes("/api/admin/rule-sets/")

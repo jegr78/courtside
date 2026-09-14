@@ -1,5 +1,6 @@
 import { expect, test } from "../../fixtures";
 import { activate, openTheApplication, openTheSlot, signIn, walks } from "../../journey-walking";
+import { COURT_CLOSED_CARD } from "../../shipped-rows";
 
 test("given a groundskeeper standing on a waterlogged court, when they close it on the card the club keeps for that, then the slot is no longer one a member can take",
   walks("session-and-own-account", "booking-participation-and-series"), async ({ page, language }) => {
@@ -10,7 +11,7 @@ test("given a groundskeeper standing on a waterlogged court, when they close it 
 
     // when
     const stillFree = await openTheSlot(page, page.locator('[data-testid="free-slot"][data-state="free"]').first());
-    await page.getByTestId("booking-card").selectOption({ label: "Court closed" });
+    await page.getByTestId("booking-card").selectOption(COURT_CLOSED_CARD);
     await activate(page.getByTestId("booking-submit"));
 
     // then

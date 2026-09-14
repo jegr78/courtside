@@ -299,15 +299,36 @@ and nothing else: no view reloads, so a selection, a typed value and a page alre
 survive the switch, and a failure already on screen is read out again in the language now chosen.
 
 **Which languages an instance has is derived, not declared.** A language exists because the image
-carries a `messages_<tag>` bundle for the screen and a `mail_<tag>` bundle for what is sent, and
-because the frontend carries a translation of the same name; nothing lists the set anywhere, and an
-image that translates one surface but not the other refuses to start rather than writing to a member
-in a language they did not choose. `GET /api/public/config` serves the derived set as
+carries a `messages_<tag>` bundle for the screen, a `mail_<tag>` bundle for what is sent and a
+`seed_<tag>` bundle for the rows the instance ships with, and because the frontend carries a
+translation of the same name; nothing lists the set anywhere, and an image that translates one
+surface but not the others refuses to start rather than writing to a member in a language they did
+not choose. `GET /api/public/config` serves the derived set as
 `supportedLocales`, and every surface that offers a language reads it from there — no client, no
 schema and no database constraint names a language. The contract states the *shape* of a language
 tag; a well-formed tag the instance ships no translation for is refused with
 `urn:courtside:error:language-unsupported`, at the boundary as a field error and again in the
 service that writes it.
+
+**The rows an instance ships with are named in the club's language, once.** A booking card, a slot
+filler, a rule set and a membership type are rows, not text a reader's browser translates, so they
+carry one name for the whole club — a member reading in English sees the same card name as the
+board that named it. The migrations seed them in the base language, and at startup and on a change
+of the club's language each module renames its own rows to what `seed_<tag>` calls them. A row is
+recognised by the id it was seeded with, and only while it still carries one of the names the image
+ships for it: a board that names a row something of its own has that name stand, because no
+language of this image gives the row that name. The converse is the accepted cost of recognising a
+row by its name rather than by a marker column — a board that renames a row to what *another*
+shipped language calls it has chosen a name the image still recognises, and the row goes on
+following the club's language.
+
+Every one of those names is unique per table, so a row takes its new name only when that name is
+free; a name the club has already given to something else stays with the row that has it. A name
+already in use is never a reason for an instance not to start: at startup each row is renamed on its
+own, and one that cannot take its name leaves the others alone. Any other refusal from the database
+is this image's own defect rather than a club's data — a bundle that named a row something no row
+may carry at all — and the instance stops on it instead of filing it as a name in use. A *member* switching their own language still
+re-renders the text and nothing else; what a row is called is the club's answer, not the reader's.
 
 Domain vocabulary:
 

@@ -98,13 +98,17 @@ export function validateResourceCoverage(timeline, attempt, lifecycle) {
   }
   const browserStartedAt = Math.min(...[...processBounds.values()].map(({ startedAt }) => startedAt));
   const browserFinishedAt = Math.max(...[...processBounds.values()].map(({ finishedAt }) => finishedAt));
+  // Sampling begins while the world is still being prepared, so what has to be one process is the
+  // one the browsers ran against - an earlier restart is setup, and a restart during the run is not.
   for (const target of ["application", "proxy", "postgres"]) {
-    const samples = timeline.samples.filter((sample) => sample.target === target);
-    const identities = new Set(samples.map((sample) => target === "application"
+    const covering = timeline.samples.filter((sample) => sample.target === target
+      && Date.parse(sample.recordedAt) >= browserStartedAt
+      && Date.parse(sample.recordedAt) <= browserFinishedAt);
+    const identities = new Set(covering.map((sample) => target === "application"
       ? sample.processId : sample.containerId));
     if (identities.size !== 1
-        || Date.parse(samples[0].recordedAt) > browserStartedAt + maximumGap
-        || Date.parse(samples.at(-1).recordedAt) < browserFinishedAt - maximumGap) {
+        || Date.parse(covering[0].recordedAt) > browserStartedAt + maximumGap
+        || Date.parse(covering.at(-1).recordedAt) < browserFinishedAt - maximumGap) {
       throw new Error(`${target} resource observation does not cover the browser run`);
     }
   }

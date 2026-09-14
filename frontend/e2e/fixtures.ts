@@ -4,6 +4,7 @@ import { journeyInstant, type JourneyService, type JourneyStart } from "./global
 import { connectJourneyService, type JourneyControlReference } from "./journey-control";
 import { diagnoseUnexpectedBrowserTest, observeBrowserDisconnect } from "./browser-diagnostics";
 import { browserFixtureScope, browserIsolationVariant } from "./browser-isolation";
+import { clubLanguage } from "./club-language";
 
 // Every browser is drawn from the pinned image, so a run compares like for like anywhere.
 // A project on the plain origin covers the club that serves Courtside without TLS.
@@ -154,8 +155,10 @@ export const test = base.extend<TestFixtures & JourneyOptions, WorkerFixtures>({
       errors: testInfo.errors.map((error) => error.message ?? error.value ?? "")
     }));
   }, { auto: true }],
-  resetJourney: [async ({ journeyService, start }, provide) => {
-    await journeyService.reset(start);
+  // A project published in a language shows a club that speaks it, because a card, a rule set and
+  // a membership type are rows the club names once and not text the reader's browser translates.
+  resetJourney: [async ({ journeyService, start }, provide, info) => {
+    await journeyService.reset(start, clubLanguage(info.project.use.locale));
     await provide();
   }, { auto: true }]
 });

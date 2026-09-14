@@ -1,5 +1,6 @@
 import { expect, test } from "../../fixtures";
 import { activate, openTheApplication, openTheSlot, signIn, walks } from "../../journey-walking";
+import { TRAINING_CARD } from "../../shipped-rows";
 
 test("given a trainer with one session to arrange, when they take a free slot on the training card, then the court is held for the session and not for a member's game",
   walks("session-and-own-account", "booking-participation-and-series"), async ({ page, language }) => {
@@ -10,7 +11,7 @@ test("given a trainer with one session to arrange, when they take a free slot on
 
     // when
     const stillFree = await openTheSlot(page, page.locator('[data-testid="free-slot"][data-state="free"]').first());
-    await page.getByTestId("booking-card").selectOption({ label: "Training" });
+    await page.getByTestId("booking-card").selectOption(TRAINING_CARD);
     await activate(page.getByTestId("booking-submit"));
 
     // then

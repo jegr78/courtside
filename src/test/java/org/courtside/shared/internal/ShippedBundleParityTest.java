@@ -25,7 +25,7 @@ class ShippedBundleParityTest {
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([^}]*)}");
 
     @ParameterizedTest
-    @ValueSource(strings = {"messages", "mail"})
+    @ValueSource(strings = {"messages", "mail", "seed"})
     void givenATranslatedBundle_whenComparingItWithItsBase_thenNeitherSideCarriesAKeyTheOtherLacks(
             String family) throws IOException {
         // given
@@ -42,7 +42,7 @@ class ShippedBundleParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"messages", "mail"})
+    @ValueSource(strings = {"messages", "mail", "seed"})
     void givenATranslatedValue_whenComparingItsPlaceholders_thenItNamesTheSameOnes(String family)
             throws IOException {
         // given
@@ -78,6 +78,35 @@ class ShippedBundleParityTest {
         // when / then
         assertThat(translationsOf("messages")).isNotEmpty();
         assertThat(translationsOf("mail")).isNotEmpty();
+        assertThat(translationsOf("seed")).isNotEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"messages", "mail", "seed"})
+    void givenAShippedBundle_whenReadingWhatItSays_thenNoValueOfItIsBlank(String family)
+            throws IOException {
+        // given
+        List<Properties> bundles = new ArrayList<>();
+        bundles.add(read(family + ".properties"));
+        for (Resource translated : translationsOf(family)) {
+            bundles.add(read(translated.getFilename()));
+        }
+
+        // when
+        TreeSet<String> blank = new TreeSet<>();
+        for (Properties bundle : bundles) {
+            for (String key : bundle.stringPropertyNames()) {
+                if (bundle.getProperty(key).isBlank()) {
+                    blank.add(key);
+                }
+            }
+        }
+
+        // then
+        assertThat(blank)
+                .as("a blank value reaches a member as nothing at all, and a shipped row named this"
+                        + " way is refused by the constraint that keeps a name from being empty")
+                .isEmpty();
     }
 
     private static TreeSet<String> placeholdersIn(String value) {

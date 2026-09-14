@@ -19,7 +19,7 @@ class ShippedLanguagesTest {
     void givenAnImageCarryingAThirdLanguage_whenReadingWhatItShips_thenThatLanguageIsOffered() {
         // given
         SupportedLanguages languages = languagesOf("messages_de.properties, messages_fr.properties",
-                "mail_de.properties, mail_fr.properties");
+                "mail_de.properties, mail_fr.properties", "seed_de.properties, seed_fr.properties");
 
         // when / then — nothing names French anywhere; both bundles being present is what says so
         assertThat(languages.tags()).containsExactly("de", "en", "fr");
@@ -29,7 +29,7 @@ class ShippedLanguagesTest {
     @Test
     void givenNoTranslatedBundleAtAll_whenReadingWhatItShips_thenTheBaseLanguageStandsAlone() {
         // given
-        SupportedLanguages languages = languagesOf("", "");
+        SupportedLanguages languages = languagesOf("", "", "");
 
         // when / then
         assertThat(languages.tags()).containsExactly("en");
@@ -38,7 +38,8 @@ class ShippedLanguagesTest {
     @Test
     void givenARegionalBundle_whenReadingWhatItShips_thenItIsOfferedAsALanguageTag() {
         // given
-        SupportedLanguages languages = languagesOf("messages_pt_BR.properties", "mail_pt_BR.properties");
+        SupportedLanguages languages = languagesOf("messages_pt_BR.properties",
+                "mail_pt_BR.properties", "seed_pt_BR.properties");
 
         // when / then — the file name separates with an underscore, a language tag with a hyphen
         assertThat(languages.tags()).containsExactly("en", "pt-BR");
@@ -47,16 +48,25 @@ class ShippedLanguagesTest {
     @Test
     void givenALanguageTranslatedForTheScreenButNotForTheMail_whenStarting_thenItRefusesToStart() {
         // when / then — half a translation would reach a member as a message in another language
-        assertThatThrownBy(() -> languagesOf("messages_fr.properties", "").tags())
+        assertThatThrownBy(() -> languagesOf("messages_fr.properties", "", "").tags())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("fr")
                 .hasMessageContaining("mail");
     }
 
     @Test
+    void givenALanguageTranslatedForTheMessagesButNotForTheShippedRows_whenStarting_thenItRefusesToStart() {
+        // when / then — the rows the instance ships are read by the same club as the messages are
+        assertThatThrownBy(() -> languagesOf("messages_fr.properties", "mail_fr.properties", "").tags())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("fr")
+                .hasMessageContaining("seed");
+    }
+
+    @Test
     void whenAskedAboutALanguageItDoesNotShip_thenItSaysSo() {
         // given
-        SupportedLanguages languages = languagesOf("messages_de.properties", "mail_de.properties");
+        SupportedLanguages languages = languagesOf("messages_de.properties", "mail_de.properties", "seed_de.properties");
 
         // when / then
         assertThat(languages.supports("fr")).isFalse();
@@ -73,10 +83,12 @@ class ShippedLanguagesTest {
         assertThat(languages.tags()).containsExactly("de", "en");
     }
 
-    private static SupportedLanguages languagesOf(String screenBundles, String mailBundles) {
+    private static SupportedLanguages languagesOf(String screenBundles, String mailBundles,
+                                                  String seedBundles) {
         return new ShippedLanguages(new StubResolver(Map.of(
                 "classpath*:messages_*.properties", screenBundles,
-                "classpath*:mail_*.properties", mailBundles)));
+                "classpath*:mail_*.properties", mailBundles,
+                "classpath*:seed_*.properties", seedBundles)));
     }
 
     private record StubResolver(Map<String, String> fileNamesByPattern) implements ResourcePatternResolver {
