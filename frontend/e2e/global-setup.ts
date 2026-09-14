@@ -885,7 +885,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         }
         return running.endpoint;
       }
-      const language = browserLanguage(locale);
+      const language = browserLanguage(browserName, locale);
       // Docker publishes the mapped port on every interface and the server has no authentication,
       // so the unguessable endpoint path is what keeps a reachable port from being a browser.
       const wsPath = `/${randomUUID()}`;

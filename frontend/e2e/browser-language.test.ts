@@ -4,7 +4,7 @@ import { browserLanguage } from "./browser-language";
 describe("browserLanguage", () => {
   it("given a project without a locale, when its browser is configured, then it stays the shared one", () => {
     // when
-    const settings = browserLanguage(undefined);
+    const settings = browserLanguage("webkit", undefined);
 
     // then
     expect(settings).toEqual({ environment: {}, launchOptions: {} });
@@ -12,7 +12,7 @@ describe("browserLanguage", () => {
 
   it("given a project that declares German, when its browser is configured, then the process speaks it", () => {
     // when
-    const settings = browserLanguage("de-DE");
+    const settings = browserLanguage("chromium", "de-DE");
 
     // then
     expect(settings).toEqual({
@@ -23,7 +23,7 @@ describe("browserLanguage", () => {
 
   it("given a project that declares British English, when its browser is configured, then the process speaks it", () => {
     // when
-    const settings = browserLanguage("en-GB");
+    const settings = browserLanguage("chromium", "en-GB");
 
     // then
     expect(settings).toEqual({
@@ -32,10 +32,16 @@ describe("browserLanguage", () => {
     });
   });
 
+  it("given an engine no capture was measured in, when a locale is asked of it, then it is refused", () => {
+    // when / then
+    expect(() => browserLanguage("webkit", "de-DE")).toThrow(/Only chromium can be started in a language: webkit/);
+    expect(() => browserLanguage("firefox", "de-DE")).toThrow(/Only chromium can be started in a language: firefox/);
+  });
+
   it("given a locale no browser could be started for, when it is read, then it is refused rather than passed on", () => {
     // when / then
-    expect(() => browserLanguage("de")).toThrow(/Unsupported capture locale: de/);
-    expect(() => browserLanguage("de_DE")).toThrow(/Unsupported capture locale: de_DE/);
-    expect(() => browserLanguage("../etc")).toThrow(/Unsupported capture locale/);
+    expect(() => browserLanguage("chromium", "de")).toThrow(/Unsupported capture locale: de/);
+    expect(() => browserLanguage("chromium", "de_DE")).toThrow(/Unsupported capture locale: de_DE/);
+    expect(() => browserLanguage("chromium", "../etc")).toThrow(/Unsupported capture locale/);
   });
 });
