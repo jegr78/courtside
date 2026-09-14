@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -9,6 +9,29 @@ const catalogue = JSON.parse(readFileSync(
   new URL("../site/screenshots/captures.json", import.meta.url), "utf8"));
 
 const IMAGE = /!\[([^\]]*)\]\(([^\s)]+)\)/g;
+const SECTION = /^## +(.+)$/m;
+const SHOWS_AN_IMAGE = /!\[[^\]]*\]\([^\s)]+\)/;
+
+// A guide is what a member or a board is told to read; index.md is the shelf those guides stand
+// on, so it carries links rather than passages and no surface of its own.
+function guidePages() {
+  return ["site", "site/en"].flatMap((directory) => readdirSync(resolve(repository, directory))
+    .filter((name) => name.endsWith("-guide.md")).map((name) => `${directory}/${name}`));
+}
+
+function sections(source) {
+  const parts = source.split(SECTION);
+  return parts.slice(1).reduce((found, part, index) => index % 2 === 0
+    ? [...found, { heading: part.trim(), body: "" }]
+    : [...found.slice(0, -1), { ...found[found.length - 1], body: part }], []);
+}
+
+// The passage describes a message the instance sends. There is no screen behind it to show, and a
+// picture of another one would illustrate the wrong thing.
+const NO_SCREEN_SHOWS_THIS = {
+  "site/member-guide.md": ["Wenn sich unter deiner Buchung etwas ändert"],
+  "site/en/member-guide.md": ["When something under your booking changes"]
+};
 
 test("given the captured surfaces, when the guides are read, then each page shows what the "
   + "catalogue says it shows", () => {
@@ -88,5 +111,39 @@ test("given a guide, when it shows an image, then the catalogue declares it", ()
       assert.ok(declared.has(`${page}::${name}`),
         `${page} shows ${target}, which the catalogue does not give it`);
     }
+  }
+});
+
+test("given a guide, when a section is read, then it shows the surface the passage describes", () => {
+  // given
+  const pages = guidePages();
+  assert.notEqual(pages.length, 0, "the site carries no guide");
+
+  // when / then
+  for (const page of pages) {
+    const found = sections(readFileSync(resolve(repository, page), "utf8"));
+    assert.notEqual(found.length, 0, `${page} is a guide without a section`);
+    const exempt = NO_SCREEN_SHOWS_THIS[page] ?? [];
+    for (const heading of exempt) {
+      assert.ok(found.some((section) => section.heading === heading),
+        `${page} has no section "${heading}" for its exemption to cover`);
+    }
+    for (const { heading, body } of found.filter((section) => !exempt.includes(section.heading))) {
+      assert.match(body, SHOWS_AN_IMAGE, `${page} describes "${heading}" without showing it`);
+    }
+  }
+});
+
+test("given a capture, when it is shown, then it illustrates the same passage in every locale", () => {
+  // when / then
+  for (const { name, pages } of catalogue.captures) {
+    const passages = catalogue.locales.map((locale) => {
+      const found = sections(readFileSync(resolve(repository, pages[locale]), "utf8"));
+      const passage = found.findIndex(({ body }) => body.includes(`/${name}.png`));
+      assert.notEqual(passage, -1, `${pages[locale]} shows ${name} outside any section`);
+      return passage;
+    });
+    assert.equal(new Set(passages).size, 1,
+      `${name} illustrates a different passage per locale`);
   }
 });

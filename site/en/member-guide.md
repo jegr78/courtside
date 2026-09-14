@@ -30,6 +30,8 @@ typed everything correctly, the credentials may have expired or never arrived, o
 deactivated. For the first two, *Forgotten your password or username?* sits under the form; if the
 account is deactivated, only your board can help.
 
+![The sign-in form with username and password, and the link for forgotten credentials below it.](../screenshots/en/sign-in.png)
+
 ## Forgotten password or username
 
 The page behind that link holds three forms, and none of them needs you to be signed in.
@@ -67,6 +69,8 @@ Redeeming counts only the network connection the attempts come from, never your 
 nobody can hold your recovery shut by guessing codes at you. If you share a connection with other
 members, though, their guesses and yours land in the same bucket.
 
+![The page behind that link with its three forms: ask for a code, redeem a code, send the usernames.](../screenshots/en/account-recovery.png)
+
 ## Replacing the one-time password
 
 This is about the password your board sends you — for your first sign-in, or when you cannot reach
@@ -87,6 +91,8 @@ breach. Your password does not leave the instance for that: what travels is five
 checksum, which the password cannot be recovered from. If the service does not answer, Courtside
 refuses the change rather than storing something unchecked, and you try again later. Otherwise you
 sign in once more and you are in.
+
+![The Replace one-time password page with the new password and its repetition.](../screenshots/en/initial-password.png)
 
 ## Creating a booking
 
@@ -122,6 +128,8 @@ The kind decides, among other things,
 Kinds of booking are rows in your club's database, not a fixed list inside the program. What you
 find in the dialog is what your board set up.
 
+![The Kind of booking field in the booking dialogue, showing the kind the club set up.](../screenshots/en/booking-kind.png)
+
 ## Players and guests
 
 If the chosen kind records players, the dialog shows how many of how many you have entered. There
@@ -138,12 +146,16 @@ are three sorts of player:
 Whoever you enter is told, not asked: the member you recorded receives an email. They do not have
 to agree, and they can take themselves out again.
 
+![The player part of the booking dialogue: how many slots are taken, the member search, and the expanded fields for guests and What plays.](../screenshots/en/booking-participants.png)
+
 ## Recorded as a co-player
 
 *My bookings* carries a section of its own: **Recorded as a co-player**. It holds the bookings
 other members made with your name in them. Nobody asked you first, and that section is where you
 take yourself out, without needing anyone's permission. Whoever made the booking is told; the
 booking itself stays.
+
+![The Recorded as a co-player section under My bookings, each entry carrying the button that takes you out.](../screenshots/en/participations.png)
 
 ## When a rule refuses the booking
 
@@ -169,6 +181,8 @@ These refusals exist:
 
 How many days, how many minutes, how many bookings: that lives in your club's rules, and Courtside
 names the number in the message itself.
+
+![The booking dialogue after a refused booking: the message sits next to the field it concerns and names the number from the rule.](../screenshots/en/refused-booking.png)
 
 ## Cancelling
 
@@ -198,6 +212,8 @@ Two things matter about them:
   between *This occurrence*, *This and following* and *Whole series* when cancelling or moving.
   Before a move, Courtside shows which occurrences would be affected and which of them cannot move,
   because their court would then be occupied or unavailable.
+
+![The form for a series with courts, kind of booking, first appointment, time, duration, weekdays and end.](../screenshots/en/series-form.png)
 
 ## When something under your booking changes
 
@@ -230,6 +246,8 @@ Without those four you could not reach your account, you would not hear about a 
 booking, and you would not hear that somebody recorded you in one. That is why they cannot be
 switched off.
 
+![The Notifications page with the messages that can be switched off and those that are always sent.](../screenshots/en/notification-choices.png)
+
 ## Your account
 
 Under *Account security* you change your password and see which browsers your account is signed in
@@ -242,3 +260,5 @@ once more first. The session you are in ends without that question.
 
 If the board mistyped your name or your username, that is not permanent: everything a club enters,
 a club can correct.
+
+![Account security with the password change and the list of browsers the account is signed in on.](../screenshots/en/account-security.png)

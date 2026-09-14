@@ -144,7 +144,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
     </Button>;
   }
 
-  return <section className="surface-subtle mt-6 grid gap-4 rounded-xl border p-4" aria-labelledby="series-title">
+  return <section data-testid="series-form" className="surface-subtle mt-6 grid gap-4 rounded-xl border p-4" aria-labelledby="series-title">
     <h3 id="series-title" className="text-xl font-bold">{t("series.new")}</h3>
 
     <div className="grid gap-2">
