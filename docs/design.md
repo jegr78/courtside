@@ -323,9 +323,11 @@ shipped language calls it has chosen a name the image still recognises, and the 
 following the club's language.
 
 Every one of those names is unique per table, so a row takes its new name only when that name is
-free; a name the club has already given to something else stays with the row that has it. Naming is
-never a reason for an instance not to start: at startup each row is renamed on its own, and one that
-cannot take its name leaves the others alone. A *member* switching their own language still
+free; a name the club has already given to something else stays with the row that has it. A name
+already in use is never a reason for an instance not to start: at startup each row is renamed on its
+own, and one that cannot take its name leaves the others alone. Any other refusal from the database
+is this image's own defect rather than a club's data — a bundle that named a row something no row
+may carry at all — and the instance stops on it instead of filing it as a name in use. A *member* switching their own language still
 re-renders the text and nothing else; what a row is called is the club's answer, not the reader's.
 
 Domain vocabulary:

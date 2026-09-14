@@ -43,10 +43,6 @@ public class ParticipantCard {
         this.capacity = capacity;
     }
 
-    public void rename(String label) {
-        this.label = label;
-    }
-
     public void activate() {
         this.active = true;
     }

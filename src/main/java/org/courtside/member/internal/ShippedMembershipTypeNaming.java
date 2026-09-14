@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.ConfigEvent;
 import org.courtside.shared.ShippedNames;
+import org.courtside.shared.SqlConstraintViolation;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -19,6 +20,8 @@ import java.util.UUID;
 @Component
 @Slf4j
 class ShippedMembershipTypeNaming implements ApplicationRunner {
+
+    private static final String UNIQUE_MEMBERSHIP_TYPE_NAME = "membership_type_unique_name";
 
     private static final Map<UUID, String> MEMBERSHIP_TYPES = Map.of(
             UUID.fromString("cccccccc-0000-0000-0000-000000000001"), "membershipType.active",
@@ -51,22 +54,23 @@ class ShippedMembershipTypeNaming implements ApplicationRunner {
     }
 
     private void nameThemIn(String language) {
-        MEMBERSHIP_TYPES.forEach((id, key) -> membershipTypes.findById(id)
-                .filter(type -> names.isStillTheShippedName(key, type.getName()))
-                .ifPresent(type -> rename(type, names.in(key, language))));
+        MEMBERSHIP_TYPES.forEach((id, key) -> nameOrKeepTakenName(
+                () -> membershipTypes.nameShippedType(id, names.in(key, language),
+                        names.everyLanguage(key)), key));
     }
 
-    // Every one of these names is unique per table, so a club already using this one keeps it and
-    // the row keeps the name it has. Naming is never a reason for an instance not to start.
-    private void rename(MembershipType type, String name) {
-        if (name.equals(type.getName())) {
-            return;
-        }
-        type.rename(name);
+    // A name already in use is the one failure naming expects, and it is never a reason for an
+    // instance not to start; any other violation is this image's own bug rather than a club's data.
+    private void nameOrKeepTakenName(Runnable name, String key) {
         try {
-            ownTransaction.executeWithoutResult(status -> membershipTypes.saveAndFlush(type));
-        } catch (DataIntegrityViolationException taken) {
-            log.info("A shipped membership type keeps its name, because {} is already in use", name);
+            ownTransaction.executeWithoutResult(status -> name.run());
+        } catch (DataIntegrityViolationException e) {
+            if (!SqlConstraintViolation.matches(
+                    e, SqlConstraintViolation.UNIQUE_VIOLATION, UNIQUE_MEMBERSHIP_TYPE_NAME)) {
+                throw e;
+            }
+            log.info("The shipped row {} keeps the name it has, because the one its club's language"
+                    + " gives it is already in use", key);
         }
     }
 }

@@ -1,11 +1,10 @@
 package org.courtside.card.internal;
 
 import lombok.extern.slf4j.Slf4j;
-import org.courtside.card.BookingCard;
-import org.courtside.card.ParticipantCard;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.ConfigEvent;
 import org.courtside.shared.ShippedNames;
+import org.courtside.shared.SqlConstraintViolation;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -21,6 +20,9 @@ import java.util.UUID;
 @Component
 @Slf4j
 class ShippedCardNaming implements ApplicationRunner {
+
+    private static final String UNIQUE_BOOKING_CARD_LABEL = "booking_card_unique_label";
+    private static final String UNIQUE_PARTICIPANT_CARD_LABEL = "participant_card_unique_label";
 
     private static final Map<UUID, String> BOOKING_CARDS = Map.of(
             UUID.fromString("11111111-1111-1111-1111-111111111111"), "bookingCard.member",
@@ -62,37 +64,26 @@ class ShippedCardNaming implements ApplicationRunner {
     }
 
     private void nameThemIn(String language) {
-        BOOKING_CARDS.forEach((id, key) -> bookingCards.findById(id)
-                .filter(card -> names.isStillTheShippedName(key, card.getLabel()))
-                .ifPresent(card -> renameBookingCard(card, names.in(key, language))));
-        PARTICIPANT_CARDS.forEach((id, key) -> participantCards.findById(id)
-                .filter(card -> names.isStillTheShippedName(key, card.getLabel()))
-                .ifPresent(card -> renameParticipantCard(card, names.in(key, language))));
+        BOOKING_CARDS.forEach((id, key) -> nameOrKeepTakenLabel(
+                () -> bookingCards.nameShippedCard(id, names.in(key, language),
+                        names.everyLanguage(key)), key, UNIQUE_BOOKING_CARD_LABEL));
+        PARTICIPANT_CARDS.forEach((id, key) -> nameOrKeepTakenLabel(
+                () -> participantCards.nameShippedCard(id, names.in(key, language),
+                        names.everyLanguage(key)), key, UNIQUE_PARTICIPANT_CARD_LABEL));
     }
 
-    private void renameBookingCard(BookingCard card, String name) {
-        if (name.equals(card.getLabel())) {
-            return;
-        }
-        card.rename(name);
-        nameIt(() -> bookingCards.saveAndFlush(card), name);
-    }
-
-    private void renameParticipantCard(ParticipantCard card, String name) {
-        if (name.equals(card.getLabel())) {
-            return;
-        }
-        card.rename(name);
-        nameIt(() -> participantCards.saveAndFlush(card), name);
-    }
-
-    // Every one of these names is unique per table, so a club already using this one keeps it and
-    // the row keeps the name it has. Naming is never a reason for an instance not to start.
-    private void nameIt(Runnable save, String name) {
+    // A name already in use is the one failure naming expects, and it is never a reason for an
+    // instance not to start; any other violation is this image's own bug rather than a club's data.
+    private void nameOrKeepTakenLabel(Runnable name, String key, String constraint) {
         try {
-            ownTransaction.executeWithoutResult(status -> save.run());
-        } catch (DataIntegrityViolationException taken) {
-            log.info("A shipped row keeps its name, because {} is already in use", name);
+            ownTransaction.executeWithoutResult(status -> name.run());
+        } catch (DataIntegrityViolationException e) {
+            if (!SqlConstraintViolation.matches(
+                    e, SqlConstraintViolation.UNIQUE_VIOLATION, constraint)) {
+                throw e;
+            }
+            log.info("The shipped row {} keeps the name it has, because the one its club's language"
+                    + " gives it is already in use", key);
         }
     }
 }

@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.ConfigEvent;
 import org.courtside.shared.ShippedNames;
+import org.courtside.shared.SqlConstraintViolation;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -19,6 +20,8 @@ import java.util.UUID;
 @Component
 @Slf4j
 class ShippedRuleSetNaming implements ApplicationRunner {
+
+    private static final String UNIQUE_RULE_SET_NAME = "rule_set_unique_name";
 
     private static final Map<UUID, String> RULE_SETS = Map.of(
             UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001"), "ruleSet.standard",
@@ -51,22 +54,23 @@ class ShippedRuleSetNaming implements ApplicationRunner {
     }
 
     private void nameThemIn(String language) {
-        RULE_SETS.forEach((id, key) -> ruleSets.findById(id)
-                .filter(ruleSet -> names.isStillTheShippedName(key, ruleSet.getName()))
-                .ifPresent(ruleSet -> rename(ruleSet, names.in(key, language))));
+        RULE_SETS.forEach((id, key) -> nameOrKeepTakenName(
+                () -> ruleSets.nameShippedRuleSet(id, names.in(key, language),
+                        names.everyLanguage(key)), key));
     }
 
-    // Every one of these names is unique per table, so a club already using this one keeps it and
-    // the row keeps the name it has. Naming is never a reason for an instance not to start.
-    private void rename(RuleSet ruleSet, String name) {
-        if (name.equals(ruleSet.getName())) {
-            return;
-        }
-        ruleSet.rename(name);
+    // A name already in use is the one failure naming expects, and it is never a reason for an
+    // instance not to start; any other violation is this image's own bug rather than a club's data.
+    private void nameOrKeepTakenName(Runnable name, String key) {
         try {
-            ownTransaction.executeWithoutResult(status -> ruleSets.saveAndFlush(ruleSet));
-        } catch (DataIntegrityViolationException taken) {
-            log.info("A shipped rule set keeps its name, because {} is already in use", name);
+            ownTransaction.executeWithoutResult(status -> name.run());
+        } catch (DataIntegrityViolationException e) {
+            if (!SqlConstraintViolation.matches(
+                    e, SqlConstraintViolation.UNIQUE_VIOLATION, UNIQUE_RULE_SET_NAME)) {
+                throw e;
+            }
+            log.info("The shipped row {} keeps the name it has, because the one its club's language"
+                    + " gives it is already in use", key);
         }
     }
 }
