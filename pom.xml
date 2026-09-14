@@ -36,6 +36,7 @@
         <skipTests>false</skipTests>
         <frontend.skip>false</frontend.skip>
         <frontend.test.skip>${skipTests}</frontend.test.skip>
+        <frontend.e2e.skip>${frontend.skip}</frontend.e2e.skip>
         <openapi-generator.version>7.25.0</openapi-generator.version>
         <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
         <frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
@@ -246,7 +247,10 @@
                         <id>npm-e2e</id>
                         <phase>integration-test</phase>
                         <goals><goal>npm</goal></goals>
-                        <configuration><arguments>run test:e2e</arguments></configuration>
+                        <configuration>
+                            <arguments>run test:e2e</arguments>
+                            <skip>${frontend.e2e.skip}</skip>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

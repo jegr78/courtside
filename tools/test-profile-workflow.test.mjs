@@ -95,6 +95,9 @@ test("given backend and security jobs, when they build java, then maven skips ev
     /<id>copy-web-client<\/id>[\s\S]+<skip>\$\{frontend\.skip}<\/skip>/);
   assert.match(pom,
     /<id>java-only<\/id>[\s\S]+<frontend\.skip>true<\/frontend\.skip>[\s\S]+<frontend\.test\.skip>true<\/frontend\.test\.skip>/);
+  assert.match(pom,
+    /<frontend\.e2e\.skip>\$\{frontend\.skip}<\/frontend\.e2e\.skip>/,
+    "the execution-level E2E skip must follow the profile-level frontend skip");
 });
 
 test("given remote npm audit is scheduled separately, when dependencies are installed, then regular builds do not call it", () => {

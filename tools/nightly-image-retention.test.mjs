@@ -160,6 +160,58 @@ test("given a digest shared by nightly and a release tag, when nightly dates exp
   assert.deepEqual(plan.deleteVersionIds, []);
 });
 
+test("given a failed release candidate outlives its evidence, when nightly retention runs, then its complete closure expires", () => {
+  // given
+  const image = `sha256:${"a".repeat(64)}`;
+  const child = `sha256:${"b".repeat(64)}`;
+  const signature = `sha256:${"c".repeat(64)}`;
+  const versions = [
+    version(1, image, [`release-candidate-${"d".repeat(40)}`], "2026-08-29T11:59:59.999Z"),
+    version(2, child, [], "2026-08-29T11:59:59.999Z"),
+    version(3, signature, [`sha256-${"a".repeat(64)}.sig`], "2026-08-29T11:59:59.999Z"),
+  ];
+
+  // when
+  const plan = planNightlyImageRetention({ versions, manifests: {
+    [image]: { children: [child] }, [child]: { children: [] }, [signature]: { children: [] },
+  }, now });
+
+  // then
+  assert.deepEqual(plan.deleteVersionIds, [1, 2, 3]);
+});
+
+test("given a recent failed release candidate, when retention runs, then its diagnostic closure remains", () => {
+  // given
+  const image = `sha256:${"a".repeat(64)}`;
+  const child = `sha256:${"b".repeat(64)}`;
+  const versions = [
+    version(1, image, [`release-candidate-${"d".repeat(40)}`], "2026-09-01T12:00:00.000Z"),
+    version(2, child, [], "2026-09-01T12:00:00.000Z"),
+  ];
+
+  // when
+  const plan = planNightlyImageRetention({ versions,
+    manifests: { [image]: { children: [child] }, [child]: { children: [] } }, now });
+
+  // then
+  assert.deepEqual(plan.keepVersionIds, [1, 2]);
+  assert.deepEqual(plan.deleteVersionIds, []);
+});
+
+test("given a published version shares its digest with a release candidate, when retention runs, then it remains", () => {
+  // given
+  const image = `sha256:${"a".repeat(64)}`;
+  const versions = [version(1, image,
+    [`release-candidate-${"d".repeat(40)}`, "0.1.0-rc.1"], "2026-08-01T12:00:00.000Z")];
+
+  // when
+  const plan = planNightlyImageRetention({ versions, manifests: manifests(image), now });
+
+  // then
+  assert.deepEqual(plan.keepVersionIds, [1]);
+  assert.deepEqual(plan.deleteVersionIds, []);
+});
+
 test("given an old candidate digest whose tag moved, when retention is planned, then the orphan is deleted", () => {
   // given
   const current = `sha256:${"e".repeat(64)}`;

@@ -98,6 +98,10 @@ test("given a pull-request branch dispatch, when the candidate runs, then it use
   assert.match(source, /publish=false/);
   assert.match(String(workflow.jobs.publish.if), /needs\.select\.outputs\.publish == 'true'/);
   assert.match(String(workflow.jobs.retention.if), /needs\.select\.outputs\.publish == 'true'/);
+  assert.equal(workflow.jobs["retention-plan"].if,
+    "github.event_name == 'workflow_dispatch' && inputs.publish != true");
+  assert.equal(workflow.jobs["retention-plan"].permissions.packages, "read");
+  assert.doesNotMatch(workflow.jobs["retention-plan"].steps.at(-1).run, /--apply/);
 });
 
 test("given a candidate digest, when it is qualified, then both architectures run deployment and image security gates", () => {

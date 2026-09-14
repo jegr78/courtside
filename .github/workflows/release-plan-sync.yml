@@ -1,6 +1,7 @@
 name: release plan sync
 
 on:
+  workflow_call:
   issues:
     types: [closed, edited, milestoned, demilestoned, reopened]
   release:
@@ -10,8 +11,6 @@ on:
     paths:
       - .github/workflows/release-plan-sync.yml
       - tools/release-plan-sync.mjs
-  schedule:
-    - cron: '41 3 * * *'
   workflow_dispatch:
 
 permissions: {}

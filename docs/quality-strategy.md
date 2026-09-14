@@ -41,7 +41,7 @@ Tests are placed at the lowest level that can prove the risk. Database guarantee
 | Local unit and contract feedback | under 2 minutes | Focused tests for the changed decision and its negative boundary. |
 | Required pull-request checks | under 15 minutes | Green required checks plus the pull-request risk and evidence declaration. |
 | Local single-area pull-request verification | under 15 minutes | `node tools/courtside.mjs check` selects and runs one protected reduced profile against a pinned commit. |
-| Local combined or full pull-request verification | under 25 minutes | Mixed profiles run additively; `full` runs a clean Maven verification against the same pinned commit. |
+| Local combined or full pull-request verification | under 25 minutes | Mixed profiles run additively; `full` validates every GitHub Actions workflow and runs a clean Maven verification against the same pinned commit. |
 | Nightly qualification | under 90 minutes | Periodic browser, order, concurrency, security and bounded performance evidence assigned by risk. |
 | Release qualification | under 45 minutes | Candidate-image, upgrade, restore and release-risk evidence; long soak runs are recorded separately. |
 
@@ -123,6 +123,14 @@ remain `full`. Every reduced entry names a validator that a job of its own profi
 executes, derived from what those jobs run rather than from which profile happens to own the test
 file. Unknown files, missing validators, a validator no selected job runs, and stale or
 duplicate manifest entries fail closed.
+
+The full local profile runs the pinned `actionlint` release before the longer Maven build. CI
+downloads the matching official release archive and verifies its GitHub attestation before running
+the same check. ShellCheck remains a separate repository concern, so this invocation checks GitHub
+workflow structure, expressions, job dependencies and permissions without making a platform's
+optional ShellCheck installation part of the result. The one ignored diagnostic names a permission
+that GitHub documents but the pinned actionlint release does not yet know; `ci/actionlint.json`
+keeps that exception next to the version that requires it.
 
 The selection has no separate admission step. What keeps it honest is that both inventories are
 closed and everything unrecognised fails closed: an unclassified path, a structural change such as a

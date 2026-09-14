@@ -146,7 +146,7 @@ test("given destructive or unknown changes, when planning the local check, then 
   // then
   assert.deepEqual(deleted.profiles, ["full"]);
   assert.deepEqual(unknown.profiles, ["full"]);
-  assert.deepEqual(deleted.tasks.map((task) => task.label), ["docs-check", "full"]);
+  assert.deepEqual(deleted.tasks.map((task) => task.label), ["workflow-lint", "docs-check", "full"]);
 });
 
 // A documentation change selects the full profile through one path only — a file the classifier
@@ -158,7 +158,7 @@ test("given a full plan, when its tasks are planned, then the documentation gate
 
     // then
     assert.deepEqual(plan.profiles, ["full"]);
-    assert.deepEqual(plan.tasks.map((task) => task.label), ["docs-check", "full"]);
+    assert.deepEqual(plan.tasks.map((task) => task.label), ["workflow-lint", "docs-check", "full"]);
     assert.deepEqual(plan.tasks.at(-1), {
       label: "full", workingDirectory: "repository", executable: "maven",
       arguments: ["clean", "verify"]
@@ -188,6 +188,10 @@ test("given no base commit, when the protected classification fails closed, then
     // then
     assert.deepEqual(classified.profiles, ["full"]);
     assert.deepEqual(classified.localTasks, [
+      {
+        label: "workflow-lint", workingDirectory: "repository", executable: "node",
+        arguments: ["tools/workflow-lint.mjs", "--check"]
+      },
       {
         label: "docs-check", workingDirectory: "repository", executable: "node",
         arguments: ["tools/docs-check.mjs", "--check"]
@@ -586,10 +590,10 @@ test("given protected classification fails, when planning locally, then candidat
 
   // then
   assert.deepEqual(record.profiles, ["full"]);
-  assert.deepEqual(record.tasks, ["docs-check", "full"]);
+  assert.deepEqual(record.tasks, ["workflow-lint", "docs-check", "full"]);
   const execution = localVerificationPlans(planTasks({ profiles: ["full"] }).tasks, "linux", "/repo");
   assert.deepEqual(execution.map((plan) => plan.arguments),
-    [["tools/docs-check.mjs", "--check"], ["clean", "verify"]]);
+    [["tools/workflow-lint.mjs", "--check"], ["tools/docs-check.mjs", "--check"], ["clean", "verify"]]);
 });
 
 test("given the live tree changes after pinning, when finishing, then the verified commit remains valid", async () => {

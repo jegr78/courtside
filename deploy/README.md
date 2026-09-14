@@ -101,7 +101,10 @@ docker pull ghcr.io/jegr78/courtside:nightly-<yyyymmdd>-<sha7>@sha256:<digest>
 The registry keeps the seven newest dated nightly tags and their image, signature and attestation
 manifests. With daily changes to `main`, that is a seven-day availability window. A day without a
 new fully verified commit creates no dated image, so the seven retained publications may span
-longer. `nightly-candidate` is the unqualified staging tag and must not be deployed.
+longer. Failed release-candidate images remain for the same 14 days as their diagnostic workflow
+evidence, then the nightly retention run removes their complete manifest closure. A candidate that
+reached a versioned release tag remains. `nightly-candidate` is the unqualified staging tag and must
+not be deployed.
 
 A direct `nightly image` dispatch on a pull-request branch runs the same package, multi-architecture
 image, UAT and image-security jobs against that branch head. It never moves either published nightly

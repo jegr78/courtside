@@ -106,5 +106,5 @@ test("given any full profile, when resolving coverage, then only full coverage r
 
   // then
   assert.deepEqual(jobs, ["docs", "backend", "frontend", "tooling", "security"]);
-  assert.deepEqual(tasks.map((task) => task.label), ["docs-check", "full"]);
+  assert.deepEqual(tasks.map((task) => task.label), ["workflow-lint", "docs-check", "full"]);
 });

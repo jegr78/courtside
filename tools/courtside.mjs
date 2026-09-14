@@ -452,7 +452,9 @@ function parseJsonObject(output, label) {
 export function processPlans(options, platform = process.platform) {
   const names = executableNames(platform);
   if (options.command === "build") {
-    return { single: platformPlan(names.maven, ["package", "-DskipTests"], platform) };
+    return {
+      single: platformPlan(names.maven, ["package", "-DskipTests", "-Dfrontend.test.skip=true"], platform)
+    };
   }
   if (options.command === "verify") {
     return { single: platformPlan(names.maven, ["clean", "verify"], platform) };

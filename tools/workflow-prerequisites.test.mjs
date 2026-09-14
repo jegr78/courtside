@@ -199,3 +199,17 @@ test("given the GitHub CLI named with a path, a quote or a Windows extension, wh
   assert.deepEqual(spellings.filter((run) => !invokesGitHubCli(run)), []);
   assert.deepEqual(["ghcr.io/example push", "high water", "echo gherkin"].filter(invokesGitHubCli), []);
 });
+
+test("given a workflow has jobs with distinct authority, when permissions are resolved, then no job inherits another job's scope", () => {
+  // given
+  const definitions = new Map(workflows().map(({ workflow, definition }) => [workflow, definition]));
+
+  // when / then
+  for (const name of ["build.yml", "pages.yml", "security-assessment.yml"]) {
+    const definition = definitions.get(name);
+    assert.deepEqual(definition.permissions, {}, `${name} grants top-level token permissions`);
+    for (const [job, candidate] of Object.entries(definition.jobs)) {
+      assert.notEqual(candidate.permissions, undefined, `${name}:${job} inherits token permissions`);
+    }
+  }
+});

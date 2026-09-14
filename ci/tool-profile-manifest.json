@@ -150,6 +150,8 @@
     { "path": "tools/webkit-reliability.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/workflow-action-pinning.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/workflow-history-depth.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/workflow-lint.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/workflow-lint.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/workflow-prerequisites.test.mjs", "profiles": ["tooling"], "test": true }
   ]
 }

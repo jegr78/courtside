@@ -19,13 +19,14 @@ concurrency:
   group: scheduled-security-assessment
   cancel-in-progress: false
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   assessment:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.profile == 'baseline' && 75 || github.event_name == 'workflow_dispatch' && inputs.profile == 'active' && 65 || 45 }}
+    permissions:
+      contents: read
     outputs:
       evidence-artifact: ${{ steps.records.outputs.artifact-id }}
     env:
@@ -35,16 +36,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          # `mvnw verify` runs the tooling tests, which read the history they claim to cover.
-          fetch-depth: 0
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           java-version: '25'
           distribution: temurin
           cache: maven
-      - name: Build and test the candidate
-        run: ./mvnw -B verify
-      - name: Qualify the local candidate image
+      - name: Install assessment tool dependencies
+        run: >
+          ./mvnw -B
+          com.github.eirslett:frontend-maven-plugin:install-node-and-npm
+          com.github.eirslett:frontend-maven-plugin:npm@npm-ci
+      - name: Package and qualify the local candidate image
         run: frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
       - id: candidate
         name: Resolve the immutable local image digest
