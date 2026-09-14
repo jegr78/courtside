@@ -7,6 +7,10 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -19,23 +23,25 @@ class ShippedLanguages implements SupportedLanguages {
     // one no file name names.
     private static final String BASE_LANGUAGE = "en";
 
-    private static final String SCREEN_BUNDLES = "classpath*:messages_*.properties";
-    private static final String MAIL_BUNDLES = "classpath*:mail_*.properties";
+    private static final List<String> FAMILIES = List.of("messages", "mail", "seed");
     private static final Pattern TRANSLATED =
             Pattern.compile("^[a-z]+_([a-zA-Z]{2,3}(?:_[a-zA-Z0-9]{2,8})*)\\.properties$");
 
     private final Set<String> tags;
 
     ShippedLanguages(ResourcePatternResolver resources) {
-        Set<String> screen = languagesIn(resources, SCREEN_BUNDLES);
-        Set<String> mail = languagesIn(resources, MAIL_BUNDLES);
-        if (!screen.equals(mail)) {
-            throw new IllegalStateException("A language is translated for one surface but not the "
-                    + "other, so a member would be written to in a language they did not choose: "
-                    + "messages " + screen + " against mail " + mail);
+        Map<String, Set<String>> byFamily = new LinkedHashMap<>();
+        for (String family : FAMILIES) {
+            byFamily.put(family, languagesIn(resources, "classpath*:" + family + "_*.properties"));
         }
-        screen.add(BASE_LANGUAGE);
-        this.tags = Collections.unmodifiableSet(screen);
+        if (new HashSet<>(byFamily.values()).size() > 1) {
+            throw new IllegalStateException("A language is translated for one surface but not for "
+                    + "every other, so a club would read one of them in a language it did not "
+                    + "choose: " + byFamily);
+        }
+        Set<String> offered = new TreeSet<>(byFamily.get(FAMILIES.getFirst()));
+        offered.add(BASE_LANGUAGE);
+        this.tags = Collections.unmodifiableSet(offered);
     }
 
     @Override

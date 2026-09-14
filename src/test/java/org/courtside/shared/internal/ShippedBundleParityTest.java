@@ -25,7 +25,7 @@ class ShippedBundleParityTest {
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([^}]*)}");
 
     @ParameterizedTest
-    @ValueSource(strings = {"messages", "mail"})
+    @ValueSource(strings = {"messages", "mail", "seed"})
     void givenATranslatedBundle_whenComparingItWithItsBase_thenNeitherSideCarriesAKeyTheOtherLacks(
             String family) throws IOException {
         // given
@@ -42,7 +42,7 @@ class ShippedBundleParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"messages", "mail"})
+    @ValueSource(strings = {"messages", "mail", "seed"})
     void givenATranslatedValue_whenComparingItsPlaceholders_thenItNamesTheSameOnes(String family)
             throws IOException {
         // given
@@ -78,6 +78,7 @@ class ShippedBundleParityTest {
         // when / then
         assertThat(translationsOf("messages")).isNotEmpty();
         assertThat(translationsOf("mail")).isNotEmpty();
+        assertThat(translationsOf("seed")).isNotEmpty();
     }
 
     private static TreeSet<String> placeholdersIn(String value) {
