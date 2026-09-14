@@ -52,6 +52,26 @@ test("given npm audit is unavailable, when building a release, then explicit ski
     /Refuse unresolved nightly failures[\s\S]+select\(\.body \| contains\("- Workflow: `npm audit`"\) \| not\)/);
 });
 
+test("given a candidate or stable tag, when its GitHub release is published, then it uses the cumulative release-line notes", () => {
+  // when / then
+  assert.match(workflow, /node tools\/release-notes\.mjs[\s\S]+--tag "\$GITHUB_REF_NAME"[\s\S]+--output build\/release-body\.md/);
+  assert.match(workflow, /body_path: build\/release-body\.md/);
+  assert.doesNotMatch(workflow, /generate_release_notes: true/,
+    "GitHub-generated notes start at the preceding candidate and split the release-line history");
+});
+
+test("given no release was published before, when upgrade notes are collected, then development markers are not presented as upgrades", () => {
+  // given
+  const collectStart = workflow.indexOf("      - name: Collect the upgrade notes");
+  const collectEnd = workflow.indexOf("\n      - name:", collectStart + 1);
+  const collect = workflow.slice(collectStart, collectEnd);
+
+  // when / then
+  assert.match(collect, /if \[ -n "\$previous" \]; then[\s\S]+git log/);
+  assert.match(collect,
+    /if \[ -z "\$previous" \]; then[\s\S]+First public release; no prior supported version to upgrade from\./);
+});
+
 test("given a qualified manifest, when publishing it, then tags and signatures address that manifest without rebuilding", () => {
   // when / then
   const publish = workflow.slice(workflow.indexOf("\n  publish:"));
