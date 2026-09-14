@@ -119,11 +119,20 @@ what that means.
 
 ## What the release refuses before it builds anything
 
-Three checks run before a single compilation, and each fails the run rather than warning.
+Four checks run before a single compilation, and each fails the run rather than warning.
 
 **The tag has to sit on `main`.** A tag on a branch, or on a commit that never landed, is refused by
 name. The tag is spent at that point, *When a release fails* below applies to this refusal like any
 other.
+
+**The tag has to name the release that commit records.** `versions:set` takes the version from the
+tag verbatim, so the tag alone decides what the published image calls itself. It is read against
+`.release-please-manifest.json` at that commit, which release-please writes in the same pull request
+that creates the tag, and `pom.xml`, `frontend/package.json` and both root lockfile versions are
+tied to that manifest by `release-please-configuration.test.mjs`. Checking the one value therefore
+covers all five. Without this a tag naming a candidate nobody cut, such as `v0.1.0-rc.7` while the
+repository records `0.1.0-rc.2`, would build, sign and publish under that name, because its release
+line exists and nothing else ever consults the repository's own record.
 
 **A nightly must already have verified an ancestor of this commit.** The release looks for a
 scheduled or manually dispatched `build` run on `main` that succeeded on its *first* attempt, whose
