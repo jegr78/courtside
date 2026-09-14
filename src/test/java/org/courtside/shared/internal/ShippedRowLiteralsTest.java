@@ -86,9 +86,8 @@ class ShippedRowLiteralsTest {
 
     private static String literalOn(String line, SeededRow row) {
         int opening = line.indexOf('\'', line.indexOf(row.id()) + row.id().length() + 1);
-        int closing = line.indexOf('\'', opening + 1);
         assertThat(opening).as("%s carries no name on its line", row.id()).isNotNegative();
-        return line.substring(opening + 1, closing);
+        return line.substring(opening + 1, line.indexOf('\'', opening + 1));
     }
 
     private static String migration(String name) throws IOException {

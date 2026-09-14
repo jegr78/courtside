@@ -536,7 +536,7 @@ async function snapshotJourneyData(postgres: StartedTestContainer, schema: strin
   return tables;
 }
 
-function seededWorldIn(worlds: ReadonlyMap<string, string>, language: string): string {
+export function seededWorldIn(worlds: ReadonlyMap<string, string>, language: string): string {
   const schema = worlds.get(language);
   // Silently falling back would capture a club speaking another language than the guide it
   // illustrates, which is exactly the thing this snapshot exists to prevent.

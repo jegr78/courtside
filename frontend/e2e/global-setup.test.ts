@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import type { ChildProcess } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
-import { retainProcessUntilClose, waitForProcessExit, waitForProcessMarker } from "./global-setup";
+import { retainProcessUntilClose, seededWorldIn, waitForProcessExit, waitForProcessMarker } from "./global-setup";
 
 function processWithOutput(): { client: ChildProcess; output: PassThrough } {
   const output = new PassThrough();
@@ -129,5 +129,19 @@ describe("process marker coordination", () => {
     expect(output.listenerCount("data")).toBe(0);
     expect(client.listenerCount("error")).toBe(0);
     expect(client.listenerCount("exit")).toBe(0);
+  });
+});
+
+describe("seededWorldIn", () => {
+  const worlds = new Map([["de", "journey_baseline"], ["en", "journey_baseline_en"]]);
+
+  it("given a language a world was taken in, when it is asked for, then that world answers", () => {
+    expect(seededWorldIn(worlds, "de")).toBe("journey_baseline");
+    expect(seededWorldIn(worlds, "en")).toBe("journey_baseline_en");
+  });
+
+  it("given a language no world was taken in, when it is asked for, then it is refused rather than substituted", () => {
+    expect(() => seededWorldIn(worlds, "fr"))
+      .toThrow("No journey world was taken for a club speaking fr");
   });
 });
