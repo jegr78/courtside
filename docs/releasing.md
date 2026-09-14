@@ -68,10 +68,11 @@ rather than merely unsigned.
 **Where the version lives.** `pom.xml` carries it between releases: release-please writes it, Maven
 writes `build-info.properties` from it, and `GET /api/source` reports that to the browser — so the
 version a member reads in the footer is the one that was released, and between releases it is the
-`-SNAPSHOT` that says which release it follows. `frontend/package.json` is kept in step by the same
-pull request, so nothing there can drift. The release build itself does not trust any of that: it
-takes the version from the tag and stamps it in with `versions:set`, so what is published is what
-the tag says even if the pom were to disagree.
+`-SNAPSHOT` that says which release it follows. `frontend/package.json` and both root-package
+version fields in `frontend/package-lock.json` are kept in step by the same pull request, so nothing
+there can drift. The release build itself does not trust any of that: it takes the version from the
+tag and stamps it in with `versions:set`, so what is published is what the tag says even if the pom
+were to disagree.
 
 ## Cutting a candidate
 
