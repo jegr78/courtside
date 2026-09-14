@@ -26,8 +26,10 @@ test("given a Java project, when a release is cut, then every version moves in t
     // release contain two answers even though npm ci accepts the stale metadata.
     assert.equal(config["release-type"], "maven");
     assert.equal(config["skip-snapshot"], true,
-      "release-please's JSON updater cannot remove Maven's trailing -SNAPSHOT from extra files;"
-      + " a separate snapshot PR would therefore make the next release internally inconsistent");
+      "a snapshot pull request writes 0.1.0-rc.N-SNAPSHOT into the extra files and the release that"
+      + " follows cannot take it back: GenericJson replaces only what its version pattern matches,"
+      + " and that pattern ends at the hyphen before SNAPSHOT, so writing 0.1.0-rc.N over"
+      + " 0.1.0-rc.N-SNAPSHOT changes nothing and the file drops out of the release pull request");
     assert.deepEqual(packageEntry["extra-files"], [
       { type: "json", path: "frontend/package.json", jsonpath: "$.version" },
       { type: "json", path: "frontend/package-lock.json", jsonpath: "$.version" },
@@ -46,6 +48,10 @@ test("given frontend package metadata, when a release is proposed, then every ro
     assert.deepEqual([packageJson.version, lock.version, lock.packages[""].version],
       [pomVersion, pomVersion, pomVersion],
       "the pom, package.json and npm's two root lockfile versions must describe the same release");
+    assert.equal(manifest["."], pomVersion,
+      "with no snapshot transition the release pull request is the only thing that writes either,"
+      + " so between releases the manifest and the files name the same released version — a file"
+      + " left ahead of the manifest is one the next release pull request will not move");
     assert.deepEqual(new Set(packageEntry["extra-files"]
       .filter((entry) => entry.path === "frontend/package-lock.json")
       .map((entry) => entry.jsonpath)), new Set(["$.version", "$.packages[''].version"]),

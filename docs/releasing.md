@@ -75,9 +75,11 @@ rather than merely unsigned.
 writes `build-info.properties` from it, and `GET /api/source` reports that to the browser — so the
 version a member reads in the footer is the one that was released. `frontend/package.json` and both
 root-package version fields in `frontend/package-lock.json` move in the same pull request. There is
-no snapshot transition between releases because Release Please's Maven snapshot update cannot
-remove the second suffix from JSON versions such as `0.1.0-rc.2-SNAPSHOT`. The release build itself
-does not trust repository metadata: it takes the version from the tag and stamps it in with
+no snapshot transition between releases: a snapshot pull request writes `0.1.0-rc.2-SNAPSHOT` into
+the JSON files and the release after it cannot take that back, because the updater replaces only
+the version its pattern matches and that pattern stops at the hyphen before `SNAPSHOT`. So the
+files carry the released version between releases, and the manifest agrees with them. The release
+build itself does not trust repository metadata: it takes the version from the tag and stamps it in with
 `versions:set`, so what is published is what the tag says even if the pom were to disagree.
 
 ## Cutting a candidate
