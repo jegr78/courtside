@@ -38,12 +38,12 @@ test("given a version below one, when a change is breaking, then it raises the m
 // the pinned action ships: with no release to bump from, `buildReleasePullRequest` never asks the
 // versioning strategy at all — it returns `initialReleaseVersion()`, which is `1.0.0` unless this
 // key says otherwise. The manifest, the breaking changes and the strategy are all bypassed.
-test("given no release to bump from, when the first one is proposed, then this names it", () => {
+test("given no release to bump from, when the first candidate is proposed, then this names it", () => {
   // when / then
-  assert.equal(config["initial-version"], "0.1.0",
+  assert.equal(config["initial-version"], "0.1.0-rc.1",
     "the first release pull request proposed 1.0.0 without this, and neither bump-minor-pre-major"
-    + " nor the 0.0.0 in the manifest had any say in it; 1.0 is declared by a decision, and this"
-    + " repository has not made one");
+    + " nor the 0.0.0 in the manifest had any say in it; the first production tag must rehearse"
+    + " the complete release pipeline as rc.1 before this repository publishes 0.1.0");
 });
 
 test("given a candidate is wanted, when the strategy is read, then it can be turned on and graduated",
@@ -51,9 +51,9 @@ test("given a candidate is wanted, when the strategy is read, then it can be tur
     // when / then
     assert.equal(config.versioning, "prerelease");
     assert.equal(packageEntry["prerelease-type"], "rc");
-    assert.equal(config.prerelease, false,
-      "releases are stable by default; a candidate line is opened by turning this on and closed"
-      + " by turning it off, which strips the suffix");
+    assert.equal(config.prerelease, true,
+      "the first release is currently a candidate; after rc.1 proves the release path, graduating"
+      + " it requires a reviewed change that turns this off and strips the suffix");
   });
 
 test("given a repository that never released, when it bootstraps, then it starts at its first commit",
