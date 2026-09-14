@@ -140,6 +140,11 @@ test("given a qualified main image, when it is published, then verified evidence
   assert.match(publish,
     /\.github\/workflows\/nightly-image\.yml@refs\/heads\/main/);
   assert.match(publish, /gh attestation verify/);
+  assert.deepEqual(
+    [...publish.matchAll(/--signer-workflow "([^"]+)"/g)].map((match) => match[1]),
+    Array(3).fill("$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml"),
+  );
+  assert.doesNotMatch(publish, /--signer-workflow "\$GITHUB_SERVER_URL/);
   assert.ok(publish.indexOf("cosign verify") < publish.indexOf("docker buildx imagetools create"));
   assert.ok(publish.indexOf("gh attestation verify") < publish.indexOf("docker buildx imagetools create"));
   assert.match(publish, /--tag "ghcr\.io\/\$\{\{ github\.repository \}\}:nightly"/);

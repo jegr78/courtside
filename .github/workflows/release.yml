@@ -690,12 +690,12 @@ jobs:
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             --output json "$IMAGE" > build/signature-verification.json
           gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
             --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA" \
             --predicate-type https://slsa.dev/provenance/v1 --format json \
             > build/provenance-verification.json
           gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/release.yml" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" \
             --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA" \
             --predicate-type https://spdx.dev/Document/v2.3 --format json \
             > build/sbom-verification.json

@@ -354,15 +354,15 @@ jobs:
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "$IMAGE" > /dev/null
           gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
             --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
             --predicate-type https://slsa.dev/provenance/v1 > /dev/null
           gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
             --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
             --predicate-type https://spdx.dev/Document/v2.3 > /dev/null
           gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
-            --signer-workflow "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
             --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
             --predicate-type "$NIGHTLY_SOURCE_PREDICATE" --format json \
             > build/nightly-source-verification.json
