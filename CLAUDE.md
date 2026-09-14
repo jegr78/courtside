@@ -145,8 +145,9 @@ fails on the missing `BuildProperties` bean.
   does not carry yet. A version guard was read against files the release after a snapshot silently
   declines to touch. A resource guard was read against a run that happened not to restart anything.
   Each was checked against the tree as it looked at that moment and never against the state the next
-  actor produces. Pin the generator's real output as a case — `tools/release-notes.test.mjs` carries
-  release-please's own — rather than a shape chosen by hand.
+  actor produces. Pin the generator's real output as a case — `tools/prerelease-changelog.test.mjs`
+  runs release-please's own heading over this repository's own changelog — rather than a shape
+  chosen by hand, which is what every one of those three had.
 * **Cross-module test setup uses test fixtures.** A module exposes intent-revealing fixture
   operations from `src/test/java/org/courtside/<module>/testfixture`, and consuming integration
   tests register the required fixture explicitly with `@Import`. Fixtures return identifiers or
