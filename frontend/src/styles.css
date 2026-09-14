@@ -228,7 +228,8 @@ input[type="time"] {
 }
 
 @media (width < 1024px) {
-  .desktop-day-navigation {
+  .desktop-day-navigation,
+  .desktop-week-date {
     display: none;
   }
 

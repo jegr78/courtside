@@ -1271,3 +1271,32 @@ it("given the courts cannot be read, when the plan fails, then the failure is sh
   expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
   expect(screen.queryByTestId("court-plan-empty")).toBeNull();
 });
+
+it("given the wide layout, when a date in another week is chosen there, then that week is shown", async () => {
+  // given — the day cards only ever offer the week on screen, so jumping needs a date of its own
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+
+  // when
+  fireEvent.change(screen.getByTestId("week-date"), { target: { value: "2026-08-26" } });
+
+  // then
+  await waitFor(() => expect(api.allocations).toHaveBeenCalledWith("2026-08-26"));
+  expect(screen.getByTestId("week-date")).toHaveValue("2026-08-26");
+  expect(screen.getByTestId("day-selector-2026-08-26")).toHaveAttribute("aria-pressed", "true");
+});
+
+it("given a day in another week, when returning to the current time, then today is shown again", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+  await userEvent.click(screen.getByTestId("week-next"));
+  await waitFor(() => expect(screen.getByTestId("selected-date")).toHaveValue("2026-08-17"));
+
+  // when
+  await userEvent.click(screen.getByTestId("current-time"));
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("selected-date")).toHaveValue("2026-08-10"));
+  expect(await screen.findByTestId("current-time-line")).toBeInTheDocument();
+});

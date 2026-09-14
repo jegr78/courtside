@@ -222,6 +222,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         {days.length > 0 && hasCourts && <p className="text-muted text-sm">{formatWeekRange(days, language)}</p>}
       </div>
       {(!data || hasCourts) && <div className="flex gap-2">
+        <input data-testid="week-date" type="date" value={selectedDate ?? ""} onChange={(event) => selectDate(event.target.value)} aria-label={t("week.chooseDate")} className="desktop-week-date form-control rounded-lg border px-2" />
         <Button variant="secondary" type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
           {t("week.previousShort")}
         </Button>
@@ -271,7 +272,9 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
     {data && !hasCourts && <p data-testid="court-plan-empty" className="text-muted mt-6">{t("week.noCourtOpen")}</p>}
     {data && hasCourts && <div className="mt-4 flex justify-end">
-      {isToday && <Button variant="secondary" type="button" data-testid="current-time" onClick={() => scrollToSlot(planRef.current, currentSlot)}>{t("week.now")}</Button>}
+      <Button variant="secondary" type="button" data-testid="current-time" onClick={() => isToday
+        ? scrollToSlot(planRef.current, currentSlot)
+        : selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.now")}</Button>
     </div>}
     {data && hasCourts && <div
       ref={planRef}
