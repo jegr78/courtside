@@ -1,5 +1,6 @@
 import { expect, test } from "../../fixtures";
 import { activate, openTheApplication, rewrite, signIn, walks, writeDate, writeTime } from "../../journey-walking";
+import { TRAINING_CARD } from "../../shipped-rows";
 
 test("given a trainer arranging the term, when they describe a weekly session once and look at what it would create before confirming it, then every appointment is in the list they manage",
   walks("session-and-own-account", "booking-participation-and-series"), async ({ page, language }) => {
@@ -12,7 +13,7 @@ test("given a trainer arranging the term, when they describe a weekly session on
     // when — the term is described once
     await activate(page.getByTestId("new-series"));
     await page.getByTestId("series-courts").selectOption({ index: 0 });
-    await page.getByTestId("series-card").selectOption({ label: "Training" });
+    await page.getByTestId("series-card").selectOption(TRAINING_CARD);
     await writeDate(page.getByTestId("series-starts-on"), "2026-05-18");
     await writeTime(page.getByTestId("series-start-time"), "18:00");
     await activate(page.getByTestId("series-weekday-MONDAY"));

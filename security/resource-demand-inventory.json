@@ -20,7 +20,10 @@
       "src/main/java/org/courtside/notification/internal/UsernameReminderMailer.java"
     ],
     "startupFiles": [
-      "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java"
+      "src/main/java/org/courtside/card/internal/ShippedCardNaming.java",
+      "src/main/java/org/courtside/identity/internal/BootstrapAdminInitializer.java",
+      "src/main/java/org/courtside/member/internal/ShippedMembershipTypeNaming.java",
+      "src/main/java/org/courtside/rules/internal/ShippedRuleSetNaming.java"
     ]
   },
   "classifications": [
@@ -105,9 +108,12 @@
     {
       "id": "ordinary-startup",
       "kind": "ordinary",
-      "rationale": "Bootstrap checks one database-wide existence condition and can create exactly one initial administrator; its Argon2 work is constant and startup-only.",
+      "rationale": "Bootstrap checks one database-wide existence condition and can create exactly one initial administrator; its Argon2 work is constant and startup-only. Naming the shipped rows reads ten rows by primary key and writes at most those ten, once, from a bundle already on the classpath.",
       "entryPoints": [
-        "BootstrapAdminInitializer#run"
+        "BootstrapAdminInitializer#run",
+        "ShippedCardNaming#run",
+        "ShippedMembershipTypeNaming#run",
+        "ShippedRuleSetNaming#run"
       ]
     },
     {

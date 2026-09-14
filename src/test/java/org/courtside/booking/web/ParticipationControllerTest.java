@@ -2,6 +2,7 @@ package org.courtside.booking.web;
 
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.card.CardService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -37,6 +38,9 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private WebApplicationContext context;
+
+    @Autowired
+    private CardService cards;
 
     @Autowired
     private FacilityTestFixture facilityFixture;
@@ -79,7 +83,8 @@ class ParticipationControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].courtIds[0]").value(courtId.toString()))
                 .andExpect(jsonPath("$.items[0].startsAt").value("2026-05-12T16:00:00Z"))
-                .andExpect(jsonPath("$.items[0].cardLabel").value("Member booking"))
+                .andExpect(jsonPath("$.items[0].cardLabel").value(
+                        cards.requireCard(MEMBER_BOOKING_CARD).getLabel()))
                 .andExpect(jsonPath("$.items[0].status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.items[0].bookedByName").doesNotExist())
                 .andExpect(jsonPath("$.items[0].note").doesNotExist());

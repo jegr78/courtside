@@ -1,5 +1,6 @@
 import { expect, test } from "../../fixtures";
 import { activate, bookingsHeld, openTheApplication, rewrite, signIn, walks, writeDate, writeTime } from "../../journey-walking";
+import { TRAINING_CARD } from "../../shipped-rows";
 
 test("given a trainer whose hall time moved, when they shift one appointment of the series and later call the whole series off, then the club's plan follows both decisions",
   walks("session-and-own-account", "booking-participation-and-series"), async ({ page, language }) => {
@@ -14,7 +15,7 @@ test("given a trainer whose hall time moved, when they shift one appointment of 
     // when — a term of three is arranged
     await activate(page.getByTestId("new-series"));
     await page.getByTestId("series-courts").selectOption({ index: 0 });
-    await page.getByTestId("series-card").selectOption({ label: "Training" });
+    await page.getByTestId("series-card").selectOption(TRAINING_CARD);
     await writeDate(page.getByTestId("series-starts-on"), "2026-05-18");
     await writeTime(page.getByTestId("series-start-time"), "18:00");
     await activate(page.getByTestId("series-weekday-MONDAY"));

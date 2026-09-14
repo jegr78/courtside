@@ -242,6 +242,14 @@ A database that has just been migrated is not empty. Flyway seeds a facility a c
   bookings, and two membership types — **Active** and a youth one — pointing at them
 - one `club_config` row named Courtside, in German, in `Europe/Berlin`
 
+Those names are not what a club reads. The migrations seed them in English, and at startup each
+module names its own seeded rows in the language `club_config.default_locale` holds — German on a
+fresh instance, so the four cards read *Mitgliederbuchung*, *Training*, *Punktspiel* and *Platz
+gesperrt*. A row is recognised by the id it was seeded with, and renamed only while it still carries
+one of the names this image ships for it: the moment a board gives a row a name of its own, that
+name stands and the club's language no longer reaches it. Changing the language changes the rows
+that are still shipped-named, without a restart.
+
 What it does not seed is an account. The first one is created at startup from the
 `courtside.bootstrap-admin` configuration, which is why an instance has an administrator before
 anybody has signed in — see `deploy/README.md` for the variables that carry it.

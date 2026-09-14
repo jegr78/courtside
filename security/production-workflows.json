@@ -255,7 +255,9 @@
         "ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)",
         "ClosureAnnouncements#on(FacilityEvent.CourtAvailabilityChanged)",
         "ClosureAnnouncements#on(FacilityEvent.OpeningHoursClosed)",
-        "ClosureAnnouncements#on(FacilityEvent.OpeningHoursSet)"
+        "ClosureAnnouncements#on(FacilityEvent.OpeningHoursSet)",
+        "ShippedCardNaming#run",
+        "ShippedMembershipTypeNaming#run"
       ],
       "stateTransitions": [
         "Administrators create and correct configuration records.",
@@ -394,7 +396,9 @@
         "setRule",
         "removeRule"
       ],
-      "backgroundEntryPoints": [],
+      "backgroundEntryPoints": [
+        "ShippedRuleSetNaming#run"
+      ],
       "stateTransitions": [
         "Administrators create, correct, activate and retire rule sets.",
         "Rules are added, replaced or removed by declared type.",
