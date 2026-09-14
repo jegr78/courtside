@@ -55,6 +55,14 @@ class ShippedSeedNamesTest {
     }
 
     @Test
+    void givenARowAClubHasRenamed_whenAskingWhetherItIsStillTheShippedName_thenItIsLeftAlone() {
+        // when / then
+        assertThat(names.isStillTheShippedName("bookingCard.member", "Mitgliederbuchung")).isTrue();
+        assertThat(names.isStillTheShippedName("bookingCard.member", "Member booking")).isTrue();
+        assertThat(names.isStillTheShippedName("bookingCard.member", "Club evening")).isFalse();
+    }
+
+    @Test
     void givenAKeyTheBundleDoesNotCarry_whenNamingIt_thenItSaysWhichKeyIsMissing() {
         // when / then
         assertThatThrownBy(() -> names.in("bookingCard.clubEvening", "de"))

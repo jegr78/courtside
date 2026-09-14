@@ -45,6 +45,10 @@ public class MembershipType {
         this.grantsAccount = grantsAccount;
     }
 
+    public void rename(String name) {
+        this.name = name;
+    }
+
     public void activate() {
         this.active = true;
     }

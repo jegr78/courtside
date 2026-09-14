@@ -76,6 +76,10 @@ public class MemberTestFixture {
         memberships.changeMembershipType(membershipTypeId, name, null, true);
     }
 
+    public void renameMembershipType(UUID membershipTypeId, String name) {
+        memberships.changeMembershipType(membershipTypeId, name, null, false);
+    }
+
     public UUID membershipTypeMeasuredBy(String name, UUID ruleSetId) {
         return memberships.createMembershipType(name, ruleSetId, false).getId();
     }

@@ -127,6 +127,10 @@ public class BookingCard {
         this.showGenericOccupancy = showGenericOccupancy;
     }
 
+    public void rename(String label) {
+        this.label = label;
+    }
+
     public void activate() {
         this.active = true;
     }

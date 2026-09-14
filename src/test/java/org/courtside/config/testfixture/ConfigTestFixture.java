@@ -26,6 +26,12 @@ public class ConfigTestFixture {
         config.update(commandFrom(current, hours, current.noMembershipTypeRuleSetId()));
     }
 
+    public void speak(String languageTag) {
+        ClubConfigurationSnapshot current = config.current();
+        config.update(commandFrom(current, current.bookingReminderHours(),
+                current.noMembershipTypeRuleSetId(), languageTag));
+    }
+
     public UUID ruleSetForPeopleWithoutAMembershipType() {
         return config.current().noMembershipTypeRuleSetId();
     }
@@ -36,9 +42,15 @@ public class ConfigTestFixture {
 
     private static ChangeClubConfigurationCommand commandFrom(ClubConfigurationSnapshot current,
                                                              int reminderHours, UUID ruleSetId) {
+        return commandFrom(current, reminderHours, ruleSetId, current.defaultLocale());
+    }
+
+    private static ChangeClubConfigurationCommand commandFrom(ClubConfigurationSnapshot current,
+                                                             int reminderHours, UUID ruleSetId,
+                                                             String languageTag) {
         return new ChangeClubConfigurationCommand(
                 current.clubName(), current.primaryColor(), current.accentColor(),
-                current.logoFallbackUrl(), current.imprintUrl(), current.privacyUrl(), current.defaultLocale(),
+                current.logoFallbackUrl(), current.imprintUrl(), current.privacyUrl(), languageTag,
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
