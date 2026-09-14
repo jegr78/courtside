@@ -257,7 +257,9 @@
         "ClosureAnnouncements#on(FacilityEvent.OpeningHoursClosed)",
         "ClosureAnnouncements#on(FacilityEvent.OpeningHoursSet)",
         "ShippedCardNaming#run",
-        "ShippedMembershipTypeNaming#run"
+        "ShippedCardNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)",
+        "ShippedMembershipTypeNaming#run",
+        "ShippedMembershipTypeNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)"
       ],
       "stateTransitions": [
         "Administrators create and correct configuration records.",
@@ -303,7 +305,9 @@
         "assignMembership",
         "removeMembership"
       ],
-      "backgroundEntryPoints": [],
+      "backgroundEntryPoints": [
+        "RosterSecurityEventLog#record(RosterEvent)"
+      ],
       "stateTransitions": [
         "A person may gain or lose a current membership.",
         "An account may be created, corrected, enabled, disabled or assigned a new credential.",
@@ -397,7 +401,8 @@
         "removeRule"
       ],
       "backgroundEntryPoints": [
-        "ShippedRuleSetNaming#run"
+        "ShippedRuleSetNaming#run",
+        "ShippedRuleSetNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)"
       ],
       "stateTransitions": [
         "Administrators create, correct, activate and retire rule sets.",
@@ -437,7 +442,9 @@
         "readMessageLog",
         "readAuditLog"
       ],
-      "backgroundEntryPoints": [],
+      "backgroundEntryPoints": [
+        "DomainEventWriter#record(DomainEventRecord)"
+      ],
       "stateTransitions": [
         "No product state changes."
       ],

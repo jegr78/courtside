@@ -31,6 +31,15 @@ const backgroundFiles = () => productionJavaFiles()
   .filter((path) => readFileSync(`${repository}/${path}`, "utf8").includes("@Async"))
   .toSorted();
 
+// A listener without @Async does its work on the thread of the request that published the event, so
+// it never reaches the background list although it is just as far from any operationId.
+const listenerFiles = () => productionJavaFiles()
+  .filter((path) => {
+    const source = readFileSync(`${repository}/${path}`, "utf8");
+    return source.includes("@TransactionalEventListener") && !source.includes("@Async");
+  })
+  .toSorted();
+
 const scheduledEntryPoints = () => scheduledFiles().flatMap((path) => {
   const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   const className = source.match(/\bclass\s+(\w+)/)?.[1];
@@ -42,6 +51,13 @@ const backgroundEntryPoints = () => backgroundFiles().flatMap((path) => {
   const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
   const className = source.match(/\bclass\s+(\w+)/)?.[1];
   return [...source.matchAll(/@Async\([^)]*\)\s+(?:@\w+(?:\([^)]*\))?\s+)*(?:public\s+)?void\s+(\w+)\s*\(\s*([\w.]+)/g)]
+    .map(([, method, parameter]) => `${className}#${method}(${parameter})`);
+}).toSorted();
+
+const listenerEntryPoints = () => listenerFiles().flatMap((path) => {
+  const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+  const className = source.match(/\bclass\s+(\w+)/)?.[1];
+  return [...source.matchAll(/@TransactionalEventListener(?:\([^)]*\))?\s+(?:@\w+(?:\([^)]*\))?\s+)*(?:public\s+)?void\s+(\w+)\s*\(\s*([\w.]+)/g)]
     .map(([, method, parameter]) => `${className}#${method}(${parameter})`);
 }).toSorted();
 
@@ -63,7 +79,8 @@ const classified = (kind) => inventory.classifications
   .filter((entry) => entry.kind === kind)
   .flatMap((entry) => entry.entryPoints);
 const productionEntryPoints = () => [
-  ...operationIds(), ...scheduledEntryPoints(), ...backgroundEntryPoints(), ...startupEntryPoints()
+  ...operationIds(), ...scheduledEntryPoints(), ...backgroundEntryPoints(), ...listenerEntryPoints(),
+  ...startupEntryPoints()
 ].toSorted();
 const requireExactCoverage = (actual) => assert.deepEqual(actual.toSorted(), productionEntryPoints());
 const annotationCount = (paths, annotation) => paths.reduce((count, path) =>
@@ -84,6 +101,7 @@ test("given production entry points, when classifying resource demand, then ever
   // given
   const discoveredScheduledFiles = scheduledFiles();
   const discoveredBackgroundFiles = backgroundFiles();
+  const discoveredListenerFiles = listenerFiles();
   const discoveredStartupFiles = startupFiles();
 
   // when
@@ -92,9 +110,12 @@ test("given production entry points, when classifying resource demand, then ever
   // then
   assert.deepEqual(inventory.sources.scheduledFiles.toSorted(), discoveredScheduledFiles);
   assert.deepEqual(inventory.sources.backgroundFiles.toSorted(), discoveredBackgroundFiles);
+  assert.deepEqual(inventory.sources.listenerFiles.toSorted(), discoveredListenerFiles);
   assert.deepEqual(inventory.sources.startupFiles.toSorted(), discoveredStartupFiles);
   assert.equal(scheduledEntryPoints().length, annotationCount(discoveredScheduledFiles, "@Scheduled"));
   assert.equal(backgroundEntryPoints().length, annotationCount(discoveredBackgroundFiles, "@Async"));
+  assert.equal(listenerEntryPoints().length,
+    annotationCount(discoveredListenerFiles, "@TransactionalEventListener"));
   requireExactCoverage(actual);
   assert.equal(new Set(actual).size, actual.length, "an entry point has more than one demand decision");
   const ids = inventory.classifications.map(({ id }) => id);
