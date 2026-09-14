@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface MembershipTypeRepository extends JpaRepository<MembershipType, UUID> {
 
     List<MembershipType> findAllByOrderByNameAsc();
+
+    boolean existsByName(String name);
 }

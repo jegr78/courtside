@@ -56,6 +56,20 @@ class ShippedMembershipTypeNamingTest extends AbstractIntegrationTest {
         assertThat(nameOf(YOUTH)).isEqualTo("Youth");
     }
 
+    @Test
+    void givenTheClubUsesTheNameAnotherLanguageGivesAShippedType_whenItChangesLanguage_thenTheClubKeepsThatName() {
+        // given
+        UUID own = members.createMembershipType("Youth");
+
+        // when
+        configuration.speak("en");
+
+        // then
+        assertThat(nameOf(own)).isEqualTo("Youth");
+        assertThat(nameOf(YOUTH)).isEqualTo("Jugend");
+        assertThat(nameOf(ACTIVE)).isEqualTo("Active");
+    }
+
     private String nameOf(UUID membershipTypeId) {
         return memberships.membershipTypeNameOf(membershipTypeId).orElseThrow();
     }

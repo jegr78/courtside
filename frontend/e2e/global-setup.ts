@@ -53,9 +53,14 @@ const JOURNEY_SEEDED = "journey_baseline";
 // Every language the guides are published in, because a club's rows carry one name each and the
 // club a guide shows has to be one whose language that guide's reader would have chosen.
 function publishedLanguages(): string[] {
-  return (JSON.parse(readFileSync(resolve("../site/screenshots/captures.json"), "utf8")) as {
+  const locales = (JSON.parse(readFileSync(resolve("../site/screenshots/captures.json"), "utf8")) as {
     locales: string[];
   }).locales;
+  // A catalogue entry reaches a SQL statement and a schema name, so it is a language tag or nothing.
+  return locales.map((locale) => {
+    if (!/^[a-z]{2}$/.test(locale)) throw new Error(`Not a language the guides can publish: ${locale}`);
+    return locale;
+  });
 }
 
 const PINNED_BROWSER_IMAGE =
@@ -536,12 +541,20 @@ async function snapshotJourneyData(postgres: StartedTestContainer, schema: strin
   return tables;
 }
 
-export function seededWorldIn(worlds: ReadonlyMap<string, string>, language: string): string {
-  const schema = worlds.get(language);
-  // Silently falling back would capture a club speaking another language than the guide it
-  // illustrates, which is exactly the thing this snapshot exists to prevent.
+// Silently falling back would walk a journey through a club speaking another language than the one
+// the project publishes, which is exactly the thing these snapshots exist to prevent.
+export function journeyWorldIn(start: JourneyStart, worlds: ReadonlyMap<string, string>,
+                               language: string | undefined, shipped: string): string {
+  const wanted = language ?? shipped;
+  if (start === "empty") {
+    if (wanted !== shipped) {
+      throw new Error(`No empty journey world was taken for a club speaking ${wanted}`);
+    }
+    return JOURNEY_EMPTY;
+  }
+  const schema = worlds.get(wanted);
   if (schema === undefined) {
-    throw new Error(`No journey world was taken for a club speaking ${language}`);
+    throw new Error(`No journey world was taken for a club speaking ${wanted}`);
   }
   return schema;
 }
@@ -1048,8 +1061,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
         await Promise.all([...heldLocks].map((lock) => lock.release()));
         resetStaticAssets();
         await emptyMailbox(mailboxURL);
-        await resetJourneyData(postgres!, tables, start === "empty"
-          ? JOURNEY_EMPTY : seededWorldIn(seededPerLanguage, language ?? shippedLanguage));
+        await resetJourneyData(postgres!, tables,
+          journeyWorldIn(start ?? "seeded", seededPerLanguage, language, shippedLanguage));
       },
       restart: async () => {
         // The same port again, not a new one: the club proxy is already configured against it.

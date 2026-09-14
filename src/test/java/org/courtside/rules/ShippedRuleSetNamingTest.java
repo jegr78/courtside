@@ -51,6 +51,20 @@ class ShippedRuleSetNamingTest extends AbstractIntegrationTest {
         assertThat(nameOf(YOUTH)).isEqualTo("Under 18");
     }
 
+    @Test
+    void givenTheClubUsesTheNameAnotherLanguageGivesAShippedRuleSet_whenItChangesLanguage_thenTheClubKeepsThatName() {
+        // given
+        UUID own = rules.activeRuleSet("Youth");
+
+        // when
+        configuration.speak("en");
+
+        // then
+        assertThat(nameOf(own)).isEqualTo("Youth");
+        assertThat(nameOf(YOUTH)).isEqualTo("Jugend");
+        assertThat(nameOf(STANDARD)).isEqualTo("Standard");
+    }
+
     private String nameOf(UUID ruleSetId) {
         return rules.ruleSetName(ruleSetId);
     }

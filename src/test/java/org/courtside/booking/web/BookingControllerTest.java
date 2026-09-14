@@ -365,7 +365,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/bookings").param("date", "2026-05-12"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].cardLabel").value(memberBookingLabel()));
+                .andExpect(jsonPath("$[0].cardLabel").value(labelOf(MEMBER_BOOKING_CARD)));
     }
 
     @Test
@@ -408,7 +408,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.items[0].courtIds[0]").value(courtId.toString()))
                 .andExpect(jsonPath("$.items[0].startsAt").value("2026-05-12T16:00:00Z"))
                 .andExpect(jsonPath("$.items[0].endsAt").value("2026-05-12T17:00:00Z"))
-                .andExpect(jsonPath("$.items[0].cardLabel").value(memberBookingLabel()))
+                .andExpect(jsonPath("$.items[0].cardLabel").value(labelOf(MEMBER_BOOKING_CARD)))
                 .andExpect(jsonPath("$.items[0].status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.items[0].seriesId").doesNotExist())
                 .andExpect(jsonPath("$.nextCursor").doesNotExist());
@@ -806,7 +806,7 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:participants-invalid"))
                 .andExpect(jsonPath("$.violations[0].code").value("booking.participants.slotCount"))
-                .andExpect(jsonPath("$.violations[0].params.cardLabel").value(memberBookingLabel()))
+                .andExpect(jsonPath("$.violations[0].params.cardLabel").value(labelOf(MEMBER_BOOKING_CARD)))
                 .andExpect(jsonPath("$.violations[0].params.allowed").value("2 / 4"))
                 .andExpect(jsonPath("$.violations[0].params.actual").value(1));
     }
@@ -1186,10 +1186,6 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     // A seeded card is named in the club's language, so the response carries that card's name
     // rather than the English literal the migration wrote.
-    private String memberBookingLabel() {
-        return labelOf(MEMBER_BOOKING_CARD);
-    }
-
     private String labelOf(UUID cardId) {
         return cards.requireCard(cardId).getLabel();
     }

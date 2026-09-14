@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import type { ChildProcess } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
-import { retainProcessUntilClose, seededWorldIn, waitForProcessExit, waitForProcessMarker } from "./global-setup";
+import { journeyWorldIn, retainProcessUntilClose, waitForProcessExit, waitForProcessMarker } from "./global-setup";
 
 function processWithOutput(): { client: ChildProcess; output: PassThrough } {
   const output = new PassThrough();
@@ -132,16 +132,26 @@ describe("process marker coordination", () => {
   });
 });
 
-describe("seededWorldIn", () => {
+describe("journeyWorldIn", () => {
   const worlds = new Map([["de", "journey_baseline"], ["en", "journey_baseline_en"]]);
 
   it("given a language a world was taken in, when it is asked for, then that world answers", () => {
-    expect(seededWorldIn(worlds, "de")).toBe("journey_baseline");
-    expect(seededWorldIn(worlds, "en")).toBe("journey_baseline_en");
+    expect(journeyWorldIn("seeded", worlds, "de", "de")).toBe("journey_baseline");
+    expect(journeyWorldIn("seeded", worlds, "en", "de")).toBe("journey_baseline_en");
+  });
+
+  it("given a project that publishes nothing, when a world is asked for, then the shipped club answers", () => {
+    expect(journeyWorldIn("seeded", worlds, undefined, "de")).toBe("journey_baseline");
+    expect(journeyWorldIn("empty", worlds, undefined, "de")).toBe("journey_empty");
   });
 
   it("given a language no world was taken in, when it is asked for, then it is refused rather than substituted", () => {
-    expect(() => seededWorldIn(worlds, "fr"))
+    expect(() => journeyWorldIn("seeded", worlds, "fr", "de"))
       .toThrow("No journey world was taken for a club speaking fr");
+  });
+
+  it("given the club a migration ships, when another language asks for it, then it is refused as well", () => {
+    expect(() => journeyWorldIn("empty", worlds, "en", "de"))
+      .toThrow("No empty journey world was taken for a club speaking en");
   });
 });

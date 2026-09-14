@@ -17,6 +17,8 @@ public interface ParticipantCardRepository extends JpaRepository<ParticipantCard
 
     List<ParticipantCard> findAllByOrderByLabelAsc();
 
+    boolean existsByLabel(String label);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT card FROM ParticipantCard card WHERE card.id IN :ids ORDER BY card.id")
     List<ParticipantCard> lockAllById(@Param("ids") Collection<UUID> ids);

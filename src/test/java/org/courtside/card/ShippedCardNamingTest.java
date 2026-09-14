@@ -62,6 +62,21 @@ class ShippedCardNamingTest extends AbstractIntegrationTest {
         assertThat(labelOf(MEMBER_BOOKING)).isEqualTo("Member booking");
     }
 
+    @Test
+    void givenTheClubUsesTheNameAnotherLanguageGivesAShippedCard_whenItChangesLanguage_thenTheClubKeepsThatName() {
+        // given — a card the club made, named exactly what English calls the shipped member card
+        UUID own = cards.createCard("Member booking", "#123456", Set.of(), Set.of(),
+                new short[0], false, false, false).getId();
+
+        // when
+        configuration.speak("en");
+
+        // then — the name belongs to the card that carries it, and the instance is still usable
+        assertThat(cards.requireCard(own).getLabel()).isEqualTo("Member booking");
+        assertThat(labelOf(MEMBER_BOOKING)).isEqualTo("Mitgliederbuchung");
+        assertThat(labelOf(LEAGUE_MATCH)).isEqualTo("League match");
+    }
+
     private String labelOf(UUID cardId) {
         return cards.requireCard(cardId).getLabel();
     }

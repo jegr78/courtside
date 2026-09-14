@@ -316,9 +316,17 @@ carry one name for the whole club — a member reading in English sees the same 
 board that named it. The migrations seed them in the base language, and at startup and on a change
 of the club's language each module renames its own rows to what `seed_<tag>` calls them. A row is
 recognised by the id it was seeded with, and only while it still carries one of the names the image
-ships: the moment a board gives it a name of its own, that name stands and the club's language no
-longer reaches it. A *member* switching their own language still re-renders the text and nothing
-else; what a row is called is the club's answer, not the reader's.
+ships for it: a board that names a row something of its own has that name stand, because no
+language of this image gives the row that name. The converse is the accepted cost of recognising a
+row by its name rather than by a marker column — a board that renames a row to what *another*
+shipped language calls it has chosen a name the image still recognises, and the row goes on
+following the club's language.
+
+Every one of those names is unique per table, so a row takes its new name only when that name is
+free; a name the club has already given to something else stays with the row that has it. Naming is
+never a reason for an instance not to start: at startup each row is renamed on its own, and one that
+cannot take its name leaves the others alone. A *member* switching their own language still
+re-renders the text and nothing else; what a row is called is the club's answer, not the reader's.
 
 Domain vocabulary:
 
