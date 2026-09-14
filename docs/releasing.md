@@ -18,9 +18,10 @@ may publish under this project's name.
 
 There is nothing to type. A release pull request titled `chore(main): release <version>` stands
 open on `main` and grows with every merge; it shows the version it would cut and the changelog it
-would write. Before merging a candidate pull request, fold its entries into the one changelog
-section named after the release line, such as `## 0.1.0`. Do not add a section for each candidate.
-Merge it when a nightly has verified the commit it sits on, and the rest happens.
+would write. Release Please initially writes a candidate delta, and the same workflow immediately
+folds it into the one changelog section named after the release line, such as `## 0.1.0`. A release
+pull request with a separate candidate section is incomplete and must not be merged. Merge the
+normalized pull request when a nightly has verified the commit it sits on, and the rest happens.
 
 Release Please does not open a second snapshot pull request. The release pull request moves every
 version field together, and the repository keeps that published version until the next release
@@ -94,9 +95,11 @@ Candidates are opened and closed with one line of configuration, not with a hand
    request proposes `v0.3.0`.
 
 Every candidate is a checkpoint on the same release line. Release Please proposes the changes
-since the preceding candidate, but the pull request must fold those entries into the single
-`## <major>.<minor>.<patch>` section before merge. The release workflow rejects a missing or split
-section and uses that complete section for both candidate and stable GitHub release notes.
+since the preceding candidate; the release-please workflow then folds those entries into the single
+`## <major>.<minor>.<patch>` section on its pull-request branch. The normalizer refuses multiple
+candidate deltas, a missing cumulative heading and duplicate sections instead of guessing. The
+release workflow independently rejects a missing or split section and uses that complete section
+for both candidate and stable GitHub release notes.
 
 None of that applies to the very first release, because there is nothing to bump from: with no
 release in the history release-please never asks the versioning strategy at all and takes
@@ -107,7 +110,8 @@ in the same change: without it the release after that candidate strips the suffi
 The three steps above take over from the second release onwards.
 
 The first public release has no older published contract to break. Its cumulative `0.1.0`
-changelog therefore keeps the features and fixes but has no `Breaking Changes` section. Once
+changelog therefore moves release-please's upgrade-oriented notes under `Notable changes` instead
+of deleting their operating or migration details, and has no `Breaking Changes` section. Once
 `0.1.0` is published, breaking markers describe real upgrade work and stay in later release notes.
 
 Nothing else changes: a candidate travels the same pipeline, and section 10 of `docs/design.md` says

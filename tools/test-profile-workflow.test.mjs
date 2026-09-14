@@ -7,6 +7,14 @@ const pom = readFileSync(new URL("../pom.xml", import.meta.url), "utf8");
 const toolDependencies = readFileSync(
   new URL("../.github/actions/tool-dependencies/action.yml", import.meta.url), "utf8");
 
+test("given a pull request head is superseded, when its replacement starts, then only the mergeable head keeps building", () => {
+  // when / then
+  assert.match(workflow,
+    /concurrency:\n\s+group: build-\$\{\{ github\.event\.pull_request\.number \|\| github\.run_id \}\}/);
+  assert.match(workflow,
+    /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
+});
+
 test("given profile classification, when the pull request runs, then selected quality jobs control the gate", () => {
   // when / then
   assert.match(workflow, /test-profile-plan:/);

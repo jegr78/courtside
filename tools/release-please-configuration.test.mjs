@@ -68,6 +68,13 @@ test("given the first public release line, when its changelog is read, then cand
       "the cumulative history is named after the release line, not one candidate checkpoint");
     assert.doesNotMatch(initialSection, /^### .*BREAKING CHANGES/m,
       "the first public release has no older published contract that its development history can break");
+    assert.match(initialSection, /^### Notable changes$/m,
+      "first-release migration and operating details remain visible without claiming an upgrade break");
+    assert.match(initialSection, /COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE=true/);
+    assert.match(initialSection, /load a renewed mail certificate.*#779/);
+    assert.match(initialSection, /COURTSIDE_MAIL_HOSTNAME/);
+    assert.match(initialSection, /have the instance issue and send every credential.*#454/);
+    assert.match(initialSection, /validation codes in fieldErrors entries change/);
   });
 
 // Measured against release-please 17: without this, `0.2.0` plus one breaking change becomes
@@ -97,6 +104,43 @@ test("given a candidate is wanted, when the strategy is read, then it can be tur
     assert.equal(config.prerelease, true,
       "the first release is currently a candidate; after rc.1 proves the release path, graduating"
       + " it requires a reviewed change that turns this off and strips the suffix");
+  });
+
+test("given release-please writes a candidate delta, when it updates the release PR, then the changelog is normalized before review",
+  () => {
+    // given
+    const steps = workflow.jobs["release-please"].steps;
+    const job = workflow.jobs["release-please"];
+    const release = steps.find((step) => step.id === "release");
+    const validate = steps.find((step) => step.name === "Validate the release pull request branch");
+    const trustedCheckout = steps.find((step) => step.name === "Check out the trusted normalizer");
+    const checkout = steps.find((step) => step.name === "Check out the release pull request");
+    const normalize = steps.find((step) => step.name === "Preserve the cumulative release-line changelog");
+    const commit = steps.find((step) => step.name === "Commit the normalized changelog");
+
+    // when / then
+    assert.ok(release, "the release step needs an id so later steps consume its exact PR output");
+    assert.equal(job.env, undefined,
+      "the release PAT must not be inherited by repository code that a later checkout can replace");
+    assert.match(job.steps[0].env.RELEASE_PLEASE_TOKEN, /secrets\.RELEASE_PLEASE_TOKEN/);
+    assert.ok(steps.indexOf(validate) < steps.indexOf(checkout),
+      "the action's branch output must be validated before checkout consumes it");
+    assert.match(validate.run, /git check-ref-format --branch "\$RELEASE_PR_BRANCH"/);
+    assert.equal(trustedCheckout.with.ref, "${{ github.sha }}");
+    assert.equal(trustedCheckout.with.path, "trusted-source");
+    assert.equal(trustedCheckout.with["persist-credentials"], false);
+    assert.equal(checkout.if, "steps.release.outputs.prs_created == 'true'");
+    assert.match(checkout.with.ref, /fromJSON\(steps\.release\.outputs\.pr\)\.headBranchName/);
+    assert.equal(checkout.with.path, "release-pr");
+    assert.equal(checkout.with["persist-credentials"], false);
+    assert.match(normalize.run,
+      /node trusted-source\/tools\/prerelease-changelog\.mjs --changelog release-pr\/CHANGELOG\.md/);
+    assert.match(commit.env.RELEASE_PR_BRANCH,
+      /fromJSON\(steps\.release\.outputs\.pr\)\.headBranchName/);
+    assert.equal(commit["working-directory"], "release-pr");
+    assert.match(commit.run, /credential\.helper/);
+    assert.match(commit.run, /trap .*--unset-all credential\.helper/);
+    assert.match(commit.run, /git push origin "HEAD:refs\/heads\/\$RELEASE_PR_BRANCH"/);
   });
 
 test("given a repository that never released, when it bootstraps, then it starts at its first commit",
