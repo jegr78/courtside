@@ -51,8 +51,10 @@ class ShippedCardNamingTest extends AbstractIntegrationTest {
     @Test
     void givenACardTheClubNamedItself_whenTheClubChangesItsLanguage_thenTheClubsOwnNameStands() {
         // given
-        cards.changeCard(LEAGUE_MATCH, "Medenspiel", "#3A4A5C", Set.of(), Set.of(),
-                new short[0], false, false, false);
+        BookingCard card = cards.requireCard(LEAGUE_MATCH);
+        cards.changeCard(LEAGUE_MATCH, "Medenspiel", card.getColor(), card.getAllowedRoles(),
+                card.getManagingRoles(), card.getAllowedPlayerCounts(), card.isCountsAgainstLimits(),
+                card.isGuestAllowed(), card.isShowGenericOccupancy());
 
         // when
         configuration.speak("en");
