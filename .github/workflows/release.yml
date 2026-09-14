@@ -30,6 +30,15 @@ jobs:
           git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD \
             || { echo "::error::$GITHUB_REF_NAME does not point at a commit on main"; exit 1; }
 
+      # The tag is the only thing the build asks for its version, so a tag naming a release this
+      # commit does not record would publish an image under a version nobody cut.
+      - name: Refuse a tag the repository does not record as its release
+        run: |
+          recorded="$(jq -er '."."' .release-please-manifest.json)" \
+            || { echo "::error::this commit records no released version"; exit 1; }
+          [ "${GITHUB_REF_NAME#v}" = "$recorded" ] \
+            || { echo "::error::$GITHUB_REF_NAME names ${GITHUB_REF_NAME#v}, but this commit records $recorded"; exit 1; }
+
       # Absence of a report is not evidence of a green night, so the verification is demanded
       # first and the open issues below only complement it.
       - name: Demand a nightly that verified this release

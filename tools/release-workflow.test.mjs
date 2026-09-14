@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
+const require = createRequire(new URL("../frontend/package.json", import.meta.url));
+const yaml = require("js-yaml");
 
 const workflow = readFileSync(
   fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)),
@@ -224,3 +231,45 @@ test("given a job that installs, when it starts a tool, then it installs first",
       assert.ok(runsADependentToolAt < 0 || installsAt < runsADependentToolAt,
         `${workflow}:${job} runs a tool before installing what that tool loads`));
 });
+
+// Matching the step's text would only show that somebody wrote a comparison, so this runs the
+// script the runner runs, against a manifest it can see, and reads what it does with each tag.
+function refusesTag(tag, recorded) {
+  const step = yaml.load(workflow).jobs["nightly-evidence"].steps
+    .find((entry) => entry.name === "Refuse a tag the repository does not record as its release");
+  assert.ok(step, "the release pipeline opens with a step that reads the tag against the manifest");
+  const directory = mkdtempSync(join(tmpdir(), "courtside-release-tag-"));
+  writeFileSync(join(directory, ".release-please-manifest.json"), JSON.stringify({ ".": recorded }));
+  try {
+    execFileSync("bash", ["-c", step.run], {
+      cwd: directory,
+      env: { ...process.env, GITHUB_REF_NAME: tag },
+      encoding: "utf8",
+      stdio: "pipe"
+    });
+    return null;
+  } catch (refusal) {
+    return `${refusal.stdout ?? ""}${refusal.stderr ?? ""}`;
+  }
+}
+
+test("given a release tag, when the pipeline opens, then only the version this commit records is built",
+  () => {
+    // when / then — the tag release-please cut from this manifest is the one that builds
+    assert.equal(refusesTag("v0.1.0-rc.2", "0.1.0-rc.2"), null);
+
+    // and a candidate nobody released is refused, although its release line exists
+    const unreleasedCandidate = refusesTag("v0.1.0-rc.7", "0.1.0-rc.2");
+    assert.match(unreleasedCandidate, /v0\.1\.0-rc\.7 names 0\.1\.0-rc\.7/);
+    assert.match(unreleasedCandidate, /this commit records 0\.1\.0-rc\.2/);
+    assert.match(refusesTag("v0.9.9", "0.1.0-rc.2"), /::error::/);
+  });
+
+test("given the version the build stamps, when the tag is read, then nothing is built before it is refused",
+  () => {
+    // when / then — `versions:set` takes the tag verbatim, so the refusal precedes every job
+    assert.ok(workflow.indexOf("Refuse a tag the repository does not record as its release")
+      < workflow.indexOf("versions:set"));
+    assert.match(workflow, /\n  build:\n    needs: nightly-evidence/);
+    assert.match(workflow, /\n  browser:\n    needs: nightly-evidence/);
+  });
