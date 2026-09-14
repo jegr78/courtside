@@ -60,7 +60,7 @@ describe("journey control", () => {
       const waiters = await lock.waitForWaiters(2);
       await lock.release();
       await remote.publishServiceWorkerUpdate();
-      await remote.reset();
+      await remote.reset("seeded", "en");
       await remote.restart();
 
       // then
@@ -76,6 +76,7 @@ describe("journey control", () => {
       expect(sql).toBe("result");
       expect(waiters).toBe("waiting");
       expect(calls.pinnedBrowser).toHaveBeenCalledWith("webkit", "de-DE");
+      expect(calls.reset).toHaveBeenCalledWith("seeded", "en");
       expect(calls.browserDiagnostics).toHaveBeenCalledWith("webkit", "browser-disconnected", undefined);
       expect(calls.recordBrowserTest).toHaveBeenCalledWith("webkit", "webkit-accessibility", 1, "start");
       expect(calls.releasePinnedBrowser).toHaveBeenCalledWith("webkit");
@@ -188,7 +189,7 @@ describe("journey control", () => {
     }
   });
 
-  it("given the two clubs a journey may start in, when a worker asks for one, then the reset is the one it asked for", async () => {
+  it("given the clubs a journey may start in, when a worker asks for one, then the reset is the club and the language it asked for", async () => {
     // given
     const { service, calls } = journeyService();
     const control = await startJourneyControl(service);
@@ -198,10 +199,11 @@ describe("journey control", () => {
       const remote = connectJourneyService(control.reference);
       await remote.reset("empty");
       await remote.reset("seeded");
-      await remote.reset();
+      await remote.reset("seeded", "en");
 
       // then
-      expect(calls.reset.mock.calls).toEqual([["empty"], ["seeded"], ["seeded"]]);
+      expect(calls.reset.mock.calls)
+        .toEqual([["empty", undefined], ["seeded", undefined], ["seeded", "en"]]);
     } finally {
       await control.close();
     }

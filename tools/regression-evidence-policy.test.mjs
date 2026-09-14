@@ -31,6 +31,10 @@ test("given visual baselines, when running them on different hosts, then their p
   assert.doesNotMatch(playwright, /snapshotPathTemplate:.*\{platform\}/);
   assert.match(fixtures, /journeyService\.pinnedBrowser\(browserName, info\.project\.use\.locale\)/);
   assert.match(setup, /\.withEnvironment\(language\.environment\)/);
+  // A capture shows the club whose language it is published in, and the world for that club is
+  // taken once at startup rather than translated in front of the camera.
+  assert.match(fixtures, /journeyService\.reset\(start, clubLanguage\(info\.project\.use\.locale\)\)/);
+  assert.match(setup, /seededWorldIn\(seededPerLanguage, language \?\? shippedLanguage\)/);
   assert.match(playwright, /name: "visual"/);
   assert.match(setup, /mcr\.microsoft\.com\/playwright:[^"]*@sha256:/);
   // Browsers reach the application through the same reverse proxy a club runs, read from the
