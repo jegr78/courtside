@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { type Page, type TestInfo } from "@playwright/test";
 import { expect, selectPreference, test } from "./fixtures";
 
-// The guides are read in the light theme on a page column, and the instance answers in German
-// unless somebody says otherwise, so both are chosen here rather than inherited.
-test.use({ viewport: { width: 1280, height: 800 } });
+// The guides are read in the light theme on a page column, in the language its project names, and
+// the height is the dialogue's bound: a shorter screen scrolls one and publishes it cut off.
+test.use({ viewport: { width: 1280, height: 1000 } });
 
 interface Capture {
   readonly name: string;
@@ -73,13 +73,20 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   "participations": async (page) => {
     await expect(page.getByTestId("participations")).toBeVisible();
   },
+  // A booking whose card has no players yet is refused before any rule is read, so the passage
+  // about a rule needs a dialogue the card itself accepts.
   "refused-booking": async (page) => {
     await page.getByTestId("week-next").click();
     await page.getByTestId("week-next").click();
     await page.locator('[data-testid="free-slot"][data-court-number="1"][data-slot="12:00"]').first().click();
     await expect(page.getByTestId("booking-dialog")).toBeVisible();
+    await page.getByTestId("member-search").fill("Mary");
+    await page.getByTestId("member-match").click();
     await page.getByTestId("booking-submit").click();
     await expect(page.locator('[data-code="booking.rule.advanceWindow.exceeded"]')).toBeVisible();
+    // The refusal also carries the reference a member would quote to their board, which is a
+    // different string on every screen and belongs in no published picture.
+    await page.evaluate(() => document.querySelector('[data-testid="booking-dialog"] [role="alert"]')?.remove());
     await page.evaluate(() => window.scrollTo(0, 0));
   },
   "series-form": async (page) => {
@@ -136,9 +143,14 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("admin-roster-link").click();
     await expect(page.locator('[data-testid^="roster-row-"]').first()).toBeVisible();
   },
+  // The first row of the roster is the bootstrap administrator, who holds no membership, and an
+  // empty panel would illustrate the passage with the one person it is not about.
   "person-membership": async (page) => {
+    await page.getByTestId("roster-search").fill("Jane");
+    await page.getByTestId("roster-search-submit").click();
+    await expect(page.locator('[data-testid^="roster-row-"]')).toHaveCount(2);
     await page.locator('[data-testid^="person-link-"]').first().click();
-    await expect(page.getByTestId("save-membership")).toBeVisible();
+    await expect(page.getByTestId("end-membership")).toBeVisible();
   },
   "import-source": async (page) => {
     await page.getByTestId("admin-import-link").click();
@@ -259,7 +271,7 @@ test("every surface the members are kept on is captured", async ({ page, journey
   await capture(page, "person-membership", journeyService.visualDate);
 });
 
-test("every surface a board reads its own club from is captured", async ({ page, journeyService }, info) => {
+test("the source a board reads its member list from is captured", async ({ page, journeyService }, info) => {
   // given
   await prepare(page, localeOf(info));
   await signIn(page, "configuration-admin", "court-plan-view");
@@ -267,6 +279,15 @@ test("every surface a board reads its own club from is captured", async ({ page,
 
   // when / then
   await capture(page, "import-source", journeyService.visualDate);
+});
+
+test("the record a board reads its own club from is captured", async ({ page, journeyService }, info) => {
+  // given
+  await prepare(page, localeOf(info));
+  await signIn(page, "configuration-admin", "court-plan-view");
+  await page.getByTestId("administration-link").click();
+
+  // when / then
   await capture(page, "utilisation", journeyService.visualDate);
 });
 
