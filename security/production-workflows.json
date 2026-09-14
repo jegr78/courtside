@@ -80,6 +80,7 @@
         "IdentityCleanupSchedule#deleteExpiredResetMailWindows",
         "IdentityCleanupSchedule#deleteExpiredResetTokens",
         "PasswordResetCodeMailer#on(PasswordResetRequested)",
+        "SignInFailureLog#on(AbstractAuthenticationFailureEvent)",
         "UsernameReminderMailer#on(UsernameReminderRequested)"
       ],
       "stateTransitions": [
