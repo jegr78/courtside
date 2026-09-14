@@ -430,7 +430,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             <UnsavedMark id="club-configuration" unsaved={unsavedConfiguration} />
           </div>
         </form>
-        <div className="grid gap-5">
+        <div data-testid="booking-rules" className="grid gap-5">
           <h2 className="text-2xl font-bold">{t("admin.rules.title")}</h2>
           <label className="grid gap-2 font-medium">
             {t("admin.rules.ruleSet")}

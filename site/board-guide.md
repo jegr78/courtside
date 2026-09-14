@@ -24,6 +24,8 @@ Innerhalb der Verwaltung führt eine Leiste an der linken Seite durch vier Grupp
 
 Der Weg zurück zum Platzplan steht in derselben Leiste.
 
+![Die Leiste der Verwaltung mit den Gruppen Verein, Anlage, Mitglieder und Nachweise und dem Weg zurück zum Platzplan.](screenshots/de/admin-navigation.png)
+
 ## Der geführte Weg: Einrichtung
 
 *Verein → Einrichtung* ist die Übersicht für den Anfang. Sie liest den aktuellen Stand der Instanz
@@ -91,6 +93,8 @@ Vergangenheit bleibt in den Auswertungen, und bestehende Buchungen darauf sind n
 verschwunden — betroffene Mitglieder bekommen eine Nachricht, dass ein Platz ihrer Buchung ausser
 Betrieb genommen wurde.
 
+![Die Platzliste mit Nummer und Name je Zeile, der Schaltfläche zum Deaktivieren und dem Formular für einen neuen Platz.](screenshots/de/courts.png)
+
 ## Anlage → Öffnungszeiten
 
 Je Wochentag tragen Sie eine Öffnungs- und eine Schliesszeit ein oder markieren den Tag als
@@ -102,6 +106,8 @@ Für die übliche Woche gibt es *Gleiche Zeiten übernehmen*: Zeiten eintragen, 
 
 Ausserhalb der Öffnungszeit ist keine Buchung möglich, und eine nachträgliche Verkürzung meldet sich
 bei den Mitgliedern, deren Buchung dadurch nicht mehr abgedeckt ist.
+
+![Die Öffnungszeiten je Wochentag mit Öffnungs- und Schliesszeit, der Markierung geschlossen und dem Bereich Gleiche Zeiten übernehmen.](screenshots/de/opening-hours.png)
 
 ## Anlage → Buchungskarten
 
@@ -129,12 +135,16 @@ Eine Karte trägt:
 
 Zur Verfügbarkeit gilt dasselbe wie beim Platz: deaktivieren statt löschen.
 
+![Eine Buchungskarte im Formular: Bezeichnung und Farbe mit Vorschau, berechtigte und verantwortliche Rollen, erlaubte Spielerzahlen und die Schalter der Karte.](screenshots/de/booking-card.png)
+
 ## Anlage → Platzfüller
 
 Ein Platzfüller belegt einen Spielplatz, ohne eine Person zu sein — eine Ballmaschine etwa, oder ein
 Aushang „Spielpartner gesucht“. Die Anzahl sagt, wie viele davon der Verein besitzt; leer heisst
 beliebig viele. Ist zur gebuchten Zeit alles vergeben, sagt Courtside dem buchenden Mitglied, wie
 viele es insgesamt gibt.
+
+![Die Liste der Platzfüller mit Bezeichnung und Anzahl, darunter das Formular für einen neuen.](screenshots/de/slot-fillers.png)
 
 ## Buchungsregeln
 
@@ -162,6 +172,8 @@ niemanden etwas; zeigen welche darauf, nimmt Stilllegen es nur aus der Auswahl �
 gelten die Regeln unverändert weiter, bis Sie ihnen ein anderes Regelwerk zuweisen. Courtside sagt
 Ihnen vorher, welcher Fall vorliegt.
 
+![Der Abschnitt Buchungsregeln mit der Auswahl des Regelwerks und den Regeln darunter, jede mit ihrem erlaubten Bereich.](screenshots/de/booking-rules.png)
+
 ## Mitglieder → Mitgliedsarten
 
 Eine Mitgliedsart verbindet drei Dinge: eine Bezeichnung, ein Regelwerk und die Frage, ob ein Import
@@ -172,6 +184,8 @@ gelten für diese Mitglieder unverändert weiter.
 
 **Zugang beim Import anlegen** heisst: führen Sie einen Import aus, bekommt jedes Mitglied dieser Art
 einen Zugang und sein Einmalpasswort per E-Mail. Bestehende Zugänge bleiben unberührt.
+
+![Die Mitgliedsarten mit Bezeichnung, Regelwerk und dem Häkchen, das beim Import einen Zugang anlegt.](screenshots/de/membership-types.png)
 
 ## Mitglieder → Personen und Konten
 
@@ -252,6 +266,8 @@ die Schwelle ein, ab welchem Anteil wegfallender Mitgliedschaften nachgefragt wi
 Zum Zuordnen der Spalten wählen Sie eine Beispieldatei aus. **Diese Datei bleibt in Ihrem Browser**
 und wird nur gelesen, um Ihnen Ihre eigenen Spalten anzubieten.
 
+![Die Beschreibung einer Quelle: Bezeichnung, Trennzeichen und Zeichensatz, die Zuordnung der Spalten und die Häkchen der Felder, die diese Quelle führt.](screenshots/de/import-source.png)
+
 **Datei einlesen.** Der Upload erzeugt eine Vorschau, keine Änderung: Dateiname, Zeilenzahl und
 Prüfsumme, dann die Änderungsmenge nach Art getrennt — neu, geändert, Mitgliedschaft endet —, die
 übersprungenen Zeilen, die möglichen Dubletten und die geteilten Postfächer. Dazu steht dort, wie
@@ -297,6 +313,8 @@ aber ihre Inhaber buchen auf keiner Karte mehr, die die Mitgliedsrolle verlangt.
 **Auslastung** zeigt, wie viel bestätigte Spielzeit jeder Platz in einem Zeitraum gehalten hat.
 Plätze ohne Buchung stehen mit dabei; sie sind Teil der Antwort.
 
+![Die Auslastung je Platz über einen Zeitraum mit der Zahl der Buchungen, der belegten Zeit und dem Anteil.](screenshots/de/utilisation.png)
+
 **Datenexport** gibt die Listen des Vereins als CSV. Trennzeichen und Zeichensatz entscheiden
 darüber, ob Ihre Tabellenkalkulation die Datei richtig öffnet. Der Buchungsexport nennt Platz,
 Zeitfenster und Buchungsart Tag für Tag — wer gebucht hat, steht nicht in der Datei.
@@ -324,3 +342,5 @@ bleibt lesbar, und die Auswertungen bleiben richtig.
 **Alles, was Sie eintragen, können Sie korrigieren.** Ein Tippfehler im Namen, ein falscher
 Benutzername, ein falsches Enddatum: dafür braucht es keine Datenbankkonsole und keine Anfrage bei
 uns.
+
+![Der Bereich Mitgliedschaft einer Person: Mitgliedsart, Beginn und Ende jederzeit korrigierbar, daneben die Schaltfläche, die die Mitgliedschaft beendet statt sie zu löschen.](screenshots/de/person-membership.png)

@@ -24,6 +24,8 @@ Inside, a bar down the left leads through four groups:
 
 The way back to the court plan sits in the same bar.
 
+![The administration bar with its groups Club, Facility, People and Records, and the way back to the court plan.](../screenshots/en/admin-navigation.png)
+
 ## The guided path: Setup
 
 *Club → Setup* is the overview for the beginning. It reads the instance's current state and shows,
@@ -87,6 +89,8 @@ Rather than deleting a court, deactivate it. It leaves the court plan, its past 
 reports, and bookings on it do not simply vanish — the members holding them are written to and told
 that a court of their booking was taken out of service.
 
+![The court list with number and name per row, the button that deactivates a court, and the form for a new one.](../screenshots/en/courts.png)
+
 ## Facility → Opening hours
 
 Per weekday you enter an opening and a closing time, or mark the day closed. A day carrying only one
@@ -97,6 +101,8 @@ save the week with one click.
 
 Outside the opening hours no booking is possible, and shortening them afterwards writes to the
 members whose booking is no longer covered.
+
+![The opening hours per weekday with opening and closing time, the closed marker, and the Apply the same times area.](../screenshots/en/opening-hours.png)
 
 ## Facility → Booking cards
 
@@ -123,11 +129,15 @@ A card carries:
 
 Availability works as it does for a court: deactivate rather than delete.
 
+![A booking card in the form: label and colour with a preview, allowed and managing roles, allowed player counts and the card's switches.](../screenshots/en/booking-card.png)
+
 ## Facility → Slot fillers
 
 A slot filler takes a player slot without being a person — a ball machine, say, or a "looking for a
 partner" notice. The count is how many of them the club owns; empty means any number. When they are
 all taken at the booked time, Courtside tells the booking member how many there are in total.
+
+![The list of slot fillers with label and count, and the form for a new one below it.](../screenshots/en/slot-fillers.png)
 
 ## Booking rules
 
@@ -154,6 +164,8 @@ for anybody; if some do, retiring only takes it out of the choices — their rul
 unchanged until you point them at another set. Courtside tells you which case you are in before you
 act.
 
+![The Booking rules section with the rule set chooser and the rules below it, each with its allowed range.](../screenshots/en/booking-rules.png)
+
 ## People → Membership types
 
 A membership type ties three things together: a name, a rule set, and whether an import opens an
@@ -164,6 +176,8 @@ applying to those members unchanged.
 
 **Open an account on import** means: when an import runs, every member of this type is given an
 account and mailed their own one-time password. Accounts that already exist are left alone.
+
+![The membership types with name, rule set and the tick that opens an account on import.](../screenshots/en/membership-types.png)
 
 ## People → People and accounts
 
@@ -240,6 +254,8 @@ before executing.
 To map the columns you pick an example file. **That file stays in your browser** and is read only to
 offer you your own columns.
 
+![The description of a source: name, separator and character set, the mapping of its columns, and the ticks for the fields that source owns.](../screenshots/en/import-source.png)
+
 **Read the file.** The upload produces a preview, not a change: file name, row count and checksum,
 then the change set by kind — new, changed, membership ends — the skipped rows, the possible
 duplicates and the shared mailboxes. Beside it stands how many accounts would be opened, and why one
@@ -284,6 +300,8 @@ their holders can no longer book on any card that asks for the member role.
 **Utilisation** shows how much confirmed playing time each court held over a period. Courts nobody
 booked are listed too; they are part of the answer.
 
+![Utilisation per court over a period with the number of bookings, the time held and the share.](../screenshots/en/utilisation.png)
+
 **Data export** gives the club's lists as CSV. The separator and character set decide whether your
 spreadsheet opens the file correctly. The booking export names the court, the slot and the kind of
 booking day by day — who booked is not in the file.
@@ -307,3 +325,5 @@ deactivated or retired, memberships are ended. The past stays readable and the r
 
 **Everything you enter, you can correct.** A typo in a name, a wrong username, a wrong end date:
 none of it needs a database console or a request to us.
+
+![The Membership area of a person: type, start and end correctable at any time, beside the button that ends the membership rather than deleting it.](../screenshots/en/person-membership.png)

@@ -156,12 +156,13 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         : <p data-testid="booking-court" className="mt-5 font-semibold">
           {courtName(courts, selection.courtId, t)}</p>}
       <FieldViolations id="booking-courtIds-errors" violations={fieldViolations("courtIds")} />
-      <label className="mt-4 grid gap-2 font-medium">{t("booking.card")}
+      <label data-testid="booking-kind" className="mt-4 grid gap-2 font-medium">{t("booking.card")}
         <select data-testid="booking-card" value={cardId} onChange={(event) => setCardId(event.target.value)} required aria-invalid={fieldViolations("cardId").length > 0} aria-describedby={describedBy("cardId")} className="form-control rounded-lg border px-3 py-3">
           {bookingCards.map((card) => <option key={card.id} value={card.id}>{card.label}</option>)}
         </select>
       </label>
       <FieldViolations id="booking-cardId-errors" violations={fieldViolations("cardId")} />
+      <div data-testid="booking-participants">
       {requiredPlayers !== undefined && <p data-testid="booking-players" aria-live="polite" className="mt-2">
         {t("booking.players", { players: chosenPlayers, required: requiredPlayers })}
       </p>}
@@ -210,6 +211,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </label>
       <FieldViolations id="booking-note-errors" violations={fieldViolations("note")} />
       </details>
+      </div>
       <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
       {error && <Alert>{error}</Alert>}
       </div>

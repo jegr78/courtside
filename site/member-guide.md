@@ -33,6 +33,8 @@ angekommen sein, oder das Konto ist deaktiviert. Für die ersten beiden Fälle s
 Formular *Passwort oder Benutzername vergessen?*; ist das Konto deaktiviert, hilft nur dein
 Vorstand.
 
+![Das Anmeldeformular mit Benutzername und Passwort, darunter der Verweis für vergessene Zugangsdaten.](screenshots/de/sign-in.png)
+
 ## Passwort oder Benutzername vergessen
 
 Die Seite hinter diesem Link hat drei Formulare, und alle drei kommen ohne Anmeldung aus.
@@ -72,6 +74,8 @@ Beim Einlösen zählt nur der Netzanschluss, von dem die Versuche kommen, nie de
 kann dir also die Wiederherstellung zuhalten, indem er Codes auf dich rät. Teilst du dir den
 Anschluss mit anderen Mitgliedern, landen deren Versuche allerdings im selben Topf wie deine.
 
+![Die Seite hinter dem Verweis mit ihren drei Formularen: Code anfordern, Code einlösen, Benutzernamen zuschicken.](screenshots/de/account-recovery.png)
+
 ## Das Einmalpasswort ersetzen
 
 Das betrifft das Passwort, das dein Vorstand dir zuschickt — beim ersten Zugang oder wenn du
@@ -93,6 +97,8 @@ aufgetaucht ist. Dein Passwort verlässt die Instanz dabei nicht: übertragen we
 eines Prüfwerts, aus denen es sich nicht zurückrechnen lässt. Antwortet der Dienst nicht, lehnt
 Courtside die Änderung ab, statt ungeprüft zu speichern; dann versuchst du es später noch einmal.
 Sonst meldest du dich einmal neu an und bist drin.
+
+![Die Seite Einmalpasswort ersetzen mit dem neuen Passwort und seiner Wiederholung.](screenshots/de/initial-password.png)
 
 ## Eine Buchung anlegen
 
@@ -129,6 +135,8 @@ Die Buchungsart entscheidet mit,
 Buchungsarten sind Zeilen in der Datenbank deines Vereins, keine feste Liste aus dem Programm. Was
 du im Dialog zur Auswahl hast, hat dein Vorstand so eingerichtet.
 
+![Das Feld Art der Buchung im Buchungsdialog mit der Buchungsart, die der Verein eingerichtet hat.](screenshots/de/booking-kind.png)
+
 ## Mitspieler und Gäste
 
 Erfasst die gewählte Art Spieler, zeigt der Dialog mit, wie viele von wie vielen du schon
@@ -146,12 +154,16 @@ eingetragen hast. Drei Arten von Mitspielern gibt es:
 Wen du einträgst, erfährt davon: das eingetragene Mitglied bekommt eine E-Mail. Gefragt wird es
 nicht, zustimmen muss es nicht, und es kann sich selbst wieder austragen.
 
+![Der Teil des Buchungsdialogs für Mitspieler: die Zahl der belegten Spielerplätze, die Mitgliedersuche und die aufgeklappten Felder für Gäste und Was mitspielt.](screenshots/de/booking-participants.png)
+
 ## Als Mitspieler eingetragen
 
 Unter *Meine Buchungen* steht ein eigener Abschnitt **Als Mitspieler eingetragen**. Dort landen die
 Buchungen anderer Mitglieder, in denen dein Name steht. Niemand hat dich vorher gefragt, und genau
 dort trägst du dich wieder aus, ohne jemanden um Erlaubnis zu bitten. Wer die Buchung angelegt hat,
 bekommt eine Nachricht davon; die Buchung selbst bleibt bestehen.
+
+![Der Abschnitt Als Mitspieler eingetragen unter Meine Buchungen, an jedem Eintrag die Schaltfläche zum Austragen.](screenshots/de/participations.png)
 
 ## Wenn eine Regel die Buchung ablehnt
 
@@ -177,6 +189,8 @@ Diese Ablehnungen gibt es:
 
 Wie viele Tage, wie viele Minuten, wie viele Buchungen: das steht in den Regeln deines Vereins, und
 Courtside nennt die Zahl in der Meldung selbst.
+
+![Der Buchungsdialog nach einer abgelehnten Buchung: die Meldung steht bei dem Feld, um das es geht, und nennt die Zahl aus der Regel.](screenshots/de/refused-booking.png)
 
 ## Stornieren
 
@@ -209,6 +223,8 @@ Zwei Dinge sind dabei wichtig:
   und *Ganze Serie*. Vor dem Verschieben zeigt Courtside, welche Termine betroffen wären und welche
   davon nicht verschoben werden können, weil ihr Platz dann belegt oder nicht verfügbar ist.
 
+![Das Formular für einen Serientermin mit Plätzen, Buchungsart, erstem Termin, Uhrzeit, Dauer, Wochentagen und Ende.](screenshots/de/series-form.png)
+
 ## Wenn sich unter deiner Buchung etwas ändert
 
 Es kann passieren, dass sich die Grundlage deiner Buchung nachträglich ändert: ein Platz wird
@@ -240,6 +256,8 @@ Ohne diese vier kommst du nicht an dein Konto, erfährst nichts von einer Sperru
 Buchung und nichts davon, dass jemand dich eingetragen hat. Deshalb lassen sie sich nicht
 abschalten.
 
+![Die Seite Benachrichtigungen mit den abwählbaren Nachrichten und denen, die immer geschickt werden.](screenshots/de/notification-choices.png)
+
 ## Dein Konto
 
 Unter *Kontosicherheit* änderst du dein Passwort und siehst, in welchen Browsern dein Konto
@@ -254,3 +272,5 @@ du ohne diese Rückfrage.
 
 Vertippt sich der Vorstand bei deinem Namen oder deinem Benutzernamen, ist das kein Dauerzustand:
 alles, was ein Verein einträgt, kann er auch wieder korrigieren.
+
+![Die Kontosicherheit mit der Passwortänderung und der Liste der Browser, in denen das Konto angemeldet ist.](screenshots/de/account-security.png)

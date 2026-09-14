@@ -275,7 +275,7 @@ function MembershipSection({ entry, types, disabled, save }: {
     }
   }
 
-  return <section className="surface-subtle grid gap-3 rounded-xl border p-4">
+  return <section data-testid="person-membership" className="surface-subtle grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.person.membership")}</h2>
     <div className="grid gap-3 md:grid-cols-3">
       <label className="grid gap-2 font-medium">

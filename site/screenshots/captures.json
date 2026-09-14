@@ -1,5 +1,5 @@
 {
-  "purpose": "Which guide passage shows which captured surface, so that a surface somebody changes names the pages that have to be looked at again. The capture run writes site/screenshots/<locale>/<name>.png; the pages reference it from there. A surface names the block a passage describes rather than a whole view: these images are published, so the smaller the frame, the less a field added later can wander into it unnoticed.",
+  "purpose": "Which guide passage shows which captured surface, so that a surface somebody changes names the pages that have to be looked at again. The capture run writes site/screenshots/<locale>/<name>.png; the pages reference it from there. A surface names the block a passage describes rather than a whole view: these images are published, so the smaller the frame, the less a field added later can wander into it unnoticed. Every section of a guide shows one of them, which is what makes this catalogue the list of surfaces the guides promise.",
   "locales": ["de", "en"],
   "captures": [
     {
@@ -8,7 +8,42 @@
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
     },
     {
+      "name": "sign-in",
+      "surface": "login-view",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
+      "name": "account-recovery",
+      "surface": "account-recovery-view",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
+      "name": "initial-password",
+      "surface": "initial-password-view",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
       "name": "booking-dialog",
+      "surface": "booking-dialog",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
+      "name": "booking-kind",
+      "surface": "booking-kind",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
+      "name": "booking-participants",
+      "surface": "booking-participants",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
+      "name": "participations",
+      "surface": "participations",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
+      "name": "refused-booking",
       "surface": "booking-dialog",
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
     },
@@ -16,6 +51,26 @@
       "name": "my-bookings",
       "surface": "my-bookings-page",
       "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
+      "name": "series-form",
+      "surface": "series-form",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
+      "name": "notification-choices",
+      "surface": "my-messages-view",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
+      "name": "account-security",
+      "surface": "account-security-view",
+      "pages": { "de": "site/member-guide.md", "en": "site/en/member-guide.md" }
+    },
+    {
+      "name": "admin-navigation",
+      "surface": "admin-navigation",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {
       "name": "admin-setup",
@@ -28,8 +83,53 @@
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {
+      "name": "courts",
+      "surface": "admin-courts-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
+      "name": "opening-hours",
+      "surface": "admin-opening-hours-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
+      "name": "booking-card",
+      "surface": "admin-booking-card-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
+      "name": "slot-fillers",
+      "surface": "admin-slot-fillers-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
+      "name": "booking-rules",
+      "surface": "booking-rules",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
+      "name": "membership-types",
+      "surface": "admin-membership-types-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
       "name": "admin-roster",
       "surface": "admin-roster-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
+      "name": "import-source",
+      "surface": "import-part-source",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
+      "name": "utilisation",
+      "surface": "admin-facility-utilisation-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
+      "name": "person-membership",
+      "surface": "person-membership",
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     }
   ]
