@@ -109,7 +109,8 @@ class ClosureMessageTest extends AbstractIntegrationTest {
 
         // then
         assertThat(addressesWrittenTo()).contains("jane.doe@example.org");
-        assertThat(lastBodyTo("jane.doe@example.org")).contains("Member booking");
+        assertThat(lastBodyTo("jane.doe@example.org"))
+                .contains(cards.requireCard(MEMBER_BOOKING_CARD).getLabel());
     }
 
     @Test

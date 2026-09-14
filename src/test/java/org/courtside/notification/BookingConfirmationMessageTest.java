@@ -9,6 +9,7 @@ import jakarta.mail.Multipart;
 import jakarta.mail.Part;
 import jakarta.mail.internet.MimeMessage;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.card.CardService;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
@@ -67,6 +68,9 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingService bookings;
+
+    @Autowired
+    private CardService cards;
 
     @Autowired
     private FacilityTestFixture facility;
@@ -128,7 +132,7 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
 
         // then — a dialog nobody keeps is what this message replaces, so it carries the whole booking
         String body = body(theMessageHandedOver());
-        assertThat(body).contains("13. Mai 2026", "18:00", "19:00", "Court 1", "Member booking");
+        assertThat(body).contains("13. Mai 2026", "18:00", "19:00", "Court 1", memberBookingCard());
     }
 
     @Test
@@ -145,7 +149,7 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
                 .contains("BEGIN:VCALENDAR\r\n", "BEGIN:VEVENT\r\n")
                 .contains("UID:booking-" + bookingId + "@courtside\r\n")
                 .contains("DTSTART:20260513T160000Z\r\n", "DTEND:20260513T170000Z\r\n")
-                .contains("SUMMARY:Member booking - Court 1\r\n")
+                .contains("SUMMARY:" + memberBookingCard() + " - Court 1\r\n")
                 .contains("LOCATION:Court 1\r\n")
                 .contains("END:VEVENT\r\n", "END:VCALENDAR\r\n")
                 .doesNotContain("\nBEGIN:VEVENT\n");
@@ -322,5 +326,10 @@ class BookingConfirmationMessageTest extends AbstractIntegrationTest {
             }
         }
         return null;
+    }
+
+    // The card is a row the club names in its own language, so the message carries that name.
+    private String memberBookingCard() {
+        return cards.requireCard(MEMBER_BOOKING_CARD).getLabel();
     }
 }
