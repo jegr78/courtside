@@ -18,10 +18,13 @@ may publish under this project's name.
 
 There is nothing to type. A release pull request titled `chore(main): release <version>` stands
 open on `main` and grows with every merge; it shows the version it would cut and the changelog it
-would write. Merge it when a nightly has verified the commit it sits on, and the rest happens.
+would write. Before merging a candidate pull request, fold its entries into the one changelog
+section named after the release line, such as `## 0.1.0`. Do not add a section for each candidate.
+Merge it when a nightly has verified the commit it sits on, and the rest happens.
 
-A second pull request follows each release and moves `pom.xml` on to the next `-SNAPSHOT`. It
-carries no release and no tag; merge it and forget it.
+Release Please does not open a second snapshot pull request. The release pull request moves every
+version field together, and the repository keeps that published version until the next release
+pull request changes it.
 
 ## What the nightly image proves
 
@@ -69,12 +72,12 @@ rather than merely unsigned.
 
 **Where the version lives.** `pom.xml` carries it between releases: release-please writes it, Maven
 writes `build-info.properties` from it, and `GET /api/source` reports that to the browser — so the
-version a member reads in the footer is the one that was released, and between releases it is the
-`-SNAPSHOT` that says which release it follows. `frontend/package.json` and both root-package
-version fields in `frontend/package-lock.json` are kept in step by the same pull request, so nothing
-there can drift. The release build itself does not trust any of that: it takes the version from the
-tag and stamps it in with `versions:set`, so what is published is what the tag says even if the pom
-were to disagree.
+version a member reads in the footer is the one that was released. `frontend/package.json` and both
+root-package version fields in `frontend/package-lock.json` move in the same pull request. There is
+no snapshot transition between releases because Release Please's Maven snapshot update cannot
+remove the second suffix from JSON versions such as `0.1.0-rc.2-SNAPSHOT`. The release build itself
+does not trust repository metadata: it takes the version from the tag and stamps it in with
+`versions:set`, so what is published is what the tag says even if the pom were to disagree.
 
 ## Cutting a candidate
 
@@ -90,6 +93,11 @@ Candidates are opened and closed with one line of configuration, not with a hand
 3. Set `"prerelease": false` again to graduate. The suffix is stripped and the next release pull
    request proposes `v0.3.0`.
 
+Every candidate is a checkpoint on the same release line. Release Please proposes the changes
+since the preceding candidate, but the pull request must fold those entries into the single
+`## <major>.<minor>.<patch>` section before merge. The release workflow rejects a missing or split
+section and uses that complete section for both candidate and stable GitHub release notes.
+
 None of that applies to the very first release, because there is nothing to bump from: with no
 release in the history release-please never asks the versioning strategy at all and takes
 `initial-version` verbatim — which is `1.0.0` unless the configuration says otherwise, whatever the
@@ -97,6 +105,10 @@ manifest holds and however many breaking changes the history carries. A candidat
 release is therefore opened by writing it there, as `0.1.0-rc.1`, and `"prerelease": true` belongs
 in the same change: without it the release after that candidate strips the suffix and graduates.
 The three steps above take over from the second release onwards.
+
+The first public release has no older published contract to break. Its cumulative `0.1.0`
+changelog therefore keeps the features and fixes but has no `Breaking Changes` section. Once
+`0.1.0` is published, breaking markers describe real upgrade work and stay in later release notes.
 
 Nothing else changes: a candidate travels the same pipeline, and section 10 of `docs/design.md` says
 what that means.
@@ -199,11 +211,14 @@ pull request that makes one carries `!` in its Conventional Commit title or a `B
 footer, which is what the title lint reads and what the version bump follows.
 
 **The upgrade note is your commit message.** `build` collects every `BREAKING CHANGE:` footer and
-every `!:` subject between the previous tag and this one and puts them verbatim into the release
-body under *Upgrade notes*; with none it writes that no published surface changed and a club may
-raise `COURTSIDE_VERSION` and restart. The footer is not paperwork, then — it is the text a club
-reads before pulling the image, and `BREAKING CHANGE: renamed a variable` is a sentence that helps
-nobody at 22:00.
+every `!:` subject between the previous published release and this one and puts them verbatim into
+the release body under *Upgrade notes*; with none it writes that no published surface changed and a
+club may raise `COURTSIDE_VERSION` and restart. The footer is not paperwork, then — it is the text a
+club reads before pulling the image, and `BREAKING CHANGE: renamed a variable` is a sentence that
+helps nobody at 22:00.
+
+The first public release has no upgrade origin, so its release body says that directly instead of
+turning development-time breaking markers into upgrade instructions.
 
 What no automation covers is the upgrade path itself. `upgrade` executes the origins it resolved
 from the published release history, so a release that breaks one of those is refused — but only

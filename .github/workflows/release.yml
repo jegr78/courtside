@@ -247,6 +247,13 @@ jobs:
           tags=$(node tools/courtside.upgrade-smoke.mjs --published-tags "$releases")
           echo "tags=$tags" >> "$GITHUB_OUTPUT"
 
+      - name: Collect cumulative release-line notes
+        run: >
+          node tools/release-notes.mjs
+          --changelog CHANGELOG.md
+          --tag "$GITHUB_REF_NAME"
+          --output build/release-body.md
+
       - name: Collect the upgrade notes
         env:
           PUBLISHED_TAGS: ${{ steps.published.outputs.tags }}
@@ -255,15 +262,19 @@ jobs:
           # upgrading from the last release needs the notes to start at.
           previous=$(node tools/courtside.upgrade-smoke.mjs --previous-release \
             "$GITHUB_REF_NAME" "$PUBLISHED_TAGS")
-          range=${previous:+$previous..}$GITHUB_REF_NAME
-          breaking=$(git log --no-merges --format='%s%n%b' "$range" \
-            | grep -E '^BREAKING CHANGE:|^[a-z]+(\(.+\))?!:' || true)
-          if [ -n "$breaking" ]; then
+          breaking=''
+          if [ -n "$previous" ]; then
+            breaking=$(git log --no-merges --format='%s%n%b' "$previous..$GITHUB_REF_NAME" \
+              | grep -E '^BREAKING CHANGE:|^[a-z]+(\(.+\))?!:' || true)
+          fi
+          if [ -z "$previous" ]; then
+            printf '\n## Upgrade notes\n\nFirst public release; no prior supported version to upgrade from.\n\n' >> build/release-body.md
+          elif [ -n "$breaking" ]; then
             fence='```'
-            printf '## Upgrade notes\n\nThis release changes a published surface — the REST API or an environment variable.\n\n%s\n%s\n%s\n\n' "$fence" "$breaking" "$fence" > build/release-body.md
+            printf '\n## Upgrade notes\n\nThis release changes a published surface — the REST API or an environment variable.\n\n%s\n%s\n%s\n\n' "$fence" "$breaking" "$fence" >> build/release-body.md
           else
             code='`'
-            printf '## Upgrade notes\n\nNo published surface changed. Raise %sCOURTSIDE_VERSION%s and restart.\n\n' "$code" "$code" > build/release-body.md
+            printf '\n## Upgrade notes\n\nNo published surface changed. Raise %sCOURTSIDE_VERSION%s and restart.\n\n' "$code" "$code" >> build/release-body.md
           fi
 
       - name: Resolve supported database upgrade origins
@@ -764,7 +775,6 @@ jobs:
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           body_path: build/release-body.md
-          generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             src/main/resources/api/openapi.yaml

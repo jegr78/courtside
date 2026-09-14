@@ -18,13 +18,16 @@ const packageEntry = config.packages["."];
 const git = (...arguments_) =>
   execFileSync("git", arguments_, { cwd: fileURLToPath(repository) }).toString().trim();
 
-test("given a Java project, when a release is cut, then the pom carries the version and a snapshot follows",
+test("given a Java project, when a release is cut, then every version moves in the release pull request",
   () => {
     // when / then — what the frontend shows comes from the pom by way of build-info.properties,
     // so a version living anywhere else could disagree with what a club reads in the footer. npm
     // records the root package version twice in its lockfile; leaving either one behind makes a
     // release contain two answers even though npm ci accepts the stale metadata.
     assert.equal(config["release-type"], "maven");
+    assert.equal(config["skip-snapshot"], true,
+      "release-please's JSON updater cannot remove Maven's trailing -SNAPSHOT from extra files;"
+      + " a separate snapshot PR would therefore make the next release internally inconsistent");
     assert.deepEqual(packageEntry["extra-files"], [
       { type: "json", path: "frontend/package.json", jsonpath: "$.version" },
       { type: "json", path: "frontend/package-lock.json", jsonpath: "$.version" },
@@ -39,13 +42,32 @@ test("given frontend package metadata, when a release is proposed, then every ro
     const lock = JSON.parse(read("frontend/package-lock.json"));
 
     // when / then
-    assert.deepEqual([lock.version, lock.packages[""].version],
-      [packageJson.version, packageJson.version],
-      "package.json and npm's two root lockfile versions must describe the same release");
+    const pomVersion = /<artifactId>courtside<\/artifactId>\s*<version>([^<]+)<\/version>/.exec(read("pom.xml"))?.[1];
+    assert.deepEqual([packageJson.version, lock.version, lock.packages[""].version],
+      [pomVersion, pomVersion, pomVersion],
+      "the pom, package.json and npm's two root lockfile versions must describe the same release");
     assert.deepEqual(new Set(packageEntry["extra-files"]
       .filter((entry) => entry.path === "frontend/package-lock.json")
       .map((entry) => entry.jsonpath)), new Set(["$.version", "$.packages[''].version"]),
     "release-please must update both root package versions; npm ci does not reject stale values");
+  });
+
+test("given the first public release line, when its changelog is read, then candidates do not split or invent upgrade history",
+  () => {
+    // given
+    const changelog = read("CHANGELOG.md");
+    const releaseLineHeadings = [...changelog.matchAll(/^##\s+(?:\[)?0\.1\.0(?:-[^\]\s(]+)?(?:\])?/gm)];
+    const initialSection = changelog.slice(releaseLineHeadings[0]?.index ?? 0,
+      changelog.indexOf("\n## ", (releaseLineHeadings[0]?.index ?? 0) + 1) < 0
+        ? undefined : changelog.indexOf("\n## ", (releaseLineHeadings[0]?.index ?? 0) + 1));
+
+    // when / then
+    assert.equal(releaseLineHeadings.length, 1,
+      "release candidates belong to one cumulative 0.1.0 history instead of becoming history boundaries");
+    assert.match(releaseLineHeadings[0][0], /^## 0\.1\.0(?:\s|$)/,
+      "the cumulative history is named after the release line, not one candidate checkpoint");
+    assert.doesNotMatch(initialSection, /^### .*BREAKING CHANGES/m,
+      "the first public release has no older published contract that its development history can break");
   });
 
 // Measured against release-please 17: without this, `0.2.0` plus one breaking change becomes
@@ -95,8 +117,9 @@ test("given a repository that never released, when it bootstraps, then it starts
     // any other value as a release to bump from, and the first version would come from there again.
     if (manifest["."] !== "0.0.0") {
       const headings = read("CHANGELOG.md").split("\n").filter((line) => /^#{1,3}\s/.test(line));
-      assert.ok(headings.some((heading) => heading.includes(manifest["."])),
-        "a manifest naming a version the changelog does not is a version nobody released");
+      const releaseLine = manifest["."].split("-")[0];
+      assert.ok(headings.some((heading) => heading.includes(releaseLine)),
+        "a manifest naming a release line the changelog does not is a version nobody released");
     }
     assert.equal(config["bootstrap-sha"], first,
       "the first changelog covers everything the repository has done, so it stops at the root commit");
