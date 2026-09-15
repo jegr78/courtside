@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: nightly-image-${{ github.repository }}
+  group: container-registry-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}

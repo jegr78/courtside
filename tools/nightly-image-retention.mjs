@@ -43,6 +43,13 @@ function validateVersions(versions) {
   }
 }
 
+export function validateRetentionSnapshot(versions) {
+  validateVersions(versions);
+  if (!versions.some(({ tags }) => tags.includes("nightly"))) {
+    throw new Error("nightly tag is unavailable");
+  }
+}
+
 function sortedIds(values) {
   return [...values].sort((left, right) => left - right);
 }
@@ -113,12 +120,8 @@ export function planNightlyImageRetention({ versions, manifests, now }) {
   const candidates = sortedIds(versions.filter(({ digest, updatedAt }) =>
     !keptDigests.has(digest) && timestamp(updatedAt, "version updatedAt").valueOf() < cutoff)
     .map(({ id }) => id));
-  if (candidates.length > 50) {
-    return { aborted: true, reason: `deletion ceiling exceeded: ${candidates.length} > 50`,
-      keptDatedTags, keepVersionIds, plannedDeletionCount: candidates.length, deleteVersionIds: [] };
-  }
-  return { aborted: false, reason: null, keptDatedTags, keepVersionIds,
-    plannedDeletionCount: candidates.length, deleteVersionIds: candidates };
+  return { keptDatedTags, keepVersionIds, plannedDeletionCount: candidates.length,
+    deleteVersionIds: candidates };
 }
 
 function argumentsOf(args) {
@@ -158,7 +161,7 @@ async function packageVersions({ owner, ownerKind, packageName, token }) {
       "GitHub package versions");
     if (!Array.isArray(records)) throw new Error("GitHub package versions are invalid");
     versions.push(...records.map((record) => ({ id: record.id, digest: record.name,
-      tags: record.metadata?.container?.tags ?? [], updatedAt: record.updated_at })));
+      tags: record.metadata?.container?.tags, updatedAt: record.updated_at })));
     if (records.length < 100) return versions;
   }
 }
@@ -237,11 +240,11 @@ async function main(args) {
     { headers: githubHeaders(token) }), "GitHub owner");
   const ownerKind = ownerRecord.type === "Organization" ? "orgs" : "users";
   const versions = await packageVersions({ owner, ownerKind, packageName, token });
+  validateRetentionSnapshot(versions);
   const bearer = await registryBearer({ owner, packageName, actor, token });
   const manifests = await registryManifests({ owner, packageName, versions, bearer });
   const plan = planNightlyImageRetention({ versions, manifests, now: options.now ?? new Date().toISOString() });
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
-  if (plan.aborted) throw new Error(plan.reason);
   if (options.apply) await deleteVersions({ owner, ownerKind, packageName, token,
     versions, ids: plan.deleteVersionIds });
 }

@@ -10,6 +10,7 @@ const source = readFileSync(path, "utf8");
 const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
 const workflow = yaml.load(source);
 const triggers = workflow.on ?? workflow[true];
+const release = yaml.load(readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8"));
 
 test("given the nightly image workflow, when its authority is read, then a verified build and a dispatch can start it", () => {
   // when / then
@@ -62,7 +63,16 @@ test("given a complete build, when it finishes, then it calls the image workflow
   assert.match(String(evidence.if), /github\.event_name == 'schedule'/);
   assert.match(String(evidence.if), /github\.event_name == 'workflow_dispatch'/);
   assert.match(String(evidence.if), /github\.ref == 'refs\/heads\/main'/);
-  assert.equal(workflow.concurrency.group, "nightly-image-${{ github.repository }}");
+  assert.equal(workflow.concurrency.group, "container-registry-${{ github.repository }}");
+  assert.equal(workflow.concurrency["cancel-in-progress"], false);
+});
+
+test("given nightly cleanup and release publication, when registry access is scheduled, then writes cannot overlap", () => {
+  // when / then
+  for (const jobName of ["image", "publish"]) {
+    assert.equal(release.jobs[jobName].concurrency.group, "container-registry-${{ github.repository }}");
+    assert.equal(release.jobs[jobName].concurrency["cancel-in-progress"], false);
+  }
 });
 
 test("given the current nightly already carries a revision, when selection finishes, then image work is skipped", () => {

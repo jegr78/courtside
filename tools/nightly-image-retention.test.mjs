@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { applyDeletionPlan, planNightlyImageRetention } from "./nightly-image-retention.mjs";
+import {
+  applyDeletionPlan,
+  planNightlyImageRetention,
+  validateRetentionSnapshot,
+} from "./nightly-image-retention.mjs";
 
 const now = "2026-09-13T12:00:00.000Z";
 const old = "2026-09-11T12:00:00.000Z";
@@ -256,9 +260,9 @@ test("given GitHub timestamps without milliseconds, when retention is planned, t
   assert.deepEqual(plan.deleteVersionIds, [3]);
 });
 
-test("given more than fifty deletions, when retention is planned, then the plan aborts without deleting", () => {
+test("given the incident backlog, when retention is planned, then every eligible version is returned", () => {
   // given
-  const versions = Array.from({ length: 51 }, (_, index) => version(index + 1,
+  const versions = Array.from({ length: 64 }, (_, index) => version(index + 1,
     `sha256:${index.toString(16).padStart(64, "0")}`));
 
   // when
@@ -266,9 +270,24 @@ test("given more than fifty deletions, when retention is planned, then the plan 
     manifests: manifests(...versions.map(({ digest }) => digest)), now });
 
   // then
-  assert.equal(plan.aborted, true);
-  assert.equal(plan.reason, "deletion ceiling exceeded: 51 > 50");
-  assert.deepEqual(plan.deleteVersionIds, []);
+  assert.equal(plan.plannedDeletionCount, versions.length);
+  assert.deepEqual(plan.deleteVersionIds, versions.map(({ id }) => id));
+});
+
+test("given incomplete package tag metadata, when retention validates the snapshot, then it refuses cleanup", () => {
+  // given
+  const versions = [{ id: 1, digest: `sha256:${"a".repeat(64)}`, updatedAt: old }];
+
+  // when / then
+  assert.throws(() => validateRetentionSnapshot(versions), /tags are invalid/);
+});
+
+test("given no moving nightly tag, when retention validates the snapshot, then it refuses cleanup", () => {
+  // given
+  const versions = [version(1, `sha256:${"a".repeat(64)}`, ["nightly-20260913-deadbee"])];
+
+  // when / then
+  assert.throws(() => validateRetentionSnapshot(versions), /nightly tag is unavailable/);
 });
 
 test("given an unreadable kept manifest, when retention is planned, then it refuses an unsafe deletion plan", () => {
