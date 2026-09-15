@@ -1580,10 +1580,18 @@ function uatHasAccounts(withDatabasePort, environment) {
   }) !== "0";
 }
 
+export function packagedApplicationJar(files, buildInfo) {
+  const version = /^build\.version=(.+)$/m.exec(buildInfo)?.[1].trim();
+  if (!version) throw new Error("The packaged Courtside application has no build version");
+  const jar = `courtside-${version}.jar`;
+  if (!files.includes(jar)) throw new Error(`The packaged Courtside application ${jar} was not found`);
+  return jar;
+}
+
 function extractApplicationLayers() {
-  const jar = readdirSync(join(root, "target"))
-    .find((file) => /^courtside-.*\.jar$/.test(file) && !file.endsWith(".jar.original"));
-  if (!jar) throw new Error("The packaged Courtside application was not found");
+  const buildInfo = join(root, "target", "classes", "META-INF", "build-info.properties");
+  if (!existsSync(buildInfo)) throw new Error("The Maven build wrote no build-info.properties to name its jar");
+  const jar = packagedApplicationJar(readdirSync(join(root, "target")), readFileSync(buildInfo, "utf8"));
   const layers = join(root, "build", "layers");
   rmSync(layers, { recursive: true, force: true });
   mkdirSync(layers, { recursive: true });
