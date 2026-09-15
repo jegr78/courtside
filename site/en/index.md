@@ -40,5 +40,5 @@ which rules apply to its members.
 
 The technical documents are for operators and developers. Start with the
 [reference deployment](https://github.com/jegr78/courtside/blob/main/deploy/README.md). Application
-details are in the [design specification](https://github.com/jegr78/courtside/blob/main/docs/design.md)
+details are in the [technical specification](https://github.com/jegr78/courtside/blob/main/docs/design.md)
 and the [data model](https://github.com/jegr78/courtside/blob/main/docs/data-model.md).

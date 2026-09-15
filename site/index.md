@@ -40,6 +40,6 @@ und entscheidet, welche Regeln für seine Mitglieder gelten.
 
 Die technischen Unterlagen richten sich an Betreiber und Entwickler. Beginne mit der
 [Referenz-Installation](https://github.com/jegr78/courtside/blob/main/deploy/README.md). Details zur
-Anwendung stehen in der [Entwurfsspezifikation](https://github.com/jegr78/courtside/blob/main/docs/design.md)
+Anwendung stehen in der [technischen Spezifikation](https://github.com/jegr78/courtside/blob/main/docs/design.md)
 und im [Datenmodell](https://github.com/jegr78/courtside/blob/main/docs/data-model.md). Diese Dokumente
 sind auf Englisch.

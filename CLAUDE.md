@@ -74,9 +74,9 @@ fails on the missing `BuildProperties` bean.
   admin surface that can only create is a trap that gets set once per mistake.
 
   Identifiers are the exception, because they are not data a club entered: a `personId` names a row,
-  it does not describe anybody. Deletion is separate and stays governed by section 11 of the design
-  spec — the answer to bad data is correcting it, and the answer to a departed member is
-  deactivation, not erasure.
+  it does not describe anybody. Deletion is separate and stays governed by the data-protection
+  section of the design spec — the answer to bad data is correcting it, and the answer to a departed
+  member is deactivation, not erasure.
 * **Keep controllers thin.** HTTP handling only. Business logic lives in services, never in
   controllers or repositories.
 * **Rules are data.** Booking rules are declarative rows evaluated by `RuleEngine`, not nested
@@ -491,34 +491,29 @@ on the board is a bug in the tracker, not a gap in the board.
 
 ## The design specification
 
-`docs/design.md` is the design specification: what the product is, why the architecture is shaped
-the way it is, the structural vocabulary the code uses (`DomainFailure`, `ProblemType`,
-`CodedDomainFailure`), the compatibility contract, and — in section 10 — what a club board is being
-asked to trust when it hands this application its members' credentials.
+`docs/design.md` is the current technical specification: what the product does, why its architecture
+has that shape, the structural vocabulary used by the code and the compatibility contract. It is
+not a roadmap. An unimplemented capability belongs in a concrete Product Backlog issue and not in
+the specification.
 
-It is written in the present tense as a *target*, so most of it describes the design and not the
-build. Two things in it describe the build and are therefore claims the code has to keep true:
-**section 0, "What is built today"**, and the inline **built / designed** markers, which section 10
-carries per item and section 9 carries per metric.
-
-* **A change that alters a behaviour the document states updates the document, in the same pull
-  request.** Adding a metric, closing a gap, changing what a login does — if a sentence in there
-  becomes false, it is part of the change, not follow-up work. A specification that describes last
-  month's build is worse than none, because section 10 is read as a promise.
+* **A change that alters a behaviour the document states updates the document in the same pull
+  request.** If a sentence becomes false, correcting it is part of the change, not follow-up work.
+  Do not append implementation history or test rationale. Git and the pull request retain those.
 * **A review reads it.** Whether the code contradicts the design specification is a finding, and it
   is one that neither the diff nor this file can surface — the contradiction lives in a document
   outside both. This has already been missed twice: a branch that made a stored password rehash on
-  sign-in left section 10 stating that nothing ever rehashes one, and two independent review passes
+  sign-in left the specification stating that nothing ever rehashes one, and two review passes
   went by without noticing, because both had been given the diff and this file and nothing else.
-* **An accepted risk is recorded here, not in an issue.** Where a weakness has no proportionate fix,
-  say so in the relevant section with what is observable, what an observer needs, why it stays open
-  and what bounds it. An issue nobody can close is deferral wearing a ticket number, and section 10
-  is where someone deciding whether to trust this application will actually look.
+* **An accepted security or privacy limitation is recorded in `docs/security-risks.md`, not in an
+  issue or an implementation section.** State the exposure, required access, current bound and the
+  condition for reconsidering it. A limitation with an approved remedy is work and belongs in the
+  Product Backlog instead.
 
 ## References
 
 * Design spec: `docs/design.md`
 * What the schema holds, table by table: `docs/data-model.md`
+* Accepted security and privacy limitations: `docs/security-risks.md`
 * Reference deployment and its environment: `deploy/README.md`
 * Cutting a release, and what the release refuses: `docs/releasing.md`
 * The published documentation site: `site/`, deployed by `.github/workflows/pages.yml`
