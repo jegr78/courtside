@@ -15,6 +15,10 @@ For the repository's local Dev and UAT environments, use the
 [local environment guide](../docs/local-environments.md). This document covers the production
 reference deployment only.
 
+To run the image on another platform without these recipes, read the
+[container contract](container-contract.md): what the image requires and what the recipes would
+otherwise supply.
+
 ## Choose a recipe
 
 `compose.yaml` holds only the database and the application. Everything else is a component file,

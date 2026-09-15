@@ -280,16 +280,21 @@ Every tagged release publishes:
 
 ### Compatibility contract
 
-Once third-party clubs deploy Courtside, two surfaces become public API and may not change
+Once third-party clubs deploy Courtside, three surfaces become public API and may not change
 casually:
 
 1. **Environment variables.** Documented set, defaults for everything optional. Renaming a
    variable is a breaking change.
 2. **The REST API**, as published in the OpenAPI specification.
+3. **The container contract** in `deploy/container-contract.md`: the image's user, port, writable
+   path, health endpoint, database requirements, one-shot commands and the input it reads from
+   files. A platform that runs the image without the reference deployment builds on it, so changing
+   one of those is a breaking change too.
 
 **Database migrations must be idempotent and support version skipping.** A club that has
-not updated for a year must be able to go from 1.2 directly to 1.7. Flyway runs on
-startup; the upgrade path is explicitly tested (see section 10).
+not updated for a year must be able to go from 1.2 directly to 1.7. Flyway runs on the
+application's startup, or in the one-shot migration command when the database identities are
+separated; the upgrade path is explicitly tested (see section 10).
 
 ### Language and internationalisation
 
@@ -2682,7 +2687,7 @@ AGPL users run version 1.2 in the wild, a broken migration means data loss for s
 | Language / runtime | Java 25, Spring Boot 4.1 |
 | Modularity | Spring Modulith |
 | Database | PostgreSQL 17 (`btree_gist`, range types, exclusion constraints) |
-| Migrations | Flyway, on startup |
+| Migrations | Flyway, on startup or in a one-shot command when database identities are separated |
 | Frontend | React + Vite, PWA |
 | API | REST/JSON, OpenAPI-documented, RFC 9457 errors |
 | Sessions | Spring Session, database-backed |

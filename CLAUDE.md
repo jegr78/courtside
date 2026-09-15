@@ -349,7 +349,8 @@ enough to need.
   Choose the type from what the change does to a **consumer of the API**, not from how the diff
   looks. A branch that is mostly refactoring but ends up correcting a response a member sees is a
   `fix:`. Add `!` or a `BREAKING CHANGE:` footer when a published surface changes shape — the
-  REST API or an environment variable, per the compatibility contract in `docs/design.md`.
+  REST API, an environment variable or the container contract, per the compatibility contract in
+  `docs/design.md`.
 
 * **A branch is small enough that one squashed commit is an honest unit.** Since a branch now
   collapses into a single commit, one that grew to ninety commits would leave `main` with a node

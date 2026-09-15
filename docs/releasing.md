@@ -218,8 +218,9 @@ where it is, and nothing has to be deleted to move on.
 
 ## When the change is breaking
 
-The compatibility contract in `docs/design.md` says what counts: the REST API and the environment
-variables a club sets are the published surface, and a change in the shape of either is breaking. A
+The compatibility contract in `docs/design.md` says what counts: the REST API, the environment
+variables a club sets and the container contract in `deploy/container-contract.md` are the
+published surface, and a change in the shape of any of them is breaking. A
 pull request that makes one carries `!` in its Conventional Commit title or a `BREAKING CHANGE:`
 footer, which is what the title lint reads and what the version bump follows.
 

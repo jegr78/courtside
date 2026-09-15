@@ -27,7 +27,7 @@ renders its risk and automation-gap tables.
 ## Compatibility
 
 - [ ] The OpenAPI and generated contract are unchanged, or the contract change is described.
-- [ ] Published migrations and environment variables are unchanged, or the compatibility impact is described.
+- [ ] Published migrations, environment variables and the container contract are unchanged, or the compatibility impact is described.
 
 ## Periodic workflow evidence
 
