@@ -694,20 +694,24 @@ const cookieAlert = (route) => ({ pluginid: "10010", riskcode: "1", confidence: 
   instances: [{ uri: `${passiveScannerOrigin}${route}`, method: "GET", param: "__Host-XSRF-TOKEN",
     evidence: "Set-Cookie: __Host-XSRF-TOKEN", otherinfo: "" }] });
 
+const sessionAlert = (route) => ({ pluginid: "10112", riskcode: "0", confidence: "2",
+  instances: [{ uri: `${passiveScannerOrigin}${route}`, method: "GET", param: "__Host-SESSION",
+    evidence: "__Host-SESSION", otherinfo: "cookie:__Host-SESSION" }] });
+
 const evidenceFor = (alerts, today) => buildPassiveDeploymentEvidence({
   targetFingerprint: digest, imageDigest: digest, observations: passingObservations(), requestCount: 1,
   zapReport: { version: "2.17.0", site: [{ alerts }] }, today });
 
 test("given an alert a recorded disposition covers, when building evidence, then no candidate remains", () => {
-  // given — the run against the disposable target raises this on the site root every time
-  const alerts = [cookieAlert("/")];
+  // given — the run against the disposable target raises this on a path the instance does not serve
+  const alerts = [sessionAlert("/robots.txt")];
 
   // when
   const evidence = evidenceFor(alerts);
 
   // then
   assert.equal(evidence.zap.alerts[0].state, "false-positive");
-  assert.match(evidence.zap.alerts[0].disposition.rationale, /double-submit/);
+  assert.match(evidence.zap.alerts[0].disposition.rationale, /fresh session/);
   assert.equal(evidence.outcome, "passed");
 });
 
@@ -795,11 +799,11 @@ test("given the same rule reports something else, when building evidence, then t
 
 test("given a scanner other than the one a record names, when it is matched, then it covers nothing", () => {
   // given — a bump of the pinned image changes what a rule reports, so a record does not carry over
-  const record = dispositions.dispositions[0];
+  const record = dispositions.dispositions.find(({ pluginId, routeTemplate }) =>
+    pluginId === "10112" && routeTemplate === "/robots.txt");
   const alert = { pluginId: record.pluginId, method: record.method, routeTemplate: record.routeTemplate,
     riskCode: record.riskCode, confidence: record.confidence, count: 1,
-    fingerprint: record.fingerprint,
-    ruleEvidence: { kind: "cookie-attribute", cookieName: "xsrf-token", missingAttribute: "http-only" } };
+    fingerprint: record.fingerprint, ruleEvidence: { kind: "session-signal", tokenNames: ["session"] } };
 
   // when / then
   assert.equal(recordCovers(record, alert), true);
@@ -821,11 +825,11 @@ test("given an alert no record covers, when it is validated, then no record boun
 test("given a record whose own rule and route miss its fingerprint, when it is matched, then it covers nothing",
   () => {
     // given — the fingerprint is a hash, so a record could name one its own three fields do not produce
-    const record = dispositions.dispositions[0];
+    const record = dispositions.dispositions.find(({ pluginId, routeTemplate }) =>
+      pluginId === "10112" && routeTemplate === "/robots.txt");
     const alert = { pluginId: record.pluginId, method: record.method, routeTemplate: record.routeTemplate,
       riskCode: record.riskCode, confidence: record.confidence, count: 1,
-      fingerprint: record.fingerprint,
-      ruleEvidence: { kind: "cookie-attribute", cookieName: "xsrf-token", missingAttribute: "http-only" } };
+      fingerprint: record.fingerprint, ruleEvidence: { kind: "session-signal", tokenNames: ["session"] } };
 
     // when / then — the alert still carries that fingerprint, so only the recomputation catches this
     assert.equal(recordCovers({ ...record, pluginId: "10054" }, { ...alert, pluginId: "10054" }), false);
@@ -872,7 +876,7 @@ test("given evidence claiming a state nothing recorded, when it is validated, th
 
 test("given evidence rewording a disposition it did record, when it is validated, then it fails closed", () => {
   // given — the state is the one the record gives, and only the reason beside it was rewritten
-  const evidence = evidenceFor([cookieAlert("/")]);
+  const evidence = evidenceFor([sessionAlert("/robots.txt")]);
   assert.equal(evidence.zap.alerts[0].state, "false-positive");
   evidence.zap.alerts[0].disposition = { ...evidence.zap.alerts[0].disposition, rationale: "trust me" };
 

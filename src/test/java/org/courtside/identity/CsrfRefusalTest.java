@@ -46,6 +46,18 @@ class CsrfRefusalTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void whenAWriteOutsideTheApiCarriesNoToken_thenTheRefusalNamesAccessDenied() throws Exception {
+        // when / then
+        mockMvc.perform(post("/manifest.webmanifest")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value(ACCESS_DENIED));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenARotatedTokenCookie_whenAWriteEchoesTheOldOne_thenTheRefusalNamesAccessDenied()
             throws Exception {
         // when / then

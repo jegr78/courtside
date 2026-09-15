@@ -1772,7 +1772,11 @@ whether it is built or designed. **Designed means absent today.**
   Ending another browser or using either administrative control requires a full password proof no
   older than five minutes. Password replacement also verifies the current password and ends every
   session. *Built.*
-- **CSRF:** on, double-submit cookie. *Built.*
+- **CSRF:** on, double-submit cookie. *Built.* A fetch without cookies, such as WebKit's service
+  worker loading its own script, would replace the token a signed-in page has already read if it
+  issued one. So only the session endpoint issues the token, and a sign-in replaces it there. The
+  only other response that issues one is the refusal of a state-changing request that arrived
+  without it.
 - **Brute force:** rate limiting before password verification. *Built.* The source address a
   counter is kept under is the one the reference proxy asserts in `X-Forwarded-For`, replacing
   whatever a client sent; the application trusts that header, so an instance must not be
@@ -2308,8 +2312,8 @@ whether it is built or designed. **Designed means absent today.**
   scheduled run whose cost nobody has weighed yet. *Built, as described.*
 - **Accepted: a checked-in record decides which scanner alerts stop blocking.** The passive
   assessment cannot tell a finding from a scanner's ordinary observation, so an alert holds the run
-  at `incomplete` until a record in `security/passive-alert-dispositions.json` covers it. Twelve do
-  today: eleven dismissals and one that names the unexpired acceptance in
+  at `incomplete` until a record in `security/passive-alert-dispositions.json` covers it. Five do
+  today: four dismissals and one that names the unexpired acceptance in
   `security/exceptions.json`. What an observer needs: nothing, both files ship with the source and
   the published evidence repeats the reason beside every alert it dismissed. What it does not say:
   whether the reasoning is right, that is a review of the record, and a code owner is required on

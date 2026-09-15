@@ -152,7 +152,7 @@ components:
       in: header
       name: X-XSRF-TOKEN
       description: |
-        Required on every state-changing request. Over HTTPS, any `GET` issues a readable
+        Required on every state-changing request. Over HTTPS, `GET /api/session` issues a readable
         `__Host-XSRF-TOKEN` cookie; echo its value in this header. The explicit local HTTP
         development policy uses the unprefixed `XSRF-TOKEN` name because browsers reject
         `__Host-` cookies without `Secure`. Modelled as a security scheme rather than as a header
@@ -2470,11 +2470,10 @@ paths:
         Form-encoded, not JSON: this is Spring Security's form login, and the encoding is part of
         the contract rather than an accident.
 
-        A `GET` beforehand issues the readable `__Host-XSRF-TOKEN` cookie whose value this request
-        must echo in `X-XSRF-TOKEN`. Local HTTP development uses the unprefixed cookie name.
-        Without it the answer is `401`, indistinguishable from a wrong
-        password — if credentials are certainly right and the answer is `401`, the token is
-        missing.
+        A `GET /api/session` beforehand issues the readable `__Host-XSRF-TOKEN` cookie whose value
+        this request must echo in `X-XSRF-TOKEN`. Local HTTP development uses the unprefixed cookie
+        name. Without it the answer is `403` with the `urn:courtside:error:access-denied` problem
+        type, before any credential is checked.
       security:
         - csrfToken: []
       requestBody:
@@ -2499,6 +2498,8 @@ paths:
               schema: { type: boolean }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
 
