@@ -441,7 +441,7 @@ class ServerTlsTransportTest {
     }
 
     private static String deployedCaddy() throws IOException {
-        Matcher image = CADDY_IMAGE.matcher(Files.readString(Path.of("deploy", "compose.yaml")));
+        Matcher image = CADDY_IMAGE.matcher(Files.readString(Path.of("deploy", "compose.caddy.yaml")));
         assertThat(image.find()).as("the deployment pins a Caddy image").isTrue();
         return image.group();
     }

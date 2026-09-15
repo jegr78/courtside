@@ -25,8 +25,11 @@ services:
     cap_drop:
       - ALL
     read_only: true
+    tmpfs:
+      - /tmp
     networks:
       - acceptance-mail
+      - acceptance-mail-console
     ports:
       - "127.0.0.1:${COURTSIDE_ACCEPTANCE_MAIL_PORT:-8025}:8025"
     volumes:
@@ -35,3 +38,4 @@ services:
 networks:
   acceptance-mail:
     internal: true
+  acceptance-mail-console:

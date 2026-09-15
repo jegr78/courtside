@@ -124,9 +124,9 @@ class ReferenceDeploymentDocumentationTest {
     }
 
     private static List<String> publishedPortsOf(String service) throws IOException {
-        List<String> lines = Files.readAllLines(Path.of("deploy/compose.yaml"));
+        List<String> lines = Files.readAllLines(Path.of("deploy/compose.stalwart.yaml"));
         int start = lines.indexOf("  " + service + ":");
-        assertThat(start).as("%s is a service in deploy/compose.yaml", service).isNotNegative();
+        assertThat(start).as("%s is a service in deploy/compose.stalwart.yaml", service).isNotNegative();
         List<String> published = new ArrayList<>();
         boolean inPorts = false;
         for (String line : lines.subList(start + 1, lines.size())) {

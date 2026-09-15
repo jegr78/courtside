@@ -91,7 +91,9 @@ carrying an SBOM attestation, and attaches the OpenAPI document to the release. 
 exercised before the first release too: a separate nightly workflow takes the newest complete
 first-attempt scheduled build, qualifies its exact amd64/arm64 digest, and publishes signed
 acceptance-only tags under an identity distinct from a release. The reference
-deployment carries the club's own mail server behind a profile, together with a check that resolves
+deployment is resolved from one of four recipes, `standard`, `full-self-hosted`,
+`existing-infrastructure` and `funnel`, each a versioned list of Compose components; the
+`full-self-hosted` recipe carries the club's own mail server, together with a check that resolves
 the DNS a receiver looks at, and the application sends through it: the `notification` module reacts
 to an event and generates the credential at the moment it is sent. Both message bundles ship, and
 which one an account is written to in is the club's configured default at creation, the member's
@@ -248,8 +250,9 @@ export, documentation templates) but never holds foreign personal data.
 
 ### Code and deployment
 
-The reference deployment lives in `deploy/` in this repository: a Compose file, a Caddy
-configuration and the documented environment. Clubs copy the directory and adapt it rather than
+The reference deployment lives in `deploy/` in this repository: a base Compose file with the
+database and the application, component files for the proxy, the mail paths and an external
+database, the recipes that select them, a Caddy configuration and the documented environment. Clubs copy the directory and adapt it rather than
 configuring the application repository, and the maintainer runs the same thing they publish.
 
 A separate `courtside-deploy` repository was the earlier plan, on the reasoning that clubs will not
@@ -1975,7 +1978,8 @@ whether it is built or designed. **Designed means absent today.**
   edge without forwarding or reflection. This routing is based on method and path, never on
   client-controlled browser headers. Disabling Caddy's automatic redirects leaves its certificate
   automation and ACME handling enabled. An operator
-  without a public address can use Tailscale Funnel instead. When it supplies the trusted HTTPS
+  without a public address can use the `funnel` recipe, Tailscale Funnel in front of the
+  loopback port, instead. When it supplies the trusted HTTPS
   forwarding signal, the response keeps all five application headers and loses only Caddy's
   `Permissions-Policy`. Funnel is documented as an option, not a dependency.
   That sentence binds the client too: a browser withholds `crypto.randomUUID`, service workers and
@@ -2193,9 +2197,12 @@ whether it is built or designed. **Designed means absent today.**
   switches both checks off for a club whose relay serves a certificate this container cannot
   follow; it defaults to false everywhere now, and what it costs when it is set is that whoever can
   redirect the connection reads the mail. Where it is set, the setter is a verification harness
-  rather than a deployment: the restore smoke, the performance environment and the browser journey
-  each run a throwaway relay whose certificate the harness itself issued, so the hop the
-  application requires is exercised without an authority in the loop. The failure direction in a
+  or synthetic acceptance rather than a production deployment: the restore smoke, the performance
+  environment and the browser journey each run a throwaway relay whose certificate the harness
+  itself issued, so the hop the application requires is exercised without an authority in the
+  loop. The acceptance component `compose.mailpit.yaml` sets it too, for a Mailpit it runs on an
+  internal network of its own; that component pins the instance to `UAT`, so a page served under
+  it is visibly a test instance and delivers no mail beyond that Mailpit. The failure direction in a
   deployment is closed rather than open: a relay serving the wrong name, an unknown issuer, an
   expired certificate or a chain that stops short of its issuer stops the handover. What that costs
   is recorded rather than hidden, the message is attempted four times across about a minute and is
