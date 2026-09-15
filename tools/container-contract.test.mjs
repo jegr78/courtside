@@ -285,7 +285,7 @@ test("given the image's file inputs, when the contract lists them, then it lists
 test("given the reference proxy and the mail transport, when the contract describes ingress and mail, then it names every forwarded header and STARTTLS",
   () => {
     // given
-    const headers = /\(applicationHeaders\) \{\n(?<body>(?:[\t ]+.*\n)+)\}/.exec(caddyfile)?.groups.body ?? "";
+    const headers = /\(applicationHeaders\) \{\n(?<body>(?:[\t ]+[^\t \n][^\n]*\n)+)\}/.exec(caddyfile)?.groups.body ?? "";
     const discarded = all(headers, /header_up -(\S+)/g);
     const written = all(headers, /header_up (?!-)(\S+) /g);
     const transport = javaFile("notification/internal/NotificationConfiguration");
