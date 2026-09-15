@@ -365,6 +365,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: container-registry-${{ github.repository }}
+      cancel-in-progress: false
     outputs:
       digest: ${{ steps.push.outputs.digest }}
     permissions:
@@ -678,6 +681,9 @@ jobs:
     needs: [build, browser, image, qualify, security-record, upgrade, restore]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    concurrency:
+      group: container-registry-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       attestations: write
       contents: write
