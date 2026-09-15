@@ -728,6 +728,15 @@ The standard deployment remains supported and needs only `POSTGRES_PASSWORD`. Th
 | `database-migrate` | Owns the application schema and runs Flyway. It cannot create roles or databases. |
 | `app` | Reads and changes application rows and obtains generated values from sequences. It cannot reposition sequences or create or alter schema, roles, databases, or grants. Flyway and JDBC session schema initialization are disabled in this process. |
 
+The owner does not have to be a superuser. It has to own the database and be allowed to create
+roles. If the migration or runtime role already exists and the owner did not create it, the owner
+also needs ADMIN OPTION on that role, every attribute the role holds, such as `CREATEDB` or
+`BYPASSRLS`, and the privileges of any role that granted it a membership: setup removes those
+attributes and memberships, and PostgreSQL lets only a role that has an attribute, or acts for the
+grantor, remove it. Setup refuses rather than leaving one behind. It makes the owner a member of the
+migration role so it can hand the schema over, and it sets passwords as SCRAM verifiers, so a server
+that logs statements never records one.
+
 Create three files outside the checkout, each containing exactly one password and an optional final
 line ending. Keep access as narrow as possible while ensuring that the container process can read
 its mounted file: the Courtside image runs as numeric UID `10001`, while the PostgreSQL image reads
