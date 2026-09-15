@@ -1,0 +1,37 @@
+services:
+  app:
+    environment:
+      COURTSIDE_ENVIRONMENT: UAT
+      COURTSIDE_MAIL_RELAY_HOST: mailpit
+      COURTSIDE_MAIL_RELAY_PORT: "1025"
+      COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: "true"
+      COURTSIDE_MAIL_FROM: ${COURTSIDE_MAIL_SENDER_USERNAME:-courtside}@${COURTSIDE_MAIL_DOMAIN:?set COURTSIDE_MAIL_DOMAIN in .env}
+      COURTSIDE_MAIL_REPLY_TO: ${COURTSIDE_MAIL_REPLY_TO:?set COURTSIDE_MAIL_REPLY_TO in .env}
+    networks:
+      acceptance-mail: {}
+
+  mailpit:
+    image: axllent/mailpit:v1.31@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
+    restart: unless-stopped
+    user: ${COURTSIDE_ACCEPTANCE_MAIL_USER:?set COURTSIDE_ACCEPTANCE_MAIL_USER in .env}
+    command:
+      - --smtp-tls-cert
+      - /certs/cert.pem
+      - --smtp-tls-key
+      - /certs/key.pem
+      - --smtp-require-starttls
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    networks:
+      - acceptance-mail
+    ports:
+      - "127.0.0.1:${COURTSIDE_ACCEPTANCE_MAIL_PORT:-8025}:8025"
+    volumes:
+      - ${COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES:?set COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES in .env}:/certs:ro
+
+networks:
+  acceptance-mail:
+    internal: true

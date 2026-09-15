@@ -1,0 +1,237 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  app:
+    environment:
+      COURTSIDE_MAIL_RELAY_HOST: ${COURTSIDE_MAIL_RELAY_HOST:-${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}}
+      COURTSIDE_MAIL_FROM: ${COURTSIDE_MAIL_SENDER_USERNAME:-courtside}@${COURTSIDE_MAIL_DOMAIN:?set COURTSIDE_MAIL_DOMAIN in .env}
+      COURTSIDE_MAIL_REPLY_TO: ${COURTSIDE_MAIL_REPLY_TO:?set COURTSIDE_MAIL_REPLY_TO in .env}
+      COURTSIDE_MAIL_USERNAME: ${COURTSIDE_MAIL_SENDER_USERNAME:-courtside}@${COURTSIDE_MAIL_DOMAIN}
+      COURTSIDE_MAIL_PASSWORD: ${COURTSIDE_MAIL_PASSWORD:?set COURTSIDE_MAIL_PASSWORD in .env}
+    networks:
+      relay: {}
+
+  proxy:
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+    volumes:
+      - ./Caddyfile.stalwart:/etc/caddy/sites.d/stalwart.caddy:ro
+
+  mail:
+    image: stalwartlabs/stalwart:v0.16.21@sha256:93c574e52249c1ebf90061da2c4c0756a7b72abfcc1fec34506a03c2e38b5977
+    profiles: [mail]
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: ${COURTSIDE_MAIL_MEMORY:-512m}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    environment:
+      STALWART_RECOVERY_ADMIN: ${COURTSIDE_MAIL_RECOVERY_ADMIN:-}
+      STALWART_RECOVERY_MODE: ${COURTSIDE_MAIL_RECOVERY_MODE:-}
+    networks:
+      relay:
+        aliases:
+          # The name on the certificate this server serves, on a network shared only with the app.
+          - ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+      mail-admin:
+        aliases:
+          - ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+      mail-delivery:
+        gw_priority: 1
+    volumes:
+      - mail-config:/etc/stalwart
+      - mail-data:/var/lib/stalwart
+      - mail-tls:/etc/stalwart/tls:ro
+    ports:
+      - "25:25"
+      - "127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT:-8081}:8080"
+
+  mail-certificate:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    profiles: [mail]
+    restart: unless-stopped
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # The kernel refuses to exec a file whose own capability is outside the bounding set, and the
+    # caddy binary carries cap_net_bind_service. Nothing here binds a port: it has no network.
+    cap_add:
+      - NET_BIND_SERVICE
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Caddy's store is readable by root alone, and the mail server runs as 2000: writing as root in
+    # that group is what hands over one certificate without handing over the store.
+    user: "0:2000"
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+    volumes:
+      - ./mail-certificate.sh:/mail-certificate.sh:ro
+      - caddy-data:/caddy:ro
+      - mail-tls:/tls
+    entrypoint: ["sh", "/mail-certificate.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q '^ok' /tmp/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  mail-reload:
+    image: node:26-alpine@sha256:ef24c5053d50fdc3e4e56eb4e7ddb7861874ab0fdc797046ba897581deb8e868
+    profiles: [mail]
+    restart: unless-stopped
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Outside the group the published versions belong to, so the container that tells the mail
+    # server to load the pair is the one container that cannot read it.
+    user: "1500:1500"
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+      COURTSIDE_MAIL_DOMAIN: ${COURTSIDE_MAIL_DOMAIN:?set COURTSIDE_MAIL_DOMAIN in .env}
+      COURTSIDE_MAIL_RELOAD_USERNAME: ${COURTSIDE_MAIL_RELOAD_USERNAME:-certificate-reload}
+      COURTSIDE_MAIL_RELOAD_PASSWORD: ${COURTSIDE_MAIL_RELOAD_PASSWORD:?set COURTSIDE_MAIL_RELOAD_PASSWORD in .env}
+      COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE: ${COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE:-6}
+      COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL: ${COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL:-3600}
+      COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME: ${COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME:-34560000}
+    networks:
+      - mail-admin
+    volumes:
+      - ./mail-certificate-peer.mjs:/mail-certificate-peer.mjs:ro
+      - ./mail-reload.sh:/mail-reload.sh:ro
+      - mail-tls:/tls:ro
+    entrypoint: ["sh", "/mail-reload.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q '^ok' /tmp/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  mail-plan:
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    profiles: [mail-setup]
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    network_mode: none
+    read_only: true
+    environment:
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+      COURTSIDE_MAIL_DOMAIN: ${COURTSIDE_MAIL_DOMAIN:?set COURTSIDE_MAIL_DOMAIN in .env}
+      COURTSIDE_MAIL_ADMIN_USERNAME: ${COURTSIDE_MAIL_ADMIN_USERNAME:-postmaster}
+      COURTSIDE_MAIL_ADMIN_PASSWORD: ${COURTSIDE_MAIL_ADMIN_PASSWORD:?set COURTSIDE_MAIL_ADMIN_PASSWORD in .env}
+      COURTSIDE_MAIL_SENDER_USERNAME: ${COURTSIDE_MAIL_SENDER_USERNAME:-courtside}
+      COURTSIDE_MAIL_PASSWORD: ${COURTSIDE_MAIL_PASSWORD:?set COURTSIDE_MAIL_PASSWORD in .env}
+      COURTSIDE_MAIL_RELOAD_USERNAME: ${COURTSIDE_MAIL_RELOAD_USERNAME:-certificate-reload}
+      COURTSIDE_MAIL_RELOAD_PASSWORD: ${COURTSIDE_MAIL_RELOAD_PASSWORD:?set COURTSIDE_MAIL_RELOAD_PASSWORD in .env}
+    volumes:
+      - ./mail:/mail:ro
+      - mail-plan:/plan
+    entrypoint: ["sh", "/mail/render.sh", "bootstrap", "base"]
+
+  mail-bootstrap:
+    image: stalwartlabs/cli:1.0.12@sha256:fe199affac1d120a8c200ef39ae629765a2976270e0453575c1caf906ee15b52
+    profiles: [mail-setup]
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      mail-plan:
+        condition: service_completed_successfully
+    environment:
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp
+      STALWART_URL: http://mail:8080
+      STALWART_USER: admin
+      STALWART_PASSWORD: ${COURTSIDE_MAIL_SETUP_PASSWORD:?set COURTSIDE_MAIL_SETUP_PASSWORD in .env}
+    networks:
+      - mail-admin
+    volumes:
+      - mail-plan:/plan:ro
+    command: ["apply", "--file", "/plan/bootstrap.ndjson"]
+
+  mail-configure:
+    image: stalwartlabs/cli:1.0.12@sha256:fe199affac1d120a8c200ef39ae629765a2976270e0453575c1caf906ee15b52
+    profiles: [mail-setup]
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      mail-plan:
+        condition: service_completed_successfully
+    environment:
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp
+      STALWART_URL: http://mail:8080
+      STALWART_USER: admin
+      STALWART_PASSWORD: ${COURTSIDE_MAIL_SETUP_PASSWORD:?set COURTSIDE_MAIL_SETUP_PASSWORD in .env}
+    networks:
+      - mail-admin
+    volumes:
+      - mail-plan:/plan:ro
+    command: ["apply", "--file", "/plan/base.ndjson"]
+
+  mail-check:
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    profiles: [mail-check]
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    environment:
+      COURTSIDE_MAIL_DOMAIN: ${COURTSIDE_MAIL_DOMAIN:?set COURTSIDE_MAIL_DOMAIN in .env}
+      COURTSIDE_MAIL_HOSTNAME: ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
+      COURTSIDE_MAIL_DKIM_SELECTOR: ${COURTSIDE_MAIL_DKIM_SELECTOR:?set COURTSIDE_MAIL_DKIM_SELECTOR in .env}
+      COURTSIDE_MAIL_OUTBOUND_PROBE: ${COURTSIDE_MAIL_OUTBOUND_PROBE:-gmail-smtp-in.l.google.com}
+      COURTSIDE_MAIL_RELAY_PROBE: ${COURTSIDE_MAIL_RELAY_PROBE:-relay-probe.example.com}
+      COURTSIDE_MAIL_RELAY_TARGET: ${COURTSIDE_MAIL_RELAY_TARGET:-mail}
+    networks:
+      - mail-delivery
+    volumes:
+      - ./mail-check.sh:/mail-check.sh:ro
+    entrypoint: ["sh", "/mail-check.sh"]
+
+networks:
+  relay:
+    internal: true
+  mail-admin:
+    internal: true
+  mail-delivery:
+
+volumes:
+  mail-config:
+  mail-data:
+  mail-tls:
+  mail-plan:

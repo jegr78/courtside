@@ -1,0 +1,4 @@
+schema=1
+ingress=caddy
+database=bundled
+mail=smtp-relay

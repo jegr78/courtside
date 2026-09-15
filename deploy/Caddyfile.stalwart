@@ -1,0 +1,21 @@
+http://{$COURTSIDE_MAIL_HOSTNAME} {
+	header {
+		Cache-Control "no-store"
+		Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
+		-Location
+		-Server
+		-Via
+	}
+	respond 404
+}
+
+# Caddy issues only for the names it serves, and the mail server needs one for its own. Nothing
+# here answers a browser: the block exists so that the certificate does.
+{$COURTSIDE_MAIL_HOSTNAME} {
+	header {
+		Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
+		-Server
+		-Via
+	}
+	respond 404
+}

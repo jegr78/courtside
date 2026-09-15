@@ -1,0 +1,17 @@
+services:
+  db: !reset null
+
+  app:
+    depends_on: !reset {}
+    environment:
+      SPRING_DATASOURCE_URL: ${COURTSIDE_DATABASE_URL:?set COURTSIDE_DATABASE_URL in .env}
+      SPRING_DATASOURCE_USERNAME: ${COURTSIDE_DATABASE_USERNAME:?set COURTSIDE_DATABASE_USERNAME in .env}
+      SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_DATABASE_PASSWORD:?set COURTSIDE_DATABASE_PASSWORD in .env}
+    networks:
+      database: !reset null
+
+networks:
+  database: !reset null
+
+volumes:
+  db: !reset null

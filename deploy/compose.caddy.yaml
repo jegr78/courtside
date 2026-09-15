@@ -1,0 +1,42 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  app:
+    networks:
+      ingress: {}
+
+  proxy:
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    restart: unless-stopped
+    logging: *logging
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      COURTSIDE_DOMAIN: ${COURTSIDE_DOMAIN:?set COURTSIDE_DOMAIN in .env}
+    networks:
+      ingress: {}
+      proxy-egress:
+        gw_priority: 1
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+networks:
+  ingress:
+    internal: true
+  proxy-egress:
+
+volumes:
+  caddy-data:
+  caddy-config:
