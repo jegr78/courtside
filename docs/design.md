@@ -1634,7 +1634,11 @@ whether it is built or designed. **Designed means absent today.**
   turns it on.* The standard deployment keeps its single PostgreSQL credential. The optional
   `compose.database-identities.yaml` overlay instead runs setup, Flyway, and the application as
   three separate processes. Setup alone receives the database-owner credential and reconciles two
-  bounded login roles. Flyway owns the application schema but cannot create roles or databases.
+  bounded login roles. That owner needs no superuser attribute: it owns the database and may create
+  roles, and a role it did not create also needs its ADMIN OPTION, attributes and grantors, as the
+  deployment guide lists. Setup resolves names in `pg_catalog` alone, so nothing the migration role
+  places in the schema it owns runs with the owner's authority, and it sends passwords only as SCRAM
+  verifiers. Flyway owns the application schema but cannot create roles or databases.
   The running application receives only table and sequence data privileges; it cannot create or
   alter schema, roles, databases, or grants, and neither Flyway nor Spring Session runs DDL there.
   Each password arrives from a read-only file mounted only into the processes that need it. Missing,
