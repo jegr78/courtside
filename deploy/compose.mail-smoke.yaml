@@ -15,7 +15,7 @@ services:
       default: {}
       relay:
         aliases:
-          # As in `compose.yaml`: the name on the certificate this server serves, on its own network.
+          # As in `compose.stalwart.yaml`: the name on the certificate this server serves, on its own network.
           - ${COURTSIDE_MAIL_HOSTNAME:?set COURTSIDE_MAIL_HOSTNAME in .env}
     volumes:
       - mail-config:/etc/stalwart

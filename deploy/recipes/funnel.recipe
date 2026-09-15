@@ -1,0 +1,4 @@
+schema=1
+ingress=funnel
+database=bundled
+mail=smtp-relay

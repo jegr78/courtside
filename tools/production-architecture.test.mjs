@@ -23,8 +23,21 @@ const composeSource = "deploy/compose.yaml";
 const compose = YAML.parse(readFileSync(`${repository}/${composeSource}`, "utf8"));
 const composeFiles = [composeSource, ...compose["x-courtside-production-overlays"]
   .map((path) => `deploy/${path}`)];
-const composeDocuments = composeFiles.map((path) => ({ path, document: YAML.parse(
-  readFileSync(`${repository}/${path}`, "utf8").replaceAll("!reset null", "null")) }));
+const RESET = "courtside:reset";
+const withoutResets = (document) => {
+  for (const key of ["services", "networks", "volumes"]) {
+    for (const [name, value] of Object.entries(document[key] ?? {})) if (value === RESET) delete document[key][name];
+  }
+  for (const definition of Object.values(document.services ?? {})) {
+    if (definition.networks && !Array.isArray(definition.networks)) {
+      for (const [name, value] of Object.entries(definition.networks)) if (value === RESET) delete definition.networks[name];
+    }
+    for (const [name, value] of Object.entries(definition.environment ?? {})) if (value === RESET) definition.environment[name] = null;
+  }
+  return document;
+};
+const composeDocuments = composeFiles.map((path) => ({ path, document: withoutResets(YAML.parse(
+  readFileSync(`${repository}/${path}`, "utf8").replaceAll("!reset null", `"${RESET}"`).replaceAll("!reset {}", "{}"))) }));
 const openapi = YAML.parse(readFileSync(new URL(
   "../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
 const applicationConfigurations = productionApplicationConfigurations();
@@ -88,17 +101,13 @@ const imageRegistry = (image) => {
   const first = image.slice(0, separator);
   return first === "localhost" || first.includes(".") || first.includes(":") ? first : "docker.io";
 };
-const publishedListeners = () => {
-  const overlayPortDefinitions = composeDocuments.slice(1).flatMap(({ path, document }) =>
-    Object.entries(document.services ?? {})
-      .filter(([, definition]) => Object.hasOwn(definition, "ports"))
-      .map(([service]) => `${path}:${service}`));
-  assert.deepEqual(overlayPortDefinitions, [],
-    "production overlays may not declare ports without a Compose-aware listener projection");
-  return Object.entries(compose.services).flatMap(([service, definition]) =>
-    (definition.ports ?? []).map((published) => ({ service, published })))
-    .toSorted((left, right) => `${left.service}:${left.published}`.localeCompare(`${right.service}:${right.published}`));
-};
+const publishedListeners = () => [...new Map(composeDocuments.flatMap(({ document }) =>
+  Object.entries(document.services ?? {}).flatMap(([service, definition]) =>
+    (definition.ports ?? []).map((published) => {
+      assert.equal(typeof published, "string", `${service} publishes a port in a form this projection cannot read`);
+      return [`${service}:${published}`, { service, published }];
+    })))).values()]
+  .toSorted((left, right) => `${left.service}:${left.published}`.localeCompare(`${right.service}:${right.published}`));
 const configuredMailListeners = () => mailPlan.filter(({ object }) => object === "NetworkListener")
   .flatMap(({ value }) => Object.values(value))
   .flatMap(({ name, bind }) => Object.keys(bind).map((address) => ({
@@ -123,7 +132,8 @@ const composeNetworkPosture = () => composeServices().map((service) => {
       ? definition.networks : Object.keys(definition.networks));
   return { service, mode: "attached", networks: [...new Set(explicit.length ? explicit : ["default"])].toSorted() };
 }).toSorted((left, right) => left.service.localeCompare(right.service));
-const composeNetworkSegments = (posture) => Object.entries(compose.networks ?? {}).map(([name, definition]) => ({
+const composeNetworks = () => Object.assign({}, ...composeDocuments.map(({ document }) => document.networks ?? {}));
+const composeNetworkSegments = (posture) => Object.entries(composeNetworks()).map(([name, definition]) => ({
   name,
   internal: definition?.internal === true,
   members: posture.filter(({ networks }) => networks.includes(name)).map(({ service }) => service).toSorted(),
@@ -362,11 +372,11 @@ test("given the reference deployment, when components and published listeners ch
   }
   assert.notDeepEqual([...services, "unreviewed-service"].toSorted(), composeServices());
   assert.notDeepEqual([...listeners, { service: "proxy", published: "8443:8443" }], publishedListeners());
-  const overlayApp = composeDocuments[1].document.services.app;
+  const overlayApp = composeDocuments.at(-1).document.services.app;
   overlayApp.ports = ["127.0.0.1:18080:8080"];
   try {
-    assert.throws(() => publishedListeners(),
-      /production overlays may not declare ports without a Compose-aware listener projection/);
+    assert.notDeepEqual(listeners, publishedListeners(),
+      "a port an overlay publishes escaped the listener inventory");
   } finally {
     delete overlayApp.ports;
   }
@@ -443,9 +453,11 @@ test("given the reference deployment networks, when reachability changes, then l
     .filter(({ networks }) => networks.includes(network)).map(({ service }) => service).toSorted();
   assert.deepEqual(attachedServices("app-egress"), ["app"]);
   assert.deepEqual(attachedServices("proxy-egress"), ["proxy"]);
-  assert.equal(compose.services.app.networks["app-egress"].gw_priority, 1);
-  assert.equal(compose.services.mail.networks["mail-delivery"].gw_priority, 1);
-  assert.equal(compose.services.proxy.networks["proxy-egress"].gw_priority, 1);
+  const gateway = (service, network) => serviceDefinitions(service)
+    .map(({ definition }) => definition.networks?.[network]?.gw_priority).find((priority) => priority !== undefined);
+  assert.equal(gateway("app", "app-egress"), 1);
+  assert.equal(gateway("mail", "mail-delivery"), 1);
+  assert.equal(gateway("proxy", "proxy-egress"), 1);
 });
 
 test("given reference mail delivery, when its MX route is mapped, then software bounds and external assumptions stay distinct", () => {

@@ -55,6 +55,13 @@ public class ReferenceDeploymentSecurityTest {
     private static final String CLIENT_HEADER_PLACEHOLDER = "{http.request.header.";
     private static final Pattern CADDY_IMAGE = Pattern.compile(
             "caddy(?::[\\w.-]+)?@sha256:[a-f0-9]{64}");
+    private static final List<Path> RECIPE_MAIL_COMPONENTS = List.of(Path.of("deploy/compose.smtp-relay.yaml"),
+            Path.of("deploy/compose.stalwart.yaml"), Path.of("deploy/compose.mailpit.yaml"));
+    private static final Pattern PRODUCTION_OVERLAYS = Pattern.compile(
+            "(?m)^x-courtside-production-overlays:\\R(?<entries>(?:  - compose[\\w.-]+\\.yaml\\R)+)");
+    private static final String SITE_IMPORT = "import /etc/caddy/sites.d/*.caddy";
+    private static final Pattern SITE_MOUNT = Pattern.compile(
+            "(?m)^\\s+- \\./(?<source>Caddyfile[\\w.-]*):/etc/caddy/sites\\.d/[\\w.-]+\\.caddy:ro$");
     private static final Pattern SERVICE_BLOCK = Pattern.compile(
             "(?ms)^  [a-zA-Z0-9_-]+:\\R(?<body>.*?)(?=^  [a-zA-Z0-9_-]+:\\R|\\z)");
 
@@ -156,13 +163,19 @@ public class ReferenceDeploymentSecurityTest {
                         + "\\s+(?<value>\\S.*)$");
 
         // when
-        List<String> values = Files.readString(Path.of("deploy/compose.yaml")).lines()
-                .map(credential::matcher)
-                .filter(Matcher::matches)
-                .map(matcher -> matcher.group("value"))
-                .toList();
+        List<String> values = new ArrayList<>();
+        for (Path source : productionComposeSources()) {
+            Files.readString(source).lines()
+                    .map(credential::matcher)
+                    .filter(Matcher::matches)
+                    .map(matcher -> matcher.group("value"))
+                    .filter(value -> !value.equals("!reset null"))
+                    .forEach(values::add);
+        }
 
         // then
+        assertThat(values).as("the mail components carry credentials too")
+                .anyMatch(value -> value.startsWith("${COURTSIDE_MAIL_PASSWORD:?"));
         assertThat(values).isNotEmpty().allSatisfy(value -> assertThat(value)
                 .matches("^\\$\\{[A-Z0-9_]+(?::[-?][^}]*)?}$")
                 .doesNotMatch(".*:-[^}]+}.*"));
@@ -172,9 +185,13 @@ public class ReferenceDeploymentSecurityTest {
     void givenTheProductionStartup_whenReadingItsCommands_thenNoDebugModeCanBeEnabled()
             throws IOException {
         // when
-        String startup = Files.readString(Path.of("Dockerfile")) + "\n"
-                + Files.readString(Path.of("deploy/compose.yaml")) + "\n"
-                + Files.readString(Path.of("deploy/Caddyfile"));
+        StringBuilder sources = new StringBuilder(Files.readString(Path.of("Dockerfile")));
+        for (Path source : productionComposeSources()) {
+            sources.append('\n').append(Files.readString(source));
+        }
+        sources.append('\n').append(Files.readString(Path.of("deploy/Caddyfile")))
+                .append('\n').append(Files.readString(Path.of("deploy/Caddyfile.stalwart")));
+        String startup = sources.toString();
 
         // then
         assertThat(startup)
@@ -214,11 +231,14 @@ public class ReferenceDeploymentSecurityTest {
             if (serviceBodies(compose).stream().noneMatch(ReferenceDeploymentSecurityTest::runsApplication)) {
                 continue;
             }
-            assertThat(compose)
-                    .as("%s runs the application", source)
-                    .contains("COURTSIDE_MAIL_RELAY_HOST")
-                    .contains("COURTSIDE_MAIL_FROM")
-                    .contains("COURTSIDE_MAIL_REPLY_TO");
+            List<Path> mailSources = source.equals(Path.of("deploy/compose.yaml")) ? RECIPE_MAIL_COMPONENTS : List.of(source);
+            for (Path mailSource : mailSources) {
+                assertThat(Files.readString(mailSource))
+                        .as("%s configures the mail for the application %s runs", mailSource, source)
+                        .contains("COURTSIDE_MAIL_RELAY_HOST")
+                        .contains("COURTSIDE_MAIL_FROM")
+                        .contains("COURTSIDE_MAIL_REPLY_TO");
+            }
         }
     }
 
@@ -262,7 +282,7 @@ public class ReferenceDeploymentSecurityTest {
             throws IOException {
         // given
         String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
-        String compose = Files.readString(Path.of("deploy/compose.yaml"));
+        String compose = Files.readString(Path.of("deploy/compose.caddy.yaml"));
         List<String> productionSites = PRODUCTION_SITE_BLOCK.matcher(caddyfile).results()
                 .map(match -> match.group("body"))
                 .toList();
@@ -282,7 +302,8 @@ public class ReferenceDeploymentSecurityTest {
 
     public static void assertReviewedResponseDirectives() throws IOException {
         String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
-        assertThat(reviewedResponseDirectives(caddyfile)).containsExactlyEntriesOf(Map.of(
+        String mailSites = Files.readString(Path.of("deploy/Caddyfile.stalwart"));
+        assertThat(reviewedResponseDirectives(caddyfile, mailSites)).containsExactlyEntriesOf(Map.of(
                 "plaintext", List.of("reverse_proxy app:8080 {", "import applicationHeaders"),
                 "serve", List.of("reverse_proxy https://app:8080 {", "import applicationHeaders",
                         "transport http {",
@@ -303,10 +324,7 @@ public class ReferenceDeploymentSecurityTest {
                         "respond \"Request could not be completed.\" {http.error.status_code}",
                         "@unknownMethod {", "method QUERY", "path /api/*", "method @unknownMethod PATCH",
                         "import {$COURTSIDE_APP_TLS_MODE:plaintext}"),
-                "plaintext-site", List.of("@mailHostname host {$COURTSIDE_MAIL_HOSTNAME}",
-                        "handle @mailHostname {", "header {", "Cache-Control \"no-store\"",
-                        "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"", "-Location", "-Server", "-Via",
-                        "respond 404", "@browserNavigation {", "host {$COURTSIDE_DOMAIN}", "method GET HEAD",
+                "plaintext-site", List.of("@browserNavigation {", "host {$COURTSIDE_DOMAIN}", "method GET HEAD",
                         "path / /courts /login /initial-password /account-recovery /my-bookings /my-messages /account/security /admin /admin/* /index.html /assets/* /font-licenses.txt /icon.svg /manifest.webmanifest /sw.js /workbox-*.js",
                         "handle @browserNavigation {", "header {", "Cache-Control \"no-store\"",
                         "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"", "-Server", "-Via",
@@ -314,6 +332,9 @@ public class ReferenceDeploymentSecurityTest {
                         "Cache-Control \"no-store\"", "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"",
                         "-Location", "-Server", "-Set-Cookie", "-Via",
                         "respond \"Plain HTTP is not accepted.\" 400"),
+                "mail-plaintext-site", List.of("header {", "Cache-Control \"no-store\"",
+                        "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"", "-Location", "-Server", "-Via",
+                        "respond 404"),
                 "mail-site", List.of("header {", "Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"",
                         "-Server", "-Via", "respond 404")));
     }
@@ -333,13 +354,14 @@ public class ReferenceDeploymentSecurityTest {
                         "import plaintext");
     }
 
-    private static Map<String, List<String>> reviewedResponseDirectives(String caddyfile) {
+    private static Map<String, List<String>> reviewedResponseDirectives(String caddyfile, String mailSites) {
         return Map.of(
                 "plaintext", caddyDirectives(caddyBlockBody(caddyfile, "(plaintext) {")),
                 "serve", caddyDirectives(caddyBlockBody(caddyfile, "(serve) {")),
                 "production", caddyDirectives(caddyBlockBody(caddyfile, "{$COURTSIDE_DOMAIN} {")),
                 "plaintext-site", caddyDirectives(caddyBlockBody(caddyfile, "http://:80 {")),
-                "mail-site", caddyDirectives(caddyBlockBody(caddyfile, "{$COURTSIDE_MAIL_HOSTNAME} {")));
+                "mail-plaintext-site", caddyDirectives(caddyBlockBody(mailSites, "http://{$COURTSIDE_MAIL_HOSTNAME} {")),
+                "mail-site", caddyDirectives(caddyBlockBody(mailSites, "{$COURTSIDE_MAIL_HOSTNAME} {")));
     }
 
     private static String caddyBlockBody(String caddyfile, String marker) {
@@ -397,13 +419,13 @@ public class ReferenceDeploymentSecurityTest {
         Map<String, List<String>> published = new LinkedHashMap<>();
         for (JsonNode composeFile : inventory.path("sources").path("composeFiles")) {
             String source = Files.readString(Path.of(composeFile.asString()))
-                    .replace("!reset null", "null");
+                    .replace("!reset null", "null").replace("!reset {}", "{}");
             Map<String, Object> compose = new Yaml().load(source);
             Map<String, Map<String, Object>> sourceServices =
                     (Map<String, Map<String, Object>>) compose.get("services");
             services.addAll(sourceServices.keySet());
             sourceServices.forEach((service, definition) -> {
-                if (definition.containsKey("ports")) {
+                if (definition != null && definition.containsKey("ports")) {
                     published.computeIfAbsent(service, ignored -> new ArrayList<>())
                             .addAll((List<String>) definition.get("ports"));
                 }
@@ -420,9 +442,39 @@ public class ReferenceDeploymentSecurityTest {
                 .computeIfAbsent(listener.path("service").asString(), ignored -> new ArrayList<>())
                 .add(listener.path("published").asString()));
         assertThat(inventoriedListeners).containsExactlyInAnyOrderEntriesOf(published);
-        assertThat(topLevelCaddyBlocks(Files.readString(Path.of("deploy/Caddyfile")))).containsExactly(
+        assertThat(productionCaddyTopLevelBlocks(inventory)).containsExactly(
                         "(applicationHeaders)", "(plaintext)", "(serve)", "http://:80",
-                        "{$COURTSIDE_DOMAIN}", "{$COURTSIDE_MAIL_HOSTNAME}");
+                        "{$COURTSIDE_DOMAIN}", "http://{$COURTSIDE_MAIL_HOSTNAME}", "{$COURTSIDE_MAIL_HOSTNAME}");
+    }
+
+    private static List<Path> productionComposeSources() throws IOException {
+        Matcher manifest = PRODUCTION_OVERLAYS.matcher(Files.readString(Path.of("deploy/compose.yaml")));
+        assertThat(manifest.find()).as("compose.yaml declares its production components").isTrue();
+        List<Path> sources = new ArrayList<>(List.of(Path.of("deploy/compose.yaml")));
+        manifest.group("entries").lines().map(line -> Path.of("deploy", line.strip().substring(2)))
+                .forEach(sources::add);
+        return sources;
+    }
+
+    private static List<String> productionCaddyTopLevelBlocks(JsonNode inventory) throws IOException {
+        String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
+        assertThat(caddyfile.lines().filter(line -> line.strip().startsWith("import ")
+                        && !line.startsWith("\t")).toList())
+                .as("the production proxy imports site blocks only from the directory its components mount into")
+                .containsExactly(SITE_IMPORT);
+        List<String> blocks = new ArrayList<>(topLevelCaddyBlocks(caddyfile.replace(SITE_IMPORT, "")));
+        for (JsonNode composeFile : inventory.path("sources").path("composeFiles")) {
+            String compose = Files.readString(Path.of(composeFile.asString()));
+            assertThat(compose.lines().filter(line -> line.contains("/etc/caddy/sites.d")).toList())
+                    .as("%s mounts proxy sites only as single read-only files this inventory can read",
+                            composeFile.asString())
+                    .allMatch(line -> SITE_MOUNT.matcher(line).matches());
+            Matcher mount = SITE_MOUNT.matcher(compose);
+            while (mount.find()) {
+                blocks.addAll(topLevelCaddyBlocks(Files.readString(Path.of("deploy", mount.group("source")))));
+            }
+        }
+        return blocks;
     }
 
     @Test
@@ -512,7 +564,7 @@ public class ReferenceDeploymentSecurityTest {
     }
 
     private static String deployedCaddy() throws IOException {
-        Matcher image = CADDY_IMAGE.matcher(Files.readString(Path.of("deploy", "compose.yaml")));
+        Matcher image = CADDY_IMAGE.matcher(Files.readString(Path.of("deploy", "compose.caddy.yaml")));
         assertThat(image.find()).as("the deployment pins a Caddy image").isTrue();
         return image.group();
     }
@@ -739,9 +791,10 @@ public class ReferenceDeploymentSecurityTest {
                     .startsWith("{\n\tauto_https disable_redirects\n}")
                     .doesNotContain("auto_https off", "auto_https disable_certs");
         }
-        assertThat(production)
-                .contains("@mailHostname host {$COURTSIDE_MAIL_HOSTNAME}")
-                .contains("{$COURTSIDE_MAIL_HOSTNAME} {");
+        assertThat(production).contains(SITE_IMPORT).doesNotContain("COURTSIDE_MAIL_HOSTNAME");
+        assertThat(Files.readString(Path.of("deploy/Caddyfile.stalwart")))
+                .contains("http://{$COURTSIDE_MAIL_HOSTNAME} {")
+                .contains("\n{$COURTSIDE_MAIL_HOSTNAME} {");
     }
 
     @Test

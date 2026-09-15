@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CryptographicStrengthTest {
 
     private static final Path INVENTORY = Path.of("security/cryptographic-inventory.json");
-    private static final Path COMPOSE = Path.of("deploy/compose.yaml");
+    private static final Path COMPOSE = Path.of("deploy/compose.stalwart.yaml");
     private static final Path MAIL_PLANS = Path.of("deploy/mail");
     private static final Path RESET_CODES = Path.of(
             "src/main/java/org/courtside/identity/internal/ResetCodes.java");

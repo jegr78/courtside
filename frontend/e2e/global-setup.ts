@@ -94,7 +94,7 @@ function deployedMailSinkImage(): string {
 }
 
 function deployedProxyImage(): string {
-  return deployedImage("compose.yaml", /caddy(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "Caddy");
+  return deployedImage("compose.caddy.yaml", /caddy(?::[\w.-]+)?@sha256:[a-f0-9]{64}/, "Caddy");
 }
 
 // Courtside requires STARTTLS of every relay, and Mailpit offers it only when it holds a certificate.

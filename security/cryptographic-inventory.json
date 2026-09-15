@@ -714,6 +714,7 @@
         "src/main/resources/application.yaml",
         "deploy/compose.restore.yaml",
         "deploy/compose.perf.yaml",
+        "deploy/compose.mailpit.yaml",
         "tools/*.mjs"
       ]
     },
@@ -742,8 +743,9 @@
       "locations": [
         "deploy/mail/*.ndjson",
         "deploy/.env.example",
-        "deploy/compose.yaml",
+        "deploy/compose.stalwart.yaml",
         "deploy/mail-check.sh",
+        "tools/deployment-recipes.test.mjs",
         "tools/mail-check.test.mjs"
       ]
     },

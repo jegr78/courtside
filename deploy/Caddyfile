@@ -32,17 +32,6 @@
 }
 
 http://:80 {
-	@mailHostname host {$COURTSIDE_MAIL_HOSTNAME}
-	handle @mailHostname {
-		header {
-			Cache-Control "no-store"
-			Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
-			-Location
-			-Server
-			-Via
-		}
-		respond 404
-	}
 	@browserNavigation {
 		host {$COURTSIDE_DOMAIN}
 		method GET HEAD
@@ -110,13 +99,4 @@ http://:80 {
 	import {$COURTSIDE_APP_TLS_MODE:plaintext}
 }
 
-# Caddy issues only for the names it serves, and the mail server needs one for its own. Nothing
-# here answers a browser: the block exists so that the certificate does.
-{$COURTSIDE_MAIL_HOSTNAME} {
-	header {
-		Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
-		-Server
-		-Via
-	}
-	respond 404
-}
+import /etc/caddy/sites.d/*.caddy
