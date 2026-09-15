@@ -11,8 +11,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ImportPreviewRetentionShapeTest {
 
-    // Section 10 of the design specification promises that a preview keeps the file's name, its
-    // digest and the change set parsed from it, and never the bytes that were uploaded.
     @Test
     void whenAPreviewIsStored_thenNothingInItCanHoldTheUploadedBytes() {
         // when
