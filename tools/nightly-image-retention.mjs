@@ -113,12 +113,8 @@ export function planNightlyImageRetention({ versions, manifests, now }) {
   const candidates = sortedIds(versions.filter(({ digest, updatedAt }) =>
     !keptDigests.has(digest) && timestamp(updatedAt, "version updatedAt").valueOf() < cutoff)
     .map(({ id }) => id));
-  if (candidates.length > 50) {
-    return { aborted: true, reason: `deletion ceiling exceeded: ${candidates.length} > 50`,
-      keptDatedTags, keepVersionIds, plannedDeletionCount: candidates.length, deleteVersionIds: [] };
-  }
-  return { aborted: false, reason: null, keptDatedTags, keepVersionIds,
-    plannedDeletionCount: candidates.length, deleteVersionIds: candidates };
+  return { keptDatedTags, keepVersionIds, plannedDeletionCount: candidates.length,
+    deleteVersionIds: candidates };
 }
 
 function argumentsOf(args) {
@@ -241,7 +237,6 @@ async function main(args) {
   const manifests = await registryManifests({ owner, packageName, versions, bearer });
   const plan = planNightlyImageRetention({ versions, manifests, now: options.now ?? new Date().toISOString() });
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
-  if (plan.aborted) throw new Error(plan.reason);
   if (options.apply) await deleteVersions({ owner, ownerKind, packageName, token,
     versions, ids: plan.deleteVersionIds });
 }
