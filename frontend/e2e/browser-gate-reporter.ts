@@ -2,7 +2,7 @@ import type { FullConfig, FullResult, Reporter, Suite, TestCase, TestError, Test
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
-import { classifyBrowserFailure } from "./browser-diagnostics";
+import { classifyBrowserFailure, type BrowserError } from "./browser-diagnostics";
 
 type ClaimStatus = "passed" | "failed" | "incomplete" | "not-established" | "not-run";
 
@@ -10,7 +10,7 @@ interface GateResult {
   identity?: string;
   projectName: string;
   status: string;
-  errors: ReadonlyArray<{ message?: string }>;
+  errors: ReadonlyArray<BrowserError>;
 }
 
 interface GateClaim {

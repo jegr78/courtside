@@ -80,7 +80,7 @@ interface BrowserTestOutcome extends FailureState {
   errors: ReadonlyArray<BrowserError>;
 }
 
-interface BrowserError {
+export interface BrowserError {
   message?: string;
   cause?: BrowserError;
   value?: string;
@@ -118,11 +118,16 @@ export function classifyBrowserFailure(errors: ReadonlyArray<BrowserError>, stat
   if (/WebKit encountered an internal error/i.test(messages)) return "browser-internal-error";
   if (/Target page, context or browser has been closed/i.test(messages)) return "target-lost";
   if (state.timedOut || /Test timeout of \d+ms exceeded/i.test(messages)) return "test-timeout";
-  if (errors.some(({ cause }) => cause?.message === "courtside-product-failure" || cause?.value === "courtside-product-failure")) {
+  if (errors.some(({ cause }) => isProductFailureMarker(cause?.message))) {
     return "product-failure";
   }
   if (/(?:Error:\s*)?expect\([^\n]*\)\.(?:to|not\.)|expect\([^\n]*\) failed/i.test(messages)) return "product-failure";
   return "harness-incomplete";
+}
+
+// Playwright serialises a thrown error's message with the error's name in front of it.
+function isProductFailureMarker(text: string | undefined): boolean {
+  return text !== undefined && plainText(text).replace(/^Error: /, "") === "courtside-product-failure";
 }
 
 export function productFailure(message: string): Error {
