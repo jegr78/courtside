@@ -75,7 +75,8 @@ describe("browser diagnostics", () => {
     [false, true, ["frame.evaluate: Target page, context or browser has been closed"], "target-lost"],
     [false, true, ["Test timeout of 60000ms exceeded"], "test-timeout"],
     [false, true, ["Error: expect(locator).toBeVisible() failed"], "product-failure"],
-    [false, true, [{ message: "Keyboard focus did not reach the control", cause: { message: "courtside-product-failure" } }], "product-failure"],
+    [false, true, [{ message: "Error: Keyboard focus did not reach the control", cause: { message: "Error: courtside-product-failure" } }], "product-failure"],
+    [false, true, [{ message: "Error: Keyboard focus did not reach the control", cause: { message: "Error: a courtside-product-failure lookalike" } }], "harness-incomplete"],
     [false, true, ["Expected the control to be visible"], "harness-incomplete"]
   ])("given observed browser state, when a test fails, then its failure class is derived",
     (pageCrashed, browserConnected, failures, expected) => {

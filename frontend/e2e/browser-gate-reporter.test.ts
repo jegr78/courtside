@@ -131,6 +131,25 @@ describe("browser gate reporter", () => {
     expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "passed" });
   });
 
+  it("given a keyboard journey throws a product failure, when reporting the run, then accessibility fails as a product claim", () => {
+    // given
+    const results = [{
+      projectName: "chromium-accessibility",
+      status: "failed",
+      errors: [{
+        message: "Error: Keyboard focus did not reach my-bookings-link within one lap",
+        cause: { message: "Error: courtside-product-failure" }
+      }]
+    }, { projectName: "webkit-core", status: "passed", errors: [] }, webkitPwaPass];
+
+    // when
+    const outcome = browserGateOutcome(results);
+
+    // then
+    expect(outcome.claims).toContainEqual({ id: "accessibility-rule-conformance", status: "failed" });
+    expect(outcome.claims).toContainEqual({ id: "browser-harness", status: "passed" });
+  });
+
   it("given the WebKit PWA journey fails, when reporting the run, then compatibility fails as a product claim", () => {
     // given
     const results = [{
