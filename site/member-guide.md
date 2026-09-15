@@ -8,9 +8,10 @@ und Menüpunkten stehen *kursiv*. Öffnungszeiten, Fristen und Obergrenzen legt 
 Die Startseite zeigt den Platzplan auch ohne Anmeldung. Auf einem großen Bildschirm siehst du eine
 Woche, auf einem schmalen Bildschirm einen Tag.
 
-1. Wähle *Vorherige Woche* oder *Nächste Woche*, um den Zeitraum zu wechseln.
-2. Wähle *Zur aktuellen Zeit*, um zum heutigen Tag zurückzukehren.
-3. Lies in der Legende, ob ein Zeitraum **Frei**, **Belegt**, **Deine Buchung**,
+1. Wähle unter *Datum auswählen* einen Tag, um direkt dorthin zu springen, auch über Wochen hinweg.
+2. Wähle *Vorherige Woche* oder *Nächste Woche*, um schrittweise zu blättern.
+3. Wähle *Zur aktuellen Zeit*, um zum heutigen Tag zurückzukehren. Das geht von jedem Zeitraum aus.
+4. Lies in der Legende, ob ein Zeitraum **Frei**, **Belegt**, **Deine Buchung**,
    **Nicht verfügbar** oder **Vergangen** ist.
 
 An geschlossenen Tagen zeigt Courtside kein Raster. Bei fremden Buchungen siehst du entweder die

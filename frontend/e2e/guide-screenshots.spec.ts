@@ -37,6 +37,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.goto("/");
     await expect(page.getByTestId("public-club-name")).toBeVisible();
     await selectVisualDate(page, visualDate);
+    await expectDesktopCourtPlanToFit(page);
   },
   "sign-in": async (page) => {
     await page.goto("/login");
@@ -323,4 +324,23 @@ async function selectVisualDate(page: Page, date: string): Promise<void> {
     await page.getByTestId("week-next").click();
   }
   await day.click();
+}
+
+async function expectDesktopCourtPlanToFit(page: Page): Promise<void> {
+  const layout = await page.getByTestId("court-plan-view").evaluate((plan) => {
+    const planBounds = plan.getBoundingClientRect();
+    const elements = [
+      plan.querySelector('[data-testid="week-date"]'),
+      ...plan.querySelectorAll('[data-testid^="day-selector-"]'),
+      plan.querySelector('[data-testid="week-grid"]')
+    ].filter((element): element is Element => element !== null);
+    return {
+      documentFits: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      elementsFit: elements.every((element) => {
+        const bounds = element.getBoundingClientRect();
+        return bounds.left >= planBounds.left && bounds.right <= planBounds.right;
+      })
+    };
+  });
+  expect(layout).toEqual({ documentFits: true, elementsFit: true });
 }

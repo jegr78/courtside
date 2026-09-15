@@ -8,9 +8,10 @@ This handbook explains the features you need as a member. Button and menu names 
 The home page shows the court plan without requiring you to sign in. A wide screen shows one week.
 A narrow screen shows one day.
 
-1. Select *Previous week* or *Next week* to change the period.
-2. Select *Return to current time* to return to today.
-3. Use the legend to identify **Available**, **Occupied**, **Your booking**, **Unavailable** and
+1. Use *Choose date* to jump straight to a day, across weeks as well.
+2. Select *Previous week* or *Next week* to step through the periods.
+3. Select *Return to current time* to return to today. This works from any period.
+4. Use the legend to identify **Available**, **Occupied**, **Your booking**, **Unavailable** and
    **Past** periods.
 
 Courtside does not show a grid on days when the club is closed. Another member's booking displays
