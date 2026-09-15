@@ -1042,10 +1042,11 @@ docker compose up -d
 
 Both commands read the recipe from `COMPOSE_FILE`, so every recipe upgrades the same way.
 
-Migrations run on startup and support skipping versions, so an instance that has not been updated
+Migrations run on the application's startup, or in the one-shot migration command when the database
+identities are separated, and support skipping versions, so an instance that has not been updated
 for a year goes to the current release directly. Read the release notes first: every release opens
 with upgrade notes, names the database versions exercised by the release gate, and identifies any
-change to a published surface. If startup rejects a migration, do not attempt to reverse Flyway or
+change to a published surface. If a migration is rejected, do not attempt to reverse Flyway or
 edit an applied migration. Keep the application stopped and restore the pre-upgrade backup.
 
 Back up before an upgrade. The database holds everything; the containers hold nothing. The

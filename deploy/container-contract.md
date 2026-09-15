@@ -5,6 +5,11 @@ itself requires and provides, for a platform that runs it without them: a Kubern
 a Podman unit or a managed container service. Where a recipe supplies something, the platform now
 has to supply it.
 
+Everything this page states about the image is the contract: what it runs as, listens on, writes,
+answers, reads, trusts, reaches and refuses. Changing any of it is a breaking change. Advice about a
+platform, such as which kind of probe to use, Kubernetes service links or what the reference Caddy
+adds, is guidance and not part of the contract.
+
 `tools/container-contract.test.mjs` reads the Dockerfile, the application configuration, the
 migrations, the reference Compose and Caddy files and the Java that refuses a start, and fails when
 this page stops stating the user, port, writable path, health check and response, extension, one-shot
@@ -137,7 +142,7 @@ The application trusts the forwarded headers of every request it receives: `Forw
 `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Port`, `X-Forwarded-Prefix`,
 `X-Forwarded-Proto` and `X-Forwarded-Ssl`. It takes the client address from them, which is what
 sign-in and account-recovery throttling count, and the scheme and host it answers for. So port 8080
-must be reachable only from the ingress. The ingress must discard every one of those headers a
+must be reachable only from the ingress and the health probe. The ingress must discard every one of those headers a
 client sends, then write `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto: https`
 itself. It writes `X-Forwarded-For` as a single value, the address of the member's own device, taken
 from the connection or from an upstream hop that has already sanitised it. The application counts
@@ -167,9 +172,10 @@ On a database without any account, the application refuses to start without
 name a first and a last name. Once an account exists, the three are ignored. Together with the
 database and mail input above, that is everything without a default.
 
-Beyond the refusals named above, the application refuses to start on a value outside the set or
-range a variable accepts, such as an unknown `COURTSIDE_ENVIRONMENT`, `COURTSIDE_DB_IDENTITY_MODE` or
-`COURTSIDE_DB_TLS_MODE`. These two are easy to meet on another platform:
+Beyond the refusals named above, the application refuses to start on many invalid values, such as
+an unknown `COURTSIDE_ENVIRONMENT`, `COURTSIDE_DB_IDENTITY_MODE` or `COURTSIDE_DB_TLS_MODE`. Not
+every one is caught at startup: a `COURTSIDE_MAIL_RELAY_PORT` outside the valid range only fails
+when the first message is sent. These two refusals are easy to meet on another platform:
 
 - `COURTSIDE_PASSWORD_TERMS_FILE` names a relative path, or a file that is missing, unreadable or
   holds no term;

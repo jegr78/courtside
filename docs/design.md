@@ -286,10 +286,11 @@ casually:
 1. **Environment variables.** Documented set, defaults for everything optional. Renaming a
    variable is a breaking change.
 2. **The REST API**, as published in the OpenAPI specification.
-3. **The container contract** in `deploy/container-contract.md`: the image's user, port, writable
-   path, health endpoint, database requirements, one-shot commands and the input it reads from
-   files. A platform that runs the image without the reference deployment builds on it, so changing
-   one of those is a breaking change too.
+3. **The container contract** in `deploy/container-contract.md`: everything that page states about
+   the image, such as its user, port, writable path, health endpoint and response, database
+   requirements, one-shot commands, the input it reads, the headers it trusts and what it has to
+   reach. A platform that runs the image without the reference deployment builds on it, so changing
+   any of that is a breaking change too. The page's advice about platforms is not part of it.
 
 **Database migrations must be idempotent and support version skipping.** A club that has
 not updated for a year must be able to go from 1.2 directly to 1.7. Flyway runs on the

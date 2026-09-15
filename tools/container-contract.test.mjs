@@ -7,10 +7,10 @@ function repositoryFile(path) {
   return readFileSync(fileURLToPath(new URL(`../${path}`, import.meta.url)), "utf8");
 }
 
-function repositoryFiles(directory, extension) {
+function repositoryFiles(directory, extension, keep = () => true) {
   const root = fileURLToPath(new URL(`../${directory}`, import.meta.url));
   return readdirSync(root, { recursive: true })
-    .filter((name) => name.endsWith(extension))
+    .filter((name) => name.endsWith(extension) && keep(name))
     .map((name) => readFileSync(`${root}/${name}`, "utf8"));
 }
 
@@ -18,7 +18,6 @@ function all(source, pattern) {
   return [...new Set([...source.matchAll(pattern)].map((match) => match[1]))].sort();
 }
 
-const DISPOSABLE = /^COURTSIDE_(?:DEMO|PERF|SECURITY)_/;
 // What Spring's ForwardedHeaderFilter reads under forward-headers-strategy: framework.
 const FRAMEWORK_FORWARDED_HEADERS = ["Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Port",
   "X-Forwarded-Prefix", "X-Forwarded-Proto", "X-Forwarded-Ssl"];
@@ -30,7 +29,11 @@ const caddyfile = repositoryFile("deploy/Caddyfile");
 const readme = repositoryFile("deploy/README.md");
 const productionOverlays = /^x-courtside-production-overlays:\n(?<entries>(?:  - compose[\w.-]+\.yaml\n)+)/m
   .exec(compose)?.groups.entries.match(/compose[\w.-]+\.yaml/g) ?? [];
-const sources = repositoryFiles("src/main/java", ".java");
+const pom = repositoryFile("pom.xml");
+const imageExcludes = all(/<id>default-jar<\/id>(?<jar>[\s\S]*?)<\/excludes>/.exec(pom)?.groups.jar ?? "",
+  /<exclude>(org\/courtside\/[\w/]+)\/\*\*<\/exclude>/g);
+const sources = repositoryFiles("src/main/java", ".java",
+  (name) => !imageExcludes.some((excluded) => name.startsWith(`${excluded}/`)));
 const java = sources.join("\n");
 const schema = repositoryFiles("src/main/resources/db/migration", ".sql").join("\n");
 const javaFile = (name) => repositoryFile(`src/main/java/org/courtside/${name}.java`);
@@ -71,6 +74,17 @@ function backticked(text, pattern) {
   return all(text, new RegExp(`\`(${pattern.source})\``, "g"));
 }
 
+function recordComponents(source) {
+  const start = /\brecord\s+\w+\s*\(/.exec(source);
+  if (!start) return "";
+  let depth = 1;
+  for (let index = start.index + start[0].length; index < source.length; index++) {
+    if (source[index] === "(") depth++;
+    if (source[index] === ")" && --depth === 0) return source.slice(start.index + start[0].length, index);
+  }
+  return "";
+}
+
 function appService(source) {
   return source.match(/^  app:\n(?<body>(?: {4}.*\n|\n)+)/m)?.groups.body ?? "";
 }
@@ -102,6 +116,11 @@ test("given the image, when the contract describes its process, then it states t
     assert.ok(user && port && memory, "the Dockerfile no longer states a user, a port or a memory share");
     assert.match(dockerfile, /-XX:\+ExitOnOutOfMemoryError/, "the image no longer exits on OutOfMemoryError");
     assert.match(properties, /console: ecs/, "the application no longer logs Elastic Common Schema");
+    const limit = /mem_limit: \$\{COURTSIDE_MEMORY:-(\d+)g\}/.exec(compose)?.[1];
+    const appTls = [...bound.values()].find(({ name }) => name === "COURTSIDE_APP_TLS_MODE")?.fallback;
+    assert.ok(limit && appTls, "the reference memory limit or the application TLS default changed shape");
+    assertNamed([`reference deployment sets ${limit} GiB`, `\`COURTSIDE_APP_TLS_MODE\` is \`${appTls}\` by default`],
+      "the process defaults");
     assertNamed([`UID ${user[1]}`, `GID ${user[2]}`, `port ${port}`, `${Number.parseFloat(memory)} percent`,
       "exits on an `OutOfMemoryError`", "Elastic Common Schema JSON object per line"], "the process");
   });
@@ -113,7 +132,7 @@ test("given the image's health check, when the contract describes health, then i
       .exec(dockerfile);
     const [interval, timeout, startPeriod, retries] = ["interval", "timeout", "start-period", "retries"]
       .map((name) => new RegExp(`--${name}=(\\d+)`).exec(check?.groups.options ?? "")?.[1]);
-    const count = ["zero", "one", "two", "three", "four", "five"];
+    const count = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
     const endpoint = /^  endpoint:\n {4}health:\n(?<body>(?: {6}.*\n)+)/m.exec(properties)?.groups.body ?? "";
     const groups = [
       ...(/probes:\n\s+enabled: true/.test(endpoint) ? ["liveness", "readiness"] : []),
@@ -124,12 +143,15 @@ test("given the image's health check, when the contract describes health, then i
     // when / then
     assert.ok(check && interval && timeout && startPeriod && retries,
       "the Dockerfile no longer declares a complete health check");
-    assert.equal(/exposure:\n\s+include: (\S+)/.exec(properties)?.[1], "health",
-      "the application exposes more than its health endpoint");
+    assert.ok(count[retries], `the contract cannot spell ${retries} retries as a word`);
+    const exposed = /exposure:\n\s+include: *(.+)/.exec(properties)?.[1].replace(/[[\]"']/g, "").split(",")
+      .map((name) => name.trim()).filter(Boolean);
+    assert.deepEqual(exposed, ["health"], "the application exposes more than its health endpoint");
     assert.match(endpoint, /^ {6}show-details: never$/m, "the health endpoint now shows its components");
     const security = javaFile("identity/internal/SecurityConfiguration");
-    assert.match(security, new RegExp(`"${escaped(check.groups.path)}"\\)\\.permitAll\\(\\)`),
-      "the health endpoint no longer answers anonymous requests");
+    const anonymous = [...security.matchAll(/\.requestMatchers\(([^)]*)\)\s*\.permitAll\(\)/g)]
+      .flatMap((matchers) => all(matchers[1], /"([^"]+)"/g));
+    assert.ok(anonymous.includes(check.groups.path), "the health endpoint no longer answers anonymous requests");
     assert.match(security, new RegExp(`"${escaped(check.groups.path)}/\\*\\*"\\)\\.access\\([^;]*ROLE_[^;]*ADMIN`, "s"),
       "the probe groups no longer require an administrator");
     assertNamed([
@@ -169,6 +191,10 @@ test("given the bundled database and migrations, when the contract describes Pos
     // when / then
     assert.ok(major, "the reference deployment no longer pins a PostgreSQL major version");
     assert.deepEqual(stated, extensions, "the container contract names other extensions than the schema needs");
+    const tlsDefault = [...bound.values()].find(({ name }) => name === "COURTSIDE_DB_TLS_MODE")?.fallback;
+    assert.doesNotMatch(properties, /connection-timeout/, "the connection pool no longer waits its default 30 seconds");
+    assertNamed([`\`COURTSIDE_DB_TLS_MODE\` is \`${tlsDefault}\` by default`, "the `503` takes about 30 seconds"],
+      "the database defaults");
     assertNamed([`PostgreSQL ${major}`,
       `an \`${parameter("TRANSPORT_PARAMETER")}…\` or \`${parameter("GSS_PARAMETER")}…\` argument or \`${parameter("SERVICE_PARAMETER")}\``],
     "the database version and the transport refusal");
@@ -184,6 +210,11 @@ test("given the image's one-shot commands, when the contract describes migration
     const read = (source) => all(source, /"((?:COURTSIDE|SPRING)_[A-Z0-9_]+)"/g).filter((name) => !shared.includes(name));
     const identity = javaFile("shared/DatabaseIdentityEnvironmentPostProcessor");
     const urlCredentials = /new String\[\]\{(?<names>[^}]+)\}/.exec(identity)?.groups.names.match(/\w+/g) ?? [];
+    const direct = all(identity, /refuseDirectCredential\(environment, "([\w.-]+)"\)/g);
+    const variable = (key) => key.toUpperCase().replace(/[.-]/g, "_");
+    const reserved = /value\.equals\("(\w+)"\) \|\| value\.startsWith\("(\w+)"\)/.exec(setup);
+    const sharedRefusal = /if \(hasValue\(environment, USERNAME\) \|\| hasValue\(environment, PASSWORD_FILE\)\)/.test(identity);
+    const identityInput = (constant) => bound.get(new RegExp(`${constant} = "([\\w.-]+)"`).exec(identity)?.[1])?.name;
 
     // when / then
     assert.deepEqual(backticked(prose, /--courtside-[a-z-]+/), commands,
@@ -201,9 +232,17 @@ test("given the image's one-shot commands, when the contract describes migration
     assertNamed(shared.map((name) => `\`${name}\``), "what all three processes read",
       between(prose, "All three processes read", "[Separating"));
     const longest = Number(/ROLE_NAME = Pattern\.compile\("\[a-z\]\[a-z0-9_\]\{0,(\d+)\}"\)/.exec(setup)?.[1]) + 1;
-    assert.ok(longest > 1, "the role name rule changed shape");
-    assertNamed([`at most ${longest} lower-case letters`, "`postgres`", "`pg_`",
+    assert.ok(longest > 1 && reserved && sharedRefusal, "the role name or identity refusals changed shape");
+    assert.ok(direct.some((key) => key.includes("hikari")) && direct.some((key) => key.startsWith("spring.flyway.")),
+      "separate mode no longer refuses a connection pool or Flyway credential");
+    assertNamed([`at most ${longest} lower-case letters`, `\`${reserved[1]}\``, `\`${reserved[2]}\``,
       ...urlCredentials.map((name) => `\`${name}\``)], "the role name and address refusals");
+    assert.deepEqual(
+      backticked(between(prose, "any other way:", "a connection pool"), /SPRING_DATASOURCE_[A-Z]+/),
+      direct.filter((key) => key.startsWith("spring.datasource.") && !key.includes("hikari")).map(variable).sort(),
+      "the container contract names other direct credentials than separate mode refuses");
+    assertNamed([`Setting \`${identityInput("USERNAME")}\` or \`${identityInput("PASSWORD_FILE")}\` in this mode refuses the start`],
+      "the shared mode refusal");
   });
 
 test("given the image's variables, when the contract lists them, then the set and every default match the image",
@@ -211,12 +250,13 @@ test("given the image's variables, when the contract lists them, then the set an
     // given
     const expected = new Map([...bound.values()].map(({ name, fallback }) => [name,
       fallback === "" ? "unset" : fallback === "@project.url@" ? "this repository" : `\`${fallback}\``]));
+    assert.ok(imageExcludes.length > 0, "the image excludes no source package");
     for (const name of all(java, /"(COURTSIDE_[A-Z0-9_]+)"/g)) {
-      if (!DISPOSABLE.test(name) && !expected.has(name)) expected.set(name, "unset");
+      if (!expected.has(name)) expected.set(name, "unset");
     }
     const table = between(contract, "| Variable | Default |");
-    const listed = new Map([...table.matchAll(/^\| `(COURTSIDE_[A-Z0-9_]+)` \| (.+?) \|$/gm)]
-      .map((row) => [row[1], row[2]]));
+    const listed = new Map(table.split("\n").map((row) => row.split("|").slice(1, -1).map((cell) => cell.trim()))
+      .filter((cells) => /^`COURTSIDE_[A-Z0-9_]+`$/.test(cells[0] ?? "")).map(([name, fallback]) => [name.slice(1, -1), fallback]));
     const readmeTable = between(readme, "\n## Environment variables\n", "\n## ");
     const undocumented = [...expected.keys()].filter((name) => !readmeTable.includes(`| \`${name}\` |`)).sort();
     const exceptions = backticked(between(prose, "from the `.env` side, except", "which this page describes"),
@@ -250,29 +290,31 @@ test("given the startup refusals, when the contract lists required input, then e
       "the startup refusals for mail and the first administrator changed shape");
     assert.ok(designations.length > 0 && !designations.includes("PRODUCTION"),
       "the fixed clock no longer names only disposable designations");
-    assert.match(javaFile("identity/internal/SecurityConfiguration"), /COURTSIDE_COOKIE_SECURE=false is reserved/,
-      "the insecure cookie refusal is no longer named in the security configuration");
+    assert.match(javaFile("identity/internal/SecurityConfiguration"),
+      /if \(!secureCookies && "PRODUCTION"\.equalsIgnoreCase\(environment\)\) \{\s*throw new IllegalStateException\(\s*"COURTSIDE_COOKIE_SECURE=false is reserved/,
+      "insecure cookies are no longer refused in production");
     assertNamed(refusedMail.map((name) => `\`${name}\``), "the mail refusals", section("## Mail"));
     assertNamed([...refusedBootstrap.map((name) => `\`${name}\``), `at least ${minimum} characters`],
       "the first administrator's refusals", section("## Required input and refusals"));
     assertNamed(["refuses to start with that switch lowered"], "the insecure cookie refusal", section("## HTTPS ingress"));
-    assertNamed([`\`COURTSIDE_ENVIRONMENT\` names anything but ${designations.slice(0, -1).map((name) => `\`${name}\``)
-      .join(", ")} or \`${designations.at(-1)}\``], "the fixed clock refusal", section("## Required input and refusals"));
+    const clockSentence = between(section("## Required input and refusals"), "`COURTSIDE_ENVIRONMENT` names anything but", ".");
+    assert.deepEqual(backticked(clockSentence, /[A-Z]+/), [...designations].sort(),
+      "the container contract names other designations than a fixed clock accepts");
   });
 
 test("given the image's file inputs, when the contract lists them, then it lists exactly those",
   () => {
     // given
     const pathProperties = sources.flatMap((source) => {
-      const declared = /@ConfigurationProperties\("([\w.-]+)"\)\s*record \w+\((?<components>[^)]*)\)/s.exec(source);
-      if (!declared) return [];
-      return all(declared.groups.components, /Path (\w+)/g)
-        .map((component) => `${declared[1]}.${component.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`);
+      const prefix = /@ConfigurationProperties\((?:prefix\s*=\s*)?"([\w.-]+)"/.exec(source)?.[1];
+      const components = prefix ? recordComponents(source) : "";
+      return all(components, /\bPath\s+(\w+)/g)
+        .map((component) => `${prefix}.${component.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`);
     });
     const files = [...new Set([
       ...pathProperties.map((key) => bound.get(key)?.name),
       ...[...bound].filter(([key]) => key.endsWith("-file")).map(([, variable]) => variable.name),
-      ...all(java, /"(COURTSIDE_[A-Z0-9_]+_FILE)"/g).filter((name) => !DISPOSABLE.test(name)),
+      ...all(java, /"(COURTSIDE_[A-Z0-9_]+_FILE)"/g),
     ])].sort();
     const listed = all(between(contract, "These inputs are paths to files", "No other input"),
       /^- `(COURTSIDE_[A-Z0-9_]+)`$/gm);
@@ -285,7 +327,8 @@ test("given the image's file inputs, when the contract lists them, then it lists
 test("given the reference proxy and the mail transport, when the contract describes ingress and mail, then it names every forwarded header and STARTTLS",
   () => {
     // given
-    const headers = /\(applicationHeaders\) \{\n(?<body>(?:[\t ]+[^\t \n][^\n]*\n)+)\}/.exec(caddyfile)?.groups.body ?? "";
+    const headers = /\(applicationHeaders\) \{\n(?<body>(?:(?:[\t ]+[^\t \n][^\n]*)?\n)+)\}/.exec(caddyfile)?.groups.body ?? "";
+    const bodyLimit = /max_size (\d+)MB/.exec(caddyfile)?.[1];
     const discarded = all(headers, /header_up -(\S+)/g);
     const written = all(headers, /header_up (?!-)(\S+) /g);
     const transport = javaFile("notification/internal/NotificationConfiguration");
@@ -302,21 +345,26 @@ test("given the reference proxy and the mail transport, when the contract descri
     assert.deepEqual(FRAMEWORK_FORWARDED_HEADERS.filter((name) => ![...discarded, ...written].includes(name)), [],
       "the reference proxy no longer normalises every forwarded header the application trusts");
     assertNamed(written.map((name) => `\`${name}`), "the headers the ingress writes", writes);
-    assertNamed([`So port ${/^EXPOSE (\d+)$/m.exec(dockerfile)?.[1]} must be reachable only from the ingress`,
+    assertNamed([`So port ${/^EXPOSE (\d+)$/m.exec(dockerfile)?.[1]} must be reachable only from the ingress and the health probe`,
       "writes `X-Forwarded-For` as a single value"], "the ingress boundary", section("## HTTPS ingress"));
-    assertNamed(["always requires STARTTLS"], "the relay's transport requirement", section("## Mail"));
+    const port = [...bound.values()].find(({ name }) => name === "COURTSIDE_MAIL_RELAY_PORT")?.fallback;
+    assertNamed(["always requires STARTTLS", `\`${port}\` by default`], "the relay's transport", section("## Mail"));
+    assertNamed([`limits a request body to ${bodyLimit} MB`], "the reference proxy's body limit", section("## HTTPS ingress"));
   });
 
 test("given the breach check, when the contract describes the network, then it names the endpoint the image must reach",
   () => {
     // given
-    const endpoint = new URL([...bound.values()].find(({ name }) => name === "COURTSIDE_PASSWORD_BREACH_ENDPOINT").fallback);
+    const breach = [...bound.values()].find(({ name }) => name === "COURTSIDE_PASSWORD_BREACH_ENDPOINT");
+    const unavailable = /HttpStatus\.(\w+)/.exec(javaFile("identity/internal/BreachedPasswordCheckUnavailableException"))?.[1];
 
     // when / then
-    const unavailable = /HttpStatus\.(\w+)/.exec(javaFile("identity/internal/BreachedPasswordCheckUnavailableException"))?.[1];
+    assert.ok(breach, "the image no longer reads COURTSIDE_PASSWORD_BREACH_ENDPOINT");
+    const endpoint = new URL(breach.fallback);
     assert.equal(unavailable, "SERVICE_UNAVAILABLE", "an unavailable breach check no longer answers 503");
-    assert.match(javaFile("identity/internal/SecurityConfiguration"), /cannot override HIBP in production/,
-      "the breach endpoint override refusal is no longer named in the security configuration");
+    assert.match(javaFile("identity/internal/SecurityConfiguration"),
+      /if \("PRODUCTION"\.equalsIgnoreCase\(environment\) && !HIBP_RANGE_ENDPOINT\.equals\(endpoint\)\) \{\s*throw/,
+      "the breach endpoint may now be overridden in production");
     assertNamed([`\`${endpoint.host}\` over ${endpoint.protocol.replace(":", "").toUpperCase()}`,
       "`COURTSIDE_PASSWORD_BREACH_ENDPOINT` cannot point anywhere else", "refuses the change with `503`"],
     "the breach check", section("## Network"));
