@@ -11,7 +11,7 @@ import { test } from "node:test";
 import {
   assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
-  openBackupForRestore, processPlans, requiredPorts, restoreDatabase, runInteractive, runLifecyclePlans, startProcesses,
+  openBackupForRestore, packagedApplicationJar, processPlans, requiredPorts, restoreDatabase, runInteractive, runLifecyclePlans, startProcesses,
   superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfComposePlan, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
@@ -1516,4 +1516,27 @@ test("given a remote in either form, when the repository is read from it, then o
   assert.equal(repositoryFromRemote("https://gitlab.example.org/example-club/courtside.git"), undefined);
   assert.equal(repositoryFromRemote("https://elsewhere.example/github.com/example-club/courtside.git"), undefined);
   assert.equal(repositoryFromRemote(""), undefined);
+});
+
+test("given a leftover jar that sorts first, when the packaged application is chosen, then the build's own version wins", () => {
+  // given
+  const files = ["courtside-0.1.0-SNAPSHOT.jar", "courtside-0.1.0-rc.1.jar", "courtside-0.1.0-rc.1.jar.original"];
+
+  // when
+  const jar = packagedApplicationJar(files, "build.artifact=courtside\nbuild.version=0.1.0-rc.1\n");
+
+  // then
+  assert.equal(jar, "courtside-0.1.0-rc.1.jar");
+});
+
+test("given the build's own jar is missing, when the packaged application is chosen, then no other jar stands in", () => {
+  // when / then
+  assert.throws(() => packagedApplicationJar(["courtside-0.1.0-SNAPSHOT.jar"], "build.version=0.1.0-rc.1\n"),
+    /courtside-0\.1\.0-rc\.1\.jar was not found/);
+});
+
+test("given build information without a version, when the packaged application is chosen, then no jar is guessed", () => {
+  // when / then
+  assert.throws(() => packagedApplicationJar(["courtside-0.1.0-rc.1.jar"], "build.artifact=courtside\n"),
+    /no build version/);
 });
