@@ -15,6 +15,7 @@
     { "path": "tools/browser-input-inventory.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/browser-resource-observation.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/browser-resource-observation.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/container-contract.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/courtside.mail-smoke.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/courtside.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/courtside.restore-smoke.mjs", "profiles": ["full"], "test": false },
