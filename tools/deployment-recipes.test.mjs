@@ -305,6 +305,36 @@ test("given acceptance with Mailpit, when it is rendered, then the instance can 
   assert.deepEqual(resolved("files", "funnel", "--synthetic-mail"), ["compose.yaml", "compose.mailpit.yaml"]);
 });
 
+test("given every recipe model, when a service publishes a port, then Docker has a network to publish it on", () => {
+  const models = Object.entries(recipes).map(([name, recipe]) => [name, rendered(resolved("files", name), recipe.environment)]);
+  models.push(["standard with synthetic mail", rendered(resolved("files", "standard", "--synthetic-mail"),
+    { ...recipes.standard.environment, ...syntheticMail })]);
+  for (const [name, model] of models) {
+    // given
+    const publishing = Object.entries(model.services).filter(([, service]) => (service.ports ?? []).length > 0);
+
+    // when
+    const unpublishable = publishing.filter(([, service]) => Object.keys(service.networks ?? {})
+      .every((network) => model.networks[network]?.internal === true)).map(([service]) => service);
+
+    // then
+    assert.ok(publishing.length > 0, `${name} publishes nothing, so this reads no port`);
+    assert.deepEqual(unpublishable, [], `${name} publishes a port only on internal networks, where Docker drops it`);
+  }
+});
+
+test("given acceptance with Mailpit, when its root is read-only, then it still has somewhere to keep messages", () => {
+  // given
+  const model = rendered(resolved("files", "funnel", "--synthetic-mail"), { ...recipes.funnel.environment, ...syntheticMail });
+
+  // when
+  const mailpit = model.services.mailpit;
+
+  // then
+  assert.equal(mailpit.read_only, true);
+  assert.ok((mailpit.tmpfs ?? []).includes("/tmp"), "Mailpit opens its message store under /tmp and exits without it");
+});
+
 test("given every recipe model, when its images are read, then each bundled component is pinned by digest", () => {
   for (const [name, recipe] of Object.entries(recipes)) {
     // given
