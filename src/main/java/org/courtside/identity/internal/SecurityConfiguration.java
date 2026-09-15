@@ -33,6 +33,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
 import org.springframework.security.web.csrf.DeferredCsrfToken;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
@@ -47,6 +48,7 @@ import java.net.URI;
 import java.time.Clock;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({BootstrapAdminProperties.class, CredentialIssueProperties.class,
@@ -130,9 +132,6 @@ public class SecurityConfiguration {
             @Value("${courtside.performance.telemetry-enabled:false}") boolean performanceTelemetryEnabled,
             @Value("${server.servlet.session.cookie.secure}") boolean secureCookies)
             throws Exception {
-        CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
-        csrfHandler.setCsrfRequestAttributeName(null);
-
         return http
                 .authorizeHttpRequests(auth -> auth
                         // The error dispatch is the tail of a request already decided, not a new one.
@@ -251,7 +250,7 @@ public class SecurityConfiguration {
                         .accessDeniedHandler(accessDeniedHandler))
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository(secureCookies))
-                        .csrfTokenRequestHandler(csrfHandler))
+                        .csrfTokenRequestHandler(new SessionCsrfTokenRequestHandler()))
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(
                                 "default-src 'self'; object-src 'none'; img-src 'self' https:; "
@@ -350,6 +349,31 @@ public class SecurityConfiguration {
             serializer.setUseHttpOnlyCookie(true);
             serializer.setSameSite("Lax");
             return serializer;
+        }
+    }
+
+    // A fetch without cookies, such as WebKit's service worker script, would otherwise replace the
+    // token a signed-in page has already read.
+    private static final class SessionCsrfTokenRequestHandler implements CsrfTokenRequestHandler {
+
+        private final RequestMatcher session = PathPatternRequestMatcher.withDefaults()
+                .matcher(LOGIN_PROCESSING_URL);
+        private final CsrfTokenRequestAttributeHandler issuing = new CsrfTokenRequestAttributeHandler();
+        private final CsrfTokenRequestAttributeHandler deferring = new CsrfTokenRequestAttributeHandler();
+
+        private SessionCsrfTokenRequestHandler() {
+            issuing.setCsrfRequestAttributeName(null);
+        }
+
+        @Override
+        public void handle(HttpServletRequest request, HttpServletResponse response,
+                           Supplier<CsrfToken> csrfToken) {
+            (session.matches(request) ? issuing : deferring).handle(request, response, csrfToken);
+        }
+
+        @Override
+        public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
+            return issuing.resolveCsrfTokenValue(request, csrfToken);
         }
     }
 

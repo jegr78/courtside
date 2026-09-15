@@ -601,10 +601,13 @@ export async function runPassiveDeploymentAssessment(plan, context) {
       passed: headerAssessment.passed,
       observation: headerAssessment.observation
     });
-    if (path === "/") observations.push({ id: "secure-cookie-delivery", layer: "proxy",
-      passed: response.cookiesSecure,
-      observation: response.cookiesSecure ? "issued-cookies-secure" : "insecure-cookie-issued" });
   }
+  control.beforeRequest();
+  const session = await passiveRequest(plan.target, "/api/session", { ca: context.ca, signal: control.signal,
+    timeoutMilliseconds: control.remainingMilliseconds() });
+  requestCount++;
+  observations.push({ id: "secure-cookie-delivery", layer: "proxy", passed: session.cookiesSecure,
+    observation: session.cookiesSecure ? "issued-cookies-secure" : "insecure-cookie-issued" });
   for (const path of exposurePaths) {
     control.beforeRequest();
     const response = await passiveRequest(plan.target, path, { ca: context.ca, signal: control.signal,
@@ -845,7 +848,7 @@ function connectRequest(origin, ca, control) {
 }
 
 function csrfToken(origin, ca, control) {
-  const target = new URL("/", origin);
+  const target = new URL("/api/session", origin);
   return new Promise((resolve, reject) => {
     const call = https.request(target, { agent: false, ca, servername: target.hostname, signal: control.signal,
       timeout: Math.max(1, Math.min(10_000, control.remainingMilliseconds())) }, (response) => {
