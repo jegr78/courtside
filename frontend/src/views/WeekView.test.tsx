@@ -1286,6 +1286,17 @@ it("given the wide layout, when a date in another week is chosen there, then tha
   expect(screen.getByTestId("day-selector-2026-08-26")).toHaveAttribute("aria-pressed", "true");
 });
 
+it("given the plan is still loading, when the date control is shown, then it cannot discard a selection", () => {
+  // given
+  vi.mocked(api.bookingGrid).mockImplementation(() => new Promise(() => undefined));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  expect(screen.getByTestId("week-date")).toBeDisabled();
+});
+
 it("given a day in another week, when returning to the current time, then today is shown again", async () => {
   // given
   render(<WeekView today={clubInstant("12:00")} />);
