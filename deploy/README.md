@@ -27,6 +27,10 @@ and a recipe names the components that belong together:
 | `existing-infrastructure` | external PostgreSQL 17 | your own HTTPS ingress | an external SMTP relay |
 | `funnel` | bundled PostgreSQL | Tailscale Funnel on the host | an external SMTP relay |
 
+`existing-infrastructure` reaches its database over a network the deployment does not own, so
+combine it with the `database-tls` overlay described below: without it the connection is encrypted
+only when the database offers it, and never verified.
+
 Each recipe is a file in `recipes/`. `recipe.sh` turns one into the Compose files it needs, in the
 order Compose has to merge them, and refuses a combination that cannot run: a hardening overlay
 for a component the recipe does not have, or a privileged port under rootless Docker. Pass the
@@ -70,16 +74,19 @@ Set these values in `.env`:
 - `COURTSIDE_VERSION`: an exact release, for example `0.1.0-alpha.1`. Do not use a floating tag;
   an unattended upgrade of a booking system is not a feature. To pin harder, append the digest:
   `0.1.0-alpha.1@sha256:…`. Registry tags are mutable, digests are not.
-- `POSTGRES_PASSWORD`: generate one, for example with `openssl rand -base64 32`. It is only ever
-  used between the two containers.
+- `POSTGRES_PASSWORD`, with the bundled database: generate one, for example with
+  `openssl rand -base64 32`. It is only ever used between the two containers. With an external
+  database, set `COURTSIDE_DATABASE_URL`, `COURTSIDE_DATABASE_USERNAME` and
+  `COURTSIDE_DATABASE_PASSWORD` instead.
 - `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME`: the username of the first local administrator.
 - `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD`: a one-time password of at least 12 characters. The first
   login can do nothing except replace it.
 - `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME`: the administrator's first and last name.
 - `COURTSIDE_DOMAIN`: the name your members will type. This is required only for the reverse proxy.
-- For an external SMTP relay: `COURTSIDE_MAIL_RELAY_HOST`, `COURTSIDE_MAIL_RELAY_USERNAME` and
-  `COURTSIDE_MAIL_PASSWORD` from your mail provider, `COURTSIDE_MAIL_DOMAIN` for the sender address
-  and `COURTSIDE_MAIL_REPLY_TO`.
+- For an external SMTP relay: `COURTSIDE_MAIL_RELAY_HOST` from your mail provider,
+  `COURTSIDE_MAIL_DOMAIN` for the sender address and `COURTSIDE_MAIL_REPLY_TO`. Add
+  `COURTSIDE_MAIL_RELAY_USERNAME` and `COURTSIDE_MAIL_PASSWORD` when the relay requires a login;
+  leave both empty for a relay that admits this host without one.
 
 The initial club time zone is `Europe/Berlin`. Change it to the club's IANA zone in the admin
 configuration before members create bookings.
@@ -90,9 +97,9 @@ configuration before members create bookings.
 docker compose up -d
 ```
 
-Caddy obtains a certificate for `COURTSIDE_DOMAIN` on its own, so ports 80 and 443 must reach the
-host and the name must already point at it. The application itself is published on
-`127.0.0.1:8080` and never directly on a public interface.
+In the recipes with Caddy, it obtains a certificate for `COURTSIDE_DOMAIN` on its own, so ports 80
+and 443 must reach the host and the name must already point at it. The application itself is
+published on `127.0.0.1:8080` and never directly on a public interface.
 
 Use a certificate that every member device trusts. Clicking through a browser warning for an
 untrusted certificate chain can leave the application usable while the browser still refuses to
@@ -210,8 +217,19 @@ Three things this path costs you, all worth knowing before you choose it:
 - **The application trusts forwarded headers.** Funnel or any replacement must discard incoming
   `Forwarded` and `X-Forwarded-*` values and supply its own. Never forward arbitrary client values.
 
-This is an option, not part of the reference deployment, the project must not depend on one
-vendor, and everything here works without it.
+The `funnel` recipe is one of four, not a dependency: the project must not depend on one vendor,
+and every other recipe works without it.
+
+## Your own HTTPS ingress
+
+The `existing-infrastructure` recipe runs no proxy. The application port is published on the
+host's loopback interface only, so the ingress runs on the same host and forwards to
+`127.0.0.1:${COURTSIDE_PORT}`. Whatever it is, it takes over what Caddy does here: it terminates TLS
+for `COURTSIDE_DOMAIN`, discards incoming `Forwarded` and `X-Forwarded-*` values and supplies its
+own, because the application trusts them, and it limits request bodies. Without Caddy the
+application's own headers remain, as on the Funnel path above; Caddy's `Permissions-Policy`, its
+refusal of plain HTTP API requests, its host allowlist and its 2 MB body limit do not, unless the
+ingress provides them.
 
 ## The club's own mail server
 
@@ -867,7 +885,7 @@ default.
 | `COURTSIDE_MAIL_SETUP_PASSWORD` | *required with the mail server* | Password the setup commands authenticate with while the server still has no accounts. Pair it with `COURTSIDE_MAIL_RECOVERY_ADMIN`. |
 | `COURTSIDE_MAIL_ADMIN_USERNAME` | `postmaster` | Local part of the mail administrator's address. |
 | `COURTSIDE_MAIL_RECOVERY_MODE` | *unset* | Set to `1` to force recovery mode without a recovery credential. Mail stops while it is set. |
-| `COURTSIDE_MAIL_PASSWORD` | *required except with synthetic mail* | Password the instance authenticates with when it hands a message in. With the mail server, written into its sending account by `mail-configure`; the instance is not an administrator of the mail server. |
+| `COURTSIDE_MAIL_PASSWORD` | *required with the mail server*, *unset* otherwise | Password the instance authenticates with when it hands a message in. With the mail server, written into its sending account by `mail-configure`; the instance is not an administrator of the mail server. With an external relay, set it together with `COURTSIDE_MAIL_RELAY_USERNAME`. |
 | `COURTSIDE_MAIL_RELOAD_PASSWORD` | *required with the mail server* | Password `mail-reload` authenticates with to load a renewed certificate. Written into an account whose only permission is that reload. |
 | `COURTSIDE_MAIL_RELOAD_USERNAME` | `certificate-reload` | Local part of that account's address. |
 | `COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE` | `6` | `mail-reload` reports unhealthy once less than this share of the certificate's own lifetime is left. Relative rather than a number of days, so it means the same for a ninety-day certificate and a twelve-hour one. Caddy renews at a third of the lifetime, so a sixth leaves the renewal a full window of its own to fail in first. |
@@ -876,7 +894,7 @@ default.
 | `COURTSIDE_MAIL_REPLY_TO` | *required* | The club's real mailbox, so a member who answers a message reaches somebody. |
 | `COURTSIDE_MAIL_SENDER_USERNAME` | `courtside` | Local part of the address the instance sends from, in `COURTSIDE_MAIL_DOMAIN`, and with the mail server also the account it authenticates as. |
 | `COURTSIDE_MAIL_RELAY_HOST` | `COURTSIDE_MAIL_HOSTNAME` with the mail server, *required with an external SMTP relay* | Where the instance hands its messages in. With the mail server, that server on the compose network, reached under the name on its certificate rather than under the service name, because the instance authenticates what answers. Otherwise the submission host of the club's mail provider. |
-| `COURTSIDE_MAIL_RELAY_USERNAME` | *required with an external SMTP relay* | The login the provider issued for submission. With the mail server, the instance signs in as `COURTSIDE_MAIL_SENDER_USERNAME` in `COURTSIDE_MAIL_DOMAIN` instead. |
+| `COURTSIDE_MAIL_RELAY_USERNAME` | *unset* | The login an external relay issued for submission. Left empty, the instance hands messages in without signing in, which only a relay that admits this host by its address accepts. With the mail server, the instance signs in as `COURTSIDE_MAIL_SENDER_USERNAME` in `COURTSIDE_MAIL_DOMAIN` instead. |
 | `COURTSIDE_MAIL_RELAY_PORT` | `587` | Submission port on that host. |
 | `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `false` | Accept the certificate the relay presents without authenticating it, neither its issuer nor the name on it. Nothing here needs it: the mail server serves Caddy's certificate for `COURTSIDE_MAIL_HOSTNAME` and the instance dials exactly that name. Set it only for a relay whose certificate the instance cannot check, such as one issued by a private authority the container does not hold, and know that whoever can redirect the connection then reads the mail. |
 | `COURTSIDE_MAIL_ADMIN_PORT` | `8081` | Host port on the loopback interface for the mail server's admin interface. |
@@ -1017,7 +1035,9 @@ with upgrade notes, names the database versions exercised by the release gate, a
 change to a published surface. If startup rejects a migration, do not attempt to reverse Flyway or
 edit an applied migration. Keep the application stopped and restore the pre-upgrade backup.
 
-Back up before an upgrade. The database holds everything; the containers hold nothing:
+Back up before an upgrade. The database holds everything; the containers hold nothing. The
+commands below address the bundled `db` service; with `existing-infrastructure`, back up the
+database with the tools of wherever it runs:
 
 ```sh
 set -eu

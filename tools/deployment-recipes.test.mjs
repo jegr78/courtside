@@ -68,7 +68,7 @@ const recipes = {
     files: ["compose.yaml", "compose.smtp-relay.yaml"],
     environment: { ...common, ...bundledDatabase, ...smtpRelay },
     services: { app: "", db: "" },
-    required: "COURTSIDE_MAIL_RELAY_USERNAME",
+    required: "COURTSIDE_MAIL_DOMAIN",
   },
 };
 
@@ -182,6 +182,22 @@ test("given the standard recipe, when it is rendered, then nothing of the self-h
   assert.equal(model.services.proxy.environment.COURTSIDE_MAIL_HOSTNAME, undefined);
 });
 
+test("given an external relay that admits this host, when no credentials are set, then the instance sends without signing in",
+  () => {
+    // given
+    const environment = { ...recipes.funnel.environment };
+    delete environment.COURTSIDE_MAIL_RELAY_USERNAME;
+    delete environment.COURTSIDE_MAIL_PASSWORD;
+
+    // when
+    const model = rendered(resolved("files", "funnel"), environment);
+
+    // then
+    assert.equal(model.services.app.environment.COURTSIDE_MAIL_USERNAME, "");
+    assert.equal(model.services.app.environment.COURTSIDE_MAIL_PASSWORD, "");
+    assert.equal(model.services.app.environment.COURTSIDE_MAIL_RELAY_HOST, "smtp.example.org");
+  });
+
 test("given the existing-infrastructure recipe, when it is rendered, then the application reaches only the named database",
   () => {
     // given
@@ -208,8 +224,8 @@ test("given a recipe and hardening overlays, when they are named in any order, t
   assert.deepEqual(forwards, [...recipes.standard.files, "compose.database-identities.yaml",
     "compose.database-tls.yaml", "compose.database-tls-local.yaml", "compose.app-tls.yaml"]);
   assert.deepEqual(backwards, forwards);
-  assert.deepEqual(resolved("files", "standard", "--overlay", "database-tls"),
-    resolved("files", "standard", "--overlay", "database-tls"));
+  assert.deepEqual(resolved("files", "existing-infrastructure", "--overlay", "database-tls"),
+    [...recipes["existing-infrastructure"].files, "compose.database-tls.yaml"]);
 });
 
 test("given combinations no recipe can run, when they are resolved, then each is refused with its reason", () => {
@@ -221,6 +237,9 @@ test("given combinations no recipe can run, when they are resolved, then each is
   refused(["files", "existing-infrastructure", "--overlay", "database-tls", "--overlay", "database-tls-local"],
     /database-tls-local needs the bundled database/);
   refused(["files", "standard", "--overlay", "database-tls-local"], /database-tls-local needs database-tls/);
+  refused(["files", "funnel", "--overlay", "database-tls"],
+    /database-tls with the bundled database needs database-tls-local/);
+  refused(["files", "standard", "--synthetic-mail", "--synthetic-mail"], /--synthetic-mail is named twice/);
   refused(["files", "full-self-hosted", "--synthetic-mail"], /synthetic mail replaces an external SMTP relay/);
   refused(["files", "standard", "--overlay", "database-tls", "--overlay", "database-tls"],
     /database-tls is named twice/);
@@ -242,6 +261,9 @@ test("given rootless Docker, when a recipe binds a privileged port, then only a 
       /Stalwart binds port 25, which rootless Docker cannot bind while unprivileged ports start at 80/);
     refused(["files", "standard", "--rootless-port-start", "eighty"], /--rootless-port-start needs a port number/);
     refused(["files", "standard", "--rootless-port-start"], /--rootless-port-start needs a port number/);
+    refused(["files", "standard", "--rootless-port-start", "99999999999999999999"],
+      /--rootless-port-start needs a port number/);
+    refused(["files", "standard", "--rootless-port-start", "65536"], /--rootless-port-start needs a port number/);
     assert.deepEqual(resolved("files", "standard", "--rootless-port-start", "80"), recipes.standard.files);
     assert.deepEqual(resolved("files", "full-self-hosted", "--rootless-port-start", "0"),
       recipes["full-self-hosted"].files);
@@ -259,7 +281,9 @@ test("given a recipe file, when its schema is not the one this resolver reads, t
       ["schema=1\ningress=caddy\ningress=funnel\ndatabase=bundled\nmail=smtp-relay\n", /ingress is declared twice/],
       ["schema=1\ningress=caddy\ndatabase=bundled\n", /declares no mail/],
       ["schema=1\ningress=nginx\ndatabase=bundled\nmail=smtp-relay\n", /unknown ingress nginx/],
-      ["schema=1\ningress=caddy\ndatabase=bundled\nmail=$(touch /tmp/courtside-recipe-sourced)\n", /malformed line/],
+      ["schema=1\ningress=caddy\ndatabase=bundled\nmail=$(touch /tmp/courtside-recipe-sourced)\n", /line 4 is malformed/],
+      ["schema=1\r\ningress=caddy\r\ndatabase=bundled\r\nmail=smtp-relay\r\n", /line 1 is malformed/],
+      ["schema=1\ningress=funnel\ndatabase=bundled\nmail=stalwart\n", /runs Stalwart, which takes its certificate from the Caddy ingress/],
     ];
     for (const [content, pattern] of cases) {
       // given
@@ -357,12 +381,10 @@ test("given the component manifests, when the resolver's files are compared, the
     const production = manifest("x-courtside-production-overlays");
     const acceptance = manifest("x-courtside-acceptance-components");
     const selectable = new Set();
-    for (const name of Object.keys(recipes)) {
-      for (const args of [[], ["--overlay", "database-tls"]]) resolved("files", name, ...args).forEach((f) => selectable.add(f));
-    }
-    for (const overlay of ["database-identities", "database-tls-local", "app-tls"]) {
-      resolved("files", "standard", "--overlay", "database-tls", "--overlay", overlay).forEach((f) => selectable.add(f));
-    }
+    for (const name of Object.keys(recipes)) resolved("files", name).forEach((f) => selectable.add(f));
+    resolved("files", "existing-infrastructure", "--overlay", "database-tls").forEach((f) => selectable.add(f));
+    resolved("files", "standard", "--overlay", "database-identities", "--overlay", "database-tls",
+      "--overlay", "database-tls-local", "--overlay", "app-tls").forEach((f) => selectable.add(f));
     resolved("files", "standard", "--synthetic-mail").forEach((f) => selectable.add(f));
 
     // when

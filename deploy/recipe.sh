@@ -18,14 +18,15 @@ contains() {
 }
 
 read_recipe() {
-  local file=$1 line key value seen=""
+  local file=$1 line key value seen="" number=0
   schema="" ingress="" database="" mail=""
   while IFS= read -r line || [ -n "$line" ]; do
+    number=$((number + 1))
     case "$line" in
       "" | "#"*) continue ;;
     esac
     if ! [[ "$line" =~ ^([a-z]+)=([a-z0-9-]+)$ ]]; then
-      refuse "$(basename "$file") has a malformed line"
+      refuse "$(basename "$file") line $number is malformed"
     fi
     key=${BASH_REMATCH[1]}
     value=${BASH_REMATCH[2]}
@@ -75,11 +76,13 @@ files() {
         shift 2
         ;;
       --synthetic-mail)
+        [ -z "$synthetic" ] || refuse "--synthetic-mail is named twice"
         synthetic=yes
         shift
         ;;
       --rootless-port-start)
-        [ $# -ge 2 ] && [[ "$2" =~ ^[0-9]+$ ]] || refuse "--rootless-port-start needs a port number"
+        [ $# -ge 2 ] && [[ "$2" =~ ^[0-9]{1,5}$ ]] && [ "$2" -le 65535 ] \
+          || refuse "--rootless-port-start needs a port number"
         rootless_port_start=$2
         shift 2
         ;;
@@ -92,6 +95,9 @@ files() {
   [ -f "$recipe" ] || refuse "unknown recipe $name"
   read_recipe "$recipe"
 
+  if [ "$mail" = "stalwart" ] && [ "$ingress" != "caddy" ]; then
+    refuse "$name runs Stalwart, which takes its certificate from the Caddy ingress, and has none"
+  fi
   if [ -n "$synthetic" ] && [ "$mail" != "smtp-relay" ]; then
     refuse "synthetic mail replaces an external SMTP relay, and $name runs its own mail server"
   fi
@@ -105,6 +111,9 @@ files() {
   done
   if contains "$overlays" database-tls-local && ! contains "$overlays" database-tls; then
     refuse "database-tls-local needs database-tls, or the application does not verify what the database serves"
+  fi
+  if contains "$overlays" database-tls && [ "$database" = "bundled" ] && ! contains "$overlays" database-tls-local; then
+    refuse "database-tls with the bundled database needs database-tls-local, or the application verifies a database that serves no certificate"
   fi
   if [ "$ingress" = "caddy" ]; then
     require_port Caddy 80

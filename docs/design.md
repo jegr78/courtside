@@ -252,8 +252,9 @@ export, documentation templates) but never holds foreign personal data.
 
 The reference deployment lives in `deploy/` in this repository: a base Compose file with the
 database and the application, component files for the proxy, the mail paths and an external
-database, the recipes that select them, a Caddy configuration and the documented environment. Clubs copy the directory and adapt it rather than
-configuring the application repository, and the maintainer runs the same thing they publish.
+database, the recipes that select them, a Caddy configuration and the documented environment.
+Clubs copy the directory and adapt it rather than configuring the application repository, and the
+maintainer runs the same thing they publish.
 
 A separate `courtside-deploy` repository was the earlier plan, on the reasoning that clubs will not
 all run the same infrastructure. That reasoning argues for the deployment being *copyable*, which a
@@ -1653,7 +1654,13 @@ whether it is built or designed. **Designed means absent today.**
   What bounds it: no database port is published, the network is private to the compose project, and
   both ends live on one machine. It stays accepted rather than closed because requiring a
   certificate means requiring a club to run an authority, which is a larger imposition than the
-  exposure it removes on one host. One verification profile disables the transport by name: the
+  exposure it removes on one host. That bound holds for the bundled database only. The
+  `existing-infrastructure` recipe reaches a database on another host, where an observer on the
+  path between the two can refuse encryption and read the credential the application signs in
+  with. `recipe.sh` does not require `database-tls` there, because database TLS is an optional
+  hardening overlay in the recipe model rather than part of a recipe; `deploy/README.md` names that
+  recipe together with the overlay, and a managed database that publishes its authority closes the
+  exposure with that one overlay. One verification profile disables the transport by name: the
   `postgres-exporter` in `compose.perf-telemetry.yaml` connects with `sslmode=disable` and carries
   its own password in that connection string, so requiring a verified connection for the
   application does not move it. The reverse proxy's connection to the application is the other half
@@ -1981,7 +1988,10 @@ whether it is built or designed. **Designed means absent today.**
   without a public address can use the `funnel` recipe, Tailscale Funnel in front of the
   loopback port, instead. When it supplies the trusted HTTPS
   forwarding signal, the response keeps all five application headers and loses only Caddy's
-  `Permissions-Policy`. Funnel is documented as an option, not a dependency.
+  `Permissions-Policy`. Funnel is one recipe, not a dependency. The `existing-infrastructure`
+  recipe hands the same duties to the club's own ingress, which must replace forwarded headers
+  and otherwise loses what Caddy adds: the plain-HTTP refusal, the host allowlist, the body limit
+  and `Permissions-Policy`.
   That sentence binds the client too: a browser withholds `crypto.randomUUID`, service workers and
   the rest of the secure-context APIs from a plain-HTTP origin that is not `localhost`, so no such
   API may sit on the path of a booking. `crypto.getRandomValues` is one that carries no such

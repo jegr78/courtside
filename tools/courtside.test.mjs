@@ -999,7 +999,10 @@ test("given local API tooling, when reading deployment contracts, then Swagger U
   const devCompose = readFileSync(fileURLToPath(new URL("../deploy/compose.dev.yaml", import.meta.url)), "utf8");
   const uatCompose = readFileSync(fileURLToPath(new URL("../deploy/compose.uat.yaml", import.meta.url)), "utf8");
   const uatCaddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.uat", import.meta.url)), "utf8");
-  const productionCompose = readFileSync(fileURLToPath(new URL("../deploy/compose.yaml", import.meta.url)), "utf8");
+  const deployment = fileURLToPath(new URL("../deploy/", import.meta.url));
+  const base = readFileSync(`${deployment}compose.yaml`, "utf8");
+  const components = [...base.matchAll(/^  - (compose[\w.-]+\.yaml)$/gm)].map((match) => match[1]);
+  const productionCompose = [base, ...components.map((name) => readFileSync(`${deployment}${name}`, "utf8"))].join("\n");
 
   // when / then
   assert.match(devCompose, /swaggerapi\/swagger-ui:[^\s]+@sha256:/);
@@ -1007,6 +1010,7 @@ test("given local API tooling, when reading deployment contracts, then Swagger U
   assert.match(devCompose, /SWAGGER_JSON_URL: \/api\/openapi\.yaml/);
   assert.match(uatCompose, /SWAGGER_JSON_URL: \/api\/openapi\.yaml/);
   assert.match(uatCaddy, /\/api-ui/);
+  assert.ok(components.includes("compose.caddy.yaml"), "the production components were not read");
   assert.doesNotMatch(productionCompose, /swagger|api-ui/i);
 });
 

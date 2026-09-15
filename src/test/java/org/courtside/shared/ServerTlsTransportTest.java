@@ -42,6 +42,7 @@ class ServerTlsTransportTest {
 
     private static final String MARKER = "the-application-answered";
     private static final String PRODUCTION_HOST = "courtside.test";
+    private static final String MAIL_HOST = "mail." + PRODUCTION_HOST;
     private static final String UPSTREAM = "host.testcontainers.internal";
     private static final int SERVED_PORT = 8080;
     private static final int PLAIN_PORT = 8081;
@@ -183,6 +184,23 @@ class ServerTlsTransportTest {
     }
 
     @Test
+    void givenTheMailHostnameSite_whenPlainHttpArrivesForIt_thenItIsAnsweredWithoutReachingTheApplication()
+            throws Exception {
+        // given
+        try (GenericContainer<?> proxy = productionHostProxy()) {
+            // when
+            String mail = rawGet(proxy, MAIL_HOST, MAIL_HOST, "/api/source");
+            String unknown = rawGet(proxy, "unknown.example", "unknown.example", "/api/source");
+
+            // then
+            assertThat(mail).startsWith("HTTP/1.1 404").contains("Cache-Control: no-store")
+                    .doesNotContain(MARKER, "Plain HTTP is not accepted");
+            assertThat(unknown).startsWith("HTTP/1.1 400").contains("Plain HTTP is not accepted")
+                    .doesNotContain(MARKER);
+        }
+    }
+
+    @Test
     void givenTheProductionHostBoundary_whenAnotherHostArrives_thenItIsNotForwarded()
             throws Exception {
         // given
@@ -305,13 +323,13 @@ class ServerTlsTransportTest {
     }
 
     private static GenericContainer<?> productionHostProxy(String upstream) throws IOException {
-        String caddyfile = "%s\n\n%s\n\n%s\n\n%s".formatted(
+        String caddyfile = "%s\n\n%s\n\n%s\n\n%s\n\n%s".formatted(
                 snippet("applicationHeaders"), snippet("plaintext").replace("app:8080", upstream),
                 productionSite().replace("{$COURTSIDE_DOMAIN}", "http://" + PRODUCTION_HOST)
                         .replace("import {$COURTSIDE_APP_TLS_MODE:plaintext}", "import plaintext"),
-                deploymentBlock("http://:80 {")
-                        .replace("{$COURTSIDE_DOMAIN}", PRODUCTION_HOST)
-                        .replace("{$COURTSIDE_MAIL_HOSTNAME}", "mail." + PRODUCTION_HOST));
+                deploymentBlock("http://:80 {").replace("{$COURTSIDE_DOMAIN}", PRODUCTION_HOST),
+                deploymentBlock("Caddyfile.stalwart", "http://{$COURTSIDE_MAIL_HOSTNAME} {")
+                        .replace("{$COURTSIDE_MAIL_HOSTNAME}", MAIL_HOST));
         GenericContainer<?> proxy = new GenericContainer<>(DockerImageName.parse(deployedCaddy()))
                 .withCopyToContainer(forString(caddyfile), "/etc/caddy/Caddyfile")
                 .withExposedPorts(80)
@@ -407,7 +425,11 @@ class ServerTlsTransportTest {
     }
 
     private static String deploymentBlock(String marker) throws IOException {
-        String caddyfile = Files.readString(Path.of("deploy", "Caddyfile"));
+        return deploymentBlock("Caddyfile", marker);
+    }
+
+    private static String deploymentBlock(String file, String marker) throws IOException {
+        String caddyfile = Files.readString(Path.of("deploy", file));
         int start = caddyfile.indexOf(marker);
         assertThat(start).as("the deployment defines %s", marker).isNotNegative();
         int opening = caddyfile.indexOf('{', start + marker.length() - 1);
