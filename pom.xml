@@ -11,7 +11,7 @@
 
     <groupId>org.courtside</groupId>
     <artifactId>courtside</artifactId>
-    <version>0.1.0-rc.1</version>
+    <version>0.1.0-rc.2</version>
     <name>courtside</name>
     <description>Court booking system for sports clubs</description>
     <!-- The one place the upstream repository is named; application.yaml takes it as the

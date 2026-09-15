@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.1.0-rc.2](https://github.com/jegr78/courtside/compare/v0.1.0-rc.1...v0.1.0-rc.2) (2026-09-15)
+
+
+### Features
+
+* install the reference deployment from four recipes ([#994](https://github.com/jegr78/courtside/issues/994)) ([b2c2cb8](https://github.com/jegr78/courtside/commit/b2c2cb858cb21d09a991c8fc4f8136b19aa5b926))
+* let the court plan jump to a date ([#993](https://github.com/jegr78/courtside/issues/993)) ([14ccc52](https://github.com/jegr78/courtside/commit/14ccc52934011b7f452c990390aa0dc6bc8f0356))
+* name the rows an instance ships with in the club's own language ([#983](https://github.com/jegr78/courtside/issues/983)) ([45abd0a](https://github.com/jegr78/courtside/commit/45abd0abc7a1ad936459d29bfb129f6b415d2548))
+
+
+### Bug fixes
+
+* build the local image from the jar this build packaged ([#1001](https://github.com/jegr78/courtside/issues/1001)) ([bbdca60](https://github.com/jegr78/courtside/commit/bbdca60f1aef4288311508eb756918806d7cb582))
+* keep a cookieless fetch from replacing the csrf token a page holds ([#999](https://github.com/jegr78/courtside/issues/999)) ([38166f5](https://github.com/jegr78/courtside/commit/38166f51dab0fd6a0196a9dd5f8cc95de25c81df))
+* let nightly retention clear its eligible backlog ([#998](https://github.com/jegr78/courtside/issues/998)) ([b915b35](https://github.com/jegr78/courtside/commit/b915b35167c629781515c47341a8a96e15ce2891))
+* normalize prerelease changelog ([#984](https://github.com/jegr78/courtside/issues/984)) ([381672d](https://github.com/jegr78/courtside/commit/381672d4805b9ffea409aecbd66e7f04c4936f7a))
+* preserve cumulative release-line history ([#982](https://github.com/jegr78/courtside/issues/982)) ([6b183ca](https://github.com/jegr78/courtside/commit/6b183ca8d701161ad6b5974df2d99eb1d1f183e9))
+* provision separate database identities without a superuser owner ([#1002](https://github.com/jegr78/courtside/issues/1002)) ([3d76339](https://github.com/jegr78/courtside/commit/3d76339880c1f7572330c432d0707750b3919604))
+* refuse a release tag the repository does not record as its release ([#986](https://github.com/jegr78/courtside/issues/986)) ([62fccb2](https://github.com/jegr78/courtside/commit/62fccb276225d3a1b60f08210c8517cd3ac35e69))
+
+
+### Documentation
+
+* capture each guide in a browser that speaks its language ([#979](https://github.com/jegr78/courtside/issues/979)) ([e1fe7d1](https://github.com/jegr78/courtside/commit/e1fe7d154a5e0a23f3778c1f68ddd5e1211184c3))
+* publish the contract a platform runs the image against ([#1003](https://github.com/jegr78/courtside/issues/1003)) ([ae493dc](https://github.com/jegr78/courtside/commit/ae493dce309d39c6b4c0fb02cd2b210d454731ee))
+* rewrite user guidance as handbooks ([#985](https://github.com/jegr78/courtside/issues/985)) ([874a407](https://github.com/jegr78/courtside/commit/874a407f61e5f60974dbd74056abd0ba2053c2bb))
+* show every guide section the surface it describes ([#977](https://github.com/jegr78/courtside/issues/977)) ([1907e7f](https://github.com/jegr78/courtside/commit/1907e7f3a146c27e9e1183bce7fb7ebc61017d72))
+
 ## 0.1.0 (2026-09-14)
 
 ### Notable changes
