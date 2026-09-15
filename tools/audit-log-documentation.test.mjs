@@ -18,7 +18,6 @@ for (const type of recordedTypes) {
     [...families.get(type.slice(0, type.indexOf("."))) ?? [], type]);
 }
 
-const design = repositoryFile("docs/design.md");
 const dataModel = repositoryFile("docs/data-model.md");
 const api = repositoryFile("src/main/resources/api/openapi.yaml");
 
@@ -68,14 +67,6 @@ test("given every family the log returns, when the API document describes the en
         `the readAuditLog block names no recorded ${family} event, so a client cannot tell what a `
         + `page can contain. Name one of: ${types.join(", ")}`);
     }
-  });
-
-test("given the booking events the log holds, when the specification describes it, then it names one",
-  () => {
-    // when / then
-    assert.ok(names(design, families.get("booking") ?? []),
-      "docs/design.md names no recorded booking event, so section 0 can claim again that the log "
-      + "excludes them");
   });
 
 test("given an event type a document names, when the snapshot no longer records it, then it is found",

@@ -108,8 +108,6 @@ class PreviewRetentionTest extends AbstractIntegrationTest {
         assertThat(fingerprints).doesNotContain(untouched.toString());
     }
 
-    // Section 10 of the design specification promises this application persists nothing of an
-    // uploaded file but its name, its digest and the change set parsed from it.
     @Test
     void givenAColumnThisSourceIgnores_whenAPreviewIsStored_thenNothingItCarriedSurvivesInTheRow() {
         // given

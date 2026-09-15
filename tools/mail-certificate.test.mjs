@@ -222,8 +222,6 @@ test("given the mail server, when the instance dials it, then it dials the name 
       "this deployment still accepts whatever certificate the relay presents");
   });
 
-// Section 10 of the design specification says the setter is always a harness holding both ends of
-// the hop, which is only true while each one serves the certificate it accepts unchecked.
 test("given a stack that accepts any relay certificate, when it is read, then it serves that certificate itself",
   () => {
     // given

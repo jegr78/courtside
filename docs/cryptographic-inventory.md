@@ -122,8 +122,8 @@ The rule is that no replacement may quietly weaken what it replaces.
 **A parameter within an algorithm** (raising the Argon2id cost, lengthening a generated credential)
 takes effect for everything written afterwards, and the entry says how existing material catches
 up. For passwords that is the re-encode on the next successful sign-in; for a generated credential
-it is the next issue. Lowering a parameter is a downgrade and is treated as one: it needs the same
-statement in `docs/design.md` §10 that raising it would.
+it is the next issue. Lowering a parameter is a downgrade and needs the same inventory and design
+review as raising it.
 
 **An algorithm** is replaced by writing under the successor while the predecessor stays verifiable,
 never by a flag day. The inventory carries both entries during that period, and the predecessor's

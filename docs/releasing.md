@@ -114,8 +114,8 @@ changelog therefore moves release-please's upgrade-oriented notes under `Notable
 of deleting their operating or migration details, and has no `Breaking Changes` section. Once
 `0.1.0` is published, breaking markers describe real upgrade work and stay in later release notes.
 
-Nothing else changes: a candidate travels the same pipeline, and section 10 of `docs/design.md` says
-what that means.
+Nothing else changes: a candidate travels the same pipeline described under build and release
+security in `docs/design.md`.
 
 ## What the release refuses before it builds anything
 

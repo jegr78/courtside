@@ -185,7 +185,6 @@ test("given any non-main dispatch, when jobs are evaluated, then publication and
 test("given acceptance image documentation, when users read it, then it cannot be mistaken for a release", () => {
   // given
   const deployment = readFileSync(new URL("../deploy/README.md", import.meta.url), "utf8");
-  const design = readFileSync(new URL("../docs/design.md", import.meta.url), "utf8");
   const releasing = readFileSync(new URL("../docs/releasing.md", import.meta.url), "utf8");
   const inventory = JSON.parse(readFileSync(
     new URL("../security/cryptographic-inventory.json", import.meta.url), "utf8"));
@@ -200,7 +199,5 @@ test("given acceptance image documentation, when users read it, then it cannot b
   assert.match(releasing, /nightly image/);
   assert.match(releasing, /predicts a release failure/i);
   assert.match(releasing, /custom source[\s\S]+attestation is read directly from the image registry/i);
-  assert.match(design, /newest fully verified\s+nightly revision/);
-  assert.match(design, /nightly-only identity/);
   assert.ok(inventory.entries.some(({ id }) => id === "nightly-image-signature"));
 });

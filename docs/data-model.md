@@ -185,7 +185,7 @@ a different file than the one previewed is visible after the fact.
 
 `domain_event.subject_id` is `NOT NULL`, so every entry names something. An operation that concerns
 no single entity, a bulk export, for instance, therefore records nothing, which
-`docs/design.md` section 11 carries as an accepted risk rather than a gap.
+`docs/security-risks.md` carries as an accepted limitation rather than an implementation gap.
 
 `domain_event.event_type` is a dotted name whose first segment says which module published it, and
 the table holds two kinds of entry. Six segments are the administrative surfaces, one per thing a
@@ -268,8 +268,8 @@ It is there and not here because a prose table would be a second copy of the sch
 hand, and this repository has watched that kind of copy rot. `DataProtectionInventoryTest` reads
 `information_schema.columns` after Flyway has run and requires an entry for every column it finds,
 so a migration that adds a column fails the build until somebody says what the column is. The
-lifecycle each entry names is the mechanism section 11 of `docs/design.md` describes, not a separate
-promise.
+lifecycle each entry names is the mechanism the data-protection section of `docs/design.md`
+describes, not a separate promise.
 
 ## Reading this against the code
 

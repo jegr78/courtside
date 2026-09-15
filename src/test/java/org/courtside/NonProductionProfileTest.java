@@ -30,7 +30,7 @@ class NonProductionProfileTest {
     private static final String ENVIRONMENT = "courtside.environment";
     private static final Pattern EXCLUDED_PACKAGE = Pattern.compile("(org/courtside/[a-z]+)/\\*\\*");
     // The assessment has to read the host and scheme the application itself saw, and only the
-    // application can answer that; docs/design.md section 10 records what the residue costs.
+    // application can answer that; docs/security-risks.md records what the residue costs.
     private static final Set<String> REVIEWED_INSTRUMENTATION =
             Set.of("src/main/java/org/courtside/identity/internal/SecurityRequestObservationFilter.java");
 
