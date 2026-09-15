@@ -17,12 +17,38 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
 }
 
-async function tabToTestId(page: import("@playwright/test").Page, testId: string, limit = 100, key = "Tab") {
-  for (let step = 0; step < limit; step += 1) {
-    if (await page.evaluate((value) => document.activeElement?.getAttribute("data-testid") === value, testId)) return;
-    await page.keyboard.press(key);
+type TabWalkPosition = "reached" | "moving" | "lapped" | "trapped";
+
+async function tabToTestId(page: import("@playwright/test").Page, testId: string, key = "Tab") {
+  const focusable = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex='-1'])";
+  await expect(page.getByTestId(testId).and(page.locator(focusable)).first()).toBeVisible();
+  const walk = await page.evaluateHandle(() => ({ seen: new WeakSet<Element>(), previous: null as Element | null, stays: 0 }));
+  try {
+    for (;;) {
+      const position = await page.evaluate(([state, value]): TabWalkPosition => {
+        const active = document.activeElement ?? document.body;
+        if (active.getAttribute("data-testid") === value) return "reached";
+        if (active === state.previous) {
+          state.stays += 1;
+          // Chromium walks a date or time input's fields and picker on one active element.
+          const passable = active === document.body || (active instanceof HTMLInputElement && ["date", "time"].includes(active.type));
+          return passable && state.stays < 8 ? "moving" : "trapped";
+        }
+        state.previous = active;
+        state.stays = 0;
+        if (active === document.body) return "moving";
+        if (state.seen.has(active)) return "lapped";
+        state.seen.add(active);
+        return "moving";
+      }, [walk, testId] as const);
+      if (position === "reached") return;
+      if (position === "lapped") throw productFailure(`Keyboard focus did not reach ${testId} within one lap`);
+      if (position === "trapped") throw productFailure(`Keyboard focus was trapped before reaching ${testId}`);
+      await page.keyboard.press(key);
+    }
+  } finally {
+    await walk.dispose();
   }
-  throw productFailure(`Keyboard focus did not reach ${testId}`);
 }
 
 test("account preferences open from the keyboard and remain accessible", async ({ page }) => {
@@ -284,16 +310,16 @@ test("initial password change is operable using only the keyboard", async ({ pag
   await page.keyboard.type("bootstrap-admin");
   await page.keyboard.press(tabKey);
   await page.keyboard.type("temporary-password");
-  await tabToTestId(page, "login-submit", 100, tabKey);
+  await tabToTestId(page, "login-submit", tabKey);
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("initial-password-view")).toBeVisible();
 
   // when
-  await tabToTestId(page, "new-password", 100, tabKey);
+  await tabToTestId(page, "new-password", tabKey);
   await page.keyboard.type("permanent-password");
   await page.keyboard.press(tabKey);
   await page.keyboard.type("permanent-password");
-  await tabToTestId(page, "password-submit", 100, tabKey);
+  await tabToTestId(page, "password-submit", tabKey);
   await page.keyboard.press("Enter");
 
   // then
@@ -330,18 +356,18 @@ test("a booking is operable using only the keyboard", async ({ page, browserName
   const tabKey = browserName === "webkit" ? "Alt+Tab" : "Tab";
   await selectJourneyDate(page, journeyService.visualDate);
   await page.getByTestId("court-plan-link").focus();
-  await tabToTestId(page, "free-slot", 200, tabKey);
+  await tabToTestId(page, "free-slot", tabKey);
   const bookingsBefore = await page.getByTestId("own-allocation").count();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
 
   // when
-  await tabToTestId(page, "member-search", 100, tabKey);
+  await tabToTestId(page, "member-search", tabKey);
   await page.keyboard.type("Mary");
   await expect(page.getByTestId("member-match")).toBeVisible();
-  await tabToTestId(page, "member-match", 100, tabKey);
+  await tabToTestId(page, "member-match", tabKey);
   await page.keyboard.press("Enter");
-  await tabToTestId(page, "booking-submit", 100, tabKey);
+  await tabToTestId(page, "booking-submit", tabKey);
   await page.keyboard.press("Enter");
 
   // then
@@ -359,19 +385,19 @@ test("login and cancellation are operable using only the keyboard", async ({ pag
   await page.keyboard.press("Tab");
   await page.keyboard.type("temporary-password");
   const tabKey = browserName === "webkit" ? "Alt+Tab" : "Tab";
-  await tabToTestId(page, "login-submit", 100, tabKey);
+  await tabToTestId(page, "login-submit", tabKey);
   await page.keyboard.press("Enter");
 
   // then
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
-  await tabToTestId(page, "my-bookings-link", 100, tabKey);
+  await tabToTestId(page, "my-bookings-link", tabKey);
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
-  await tabToTestId(page, "personal-cancel", 100, tabKey);
+  await tabToTestId(page, "personal-cancel", tabKey);
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("dialog").locator(":focus")).toHaveCount(1);
-  await tabToTestId(page, "confirm-cancellation", 100, tabKey);
+  await tabToTestId(page, "confirm-cancellation", tabKey);
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).not.toBeVisible();
 });
@@ -380,17 +406,17 @@ test("series management is operable using only the keyboard", async ({ page, bro
   // given
   await signIn(page, "doe.jane");
   const tabKey = browserName === "webkit" ? "Alt+Tab" : "Tab";
-  await tabToTestId(page, "my-bookings-link", 100, tabKey);
+  await tabToTestId(page, "my-bookings-link", tabKey);
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
 
   // when
-  await tabToTestId(page, "move-booking", 100, tabKey);
+  await tabToTestId(page, "move-booking", tabKey);
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
-  await tabToTestId(page, "move-duration", 100, tabKey);
+  await tabToTestId(page, "move-duration", tabKey);
   await page.keyboard.type("90");
-  await tabToTestId(page, "preview-move", 100, tabKey);
+  await tabToTestId(page, "preview-move", tabKey);
   await page.keyboard.press("Enter");
 
   // then
@@ -406,8 +432,8 @@ test("core administration is operable using only the keyboard", async ({ page, b
 
   // when
   const tabKey = browserName === "webkit" ? "Alt+Tab" : "Tab";
-  await tabToTestId(page, "club-name", 100, tabKey);
-  await tabToTestId(page, "save-club-config", 100, tabKey);
+  await tabToTestId(page, "club-name", tabKey);
+  await tabToTestId(page, "save-club-config", tabKey);
   const saved = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/config") && response.request().method() === "PUT"
   );
