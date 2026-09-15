@@ -329,6 +329,24 @@ test("given acceptance with Mailpit, when it is rendered, then the instance can 
   assert.deepEqual(resolved("files", "funnel", "--synthetic-mail"), ["compose.yaml", "compose.mailpit.yaml"]);
 });
 
+test("given acceptance with Mailpit, when it is rendered, then its messages are readable only from this host", () => {
+  // given
+  const model = rendered(resolved("files", "standard", "--synthetic-mail"), { ...recipes.standard.environment, ...syntheticMail });
+
+  // when
+  const mailpit = model.services.mailpit;
+  const consoleNetworks = Object.keys(mailpit.networks).filter((network) => model.networks[network]?.internal !== true);
+
+  // then
+  assert.ok(mailpit.ports.length > 0, "Mailpit publishes no console, so this reads no binding");
+  assert.deepEqual(mailpit.ports.map((port) => [port.host_ip, port.target]), [["127.0.0.1", 8025]]);
+  assert.equal(model.networks["acceptance-mail"]?.internal, true);
+  assert.ok(Object.keys(model.services.app.networks).includes("acceptance-mail"));
+  assert.deepEqual(consoleNetworks, ["acceptance-mail-console"]);
+  assert.deepEqual(Object.entries(model.services).filter(([name, service]) => name !== "mailpit"
+    && Object.keys(service.networks ?? {}).includes("acceptance-mail-console")).map(([name]) => name), []);
+});
+
 test("given every recipe model, when a service publishes a port, then Docker has a network to publish it on", () => {
   const models = Object.entries(recipes).map(([name, recipe]) => [name, rendered(resolved("files", name), recipe.environment)]);
   models.push(["standard with synthetic mail", rendered(resolved("files", "standard", "--synthetic-mail"),

@@ -464,7 +464,12 @@ public class ReferenceDeploymentSecurityTest {
                 .containsExactly(SITE_IMPORT);
         List<String> blocks = new ArrayList<>(topLevelCaddyBlocks(caddyfile.replace(SITE_IMPORT, "")));
         for (JsonNode composeFile : inventory.path("sources").path("composeFiles")) {
-            Matcher mount = SITE_MOUNT.matcher(Files.readString(Path.of(composeFile.asString())));
+            String compose = Files.readString(Path.of(composeFile.asString()));
+            assertThat(compose.lines().filter(line -> line.contains("/etc/caddy/sites.d")).toList())
+                    .as("%s mounts proxy sites only as single read-only files this inventory can read",
+                            composeFile.asString())
+                    .allMatch(line -> SITE_MOUNT.matcher(line).matches());
+            Matcher mount = SITE_MOUNT.matcher(compose);
             while (mount.find()) {
                 blocks.addAll(topLevelCaddyBlocks(Files.readString(Path.of("deploy", mount.group("source")))));
             }

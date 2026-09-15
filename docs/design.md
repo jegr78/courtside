@@ -94,8 +94,9 @@ acceptance-only tags under an identity distinct from a release. The reference
 deployment is resolved from one of four recipes, `standard`, `full-self-hosted`,
 `existing-infrastructure` and `funnel`, each a versioned list of Compose components; the
 `full-self-hosted` recipe carries the club's own mail server, together with a check that resolves
-the DNS a receiver looks at, and the application sends through it: the `notification` module reacts
-to an event and generates the credential at the moment it is sent. Both message bundles ship, and
+the DNS a receiver looks at, and the application sends through it, while the other three recipes
+hand the same messages to a relay the club already uses. The `notification` module reacts to an
+event and generates the credential at the moment it is sent. Both message bundles ship, and
 which one an account is written to in is the club's configured default at creation, the member's
 own choice afterwards, and an administrator's correction where a member cannot reach it. Mail
 configuration is mandatory, an instance without it refuses to start and names
@@ -2195,23 +2196,38 @@ whether it is built or designed. **Designed means absent today.**
   vendoring an interface this product does not maintain. What bounds it: the admin port is bound
   to the loopback interface, nothing else in the deployment reads that interface, and it is
   reached only during setup and recovery. *Built, as described.*
-- **Mail hop authentication:** everything that grants access travels by mail, so the credential and
-  the password the instance authenticates with both cross the hop to the mail server, and that hop
-  is authenticated in both halves. It is required to be encrypted, STARTTLS is required and not
-  merely enabled, so a relay that stops offering it fails the handover rather than carrying a
-  password in the clear, and the certificate is checked, both the chain up to an authority the
-  runtime already holds and the name on it. The reference deployment reaches the relay under
+- **Mail hop authentication:** everything that grants access travels by mail, so the credential
+  crosses the hop to the mail server, and so does the password the instance authenticates with
+  wherever it signs in. The hop is required to be encrypted, STARTTLS is required and not merely
+  enabled, so a relay that stops offering it fails the handover rather than carrying either in the
+  clear, and the certificate is checked, both the chain up to an authority the runtime already
+  holds and the name on it. In the `full-self-hosted` recipe the hop is authenticated in both
+  halves: the instance signs in to the club's own mail server and reaches it under
   `COURTSIDE_MAIL_HOSTNAME`, the name Caddy issued the certificate for, which the mail server
   answers to as a second name on a network shared with the instance and nothing else, so nothing
-  there needs an exception. `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` still exists and still
+  there needs an exception. The `standard`, `existing-infrastructure` and `funnel` recipes hand mail
+  to the relay named in `COURTSIDE_MAIL_RELAY_HOST`, and sign in only when
+  `COURTSIDE_MAIL_RELAY_USERNAME` and `COURTSIDE_MAIL_PASSWORD` are both set; naming only one of
+  them stops the instance at start. **Accepted:** with both left empty the instance hands messages
+  in without SMTP authentication, to a relay that admits its host by address. The relay's half of
+  the hop is still authenticated by its certificate; the instance's half is authenticated only by
+  where it connects from, so anything else that relay admits from that address can submit mail in
+  the club's name, and this instance cannot tell those submissions apart from its own. It stays
+  open because a club that runs such a relay has already drawn that boundary for every host behind
+  it, and a login this deployment demanded would not narrow what the relay accepts from the
+  address. It is bounded by the relay's own admission list, which the club owns and this instance
+  cannot widen.
+  `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` still exists and still
   switches both checks off for a club whose relay serves a certificate this container cannot
   follow; it defaults to false everywhere now, and what it costs when it is set is that whoever can
   redirect the connection reads the mail. Where it is set, the setter is a verification harness
   or synthetic acceptance rather than a production deployment: the restore smoke, the performance
   environment and the browser journey each run a throwaway relay whose certificate the harness
   itself issued, so the hop the application requires is exercised without an authority in the
-  loop. The acceptance component `compose.mailpit.yaml` sets it too, for a Mailpit it runs on an
-  internal network of its own; that component pins the instance to `UAT`, so a page served under
+  loop. The acceptance component `compose.mailpit.yaml` sets it too, for a Mailpit the instance
+  reaches over an internal network. Mailpit's console sits on a second network that is not
+  internal, because Docker publishes no port without one, and is published on this host's
+  loopback interface only; that component pins the instance to `UAT`, so a page served under
   it is visibly a test instance and delivers no mail beyond that Mailpit. The failure direction in a
   deployment is closed rather than open: a relay serving the wrong name, an unknown issuer, an
   expired certificate or a chain that stops short of its issuer stops the handover. What that costs
