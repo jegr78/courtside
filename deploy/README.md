@@ -5,8 +5,8 @@ instance. Copy this directory, configure `.env` and adapt the deployment to your
 
 You need Docker with Compose 2.33.1 or newer. `compose.yaml` declares this minimum because older
 versions cannot select the dedicated egress networks safely. The file also lists every supported
-production overlay under `x-courtside-production-overlays`; repository checks keep that list in
-sync with the architecture map.
+production component and overlay under `x-courtside-production-overlays`; repository checks keep
+that list in sync with the architecture map.
 
 The application container may use up to 1 GiB of memory. An idle instance with an empty database
 uses about 450 MiB. Increase `COURTSIDE_MEMORY` if the instance reaches its limit.
@@ -15,6 +15,45 @@ For the repository's local Dev and UAT environments, use the
 [local environment guide](../docs/local-environments.md). This document covers the production
 reference deployment only.
 
+## Choose a recipe
+
+`compose.yaml` holds only the database and the application. Everything else is a component file,
+and a recipe names the components that belong together:
+
+| Recipe | Database | Ingress | Mail |
+|---|---|---|---|
+| `standard` | bundled PostgreSQL | Caddy | an external SMTP relay |
+| `full-self-hosted` | bundled PostgreSQL | Caddy | this deployment's own Stalwart server |
+| `existing-infrastructure` | external PostgreSQL 17 | your own HTTPS ingress | an external SMTP relay |
+| `funnel` | bundled PostgreSQL | Tailscale Funnel on the host | an external SMTP relay |
+
+Each recipe is a file in `recipes/`. `recipe.sh` turns one into the Compose files it needs, in the
+order Compose has to merge them, and refuses a combination that cannot run: a hardening overlay
+for a component the recipe does not have, or a privileged port under rootless Docker. Pass the
+first port rootless Docker may bind, the value of `net.ipv4.ip_unprivileged_port_start`, as
+`--rootless-port-start` when the host runs Docker rootless.
+
+```sh
+./recipe.sh files standard | paste -sd: -
+```
+
+That prints `compose.yaml:compose.caddy.yaml:compose.smtp-relay.yaml`. Compose reads
+`COMPOSE_FILE` from `.env`, so putting that value there once makes every `docker compose` command
+in this guide use the recipe. A hardening overlay described further down is added with
+`--overlay`, and its output replaces the `COMPOSE_FILE` value again.
+
+### Acceptance with synthetic mail
+
+`--synthetic-mail` replaces the external SMTP relay with a local Mailpit that keeps every message
+and delivers none. It is for trying out an installation, never for running a club: the component
+sets `COURTSIDE_ENVIRONMENT` to `UAT`, which marks every page as a test instance, and no value in
+`.env` changes that. A recipe with its own mail server has no relay to replace and refuses the flag.
+
+Mailpit requires STARTTLS with a certificate you supply. Put `cert.pem` and `key.pem` in a
+directory, name it in `COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES`, and set
+`COURTSIDE_ACCEPTANCE_MAIL_USER` to the `uid:gid` that can read the key. The messages are readable
+at `http://127.0.0.1:${COURTSIDE_ACCEPTANCE_MAIL_PORT}/`.
+
 ## Start the instance for the first time
 
 ### 1. Create the environment file
@@ -22,6 +61,9 @@ reference deployment only.
 ```sh
 cp .env.example .env
 ```
+
+`.env.example` selects the `standard` recipe. Replace its `COMPOSE_FILE` line when you chose
+another one.
 
 Set these values in `.env`:
 
@@ -35,6 +77,9 @@ Set these values in `.env`:
   login can do nothing except replace it.
 - `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME`: the administrator's first and last name.
 - `COURTSIDE_DOMAIN`: the name your members will type. This is required only for the reverse proxy.
+- For an external SMTP relay: `COURTSIDE_MAIL_RELAY_HOST`, `COURTSIDE_MAIL_RELAY_USERNAME` and
+  `COURTSIDE_MAIL_PASSWORD` from your mail provider, `COURTSIDE_MAIL_DOMAIN` for the sender address
+  and `COURTSIDE_MAIL_REPLY_TO`.
 
 The initial club time zone is `Europe/Berlin`. Change it to the club's IANA zone in the admin
 configuration before members create bookings.
@@ -42,7 +87,7 @@ configuration before members create bookings.
 ### 2. Start the containers
 
 ```sh
-docker compose --profile proxy up -d
+docker compose up -d
 ```
 
 Caddy obtains a certificate for `COURTSIDE_DOMAIN` on its own, so ports 80 and 443 must reach the
@@ -143,7 +188,7 @@ A club with no static address, no server and no budget still needs its instance 
 [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) does that: it terminates TLS on a
 `*.ts.net` name and forwards to a local port, so no port has to be opened on the router.
 
-Leave the reverse proxy out and expose the application port instead:
+The `funnel` recipe leaves the reverse proxy out, and Funnel exposes the application port instead:
 
 ```sh
 docker compose up -d
@@ -172,7 +217,7 @@ vendor, and everything here works without it.
 
 A member's first password is meant to reach that member and nobody else, which an instance cannot
 do without a way to send mail. The reference deployment therefore carries its own MTA,
-[Stalwart](https://stalw.art), under the `mail` profile.
+[Stalwart](https://stalw.art), in the `full-self-hosted` recipe and there under the `mail` profile.
 
 Treat it as separate from whatever the club already uses for its own correspondence. It exists to
 send from one address, it holds no member's mailbox, and a club that runs its mail elsewhere keeps
@@ -194,7 +239,7 @@ readable and diffable, and `stalwart-cli apply` loads them. The values that diff
 come from `.env`, so `.env` is the only place any of it is written down.
 
 ```sh
-docker compose --profile proxy up -d proxy
+docker compose up -d proxy
 docker compose --profile mail up -d mail mail-certificate
 docker compose --profile mail logs mail-certificate
 docker compose --profile mail-setup run --rm mail-bootstrap
@@ -257,7 +302,7 @@ plan is rendered, and the rendered copy lives in a volume rather than in the rep
 
 Two things about the mail container are worth knowing regardless:
 
-- **The web interface is not pinned.** Every image in `compose.yaml` is pinned by digest; the admin
+- **The web interface is not pinned.** Every image in the recipe files is pinned by digest; the admin
   interface is the one artefact fetched at runtime from a release URL, and it is the component with
   full control over the mail server. Its integrity rests on TLS to GitHub and nothing else. A
   deliberate exception, not an oversight.
@@ -462,7 +507,7 @@ the recipient is what this deployment does by default, not what it requires.
 ### Port 25 is public, and a host firewall will not change that
 
 `25:25` binds every interface. That is what an MTA is for, but it is also the one published port in
-`compose.yaml` that is not pinned to `127.0.0.1`, and Docker installs its forwarding rules ahead of
+`compose.stalwart.yaml` that is not pinned to `127.0.0.1`, and Docker installs its forwarding rules ahead of
 `ufw` or `nftables`, a host firewall rule will not close it. If you need it restricted, do it in
 your provider's security groups or in Stalwart's own configuration.
 
@@ -473,7 +518,7 @@ read them, forward them, act on them, has no answer in this deployment yet.
 POP3 have no published port at all: the application reaches submission over the compose network, and
 nobody holds a mailbox here to collect. The admin interface is published on `127.0.0.1` only. Port
 25 is this server's entire public surface, and the only thing that changes that is a port added to
-`compose.yaml`.
+`compose.stalwart.yaml`.
 
 ### Checking all of it at once
 
@@ -608,14 +653,14 @@ own, for instance, would be readable by whatever a flaw in the application can b
 and whoever holds the database's key can be the database.
 
 ```bash
-docker compose -f compose.yaml -f compose.database-tls.yaml up -d
+./recipe.sh files existing-infrastructure --overlay database-tls | paste -sd: -
+docker compose up -d
 ```
 
-That is the application's side of a database somewhere else. Pointing it at that host is a change
-to `compose.yaml` itself and not a line in `.env`: `SPRING_DATASOURCE_URL` is set literally there,
-and the `app` service waits for the local `db` service through `depends_on`. Edit both, and drop
-the `db` service if this host no longer runs one. The certificate that host serves has to name the
-host the URL names.
+That is the application's side of a database somewhere else. The `existing-infrastructure` recipe
+points the application at that host through `COURTSIDE_DATABASE_URL`,
+`COURTSIDE_DATABASE_USERNAME` and `COURTSIDE_DATABASE_PASSWORD` and runs no `db` service of its own.
+The certificate that host serves has to name the host the URL names.
 
 Do not put an `ssl` or `gssEncMode` argument, or a `service` name, in that URL, and do not set one
 as a driver property on the pool. Each decides the transport behind the verification, a URL
@@ -635,7 +680,8 @@ COURTSIDE_DB_TLS_KEY=/srv/courtside/tls/server/server.key
 ```
 
 ```bash
-docker compose -f compose.yaml -f compose.database-tls.yaml -f compose.database-tls-local.yaml up -d
+./recipe.sh files standard --overlay database-tls --overlay database-tls-local | paste -sd: -
+docker compose up -d
 ```
 
 Both files are mounted read-only, and the overlay installs the key where only root writes under the
@@ -678,7 +724,8 @@ changed with the corresponding `*_USERNAME` variables.
 For a new volume, leave `POSTGRES_PASSWORD` empty and start the overlay:
 
 ```sh
-docker compose -f compose.yaml -f compose.database-identities.yaml --profile proxy up -d
+./recipe.sh files standard --overlay database-identities | paste -sd: -
+docker compose up -d
 ```
 
 PostgreSQL initializes the owner from its password file. Compose then waits for setup and migration
@@ -688,16 +735,16 @@ credential.
 
 To adopt the overlay on an existing standard deployment, first make a qualified backup. Set
 `COURTSIDE_DB_OWNER_USERNAME=courtside`, put the existing `POSTGRES_PASSWORD` value in the owner
-file, remove `POSTGRES_PASSWORD` from `.env`, and run the command above. Setup transfers existing
+file, remove `POSTGRES_PASSWORD` from `.env`, put the overlay into `COMPOSE_FILE`, and start it. Setup transfers existing
 application objects to the migration role and reconciles the runtime grants before Flyway runs.
 
 To replace a migration or runtime credential, atomically replace its host file, then recreate the
 affected one-shot processes and application:
 
 ```sh
-docker compose -f compose.yaml -f compose.database-identities.yaml run --rm database-setup
-docker compose -f compose.yaml -f compose.database-identities.yaml run --rm database-migrate
-docker compose -f compose.yaml -f compose.database-identities.yaml up -d --force-recreate app
+docker compose run --rm database-setup
+docker compose run --rm database-migrate
+docker compose up -d --force-recreate app
 ```
 
 The old password is refused as soon as setup commits. Recreating the application is deliberate: a
@@ -705,9 +752,10 @@ single-file bind mount otherwise keeps the inode it first saw. A database backup
 data, not PostgreSQL roles or their passwords, so restore the archive into an already provisioned
 target and run setup again; do not restore retired credential files with it.
 
-The database TLS and identity overlays are independent. To use both, list the identity overlay
-before `compose.database-tls.yaml`; setup, migration, and runtime then use the same `verify-full`
-policy and trust anchor, while retaining separate credentials.
+The database TLS and identity overlays are independent. To use both, name both with `--overlay`;
+`recipe.sh` lists the identity overlay before `compose.database-tls.yaml`, and setup, migration,
+and runtime then use the same `verify-full` policy and trust anchor, while retaining separate
+credentials.
 
 Courtside owns these inputs, minimum grants, refusal behavior, and the one-shot setup and migration
 commands. The operator owns creation and storage of the files, rotation timing, revocation,
@@ -762,7 +810,8 @@ readable by that account on the host: `chown 10001:10001 server.key` and `chmod 
 Making it world-readable instead is the shortcut this paragraph exists to prevent.
 
 ```bash
-docker compose -f compose.yaml -f compose.app-tls.yaml --profile proxy up -d
+./recipe.sh files standard --overlay app-tls | paste -sd: -
+docker compose up -d
 ```
 
 The application's own health probe then verifies its certificate against that same authority, so a
@@ -811,22 +860,23 @@ default.
 | `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | *required on an empty account table* | One-time password, at least 12 characters. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
 | `COURTSIDE_DOMAIN` | *required with the proxy* | The public name Caddy obtains a certificate for. |
-| `COURTSIDE_MAIL_DOMAIN` | *required with the mail server* | The domain Courtside sends from, and the domain SPF, DKIM and DMARC are published for. |
-| `COURTSIDE_MAIL_HOSTNAME` | *required with the proxy and with the mail server* | The mail server's own name. Its forward and reverse DNS must agree, and Caddy obtains a certificate for it, so it must point at this host. **Running the proxy without this deployment's mail server?** Delete that site block from `Caddyfile` and the variable's line from the `proxy` service, Caddy would otherwise retry forever for a name it cannot prove, and Compose would refuse to start without a value. The rest of the proxy is unaffected. |
+| `COURTSIDE_MAIL_DOMAIN` | *required* | The domain Courtside sends from, and with the mail server the domain SPF, DKIM and DMARC are published for. |
+| `COURTSIDE_MAIL_HOSTNAME` | *required with the mail server* | The mail server's own name. Its forward and reverse DNS must agree, and Caddy obtains a certificate for it, so it must point at this host. Only `full-self-hosted` reads it: `compose.stalwart.yaml` adds the site block in `Caddyfile.stalwart` to the proxy, and a recipe without the mail server never asks Caddy for this name. |
 | `COURTSIDE_MAIL_DKIM_SELECTOR` | *required with the mail server* | The selector of the DKIM key the setup wizard generated, as it appears in the admin interface. |
 | `COURTSIDE_MAIL_ADMIN_PASSWORD` | *required with the mail server* | Password for the club's mail administrator, written into the account by `mail-configure`. |
 | `COURTSIDE_MAIL_SETUP_PASSWORD` | *required with the mail server* | Password the setup commands authenticate with while the server still has no accounts. Pair it with `COURTSIDE_MAIL_RECOVERY_ADMIN`. |
 | `COURTSIDE_MAIL_ADMIN_USERNAME` | `postmaster` | Local part of the mail administrator's address. |
 | `COURTSIDE_MAIL_RECOVERY_MODE` | *unset* | Set to `1` to force recovery mode without a recovery credential. Mail stops while it is set. |
-| `COURTSIDE_MAIL_PASSWORD` | *required with the mail server* | Password the instance authenticates with when it hands a message in. Written into its sending account by `mail-configure`; the instance is not an administrator of the mail server. |
+| `COURTSIDE_MAIL_PASSWORD` | *required except with synthetic mail* | Password the instance authenticates with when it hands a message in. With the mail server, written into its sending account by `mail-configure`; the instance is not an administrator of the mail server. |
 | `COURTSIDE_MAIL_RELOAD_PASSWORD` | *required with the mail server* | Password `mail-reload` authenticates with to load a renewed certificate. Written into an account whose only permission is that reload. |
 | `COURTSIDE_MAIL_RELOAD_USERNAME` | `certificate-reload` | Local part of that account's address. |
 | `COURTSIDE_MAIL_CERTIFICATE_REMAINING_SHARE` | `6` | `mail-reload` reports unhealthy once less than this share of the certificate's own lifetime is left. Relative rather than a number of days, so it means the same for a ninety-day certificate and a twelve-hour one. Caddy renews at a third of the lifetime, so a sixth leaves the renewal a full window of its own to fail in first. |
 | `COURTSIDE_MAIL_CERTIFICATE_CHECK_INTERVAL` | `3600` | Seconds between two read-backs of what the mail server holds. A swap wakes `mail-reload` immediately; this is what notices a certificate that expires with no swap to announce it, so it bounds how long a problem can stay invisible. |
 | `COURTSIDE_MAIL_CERTIFICATE_MAXIMUM_LIFETIME` | `34560000` | Seconds. A loaded certificate valid for longer than this is not one an authority issued, the mail server's own fallback runs to the year 4096, and `mail-reload` reports unhealthy rather than accepting it. 400 days is the longest any public authority issues for. |
-| `COURTSIDE_MAIL_REPLY_TO` | *required with the mail server* | The club's real mailbox, so a member who answers a message reaches somebody. |
-| `COURTSIDE_MAIL_SENDER_USERNAME` | `courtside` | Local part of the address the instance sends from and authenticates as, in `COURTSIDE_MAIL_DOMAIN`. |
-| `COURTSIDE_MAIL_RELAY_HOST` | `COURTSIDE_MAIL_HOSTNAME` | Where the instance hands its messages in. The mail server on the compose network by default, reached under the name on its certificate rather than under the service name, because the instance authenticates what answers. Point it at the club's provider instead if this deployment runs without one. |
+| `COURTSIDE_MAIL_REPLY_TO` | *required* | The club's real mailbox, so a member who answers a message reaches somebody. |
+| `COURTSIDE_MAIL_SENDER_USERNAME` | `courtside` | Local part of the address the instance sends from, in `COURTSIDE_MAIL_DOMAIN`, and with the mail server also the account it authenticates as. |
+| `COURTSIDE_MAIL_RELAY_HOST` | `COURTSIDE_MAIL_HOSTNAME` with the mail server, *required with an external SMTP relay* | Where the instance hands its messages in. With the mail server, that server on the compose network, reached under the name on its certificate rather than under the service name, because the instance authenticates what answers. Otherwise the submission host of the club's mail provider. |
+| `COURTSIDE_MAIL_RELAY_USERNAME` | *required with an external SMTP relay* | The login the provider issued for submission. With the mail server, the instance signs in as `COURTSIDE_MAIL_SENDER_USERNAME` in `COURTSIDE_MAIL_DOMAIN` instead. |
 | `COURTSIDE_MAIL_RELAY_PORT` | `587` | Submission port on that host. |
 | `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `false` | Accept the certificate the relay presents without authenticating it, neither its issuer nor the name on it. Nothing here needs it: the mail server serves Caddy's certificate for `COURTSIDE_MAIL_HOSTNAME` and the instance dials exactly that name. Set it only for a relay whose certificate the instance cannot check, such as one issued by a private authority the container does not hold, and know that whoever can redirect the connection then reads the mail. |
 | `COURTSIDE_MAIL_ADMIN_PORT` | `8081` | Host port on the loopback interface for the mail server's admin interface. |
@@ -836,6 +886,12 @@ default.
 | `COURTSIDE_MAIL_RELAY_TARGET` | `mail` | Where the relay test connects. The service on the compose network by default, because a host seldom reaches its own published port from inside a container. |
 | `COURTSIDE_MAIL_MEMORY` | `512m` | Memory ceiling for the mail server, which is the one container taking unauthenticated traffic from the internet. |
 | `COURTSIDE_MEMORY` | `1g` | Memory ceiling for the application container. |
+| `COURTSIDE_DATABASE_URL` | *required with an external database* | JDBC URL of the PostgreSQL 17 database the `existing-infrastructure` recipe uses, for example `jdbc:postgresql://database.example.org:5432/courtside`. |
+| `COURTSIDE_DATABASE_USERNAME` | *required with an external database* | The role the application signs in as. |
+| `COURTSIDE_DATABASE_PASSWORD` | *required with an external database* | That role's password. |
+| `COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES` | *required with synthetic mail* | Host directory holding `cert.pem` and `key.pem`, the certificate Mailpit serves for STARTTLS. |
+| `COURTSIDE_ACCEPTANCE_MAIL_USER` | *required with synthetic mail* | The `uid:gid` Mailpit runs as, one that can read that key. |
+| `COURTSIDE_ACCEPTANCE_MAIL_PORT` | `8025` | Host port on the loopback interface where Mailpit shows the messages it kept. |
 | `COURTSIDE_COOKIE_SECURE` | `true` | Forces host-bound `__Host-SESSION` and `__Host-XSRF-TOKEN` cookies with `Secure` and `Path=/`. Lower it only for local development or a controlled test environment; production refuses to start. HTTPS requests still receive the host-bound policy, while a plain HTTP request then uses the explicit `SESSION` / `XSRF-TOKEN` test names without `Secure`. |
 | `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` | `20` | Password-verification attempts allowed per login source, and independently per signed-in account and credential-proof source, within the window. The account limit prevents a stolen session from gaining a fresh budget by changing addresses; a successful proof clears that account's count but not the source's request-volume count. |
 | `COURTSIDE_LOGIN_ADDRESS_WINDOW` | `1m` | Counting window for each password-verification limit above. |
@@ -877,8 +933,9 @@ renewable whole-instance cooldown they configured was removed; use the diagnosti
 verification concurrency settings above instead.
 
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` are set by
-`compose.yaml`. Point them elsewhere if you run PostgreSQL outside Compose; the application needs
-PostgreSQL 17 and will not run on anything else.
+`compose.yaml`, and by `compose.external-database.yaml` from the `COURTSIDE_DATABASE_*` values when
+PostgreSQL runs outside Compose. The application needs PostgreSQL 17 and will not run on anything
+else.
 
 ## Diagnose slow requests and queries
 
@@ -945,15 +1002,14 @@ whose own message names what it turned down, and assert that it stays out of the
 
 ## Upgrading
 
-Raise `COURTSIDE_VERSION`, then, with the reverse proxy:
+Raise `COURTSIDE_VERSION`, then:
 
 ```sh
 docker compose pull app
-docker compose --profile proxy up -d
+docker compose up -d
 ```
 
-or, on the Funnel path, the same two commands without `--profile proxy`. Leaving the profile out
-of the second command would stop Caddy.
+Both commands read the recipe from `COMPOSE_FILE`, so every recipe upgrades the same way.
 
 Migrations run on startup and support skipping versions, so an instance that has not been updated
 for a year goes to the current release directly. Read the release notes first: every release opens
@@ -992,16 +1048,17 @@ database and do not combine the archive with an image or configuration from a di
 
 ## Image updates between releases
 
-Every image `compose.yaml` names other than Courtside itself, `postgres:17-alpine`,
-`caddy:2-alpine`, `stalwartlabs/stalwart` and `alpine:3`, is pinned by digest, not by floating tag,
+Every image the recipe files name other than Courtside itself, `postgres:17-alpine`,
+`caddy:2-alpine`, `stalwartlabs/stalwart` and `alpine:3` among them, is pinned by digest, not by
+floating tag,
 so `docker compose pull` alone will never change them. That is deliberate: a club's database, its
 reverse proxy and its mail server should not change without anyone deciding they should. It also
 means the digests do not update themselves. Dependabot opens a pull request against this repository
 when one of them gets a new patch release; a maintainer bumping the digest here is how it reaches
-your instance, take the updated `compose.yaml` and run `docker compose up -d` to apply it.
+your instance, take the updated Compose files and run `docker compose up -d` to apply it.
 Until then, you can raise it yourself: look up the current tag's digest with
 `docker buildx imagetools inspect postgres:17-alpine` (or any of the others) and replace the
-`@sha256:…` suffix in `compose.yaml`.
+`@sha256:…` suffix in the Compose file that names it.
 
 ## One setting to review for your domain
 

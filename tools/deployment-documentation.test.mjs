@@ -17,8 +17,11 @@ const baseCompose = deploymentFile("compose.yaml");
 const overlayBlock = baseCompose.match(
   /^x-courtside-production-overlays:\n(?<entries>(?:  - compose[\w.-]+\.yaml\n)+)/m);
 assert.ok(overlayBlock, "compose.yaml has no closed production-overlay manifest");
-const OPERATOR_FACING = ["compose.yaml", ...[...overlayBlock.groups.entries
-  .matchAll(/^  - (compose[\w.-]+\.yaml)$/gm)].map((match) => match[1])];
+const acceptanceBlock = baseCompose.match(
+  /^x-courtside-acceptance-components:\n(?<entries>(?:  - compose[\w.-]+\.yaml\n)+)/m);
+assert.ok(acceptanceBlock, "compose.yaml has no closed acceptance-component manifest");
+const OPERATOR_FACING = ["compose.yaml", ...[overlayBlock, acceptanceBlock].flatMap((block) => [...block.groups
+  .entries.matchAll(/^  - (compose[\w.-]+\.yaml)$/gm)].map((match) => match[1]))];
 const compose = OPERATOR_FACING.map(deploymentFile).join("\n");
 const readme = deploymentFile("README.md");
 const example = deploymentFile(".env.example");

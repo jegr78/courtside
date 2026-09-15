@@ -9,20 +9,21 @@ function deploymentFile(name) {
 }
 
 const compose = deploymentFile("compose.yaml");
+const stalwart = deploymentFile("compose.stalwart.yaml");
 const smoke = readFileSync(fileURLToPath(new URL("courtside.mail-smoke.mjs", import.meta.url)),
   "utf8");
-const caddyfile = deploymentFile("Caddyfile");
+const caddyfile = deploymentFile("Caddyfile.stalwart");
 const helper = deploymentFile("mail-certificate.sh");
 const reloadScript = deploymentFile("mail-reload.sh");
 const mailWorkflow = readFileSync(fileURLToPath(new URL("../.github/workflows/mail-smoke.yml",
   import.meta.url)), "utf8");
 
 function service(name) {
-  const start = compose.indexOf(`\n  ${name}:\n`);
-  assert.ok(start >= 0, `compose.yaml has no ${name} service`);
-  const body = compose.slice(start + 1);
+  const start = stalwart.indexOf(`\n  ${name}:\n`);
+  assert.ok(start >= 0, `compose.stalwart.yaml has no ${name} service`);
+  const body = stalwart.slice(start + 1);
   const next = body.slice(1).search(/^ {2}\S/m);
-  assert.ok(next >= 0, `${name} is the last block in compose.yaml`);
+  assert.ok(next >= 0, `${name} is the last block in compose.stalwart.yaml`);
   return body.slice(0, next + 1);
 }
 
@@ -206,7 +207,7 @@ test("given the mail server, when the instance dials it, then it dials the name 
   () => {
     // given
     const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
-    const deployment = yaml.load(compose);
+    const deployment = yaml.load(stalwart);
 
     // when / then
     assert.match(service("mail"),
@@ -214,7 +215,7 @@ test("given the mail server, when the instance dials it, then it dials the name 
       "the compose network answers for `mail` alone, a name no authority issues a certificate for");
     assert.ok(Object.hasOwn(deployment.services.app.networks, "relay"),
       "the instance is not on the network the name answers on, so it reaches nothing under it");
-    assert.match(compose,
+    assert.match(stalwart,
       /COURTSIDE_MAIL_RELAY_HOST: \$\{COURTSIDE_MAIL_RELAY_HOST:-\$\{COURTSIDE_MAIL_HOSTNAME:\?/,
       "an instance that keeps dialling `mail` cannot authenticate what answers");
     assert.match(compose, /COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: \$\{[^}]*:-false\}/,

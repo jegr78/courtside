@@ -21,7 +21,7 @@ const planNames = readdirSync(fileURLToPath(new URL("../deploy/mail", import.met
   .filter((entry) => entry.endsWith(".ndjson"))
   .map((entry) => entry.replace(/\.ndjson$/, ""));
 
-const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.yaml", import.meta.url)), "utf8");
+const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.stalwart.yaml", import.meta.url)), "utf8");
 
 const renderScript = fileURLToPath(new URL("../deploy/mail/render.sh", import.meta.url));
 
@@ -254,14 +254,14 @@ test("given a value holding a line break, when a plan is rendered, then renderin
 test("given the account the app and the plan share, when the plan service is declared, then it is given the same values", () => {
   // given
   const script = readFileSync(new URL("../deploy/mail/render.sh", import.meta.url), "utf8");
-  const compose = readFileSync(new URL("../deploy/compose.yaml", import.meta.url), "utf8");
+  const compose = readFileSync(new URL("../deploy/compose.stalwart.yaml", import.meta.url), "utf8");
   const section = (name, next) =>
     compose.slice(compose.indexOf(`\n  ${name}:`), compose.indexOf(`\n  ${next}:`));
   const declared = (text) => new Set([...text.matchAll(/^\s{6}([A-Z_]+):/gm)].map(([, name]) => name));
   const referenced = (text) => new Set([...text.matchAll(/\$\{(COURTSIDE_MAIL_[A-Z_]+)/g)]
     .map(([, name]) => name));
   const rendererReads = referenced(script);
-  const appUses = referenced(section("app", "mail"));
+  const appUses = referenced(section("app", "proxy"));
   const planIsGiven = declared(section("mail-plan", "mail-bootstrap"));
 
   // when
