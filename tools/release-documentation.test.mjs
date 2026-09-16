@@ -73,13 +73,24 @@ test("given the release body, when the document promises what it carries, then t
     // when / then
     assert.ok(publish, "the release no longer publishes through the action this document describes");
     for (const file of publish.with.files.trim().split("\n").map((line) => line.trim())) {
-      // A versioned asset is attached by pattern, and the document names the stem before the wildcard.
-      const name = file.split("/").pop().split("*")[0];
-      assert.ok(name.length > 0, `the release attaches ${file}, which names nothing a reader can look up`);
-      assert.ok(document.includes(name.replace(/\.[a-z]+$/, "")) || document.includes(name),
-        `the release attaches ${name} and docs/releasing.md does not mention it`);
+      lookedUp(file);
     }
   });
+
+// A versioned asset is attached by pattern, and the document names the stem before the wildcard.
+function lookedUp(file) {
+  const name = file.split("/").pop().split("*")[0];
+  assert.ok(name.length > 0, `the release attaches ${file}, which names nothing a reader can look up`);
+  assert.ok(document.includes(name.replace(/\.[a-z]+$/, "")) || document.includes(name),
+    `the release attaches ${name} and docs/releasing.md does not mention it`);
+}
+
+test("given an asset the document cannot name, when the release attaches it, then it is refused", () => {
+  // when / then
+  assert.throws(() => lookedUp("build/*"), /names nothing a reader can look up/);
+  assert.throws(() => lookedUp("build/${{ needs.archive.outputs.name }}"), /does not mention it/);
+  assert.throws(() => lookedUp("build/undocumented-evidence.json"), /does not mention it/);
+});
 
 test("given a candidate tag, when the release resolves upgrade origins, then the document describes what happens",
   () => {

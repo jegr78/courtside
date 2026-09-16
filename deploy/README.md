@@ -600,7 +600,8 @@ domain the relay test asks about.
 
 ### Proving it works before a member depends on it
 
-`node tools/courtside.mail-smoke.mjs` brings this same mail server up on a scratch Compose project,
+This project's own `courtside.mail-smoke` check, which runs in its repository and not from this
+archive, brings the same mail server up on a scratch Compose project,
 renders and applies these same plans, and hands it a message over the submission port the way the
 application will, authenticated, over STARTTLS, then reads that message back out of a local sink.
 Before that it offers the same server somebody else's mail on port 25, unauthenticated and with the

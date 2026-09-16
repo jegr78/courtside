@@ -276,6 +276,24 @@ test("given a symlink out of the deployment, when the archive is derived, then i
   }
 });
 
+test("given a Compose key the derivation cannot follow, when the archive is derived, then it stops", () => {
+  const added = mkdtempSync(join(tmpdir(), "courtside-key-"));
+  try {
+    // given
+    const copy = join(added, "deploy");
+    cpSync(deploy, copy, { recursive: true });
+    const component = join(copy, "compose.caddy.yaml");
+    const model = YAML.parse(readFileSync(component, "utf8"), { logLevel: "silent" });
+    Object.values(model.services)[0].env_file = ["./extra.env"];
+    writeFileSync(component, YAML.stringify(model));
+
+    // when / then
+    assert.throws(() => archiveEntries(copy), /env_file, which the archive cannot follow/);
+  } finally {
+    rmSync(added, { recursive: true, force: true });
+  }
+});
+
 test("given the archive, when a club follows its own first step, then the file that step names is in it", () => {
   // when
   const paths = archiveEntries(deploy).map((entry) => entry.path);

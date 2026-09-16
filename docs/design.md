@@ -56,10 +56,10 @@ release candidate follows the same qualification path but receives no floating v
 
 The reference deployment lives in `deploy/`. Its recipes are `standard`, `full-self-hosted`,
 `existing-infrastructure` and `funnel`. A tagged release also publishes
-`courtside-deployment-<version>.zip`: the Compose files every recipe can select, the recipe
-resolver, the files those Compose files bind, the deployment guide and the container contract, with
-a manifest naming the release, its image digest, its source revision and the workflow identity that
-signs it. The archive carries a checksum per file; the release page carries one for the archive, and
+`courtside-deployment-<version>.zip`: the four recipes and the resolver that reads them, the Compose
+files any recipe can select, the files those Compose files bind, the configuration example, the
+deployment guide and the container contract, with a manifest naming the release, its image digest,
+its source revision and the workflow identity that signs it. The archive carries a checksum per file; the release page carries one for the archive, and
 the release attests its provenance. Installing from it needs no clone of this repository.
 
 Two interfaces are public compatibility contracts:

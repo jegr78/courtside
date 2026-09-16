@@ -86,11 +86,22 @@ function within(path) {
   return path.startsWith("../") || path === ".." || posix.isAbsolute(path) ? undefined : path;
 }
 
+// Every other Compose key that can name a neighbouring file; this reads volumes and nothing else.
+const unread = ["env_file", "extends", "include", "configs", "secrets"];
+
 export function boundPaths(deploy, composeFiles) {
   const bound = new Set();
   for (const file of composeFiles) {
     const model = YAML.parse(readFileSync(join(deploy, file), "utf8"), { logLevel: "silent" }) ?? {};
+    for (const key of unread) {
+      if (model[key] !== undefined) throw new Error(`${file} uses ${key}, which the archive cannot follow`);
+    }
     for (const service of Object.values(model.services ?? {})) {
+      for (const key of unread) {
+        if (service?.[key] !== undefined) {
+          throw new Error(`${file} uses ${key}, which the archive cannot follow`);
+        }
+      }
       for (const volume of service?.volumes ?? []) {
         const path = shippedPath(volumeSource(volume));
         if (path) bound.add(path);
