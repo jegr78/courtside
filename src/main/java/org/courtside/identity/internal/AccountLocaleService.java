@@ -17,7 +17,7 @@ class AccountLocaleService {
     @Transactional
     void change(String locale) {
         languages.require(locale);
-        UserAccount account = currentUser.requireAccount();
+        UserAccount account = currentUser.requireAccountForUpdate();
         account.changeLocale(locale);
     }
 }

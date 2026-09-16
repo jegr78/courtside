@@ -19,13 +19,17 @@ public class CurrentUser {
     private final UserAccountRepository accounts;
 
     public Optional<UserAccount> account() {
+        return signedInUsername().flatMap(accounts::findByUsername);
+    }
+
+    private static Optional<String> signedInUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         // The anonymous token reports isAuthenticated() == true.
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken) {
             return Optional.empty();
         }
-        return accounts.findByUsername(authentication.getName());
+        return Optional.of(authentication.getName());
     }
 
     // From the principal, not from a lookup: at commit time a renamed account no longer answers to
@@ -47,5 +51,11 @@ public class CurrentUser {
 
     public UserAccount requireAccount() {
         return account().orElseThrow(() -> new IllegalStateException("No authenticated account"));
+    }
+
+    public UserAccount requireAccountForUpdate() {
+        return signedInUsername()
+                .flatMap(accounts::findWithLockByUsername)
+                .orElseThrow(() -> new IllegalStateException("No authenticated account"));
     }
 }

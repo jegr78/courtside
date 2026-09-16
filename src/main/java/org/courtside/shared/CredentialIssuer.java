@@ -2,10 +2,11 @@ package org.courtside.shared;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.function.Consumer;
 
-// The credential exists between this call and the message that carries it, and nowhere else: what
-// is stored is its hash, and what is returned is handed straight to whoever sends it.
+// The credential exists between the handover this is given and the account row it is written to,
+// and nowhere else: what is stored is its hash, and a handover that throws stores nothing at all.
 public interface CredentialIssuer {
 
-    IssuedCredential issueFor(UUID accountId, Instant expiresAt);
+    void issueFor(UUID accountId, Instant expiresAt, Consumer<IssuedCredential> handOver);
 }

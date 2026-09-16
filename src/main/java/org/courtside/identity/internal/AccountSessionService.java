@@ -71,7 +71,7 @@ class AccountSessionService {
     @Transactional
     void endAll() {
         recentAuthentication.requireRecent();
-        UserAccount account = currentUser.requireAccount();
+        UserAccount account = currentUser.requireAccountForUpdate();
         accountSessions.revoke(account);
         securityEvents.sessionTerminatedAfterCommit(account.getId(), account.getId(),
                 SecurityEventLog.SessionTermination.USER_REVOKED);

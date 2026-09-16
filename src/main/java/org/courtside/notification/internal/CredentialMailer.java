@@ -38,7 +38,11 @@ class CredentialMailer {
     @TransactionalEventListener
     void on(CredentialsRequested requested) {
         Instant expiresAt = clock.instant().plus(validity.validFor(requested.reason()));
-        IssuedCredential issued = credentials.issueFor(requested.accountId(), expiresAt);
+        credentials.issueFor(requested.accountId(), expiresAt,
+                issued -> send(requested, issued, expiresAt));
+    }
+
+    private void send(CredentialsRequested requested, IssuedCredential issued, Instant expiresAt) {
         Locale locale = MessageLanguage.of(issued.recipientLocale(), club.defaultLocale());
         MessageKind kind = requested.reason() == CredentialsRequested.Reason.NEW_ACCOUNT
                 ? MessageKind.CREDENTIALS_NEW_ACCOUNT

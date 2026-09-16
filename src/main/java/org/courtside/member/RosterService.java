@@ -338,7 +338,7 @@ public class RosterService {
     }
 
     private void revokeSessionsOf(UUID personId) {
-        accounts.findByPersonIdIn(List.of(personId)).forEach(sessions::revoke);
+        accounts.findWithLockByPersonIdIn(List.of(personId)).forEach(sessions::revoke);
     }
 
     private void endStoredSessionsIfRevoked(UserAccount account, String principal, long epochBefore) {
@@ -366,7 +366,7 @@ public class RosterService {
         if (!persons.existsById(personId)) {
             throw new PersonNotFoundException("No person with id " + personId);
         }
-        return accounts.findByPersonIdIn(List.of(personId)).stream()
+        return accounts.findWithLockByPersonIdIn(List.of(personId)).stream()
                 .reduce(RosterService::preferredAccount)
                 .orElseThrow(() -> new AccountNotFoundException(
                         "No account for person " + personId));
@@ -506,7 +506,7 @@ public class RosterService {
         if (!changed.contains("email")) {
             return;
         }
-        accounts.findByPersonIdIn(List.of(personId)).forEach(account -> {
+        accounts.findWithLockByPersonIdIn(List.of(personId)).forEach(account -> {
             long epoch = account.getSecurityEpoch();
             boolean withdrawn = account.withdrawUnusedCredential();
             endStoredSessionsIfRevoked(account, account.getUsername(), epoch);
