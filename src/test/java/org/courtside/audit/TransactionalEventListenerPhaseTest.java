@@ -29,10 +29,8 @@ class TransactionalEventListenerPhaseTest {
         List<String> beforeCommit = annotated.stream()
                 .filter(TransactionalEventListenerPhaseTest::listensBeforeCommit).toList();
         assertThat(beforeCommit).as(
-                        "Section 3 of docs/design.md states the audit guarantee rests on exactly one "
-                                + ANNOTATION + " registered at BEFORE_COMMIT: no commit without a row. A "
-                                + "second one there, or that phase moved off the audit writer, makes that "
-                                + "sentence false; update the design specification in the same change.")
+                        "the audit guarantee rests on exactly one " + ANNOTATION
+                                + " registered at BEFORE_COMMIT: no commit without a row")
                 .containsExactly("org/courtside/audit/internal/DomainEventWriter.java");
         assertThat(Files.readString(Path.of("src/main/java", beforeCommit.getFirst())))
                 .contains(ANNOTATION + "(phase = TransactionPhase.BEFORE_COMMIT)");

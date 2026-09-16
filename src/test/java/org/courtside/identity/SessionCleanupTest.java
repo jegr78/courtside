@@ -48,8 +48,7 @@ class SessionCleanupTest extends AbstractIntegrationTest {
     void whenTheApplicationStarts_thenTheCadenceIsHeldToOneThatDeletes() {
         // when / then
         assertThat(context.getBeanNamesForType(SessionCleanupCadence.class))
-                .as("without the guard a deployment can switch the cleanup off, and section 11 of"
-                        + " the design specification says it cannot")
+                .as("without the guard a deployment can switch off the session lifecycle")
                 .isNotEmpty();
     }
 

@@ -9,8 +9,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SessionCleanupCadence implements InitializingBean {
 
-    // Spring Session reads a lone "-" as "schedule nothing at all", and section 11 of the design
-    // specification states that an expired session's row is deleted.
+    // Spring Session reads a lone "-" as "schedule nothing at all"; expired rows must be deleted.
     private static final String CLEANUP_OFF = "-";
 
     private final JdbcSessionProperties properties;

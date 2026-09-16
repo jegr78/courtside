@@ -24,8 +24,7 @@ next club to fork this can follow them.
   below, the file wins.
 - [`README.md`](README.md) gets the application running and creates the first administrator.
 - [`docs/design.md`](docs/design.md) is the design specification: what the product is, why the
-  architecture is shaped the way it is, and what section 10 promises a club board about the
-  credentials it hands over.
+  architecture is shaped the way it is, and which guarantees it makes about credentials.
 - [`docs/data-model.md`](docs/data-model.md) says what the schema holds, table by table.
 - [`docs/local-environments.md`](docs/local-environments.md) covers the CLI commands, database
   access, certificates and the persistent acceptance environment.

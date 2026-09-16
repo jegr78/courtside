@@ -89,7 +89,7 @@
       },
       "class": "rate-bounded-secret",
       "owner": "club-operator",
-      "storageBoundary": "Generated in memory, mailed to the member, and kept only as its SHA-256 in the outstanding-code row. The plaintext is never written to the database, a log or an administrative screen. Section 10 of the design specification records what that digest is worth to somebody who reads the database, and why it is not a keyed one.",
+      "storageBoundary": "Generated in memory, mailed to the member, and kept only as its SHA-256 in the outstanding-code row. The plaintext is never written to the database, a log or an administrative screen. docs/security-risks.md records what that digest is worth to somebody who reads the database, and why it is not a keyed one.",
       "permittedUse": "One redemption, which sets the password the member typed and ends every session of the account. It never becomes the password, and it authorises nothing else.",
       "rotation": "Asking for a code again replaces the outstanding one, and the code that was replaced stops working at that moment.",
       "revocation": "Redemption, expiry and the retention sweep each delete the row. Anything that moves the account's security epoch or its address leaves the row in place and makes it unredeemable, because redemption compares both against the account as it is then; the sweep removes it once its deadline passes. After any of them the code reads as one nobody holds.",

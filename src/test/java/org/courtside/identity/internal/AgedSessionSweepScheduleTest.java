@@ -31,8 +31,7 @@ class AgedSessionSweepScheduleTest {
                 .singleElement()
                 .extracting(ScheduledTask::getTask)
                 .isInstanceOfSatisfying(CronTask.class, task -> assertThat(task.getExpression())
-                        .as("COURTSIDE_SESSION_CLEANUP_CRON feeds this property, and section 11 of the"
-                                + " design specification says a session past its lifetime is swept on it")
+                        .as("COURTSIDE_SESSION_CLEANUP_CRON must reach the sweep that deletes expired sessions")
                         .isEqualTo("0 0 4 1 1 *")));
     }
 

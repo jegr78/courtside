@@ -76,17 +76,15 @@ class BookingAuthenticationContractTest {
     }
 
     @Test
-    void givenFutureExternalAccounts_whenReadingTheContracts_thenCardAccessMustBeExplicit()
+    void givenFutureExternalAccounts_whenReadingTheApiContract_thenCardAccessMustBeExplicit()
             throws IOException {
         // given
-        String design = Files.readString(Path.of("docs/design.md"));
         Map<String, Object> document = apiDocument();
 
         // when
         Map<String, Object> info = value(document, "info");
 
         // then
-        assertThat(design).contains("`EXTERNAL_BOOKER`", "an empty card role\nlist never grants external access");
         assertThat((String) info.get("description"))
                 .contains("`EXTERNAL_BOOKER`", "an empty card role list never grants external access");
     }
