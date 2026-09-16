@@ -96,6 +96,7 @@ const reviewedImages = (documents = composeDocuments) => {
   return [...images.values()].toSorted((left, right) => left.service.localeCompare(right.service));
 };
 const imageRegistry = (image) => {
+  if (image.startsWith("${COURTSIDE_CUSTOM_IMAGE_REPOSITORY")) return "custom";
   const separator = image.indexOf("/");
   if (separator < 0) return "docker.io";
   const first = image.slice(0, separator);
@@ -333,7 +334,8 @@ test("given the production architecture, when validating it, then every claim sa
     const registry = imageRegistry(image);
     const registryComponent = new Map([
       ["docker.io", "docker-hub"],
-      ["ghcr.io", "container-registry"]
+      ["ghcr.io", "application-image-registry"],
+      ["custom", "application-image-registry"]
     ]).get(registry);
     assert.ok(registryComponent, `${reviewed.service} uses unclassified image registry ${registry}`);
     const boundary = architecture.trustBoundaries.find(({ id }) => id === reviewed.boundaryId);

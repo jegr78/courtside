@@ -283,7 +283,7 @@ jobs:
             printf '\n## Upgrade notes\n\nThis release changes a published surface — the REST API, an environment variable or the container contract.\n\n%s\n%s\n%s\n\n' "$fence" "$breaking" "$fence" >> build/release-body.md
           else
             code='`'
-            printf '\n## Upgrade notes\n\nNo published surface changed. Raise %sCOURTSIDE_VERSION%s and restart.\n\n' "$code" "$code" >> build/release-body.md
+            printf '\n## Upgrade notes\n\nNo published surface changed. Replace %sCOURTSIDE_IMAGE_DIGEST%s and restart.\n\n' "$code" "$code" >> build/release-body.md
           fi
 
       - name: Resolve supported database upgrade origins

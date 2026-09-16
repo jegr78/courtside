@@ -17,7 +17,7 @@ shasum -a 256 -c courtside-deployment-<version>.zip.sha256
 `--source-ref` is what ties the archive to the tag it claims; without it a genuine archive from any
 release of this project satisfies the check.
 
-`manifest.json` inside the archive names the release, the image digest it was built against, the
+`manifest.json` inside the archive names the release, the digest-pinned image it was built against, the
 source revision and the release workflow that attests it, and carries a SHA-256 for every file
 beside it. Unpack the archive, configure `.env` and adapt the deployment to your infrastructure.
 
@@ -92,12 +92,9 @@ another one.
 
 Set these values in `.env`:
 
-- `COURTSIDE_VERSION`: the version and the digest its archive was built against, as
-  `0.1.0-alpha.1@sha256:…`. Take the digest from the `image` field of `manifest.json` in the
-  archive. Registry tags are mutable and digests are not, so a bare `0.1.0-alpha.1` leaves whoever
-  can overwrite that tag able to change what your instance runs. Verifying the archive then proves
-  nothing about the application. Never use a floating tag such as `latest`; an unattended upgrade
-  of a booking system is not a feature.
+- `COURTSIDE_IMAGE_DIGEST`: the 64 lowercase hexadecimal characters after `sha256:` in the `image`
+  field of `manifest.json`. The Compose model fixes both repository and digest algorithm, so a
+  registry tag cannot decide what the instance runs.
 - `POSTGRES_PASSWORD`, with the bundled database: generate one, for example with
   `openssl rand -base64 32`. It is only ever used between the two containers. With an external
   database, set `COURTSIDE_DATABASE_URL`, `COURTSIDE_DATABASE_USERNAME` and
@@ -160,16 +157,34 @@ workflow and not from someone with a registry token:
 cosign verify \
   --certificate-identity-regexp '^https://github\.com/jegr78/courtside/\.github/workflows/release\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/jegr78/courtside:<version>
+  ghcr.io/jegr78/courtside@sha256:<digest>
 ```
 
 The image also carries an SBOM and provenance attestation:
-`docker buildx imagetools inspect ghcr.io/jegr78/courtside:<version> --format '{{ json .SBOM }}'`.
+`docker buildx imagetools inspect ghcr.io/jegr78/courtside@sha256:<digest> --format '{{ json .SBOM }}'`.
+
+### Running an image built elsewhere
+
+The `custom-image` overlay is the deliberate escape hatch for a fork or a locally built image. Set
+`COURTSIDE_CUSTOM_IMAGE_REPOSITORY` to its repository, `COURTSIDE_CUSTOM_IMAGE_DIGEST` to the 64
+lowercase hexadecimal characters after `sha256:`, and `COURTSIDE_SOURCE_URL` to the corresponding
+source. Then add the overlay when resolving the recipe:
+
+```sh
+./recipe.sh files standard --overlay custom-image | paste -sd: -
+```
+
+Put that output in `COMPOSE_FILE`. The resolver warns that the Courtside release trust guarantee no
+longer applies, and the rendered application carries `org.courtside.image-trust=custom`. With
+separate database identities, the setup, migration and application processes all use the same
+custom image. Keep `COURTSIDE_IMAGE_DIGEST` set to the archive's value; the explicit overlay
+replaces that verified official default. The official cosign identity and archive attestation above
+say nothing about the custom image; verify it against the source and provenance of whoever built it.
 
 ## Nightly images
 
-Nightly images are for acceptance and testing. They are not releases and are not the version a
-club should put into `COURTSIDE_VERSION` for normal operation. The moving `nightly` tag names the
+Nightly images are for acceptance and testing. They are not releases and are not the digest a
+club should put into `COURTSIDE_IMAGE_DIGEST` for normal operation. The moving `nightly` tag names the
 last published nightly. Each publication also writes an immutable-looking
 `nightly-<yyyymmdd>-<sha7>` tag. Pin that tag together with the resolved digest when an acceptance
 installation must keep running the exact candidate it tested:
@@ -948,7 +963,9 @@ default.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `COURTSIDE_VERSION` | *required* | The release to run with its digest, `<version>@sha256:…`, from the archive's `manifest.json`. |
+| `COURTSIDE_IMAGE_DIGEST` | *required* | The 64 lowercase hexadecimal characters after `sha256:` in the archive manifest's image. The official repository and algorithm are fixed in the Compose files; an explicit custom-image overlay may replace this default. |
+| `COURTSIDE_CUSTOM_IMAGE_REPOSITORY` | *required with `compose.custom-image.yaml`* | Image repository for a fork or local build. Selecting it removes the official release trust guarantee and requires `COURTSIDE_SOURCE_URL` to name that image's source. |
+| `COURTSIDE_CUSTOM_IMAGE_DIGEST` | *required with `compose.custom-image.yaml`* | The custom image digest's 64 lowercase hexadecimal characters. The model fixes the `sha256:` algorithm, so this cannot become a moving tag. |
 | `POSTGRES_PASSWORD` | *required without `compose.database-identities.yaml`* | Shared database password used by the standard deployment only. Leave it empty when the identity overlay supplies file-backed credentials. |
 | `COURTSIDE_DB_OWNER_USERNAME` | `courtside_owner` | Setup role used by `compose.database-identities.yaml`. On an existing standard volume, set this to `courtside`. With an external database the role has to exist already, so the default is almost never right; that combination refuses to resolve until you set this. |
 | `COURTSIDE_DB_OWNER_PASSWORD_FILE` | *required with `compose.database-identities.yaml`* | Host path to the current database-owner password file. It is mounted into the setup process, and into PostgreSQL where this deployment runs one. |
@@ -1113,8 +1130,8 @@ whose own message names what it turned down, and assert that it stays out of the
 ## Upgrading
 
 Download and verify the archive of the new release as described at the top of this guide, and
-replace the deployment files with its contents, keeping your `.env`. Set `COURTSIDE_VERSION` to the
-new `<version>@sha256:…` from its `manifest.json`, then:
+replace the deployment files with its contents, keeping your `.env`. Set `COURTSIDE_IMAGE_DIGEST`
+to the 64 hexadecimal characters after `sha256:` in its `manifest.json`, then:
 
 ```sh
 docker compose pull app

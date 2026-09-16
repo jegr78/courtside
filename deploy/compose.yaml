@@ -13,6 +13,8 @@ x-courtside-production-overlays:
   - compose.database-tls-local.yaml
   - compose.app-tls.yaml
   - compose.external-database-identities.yaml
+  - compose.database-identities-custom-image.yaml
+  - compose.custom-image.yaml
 x-courtside-acceptance-components:
   - compose.mailpit.yaml
 
@@ -44,7 +46,7 @@ services:
       retries: 12
 
   app:
-    image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}
+    image: ghcr.io/jegr78/courtside@sha256:${COURTSIDE_IMAGE_DIGEST:?set COURTSIDE_IMAGE_DIGEST in .env}
     restart: unless-stopped
     logging: *logging
     mem_limit: ${COURTSIDE_MEMORY:-1g}

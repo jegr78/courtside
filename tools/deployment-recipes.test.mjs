@@ -12,9 +12,16 @@ const deploy = fileURLToPath(new URL("../deploy/", import.meta.url));
 const resolver = join(deploy, "recipe.sh");
 
 const common = {
-  COURTSIDE_VERSION: "0.1.0",
+  COURTSIDE_IMAGE_DIGEST: "a".repeat(64),
   COURTSIDE_SOURCE_URL: "https://example.org/courtside",
 };
+const customImage = {
+  COURTSIDE_CUSTOM_IMAGE_REPOSITORY: "registry.example.org/example/courtside",
+  COURTSIDE_CUSTOM_IMAGE_DIGEST: "b".repeat(64),
+  COURTSIDE_SOURCE_URL: "https://example.org/example/courtside",
+};
+const customImageReference = `${customImage.COURTSIDE_CUSTOM_IMAGE_REPOSITORY}`
+  + `@sha256:${customImage.COURTSIDE_CUSTOM_IMAGE_DIGEST}`;
 const bundledDatabase = { POSTGRES_PASSWORD: "placeholder" };
 const caddy = { COURTSIDE_DOMAIN: "courts.example.org" };
 const smtpRelay = {
@@ -436,14 +443,15 @@ test("given every resolvable chain, when a component resets an environment value
 test("given a recipe and hardening overlays, when they are named in any order, then one model results", () => {
   // when
   const forwards = resolved("files", "standard", "--overlay", "database-tls", "--overlay", "database-identities",
-    "--overlay", "app-tls", "--overlay", "database-tls-local");
+    "--overlay", "custom-image", "--overlay", "app-tls", "--overlay", "database-tls-local");
   const backwards = resolved("files", "standard", "--overlay", "database-tls-local", "--overlay", "app-tls",
-    "--overlay", "database-identities", "--overlay", "database-tls");
+    "--overlay", "custom-image", "--overlay", "database-identities", "--overlay", "database-tls");
 
   // then
   const [base, ...components] = recipes.standard.files;
   assert.deepEqual(forwards, [base, "compose.database-identities.yaml", ...components,
-    "compose.database-tls.yaml", "compose.database-tls-local.yaml", "compose.app-tls.yaml"]);
+    "compose.database-tls.yaml", "compose.database-tls-local.yaml", "compose.app-tls.yaml",
+    "compose.database-identities-custom-image.yaml", "compose.custom-image.yaml"]);
   assert.deepEqual(backwards, forwards);
   assert.deepEqual(resolved("files", "existing-infrastructure", "--overlay", "database-tls"),
     [...recipes["existing-infrastructure"].files, "compose.database-tls.yaml"]);
@@ -619,14 +627,82 @@ test("given every recipe model, when its images are read, then each bundled comp
     const model = rendered(resolved("files", name), recipe.environment);
 
     // when
-    const images = Object.entries(model.services).filter(([service]) => service !== "app"
-      && !service.startsWith("database-")).map(([, service]) => service.image);
+    const images = Object.values(model.services).map((service) => service.image).filter(Boolean);
 
     // then
     for (const image of images) {
       assert.match(image, /@sha256:[a-f0-9]{64}$/, `${name} runs ${image} by a tag that can move`);
     }
   }
+});
+
+test("given a custom image mode, when each recipe is rendered, then every Courtside process uses that source", () => {
+  for (const [name, recipe] of Object.entries(recipes)) {
+    // given
+    const identity = ["--overlay", "database-identities"];
+    const options = ["--overlay", "custom-image", ...identity];
+    const environment = { ...recipe.environment, ...customImage, ...separateIdentities, ...externalOwner };
+
+    // when
+    const selected = resolve(["files", name, ...options]);
+    const model = rendered(selected.files, environment);
+    const processes = [model.services.app, model.services["database-setup"], model.services["database-migrate"]];
+
+    // then
+    assert.equal(selected.status, 0, selected.error);
+    assert.match(selected.error, /custom image has no Courtside release trust guarantee/);
+    for (const process of processes) assert.equal(process.image, customImageReference);
+    assert.equal(model.services.app.environment.COURTSIDE_SOURCE_URL, customImage.COURTSIDE_SOURCE_URL);
+    assert.equal(model.services.app.labels["org.courtside.image-trust"], "custom");
+  }
+});
+
+test("given custom image mode, when its repository, digest or source is missing, then Compose names the decision", () => {
+  // given
+  const files = resolved("files", "standard", "--overlay", "custom-image");
+
+  // when / then
+  assert.match(render(files, recipes.standard.environment).error,
+    /required variable COURTSIDE_CUSTOM_IMAGE_REPOSITORY is missing/);
+  const withoutDigest = { ...recipes.standard.environment, ...customImage };
+  delete withoutDigest.COURTSIDE_CUSTOM_IMAGE_DIGEST;
+  assert.match(render(files, withoutDigest).error, /required variable COURTSIDE_CUSTOM_IMAGE_DIGEST is missing/);
+  const withoutSource = { ...recipes.standard.environment, ...customImage };
+  delete withoutSource.COURTSIDE_SOURCE_URL;
+  assert.match(render(files, withoutSource).error, /required variable COURTSIDE_SOURCE_URL is missing/);
+});
+
+test("given custom image mode, when image settings are hostile, then they cannot select a moving tag", () => {
+  const files = resolved("files", "standard", "--overlay", "custom-image");
+  for (const [repository, digest] of [
+    ["registry.example.org/example/courtside:latest", "b".repeat(64)],
+    ["registry.example.org/example/courtside", `sha512:${"b".repeat(128)}`],
+    ["registry.example.org/example/courtside", "latest"],
+  ]) {
+    // given
+    const environment = { ...recipes.standard.environment, ...customImage,
+      COURTSIDE_CUSTOM_IMAGE_REPOSITORY: repository, COURTSIDE_CUSTOM_IMAGE_DIGEST: digest };
+
+    // when
+    const image = rendered(files, environment).services.app.image;
+
+    // then
+    assert.equal(image, `${repository}@sha256:${digest}`);
+    assert.match(image, /@sha256:/, `custom settings escaped the immutable digest position: ${image}`);
+  }
+});
+
+test("given an official image mode, when a recipe is rendered, then it carries no custom trust marker", () => {
+  // when
+  const app = rendered(resolved("files", "standard"), recipes.standard.environment).services.app;
+
+  // then
+  assert.equal(app.labels?.["org.courtside.image-trust"], undefined);
+  assert.equal(app.image, `ghcr.io/jegr78/courtside@sha256:${common.COURTSIDE_IMAGE_DIGEST}`);
+  const withoutDigest = { ...recipes.standard.environment };
+  delete withoutDigest.COURTSIDE_IMAGE_DIGEST;
+  assert.match(render(resolved("files", "standard"), withoutDigest).error,
+    /required variable COURTSIDE_IMAGE_DIGEST is missing/);
 });
 
 test("given the component manifests, when the resolver's files are compared, then every selectable file is declared",
@@ -640,6 +716,8 @@ test("given the component manifests, when the resolver's files are compared, the
     resolved("files", "existing-infrastructure", "--overlay", "database-identities").forEach((f) => selectable.add(f));
     resolved("files", "standard", "--overlay", "database-identities", "--overlay", "database-tls",
       "--overlay", "database-tls-local", "--overlay", "app-tls").forEach((f) => selectable.add(f));
+    resolved("files", "standard", "--overlay", "database-identities", "--overlay", "custom-image")
+      .forEach((f) => selectable.add(f));
     resolved("files", "standard", "--synthetic-mail").forEach((f) => selectable.add(f));
 
     // when

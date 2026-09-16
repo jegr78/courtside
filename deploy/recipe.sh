@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly schema_version=1
-readonly overlay_order="database-identities database-tls database-tls-local app-tls"
+readonly overlay_order="database-identities database-tls database-tls-local app-tls custom-image"
 readonly usage="usage: recipe.sh files <recipe> [--overlay <name>]... [--synthetic-mail] [--rootless-port-start <port>]"
 
 refuse() {
@@ -139,11 +139,17 @@ files() {
     echo "compose.$mail.yaml"
   fi
   for overlay in $overlay_order; do
-    if [ "$overlay" != database-identities ] && contains "$overlays" "$overlay"; then
+    if [ "$overlay" != database-identities ] && [ "$overlay" != custom-image ] \
+      && contains "$overlays" "$overlay"; then
       echo "compose.$overlay.yaml"
     fi
   done
   [ -n "$separated" ] && echo compose.external-database-identities.yaml
+  if contains "$overlays" custom-image; then
+    printf 'recipe: custom image has no Courtside release trust guarantee; verify its source and provenance yourself\n' >&2
+    contains "$overlays" database-identities && echo compose.database-identities-custom-image.yaml
+    echo compose.custom-image.yaml
+  fi
   return 0
 }
 
