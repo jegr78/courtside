@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -113,8 +115,8 @@ class CredentialMailerTest {
     }
 
     private void issuesTo(UUID accountId, String firstName, String username) {
-        when(credentials.issueFor(eq(accountId), any())).thenReturn(new IssuedCredential(
-                ADDRESS, firstName, "de", username, "a-credential", NOW.plus(Duration.ofDays(7))));
+        handsOver(accountId, new IssuedCredential(ADDRESS, firstName, "de", username,
+                "a-credential", NOW.plus(Duration.ofDays(7))));
     }
 
     @Test
@@ -160,8 +162,16 @@ class CredentialMailerTest {
 
     private void issues(String recipientLocale) {
         when(validity.validFor(any())).thenReturn(Duration.ofDays(7));
-        when(credentials.issueFor(eq(ACCOUNT), any())).thenReturn(new IssuedCredential(
-                ADDRESS, "Jane", recipientLocale, "doe.jane", "a-credential", NOW.plus(Duration.ofDays(7))));
+        handsOver(ACCOUNT, new IssuedCredential(ADDRESS, "Jane", recipientLocale, "doe.jane",
+                "a-credential", NOW.plus(Duration.ofDays(7))));
+    }
+
+    private void handsOver(UUID accountId, IssuedCredential issued) {
+        doAnswer(invocation -> {
+            Consumer<IssuedCredential> handOver = invocation.getArgument(2);
+            handOver.accept(issued);
+            return null;
+        }).when(credentials).issueFor(eq(accountId), any(), any());
     }
 
     private record Message(String recipient, String subject, String body) {

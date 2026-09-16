@@ -15,6 +15,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Component
 @RequiredArgsConstructor
@@ -30,7 +31,7 @@ class AccountCredentialIssuer implements CredentialIssuer {
 
     @Override
     @Transactional
-    public IssuedCredential issueFor(UUID accountId, Instant expiresAt) {
+    public void issueFor(UUID accountId, Instant expiresAt, Consumer<IssuedCredential> handOver) {
         UserAccount account = accounts.findById(accountId).orElseThrow(() ->
                 new IllegalStateException("No account to issue a credential for"));
         String address = account.getPerson().getEmail();
@@ -39,13 +40,14 @@ class AccountCredentialIssuer implements CredentialIssuer {
                     + " has no address to send its credential to");
         }
         String credential = generated();
-        account.credentialsIssued(passwordEncoder.encode(credential), expiresAt);
-        sessions.endFor(account.getUsername());
+        String username = account.getUsername();
+        // Nothing is written before this returns, so no account row is held across the relay.
+        handOver.accept(new IssuedCredential(address, account.getPerson().getFirstName(),
+                account.getLocale(), username, credential, expiresAt));
+        accounts.issueCredential(accountId, passwordEncoder.encode(credential), expiresAt);
+        sessions.endFor(username);
         securityEvents.credentialChangedAfterCommit(accountId, null,
                 SecurityEventLog.CredentialChange.TEMPORARY_CREDENTIAL_ISSUED);
-        return new IssuedCredential(address,
-                account.getPerson().getFirstName(), account.getLocale(),
-                account.getUsername(), credential, expiresAt);
     }
 
     // Base64 without padding, so nothing a member retypes is a character they have to guess at.

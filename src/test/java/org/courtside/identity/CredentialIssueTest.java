@@ -9,6 +9,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,7 +34,7 @@ class CredentialIssueTest extends AbstractIntegrationTest {
         UUID accountId = accountAwaitingCredentials();
 
         // when
-        IssuedCredential issued = credentials.issueFor(accountId, expiry());
+        IssuedCredential issued = issue(accountId);
 
         // then
         UserAccount account = accounts.findById(accountId).orElseThrow();
@@ -58,8 +59,8 @@ class CredentialIssueTest extends AbstractIntegrationTest {
     @Test
     void givenTwoAccounts_whenCredentialsAreIssued_thenTheyAreIndependentPolicySizedSecrets() {
         // given / when
-        String first = credentials.issueFor(accountAwaitingCredentials(), expiry()).credential();
-        String second = credentials.issueFor(accountAwaitingCredentials(), expiry()).credential();
+        String first = issue(accountAwaitingCredentials()).credential();
+        String second = issue(accountAwaitingCredentials()).credential();
 
         // then
         assertThat(first).isNotEqualTo(second).hasSize(32).matches("[A-Za-z0-9_-]{32}");
@@ -69,8 +70,14 @@ class CredentialIssueTest extends AbstractIntegrationTest {
     @Test
     void givenAnUnknownAccount_whenIssuingACredential_thenItSaysSoRatherThanFailingLater() {
         // when / then
-        assertThatThrownBy(() -> credentials.issueFor(UUID.randomUUID(), expiry()))
+        assertThatThrownBy(() -> issue(UUID.randomUUID()))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    private IssuedCredential issue(UUID accountId) {
+        AtomicReference<IssuedCredential> handedOver = new AtomicReference<>();
+        credentials.issueFor(accountId, expiry(), handedOver::set);
+        return handedOver.get();
     }
 
     private static Instant expiry() {

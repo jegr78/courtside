@@ -21,7 +21,7 @@ class PermanentPasswordService {
 
     @Transactional
     void change(String currentPassword, String replacement) {
-        UserAccount account = currentUser.requireAccount();
+        UserAccount account = currentUser.requireAccountForUpdate();
         if (currentPassword == null || account.getPasswordHash() == null
                 || !passwordEncoder.matches(currentPassword, account.getPasswordHash())) {
             securityEvents.controlRefused(account.getId(),

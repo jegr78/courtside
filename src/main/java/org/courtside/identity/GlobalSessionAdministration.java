@@ -5,6 +5,7 @@ import org.courtside.shared.SecurityEventLog;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -21,10 +22,12 @@ public class GlobalSessionAdministration {
     public void endAll() {
         recentAuthentication.requireRecent();
         UUID actorId = currentUser.accountId().orElseThrow();
-        for (UserAccount account : accounts.findAll()) {
-            sessions.revoke(account);
-            securityEvents.sessionTerminatedAfterCommit(account.getId(), actorId,
-                    SecurityEventLog.SessionTermination.GLOBAL_REVOKED);
-        }
+        List<UserAccount> holders = accounts.findAll();
+        List<UUID> revoked = holders.stream().map(UserAccount::getId).toList();
+        List<String> usernames = holders.stream().map(UserAccount::getUsername).toList();
+        accounts.revokeEverySession();
+        usernames.forEach(sessions::endFor);
+        revoked.forEach(accountId -> securityEvents.sessionTerminatedAfterCommit(accountId, actorId,
+                SecurityEventLog.SessionTermination.GLOBAL_REVOKED));
     }
 }

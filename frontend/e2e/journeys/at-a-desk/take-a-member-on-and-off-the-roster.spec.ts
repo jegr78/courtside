@@ -35,19 +35,19 @@ test("given a board that has taken on a new member, when they record the person,
     await activate(page.getByTestId("new-account-role-MEMBER"));
     await activate(page.getByTestId("create-account"));
 
-    // then — the one-time password went to the member, and the board never saw it. The instance
-    // hands that message over after it has answered, and the account is written again when it does.
+    // then — the one-time password went to the member, and the board never saw it
     await expect(page.getByTestId("account-username")).toHaveValue("major.mary");
     await expect(page.getByTestId("credential-destination")).toContainText("mary.major@example.org");
-    await messageTo(journeyService.mailboxURL, "mary.major@example.org");
 
-    // when — the club records what the person joined as
+    // when — the club records what the person joined as, without waiting for that message: the
+    // instance answers first and writes the account again when it hands the credential over.
     await page.getByTestId("membership-type").selectOption({ index: 1 });
     await writeDate(page.getByTestId("membership-started-on"), "2026-01-01");
     await activate(page.getByTestId("save-membership"));
 
     // then
     await expect(page.getByTestId("end-membership")).toBeVisible();
+    await messageTo(journeyService.mailboxURL, "mary.major@example.org");
 
     // when — and the membership ends, with the sessions that account holds. A club records a
     // departure that has happened, so a day the club has not reached yet is refused.

@@ -132,7 +132,7 @@ public class RosterSyncService {
         personIds.forEach(roster::endMembership);
         int disabled = 0;
         int rolesRemoved = 0;
-        for (UserAccount account : accounts.findByPersonIdIn(personIds)) {
+        for (UserAccount account : accounts.findWithLockByPersonIdIn(personIds)) {
             Departure departure = withdrawMembershipFrom(account);
             disabled += departure == Departure.DISABLED ? 1 : 0;
             rolesRemoved += departure == Departure.ROLE_REMOVED ? 1 : 0;
