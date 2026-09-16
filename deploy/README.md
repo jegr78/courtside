@@ -2,9 +2,18 @@
 
 This guide describes the production reference deployment. Each club runs its own Courtside
 instance. Take `courtside-deployment-<version>.zip` from the release page rather than cloning this
-repository: it holds these files for one released version, with a checksum per file in
-`manifest.json` and a provenance attestation `gh attestation verify` reads. Unpack it, configure
-`.env` and adapt the deployment to your infrastructure.
+repository: it holds these files for one released version. Check what you downloaded before you
+unpack it, because a checksum published beside the file it describes proves nothing on its own:
+
+```bash
+gh attestation verify courtside-deployment-<version>.zip --repo jegr78/courtside \
+  --signer-workflow jegr78/courtside/.github/workflows/release.yml
+shasum -a 256 -c courtside-deployment-<version>.zip.sha256
+```
+
+`manifest.json` inside the archive names the release, the image digest it was built against, the
+source revision and the signing identity, and carries a SHA-256 for every file beside it. Unpack the
+archive, configure `.env` and adapt the deployment to your infrastructure.
 
 You need Docker with Compose 2.33.1 or newer. `compose.yaml` declares this minimum because older
 versions cannot select the dedicated egress networks safely. The file also lists every supported
