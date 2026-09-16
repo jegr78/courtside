@@ -49,6 +49,8 @@ function resolverOutput(root, args) {
   return result.stdout.split("\n").filter(Boolean);
 }
 
+const recipes = ["standard", "full-self-hosted", "existing-infrastructure", "funnel"];
+
 const settings = {
   COURTSIDE_VERSION: release.version,
   COURTSIDE_SOURCE_URL: "https://example.org/courtside",
@@ -62,6 +64,11 @@ const settings = {
   COURTSIDE_MAIL_ADMIN_PASSWORD: "placeholder",
   COURTSIDE_MAIL_SETUP_PASSWORD: "placeholder",
   COURTSIDE_MAIL_DKIM_SELECTOR: "placeholder",
+  COURTSIDE_MAIL_RELAY_HOST: "smtp.example.org",
+  COURTSIDE_MAIL_RELAY_USERNAME: "courts@example.org",
+  COURTSIDE_DATABASE_URL: "jdbc:postgresql://database.example.org:5432/courtside",
+  COURTSIDE_DATABASE_USERNAME: "courtside",
+  COURTSIDE_DATABASE_PASSWORD: "placeholder",
 };
 
 function renderedFrom(root, files) {
@@ -88,7 +95,7 @@ test("given every recipe the archive ships, when each is resolved from an extrac
     const root = extracted(zip, directory);
 
     // when / then
-    for (const recipe of ["standard", "full-self-hosted", "existing-infrastructure", "funnel"]) {
+    for (const recipe of recipes) {
       for (const file of resolverOutput(root, [recipe])) {
         assert.ok(existsSync(join(root, file)),
           `${recipe} names ${file}, and the archive does not carry it`);
@@ -97,21 +104,22 @@ test("given every recipe the archive ships, when each is resolved from an extrac
   });
 });
 
-test("given the archive alone, when a recipe is rendered from it, then every bound file lies inside it", () => {
+test("given the archive alone, when every recipe is rendered from it, then each bound file lies inside it", () => {
   const { zip } = buildArchive({ deploy, ...release });
   scratch((directory) => {
     const root = extracted(zip, directory);
-    const files = resolverOutput(root, ["full-self-hosted"]);
+    for (const recipe of recipes) {
+      // when
+      const sources = boundSources(renderedFrom(root, resolverOutput(root, [recipe])));
 
-    // when
-    const sources = boundSources(renderedFrom(root, files));
-
-    // then
-    assert.ok(sources.length > 0, "the rendered model bound no file, so this proves nothing");
-    assert.deepEqual(sources.filter((source) => !source.startsWith(`${root}/`)), [],
-      "the archive reaches outside itself for a file");
-    for (const source of sources) {
-      assert.ok(existsSync(source), `the archive binds ${relative(root, source)} and does not carry it`);
+      // then
+      assert.ok(sources.length > 0, `${recipe} bound no file, so this proves nothing`);
+      assert.deepEqual(sources.filter((source) => !source.startsWith(`${root}/`)), [],
+        `${recipe} reaches outside the archive for a file`);
+      for (const source of sources) {
+        assert.ok(existsSync(source),
+          `${recipe} binds ${relative(root, source)} and the archive does not carry it`);
+      }
     }
   });
 });
