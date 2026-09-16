@@ -1,7 +1,10 @@
 # Running a Courtside instance
 
 This guide describes the production reference deployment. Each club runs its own Courtside
-instance. Copy this directory, configure `.env` and adapt the deployment to your infrastructure.
+instance. Take `courtside-deployment-<version>.zip` from the release page rather than cloning this
+repository: it holds these files for one released version, with a checksum per file in
+`manifest.json` and a provenance attestation `gh attestation verify` reads. Unpack it, configure
+`.env` and adapt the deployment to your infrastructure.
 
 You need Docker with Compose 2.33.1 or newer. `compose.yaml` declares this minimum because older
 versions cannot select the dedicated egress networks safely. The file also lists every supported

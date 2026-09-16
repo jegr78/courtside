@@ -187,10 +187,18 @@ Permission failures and malformed evidence still stop the build.
 | `upgrade` | The database upgrade path from each resolved origin is executed against the candidate |
 | `restore` | A backup taken from the candidate is restored into it |
 | `security-record` | The build, image, qualify and active-security evidence is collected into one file. `upgrade` and `restore` are not in it |
+| `archive` | `tools/deployment-archive.mjs` packs the reference deployment for that digest into `courtside-deployment-<version>.zip` |
 | `publish` | The qualified manifest is tagged, signed with cosign, given an SBOM and a provenance attestation, and the GitHub release is written |
 
 `publish` retags the manifest that `qualify` proved. Nothing is rebuilt between qualification and
 publication, so the digest a club pulls is the digest that was brought up twice.
+
+The release page carries the OpenAPI document, the security record and the deployment archive with
+its checksum. `archive` builds those bytes once and `publish` attaches the artifact it downloads, so
+what a club unpacks is what was attested. The archive's contents are derived from what the shipped
+recipe resolver can emit rather than listed by hand, and a file the resolver never names is not in
+it: `tools/deployment-archive.test.mjs` unpacks the archive into an empty directory and renders a
+recipe from there, which fails if anything it binds lives only in this repository.
 
 ## When a release fails
 
