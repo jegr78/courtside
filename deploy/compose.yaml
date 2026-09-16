@@ -12,6 +12,7 @@ x-courtside-production-overlays:
   - compose.database-tls.yaml
   - compose.database-tls-local.yaml
   - compose.app-tls.yaml
+  - compose.external-database-identities.yaml
 x-courtside-acceptance-components:
   - compose.mailpit.yaml
 

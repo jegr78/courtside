@@ -17,6 +17,32 @@ networks. The database port is not published. `production-architecture.json` rec
 listener exposed by each recipe. Operators may enable verified TLS for either hop. Reconsider the
 default if the reference architecture places one across hosts or a shared network.
 
+## Setup and migration reach an external database unverified unless the operator says otherwise
+
+`existing-infrastructure` puts every database hop on the operator's own network instead of a private
+one. That already held for the application's connection; separated identities add the setup and
+migration processes, which carry the owner and migration credentials. Selecting `database-tls` sets
+`verify-full` on the application alone. Setup and migration read `COURTSIDE_DB_TLS_MODE`, which
+defaults to `prefer`, so that overlay on its own leaves them unverified while the application is held
+to the trust anchor.
+
+`prefer` attempts TLS and continues in the clear when the server declines, so against a database
+that serves no certificate a passive observer on the path reads the whole setup session. An active
+one needs no certificate either: nothing constrains which authentication method the driver accepts,
+so a server that asks for a plaintext password is answered with one, and the owner credential is the
+most privileged the deployment holds. Courtside writes the migration and runtime passwords as
+verifiers rather than sending them, which bounds what a rotation exposes but not the owner's own
+login.
+
+Setup and migration run during installation, upgrade and credential rotation only, and their
+container is the first to hold the owner credential with a route off the host; the bundled database
+keeps the same two processes on an internal network. The continuous member-data connection is
+covered by `verify-full` wherever `database-tls` is selected. Setting `COURTSIDE_DB_TLS_MODE` to
+`verify-full` in `.env` closes the gap, together with `database-tls`, which supplies the trust anchor
+those two processes would otherwise look for in an empty directory. `deploy/README.md` says so where
+it describes the combination. This entry ends when selecting `database-tls` holds all three processes
+to the anchor without that variable.
+
 ## Password-hash age can affect failed-login time
 
 A wrong password for an older Argon2 encoding may take a different time from a wrong password for

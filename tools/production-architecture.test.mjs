@@ -37,7 +37,7 @@ const withoutResets = (document) => {
   return document;
 };
 const composeDocuments = composeFiles.map((path) => ({ path, document: withoutResets(YAML.parse(
-  readFileSync(`${repository}/${path}`, "utf8").replaceAll("!reset null", `"${RESET}"`).replaceAll("!reset {}", "{}"))) }));
+  readFileSync(`${repository}/${path}`, "utf8").replaceAll("!reset null", `"${RESET}"`).replaceAll("!reset {}", "{}").replaceAll("!override", ""))) }));
 const openapi = YAML.parse(readFileSync(new URL(
   "../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
 const applicationConfigurations = productionApplicationConfigurations();

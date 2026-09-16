@@ -76,7 +76,7 @@ test("given the identity overlay, when it is merged with the reference deploymen
   }
 });
 
-test("given optional TLS and bounded identities, when combined, then setup and migration share its policy", () => {
+test("given optional TLS and bounded identities, when combined, then setup and migration mount the trust anchor", () => {
   // when / then
   for (const process of [service("database-setup", "database-migrate"), service("database-migrate", "app")]) {
     assert.match(process, /COURTSIDE_DB_TLS_MODE/);

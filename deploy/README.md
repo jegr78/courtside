@@ -81,7 +81,8 @@ Set these values in `.env`:
 - `POSTGRES_PASSWORD`, with the bundled database: generate one, for example with
   `openssl rand -base64 32`. It is only ever used between the two containers. With an external
   database, set `COURTSIDE_DATABASE_URL`, `COURTSIDE_DATABASE_USERNAME` and
-  `COURTSIDE_DATABASE_PASSWORD` instead.
+  `COURTSIDE_DATABASE_PASSWORD` instead. The identity overlay below replaces all three passwords
+  with files, whichever database you run.
 - `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME`: the username of the first local administrator.
 - `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD`: a one-time password of at least 12 characters. The first
   login can do nothing except replace it.
@@ -363,8 +364,11 @@ Two things about the mail container are worth knowing regardless:
 The remaining Compose networks separate database, reverse-proxy, mail administration and mail
 delivery reachability. The application and proxy each also have a single-member egress network:
 the application still needs operator-selected SMTP and telemetry targets plus the fixed production
-password-range service, while Caddy needs ACME. Those networks preserve outbound routing; they do
-not grant either service a path into another deployment component.
+password-range service, while Caddy needs ACME. Separated identities on an external database add
+`database-egress`, which carries the setup and migration processes to the operator's host and admits
+nothing else. Those networks preserve outbound routing rather than opening one component to another.
+`database-egress` is the only one of those with two members, and they are the setup and migration
+processes, which `docker compose up` never runs at the same time.
 
 ### The certificate the mail server serves
 
@@ -695,8 +699,9 @@ docker compose up -d
 
 That is the application's side of a database somewhere else. The `existing-infrastructure` recipe
 points the application at that host through `COURTSIDE_DATABASE_URL`,
-`COURTSIDE_DATABASE_USERNAME` and `COURTSIDE_DATABASE_PASSWORD` and runs no `db` service of its own.
-The certificate that host serves has to name the host the URL names.
+`COURTSIDE_DATABASE_USERNAME` and `COURTSIDE_DATABASE_PASSWORD` and runs no `db` service of its own;
+with `compose.database-identities.yaml` the URL is the only one of the three it reads. The
+certificate that host serves has to name the host the URL names.
 
 Do not put an `ssl` or `gssEncMode` argument, or a `service` name, in that URL, and do not set one
 as a driver property on the pool. Each decides the transport behind the verification, a URL
@@ -801,14 +806,52 @@ data, not PostgreSQL roles or their passwords, so restore the archive into an al
 target and run setup again; do not restore retired credential files with it.
 
 The database TLS and identity overlays are independent. To use both, name both with `--overlay`;
-`recipe.sh` lists the identity overlay before `compose.database-tls.yaml`, and setup, migration,
-and runtime then use the same `verify-full` policy and trust anchor, while retaining separate
-credentials.
+`recipe.sh` lists the identity overlay before `compose.database-tls.yaml`, and all three processes
+then mount the same trust anchor, while retaining separate credentials. They do not share the
+policy: `compose.database-tls.yaml` sets `verify-full` on the application alone, and setup and
+migration read `COURTSIDE_DB_TLS_MODE`, which defaults to `prefer`. Set it to `verify-full` in
+`.env` to hold the owner and migration credentials to the same transport.
 
 Courtside owns these inputs, minimum grants, refusal behavior, and the one-shot setup and migration
 commands. The operator owns creation and storage of the files, rotation timing, revocation,
 destruction, database-owner recovery, and any vault or certificate infrastructure. None of those
 systems, a second approver, or this optional overlay is required for normal operation.
+
+### With a database somewhere else
+
+Everything above about the three credentials, their files and their rotation holds here too. What
+does not is the bundled database itself: this recipe runs no PostgreSQL container, so nothing
+initializes the owner from its password file and `POSTGRES_PASSWORD` has no meaning. The overlay
+resolves on `existing-infrastructure`:
+
+```sh
+./recipe.sh files existing-infrastructure --overlay database-identities | paste -sd: -
+docker compose up -d
+```
+
+`COURTSIDE_DATABASE_USERNAME` and `COURTSIDE_DATABASE_PASSWORD` are then neither needed nor read:
+the three password files replace that one shared credential, and setup connects as the role
+`COURTSIDE_DB_OWNER_USERNAME` names. Set that variable. Its default `courtside_owner` is a name no
+provider hands out, and setup cannot authenticate as a role that does not exist. The role is one the
+database provider gave the club. It has to own the database and be allowed to create roles, and it
+does not have to be a superuser, which is what makes this usable on a managed PostgreSQL.
+`COURTSIDE_DATABASE_URL` still names the host.
+
+Give Courtside a database of its own. Setup hands schema `public`, every relation in it and every
+function it did not get from an extension to the migration role, and revokes `CREATE` there from
+`PUBLIC`, so another application sharing that database would lose the rights to its own objects. It
+also revokes `CREATE` and `TEMPORARY` on the database from `PUBLIC`, which stops a job that only ever
+needed a temporary table. Roles are not database-scoped: a role already named
+`COURTSIDE_DB_MIGRATION_USERNAME` or `COURTSIDE_DB_RUNTIME_USERNAME` anywhere in the cluster is the
+one setup reconciles, and it loses its memberships and its password to that. Pick names nothing else
+in the cluster uses.
+
+Setup and migration reach that host over an egress network of their own. Nothing else joins it, and
+they never join the internal one, which this recipe does not create because it runs no database.
+
+A database the deployment does not own is worth verifying, so combine it with the `database-tls`
+overlay. Read what the two overlays being independent means above before you do; the policy is not
+shared.
 
 ## Encrypting the connection between the proxy and the application
 
@@ -886,8 +929,8 @@ default.
 |---|---|---|
 | `COURTSIDE_VERSION` | *required* | The release to run, optionally with `@sha256:…`. Pin it. |
 | `POSTGRES_PASSWORD` | *required without `compose.database-identities.yaml`* | Shared database password used by the standard deployment only. Leave it empty when the identity overlay supplies file-backed credentials. |
-| `COURTSIDE_DB_OWNER_USERNAME` | `courtside_owner` | Setup role used by `compose.database-identities.yaml`. On an existing standard volume, set this to `courtside`. |
-| `COURTSIDE_DB_OWNER_PASSWORD_FILE` | *required with `compose.database-identities.yaml`* | Host path to the current database-owner password file. It is mounted only into PostgreSQL and the setup process. |
+| `COURTSIDE_DB_OWNER_USERNAME` | `courtside_owner` | Setup role used by `compose.database-identities.yaml`. On an existing standard volume, set this to `courtside`. With an external database the role has to exist already, so the default is almost never right; that combination refuses to resolve until you set this. |
+| `COURTSIDE_DB_OWNER_PASSWORD_FILE` | *required with `compose.database-identities.yaml`* | Host path to the current database-owner password file. It is mounted into the setup process, and into PostgreSQL where this deployment runs one. |
 | `COURTSIDE_DB_MIGRATION_USERNAME` | `courtside_migration` | Role used only by the one-shot Flyway process. |
 | `COURTSIDE_DB_MIGRATION_PASSWORD_FILE` | *required with `compose.database-identities.yaml`* | Host path to the migration role's password file. |
 | `COURTSIDE_DB_RUNTIME_USERNAME` | `courtside_runtime` | Bounded role used by the running application. |
@@ -934,8 +977,8 @@ default.
 | `COURTSIDE_MAIL_MEMORY` | `512m` | Memory ceiling for the mail server, which is the one container taking unauthenticated traffic from the internet. |
 | `COURTSIDE_MEMORY` | `1g` | Memory ceiling for the application container. |
 | `COURTSIDE_DATABASE_URL` | *required with an external database* | JDBC URL of the PostgreSQL 17 database the `existing-infrastructure` recipe uses, for example `jdbc:postgresql://database.example.org:5432/courtside`. |
-| `COURTSIDE_DATABASE_USERNAME` | *required with an external database* | The role the application signs in as. |
-| `COURTSIDE_DATABASE_PASSWORD` | *required with an external database* | That role's password. |
+| `COURTSIDE_DATABASE_USERNAME` | *required with an external database and without `compose.database-identities.yaml`* | The role the application signs in as. The identity overlay replaces it with file-backed credentials. |
+| `COURTSIDE_DATABASE_PASSWORD` | *required with an external database and without `compose.database-identities.yaml`* | That role's password. |
 | `COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES` | *required with synthetic mail* | Host directory holding `cert.pem` and `key.pem`, the certificate Mailpit serves for STARTTLS. |
 | `COURTSIDE_ACCEPTANCE_MAIL_USER` | *required with synthetic mail* | The `uid:gid` Mailpit runs as, one that can read that key. |
 | `COURTSIDE_ACCEPTANCE_MAIL_PORT` | `8025` | Host port on the loopback interface where Mailpit shows the messages it kept. |

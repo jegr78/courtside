@@ -44,6 +44,7 @@ const databaseTls = {
   COURTSIDE_DB_TLS_CERTIFICATE: "/srv/courtside/database-tls/server.crt",
   COURTSIDE_DB_TLS_KEY: "/srv/courtside/database-tls/server.key",
 };
+const externalOwner = { COURTSIDE_DB_OWNER_USERNAME: "club_owner" };
 const separateIdentities = {
   COURTSIDE_DB_OWNER_PASSWORD_FILE: "/srv/courtside/database-owner-password",
   COURTSIDE_DB_MIGRATION_PASSWORD_FILE: "/srv/courtside/database-migration-password",
@@ -294,12 +295,64 @@ test("given the existing-infrastructure recipe, when it is rendered, then the ap
     assert.equal(Object.keys(app.networks).includes("database"), false);
   });
 
+test("given separate identities on an external database, when the recipe is rendered, then each process holds its own credential",
+  () => {
+    // given
+    const files = resolved("files", "existing-infrastructure", "--overlay", "database-identities");
+
+    // when
+    const environment = { ...common, ...caddy, COURTSIDE_DATABASE_URL: externalDatabase.COURTSIDE_DATABASE_URL,
+      ...separateIdentities, ...smtpRelay };
+    const model = rendered(files, { ...environment, ...externalOwner });
+    const { app, "database-setup": setup, "database-migrate": migrate } = model.services;
+
+    // then
+    assert.equal(files.includes("compose.external-database.yaml"), false,
+      "the shared credential the separated identities replace is still demanded");
+    assert.equal(model.services.db, undefined, "the recipe still runs a database of its own");
+    assert.equal(Object.keys(model.networks ?? {}).includes("database"), false);
+    for (const [name, process] of Object.entries({ app, setup, migrate })) {
+      assert.equal(process.environment.SPRING_DATASOURCE_URL, externalDatabase.COURTSIDE_DATABASE_URL,
+        `${name} reads another database`);
+      assert.equal(Object.keys(process.networks ?? {}).includes("database"), false,
+        `${name} still joins the network only the bundled database has`);
+    }
+    for (const process of [setup, migrate]) {
+      assert.deepEqual(Object.keys(process.networks), ["database-egress"]);
+    }
+    assert.match(render(files, environment).error,
+      /required variable COURTSIDE_DB_OWNER_USERNAME is missing/,
+      "the default owner role name is accepted, and no provider hands that name out");
+    const plain = rendered(resolved("files", "existing-infrastructure"),
+      { ...common, ...caddy, ...externalDatabase, ...smtpRelay });
+    assert.deepEqual(Object.keys(app.networks), Object.keys(plain.services.app.networks),
+      "the overlay changed which networks the application joins, and it has no reason to");
+    const egressMembers = (rendering) => Object.entries(rendering.services)
+      .filter(([, process]) => Object.keys(process.networks ?? {}).includes("database-egress"))
+      .map(([name]) => name).sort();
+    assert.deepEqual(egressMembers(model), ["database-migrate", "database-setup"],
+      "the guide promises that nothing else joins the egress network");
+    const synthetic = rendered(
+      resolved("files", "existing-infrastructure", "--overlay", "database-identities", "--synthetic-mail"),
+      { ...environment, ...externalOwner, ...syntheticMail });
+    assert.deepEqual(egressMembers(synthetic), ["database-migrate", "database-setup"],
+      "another overlay reached the egress network reserved for the two one-shot processes");
+    assert.equal(setup.depends_on, undefined, "setup still waits for a database this recipe does not run");
+    assert.equal(migrate.depends_on["database-setup"].condition, "service_completed_successfully");
+    assert.equal(app.depends_on["database-migrate"].condition, "service_completed_successfully");
+    assert.equal(app.environment.COURTSIDE_DB_IDENTITY_MODE, "separate");
+    assert.equal(app.environment.SPRING_DATASOURCE_USERNAME, undefined);
+    assert.equal(app.environment.SPRING_DATASOURCE_PASSWORD, undefined);
+    assert.equal(setup.environment.COURTSIDE_DB_OWNER_PASSWORD_FILE, "/run/secrets/database-owner-password");
+  });
+
 test("given a recipe and the identity overlay, when it is rendered, then no shared credential survives for the application",
   () => {
     let covered = 0;
     for (const [name, recipe] of Object.entries(recipes)) {
-      if (recipe.files.includes("compose.external-database.yaml")) continue;
-      const hardened = ["database-identities", "database-tls", "database-tls-local"];
+      const bundled = !recipe.files.includes("compose.external-database.yaml");
+      const hardened = ["database-identities", "database-tls"];
+      if (bundled) hardened.push("database-tls-local");
       if (recipe.files.includes("compose.caddy.yaml")) hardened.push("app-tls");
 
       for (const overlays of [["database-identities"], hardened]) {
@@ -308,7 +361,8 @@ test("given a recipe and the identity overlay, when it is rendered, then no shar
         const files = resolved("files", name, ...overlays.flatMap((overlay) => ["--overlay", overlay]));
 
         // when
-        const app = rendered(files, { ...recipe.environment, ...separateIdentities, ...databaseTls }).services.app;
+        const app = rendered(files, { ...recipe.environment, ...separateIdentities, ...externalOwner,
+          ...databaseTls }).services.app;
 
         // then
         assert.equal(app.environment.COURTSIDE_DB_IDENTITY_MODE, "separate");
@@ -320,6 +374,41 @@ test("given a recipe and the identity overlay, when it is rendered, then no shar
       }
     }
     assert.ok(covered > 0, "no recipe reached the identity overlay, so this read nothing");
+  });
+
+test("given the identity and database TLS overlays, when they are combined, then only the application is held to verify-full",
+  () => {
+    // given
+    const chains = {
+      funnel: {
+        files: resolved("files", "funnel", "--overlay", "database-identities", "--overlay", "database-tls",
+          "--overlay", "database-tls-local"),
+        environment: { ...recipes.funnel.environment, ...separateIdentities, ...databaseTls },
+      },
+      "existing-infrastructure": {
+        files: resolved("files", "existing-infrastructure", "--overlay", "database-identities",
+          "--overlay", "database-tls"),
+        environment: { ...common, ...caddy, COURTSIDE_DATABASE_URL: externalDatabase.COURTSIDE_DATABASE_URL,
+          ...separateIdentities, ...externalOwner, ...databaseTls, ...smtpRelay },
+      },
+    };
+
+    for (const [recipe, chain] of Object.entries(chains)) {
+      // when
+      const model = rendered(chain.files, chain.environment);
+      const hardened = rendered(chain.files, { ...chain.environment, COURTSIDE_DB_TLS_MODE: "verify-full" });
+
+      // then
+      for (const process of ["database-setup", "database-migrate"]) {
+        assert.equal(model.services[process].environment.COURTSIDE_DB_TLS_MODE, "prefer",
+          `${recipe}: ${process} would verify the certificate without the operator asking`);
+        assert.equal(hardened.services[process].environment.COURTSIDE_DB_TLS_MODE, "verify-full",
+          `${recipe}: ${process} ignores the policy the guide tells an operator to set`);
+        assert.equal(model.services[process].environment.COURTSIDE_DB_TLS_ROOT_CERTIFICATE,
+          model.services.app.environment.COURTSIDE_DB_TLS_ROOT_CERTIFICATE);
+      }
+      assert.equal(model.services.app.environment.COURTSIDE_DB_TLS_MODE, "verify-full");
+    }
   });
 
 test("given every resolvable chain, when a component resets an environment value, then no earlier component wrote it",
@@ -358,12 +447,17 @@ test("given a recipe and hardening overlays, when they are named in any order, t
   assert.deepEqual(backwards, forwards);
   assert.deepEqual(resolved("files", "existing-infrastructure", "--overlay", "database-tls"),
     [...recipes["existing-infrastructure"].files, "compose.database-tls.yaml"]);
+  const [externalBase, external, ...externalComponents] = recipes["existing-infrastructure"].files;
+  assert.equal(external, "compose.external-database.yaml");
+  assert.deepEqual(resolved("files", "existing-infrastructure", "--overlay", "database-identities",
+    "--overlay", "database-tls"),
+  [externalBase, "compose.database-identities.yaml", ...externalComponents, "compose.database-tls.yaml",
+    "compose.external-database-identities.yaml"],
+  "the separated overlay has to stay last, or its resets no longer reach what the chain already set");
 });
 
 test("given combinations no recipe can run, when they are resolved, then each is refused with its reason", () => {
   // given / when / then
-  refused(["files", "existing-infrastructure", "--overlay", "database-identities"],
-    /database-identities needs the bundled database/);
   refused(["files", "existing-infrastructure", "--overlay", "database-tls", "--overlay", "database-tls-local"],
     /database-tls-local needs the bundled database/);
   refused(["files", "standard", "--overlay", "database-tls-local"], /database-tls-local needs database-tls/);
@@ -543,6 +637,7 @@ test("given the component manifests, when the resolver's files are compared, the
     const selectable = new Set();
     for (const name of Object.keys(recipes)) resolved("files", name).forEach((f) => selectable.add(f));
     resolved("files", "existing-infrastructure", "--overlay", "database-tls").forEach((f) => selectable.add(f));
+    resolved("files", "existing-infrastructure", "--overlay", "database-identities").forEach((f) => selectable.add(f));
     resolved("files", "standard", "--overlay", "database-identities", "--overlay", "database-tls",
       "--overlay", "database-tls-local", "--overlay", "app-tls").forEach((f) => selectable.add(f));
     resolved("files", "standard", "--synthetic-mail").forEach((f) => selectable.add(f));

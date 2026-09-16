@@ -456,7 +456,7 @@ public class ReferenceDeploymentSecurityTest {
         Map<String, List<String>> published = new LinkedHashMap<>();
         for (JsonNode composeFile : inventory.path("sources").path("composeFiles")) {
             String source = Files.readString(Path.of(composeFile.asString()))
-                    .replace("!reset null", "null").replace("!reset {}", "{}");
+                    .replace("!reset null", "null").replace("!reset {}", "{}").replace("!override", "");
             Map<String, Object> compose = new Yaml().load(source);
             Map<String, Map<String, Object>> sourceServices =
                     (Map<String, Map<String, Object>>) compose.get("services");
