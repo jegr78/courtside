@@ -40,7 +40,7 @@ jobs:
       - name: Validate the release pull request branch
         if: steps.release.outputs.prs_created == 'true'
         env:
-          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
         run: |
           git check-ref-format --branch "$RELEASE_PR_BRANCH"
           case "$RELEASE_PR_BRANCH" in
@@ -62,7 +62,7 @@ jobs:
         if: steps.release.outputs.prs_created == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          ref: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           path: release-pr
           fetch-depth: 0
@@ -75,7 +75,7 @@ jobs:
       - name: Commit the normalized changelog
         if: steps.release.outputs.prs_created == 'true'
         env:
-          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          RELEASE_PR_BRANCH: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
           RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         working-directory: release-pr
         run: |
