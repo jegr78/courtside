@@ -101,11 +101,9 @@ files() {
   if [ -n "$synthetic" ] && [ "$mail" != "smtp-relay" ]; then
     refuse "synthetic mail replaces an external SMTP relay, and $name runs its own mail server"
   fi
-  for overlay in database-identities database-tls-local; do
-    if contains "$overlays" "$overlay" && [ "$database" != "bundled" ]; then
-      refuse "$overlay needs the bundled database, and $name uses an external one"
-    fi
-  done
+  if contains "$overlays" database-tls-local && [ "$database" != "bundled" ]; then
+    refuse "database-tls-local needs the bundled database, and $name uses an external one"
+  fi
   if contains "$overlays" database-tls-local && ! contains "$overlays" database-tls; then
     refuse "database-tls-local needs database-tls, or the application does not verify what the database serves"
   fi
@@ -119,11 +117,16 @@ files() {
     require_port Stalwart 25
   fi
 
+  local separated=""
+  if [ "$database" = "external" ] && contains "$overlays" database-identities; then
+    separated=yes
+  fi
+
   echo compose.yaml
   # Compose applies a reset only against what earlier files set, so the identity overlay has to drop
   # the shared credential before any other component writes the same environment map.
   contains "$overlays" database-identities && echo compose.database-identities.yaml
-  [ "$database" = "external" ] && echo compose.external-database.yaml
+  [ "$database" = "external" ] && [ -z "$separated" ] && echo compose.external-database.yaml
   echo compose.caddy.yaml
   if [ "$ingress" = "caddy" ]; then
     echo compose.caddy-public.yaml
@@ -140,6 +143,7 @@ files() {
       echo "compose.$overlay.yaml"
     fi
   done
+  [ -n "$separated" ] && echo compose.external-database-identities.yaml
   return 0
 }
 

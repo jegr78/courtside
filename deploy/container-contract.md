@@ -213,7 +213,9 @@ variables with other names:
 
 - `POSTGRES_PASSWORD` becomes `SPRING_DATASOURCE_PASSWORD`, and with an external database
   `COURTSIDE_DATABASE_URL`, `COURTSIDE_DATABASE_USERNAME` and `COURTSIDE_DATABASE_PASSWORD` become
-  `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`;
+  `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`. With
+  separated identities on an external database neither username nor password is read, and every
+  process takes its URL from `COURTSIDE_DATABASE_URL`;
 - `COURTSIDE_LOG_LEVEL` becomes `LOGGING_LEVEL_ORG_COURTSIDE`;
 - `COURTSIDE_MAIL_SENDER_USERNAME` and `COURTSIDE_MAIL_DOMAIN` become `COURTSIDE_MAIL_FROM`, and with
   this deployment's own mail server also `COURTSIDE_MAIL_USERNAME`;

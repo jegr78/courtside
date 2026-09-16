@@ -1,0 +1,31 @@
+services:
+  db: !reset null
+
+  database-setup:
+    depends_on: !reset {}
+    environment:
+      SPRING_DATASOURCE_URL: ${COURTSIDE_DATABASE_URL:?set COURTSIDE_DATABASE_URL in .env}
+      COURTSIDE_DB_OWNER_USERNAME: ${COURTSIDE_DB_OWNER_USERNAME:?set COURTSIDE_DB_OWNER_USERNAME in .env}
+    networks: !override
+      - database-egress
+
+  database-migrate:
+    environment:
+      SPRING_DATASOURCE_URL: ${COURTSIDE_DATABASE_URL:?set COURTSIDE_DATABASE_URL in .env}
+    networks: !override
+      - database-egress
+
+  app:
+    depends_on:
+      db: !reset null
+    environment:
+      SPRING_DATASOURCE_URL: ${COURTSIDE_DATABASE_URL:?set COURTSIDE_DATABASE_URL in .env}
+    networks:
+      database: !reset null
+
+networks:
+  database: !reset null
+  database-egress:
+
+volumes:
+  db: !reset null
