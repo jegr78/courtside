@@ -5,11 +5,11 @@
     "compose": "deploy/compose.yaml",
     "composeFiles": [
       "deploy/compose.yaml",
+      "deploy/compose.database-identities.yaml",
       "deploy/compose.external-database.yaml",
       "deploy/compose.caddy.yaml",
       "deploy/compose.smtp-relay.yaml",
       "deploy/compose.stalwart.yaml",
-      "deploy/compose.database-identities.yaml",
       "deploy/compose.database-tls.yaml",
       "deploy/compose.database-tls-local.yaml",
       "deploy/compose.app-tls.yaml"

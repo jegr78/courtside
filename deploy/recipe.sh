@@ -123,6 +123,9 @@ files() {
   fi
 
   echo compose.yaml
+  # Compose applies a reset only against what earlier files set, so the identity overlay has to drop
+  # the shared credential before any other component writes the same environment map.
+  contains "$overlays" database-identities && echo compose.database-identities.yaml
   [ "$database" = "external" ] && echo compose.external-database.yaml
   [ "$ingress" = "caddy" ] && echo compose.caddy.yaml
   if [ -n "$synthetic" ]; then
@@ -131,7 +134,9 @@ files() {
     echo "compose.$mail.yaml"
   fi
   for overlay in $overlay_order; do
-    contains "$overlays" "$overlay" && echo "compose.$overlay.yaml"
+    if [ "$overlay" != database-identities ] && contains "$overlays" "$overlay"; then
+      echo "compose.$overlay.yaml"
+    fi
   done
   return 0
 }
