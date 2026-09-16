@@ -108,12 +108,11 @@ test("given the archive alone, when a recipe is rendered from it, then every bou
 
     // then
     assert.ok(sources.length > 0, "the rendered model bound no file, so this proves nothing");
+    assert.deepEqual(sources.filter((source) => !source.startsWith(`${root}/`)), [],
+      "the archive reaches outside itself for a file");
     for (const source of sources) {
-      if (!source.startsWith(root)) continue;
       assert.ok(existsSync(source), `the archive binds ${relative(root, source)} and does not carry it`);
     }
-    const escaped = sources.filter((source) => !source.startsWith(root) && !source.startsWith("/tmp"));
-    assert.deepEqual(escaped, [], "the archive reaches outside itself for a file");
   });
 });
 

@@ -115,6 +115,11 @@ export function refuseSecrets(entries) {
   return entries;
 }
 
+function byPath(left, right) {
+  // Code-unit order, because a locale comparison would tie the published bytes to an ICU version.
+  return left.path < right.path ? -1 : left.path > right.path ? 1 : 0;
+}
+
 function digestOf(content) {
   return createHash("sha256").update(content).digest("hex");
 }
@@ -184,7 +189,7 @@ export function buildArchive({ deploy, version, revision, image, repository, ref
   const prefix = `courtside-deployment-${version}`;
   const carried = [...entries, { path: "manifest.json", mode: 0o644,
     content: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8") }]
-    .sort((left, right) => left.path.localeCompare(right.path, "en"))
+    .sort(byPath)
     .map((entry) => ({ ...entry, path: posix.join(prefix, entry.path) }));
   const zip = zipOf(carried);
   return { zip, manifest, sha256: digestOf(zip), name: `${prefix}.zip` };

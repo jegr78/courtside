@@ -24,7 +24,7 @@ The application container may use up to 1 GiB of memory. An idle instance with a
 uses about 450 MiB. Increase `COURTSIDE_MEMORY` if the instance reaches its limit.
 
 For the repository's local Dev and UAT environments, use the
-[local environment guide](../docs/local-environments.md). This document covers the production
+[local environment guide](https://github.com/jegr78/courtside/blob/main/docs/local-environments.md). This document covers the production
 reference deployment only.
 
 To run the image on another platform without these recipes, read the
@@ -1062,7 +1062,7 @@ management using Spring's
 to `.env`. The collector and its retention policy remain the operator's responsibility.
 
 Courtside's security events use the stable catalogue described in
-[`docs/security-events.md`](../docs/security-events.md) and remain in the same ECS standard-output
+[`docs/security-events.md`](https://github.com/jegr78/courtside/blob/main/docs/security-events.md) and remain in the same ECS standard-output
 stream. Docker logging drivers, sidecars and collectors are optional ways to route that stream; the
 reference deployment makes no synchronous external delivery call and does not assert that a
 destination accepted an event. Operators remain responsible for choosing a logging configuration
