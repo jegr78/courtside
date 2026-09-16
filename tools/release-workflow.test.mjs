@@ -27,7 +27,7 @@ test("given a release image, when publishing it, then the same digest is qualifi
   assert.match(workflow, /node tools\/courtside\.uat-smoke\.mjs --confirm courtside-uat/);
   assert.match(workflow, /\n  security-record:\n    needs: \[build, image, qualify, active-security\]/);
   assert.match(workflow,
-    /\n  publish:\n    needs: \[build, browser, image, qualify, security-record, upgrade, restore\]/);
+    /\n  publish:\n    needs: \[archive, build, browser, image, qualify, security-record, upgrade, restore\]/);
 });
 
 test("given a release build, when browser tests run, then WebKit axe qualification is required", () => {

@@ -73,7 +73,9 @@ test("given the release body, when the document promises what it carries, then t
     // when / then
     assert.ok(publish, "the release no longer publishes through the action this document describes");
     for (const file of publish.with.files.trim().split("\n").map((line) => line.trim())) {
-      const name = file.split("/").pop();
+      // A versioned asset is attached by pattern, and the document names the stem before the wildcard.
+      const name = file.split("/").pop().split("*")[0];
+      assert.ok(name.length > 0, `the release attaches ${file}, which names nothing a reader can look up`);
       assert.ok(document.includes(name.replace(/\.[a-z]+$/, "")) || document.includes(name),
         `the release attaches ${name} and docs/releasing.md does not mention it`);
     }

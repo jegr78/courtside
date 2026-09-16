@@ -203,8 +203,8 @@ test("given the release workflow, when it publishes, then it attaches the archiv
     "publish does not download the archive that was built once");
   assert.ok(!publish.includes("deployment-archive.mjs"),
     "publish builds the archive a second time instead of publishing the qualified bytes");
-  assert.match(publish, /files: \|[\s\S]*build\/\$\{\{ needs\.archive\.outputs\.name \}\}/,
+  assert.match(publish, /files: \|[\s\S]*build\/courtside-deployment-\*/,
     "the release page does not carry the archive");
-  assert.match(publish, /attest-build-provenance[\s\S]*subject-path: build\/\$\{\{ needs\.archive\.outputs\.name \}\}/,
+  assert.match(publish, /attest-build-provenance[\s\S]*subject-path: build\/courtside-deployment-\*\.zip/,
     "the archive is published with a checksum and no provenance");
 });
