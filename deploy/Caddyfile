@@ -1,17 +1,24 @@
 {
 	auto_https disable_redirects
+	servers {
+		trusted_proxies static {$COURTSIDE_TRUSTED_PROXIES:127.0.0.1/32 ::1/128}
+		client_ip_headers X-Forwarded-For
+		trusted_proxies_strict
+	}
 }
 
 # Caddy applies header deletions after the sets, whatever the line order, so a name set below
 # must not be deleted above: the deletion would take the value this proxy just asserted.
 (applicationHeaders) {
 	header_up -Forwarded
-	header_up -X-Forwarded-Port
 	header_up -X-Forwarded-Prefix
 	header_up -X-Forwarded-Ssl
-	header_up X-Forwarded-For {remote_host}
+	header_up X-Forwarded-For {client_ip}
+	# Caddy calls this redundant for an untrusted client, but a trusted proxy may supply the header;
+	# assert the accepted host explicitly so that trust in its client address does not extend to it.
 	header_up X-Forwarded-Host {host}
-	header_up X-Forwarded-Proto {scheme}
+	header_up X-Forwarded-Port 443
+	header_up X-Forwarded-Proto https
 }
 
 (plaintext) {
@@ -29,6 +36,16 @@
 			tls_trust_pool file /etc/courtside/tls/app-authority/authority.pem
 		}
 	}
+}
+
+(publicIngress) {
+	import {$COURTSIDE_APP_TLS_MODE:plaintext}
+}
+
+(forwardedIngress) {
+	@notForwardedHttps not header X-Forwarded-Proto https
+	respond @notForwardedHttps "Secure outer ingress is required." 400
+	import {$COURTSIDE_APP_TLS_MODE:plaintext}
 }
 
 http://:80 {
@@ -59,7 +76,7 @@ http://:80 {
 	}
 }
 
-{$COURTSIDE_DOMAIN} {
+{$COURTSIDE_SITE_ADDRESS} {
 	encode zstd gzip
 
 	request_body {
@@ -96,7 +113,7 @@ http://:80 {
 	}
 	method @unknownMethod PATCH
 
-	import {$COURTSIDE_APP_TLS_MODE:plaintext}
+	import {$COURTSIDE_INGRESS_MODE:publicIngress}
 }
 
 import /etc/caddy/sites.d/*.caddy

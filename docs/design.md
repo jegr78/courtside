@@ -379,7 +379,9 @@ worker request cannot replace the token held by a signed-in page.
 
 Rate limiting runs before password verification. Source buckets contain concentrated attempts, and
 a concurrency guard bounds Argon2 work. Distributed attempts produce a privacy-safe metric and log
-event instead of an instance-wide lockout an anonymous caller could hold closed.
+event instead of an instance-wide lockout an anonymous caller could hold closed. Caddy replaces the
+client-address header before the application sees it, and the reference deployment publishes no
+application port that could bypass that assertion.
 
 The application sets `Content-Security-Policy`, `X-Content-Type-Options: nosniff`,
 `X-Frame-Options: DENY` and `Referrer-Policy: strict-origin-when-cross-origin` on its own responses.
@@ -387,11 +389,13 @@ For secure requests, Spring Security also sets `Strict-Transport-Security`. Cadd
 frame denial and the referrer policy at the edge. `Permissions-Policy` is the only response policy
 here that comes only from Caddy.
 
-The `standard` and `full-self-hosted` recipes route traffic through Caddy, which terminates TLS and
-replaces forwarding headers. The `funnel` and `existing-infrastructure` recipes publish the
-application on a loopback port for an operator-owned HTTPS ingress. In those recipes, that ingress
-owns forwarded-header normalization, request limits and the response policies otherwise added by
-Caddy.
+Every supported recipe routes web traffic through Caddy. The `standard` and `full-self-hosted`
+recipes let Caddy terminate public TLS on ports 80 and 443. The `funnel` and
+`existing-infrastructure` recipes put an operator-owned HTTPS ingress in front of Caddy's
+loopback-only listener. That outer ingress replaces client forwarding headers and supplies an exact
+HTTPS signal. Caddy accepts client-address metadata only from the documented same-host boundary,
+refuses another scheme, normalizes every header sent to the application and applies the same host,
+request-size, error and response-header policy as the public path.
 
 Verified TLS to PostgreSQL and between Caddy and the application is optional hardening. Enabling it
 fails closed on inconsistent certificates, keys, authorities or transport settings. The standard

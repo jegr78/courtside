@@ -142,10 +142,11 @@ The application trusts the forwarded headers of every request it receives: `Forw
 `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Port`, `X-Forwarded-Prefix`,
 `X-Forwarded-Proto` and `X-Forwarded-Ssl`. It takes the client address from them, which is what
 sign-in and account-recovery throttling count, and the scheme and host it answers for. So port 8080
-must be reachable only from the ingress and the health probe. The ingress must discard every one of those headers a
-client sends, then write `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto: https`
-itself. It writes `X-Forwarded-For` as a single value, the address of the member's own device, taken
-from the connection or from an upstream hop that has already sanitised it. The application counts
+must be reachable only from the ingress and the health probe. The ingress must discard every one of
+those headers a client sends, then write `X-Forwarded-For`, `X-Forwarded-Host`,
+`X-Forwarded-Port: 443` and `X-Forwarded-Proto: https` itself. It writes `X-Forwarded-For` as a
+single value, the address of the member's own device, taken from the connection or from an upstream
+hop that has already sanitised it. The application counts
 the first value, so an ingress that appends lets a client choose its address, and one behind a load
 balancer that writes the balancer's address puts every member into one throttling bucket.
 

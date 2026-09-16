@@ -1,0 +1,14 @@
+services:
+  proxy:
+    environment:
+      COURTSIDE_INGRESS_MODE: publicIngress
+      COURTSIDE_SITE_ADDRESS: ${COURTSIDE_DOMAIN:?set COURTSIDE_DOMAIN in .env}
+    networks:
+      proxy-egress:
+        gw_priority: 1
+    ports:
+      - "80:80"
+      - "443:443"
+
+networks:
+  proxy-egress:

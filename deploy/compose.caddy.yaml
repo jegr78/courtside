@@ -20,13 +20,9 @@ services:
         condition: service_healthy
     environment:
       COURTSIDE_DOMAIN: ${COURTSIDE_DOMAIN:?set COURTSIDE_DOMAIN in .env}
+      COURTSIDE_TRUSTED_PROXIES: 127.0.0.1/32 ::1/128
     networks:
       ingress: {}
-      proxy-egress:
-        gw_priority: 1
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -35,7 +31,6 @@ services:
 networks:
   ingress:
     internal: true
-  proxy-egress:
 
 volumes:
   caddy-data:

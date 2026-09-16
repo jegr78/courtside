@@ -346,6 +346,22 @@ test("given the production architecture, when validating it, then every claim sa
   assert.equal(imageRegistry("quay.io/example/image:1"), "quay.io");
 });
 
+test("given a configured target with two classification forms, when validating it, then the schema refuses ambiguity", () => {
+  // given
+  const ambiguous = structuredClone(architecture);
+  const target = ambiguous.sources.configuredTargets.find(({ variants }) => variants);
+  target.productionPath = target.variants[0].productionPath;
+  target.boundaryIds = target.variants[0].boundaryIds;
+  const validateArchitecture = new Ajv({ strict: true, allErrors: true }).compile(architectureSchema);
+
+  // when
+  const valid = validateArchitecture(ambiguous);
+
+  // then
+  assert.equal(valid, false);
+  assert.ok(validateArchitecture.errors.some(({ keyword }) => keyword === "oneOf"));
+});
+
 test("given the reference deployment, when components and published listeners change, then the architecture inventory fails closed", () => {
   // given
   const services = architecture.components.filter(({ source }) => source === "compose")
@@ -441,7 +457,7 @@ test("given the reference deployment networks, when reachability changes, then l
   assert.deepEqual(posture.find(({ service }) => service === "app").networks,
     ["app-egress", "database", "ingress", "relay"]);
   assert.deepEqual(posture.find(({ service }) => service === "proxy").networks,
-    ["ingress", "proxy-egress"]);
+    ["host-ingress", "ingress", "proxy-egress"]);
   for (const helper of ["mail-bootstrap", "mail-configure", "mail-reload"]) {
     assert.deepEqual(sharedNetworks(posture, "mail", helper), ["mail-admin"]);
     assert.deepEqual(sharedNetworks(posture, "app", helper), []);
@@ -587,14 +603,17 @@ test("given effective production network targets, when application or Compose co
   assert.deepEqual(composeClassifications, composeEnvironmentNames());
   assert.equal(new Set(properties).size, properties.length, "a configured target is duplicated");
   for (const target of targets) {
-    const requiredPath = target.target.startsWith("compose:")
-      ? target.productionPath : architecture.sources.application;
-    assert.ok(target.boundaryIds.length > 0, `${target.target} has no boundary`);
-    for (const boundaryId of target.boundaryIds) {
-      const boundary = architecture.trustBoundaries.find(({ id }) => id === boundaryId);
-      assert.ok(boundary, `${target.target} has unknown boundary ${boundaryId}`);
-      assert.ok(boundary.productionPaths.includes(requiredPath),
-        `${target.target} boundary does not cite ${requiredPath}`);
+    const variants = target.variants ?? [{ productionPath: target.productionPath, boundaryIds: target.boundaryIds }];
+    for (const variant of variants) {
+      const requiredPath = target.target.startsWith("compose:")
+        ? variant.productionPath : architecture.sources.application;
+      assert.ok(variant.boundaryIds.length > 0, `${target.target} has no boundary for ${requiredPath}`);
+      for (const boundaryId of variant.boundaryIds) {
+        const boundary = architecture.trustBoundaries.find(({ id }) => id === boundaryId);
+        assert.ok(boundary, `${target.target} has unknown boundary ${boundaryId}`);
+        assert.ok(boundary.productionPaths.includes(requiredPath),
+          `${target.target} boundary does not cite ${requiredPath}`);
+      }
     }
   }
   for (const serviceTarget of configuredComposeServiceTargets()) {
@@ -610,6 +629,17 @@ test("given effective production network targets, when application or Compose co
   } }]), ["application:application-example.yaml:management.zipkin.tracing.endpoint"]);
   assert.deepEqual(composeNetworkTargets({ ZIPKIN_ENDPOINT: "https://collector.example" }),
     ["compose:app:ZIPKIN_ENDPOINT"]);
+});
+
+test("given one proxy target differs by ingress mode, when it is classified, then each defining file owns its boundary", () => {
+  const siteAddress = architecture.sources.configuredTargets
+    .find(({ target }) => target === "compose:proxy:COURTSIDE_SITE_ADDRESS");
+
+  assert.deepEqual(siteAddress.variants, [
+    { productionPath: "deploy/compose.caddy-public.yaml", boundaryIds: ["browser-proxy", "proxy-acme"] },
+    { productionPath: "deploy/compose.caddy-forwarded.yaml",
+      boundaryIds: ["browser-proxy", "operator-proxy-ingress"] },
+  ]);
 });
 
 test("given a trust boundary, when its endpoints and anchors are resolved, then it names real classified components and evidence", () => {

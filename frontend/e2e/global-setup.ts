@@ -183,12 +183,13 @@ function loginSubject(address: string): string {
 
 function clubProxyConfiguration(applicationPort: number): string {
   const applicationHeaders = deployedCaddyBlock("(applicationHeaders) {");
+  const publicIngress = deployedCaddyBlock("(publicIngress) {");
   const plaintext = replaceRequired(
     deployedCaddyBlock("(plaintext) {"), "app:8080", `host.docker.internal:${applicationPort}`);
   const productionSite = replaceRequired(
-    replaceRequired(deployedCaddyBlock("{$COURTSIDE_DOMAIN} {"),
-      "{$COURTSIDE_DOMAIN}", `https://${PROXY_BOUNDARY_HOST}`),
-    "import {$COURTSIDE_APP_TLS_MODE:plaintext}", "import plaintext");
+    replaceRequired(deployedCaddyBlock("{$COURTSIDE_SITE_ADDRESS} {"),
+      "{$COURTSIDE_SITE_ADDRESS}", `https://${PROXY_BOUNDARY_HOST}`),
+    "import {$COURTSIDE_INGRESS_MODE:publicIngress}", "import publicIngress");
   return `{
 	admin off
 	local_certs
@@ -199,6 +200,8 @@ https://${CLUB_HOST} {
 }
 
 ${applicationHeaders}
+
+${publicIngress}
 
 ${plaintext}
 

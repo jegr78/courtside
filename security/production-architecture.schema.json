@@ -38,11 +38,31 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["target", "productionPath", "boundaryIds"],
+            "required": ["target"],
+            "oneOf": [
+              {
+                "required": ["productionPath", "boundaryIds"],
+                "properties": { "productionPath": true, "boundaryIds": true }
+              },
+              { "required": ["variants"], "properties": { "variants": true } }
+            ],
             "properties": {
               "target": { "type": "string", "pattern": "^(application|compose):.+" },
               "productionPath": { "$ref": "#/$defs/path" },
-              "boundaryIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+              "boundaryIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+              "variants": {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["productionPath", "boundaryIds"],
+                  "properties": {
+                    "productionPath": { "$ref": "#/$defs/path" },
+                    "boundaryIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+                  }
+                }
+              }
             }
           }
         },
