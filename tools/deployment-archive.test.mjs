@@ -3,12 +3,11 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync }
   from "node:fs";
-import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
+import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-
-import { createRequire } from "node:module";
 
 import { archiveEntries, buildArchive, emittedComposeFiles, overlayNames, recipeNames, refuseSecrets }
   from "./deployment-archive.mjs";
@@ -340,4 +339,10 @@ test("given the release workflow, when it publishes, then it attaches the archiv
     "the release page does not carry the archive");
   assert.match(publish, /attest-build-provenance[\s\S]*subject-path: build\/courtside-deployment-\*\.zip/,
     "the archive is published with a checksum and no provenance");
+  assert.match(publish, /jq -r \.revision <<< "\$manifest"\)" = "\$GITHUB_SHA"/,
+    "nothing checks that the archive was packed from the commit its manifest claims");
+  assert.match(publish, /jq -r \.image <<< "\$manifest"\)" = "\$IMAGE"/,
+    "nothing checks that the archive names the digest this release publishes");
+  assert.match(publish, /gh attestation verify "build\/courtside-deployment-/,
+    "the archive's own attestation is created and never read back");
 });

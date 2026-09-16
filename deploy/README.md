@@ -7,9 +7,13 @@ unpack it, because a checksum published beside the file it describes proves noth
 
 ```bash
 gh attestation verify courtside-deployment-<version>.zip --repo jegr78/courtside \
-  --signer-workflow jegr78/courtside/.github/workflows/release.yml
+  --signer-workflow jegr78/courtside/.github/workflows/release.yml \
+  --source-ref refs/tags/v<version>
 shasum -a 256 -c courtside-deployment-<version>.zip.sha256
 ```
+
+`--source-ref` is what ties the archive to the tag it claims; without it a genuine archive from any
+release of this project satisfies the check.
 
 `manifest.json` inside the archive names the release, the image digest it was built against, the
 source revision and the signing identity, and carries a SHA-256 for every file beside it. Unpack the
@@ -87,9 +91,12 @@ another one.
 
 Set these values in `.env`:
 
-- `COURTSIDE_VERSION`: an exact release, for example `0.1.0-alpha.1`. Do not use a floating tag;
-  an unattended upgrade of a booking system is not a feature. To pin harder, append the digest:
-  `0.1.0-alpha.1@sha256:…`. Registry tags are mutable, digests are not.
+- `COURTSIDE_VERSION`: the version and the digest its archive was built against, as
+  `0.1.0-alpha.1@sha256:…`. Take the digest from the `image` field of `manifest.json` in the
+  archive. Registry tags are mutable and digests are not, so a bare `0.1.0-alpha.1` leaves whoever
+  can overwrite that tag able to change what your instance runs. Verifying the archive then proves
+  nothing about the application. Never use a floating tag such as `latest`; an unattended upgrade
+  of a booking system is not a feature.
 - `POSTGRES_PASSWORD`, with the bundled database: generate one, for example with
   `openssl rand -base64 32`. It is only ever used between the two containers. With an external
   database, set `COURTSIDE_DATABASE_URL`, `COURTSIDE_DATABASE_USERNAME` and
