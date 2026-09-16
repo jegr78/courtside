@@ -1,7 +1,25 @@
 # Running a Courtside instance
 
 This guide describes the production reference deployment. Each club runs its own Courtside
-instance. Copy this directory, configure `.env` and adapt the deployment to your infrastructure.
+instance. Take `courtside-deployment-<version>.zip` from the release page rather than cloning this
+repository: it holds these files for one released version. Check what you downloaded before you
+unpack it, because a checksum published beside the file it describes proves nothing on its own:
+
+```bash
+gh attestation verify courtside-deployment-<version>.zip --repo jegr78/courtside \
+  --signer-workflow jegr78/courtside/.github/workflows/release.yml \
+  --source-ref refs/tags/v<version>
+shasum -a 256 -c courtside-deployment-<version>.zip.sha256
+```
+
+`gh attestation verify` asks GitHub for the attestation, so `gh` has to be signed in first
+(`gh auth login`, or `GH_TOKEN` set); a token with read access to public repositories is enough.
+`--source-ref` is what ties the archive to the tag it claims; without it a genuine archive from any
+release of this project satisfies the check.
+
+`manifest.json` inside the archive names the release, the image digest it was built against, the
+source revision and the release workflow that attests it, and carries a SHA-256 for every file
+beside it. Unpack the archive, configure `.env` and adapt the deployment to your infrastructure.
 
 You need Docker with Compose 2.33.1 or newer. `compose.yaml` declares this minimum because older
 versions cannot select the dedicated egress networks safely. The file also lists every supported
@@ -11,9 +29,8 @@ that list in sync with the architecture map.
 The application container may use up to 1 GiB of memory. An idle instance with an empty database
 uses about 450 MiB. Increase `COURTSIDE_MEMORY` if the instance reaches its limit.
 
-For the repository's local Dev and UAT environments, use the
-[local environment guide](../docs/local-environments.md). This document covers the production
-reference deployment only.
+For the local Dev and UAT environments, use `docs/local-environments.md` in the Courtside
+repository. This document covers the production reference deployment only.
 
 To run the image on another platform without these recipes, read the
 [container contract](container-contract.md): what the image requires and what the recipes would
@@ -75,9 +92,12 @@ another one.
 
 Set these values in `.env`:
 
-- `COURTSIDE_VERSION`: an exact release, for example `0.1.0-alpha.1`. Do not use a floating tag;
-  an unattended upgrade of a booking system is not a feature. To pin harder, append the digest:
-  `0.1.0-alpha.1@sha256:…`. Registry tags are mutable, digests are not.
+- `COURTSIDE_VERSION`: the version and the digest its archive was built against, as
+  `0.1.0-alpha.1@sha256:…`. Take the digest from the `image` field of `manifest.json` in the
+  archive. Registry tags are mutable and digests are not, so a bare `0.1.0-alpha.1` leaves whoever
+  can overwrite that tag able to change what your instance runs. Verifying the archive then proves
+  nothing about the application. Never use a floating tag such as `latest`; an unattended upgrade
+  of a booking system is not a feature.
 - `POSTGRES_PASSWORD`, with the bundled database: generate one, for example with
   `openssl rand -base64 32`. It is only ever used between the two containers. With an external
   database, set `COURTSIDE_DATABASE_URL`, `COURTSIDE_DATABASE_USERNAME` and
@@ -271,7 +291,7 @@ work through the DNS below, not before, a server that starts is not a server who
 ### Setting it up without touching a wizard
 
 Stalwart normally asks for its configuration through a setup wizard in the browser. This deployment
-does not: `deploy/mail/` holds the configuration as two plans in NDJSON, one operation per line,
+does not: `mail/` holds the configuration as two plans in NDJSON, one operation per line,
 readable and diffable, and `stalwart-cli apply` loads them. The values that differ between clubs
 come from `.env`, so `.env` is the only place any of it is written down.
 
@@ -581,15 +601,16 @@ domain the relay test asks about.
 
 ### Proving it works before a member depends on it
 
-`node tools/courtside.mail-smoke.mjs` brings this same mail server up on a scratch Compose project,
-renders and applies these same plans, and hands it a message over the submission port the way the
-application will, authenticated, over STARTTLS, then reads that message back out of a local sink.
-Before that it offers the same server somebody else's mail on port 25, unauthenticated and with the
-transcript `mail-check.sh` sends, and requires it to refuse: an open relay is the one state in which
-an instance harms people who are not its members, and it is not a state anybody should have to take
-on trust. It tears the project down afterwards and needs Docker and `openssl`. The `mail smoke`
-workflow runs it whenever anything under `deploy/mail/` or in the application's own mail path
-changes, so the configuration a club applies is configuration that has been applied.
+The Courtside repository's own `courtside.mail-smoke` check, which does not run from this archive,
+brings the same mail server up on a scratch Compose project, renders and applies these same plans,
+and hands it a message over the submission port the way the application will, authenticated, over
+STARTTLS, then reads that message back out of a local sink. Before that it offers the same server
+somebody else's mail on port 25, unauthenticated and with the transcript `mail-check.sh` sends, and
+requires it to refuse: an open relay is the one state in which an instance harms people who are not
+its members, and it is not a state anybody should have to take on trust. It tears the project down
+afterwards and needs Docker and `openssl`. The `mail smoke` workflow in that repository runs it
+whenever anything under `mail/` or in the application's mail path changes, so the configuration a
+club applies is configuration that has been applied.
 
 One thing the run does differently on purpose: its Caddy issues from a local authority rather than
 from Let's Encrypt, because a smoke world has no public name to prove. Everything after that is the
@@ -927,7 +948,7 @@ default.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `COURTSIDE_VERSION` | *required* | The release to run, optionally with `@sha256:…`. Pin it. |
+| `COURTSIDE_VERSION` | *required* | The release to run with its digest, `<version>@sha256:…`, from the archive's `manifest.json`. |
 | `POSTGRES_PASSWORD` | *required without `compose.database-identities.yaml`* | Shared database password used by the standard deployment only. Leave it empty when the identity overlay supplies file-backed credentials. |
 | `COURTSIDE_DB_OWNER_USERNAME` | `courtside_owner` | Setup role used by `compose.database-identities.yaml`. On an existing standard volume, set this to `courtside`. With an external database the role has to exist already, so the default is almost never right; that combination refuses to resolve until you set this. |
 | `COURTSIDE_DB_OWNER_PASSWORD_FILE` | *required with `compose.database-identities.yaml`* | Host path to the current database-owner password file. It is mounted into the setup process, and into PostgreSQL where this deployment runs one. |
@@ -1049,13 +1070,12 @@ management using Spring's
 `MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION` environment variables; never commit tokens
 to `.env`. The collector and its retention policy remain the operator's responsibility.
 
-Courtside's security events use the stable catalogue described in
-[`docs/security-events.md`](../docs/security-events.md) and remain in the same ECS standard-output
-stream. Docker logging drivers, sidecars and collectors are optional ways to route that stream; the
-reference deployment makes no synchronous external delivery call and does not assert that a
-destination accepted an event. Operators remain responsible for choosing a logging configuration
-whose outage behavior cannot block requests, as well as storage, access, retention and alert
-thresholds for the installation.
+Courtside's security events use the stable catalogue described in `docs/security-events.md` in the
+Courtside repository and remain in the same ECS standard-output stream. Docker logging drivers,
+sidecars and collectors are optional ways to route that stream; the reference deployment makes no
+synchronous external delivery call and does not assert that a destination accepted an event.
+Operators remain responsible for choosing a logging configuration whose outage behavior cannot block
+requests, as well as storage, access, retention and alert thresholds for the installation.
 
 ## When a member reports an error
 
@@ -1092,7 +1112,9 @@ whose own message names what it turned down, and assert that it stays out of the
 
 ## Upgrading
 
-Raise `COURTSIDE_VERSION`, then:
+Download and verify the archive of the new release as described at the top of this guide, and
+replace the deployment files with its contents, keeping your `.env`. Set `COURTSIDE_VERSION` to the
+new `<version>@sha256:…` from its `manifest.json`, then:
 
 ```sh
 docker compose pull app

@@ -10,8 +10,9 @@ answers, reads, trusts, reaches and refuses. Changing any of it is a breaking ch
 platform, such as which kind of probe to use, Kubernetes service links or what the reference Caddy
 adds, is guidance and not part of the contract.
 
-`tools/container-contract.test.mjs` reads the Dockerfile, the application configuration, the
-migrations, the reference Compose and Caddy files and the Java that refuses a start, and fails when
+In the Courtside repository, `tools/container-contract.test.mjs` reads the Dockerfile, the
+application configuration, the migrations, the reference Compose and Caddy files and the Java that
+refuses a start, and fails when
 this page stops stating the user, port, writable path, health check and response, extension, one-shot
 commands and their input, forwarded headers, mail transport, file inputs and variable set they
 define.

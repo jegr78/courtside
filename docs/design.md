@@ -54,9 +54,14 @@ A tagged release publishes a multi-architecture image on GHCR, its OpenAPI docum
 a software bill of materials and provenance. The release workflow signs the image with cosign. A
 release candidate follows the same qualification path but receives no floating version tag.
 
-The reference deployment lives in `deploy/`. A release archive contains the Compose files,
-configuration example and lifecycle commands for the same application version. Its recipes are
-`standard`, `full-self-hosted`, `existing-infrastructure` and `funnel`.
+The reference deployment lives in `deploy/`. Its recipes are `standard`, `full-self-hosted`,
+`existing-infrastructure` and `funnel`. A tagged release also publishes
+`courtside-deployment-<version>.zip`: the four recipes and the resolver that reads them, the Compose
+files any recipe can select, the files those Compose files bind, the configuration example, the
+deployment guide and the container contract, with a manifest naming the release, its image digest,
+its source revision and the release workflow that attests it. The manifest carries a checksum per
+file and the release page carries one for the archive. Installing from it needs no clone of this
+repository.
 
 Two interfaces are public compatibility contracts:
 

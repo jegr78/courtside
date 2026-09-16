@@ -745,6 +745,7 @@
         "deploy/.env.example",
         "deploy/compose.stalwart.yaml",
         "deploy/mail-check.sh",
+        "tools/deployment-archive.test.mjs",
         "tools/deployment-recipes.test.mjs",
         "tools/mail-check.test.mjs"
       ]

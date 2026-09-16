@@ -33,6 +33,8 @@
     { "path": "tools/dependency-remediation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/dependency-snapshot.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/dependency-snapshot.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/deployment-archive.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/deployment-archive.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/deployment-documentation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/deployment-recipes.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/design-documentation.test.mjs", "profiles": ["tooling"], "test": true },

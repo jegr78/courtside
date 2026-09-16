@@ -27,7 +27,7 @@ test("given a release image, when publishing it, then the same digest is qualifi
   assert.match(workflow, /node tools\/courtside\.uat-smoke\.mjs --confirm courtside-uat/);
   assert.match(workflow, /\n  security-record:\n    needs: \[build, image, qualify, active-security\]/);
   assert.match(workflow,
-    /\n  publish:\n    needs: \[build, browser, image, qualify, security-record, upgrade, restore\]/);
+    /\n  publish:\n    needs: \[archive, build, browser, image, qualify, security-record, upgrade, restore\]/);
 });
 
 test("given a release build, when browser tests run, then WebKit axe qualification is required", () => {
@@ -90,7 +90,7 @@ test("given a qualified manifest, when publishing it, then tags and signatures a
   assert.match(publish, /gh attestation verify/);
   assert.deepEqual(
     [...publish.matchAll(/--signer-workflow "([^"]+)"/g)].map((match) => match[1]),
-    Array(2).fill("$GITHUB_REPOSITORY/.github/workflows/release.yml"),
+    Array(3).fill("$GITHUB_REPOSITORY/.github/workflows/release.yml"),
   );
   assert.doesNotMatch(publish, /--signer-workflow "\$GITHUB_SERVER_URL/);
   assert.match(publish, /node tools\/security-supply-chain\.mjs/);
