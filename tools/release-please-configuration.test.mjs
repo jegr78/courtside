@@ -131,18 +131,21 @@ test("given release-please writes a candidate delta, when it updates the release
     assert.match(job.steps[0].env.RELEASE_PLEASE_TOKEN, /secrets\.RELEASE_PLEASE_TOKEN/);
     assert.ok(steps.indexOf(validate) < steps.indexOf(checkout),
       "the action's branch output must be validated before checkout consumes it");
+    assert.match(validate.env.RELEASE_PR_BRANCH,
+      /fromJSON\(steps\.release\.outputs\.pr \|\| '\{\}'\)\.headBranchName/);
     assert.match(validate.run, /git check-ref-format --branch "\$RELEASE_PR_BRANCH"/);
     assert.equal(trustedCheckout.with.ref, "${{ github.sha }}");
     assert.equal(trustedCheckout.with.path, "trusted-source");
     assert.equal(trustedCheckout.with["persist-credentials"], false);
     assert.equal(checkout.if, "steps.release.outputs.prs_created == 'true'");
-    assert.match(checkout.with.ref, /fromJSON\(steps\.release\.outputs\.pr\)\.headBranchName/);
+    assert.match(checkout.with.ref,
+      /fromJSON\(steps\.release\.outputs\.pr \|\| '\{\}'\)\.headBranchName/);
     assert.equal(checkout.with.path, "release-pr");
     assert.equal(checkout.with["persist-credentials"], false);
     assert.match(normalize.run,
       /node trusted-source\/tools\/prerelease-changelog\.mjs --changelog release-pr\/CHANGELOG\.md/);
     assert.match(commit.env.RELEASE_PR_BRANCH,
-      /fromJSON\(steps\.release\.outputs\.pr\)\.headBranchName/);
+      /fromJSON\(steps\.release\.outputs\.pr \|\| '\{\}'\)\.headBranchName/);
     assert.equal(commit["working-directory"], "release-pr");
     assert.match(commit.run, /credential\.helper/);
     assert.match(commit.run, /trap .*--unset-all credential\.helper/);

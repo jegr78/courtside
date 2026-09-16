@@ -61,6 +61,7 @@ test("a board mistypes an address, the log shows the refusal, and the correction
     response.url().endsWith(`/api/admin/roster/${personId}/account`) && response.request().method() === "POST");
   await page.getByTestId("create-account").click();
   expect((await accountCreated).status()).toBe(201);
+  await expect(page.getByTestId("account-username")).toHaveValue("miles.richard");
 
   // then — the log says what became of it, and says what handed over would have meant
   await openTheMessageLog(page);
