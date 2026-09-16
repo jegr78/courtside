@@ -2,11 +2,11 @@ name: courtside
 
 x-courtside-compose-version: ">=2.33.1"
 x-courtside-production-overlays:
+  - compose.database-identities.yaml
   - compose.external-database.yaml
   - compose.caddy.yaml
   - compose.smtp-relay.yaml
   - compose.stalwart.yaml
-  - compose.database-identities.yaml
   - compose.database-tls.yaml
   - compose.database-tls-local.yaml
   - compose.app-tls.yaml

@@ -766,8 +766,11 @@ credential.
 
 To adopt the overlay on an existing standard deployment, first make a qualified backup. Set
 `COURTSIDE_DB_OWNER_USERNAME=courtside`, put the existing `POSTGRES_PASSWORD` value in the owner
-file, remove `POSTGRES_PASSWORD` from `.env`, put the overlay into `COMPOSE_FILE`, and start it. Setup transfers existing
-application objects to the migration role and reconciles the runtime grants before Flyway runs.
+file, remove `POSTGRES_PASSWORD` from `.env`, resolve the recipe again with
+`--overlay database-identities`, replace the `COMPOSE_FILE` value with its output, and start it. The
+resolver places the overlay where its reset of the shared credential survives the other components,
+which a hand-written order does not. Setup transfers existing application objects to the migration
+role and reconciles the runtime grants before Flyway runs.
 
 To replace a migration or runtime credential, atomically replace its host file, then recreate the
 affected one-shot processes and application:

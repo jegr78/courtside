@@ -39,6 +39,16 @@ const externalDatabase = {
   COURTSIDE_DATABASE_USERNAME: "courtside",
   COURTSIDE_DATABASE_PASSWORD: "placeholder",
 };
+const databaseTls = {
+  COURTSIDE_DB_TLS_AUTHORITY: "/srv/courtside/database-authority",
+  COURTSIDE_DB_TLS_CERTIFICATE: "/srv/courtside/database-tls/server.crt",
+  COURTSIDE_DB_TLS_KEY: "/srv/courtside/database-tls/server.key",
+};
+const separateIdentities = {
+  COURTSIDE_DB_OWNER_PASSWORD_FILE: "/srv/courtside/database-owner-password",
+  COURTSIDE_DB_MIGRATION_PASSWORD_FILE: "/srv/courtside/database-migration-password",
+  COURTSIDE_DB_RUNTIME_PASSWORD_FILE: "/srv/courtside/database-runtime-password",
+};
 const syntheticMail = {
   COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES: "/srv/courtside/acceptance-mail",
   COURTSIDE_ACCEPTANCE_MAIL_USER: "1000:1000",
@@ -119,6 +129,36 @@ function recipeCopy(recipeName, content) {
   copyFileSync(resolver, join(scratch, "recipe.sh"));
   writeFileSync(join(scratch, "recipes", `${recipeName}.recipe`), content);
   return { script: join(scratch, "recipe.sh"), remove: () => rmSync(scratch, { recursive: true, force: true }) };
+}
+
+function everyChain() {
+  const overlays = ["database-identities", "database-tls", "database-tls-local", "app-tls"];
+  const chains = [];
+  for (const name of Object.keys(recipes)) {
+    for (const mail of [[], ["--synthetic-mail"]]) {
+      for (let selection = 0; selection < 1 << overlays.length; selection += 1) {
+        const selected = overlays.filter((overlay, position) => selection & (1 << position))
+          .flatMap((overlay) => ["--overlay", overlay]);
+        const result = resolve(["files", name, ...selected, ...mail]);
+        if (result.status === 0) chains.push(result.files);
+      }
+    }
+  }
+  return chains;
+}
+
+function environmentUse(file) {
+  const model = YAML.parse(readFileSync(join(deploy, file), "utf8")
+    .replace(/!reset\s+(?:null|\{\}|\[\])/g, '"resets this"').replace(/!override\b/g, ""));
+  const writes = new Set();
+  const resets = new Set();
+  for (const [service, definition] of Object.entries(model?.services ?? {})) {
+    const environment = definition?.environment;
+    if (environment === null || typeof environment !== "object" || Array.isArray(environment)) continue;
+    writes.add(service);
+    if (Object.values(environment).includes("resets this")) resets.add(service);
+  }
+  return { writes, resets };
 }
 
 function manifest(key) {
@@ -213,6 +253,56 @@ test("given the existing-infrastructure recipe, when it is rendered, then the ap
     assert.equal(Object.keys(app.networks).includes("database"), false);
   });
 
+test("given a recipe and the identity overlay, when it is rendered, then no shared credential survives for the application",
+  () => {
+    let covered = 0;
+    for (const [name, recipe] of Object.entries(recipes)) {
+      if (recipe.files.includes("compose.external-database.yaml")) continue;
+      const hardened = ["database-identities", "database-tls", "database-tls-local"];
+      if (recipe.files.includes("compose.caddy.yaml")) hardened.push("app-tls");
+
+      for (const overlays of [["database-identities"], hardened]) {
+        covered += 1;
+        // given
+        const files = resolved("files", name, ...overlays.flatMap((overlay) => ["--overlay", overlay]));
+
+        // when
+        const app = rendered(files, { ...recipe.environment, ...separateIdentities, ...databaseTls }).services.app;
+
+        // then
+        assert.equal(app.environment.COURTSIDE_DB_IDENTITY_MODE, "separate");
+        for (const credential of ["SPRING_DATASOURCE_USERNAME", "SPRING_DATASOURCE_PASSWORD"]) {
+          assert.equal(app.environment[credential], undefined,
+            `${name} with ${overlays.join(" and ")} hands the application ${credential}, `
+            + "which the separate identity refuses to start beside");
+        }
+      }
+    }
+    assert.ok(covered > 0, "no recipe reached the identity overlay, so this read nothing");
+  });
+
+test("given every resolvable chain, when a component resets an environment value, then no earlier component wrote it",
+  () => {
+    // given
+    let covered = 0;
+
+    for (const chain of everyChain()) {
+      // when
+      const components = chain.map(environmentUse);
+
+      // then
+      for (const [position, { resets }] of components.entries()) {
+        for (const service of resets) {
+          covered += 1;
+          const written = components.slice(1, position).findIndex((component) => component.writes.has(service));
+          assert.equal(written, -1, `${chain[position]} resets an environment value of ${service}, which `
+            + `${chain[written + 1]} has already written, so Compose keeps the value`);
+        }
+      }
+    }
+    assert.ok(covered > 0, "no component in any chain resets an environment value");
+  });
+
 test("given a recipe and hardening overlays, when they are named in any order, then one model results", () => {
   // when
   const forwards = resolved("files", "standard", "--overlay", "database-tls", "--overlay", "database-identities",
@@ -221,7 +311,8 @@ test("given a recipe and hardening overlays, when they are named in any order, t
     "--overlay", "database-identities", "--overlay", "database-tls");
 
   // then
-  assert.deepEqual(forwards, [...recipes.standard.files, "compose.database-identities.yaml",
+  const [base, ...components] = recipes.standard.files;
+  assert.deepEqual(forwards, [base, "compose.database-identities.yaml", ...components,
     "compose.database-tls.yaml", "compose.database-tls-local.yaml", "compose.app-tls.yaml"]);
   assert.deepEqual(backwards, forwards);
   assert.deepEqual(resolved("files", "existing-infrastructure", "--overlay", "database-tls"),
