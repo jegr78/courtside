@@ -195,10 +195,13 @@ publication, so the digest a club pulls is the digest that was brought up twice.
 
 The release page carries the OpenAPI document, the security record and the deployment archive with
 its checksum. `archive` builds those bytes once and `publish` attaches the artifact it downloads, so
-what a club unpacks is what was attested. The archive's contents are derived from what the shipped
-recipe resolver can emit rather than listed by hand, and a file the resolver never names is not in
-it: `tools/deployment-archive.test.mjs` unpacks the archive into an empty directory and renders a
-recipe from there, which fails if anything it binds lives only in this repository.
+what a club unpacks is what was attested. Before anything reaches the registry, `publish` builds
+the archive again from the tagged tree and requires the same bytes. The contents are derived rather
+than listed by hand: every Compose file the shipped resolver can emit, every file those Compose
+files name, the recipes, the configuration example, the deployment guide and the container
+contract. `tools/deployment-archive.test.mjs` unpacks the archive into an empty directory and
+renders every recipe with every overlay from there, which fails if anything they bind lives only in
+this repository.
 
 ## When a release fails
 
@@ -283,9 +286,10 @@ floating major tag moves with every matching release as well.
 the GitHub release is marked as a prerelease, so a club that pinned `latest` or `0.2` never receives
 one by accident. Reaching a candidate is a deliberate act: pinning its exact version.
 
-The GitHub release carries two files: the `openapi.yaml` this version answers to, and
-`security-record.json`. That record is an ordinary release asset, neither signed nor attested,
-unlike the image itself, so it reports what the passes found rather than proving it.
+The GitHub release carries four files: the `openapi.yaml` this version answers to,
+`security-record.json`, `courtside-deployment-<version>.zip` and that archive's `.sha256`. The
+archive is attested like the image. The security record is an ordinary release asset, neither
+signed nor attested, so it reports what the passes found rather than proving it.
 
 `deploy/.env.example` names `COURTSIDE_VERSION`, and a club moves by editing that one line and
 recreating the container, the deployment reference in `deploy/README.md` is what they follow, not

@@ -59,8 +59,9 @@ The reference deployment lives in `deploy/`. Its recipes are `standard`, `full-s
 `courtside-deployment-<version>.zip`: the four recipes and the resolver that reads them, the Compose
 files any recipe can select, the files those Compose files bind, the configuration example, the
 deployment guide and the container contract, with a manifest naming the release, its image digest,
-its source revision and the workflow identity that signs it. The archive carries a checksum per file; the release page carries one for the archive, and
-the release attests its provenance. Installing from it needs no clone of this repository.
+its source revision and the release workflow that attests it. The manifest carries a checksum per
+file and the release page carries one for the archive. Installing from it needs no clone of this
+repository.
 
 Two interfaces are public compatibility contracts:
 

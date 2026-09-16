@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync }
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync }
   from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { archiveEntries, buildArchive, emittedComposeFiles, overlayNames, recipeNames, refuseSecrets }
-  from "./deployment-archive.mjs";
+import { archiveEntries, buildArchive, emittedComposeFiles, executable, overlayNames, recipeNames,
+  refuseSecrets } from "./deployment-archive.mjs";
 
 const YAML = createRequire(new URL("../frontend/package.json", import.meta.url))("yaml");
 
@@ -22,14 +22,6 @@ const release = {
   repository: "jegr78/courtside",
   ref: "refs/tags/v0.1.0",
 };
-
-function executable(name) {
-  const found = (process.env.PATH ?? "").split(delimiter).filter(isAbsolute)
-    .map((directory) => join(directory, name))
-    .find((candidate) => existsSync(candidate) && statSync(candidate).mode & 0o111);
-  if (!found) throw new Error(`${name} is not on PATH, and this test needs it to read the archive`);
-  return found;
-}
 
 function scratch(use) {
   const directory = mkdtempSync(join(tmpdir(), "courtside-archive-"));
@@ -112,6 +104,10 @@ function resolves(root, args) {
   return spawnSync(executable("bash"), [join(root, "recipe.sh"), "files", ...args]).status === 0;
 }
 
+function composeText(root) {
+  return emittedComposeFiles(root).map((file) => readFileSync(join(root, file), "utf8"));
+}
+
 function boundSources(model) {
   return Object.values(model.services ?? {}).flatMap((service) => service.volumes ?? [])
     .filter((volume) => volume.type === "bind").map((volume) => volume.source);
@@ -136,21 +132,26 @@ test("given the archive alone, when every recipe is rendered from it, then each 
   const { zip } = buildArchive({ deploy, ...release });
   scratch((directory) => {
     const root = extracted(zip, directory);
+    const spelledOut = [...Object.values(settings), ...composeText(root)];
+    const rendered = new Set();
     for (const [recipe, chosen] of selections(root)) {
       // when
-      const sources = boundSources(renderedFrom(root, resolverOutput(root, [recipe, ...chosen])));
+      const files = resolverOutput(root, [recipe, ...chosen]);
+      const sources = boundSources(renderedFrom(root, files));
+      files.forEach((file) => rendered.add(file));
 
       // then
       assert.ok(sources.length > 0, `${recipe} bound no file, so this proves nothing`);
-      // An absolute path elsewhere is the operator's; a sibling of the archive is the archive leaking.
-      assert.deepEqual(sources.filter((source) => source.startsWith(directory)
-        && !source.startsWith(`${root}/`)), [],
-      `${recipe} ${chosen.join(" ")} reaches outside the archive for a file`);
+      const outside = sources.filter((source) => !source.startsWith(`${root}/`));
+      assert.deepEqual(outside.filter((source) => !spelledOut.some((text) => text.includes(source))), [],
+        `${recipe} ${chosen.join(" ")} reaches outside the archive for a file nobody configured`);
       for (const source of sources.filter((source) => source.startsWith(`${root}/`))) {
         assert.ok(existsSync(source),
           `${recipe} ${chosen.join(" ")} binds ${relative(root, source)}, which the archive omits`);
       }
     }
+    assert.deepEqual(emittedComposeFiles(root).filter((file) => !rendered.has(file)), [],
+      "a Compose file the archive carries was never rendered");
   });
 });
 
@@ -164,7 +165,8 @@ test("given the same release, when the archive is built twice, then both runs pr
   assert.ok(first.zip.equals(second.zip), "two builds of one release produced different bytes");
 });
 
-test("given a built archive, when its manifest is read, then it names the release, image, revision and signer", () => {
+test("given a release, when its archive is built, then the manifest it carries names the release, image, revision and signer", () => {
+  // when
   const { zip, manifest } = buildArchive({ deploy, ...release });
 
   // then
@@ -184,7 +186,7 @@ test("given a built archive, when its manifest is read, then it names the releas
   });
 });
 
-test("given an image that no digest pins, when the archive is built, then it is refused", () => {
+test("given an image no digest pins or a short revision, when the archive is built, then it is refused", () => {
   // when / then
   assert.throws(() => buildArchive({ deploy, ...release, image: "ghcr.io/jegr78/courtside:0.1.0" }),
     /digest/);
@@ -197,100 +199,165 @@ test("given the shipped deployment, when its files are read, then none carries a
 });
 
 const carried = [
-  ["a certificate without a key", "tls.crt", "-----BEGIN CERTIFICATE-----\nPRIVATE KEY-----\n"],
-  ["the environment template", ".env.example", "COURTSIDE_MAIL_PASSWORD=\n"],
-  ["a documented variable name", "README.md", "Set `POSTGRES_PASSWORD` in .env.\n"],
-  ["a variable naming a secret file", "x.yaml", "DB_OWNER_PASSWORD_FILE: /run/secrets/owner\n"],
-  ["a path whose last segment is a word", "x.yaml", "- /run/secrets/owner-password:ro\n"],
-  ["a setting that counts credentials", "x.env", "CREDENTIAL_ISSUE_MAX_PER_WINDOW=5\n"],
-  ["a seed placeholder", "x.ndjson", '{"secret": "{{adminpassword}}"}\n'],
-  ["a structured value", "x.ndjson", '{"authSecret": {"@type": "None"}}\n'],
-  ["a shell reference in quotes", "x.sh", 'password="${MAIL_PASSWORD:?set it}"\n'],
-  ["a variable naming a key file", "x.yaml", "APP_TLS_KEY: /etc/courtside/tls/server.key\n"],
-  ["a database URL without a password", "x.env", "URL=jdbc:postgresql://db.example.org:5432/x\n"],
+  ["a certificate without a key", "tls.crt", "-----BEGIN CERTIFICATE-----\nPRIVATE KEY-----"],
+  ["the environment template", ".env.example", "COURTSIDE_MAIL_PASSWORD="],
+  ["a documented variable name", "README.md", "Set `POSTGRES_PASSWORD` in .env."],
+  ["a variable naming a secret file", "x.yaml", "DB_OWNER_PASSWORD_FILE: /run/secrets/owner"],
+  ["a path whose last segment is a word", "x.yaml", "- /run/secrets/owner-password:ro"],
+  ["a setting that counts credentials", "x.env", "CREDENTIAL_ISSUE_MAX_PER_WINDOW=5"],
+  ["a seed placeholder", "x.ndjson", '{"secret": "{{adminpassword}}"}'],
+  ["a Stalwart environment macro", "x.json", '{"secret": "%{env:ADMIN_SECRET}%"}'],
+  ["a structured value", "x.ndjson", '{"authSecret": {"@type": "None"}}'],
+  ["a required reference in quotes", "x.sh", 'password="${MAIL_PASSWORD:?set it}"'],
+  ["a plain shell reference", "x.sh", "password=$MAIL_PASSWORD"],
+  ["a reference that falls back to another", "x.yaml", "PASSWORD: ${OUTER:-${INNER:?set it}}"],
+  ["a value the shell computes", "x.sh", `credential="$(printf '%s' "$u:$p" | base64)"`],
+  ["a Compose reset", "x.yaml", "POSTGRES_PASSWORD: !reset null"],
+  ["a variable naming a key file", "x.yaml", "APP_TLS_KEY: /etc/courtside/tls/server.key"],
+  ["a database URL without a password", "x.env", "URL=jdbc:postgresql://db.example.org:5432/x"],
+  ["a sort key", "x.yaml", "sort_key: name"],
+  ["a primary key", "x.yaml", "primary_key: id"],
+  ["a word that ends in key", "x.yaml", "monkey: banana"],
+  ["a public key", "x.yaml", "public_key: ssh-ed25519 AAAA"],
+  ["a key algorithm", "x.env", "COURTSIDE_DKIM_KEY=rsa"],
+  ["a shell command named like a secret", "x.sh", "  rotate_secret mail"],
+  ["a Caddy directive that is not a secret", "Caddyfile", "\ttls_key internal"],
 ];
 
 const refused = [
-  ["a value in a Compose variable default", "compose.yaml", "PASSWORD: ${PASSWORD:-s3cret}\n"],
-  ["a JSON key", "x.ndjson", '{"API_TOKEN": "abc123"}\n'],
-  ["a space-separated directive", "Caddyfile", "api_token abc123\n"],
-  ["a lowercase key", "x.yaml", "password: hunter2\n"],
-  ["a private key", "tls.key", "-----BEGIN RSA PRIVATE KEY-----\n"],
-  ["an environment file somebody filled in", ".env", "POSTGRES_PASSWORD=hunter2\n"],
-  ["a signing salt", "x.yaml", "COURTSIDE_SALT: 9f2c\n"],
-  ["a credential inside a URL", "x.env", "URL=postgres://courtside:hunter2@db:5432/courtside\n"],
+  ["a value in a Compose variable default", "compose.yaml", "PASSWORD: ${PASSWORD:-s3cret}"],
+  ["a value in a nested default", "x.yaml", "PASSWORD: ${OTHER:-${NESTED:-s3cret}}"],
+  ["a value Compose substitutes when set", "x.yaml", "PASSWORD: ${X:+s3cret}"],
+  ["a literal after a reference", "x.yaml", "PASSWORD: ${A}hunter2"],
+  ["an escaped dollar, which Compose ships literally", "x.env", "POSTGRES_PASSWORD=$$hunter2"],
+  ["a value that begins with a slash", "x.yaml", "API_KEY: /s3cr3tAbc"],
+  ["a value that begins with an exclamation mark", "x.yaml", "password: '!hunter2'"],
+  ["a value in a flow sequence", "x.json", '{"API_TOKEN": ["abc123"]}'],
+  ["a value in braces", "x.yaml", "password: {s3cret}"],
+  ["a JSON key", "x.ndjson", '{"API_TOKEN": "abc123"}'],
+  ["a camel-case key", "x.json", '{"passwordHash":"hunter2"}'],
+  ["a dotted key", "x.properties", "spring.datasource.password=hunter2"],
+  ["a hyphenated key", "x.yaml", "api-key: hunter2"],
+  ["a plural name", "x.yaml", "API_KEYS: abc"],
+  ["a space-separated directive", "Caddyfile", "api_token abc123"],
+  ["a lowercase key", "x.yaml", "password: hunter2"],
+  ["an RSA private key", "tls.key", "-----BEGIN RSA PRIVATE KEY-----"],
+  ["a PGP private key", "x.asc", "-----BEGIN PGP PRIVATE KEY BLOCK-----"],
+  ["an environment file somebody filled in", ".env", "POSTGRES_PASSWORD=hunter2"],
+  ["a signing salt", "x.yaml", "COURTSIDE_SALT: 9f2c"],
+  ["a credential inside a URL", "x.env", "URL=postgres://courtside:hunter2@db:5432/courtside"],
+  ["a URL with a password and no user", "x.env", "URL=https://:hunter2@host/"],
+  ["a URL password containing a slash", "x.env", "URL=https://user:p/ss@host/"],
 ];
+
+function guarded(path, content) {
+  return () => refuseSecrets([{ path, mode: 0o644, content: Buffer.from(`${content}\n`) }]);
+}
 
 test("given a file the archive may carry, when the credential guard reads it, then it stays", () => {
   for (const [what, path, content] of carried) {
     // when / then
-    refuseSecrets([{ path, mode: 0o644, content: Buffer.from(content) }]);
-    assert.ok(true, what);
+    assert.doesNotThrow(guarded(path, content), `${what} was refused`);
   }
 });
 
 test("given a file that would publish a credential, when the guard reads it, then it is refused", () => {
   for (const [what, path, content] of refused) {
     // when / then
-    assert.throws(() => refuseSecrets([{ path, mode: 0o644, content: Buffer.from(content) }]),
-      new RegExp(path.replace(/[.]/g, "\\.")), `${what} reached the archive`);
+    assert.throws(guarded(path, content), (error) => error.message.startsWith(`${path} `),
+      `${what} reached the archive`);
   }
 });
 
-test("given a bind that climbs out of the deployment, when the archive is derived, then it is dropped", () => {
-  const climbing = mkdtempSync(join(tmpdir(), "courtside-climb-"));
+function withCopy(change, use) {
+  const scratchRoot = mkdtempSync(join(tmpdir(), "courtside-copy-"));
   try {
-    // given
-    writeFileSync(join(climbing, "secret.pem"), "material\n");
-    const copy = join(climbing, "deploy");
+    const copy = join(scratchRoot, "deploy");
     cpSync(deploy, copy, { recursive: true });
-    writeFileSync(join(copy, "compose.caddy.yaml"),
-      readFileSync(join(copy, "compose.caddy.yaml"), "utf8")
-        .replace("- ./Caddyfile:", "- ./../secret.pem:/x:ro\n      - ./Caddyfile:"));
-
-    // when
-    const paths = archiveEntries(copy).map((entry) => entry.path);
-
-    // then
-    assert.ok(!paths.some((path) => path.endsWith("secret.pem")),
-      "a bind that climbs out of the deployment put a file into the archive");
+    change(copy, scratchRoot);
+    return use(copy);
   } finally {
-    rmSync(climbing, { recursive: true, force: true });
+    rmSync(scratchRoot, { recursive: true, force: true });
   }
+}
+
+function editComponent(copy, edit) {
+  const component = join(copy, "compose.caddy.yaml");
+  const model = YAML.parse(readFileSync(component, "utf8"), { logLevel: "silent" });
+  edit(model, Object.values(model.services).find((service) => Array.isArray(service.volumes)));
+  writeFileSync(component, YAML.stringify(model));
+}
+
+test("given a bind that climbs out of the deployment, when the archive is derived, then it is refused", () => {
+  for (const source of ["./../secret.pem", "./../../secret.pem", "${EXTRA:-..}/secret.pem"]) {
+    // given
+    const climbing = (copy, outside) => {
+      writeFileSync(join(outside, "secret.pem"), "material\n");
+      editComponent(copy, (_, service) => service.volumes.push(`${source}:/x:ro`));
+    };
+
+    // when / then
+    withCopy(climbing, (copy) => assert.throws(() => archiveEntries(copy), /climbs out of the deployment/,
+      `${source} was not refused`));
+  }
+});
+
+test("given a bind of the whole deployment, when the archive is derived, then it says so", () => {
+  // given
+  const whole = (copy) => editComponent(copy, (_, service) => service.volumes.push(".:/whole:ro"));
+
+  // when / then
+  withCopy(whole, (copy) => assert.throws(() => archiveEntries(copy), /binds the whole deployment directory/));
 });
 
 test("given a symlink out of the deployment, when the archive is derived, then it is refused", () => {
-  const linked = mkdtempSync(join(tmpdir(), "courtside-link-"));
-  try {
-    // given
-    writeFileSync(join(linked, "secret.pem"), "material\n");
-    const copy = join(linked, "deploy");
-    cpSync(deploy, copy, { recursive: true });
+  // given
+  const linked = (copy, outside) => {
+    writeFileSync(join(outside, "secret.pem"), "material\n");
     rmSync(join(copy, "mail", "base.ndjson"));
-    symlinkSync(join(linked, "secret.pem"), join(copy, "mail", "base.ndjson"));
+    symlinkSync(join(outside, "secret.pem"), join(copy, "mail", "base.ndjson"));
+  };
 
-    // when / then
-    assert.throws(() => archiveEntries(copy), /outside the deployment/);
-  } finally {
-    rmSync(linked, { recursive: true, force: true });
-  }
+  // when / then
+  withCopy(linked, (copy) => assert.throws(() => archiveEntries(copy), /outside the deployment/));
+});
+
+test("given every Compose key that names a neighbouring file, when the archive is derived, then it carries each", () => {
+  // given
+  const named = ["seed.env", "labels.env", "admin.secret", "site.conf", "seeds/one.sql", "extra/sub/a.txt"];
+  const naming = (copy) => {
+    for (const file of named) {
+      mkdirSync(join(copy, file, ".."), { recursive: true });
+      writeFileSync(join(copy, file), "placeholder\n");
+    }
+    editComponent(copy, (model, service) => {
+      service.env_file = [{ path: "./seed.env" }];
+      service.label_file = "labels.env";
+      service.volumes.push("${EXTRA:-./extra}/sub:/extra:ro");
+      model.secrets = { admin: { file: "admin.secret" }, inline: { environment: "ADMIN" } };
+      model.configs = { site: { file: "./site.conf" }, greeting: { content: "hello" } };
+      model.volumes = { seeds: { driver: "local", driver_opts: { type: "none", o: "bind", device: "./seeds" } } };
+    });
+  };
+
+  // when
+  const paths = withCopy(naming, (copy) => archiveEntries(copy).map((entry) => entry.path));
+
+  // then
+  assert.deepEqual(named.filter((file) => !paths.includes(file)), [],
+    "a file a Compose key names is missing from the archive");
 });
 
 test("given a Compose key the derivation cannot follow, when the archive is derived, then it stops", () => {
-  const added = mkdtempSync(join(tmpdir(), "courtside-key-"));
-  try {
+  for (const key of ["extends", "build"]) {
     // given
-    const copy = join(added, "deploy");
-    cpSync(deploy, copy, { recursive: true });
-    const component = join(copy, "compose.caddy.yaml");
-    const model = YAML.parse(readFileSync(component, "utf8"), { logLevel: "silent" });
-    Object.values(model.services)[0].env_file = ["./extra.env"];
-    writeFileSync(component, YAML.stringify(model));
+    const unfollowable = (copy) => editComponent(copy, (_, service) => {
+      service[key] = { file: "./other.yaml", context: "." };
+    });
 
     // when / then
-    assert.throws(() => archiveEntries(copy), /env_file, which the archive cannot follow/);
-  } finally {
-    rmSync(added, { recursive: true, force: true });
+    withCopy(unfollowable, (copy) => assert.throws(() => archiveEntries(copy),
+      new RegExp(`uses ${key}, which the archive cannot follow`)));
   }
 });
 
@@ -346,21 +413,23 @@ test("given an archive, when a shell script is extracted from it, then it is sti
 
 test("given the release workflow, when it publishes, then it attaches the archive it already built", () => {
   const workflow = readFileSync(resolve(deploy, "../.github/workflows/release.yml"), "utf8");
+  const archive = workflow.slice(workflow.indexOf("\n  archive:"), workflow.indexOf("\n  qualify:"));
   const publish = workflow.slice(workflow.indexOf("\n  publish:"));
 
   // then
+  assert.match(archive, /git status --porcelain --ignored -- deploy\//,
+    "archive packs a deploy/ it never checked against the tagged commit");
   assert.match(publish, /name: deployment-archive/,
     "publish does not download the archive that was built once");
-  assert.ok(!publish.includes("deployment-archive.mjs"),
-    "publish builds the archive a second time instead of publishing the qualified bytes");
-  assert.match(publish, /files: \|[\s\S]*build\/courtside-deployment-\*/,
-    "the release page does not carry the archive");
+  assert.match(publish, /--output build\/rebuilt\n/, "publish does not rebuild the archive apart from it");
+  assert.match(publish, /cmp "build\/courtside-deployment-\$version\.zip" "build\/rebuilt\/courtside-deployment-/,
+    "publish does not compare the archive it publishes with one built from the tagged tree");
+  assert.ok(publish.indexOf("cmp \"build/") < publish.indexOf("docker/login-action"),
+    "the archive is compared only after the release has written to the registry");
+  assert.match(publish, /files: \|[\s\S]*\n {12}build\/courtside-deployment-\*\n/,
+    "the release page does not carry the archive that was downloaded");
   assert.match(publish, /attest-build-provenance[\s\S]*subject-path: build\/courtside-deployment-\*\.zip/,
     "the archive is published with a checksum and no provenance");
-  assert.match(publish, /jq -r \.revision <<< "\$manifest"\)" = "\$GITHUB_SHA"/,
-    "nothing checks that the archive was packed from the commit its manifest claims");
-  assert.match(publish, /jq -r \.image <<< "\$manifest"\)" = "\$IMAGE"/,
-    "nothing checks that the archive names the digest this release publishes");
   assert.match(publish, /gh attestation verify "build\/courtside-deployment-/,
     "the archive's own attestation is created and never read back");
 });

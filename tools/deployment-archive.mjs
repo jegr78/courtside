@@ -34,7 +34,7 @@ function combinations(names, overlays) {
   return selections;
 }
 
-function executable(name) {
+export function executable(name) {
   const found = (process.env.PATH ?? "").split(delimiter).filter(isAbsolute)
     .map((directory) => join(directory, name))
     .find((candidate) => existsSync(candidate) && statSync(candidate).mode & 0o111);
@@ -57,9 +57,25 @@ export function emittedComposeFiles(deploy) {
   return [...emitted].sort();
 }
 
+const reference = "\u0000REF\u0000";
+
+function substituted(text) {
+  // Innermost first, so ${A:-${B:-x}} yields x; a reference with no value to offer becomes a marker.
+  let previous;
+  let current = text;
+  do {
+    previous = current;
+    current = current.replace(/\$\{([^${}]*)\}/g, (_, inner) => {
+      const offered = /^[A-Za-z_][A-Za-z0-9_]*:?[-+](.*)$/s.exec(inner);
+      return offered ? offered[1] : reference;
+    });
+  } while (current !== previous);
+  return current;
+}
+
 function volumeSource(entry) {
   if (typeof entry === "object" && entry !== null) {
-    return entry.type === "bind" ? { source: entry.source, declaredBind: true } : undefined;
+    return entry.type === "bind" ? { source: entry.source, declared: true } : undefined;
   }
   if (typeof entry !== "string") return undefined;
   let depth = 0;
@@ -71,85 +87,95 @@ function volumeSource(entry) {
   return undefined;
 }
 
-function shippedPath(bound) {
-  const defaulted = /^\$\{[A-Za-z_][A-Za-z0-9_]*:?-(.+)\}$/.exec(bound?.source ?? "");
-  const candidate = defaulted ? defaulted[1] : bound?.source ?? "";
-  // In short form a bare word is a named volume; a declared bind resolves it against the project.
-  const named = candidate.startsWith("./")
-    || (bound?.declaredBind && candidate && !candidate.startsWith("/") && !candidate.startsWith("$"));
-  if (!named) return undefined;
-  return within(posix.normalize(candidate));
+function shippedPath(file, bound) {
+  if (typeof bound?.source !== "string") return undefined;
+  const source = substituted(bound.source);
+  if (source.includes(reference) || source.startsWith("/") || source.startsWith("~")) return undefined;
+  // Compose reads a short-form source as a path only when it starts with a dot.
+  if (!bound.declared && !source.startsWith(".")) return undefined;
+  const path = posix.normalize(source);
+  if (path === ".") throw new Error(`${file} binds the whole deployment directory`);
+  if (path === ".." || path.startsWith("../")) {
+    throw new Error(`${file} binds ${bound.source}, which climbs out of the deployment`);
+  }
+  return path;
 }
 
-// posix.join swallows a leading .., so ./../secrets/key.pem would enter the archive as secrets/key.pem.
-function within(path) {
-  return path.startsWith("../") || path === ".." || posix.isAbsolute(path) ? undefined : path;
+function listed(value) {
+  if (value === undefined) return [];
+  return (Array.isArray(value) ? value : [value])
+    .map((item) => (typeof item === "object" && item !== null ? item.path : item));
 }
 
-// Every other Compose key that can name a neighbouring file; this reads volumes and nothing else.
-const unread = ["env_file", "extends", "include", "configs", "secrets"];
+const unfollowed = ["extends", "include", "build"];
 
 export function boundPaths(deploy, composeFiles) {
   const bound = new Set();
+  const follow = (file, source, declared = true) => {
+    const path = shippedPath(file, { source, declared });
+    if (path) bound.add(path);
+  };
   for (const file of composeFiles) {
     const model = YAML.parse(readFileSync(join(deploy, file), "utf8"), { logLevel: "silent" }) ?? {};
-    for (const key of unread) {
-      if (model[key] !== undefined) throw new Error(`${file} uses ${key}, which the archive cannot follow`);
+    if (model.include !== undefined) throw new Error(`${file} uses include, which the archive cannot follow`);
+    for (const kind of ["secrets", "configs"]) {
+      for (const item of Object.values(model[kind] ?? {})) follow(file, item?.file);
+    }
+    for (const volume of Object.values(model.volumes ?? {})) {
+      if (/\bbind\b/.test(volume?.driver_opts?.o ?? "")) follow(file, volume.driver_opts.device);
     }
     for (const service of Object.values(model.services ?? {})) {
-      for (const key of unread) {
-        if (service?.[key] !== undefined) {
-          throw new Error(`${file} uses ${key}, which the archive cannot follow`);
-        }
+      for (const key of unfollowed) {
+        if (service?.[key] !== undefined) throw new Error(`${file} uses ${key}, which the archive cannot follow`);
+      }
+      for (const key of ["env_file", "label_file"]) {
+        for (const source of listed(service?.[key])) follow(file, source);
       }
       for (const volume of service?.volumes ?? []) {
-        const path = shippedPath(volumeSource(volume));
-        if (path) bound.add(path);
+        const entry = volumeSource(volume);
+        if (entry) follow(file, entry.source, entry.declared ?? false);
       }
     }
   }
   return [...bound].sort();
 }
 
-function expand(deploy, path) {
+function resolvedWithin(deploy, path) {
   const absolute = join(deploy, path);
   if (!existsSync(absolute)) throw new Error(`the deployment names ${path}, which does not exist`);
-  // realpath, because a symlink is read through its target and would publish a file from anywhere.
+  // A symlink is read through its target, so the target is what has to lie inside the deployment.
   const resolved = realpathSync(absolute);
   if (!resolved.startsWith(realpathSync(deploy) + sep)) {
     throw new Error(`${path} resolves to ${resolved}, which is outside the deployment`);
   }
-  if (!statSync(resolved).isDirectory()) return [path];
+  return resolved;
+}
+
+function expand(deploy, path) {
+  const resolved = resolvedWithin(deploy, path);
+  if (!statSync(resolved).isDirectory()) return [{ path, resolved }];
   return readdirSync(resolved).flatMap((entry) => expand(deploy, posix.join(path, entry)));
 }
 
 export function archiveEntries(deploy) {
   const composeFiles = emittedComposeFiles(deploy);
   const recipes = recipeNames(deploy).map((name) => `recipes/${name}.recipe`);
-  const named = [...composeFiles, ...boundPaths(deploy, composeFiles), ...recipes, ...roots];
-  const paths = [...new Set(named.flatMap((path) => expand(deploy, path)))].sort();
-  return paths.map((path) => ({
-    path,
-    mode: statSync(join(deploy, path)).mode & 0o111 ? 0o755 : 0o644,
-    content: readFileSync(join(deploy, path)),
-  }));
-}
-
-// The word ends the name: COURTSIDE_MAIL_PASSWORD holds one, CREDENTIAL_ISSUE_MAX_PER_WINDOW counts.
-const secretName = "[A-Za-z0-9_]*(?:PASSWORD|PASSWD|PWD|SECRET|TOKEN|CREDENTIAL|SALT|KEY)";
-// The lookbehind keeps the name in key position: .../database-owner-password:ro is a path, not one.
-const assignment = new RegExp(`(?<![-/\\w.])["']?(${secretName})["']?[ \\t]*[:=][ \\t]*(\\S+)`, "gi");
-const directive = new RegExp(`^[ \\t]*(${secretName})[ \\t]+(\\S+)`, "gim");
-const privateKey = /-----BEGIN [A-Z ]*PRIVATE KEY-----/;
-const urlCredential = /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:([^\s@/]+)@/gi;
-
-function withoutReferences(text) {
-  // A ${VAR:-default} keeps its default, because that default is a value the archive would carry.
-  return text.replace(/\$\{([^}]*)\}/g, (_, inner) => {
-    const defaulted = /^[A-Za-z_][A-Za-z0-9_]*:?-(.*)$/s.exec(inner);
-    return defaulted ? defaulted[1] : "$REF";
+  const declared = [...composeFiles, ...boundPaths(deploy, composeFiles), ...recipes, ...roots];
+  const found = new Map(declared.flatMap((path) => expand(deploy, path))
+    .map((file) => [file.path, file.resolved]));
+  return [...found.keys()].sort().map((path) => {
+    const content = readFileSync(found.get(path));
+    return { path, mode: statSync(found.get(path)).mode & 0o111 ? 0o755 : 0o644, content };
   });
 }
+
+const signal = "(?:PASSWORD|PASSWD|PWD|SECRET|TOKEN|CREDENTIAL|SALT"
+  + "|(?:API|PRIVATE|SECRET|ACCESS|SIGNING|ENCRYPTION|MASTER|AUTH)[_.-]?KEY)";
+const secretName = `[A-Za-z0-9_.-]*${signal}(?:[_-]?(?:VALUE|HASH)|S)?`;
+const assignment = new RegExp(`(?<![-/\\w.])["']?(${secretName})["']?[ \\t]*[:=][ \\t]*(\\S+)`, "gi");
+const directive = new RegExp(`^[ \\t]*(${secretName})[ \\t]+(\\S+)`, "gim");
+const privateKey = /-----BEGIN [A-Z ]*PRIVATE KEY(?: BLOCK)?-----/;
+const urlCredential = /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]*:([^\s@]+)@/gi;
 
 export function refuseSecrets(entries) {
   for (const entry of entries) {
@@ -157,25 +183,32 @@ export function refuseSecrets(entries) {
     if (name === ".env" || (name.startsWith(".env.") && name !== ".env.example")) {
       throw new Error(`${entry.path} is a filled-in environment file, and a release archive carries none`);
     }
-    const text = withoutReferences(entry.content.toString("utf8"));
+    const text = substituted(entry.content.toString("utf8"));
     if (privateKey.test(text)) throw new Error(`${entry.path} carries a private key`);
     for (const [, secret] of text.matchAll(urlCredential)) {
       if (!carriesNothing("", secret)) throw new Error(`${entry.path} puts a credential in a URL`);
     }
-    const rules = name.endsWith(".md") ? [assignment] : [assignment, directive];
+    const rules = name.startsWith("Caddyfile") ? [assignment, directive] : [assignment];
     for (const rule of rules) {
       for (const [, assigned, value] of text.matchAll(rule)) {
-        if (carriesNothing(assigned, value)) continue;
-        throw new Error(`${entry.path} assigns a credential: ${assigned}`);
+        if (!carriesNothing(assigned, value)) {
+          throw new Error(`${entry.path} assigns a credential: ${assigned}`);
+        }
       }
     }
   }
 }
 
+const empty = new Set(["", "null", "[", "[]", "{", "{}", "|", ">"]);
+
 function carriesNothing(name, value) {
-  // A _FILE names a path; a reference, tag, placeholder, nested structure or blank holds no secret.
-  const bare = value.replace(/^["']+/, "").replace(/["']+$/, "");
-  return /_FILE$/i.test(name) || /^[$!{[/]/.test(bare) || bare === "" || bare === "null";
+  const bare = value.replace(/[,;)\]}]+$/, "").replace(/^["']+/, "").replace(/["']+$/, "");
+  if (/_FILE$/i.test(name) || empty.has(bare) || bare === reference) return true;
+  // A lowercase path of two or more segments names a file; a random value almost never has that shape.
+  if (/^\/[a-z0-9._-]+(?:\/[a-z0-9._-]+)+$/.test(bare)) return true;
+  return /^\$[A-Za-z_]\w*$/.test(bare) || bare.startsWith("$(") || /^!(?:reset|override)$/.test(bare)
+    || bare.startsWith('{"')
+    || /^\{\{[a-z]+\}\}$/.test(bare) || /^%\{env:[A-Za-z_]\w*\}%$/.test(bare);
 }
 
 function byPath(left, right) {
