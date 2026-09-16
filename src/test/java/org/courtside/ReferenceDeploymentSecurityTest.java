@@ -37,7 +37,7 @@ public class ReferenceDeploymentSecurityTest {
     private static final Pattern APPLICATION_HEADERS = Pattern.compile(
             "(?m)^\\(applicationHeaders\\) \\{\\R(?<directives>(?:\\t[^\\r\\n]*\\R)*)}$");
     private static final Pattern PRODUCTION_SITE_BLOCK = Pattern.compile(
-            "(?m)^\\{\\$COURTSIDE_DOMAIN} \\{\\R(?<body>(?:.*\\R)*?)^}$");
+            "(?m)^\\{\\$COURTSIDE_SITE_ADDRESS} \\{\\R(?<body>(?:.*\\R)*?)^}$");
     private static final Pattern UAT_PUBLIC_SITE_BLOCK = Pattern.compile(
             "(?m)^https://localhost:443 \\{\\R(?<body>(?:.*\\R)*?)^}$");
     private static final Pattern PRODUCTION_PLAINTEXT_SITE_BLOCK = Pattern.compile(
@@ -203,12 +203,18 @@ public class ReferenceDeploymentSecurityTest {
     }
 
     @Test
-    void whenReadingComposeFile_thenApplicationPortIsBoundToLoopback() throws IOException {
+    void whenReadingProductionComponents_thenOnlyCaddyPublishesAWebPort() throws IOException {
         // when
         String compose = Files.readString(Path.of("deploy/compose.yaml"));
+        String publicCaddy = Files.readString(Path.of("deploy/compose.caddy-public.yaml"));
+        String forwardedCaddy = Files.readString(Path.of("deploy/compose.caddy-forwarded.yaml"));
 
         // then
-        assertThat(compose).contains("127.0.0.1:${COURTSIDE_PORT:-8080}:8080");
+        assertThat(compose).doesNotContain("ports:", "COURTSIDE_PORT");
+        assertThat(publicCaddy).contains("80:80", "443:443");
+        assertThat(forwardedCaddy)
+                .contains("127.0.0.1:${COURTSIDE_PORT:-8080}:8080")
+                .doesNotContain("80:80", "443:443");
     }
 
     // An instance without mail configuration refuses to start, so a world that runs the image and
@@ -269,12 +275,37 @@ public class ReferenceDeploymentSecurityTest {
         });
         assertThat(headers.group("directives").lines().map(String::strip).toList()).containsExactly(
                 "header_up -Forwarded",
-                "header_up -X-Forwarded-Port",
                 "header_up -X-Forwarded-Prefix",
                 "header_up -X-Forwarded-Ssl",
-                "header_up X-Forwarded-For {remote_host}",
+                "header_up X-Forwarded-For {client_ip}",
+                "# Caddy calls this redundant for an untrusted client, but a trusted proxy may supply the header;",
+                "# assert the accepted host explicitly so that trust in its client address does not extend to it.",
                 "header_up X-Forwarded-Host {host}",
-                "header_up X-Forwarded-Proto {scheme}");
+                "header_up X-Forwarded-Port 443",
+                "header_up X-Forwarded-Proto https");
+    }
+
+    @Test
+    void whenReadingCaddyfile_thenOnlyAnExplicitTrustedProxyCanSupplyTheClientAddress()
+            throws IOException {
+        // when
+        String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
+        String common = Files.readString(Path.of("deploy/compose.caddy.yaml"));
+        String forwarded = Files.readString(Path.of("deploy/compose.caddy-forwarded.yaml"));
+
+        // then
+        assertThat(caddyfile)
+                .contains("trusted_proxies static {$COURTSIDE_TRUSTED_PROXIES:127.0.0.1/32 ::1/128}")
+                .contains("client_ip_headers X-Forwarded-For")
+                .contains("trusted_proxies_strict");
+        assertThat(common)
+                .contains("COURTSIDE_TRUSTED_PROXIES: 127.0.0.1/32 ::1/128")
+                .doesNotContain("${COURTSIDE_TRUSTED_PROXIES");
+        assertThat(forwarded).contains("COURTSIDE_TRUSTED_PROXIES: private_ranges");
+        assertThat(forwarded).contains("COURTSIDE_INGRESS_MODE: forwardedIngress");
+        assertThat(caddyfile)
+                .contains("@notForwardedHttps not header X-Forwarded-Proto https")
+                .contains("respond @notForwardedHttps \"Secure outer ingress is required.\" 400");
     }
 
     @Test
@@ -308,6 +339,10 @@ public class ReferenceDeploymentSecurityTest {
                 "serve", List.of("reverse_proxy https://app:8080 {", "import applicationHeaders",
                         "transport http {",
                         "tls_trust_pool file /etc/courtside/tls/app-authority/authority.pem"),
+                "public-ingress", List.of("import {$COURTSIDE_APP_TLS_MODE:plaintext}"),
+                "forwarded-ingress", List.of("@notForwardedHttps not header X-Forwarded-Proto https",
+                        "respond @notForwardedHttps \"Secure outer ingress is required.\" 400",
+                        "import {$COURTSIDE_APP_TLS_MODE:plaintext}"),
                 "production", List.of("encode zstd gzip", "request_body {", "max_size 2MB", "header {",
                         "+Content-Security-Policy \"base-uri 'none'; frame-ancestors 'none'\"",
                         "Strict-Transport-Security \"max-age=31536000; includeSubDomains\"",
@@ -323,7 +358,7 @@ public class ReferenceDeploymentSecurityTest {
                         "-Server", "-Via",
                         "respond \"Request could not be completed.\" {http.error.status_code}",
                         "@unknownMethod {", "method QUERY", "path /api/*", "method @unknownMethod PATCH",
-                        "import {$COURTSIDE_APP_TLS_MODE:plaintext}"),
+                        "import {$COURTSIDE_INGRESS_MODE:publicIngress}"),
                 "plaintext-site", List.of("@browserNavigation {", "host {$COURTSIDE_DOMAIN}", "method GET HEAD",
                         "path / /courts /login /initial-password /account-recovery /my-bookings /my-messages /account/security /admin /admin/* /index.html /assets/* /font-licenses.txt /icon.svg /manifest.webmanifest /sw.js /workbox-*.js",
                         "handle @browserNavigation {", "header {", "Cache-Control \"no-store\"",
@@ -358,7 +393,9 @@ public class ReferenceDeploymentSecurityTest {
         return Map.of(
                 "plaintext", caddyDirectives(caddyBlockBody(caddyfile, "(plaintext) {")),
                 "serve", caddyDirectives(caddyBlockBody(caddyfile, "(serve) {")),
-                "production", caddyDirectives(caddyBlockBody(caddyfile, "{$COURTSIDE_DOMAIN} {")),
+                "public-ingress", caddyDirectives(caddyBlockBody(caddyfile, "(publicIngress) {")),
+                "forwarded-ingress", caddyDirectives(caddyBlockBody(caddyfile, "(forwardedIngress) {")),
+                "production", caddyDirectives(caddyBlockBody(caddyfile, "{$COURTSIDE_SITE_ADDRESS} {")),
                 "plaintext-site", caddyDirectives(caddyBlockBody(caddyfile, "http://:80 {")),
                 "mail-plaintext-site", caddyDirectives(caddyBlockBody(mailSites, "http://{$COURTSIDE_MAIL_HOSTNAME} {")),
                 "mail-site", caddyDirectives(caddyBlockBody(mailSites, "{$COURTSIDE_MAIL_HOSTNAME} {")));
@@ -443,8 +480,10 @@ public class ReferenceDeploymentSecurityTest {
                 .add(listener.path("published").asString()));
         assertThat(inventoriedListeners).containsExactlyInAnyOrderEntriesOf(published);
         assertThat(productionCaddyTopLevelBlocks(inventory)).containsExactly(
-                        "(applicationHeaders)", "(plaintext)", "(serve)", "http://:80",
-                        "{$COURTSIDE_DOMAIN}", "http://{$COURTSIDE_MAIL_HOSTNAME}", "{$COURTSIDE_MAIL_HOSTNAME}");
+                        "(applicationHeaders)", "(plaintext)", "(serve)", "(publicIngress)",
+                        "(forwardedIngress)", "http://:80",
+                        "{$COURTSIDE_SITE_ADDRESS}", "http://{$COURTSIDE_MAIL_HOSTNAME}",
+                        "{$COURTSIDE_MAIL_HOSTNAME}");
     }
 
     private static List<Path> productionComposeSources() throws IOException {
@@ -547,6 +586,7 @@ public class ReferenceDeploymentSecurityTest {
         try (GenericContainer<?> adapter = new GenericContainer<>(DockerImageName.parse(deployedCaddy()))
                 .withCopyToContainer(MountableFile.forHostPath(caddyfile), "/etc/caddy/Caddyfile")
                 .withEnv("COURTSIDE_DOMAIN", "https://club.example")
+                .withEnv("COURTSIDE_SITE_ADDRESS", "club.example")
                 .withEnv("COURTSIDE_MAIL_HOSTNAME", "mail.club.example")
                 .withEnv("COURTSIDE_APP_TLS_MODE", tlsMode)
                 .withCommand("caddy", "adapt", "--config", "/etc/caddy/Caddyfile")
@@ -788,7 +828,7 @@ public class ReferenceDeploymentSecurityTest {
                     .doesNotContain("reverse_proxy", "{host}", "header Accept", "header User-Agent",
                             "header Sec-Fetch");
             assertThat(source.caddyfile())
-                    .startsWith("{\n\tauto_https disable_redirects\n}")
+                    .startsWith("{\n\tauto_https disable_redirects\n")
                     .doesNotContain("auto_https off", "auto_https disable_certs");
         }
         assertThat(production).contains(SITE_IMPORT).doesNotContain("COURTSIDE_MAIL_HOSTNAME");
@@ -802,12 +842,16 @@ public class ReferenceDeploymentSecurityTest {
             throws IOException {
         // when
         String caddyfile = Files.readString(Path.of("deploy/Caddyfile"));
+        String publicMode = Files.readString(Path.of("deploy/compose.caddy-public.yaml"));
 
         // then
         assertThat(caddyfile)
-                .contains("{$COURTSIDE_DOMAIN} {")
+                .contains("{$COURTSIDE_SITE_ADDRESS} {")
                 .doesNotContain("tls internal", "tls self_signed", "issuer internal", "local_certs",
                         "auto_https off", "auto_https disable_certs");
+        assertThat(publicMode)
+                .contains("COURTSIDE_SITE_ADDRESS: ${COURTSIDE_DOMAIN:?set COURTSIDE_DOMAIN in .env}")
+                .contains("80:80", "443:443");
     }
 
     private record PlaintextSource(String caddyfile, Pattern pattern, String redirectTarget) {
@@ -831,10 +875,8 @@ public class ReferenceDeploymentSecurityTest {
                     .contains("`Permissions-Policy` is the only response policy here that comes only from Caddy");
         }
         assertThat(deploymentGuide)
-                .contains("Funnel keeps the application's headers")
-                .contains("keeps those five application headers when Funnel supplies the trusted HTTPS "
-                        + "forwarding signal")
-                .contains("loses only Caddy's `Permissions-Policy` response header")
+                .contains("Funnel forwards to Caddy's loopback listener")
+                .contains("Caddy remains the only route to the application")
                 .doesNotContain("Without the proxy there is no HSTS");
     }
 

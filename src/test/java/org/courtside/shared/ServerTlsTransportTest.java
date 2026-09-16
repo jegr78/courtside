@@ -169,6 +169,14 @@ class ServerTlsTransportTest {
                             throws IOException {
                         response.setHeader("X-Probe-Forwarded-Host",
                                 String.valueOf(request.getHeader("X-Forwarded-Host")));
+                        response.setHeader("X-Probe-Forwarded-For",
+                                String.valueOf(request.getHeader("X-Forwarded-For")));
+                        response.setHeader("X-Probe-Forwarded-Proto",
+                                String.valueOf(request.getHeader("X-Forwarded-Proto")));
+                        response.setHeader("X-Probe-Forwarded-Port",
+                                String.valueOf(request.getHeader("X-Forwarded-Port")));
+                        response.setHeader("X-Probe-Forwarded",
+                                String.valueOf(request.getHeader("Forwarded")));
                         response.setHeader("Server", "upstream-server");
                         response.setHeader("Via", "upstream-via");
                         if ("/missing".equals(request.getRequestURI())) {
@@ -213,6 +221,47 @@ class ServerTlsTransportTest {
             assertThat(accepted).contains("200 OK", MARKER, "X-Probe-Forwarded-Host")
                     .doesNotContain("X-Probe-Forwarded-Host: attacker.example");
             assertThat(hostile).doesNotContain(MARKER, "X-Probe-Forwarded-Host");
+        }
+    }
+
+    @Test
+    void givenPublicAndForwardedIngress_whenClientHeadersArrive_thenOnlyTheTrustedHopSuppliesTheAddress()
+            throws Exception {
+        // given
+        String insecureForwardedRequest = "GET /probe HTTP/1.1\r\nHost: " + PRODUCTION_HOST
+                + "\r\nForwarded: for=attacker;proto=http"
+                + "\r\nX-Forwarded-For: 198.51.100.42"
+                + "\r\nX-Forwarded-Host: attacker.example"
+                + "\r\nX-Forwarded-Port: 80"
+                + "\r\nX-Forwarded-Prefix: /attacker"
+                + "\r\nX-Forwarded-Proto: http"
+                + "\r\nX-Forwarded-Ssl: off"
+                + "\r\nConnection: close\r\n\r\n";
+        String secureForwardedRequest = insecureForwardedRequest
+                .replace("X-Forwarded-Proto: http", "X-Forwarded-Proto: https");
+
+        // when
+        try (GenericContainer<?> publicProxy = productionHostProxy();
+             GenericContainer<?> forwardedProxy = forwardedProductionHostProxy()) {
+            String publicAnswer = rawRequest(publicProxy, insecureForwardedRequest);
+            String refusedAnswer = rawRequest(forwardedProxy, insecureForwardedRequest);
+            String forwardedAnswer = rawRequest(forwardedProxy, secureForwardedRequest);
+
+            // then
+            assertThat(publicAnswer)
+                    .doesNotContain("X-Probe-Forwarded-For: 198.51.100.42")
+                    .contains("X-Probe-Forwarded-Host: " + PRODUCTION_HOST,
+                            "X-Probe-Forwarded-Proto: https", "X-Probe-Forwarded-Port: 443",
+                            "X-Probe-Forwarded: null");
+            assertThat(refusedAnswer)
+                    .startsWith("HTTP/1.1 400")
+                    .contains("Secure outer ingress is required.")
+                    .doesNotContain(MARKER, "X-Probe-Forwarded-For");
+            assertThat(forwardedAnswer)
+                    .contains("X-Probe-Forwarded-For: 198.51.100.42",
+                            "X-Probe-Forwarded-Host: " + PRODUCTION_HOST,
+                            "X-Probe-Forwarded-Proto: https", "X-Probe-Forwarded-Port: 443",
+                            "X-Probe-Forwarded: null");
         }
     }
 
@@ -319,13 +368,30 @@ class ServerTlsTransportTest {
     }
 
     private static GenericContainer<?> productionHostProxy() throws IOException {
-        return productionHostProxy(UPSTREAM + ":" + PLAIN_PORT);
+        return productionHostProxy(UPSTREAM + ":" + PLAIN_PORT, null);
     }
 
     private static GenericContainer<?> productionHostProxy(String upstream) throws IOException {
-        String caddyfile = "%s\n\n%s\n\n%s\n\n%s\n\n%s".formatted(
-                snippet("applicationHeaders"), snippet("plaintext").replace("app:8080", upstream),
-                productionSite().replace("{$COURTSIDE_DOMAIN}", "http://" + PRODUCTION_HOST)
+        return productionHostProxy(upstream, null);
+    }
+
+    private static GenericContainer<?> forwardedProductionHostProxy() throws IOException {
+        return productionHostProxy(UPSTREAM + ":" + PLAIN_PORT, "private_ranges", "forwardedIngress");
+    }
+
+    private static GenericContainer<?> productionHostProxy(String upstream, String trustedProxies)
+            throws IOException {
+        return productionHostProxy(upstream, trustedProxies, "publicIngress");
+    }
+
+    private static GenericContainer<?> productionHostProxy(
+            String upstream, String trustedProxies, String ingressMode) throws IOException {
+        String caddyfile = "%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s".formatted(
+                deploymentBlock("{"), snippet("applicationHeaders"), snippet("publicIngress"),
+                snippet("forwardedIngress"),
+                snippet("plaintext").replace("app:8080", upstream),
+                productionSite().replace("{$COURTSIDE_SITE_ADDRESS}", "http://" + PRODUCTION_HOST)
+                        .replace("import {$COURTSIDE_INGRESS_MODE:publicIngress}", "import " + ingressMode)
                         .replace("import {$COURTSIDE_APP_TLS_MODE:plaintext}", "import plaintext"),
                 deploymentBlock("http://:80 {").replace("{$COURTSIDE_DOMAIN}", PRODUCTION_HOST),
                 deploymentBlock("Caddyfile.stalwart", "http://{$COURTSIDE_MAIL_HOSTNAME} {")
@@ -334,6 +400,9 @@ class ServerTlsTransportTest {
                 .withCopyToContainer(forString(caddyfile), "/etc/caddy/Caddyfile")
                 .withExposedPorts(80)
                 .waitingFor(Wait.forLogMessage(".*serving initial configuration.*", 1));
+        if (trustedProxies != null) {
+            proxy.withEnv("COURTSIDE_TRUSTED_PROXIES", trustedProxies);
+        }
         proxy.start();
         return proxy;
     }
@@ -421,7 +490,7 @@ class ServerTlsTransportTest {
     }
 
     private static String productionSite() throws IOException {
-        return deploymentBlock("{$COURTSIDE_DOMAIN} {");
+        return deploymentBlock("{$COURTSIDE_SITE_ADDRESS} {");
     }
 
     private static String deploymentBlock(String marker) throws IOException {

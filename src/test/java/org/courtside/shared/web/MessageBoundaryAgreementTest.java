@@ -290,12 +290,13 @@ class MessageBoundaryAgreementTest extends AbstractIntegrationTest {
     // Only the upstream address and the site's transport are substituted: the body limit, the
     // header rewriting and the error handling are the deployment's own text.
     private static String theDeploymentsFrontDoor() throws IOException {
-        return "%s\n\n%s\n\n%s\n".formatted(
+        return "%s\n\n%s\n\n%s\n\n%s\n".formatted(
                 block("(applicationHeaders) {"),
+                block("(publicIngress) {"),
                 replacingOnce(block("(plaintext) {"), "app:8080", UPSTREAM + ":" + FORWARDED_PORT),
-                replacingOnce(replacingOnce(block("{$COURTSIDE_DOMAIN} {"),
-                        "{$COURTSIDE_DOMAIN}", "http://" + HOST),
-                        "import {$COURTSIDE_APP_TLS_MODE:plaintext}", "import plaintext"));
+                replacingOnce(replacingOnce(block("{$COURTSIDE_SITE_ADDRESS} {"),
+                        "{$COURTSIDE_SITE_ADDRESS}", "http://" + HOST),
+                        "import {$COURTSIDE_INGRESS_MODE:publicIngress}", "import publicIngress"));
     }
 
     private static String replacingOnce(String text, String what, String with) {

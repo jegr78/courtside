@@ -26,10 +26,10 @@ and a recipe names the components that belong together:
 
 | Recipe | Database | Ingress | Mail |
 |---|---|---|---|
-| `standard` | bundled PostgreSQL | Caddy | an external SMTP relay |
-| `full-self-hosted` | bundled PostgreSQL | Caddy | this deployment's own Stalwart server |
-| `existing-infrastructure` | external PostgreSQL 17 | your own HTTPS ingress | an external SMTP relay |
-| `funnel` | bundled PostgreSQL | Tailscale Funnel on the host | an external SMTP relay |
+| `standard` | bundled PostgreSQL | Caddy with public TLS | an external SMTP relay |
+| `full-self-hosted` | bundled PostgreSQL | Caddy with public TLS | this deployment's own Stalwart server |
+| `existing-infrastructure` | external PostgreSQL 17 | your HTTPS ingress, then Caddy | an external SMTP relay |
+| `funnel` | bundled PostgreSQL | Tailscale Funnel, then Caddy | an external SMTP relay |
 
 `existing-infrastructure` reaches its database over a network the deployment does not own, so
 combine it with the `database-tls` overlay described below: without it the connection is encrypted
@@ -45,7 +45,7 @@ first port rootless Docker may bind, the value of `net.ipv4.ip_unprivileged_port
 ./recipe.sh files standard | paste -sd: -
 ```
 
-That prints `compose.yaml:compose.caddy.yaml:compose.smtp-relay.yaml`. Compose reads
+That prints `compose.yaml:compose.caddy.yaml:compose.caddy-public.yaml:compose.smtp-relay.yaml`. Compose reads
 `COMPOSE_FILE` from `.env`, so putting that value there once makes every `docker compose` command
 in this guide use the recipe. A hardening overlay described further down is added with
 `--overlay`, and its output replaces the `COMPOSE_FILE` value again.
@@ -86,7 +86,8 @@ Set these values in `.env`:
 - `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD`: a one-time password of at least 12 characters. The first
   login can do nothing except replace it.
 - `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME`: the administrator's first and last name.
-- `COURTSIDE_DOMAIN`: the name your members will type. This is required only for the reverse proxy.
+- `COURTSIDE_DOMAIN`: the name your members will type. Every supported web ingress requires it so
+  Caddy can reject requests for another host.
 - For an external SMTP relay: `COURTSIDE_MAIL_RELAY_HOST` from your mail provider,
   `COURTSIDE_MAIL_DOMAIN` for the sender address and `COURTSIDE_MAIL_REPLY_TO`. Add
   `COURTSIDE_MAIL_RELAY_USERNAME` and `COURTSIDE_MAIL_PASSWORD` when the relay requires a login;
@@ -101,9 +102,10 @@ configuration before members create bookings.
 docker compose up -d
 ```
 
-In the recipes with Caddy, it obtains a certificate for `COURTSIDE_DOMAIN` on its own, so ports 80
-and 443 must reach the host and the name must already point at it. The application itself is
-published on `127.0.0.1:8080` and never directly on a public interface.
+In the public Caddy recipes, it obtains a certificate for `COURTSIDE_DOMAIN` on its own, so ports
+80 and 443 must reach the host and the name must already point at it. In a forwarded recipe, the
+outer ingress owns that certificate. The application has no host port in either case. Public
+traffic reaches Caddy, and a same-host outer ingress reaches its loopback-only port.
 
 Use a certificate that every member device trusts. Clicking through a browser warning for an
 untrusted certificate chain can leave the application usable while the browser still refuses to
@@ -199,41 +201,53 @@ A club with no static address, no server and no budget still needs its instance 
 [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) does that: it terminates TLS on a
 `*.ts.net` name and forwards to a local port, so no port has to be opened on the router.
 
-The `funnel` recipe leaves the reverse proxy out, and Funnel exposes the application port instead:
+The `funnel` recipe publishes Caddy on the host's loopback interface. Funnel forwards to Caddy's
+loopback listener, and Caddy remains the only route to the application:
 
 ```sh
 docker compose up -d
-tailscale funnel 8080
+tailscale funnel http://127.0.0.1:${COURTSIDE_PORT:-8080}
 ```
 
-Three things this path costs you, all worth knowing before you choose it:
+Funnel owns the public `*.ts.net` certificate. Caddy does not ask an ACME authority for another
+certificate in this mode and publishes neither port 80 nor 443. It still applies the same request
+size, compression, error and browser-header policy as the public Caddy path.
+Funnel supplies `X-Forwarded-Proto: https` after terminating that public connection. Caddy refuses
+the request if this signal is missing or names another scheme; it never guesses that an outer HTTP
+route was secure.
 
-- **Funnel keeps the application's headers.** The application sets `Content-Security-Policy`,
-  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and
-  `Referrer-Policy: strict-origin-when-cross-origin` on its own responses. For a request it
-  recognizes as secure, Spring Security also sets `Strict-Transport-Security`. Caddy repeats
-  nosniff, frame denial and the referrer policy at the edge and sets HSTS independently;
-  `Permissions-Policy` is the only response policy here that comes only from Caddy. The Funnel path
-  therefore keeps those five application headers when Funnel supplies the trusted HTTPS forwarding
-  signal required below. It loses only Caddy's `Permissions-Policy` response header.
-- **Funnel makes the instance reachable from anywhere in the world**, exactly like a public
-  address does. Everything in "What this deployment does not solve yet" applies with full force.
-- **The application trusts forwarded headers.** Funnel or any replacement must discard incoming
-  `Forwarded` and `X-Forwarded-*` values and supply its own. Never forward arbitrary client values.
+The application sets `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options:
+DENY` and `Referrer-Policy: strict-origin-when-cross-origin` on its own responses. Spring Security
+also sets `Strict-Transport-Security` when it sees the HTTPS scheme that Caddy supplies. Caddy
+repeats nosniff, frame denial and the referrer policy at the edge. It adds HSTS independently;
+`Permissions-Policy` is the only response policy here that comes only from Caddy.
+
+Funnel makes the instance reachable from anywhere in the world, just as a public address does.
+Everything in "What this deployment does not solve yet" still applies.
+
+Caddy accepts the outer proxy's client address from private source addresses because Docker turns a
+same-host connection to the published loopback port into one from its bridge gateway. The loopback
+bind is the public boundary: remote hosts cannot reach the listener. Treat other containers on this
+host as part of the same operator-controlled boundary, do not attach them to Courtside's `ingress`
+or `host-ingress` networks, and never publish this listener on a public interface. Caddy replaces
+the remaining forwarding headers before the application sees them.
 
 The `funnel` recipe is one of four, not a dependency: the project must not depend on one vendor,
 and every other recipe works without it.
 
 ## Your own HTTPS ingress
 
-The `existing-infrastructure` recipe runs no proxy. The application port is published on the
-host's loopback interface only, so the ingress runs on the same host and forwards to
-`127.0.0.1:${COURTSIDE_PORT}`. Whatever it is, it takes over what Caddy does here: it terminates TLS
-for `COURTSIDE_DOMAIN`, discards incoming `Forwarded` and `X-Forwarded-*` values and supplies its
-own, because the application trusts them, and it limits request bodies. Without Caddy the
-application's own headers remain, as on the Funnel path above; Caddy's `Permissions-Policy`, its
-refusal of plain HTTP API requests, its host allowlist and its 2 MB body limit do not, unless the
-ingress provides them.
+The `existing-infrastructure` recipe uses the same loopback Caddy listener as Funnel. Your ingress
+runs on the same host, terminates public TLS and forwards to
+`http://127.0.0.1:${COURTSIDE_PORT:-8080}`. It must discard client-supplied `Forwarded` and
+`X-Forwarded-*` values, write the connecting client's address to `X-Forwarded-For` and preserve the
+configured `COURTSIDE_DOMAIN` as the host. It must also set `X-Forwarded-Proto: https`; Caddy refuses
+the request otherwise. Caddy accepts that metadata inside the operator-controlled host boundary
+described above. It then rewrites what the application receives and applies the common proxy policy.
+
+Do not place the external ingress in front of the application port. The application has no host
+port in a supported recipe, so doing that requires an untracked local override and leaves the
+tested deployment path.
 
 ## The club's own mail server
 
@@ -799,9 +813,9 @@ systems, a second approver, or this optional overlay is required for normal oper
 ## Encrypting the connection between the proxy and the application
 
 By default the reverse proxy reaches the application over plain HTTP on the compose network. The
-application's own port is published on loopback only and the network is private to the compose
-project, so on a single host that is the whole story. It stops being the whole story when the proxy
-and the application are not on the same one.
+application has no host port; only Caddy and the application share the private `ingress` network.
+On a single host that is the whole story. It stops being the whole story when the proxy and the
+application are not on the same one.
 
 `compose.app-tls.yaml` turns that hop into TLS on both ends at once. The application serves the
 certificate you supply, and the proxy dials it over TLS trusting nothing but the authority you name:
@@ -851,9 +865,8 @@ docker compose up -d
 The application's own health probe then verifies its certificate against that same authority, so a
 pair that does not match reports an unhealthy application rather than a bad gateway.
 
-The published loopback port serves HTTPS from that point on. `https://127.0.0.1:8080/` presents the
-certificate issued for `app`, so anything reaching the application directly on the host has to trust
-your authority and address it by that name.
+The public or loopback Caddy listener does not change. This overlay protects only the internal hop
+from Caddy to `app:8080`; nothing publishes the application port on the host.
 
 ### Renewal
 
@@ -893,7 +906,7 @@ default.
 | `COURTSIDE_BOOTSTRAP_ADMIN_USERNAME` | *required on an empty account table* | Username of the first local administrator. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD` | *required on an empty account table* | One-time password, at least 12 characters. |
 | `COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME` | *required on an empty account table* | First and last name of the first administrator. |
-| `COURTSIDE_DOMAIN` | *required with the proxy* | The public name Caddy obtains a certificate for. |
+| `COURTSIDE_DOMAIN` | *required* | The public name Caddy accepts. In the public recipes Caddy obtains its certificate; in a forwarded recipe the outer ingress owns TLS. |
 | `COURTSIDE_MAIL_DOMAIN` | *required* | The domain Courtside sends from, and with the mail server the domain SPF, DKIM and DMARC are published for. |
 | `COURTSIDE_MAIL_HOSTNAME` | *required with the mail server* | The mail server's own name. Its forward and reverse DNS must agree, and Caddy obtains a certificate for it, so it must point at this host. Only `full-self-hosted` reads it: `compose.stalwart.yaml` adds the site block in `Caddyfile.stalwart` to the proxy, and a recipe without the mail server never asks Caddy for this name. |
 | `COURTSIDE_MAIL_DKIM_SELECTOR` | *required with the mail server* | The selector of the DKIM key the setup wizard generated, as it appears in the admin interface. |
@@ -957,7 +970,7 @@ default.
 | `COURTSIDE_IMPORT_SWEEP_INTERVAL` | `1h` | How often previews past their retention are swept, between a minute and a day. The sweep drops the resolved change set and the person fingerprints, and keeps the row, the file's name and hash, and the counts. |
 | `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` | `500` | Logs Hibernate queries slower than this threshold in milliseconds. Bind values are not logged. |
 | `COURTSIDE_LOG_LEVEL` | `INFO` | Log level of the application's ordinary loggers. `DEBUG` adds an `Answering` line for every error one of its exception handlers answers. The security-event logger remains at `INFO`, so changing this setting cannot silently remove its successful authentication, session, credential or administrative events. |
-| `COURTSIDE_PORT` | `8080` | Host port on the loopback interface. |
+| `COURTSIDE_PORT` | `8080` | Host loopback port for Caddy when Funnel or another local ingress owns public TLS. The application is not published. |
 | `COURTSIDE_SOURCE_URL` | required | The absolute HTTP or HTTPS address without embedded credentials returned by `GET /api/source`. Point an unchanged installation here and a modified fork at the corresponding source for that fork. Compose refuses to start without this choice. |
 | `COURTSIDE_ENVIRONMENT` | `PRODUCTION` | Public environment designation: `PRODUCTION`, `UAT`, `DEVELOPMENT`, `PERFORMANCE` or `SECURITY`. `UAT` and `PERFORMANCE` are visibly marked in the frontend. `SECURITY` belongs to the disposable assessment target and also answers every request with the host and scheme the application observed; a club has no reason to set it. |
 | `COURTSIDE_CLOCK_FIXED_INSTANT` | *unset* | Freezes the clock at an ISO-8601 instant so an automated suite reads the same date on every run. A club never sets this: the instance starts with it only while `COURTSIDE_ENVIRONMENT` names `UAT`, `DEVELOPMENT` or `PERFORMANCE`, so a misspelt designation refuses rather than unlocks. |

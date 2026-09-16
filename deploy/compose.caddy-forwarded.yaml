@@ -1,0 +1,14 @@
+services:
+  proxy:
+    environment:
+      COURTSIDE_INGRESS_MODE: forwardedIngress
+      COURTSIDE_SITE_ADDRESS: http://${COURTSIDE_DOMAIN:?set COURTSIDE_DOMAIN in .env}:8080
+      COURTSIDE_TRUSTED_PROXIES: private_ranges
+    networks:
+      host-ingress:
+        gw_priority: 1
+    ports:
+      - "127.0.0.1:${COURTSIDE_PORT:-8080}:8080"
+
+networks:
+  host-ingress:

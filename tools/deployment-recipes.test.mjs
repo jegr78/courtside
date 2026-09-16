@@ -56,28 +56,29 @@ const syntheticMail = {
 
 const recipes = {
   standard: {
-    files: ["compose.yaml", "compose.caddy.yaml", "compose.smtp-relay.yaml"],
+    files: ["compose.yaml", "compose.caddy.yaml", "compose.caddy-public.yaml", "compose.smtp-relay.yaml"],
     environment: { ...common, ...bundledDatabase, ...caddy, ...smtpRelay },
     services: { app: "", db: "", proxy: "" },
     required: "COURTSIDE_MAIL_RELAY_HOST",
   },
   "full-self-hosted": {
-    files: ["compose.yaml", "compose.caddy.yaml", "compose.stalwart.yaml"],
+    files: ["compose.yaml", "compose.caddy.yaml", "compose.caddy-public.yaml", "compose.stalwart.yaml"],
     environment: { ...common, ...bundledDatabase, ...caddy, ...stalwart },
     services: { app: "", db: "", proxy: "", mail: "mail", "mail-certificate": "mail", "mail-reload": "mail",
       "mail-plan": "mail-setup", "mail-bootstrap": "mail-setup", "mail-configure": "mail-setup", "mail-check": "mail-check" },
     required: "COURTSIDE_MAIL_HOSTNAME",
   },
   "existing-infrastructure": {
-    files: ["compose.yaml", "compose.external-database.yaml", "compose.smtp-relay.yaml"],
-    environment: { ...common, ...externalDatabase, ...smtpRelay },
-    services: { app: "" },
+    files: ["compose.yaml", "compose.external-database.yaml", "compose.caddy.yaml",
+      "compose.caddy-forwarded.yaml", "compose.smtp-relay.yaml"],
+    environment: { ...common, ...externalDatabase, ...caddy, ...smtpRelay },
+    services: { app: "", proxy: "" },
     required: "COURTSIDE_DATABASE_URL",
   },
   funnel: {
-    files: ["compose.yaml", "compose.smtp-relay.yaml"],
-    environment: { ...common, ...bundledDatabase, ...smtpRelay },
-    services: { app: "", db: "" },
+    files: ["compose.yaml", "compose.caddy.yaml", "compose.caddy-forwarded.yaml", "compose.smtp-relay.yaml"],
+    environment: { ...common, ...bundledDatabase, ...caddy, ...smtpRelay },
+    services: { app: "", db: "", proxy: "" },
     required: "COURTSIDE_MAIL_DOMAIN",
   },
 };
@@ -176,6 +177,31 @@ test("given each declared recipe, when it is resolved, then it names its compone
   }
 });
 
+test("given every supported ingress, when its model is rendered, then Caddy is the only host web boundary", () => {
+  for (const [name, recipe] of Object.entries(recipes)) {
+    // given
+    const model = rendered(resolved("files", name), recipe.environment);
+
+    // when
+    const app = model.services.app;
+    const proxy = model.services.proxy;
+    const published = proxy.ports ?? [];
+
+    // then
+    assert.ok(proxy, `${name} has no Courtside-managed proxy`);
+    assert.equal(app.ports, undefined, `${name} publishes the application port`);
+    assert.ok(Object.hasOwn(app.networks, "ingress"), `${name} does not connect the application to Caddy`);
+    if (name === "standard" || name === "full-self-hosted") {
+      assert.deepEqual(published.map((port) => port.published).toSorted(), ["443", "80"]);
+    } else {
+      assert.deepEqual(published.map((port) => [port.host_ip, port.published, port.target]),
+        [["127.0.0.1", "8080", 8080]], `${name} does not keep its Caddy listener on loopback`);
+      assert.equal(proxy.environment.COURTSIDE_INGRESS_MODE, "forwardedIngress",
+        `${name} does not require proof of outer HTTPS`);
+    }
+  }
+});
+
 test("given each declared recipe and only its own settings, when Compose renders it, then exactly its services exist",
   () => {
     for (const [name, recipe] of Object.entries(recipes)) {
@@ -205,6 +231,21 @@ test("given each declared recipe, when a setting its components require is missi
     // then
     assert.notEqual(result.status, 0, `${name} rendered without ${recipe.required}`);
     assert.match(result.error, new RegExp(`required variable ${recipe.required} is missing`));
+  }
+});
+
+test("given every supported ingress, when its public hostname is missing, then the recipe refuses to render", () => {
+  for (const [name, recipe] of Object.entries(recipes)) {
+    // given
+    const environment = { ...recipe.environment };
+    delete environment.COURTSIDE_DOMAIN;
+
+    // when
+    const result = render(resolved("files", name), environment);
+
+    // then
+    assert.notEqual(result.status, 0, `${name} rendered without COURTSIDE_DOMAIN`);
+    assert.match(result.error, /required variable COURTSIDE_DOMAIN is missing/);
   }
 });
 
@@ -321,8 +362,6 @@ test("given a recipe and hardening overlays, when they are named in any order, t
 
 test("given combinations no recipe can run, when they are resolved, then each is refused with its reason", () => {
   // given / when / then
-  refused(["files", "funnel", "--overlay", "app-tls"], /app-tls needs the Caddy ingress/);
-  refused(["files", "existing-infrastructure", "--overlay", "app-tls"], /app-tls needs the Caddy ingress/);
   refused(["files", "existing-infrastructure", "--overlay", "database-identities"],
     /database-identities needs the bundled database/);
   refused(["files", "existing-infrastructure", "--overlay", "database-tls", "--overlay", "database-tls-local"],
@@ -341,6 +380,16 @@ test("given combinations no recipe can run, when they are resolved, then each is
   refused(["files"], /usage/);
   refused(["render", "standard"], /usage/);
   refused(["files", "standard", "--color"], /unknown option --color/);
+});
+
+test("given a forwarded ingress, when application TLS is selected, then Caddy still owns that hop", () => {
+  // when
+  const funnel = resolved("files", "funnel", "--overlay", "app-tls");
+  const external = resolved("files", "existing-infrastructure", "--overlay", "app-tls");
+
+  // then
+  assert.deepEqual(funnel, [...recipes.funnel.files, "compose.app-tls.yaml"]);
+  assert.deepEqual(external, [...recipes["existing-infrastructure"].files, "compose.app-tls.yaml"]);
 });
 
 test("given rootless Docker, when a recipe binds a privileged port, then only a host that permits the port may run it",
@@ -413,11 +462,13 @@ test("given acceptance with Mailpit, when it is rendered, then the instance can 
   const model = rendered(files, environment);
 
   // then
-  assert.deepEqual(files, ["compose.yaml", "compose.caddy.yaml", "compose.mailpit.yaml"]);
+  assert.deepEqual(files,
+    ["compose.yaml", "compose.caddy.yaml", "compose.caddy-public.yaml", "compose.mailpit.yaml"]);
   assert.equal(model.services.app.environment.COURTSIDE_ENVIRONMENT, "UAT");
   assert.equal(model.services.app.environment.COURTSIDE_MAIL_RELAY_HOST, "mailpit");
   assert.match(model.services.mailpit.image, /^axllent\/mailpit:[^@]+@sha256:[a-f0-9]{64}$/);
-  assert.deepEqual(resolved("files", "funnel", "--synthetic-mail"), ["compose.yaml", "compose.mailpit.yaml"]);
+  assert.deepEqual(resolved("files", "funnel", "--synthetic-mail"),
+    ["compose.yaml", "compose.caddy.yaml", "compose.caddy-forwarded.yaml", "compose.mailpit.yaml"]);
 });
 
 test("given acceptance with Mailpit, when it is rendered, then its messages are readable only from this host", () => {

@@ -101,9 +101,6 @@ files() {
   if [ -n "$synthetic" ] && [ "$mail" != "smtp-relay" ]; then
     refuse "synthetic mail replaces an external SMTP relay, and $name runs its own mail server"
   fi
-  if contains "$overlays" app-tls && [ "$ingress" != "caddy" ]; then
-    refuse "app-tls needs the Caddy ingress, and $name has none"
-  fi
   for overlay in database-identities database-tls-local; do
     if contains "$overlays" "$overlay" && [ "$database" != "bundled" ]; then
       refuse "$overlay needs the bundled database, and $name uses an external one"
@@ -127,7 +124,12 @@ files() {
   # the shared credential before any other component writes the same environment map.
   contains "$overlays" database-identities && echo compose.database-identities.yaml
   [ "$database" = "external" ] && echo compose.external-database.yaml
-  [ "$ingress" = "caddy" ] && echo compose.caddy.yaml
+  echo compose.caddy.yaml
+  if [ "$ingress" = "caddy" ]; then
+    echo compose.caddy-public.yaml
+  else
+    echo compose.caddy-forwarded.yaml
+  fi
   if [ -n "$synthetic" ]; then
     echo compose.mailpit.yaml
   else
