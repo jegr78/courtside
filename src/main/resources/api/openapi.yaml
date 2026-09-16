@@ -4412,9 +4412,6 @@ paths:
         that holds it is answered `409`, because the instance would then have nobody who could
         give it back.
 
-        A write that would overwrite a change to the account made since this entry was read is
-        answered `409` with `urn:courtside:error:concurrent-modification`.
-
         This operation requires a full reauthentication within the configured window, capped at
         five minutes. Missing or stale proof is answered `403` with
         `urn:courtside:error:recent-authentication-required` and changes nothing.
@@ -4469,9 +4466,6 @@ paths:
 
         A username another account holds is answered `409` with the same problem type
         `POST /api/admin/roster/{personId}/account` answers with.
-
-        A write that would overwrite a change to the account made since this entry was read is
-        answered `409` with `urn:courtside:error:concurrent-modification`.
 
         This operation requires a full reauthentication within the configured window, capped at
         five minutes. Missing or stale proof is answered `403` with
@@ -4675,9 +4669,6 @@ paths:
         Disabling the last enabled account holding `ADMIN` is answered `409`, for the reason
         `PUT .../account/roles` gives.
 
-        A write that would overwrite a change to the account made since this entry was read is
-        answered `409` with `urn:courtside:error:concurrent-modification`.
-
         This operation requires a full reauthentication within the configured window, capped at
         five minutes. Missing or stale proof is answered `403` with
         `urn:courtside:error:recent-authentication-required` and changes nothing.
@@ -4748,9 +4739,6 @@ paths:
         none to end.
 
         The response is the roster entry.
-
-        A write that would overwrite a change to the account made since this entry was read is
-        answered `409` with `urn:courtside:error:concurrent-modification`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -4784,8 +4772,7 @@ paths:
         "409":
           description: |
             The membership type is no longer offered
-            (`urn:courtside:error:membership-type-inactive`), or the person was changed while this
-            request was in flight (`urn:courtside:error:concurrent-modification`).
+            (`urn:courtside:error:membership-type-inactive`).
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
@@ -4812,9 +4799,6 @@ paths:
         and answers the same way, and it leaves an already recorded end date where it is.
 
         Their account's sessions end, for the reason the assignment gives.
-
-        A write that would overwrite a change to the account made since this entry was read is
-        answered `409` with `urn:courtside:error:concurrent-modification`.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -4834,8 +4818,6 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
-        "409":
-          $ref: "#/components/responses/Conflict"
 
   /api/admin/import/encodings:
     get:

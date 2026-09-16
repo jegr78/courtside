@@ -145,8 +145,8 @@
           "level": "PostgreSQL integration, React, E2E", "frequency": ["PR", "nightly"],
           "environment": "PostgreSQL 17, browser", "syntheticData": "Deterministic conflicting updates",
           "evidenceType": "Final row state and UI trace", "owner": "Administration",
-          "openGap": "None open: optimistic locking refuses a stale write, and a browser journey proves that a court and a role changed behind an open dialog fail closed.",
-          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2027-03-04"
+          "openGap": "None open: writers of one account row serialize on it instead of refusing the later one, so a confirmed change is the final state, and a browser journey proves that a court and a role changed behind an open dialog fail closed.",
+          "lastReviewedOn": "2026-09-16", "nextReviewOn": "2027-03-04"
         }
       ]
     },
