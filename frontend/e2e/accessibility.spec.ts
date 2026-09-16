@@ -429,18 +429,49 @@ test("core administration is operable using only the keyboard", async ({ page, b
   await page.goto("/admin/configuration");
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
   await expect(page.getByTestId("club-name")).toHaveValue("Courtside");
+  await page.evaluate(() => {
+    const nativeFetch = window.fetch.bind(window);
+    const observed = window as typeof window & { configurationWrites: number };
+    observed.configurationWrites = 0;
+    window.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith("/api/admin/config") && init?.method === "PUT") {
+        observed.configurationWrites += 1;
+        if (observed.configurationWrites === 1) {
+          const name = location.protocol === "https:" ? "__Host-XSRF-TOKEN" : "XSRF-TOKEN";
+          const token = document.cookie.split("; ").find((entry) => entry.startsWith(`${name}=`));
+          if (!token) throw new Error("The signed-in browser has no CSRF cookie to rotate");
+          const secure = location.protocol === "https:" ? "; Secure" : "";
+          document.cookie = `${token}-rotated; Path=/; SameSite=Lax${secure}`;
+        }
+      }
+      return nativeFetch(input, init);
+    };
+  });
 
   // when
   const tabKey = browserName === "webkit" ? "Alt+Tab" : "Tab";
   await tabToTestId(page, "club-name", tabKey);
   await tabToTestId(page, "save-club-config", tabKey);
+  const refused = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/config")
+      && response.request().method() === "PUT"
+      && response.status() === 403
+  );
   const saved = page.waitForResponse((response) =>
-    response.url().endsWith("/api/admin/config") && response.request().method() === "PUT"
+    response.url().endsWith("/api/admin/config")
+      && response.request().method() === "PUT"
+      && response.status() === 200
   );
   await page.keyboard.press("Enter");
 
   // then
-  expect((await saved).status()).toBe(200);
+  const [refusal, completedSave] = await Promise.all([refused, saved]);
+  expect(refusal.status()).toBe(403);
+  expect(completedSave.status()).toBe(200);
+  expect(await page.evaluate(() =>
+    (window as typeof window & { configurationWrites: number }).configurationWrites
+  )).toBe(2);
   await expect(page.getByTestId("admin-save-success")).toBeVisible();
 });
 
