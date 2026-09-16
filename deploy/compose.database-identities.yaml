@@ -10,7 +10,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${COURTSIDE_DB_OWNER_USERNAME:-courtside_owner} -d courtside"]
 
   database-setup:
-    image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}
+    image: ghcr.io/jegr78/courtside@sha256:${COURTSIDE_IMAGE_DIGEST:?set COURTSIDE_IMAGE_DIGEST in .env}
     restart: "no"
     read_only: true
     tmpfs:
@@ -42,7 +42,7 @@ services:
     command: ["--courtside-database-setup"]
 
   database-migrate:
-    image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}
+    image: ghcr.io/jegr78/courtside@sha256:${COURTSIDE_IMAGE_DIGEST:?set COURTSIDE_IMAGE_DIGEST in .env}
     restart: "no"
     read_only: true
     tmpfs:

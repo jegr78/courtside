@@ -1,0 +1,5 @@
+services:
+  app:
+    image: ${COURTSIDE_CUSTOM_IMAGE_REPOSITORY:?set COURTSIDE_CUSTOM_IMAGE_REPOSITORY in .env}@sha256:${COURTSIDE_CUSTOM_IMAGE_DIGEST:?set COURTSIDE_CUSTOM_IMAGE_DIGEST in .env}
+    labels:
+      org.courtside.image-trust: custom

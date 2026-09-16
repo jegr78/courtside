@@ -61,7 +61,10 @@ files any recipe can select, the files those Compose files bind, the configurati
 deployment guide and the container contract, with a manifest naming the release, its image digest,
 its source revision and the release workflow that attests it. The manifest carries a checksum per
 file and the release page carries one for the archive. Installing from it needs no clone of this
-repository.
+repository. The official recipes compose the fixed GHCR repository and SHA-256 algorithm with that
+manifest digest, so they cannot run a moving tag. An explicit `custom-image` overlay composes
+another repository with a required SHA-256 digest and source URL, marks the rendered service as
+custom, and warns that the official release trust guarantee no longer applies.
 
 Two interfaces are public compatibility contracts:
 

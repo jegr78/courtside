@@ -66,7 +66,10 @@ public class ReferenceDeploymentSecurityTest {
             "(?ms)^  [a-zA-Z0-9_-]+:\\R(?<body>.*?)(?=^  [a-zA-Z0-9_-]+:\\R|\\z)");
 
     private static final String GHCR_RELEASE_IMAGE =
-            "image: ghcr.io/jegr78/courtside:${COURTSIDE_VERSION:?set COURTSIDE_VERSION in .env}";
+            "image: ghcr.io/jegr78/courtside@sha256:${COURTSIDE_IMAGE_DIGEST:?set COURTSIDE_IMAGE_DIGEST in .env}";
+    private static final String CUSTOM_IMAGE =
+            "image: ${COURTSIDE_CUSTOM_IMAGE_REPOSITORY:?set COURTSIDE_CUSTOM_IMAGE_REPOSITORY in .env}"
+                    + "@sha256:${COURTSIDE_CUSTOM_IMAGE_DIGEST:?set COURTSIDE_CUSTOM_IMAGE_DIGEST in .env}";
     private static final String UAT_LOCAL_IMAGE_ALIAS =
             "image: ${COURTSIDE_UAT_IMAGE:-courtside:uat-local}";
     private static final String PERF_LOCAL_IMAGE_ALIAS =
@@ -81,7 +84,7 @@ public class ReferenceDeploymentSecurityTest {
             "image: ${COURTSIDE_SECURITY_FIXTURES_IMAGE:?required}";
     private static final String FIXTURE_IMAGE_BASE = "FROM ${BASE_IMAGE}";
     private static final Set<String> OWN_IMAGE_REFERENCES =
-            Set.of(GHCR_RELEASE_IMAGE, UAT_LOCAL_IMAGE_ALIAS, PERF_LOCAL_IMAGE_ALIAS,
+            Set.of(GHCR_RELEASE_IMAGE, CUSTOM_IMAGE, UAT_LOCAL_IMAGE_ALIAS, PERF_LOCAL_IMAGE_ALIAS,
                     UPGRADE_CANDIDATE_IMAGE_ALIAS, RESTORE_CANDIDATE_IMAGE_ALIAS,
                     SECURITY_CANDIDATE_IMAGE_ALIAS, SECURITY_FIXTURES_IMAGE_ALIAS,
                     FIXTURE_IMAGE_BASE);
@@ -114,15 +117,18 @@ public class ReferenceDeploymentSecurityTest {
     }
 
     @Test
-    void whenReadingProductionCompose_thenOwnImageIsSelectedByVersionNotDigest() throws IOException {
+    void whenReadingProductionCompose_thenOfficialAndCustomImageSourcesAreExplicit() throws IOException {
         // given
-        List<String> ownImageLines = Files.readAllLines(Path.of("deploy/compose.yaml")).stream()
-                .map(String::strip)
-                .filter(OWN_IMAGE_REFERENCES::contains)
-                .toList();
+        List<String> ownImageLines = new ArrayList<>();
+        for (Path source : productionComposeSources()) {
+            Files.readAllLines(source).stream()
+                    .map(String::strip)
+                    .filter(OWN_IMAGE_REFERENCES::contains)
+                    .forEach(ownImageLines::add);
+        }
 
         // when / then
-        assertThat(ownImageLines).containsExactly(GHCR_RELEASE_IMAGE);
+        assertThat(ownImageLines).contains(GHCR_RELEASE_IMAGE, CUSTOM_IMAGE);
     }
 
     @Test
@@ -250,6 +256,7 @@ public class ReferenceDeploymentSecurityTest {
 
     private static boolean runsApplication(String service) {
         return OWN_IMAGE_REFERENCES.stream().anyMatch(service::contains)
+                && service.contains("environment:")
                 && !service.contains("command: [\"--courtside-database-");
     }
 

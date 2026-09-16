@@ -50,7 +50,9 @@ function resolverOutput(root, args) {
 const recipes = recipeNames(deploy);
 
 const settings = {
-  COURTSIDE_VERSION: release.version,
+  COURTSIDE_IMAGE_DIGEST: release.image.split("@sha256:", 2)[1],
+  COURTSIDE_CUSTOM_IMAGE_REPOSITORY: "registry.example.org/example/courtside",
+  COURTSIDE_CUSTOM_IMAGE_DIGEST: "b".repeat(64),
   COURTSIDE_SOURCE_URL: "https://example.org/courtside",
   COURTSIDE_DOMAIN: "courts.example.org",
   POSTGRES_PASSWORD: "placeholder",

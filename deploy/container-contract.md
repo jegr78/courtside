@@ -19,7 +19,8 @@ define.
 
 ## The image
 
-- `ghcr.io/jegr78/courtside:<version>`. Check its signature before you run it, as
+- `ghcr.io/jegr78/courtside@sha256:<digest>`. The reference recipes require the digest from their
+  release archive. Check its signature before you run it, as
   [Verifying what you are about to run](README.md#verifying-what-you-are-about-to-run) describes.
 - The process runs as UID 10001 and GID 10001. It needs no root and no Linux capability. The
   reference deployment drops every capability and sets `no-new-privileges`.

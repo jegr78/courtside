@@ -238,7 +238,7 @@ footer, which is what the title lint reads and what the version bump follows.
 **The upgrade note is your commit message.** `build` collects every `BREAKING CHANGE:` footer and
 every `!:` subject between the previous published release and this one and puts them verbatim into
 the release body under *Upgrade notes*; with none it writes that no published surface changed and a
-club may raise `COURTSIDE_VERSION` and restart. The footer is not paperwork, then, it is the text a
+club may replace `COURTSIDE_IMAGE_DIGEST` and restart. The footer is not paperwork, then, it is the text a
 club reads before pulling the image, and `BREAKING CHANGE: renamed a variable` is a sentence that
 helps nobody at 22:00.
 
@@ -291,6 +291,6 @@ The GitHub release carries four files: the `openapi.yaml` this version answers t
 archive is attested like the image. The security record is an ordinary release asset, neither
 signed nor attested, so it reports what the passes found rather than proving it.
 
-`deploy/.env.example` names `COURTSIDE_VERSION`, and a club moves by editing that one line and
-recreating the container, the deployment reference in `deploy/README.md` is what they follow, not
-this file.
+`deploy/.env.example` names `COURTSIDE_IMAGE_DIGEST`; a club copies the 64 hexadecimal characters
+after `sha256:` into that line and recreates the container. The deployment reference in
+`deploy/README.md` is what they follow, not this file.
