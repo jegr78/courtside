@@ -1,13 +1,19 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync }
+  from "node:fs";
 import { delimiter, isAbsolute, join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { archiveEntries, buildArchive, emittedComposeFiles, refuseSecrets } from "./deployment-archive.mjs";
+import { createRequire } from "node:module";
+
+import { archiveEntries, buildArchive, emittedComposeFiles, overlayNames, recipeNames, refuseSecrets }
+  from "./deployment-archive.mjs";
+
+const YAML = createRequire(new URL("../frontend/package.json", import.meta.url))("yaml");
 
 const deploy = fileURLToPath(new URL("../deploy/", import.meta.url));
 const release = {
@@ -20,7 +26,8 @@ const release = {
 
 function executable(name) {
   const found = (process.env.PATH ?? "").split(delimiter).filter(isAbsolute)
-    .map((directory) => join(directory, name)).find((candidate) => existsSync(candidate));
+    .map((directory) => join(directory, name))
+    .find((candidate) => existsSync(candidate) && statSync(candidate).mode & 0o111);
   if (!found) throw new Error(`${name} is not on PATH, and this test needs it to read the archive`);
   return found;
 }
@@ -49,7 +56,7 @@ function resolverOutput(root, args) {
   return result.stdout.split("\n").filter(Boolean);
 }
 
-const recipes = ["standard", "full-self-hosted", "existing-infrastructure", "funnel"];
+const recipes = recipeNames(deploy);
 
 const settings = {
   COURTSIDE_VERSION: release.version,
@@ -69,6 +76,15 @@ const settings = {
   COURTSIDE_DATABASE_URL: "jdbc:postgresql://database.example.org:5432/courtside",
   COURTSIDE_DATABASE_USERNAME: "courtside",
   COURTSIDE_DATABASE_PASSWORD: "placeholder",
+  COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES: "/srv/courtside/acceptance-mail",
+  COURTSIDE_ACCEPTANCE_MAIL_USER: "1000:1000",
+  COURTSIDE_DB_TLS_AUTHORITY: "/srv/courtside/database-authority",
+  COURTSIDE_DB_TLS_CERTIFICATE: "/srv/courtside/database-tls/server.crt",
+  COURTSIDE_DB_TLS_KEY: "/srv/courtside/database-tls/server.key",
+  COURTSIDE_DB_OWNER_USERNAME: "club_owner",
+  COURTSIDE_DB_OWNER_PASSWORD_FILE: "/srv/courtside/database-owner-password",
+  COURTSIDE_DB_MIGRATION_PASSWORD_FILE: "/srv/courtside/database-migration-password",
+  COURTSIDE_DB_RUNTIME_PASSWORD_FILE: "/srv/courtside/database-runtime-password",
 };
 
 function renderedFrom(root, files) {
@@ -82,6 +98,19 @@ function renderedFrom(root, files) {
   });
   assert.equal(result.status, 0, `Compose refused ${files.join(" + ")} outside the source tree: ${result.stderr}`);
   return JSON.parse(result.stdout);
+}
+
+function selections(root) {
+  const overlays = overlayNames(root);
+  const chosen = [[], ["--synthetic-mail"],
+    ...overlays.map((overlay) => ["--overlay", overlay]),
+    overlays.flatMap((overlay) => ["--overlay", overlay])];
+  return recipes.flatMap((recipe) => chosen.map((options) => [recipe, options]))
+    .filter(([recipe, options]) => resolves(root, [recipe, ...options]));
+}
+
+function resolves(root, args) {
+  return spawnSync(executable("bash"), [join(root, "recipe.sh"), "files", ...args]).status === 0;
 }
 
 function boundSources(model) {
@@ -108,17 +137,19 @@ test("given the archive alone, when every recipe is rendered from it, then each 
   const { zip } = buildArchive({ deploy, ...release });
   scratch((directory) => {
     const root = extracted(zip, directory);
-    for (const recipe of recipes) {
+    for (const [recipe, chosen] of selections(root)) {
       // when
-      const sources = boundSources(renderedFrom(root, resolverOutput(root, [recipe])));
+      const sources = boundSources(renderedFrom(root, resolverOutput(root, [recipe, ...chosen])));
 
       // then
       assert.ok(sources.length > 0, `${recipe} bound no file, so this proves nothing`);
-      assert.deepEqual(sources.filter((source) => !source.startsWith(`${root}/`)), [],
-        `${recipe} reaches outside the archive for a file`);
-      for (const source of sources) {
+      // An absolute path elsewhere is the operator's; a sibling of the archive is the archive leaking.
+      assert.deepEqual(sources.filter((source) => source.startsWith(directory)
+        && !source.startsWith(`${root}/`)), [],
+      `${recipe} ${chosen.join(" ")} reaches outside the archive for a file`);
+      for (const source of sources.filter((source) => source.startsWith(`${root}/`))) {
         assert.ok(existsSync(source),
-          `${recipe} binds ${relative(root, source)} and the archive does not carry it`);
+          `${recipe} ${chosen.join(" ")} binds ${relative(root, source)}, which the archive omits`);
       }
     }
   });
@@ -166,14 +197,109 @@ test("given the shipped deployment, when its files are read, then none carries a
   refuseSecrets(archiveEntries(deploy));
 });
 
-test("given a file that assigns a password, when the archive is built, then it is refused", () => {
-  // when / then
-  assert.throws(() => refuseSecrets([
-    { path: "compose.yaml", mode: 0o644, content: Buffer.from("POSTGRES_PASSWORD: hunter2\n") },
-  ]), /compose\.yaml/);
-  assert.throws(() => refuseSecrets([
-    { path: ".env", mode: 0o600, content: Buffer.from("") },
-  ]), /\.env/);
+const carried = [
+  ["a certificate without a key", "tls.crt", "-----BEGIN CERTIFICATE-----\nPRIVATE KEY-----\n"],
+  ["the environment template", ".env.example", "COURTSIDE_MAIL_PASSWORD=\n"],
+  ["a documented variable name", "README.md", "Set `POSTGRES_PASSWORD` in .env.\n"],
+  ["a variable naming a secret file", "x.yaml", "DB_OWNER_PASSWORD_FILE: /run/secrets/owner\n"],
+  ["a path whose last segment is a word", "x.yaml", "- /run/secrets/owner-password:ro\n"],
+  ["a setting that counts credentials", "x.env", "CREDENTIAL_ISSUE_MAX_PER_WINDOW=5\n"],
+  ["a seed placeholder", "x.ndjson", '{"secret": "{{adminpassword}}"}\n'],
+  ["a structured value", "x.ndjson", '{"authSecret": {"@type": "None"}}\n'],
+  ["a shell reference in quotes", "x.sh", 'password="${MAIL_PASSWORD:?set it}"\n'],
+  ["a variable naming a key file", "x.yaml", "APP_TLS_KEY: /etc/courtside/tls/server.key\n"],
+  ["a database URL without a password", "x.env", "URL=jdbc:postgresql://db.example.org:5432/x\n"],
+];
+
+const refused = [
+  ["a value in a Compose variable default", "compose.yaml", "PASSWORD: ${PASSWORD:-s3cret}\n"],
+  ["a JSON key", "x.ndjson", '{"API_TOKEN": "abc123"}\n'],
+  ["a space-separated directive", "Caddyfile", "api_token abc123\n"],
+  ["a lowercase key", "x.yaml", "password: hunter2\n"],
+  ["a private key", "tls.key", "-----BEGIN RSA PRIVATE KEY-----\n"],
+  ["an environment file somebody filled in", ".env", "POSTGRES_PASSWORD=hunter2\n"],
+  ["a signing salt", "x.yaml", "COURTSIDE_SALT: 9f2c\n"],
+  ["a credential inside a URL", "x.env", "URL=postgres://courtside:hunter2@db:5432/courtside\n"],
+];
+
+test("given a file the archive may carry, when the credential guard reads it, then it stays", () => {
+  for (const [what, path, content] of carried) {
+    // when / then
+    refuseSecrets([{ path, mode: 0o644, content: Buffer.from(content) }]);
+    assert.ok(true, what);
+  }
+});
+
+test("given a file that would publish a credential, when the guard reads it, then it is refused", () => {
+  for (const [what, path, content] of refused) {
+    // when / then
+    assert.throws(() => refuseSecrets([{ path, mode: 0o644, content: Buffer.from(content) }]),
+      new RegExp(path.replace(/[.]/g, "\\.")), `${what} reached the archive`);
+  }
+});
+
+test("given a bind that climbs out of the deployment, when the archive is derived, then it is dropped", () => {
+  const climbing = mkdtempSync(join(tmpdir(), "courtside-climb-"));
+  try {
+    // given
+    writeFileSync(join(climbing, "secret.pem"), "material\n");
+    const copy = join(climbing, "deploy");
+    cpSync(deploy, copy, { recursive: true });
+    writeFileSync(join(copy, "compose.caddy.yaml"),
+      readFileSync(join(copy, "compose.caddy.yaml"), "utf8")
+        .replace("- ./Caddyfile:", "- ./../secret.pem:/x:ro\n      - ./Caddyfile:"));
+
+    // when
+    const paths = archiveEntries(copy).map((entry) => entry.path);
+
+    // then
+    assert.ok(!paths.some((path) => path.endsWith("secret.pem")),
+      "a bind that climbs out of the deployment put a file into the archive");
+  } finally {
+    rmSync(climbing, { recursive: true, force: true });
+  }
+});
+
+test("given a symlink out of the deployment, when the archive is derived, then it is refused", () => {
+  const linked = mkdtempSync(join(tmpdir(), "courtside-link-"));
+  try {
+    // given
+    writeFileSync(join(linked, "secret.pem"), "material\n");
+    const copy = join(linked, "deploy");
+    cpSync(deploy, copy, { recursive: true });
+    rmSync(join(copy, "mail", "base.ndjson"));
+    symlinkSync(join(linked, "secret.pem"), join(copy, "mail", "base.ndjson"));
+
+    // when / then
+    assert.throws(() => archiveEntries(copy), /outside the deployment/);
+  } finally {
+    rmSync(linked, { recursive: true, force: true });
+  }
+});
+
+test("given the archive, when a club follows its own first step, then the file that step names is in it", () => {
+  // when
+  const paths = archiveEntries(deploy).map((entry) => entry.path);
+
+  // then
+  assert.ok(paths.includes(".env.example"),
+    "the guide says to copy .env.example, and the archive does not carry it");
+});
+
+test("given the overlays the deployment declares, when the archive is derived, then it carries each", () => {
+  const model = YAML.parse(readFileSync(join(deploy, "compose.yaml"), "utf8"), { logLevel: "silent" });
+
+  // when
+  const emitted = emittedComposeFiles(deploy);
+
+  // then
+  const declared = model["x-courtside-production-overlays"];
+  assert.ok(declared.length > 0, "compose.yaml declares no overlay, so this proves nothing");
+  for (const file of declared) {
+    assert.ok(emitted.includes(file), `${file} is a supported overlay the archive never derives`);
+  }
+  assert.deepEqual(overlayNames(deploy).filter((name) => !emitted.includes(`compose.${name}.yaml`)), [],
+    "the resolver names an overlay whose file the archive does not carry");
 });
 
 test("given the shipped resolver, when every accepted combination is enumerated, then each named file exists", () => {
