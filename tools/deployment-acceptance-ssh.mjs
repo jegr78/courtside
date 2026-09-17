@@ -69,7 +69,7 @@ archive="$input/candidate.zip"
 entries=$(unzip -Z1 "$archive")
 test -n "$entries"
 if printf '%s\\n' "$entries" | awk '
-  /^\// || /\\\\/ { exit 1 }
+  substr($0, 1, 1) == "/" || index($0, sprintf("%c", 92)) { exit 1 }
   { count = split($0, parts, "/"); if (parts[1] !~ /^courtside-deployment-[A-Za-z0-9.+-]+$/) exit 1 }
   { for (part = 1; part <= count; part++) if (parts[part] == "..") exit 1 }
 '; then :; else printf 'archive contains an unsafe path\n' >&2; exit 2; fi
@@ -87,16 +87,22 @@ unzip -q "$archive" -d "$release"
 archive_root=$(find "$release" -mindepth 1 -maxdepth 1 -type d -name 'courtside-deployment-*' -print -quit)
 test -n "$archive_root"
 grep -qx "recipe=$recipe" "$root/answers.conf"
-"$archive_root/courtside" --directory "$installation" init --answers "$root/answers.conf" --yes
-"$installation/current/courtside" doctor --json
-"$installation/current/courtside" up
-"$installation/current/courtside" status
-"$installation/current/courtside" backup --retain 2
+"$archive_root/courtside" --directory "$installation" init --answers "$root/answers.conf" --yes </dev/null
+"$installation/current/courtside" up </dev/null
+"$installation/current/courtside" doctor --json </dev/null
+"$installation/current/courtside" status </dev/null
+"$installation/current/courtside" backup --retain 2 </dev/null
 recovery=$(find "$installation/backups" -mindepth 1 -maxdepth 1 -type d -name 'recovery-*' -print | sort | tail -n 1)
 test -n "$recovery"
-"$installation/current/courtside" restore-check --recovery "$recovery"
-"$installation/current/courtside" up
-"$installation/current/courtside" status
+restore_username=$(sed -n 's/^bootstrap_username=//p' "$root/answers.conf")
+restore_password=$(< "$installation/secrets/bootstrap-admin-password")
+test -n "$restore_username"
+test -n "$restore_password"
+COURTSIDE_RESTORE_USERNAME="$restore_username" COURTSIDE_RESTORE_PASSWORD="$restore_password" \
+  "$installation/current/courtside" restore-check --recovery "$recovery" </dev/null
+unset restore_username restore_password
+"$installation/current/courtside" up </dev/null
+"$installation/current/courtside" status </dev/null
 `;
   return {
     executable: "ssh",

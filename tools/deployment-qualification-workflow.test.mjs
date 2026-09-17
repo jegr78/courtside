@@ -49,10 +49,21 @@ test("given main or nightly qualification, when the image is exercised, then a c
   // given
   const build = source("../.github/workflows/build.yml");
   const nightly = source("../.github/workflows/nightly-image.yml");
+  const archiveJob = nightly.match(/\n  archive:\n([\s\S]+?)\n  qualify:/)?.[1] ?? "";
+  const qualifyJob = nightly.match(/\n  qualify:\n([\s\S]+?)\n  publish:/)?.[1] ?? "";
+  const uploadedArtifact = archiveJob.match(
+    /uses: actions\/upload-artifact@[a-f0-9]{40}[\s\S]+?name: ([^\n]+)/)?.[1];
+  const downloadedArtifact = qualifyJob.match(
+    /uses: actions\/download-artifact@[a-f0-9]{40}[\s\S]+?name: ([^\n]+)/)?.[1];
 
   // when / then
   assert.match(build, /github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
-  assert.match(nightly, /node tools\/deployment-archive\.mjs[\s\S]+nightly/);
+  assert.match(nightly, /version=.*-nightly\.\$\{GITHUB_RUN_ID\}/);
+  assert.match(nightly, /name: nightly-deployment-archive/);
+  assert.match(nightly, /--workflow nightly-image\.yml[\s\\]+--ref "\$GITHUB_REF"/);
+  assert.match(nightly, /uses: actions\/upload-artifact@[a-f0-9]{40}/);
+  assert.match(nightly, /uses: actions\/download-artifact@[a-f0-9]{40}[\s\S]+name: nightly-deployment-archive/);
+  assert.equal(downloadedArtifact, uploadedArtifact);
   assert.match(nightly, /deployment-qualification\.mjs --inspect-archive/);
   assert.match(nightly, /--recipes standard,full-self-hosted,existing-infrastructure,funnel/);
   assert.match(nightly, /architecture: amd64[\s\S]+architecture: arm64/);

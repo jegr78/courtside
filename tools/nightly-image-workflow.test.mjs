@@ -79,7 +79,7 @@ test("given the current nightly already carries a revision, when selection finis
   // when / then
   assert.match(source, /docker image inspect[\s\S]+org\.opencontainers\.image\.revision/);
   assert.match(source, /if \[\[ "\$published_revision" = "\$commit" \]\]/);
-  for (const job of ["package", "image", "qualify"]) {
+  for (const job of ["package", "image", "archive", "qualify"]) {
     assert.match(String(workflow.jobs[job].if), /needs\.select\.outputs\.build == 'true'/,
       `${job} does not obey the no-change selection`);
   }
@@ -87,7 +87,7 @@ test("given the current nightly already carries a revision, when selection finis
 
 test("given a new verified revision, when its image is built, then one candidate carries both architectures and the revision", () => {
   // given
-  const image = source.slice(source.indexOf("  image:"), source.indexOf("\n  qualify:"));
+  const image = source.slice(source.indexOf("  image:"), source.indexOf("\n  archive:"));
 
   // when / then
   assert.match(source, /\.\/mvnw -B package -DskipTests/);
@@ -104,7 +104,8 @@ test("given a pull-request branch dispatch, when the candidate runs, then it use
   // when / then
   assert.deepEqual(workflow.jobs.package.needs, "select");
   assert.deepEqual(workflow.jobs.image.needs, ["select", "package"]);
-  assert.deepEqual(workflow.jobs.qualify.needs, ["select", "image"]);
+  assert.deepEqual(workflow.jobs.archive.needs, ["select", "image"]);
+  assert.deepEqual(workflow.jobs.qualify.needs, ["select", "image", "archive"]);
   assert.match(source, /publish=false/);
   assert.match(String(workflow.jobs.publish.if), /needs\.select\.outputs\.publish == 'true'/);
   assert.match(String(workflow.jobs.retention.if), /needs\.select\.outputs\.publish == 'true'/);

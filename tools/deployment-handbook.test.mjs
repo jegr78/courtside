@@ -68,10 +68,11 @@ test("given the operator documentation, when its entry points are read, then sel
     "operations", "stalwart", "hardening"]) {
     assert.match(readme, new RegExp(`guides/${guide}\\.md`));
   }
-  assert.match(funnel, /tailscale funnel --bg https\+insecure:\/\/127\.0\.0\.1:8080/);
-  assert.match(operations, /tailscale funnel --bg https\+insecure:\/\/127\.0\.0\.1:\$\{COURTSIDE_PORT:-8080\}/);
+  assert.match(funnel, /tailscale funnel --bg http:\/\/127\.0\.0\.1:8080/);
+  assert.match(operations, /tailscale funnel --bg http:\/\/127\.0\.0\.1:\$\{COURTSIDE_PORT:-8080\}/);
+  assert.match(operations, /\(cd \.\/nightly-deployment && sha256sum --check \*\.sha256\)/);
   assert.match(funnel, /management/i);
   assert.match(funnel, /API/);
-  assert.match(german, /tailscale funnel --bg https\+insecure:\/\/127\.0\.0\.1:8080/);
+  assert.match(german, /tailscale funnel --bg http:\/\/127\.0\.0\.1:8080/);
   assert.doesNotMatch(german, /\b(?:Sie|Ihr(?:e|en|em|er|es)?)\b/);
 });

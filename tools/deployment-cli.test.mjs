@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
-  readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+  readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -15,6 +15,12 @@ const deploy = join(repository, "deploy");
 const bash = "/bin/bash";
 const digest = "a".repeat(64);
 const revision = "0123456789abcdef0123456789abcdef01234567";
+
+function manifestSigner(version) {
+  return version.includes("-nightly.")
+    ? "https://github.com/jegr78/courtside/.github/workflows/nightly-image.yml@refs/heads/main"
+    : `https://github.com/jegr78/courtside/.github/workflows/release.yml@refs/tags/v${version}`;
+}
 
 function fileInventory(root, relative = "") {
   return Object.fromEntries(readdirSync(join(root, relative), { withFileTypes: true })
@@ -42,7 +48,7 @@ function fixture(use, releaseVersion = "0.1.0") {
     version: releaseVersion,
     revision,
     image: `ghcr.io/jegr78/courtside@sha256:${digest}`,
-    signer: `https://github.com/jegr78/courtside/.github/workflows/release.yml@refs/tags/v${releaseVersion}`,
+    signer: manifestSigner(releaseVersion),
     recipes: ["existing-infrastructure", "full-self-hosted", "funnel", "standard"],
     files: fileInventory(archive),
   }, null, 2)}\n`);
@@ -95,12 +101,13 @@ case "$*" in
   *' config --networks') printf '%s\n' 'default' ;;
   *' ps -a --format json') printf '%s\\n' '[]' ;;
   *' port app 8080') printf '%s\\n' '127.0.0.1:49152' ;;
-  *' ps --format json') printf '%s\\n' '[{"Service":"app","State":"running","Health":"healthy"},{"Service":"mail","State":"running","Health":"healthy"}]' ;;
-  *' ps --format {{.Service}}='*) printf '%s\\n' 'app=healthy' 'mail=healthy' ;;
+  *' ps --format json') if [ -f "${join(root, "docker-ps-json")}" ]; then cat "${join(root, "docker-ps-json")}"; else printf '%s\\n' '[{"Service":"app","State":"running","Health":"healthy"},{"Service":"mail","State":"running","Health":"healthy"},{"Service":"proxy","State":"running","Health":""}]'; fi ;;
+  *' ps --format {{.Service}}='*) if [ -f "${join(root, "docker-components")}" ]; then cat "${join(root, "docker-components")}"; else printf '%s\\n' 'app=healthy' 'mail=healthy' 'proxy=running'; fi ;;
 esac
 `, { mode: 0o755 });
   writeFileSync(join(bin, "curl"), `#!/bin/sh
 printf '%s\\n' "$*" >> "${join(root, "curl.log")}"
+[ ! -f "${join(root, "curl-fail")}" ] || exit 22
 [ "\${HTTP_PROXY+x}" != x ] || printf '%s\\n' 'leaked HTTP_PROXY' >> "${join(root, "curl.log")}"
 [ "\${HTTPS_PROXY+x}" != x ] || printf '%s\\n' 'leaked HTTPS_PROXY' >> "${join(root, "curl.log")}"
 [ "\${ALL_PROXY+x}" != x ] || printf '%s\\n' 'leaked ALL_PROXY' >> "${join(root, "curl.log")}"
@@ -138,7 +145,7 @@ function releaseArchive(root, version, imageDigest = "b".repeat(64)) {
     version,
     revision: "fedcba9876543210fedcba9876543210fedcba98",
     image: `ghcr.io/jegr78/courtside@sha256:${imageDigest}`,
-    signer: `https://github.com/jegr78/courtside/.github/workflows/release.yml@refs/tags/v${version}`,
+    signer: manifestSigner(version),
     recipes: ["existing-infrastructure", "full-self-hosted", "funnel", "standard"],
     files: fileInventory(archive),
   }, null, 2)}\n`);
@@ -493,10 +500,13 @@ test("given a recipe change needs an external secret, when reconfigure plans it,
 test("given installation evidence, when doctor emits JSON, then warnings and failures have distinct states and exits", () => {
   fixture((context) => {
     // given
-    assert.equal(initialize(context).status, 0);
+    assert.equal(initialize(context, { recipe: "funnel" }).status, 0);
 
     // when
     const healthy = run(context.archive, context.target, ["doctor", "--json"], context.environment);
+    writeFileSync(join(context.root, "curl-fail"), "yes\n");
+    const unreachable = run(context.archive, context.target, ["doctor", "--json"], context.environment);
+    rmSync(join(context.root, "curl-fail"));
     writeFileSync(join(context.target, "config", "local.override.yaml"), "services: {}\n");
     const warning = run(context.archive, context.target, ["doctor", "--json"], context.environment);
     chmodSync(join(context.target, "config", "local.override.yaml"), 0o666);
@@ -515,6 +525,9 @@ test("given installation evidence, when doctor emits JSON, then warnings and fai
     // then
     assert.equal(healthy.status, 0, healthy.stderr);
     assert.equal(JSON.parse(healthy.stdout).result, "PASS");
+    assert.match(JSON.stringify(JSON.parse(healthy.stdout)), /local-listener/);
+    assert.equal(unreachable.status, 2);
+    assert.match(JSON.stringify(JSON.parse(unreachable.stdout)), /local-listener/);
     assert.equal(warning.status, 1, warning.stderr);
     const warningBody = JSON.parse(warning.stdout);
     assert.equal(warningBody.result, "WARN");
@@ -527,6 +540,24 @@ test("given installation evidence, when doctor emits JSON, then warnings and fai
     assert.equal(JSON.parse(unsafe.stdout).result, "FAIL");
     assert.equal(broken.status, 2);
     assert.equal(JSON.parse(broken.stdout).result, "FAIL");
+  });
+});
+
+test("given a forwarded-ingress installation with a stopped proxy, when doctor runs, then it reports the missing listener", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recipe: "funnel" }).status, 0);
+    writeFileSync(join(context.root, "docker-components"), "app=healthy\nproxy=exited\n");
+
+    // when
+    const result = run(context.archive, context.target, ["doctor", "--json"], context.environment);
+
+    // then
+    assert.equal(result.status, 2);
+    const body = JSON.parse(result.stdout);
+    assert.equal(body.result, "FAIL");
+    assert.match(JSON.stringify(body), /local-listener/);
+    assert.doesNotMatch(JSON.stringify(body), /no runtime listener exists to probe/);
   });
 });
 
@@ -642,6 +673,65 @@ test("given a running installation, when status and diagnose run, then operation
     assert.match(diagnose.stdout, /release=0\.1\.0/);
     assert.doesNotMatch(diagnose.stdout + diagnose.stderr,
       /POSTGRES_PASSWORD|BOOTSTRAP_ADMIN_PASSWORD|member-private-value|private database rows|board@example\.org/);
+  });
+});
+
+test("given verified recovery units and unrelated entries, when status and diagnose report backup age, then they use creation metadata", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    mkdirSync(join(context.target, "backups", "unrelated"));
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))
+      .find((entry) => entry.startsWith("recovery-")));
+    const oldDirectoryTime = new Date(Date.now() - 60_000);
+    utimesSync(recovery, oldDirectoryTime, oldDirectoryTime);
+    const systemDate = executable("date");
+    writeFileSync(join(context.root, "bin", "date"), `#!/bin/sh
+if [ "$1 $2" = '-u -d' ]; then
+  case "$3" in
+    ????-??-??T??:??:??Z) exec '${systemDate}' +%s ;;
+    *) exit 1 ;;
+  esac
+fi
+exec '${systemDate}' "$@"
+`, { mode: 0o755 });
+
+    // when
+    const status = run(context.archive, context.target, ["status"], context.environment);
+    const diagnose = run(context.archive, context.target, ["diagnose"], context.environment);
+
+    // then
+    const statusAge = Number(status.stdout.match(/backup_age_seconds=([0-9]+)/)?.[1]);
+    const diagnoseAge = Number(diagnose.stdout.match(/backup_age_seconds=([0-9]+)/)?.[1]);
+    assert.ok(statusAge < 30, `expected creation metadata age, received ${statusAge}`);
+    assert.doesNotMatch(status.stdout, /backup_age_seconds=unknown/);
+    assert.ok(diagnoseAge < 30, `expected creation metadata age, received ${diagnoseAge}`);
+    assert.doesNotMatch(diagnose.stdout, /backup_age_seconds=unknown/);
+  });
+});
+
+test("given corrupt and future-dated recovery units, when status reports backup age, then it ignores both", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))
+      .find((entry) => entry.startsWith("recovery-")));
+    writeFileSync(join(recovery, "database.dump"), "corrupt\n");
+    const future = join(context.target, "backups", "recovery-future");
+    cpSync(recovery, future, { recursive: true });
+    const recoveryConfiguration = join(future, "recovery.conf");
+    writeFileSync(recoveryConfiguration, readFileSync(recoveryConfiguration, "utf8")
+      .replace(/^created_at=.*$/m, "created_at=29990101T000000Z"));
+    writeRecoveryChecksums(future);
+
+    // when
+    const result = run(context.archive, context.target, ["status"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /backup_age_seconds=unknown/);
   });
 });
 
@@ -1033,6 +1123,39 @@ test("given numeric release candidates, when update compares them, then semantic
   }, "0.1.0-rc.10");
 });
 
+test("given consecutive nightly archives, when update compares their run identifiers, then the later run is newer", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const newer = releaseArchive(context.root, "0.1.0-nightly.101");
+
+    // when
+    const result = run(context.archive, context.target,
+      ["update-check", "--archive", newer], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /update=available/);
+  }, "0.1.0-nightly.100");
+});
+
+test("given a branch nightly manifest, when init reads its claimed signer, then it refuses the unofficial archive", () => {
+  fixture((context) => {
+    // given
+    const manifest = join(context.archive, "manifest.json");
+    const body = JSON.parse(readFileSync(manifest, "utf8"));
+    body.signer = "https://github.com/jegr78/courtside/.github/workflows/nightly-image.yml@refs/heads/feature";
+    writeFileSync(manifest, `${JSON.stringify(body, null, 2)}\n`);
+
+    // when
+    const result = initialize(context);
+
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /does not bind nightly/);
+  }, "0.1.0-nightly.100");
+});
+
 test("given a recovery unit from the prior release, when the installation has updated, then its own image validates it", () => {
   fixture((context) => {
     // given
@@ -1345,6 +1468,26 @@ test("given local and external mail, when mail-check runs, then only the local s
   });
 });
 
+test("given synthetic Mailpit, when status and mail-check run, then the controlled handover is reported", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recipe: "funnel", synthetic_mail: "true" }).status, 0);
+    writeFileSync(join(context.root, "docker-ps-json"),
+      '[{"Service":"app","State":"running","Health":"healthy"},{"Service":"mailpit","State":"running","Health":"healthy"},{"Service":"proxy","State":"running","Health":""}]\n');
+    writeFileSync(join(context.root, "docker-components"), "app=healthy\nmailpit=healthy\nproxy=running\n");
+
+    // when
+    const status = run(context.archive, context.target, ["status"], context.environment);
+    const checked = run(context.archive, context.target, ["mail-check"], context.environment);
+
+    // then
+    assert.match(status.stdout, /mail_handover=synthetic/);
+    assert.equal(checked.status, 0, checked.stderr);
+    assert.match(checked.stdout, /mail_check=pass/);
+    assert.match(checked.stdout, /synthetic-mailpit-running/);
+  });
+});
+
 test("given bootstrap is still live, when finalization has no verified backup, then it keeps the credential", () => {
   fixture((context) => {
     // given
@@ -1383,6 +1526,83 @@ test("given destructive removal, when the exact installation phrase is confirmed
     assert.ok(!existsSync(context.target));
     assert.match(readFileSync(context.dockerLog, "utf8"), / down --volumes --remove-orphans/);
     assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /system prune|volume prune/);
+  });
+});
+
+test("given current becomes a dangling symlink, when destructive removal runs, then it does not chmod the symlink", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const phrase = `delete example-club at ${realpathSync(context.target)}`;
+    const systemChmod = executable("chmod");
+    writeFileSync(join(context.root, "bin", "chmod"), `#!/bin/sh
+last=''
+for argument in "$@"; do last=$argument; done
+if [ -L "$last" ]; then
+  printf '%s\n' 'refusing chmod on symbolic link' >&2
+  exit 91
+fi
+exec '${systemChmod}' "$@"
+`, { mode: 0o755 });
+
+    // when
+    const removed = run(context.archive, context.target,
+      ["uninstall", "--destroy", "--confirm", phrase], context.environment);
+
+    // then
+    assert.equal(removed.status, 0, removed.stderr);
+    assert.ok(!existsSync(context.target));
+  });
+});
+
+test("given a protected parent directory, when destructive removal empties the installation, then it reports the privileged final rmdir without failing", () => {
+  fixture((context) => {
+    // given
+    const protectedParent = join(context.root, "protected");
+    const target = join(protectedParent, "instance");
+    mkdirSync(protectedParent);
+    assert.equal(run(context.archive, target,
+      ["init", "--answers", answers(context.root), "--yes"], context.environment).status, 0);
+    const phrase = `delete example-club at ${realpathSync(target)}`;
+    chmodSync(protectedParent, 0o500);
+
+    // when
+    let removed;
+    try {
+      removed = run(context.archive, target,
+        ["uninstall", "--destroy", "--confirm", phrase], context.environment);
+    } finally {
+      chmodSync(protectedParent, 0o700);
+    }
+
+    // then
+    assert.equal(removed.status, 0, removed.stderr);
+    assert.ok(existsSync(target));
+    assert.deepEqual(readdirSync(target), []);
+    assert.match(removed.stdout, /sudo rmdir --/);
+  });
+});
+
+test("given a writable parent and an unexpected rmdir failure, when destructive removal finishes, then it reports failure", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const phrase = `delete example-club at ${realpathSync(context.target)}`;
+    const systemRmdir = executable("rmdir");
+    writeFileSync(join(context.root, "bin", "rmdir"), `#!/bin/sh
+case "$*" in
+  *'/instance') exit 1 ;;
+  *) exec '${systemRmdir}' "$@" ;;
+esac
+`, { mode: 0o755 });
+
+    // when
+    const removed = run(context.archive, context.target,
+      ["uninstall", "--destroy", "--confirm", phrase], context.environment);
+
+    // then
+    assert.equal(removed.status, 2);
+    assert.match(removed.stderr, /could not remove the empty installation path/);
   });
 });
 

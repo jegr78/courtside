@@ -285,9 +285,14 @@ read_manifest() {
   [[ "$manifest_version" =~ ^[0-9A-Za-z.+-]+$ ]] || refuse "manifest carries an invalid version"
   [[ "$manifest_revision" =~ ^[0-9a-f]{40}$ ]] || refuse "manifest carries an invalid revision"
   [[ "$manifest_image" =~ @sha256:([0-9a-f]{64})$ ]] || refuse "manifest image is not digest-pinned"
-  [ "$manifest_signer" = "https://github.com/jegr78/courtside/.github/workflows/release.yml@refs/tags/v$manifest_version" ] \
-    || refuse "manifest signer does not bind release $manifest_version"
   manifest_digest=${BASH_REMATCH[1]}
+  if [[ "$manifest_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-nightly\.[1-9][0-9]*$ ]]; then
+    [ "$manifest_signer" = "https://github.com/jegr78/courtside/.github/workflows/nightly-image.yml@refs/heads/main" ] \
+      || refuse "manifest signer does not bind nightly $manifest_version"
+  else
+    [ "$manifest_signer" = "https://github.com/jegr78/courtside/.github/workflows/release.yml@refs/tags/v$manifest_version" ] \
+      || refuse "manifest signer does not bind release $manifest_version"
+  fi
   manifest_sha256=$(file_digest "$manifest") || refuse "cannot digest $manifest"
 }
 
@@ -883,8 +888,24 @@ recovery_declares() {
   return 1
 }
 
+recovery_timestamp_epoch() {
+  local timestamp=$1 epoch normalized
+  [[ "$timestamp" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || return 1
+  normalized="${timestamp:0:4}-${timestamp:4:2}-${timestamp:6:2}T${timestamp:9:2}:${timestamp:11:2}:${timestamp:13:2}Z"
+  if epoch=$(date -u -d "$normalized" +%s 2>/dev/null); then
+    :
+  elif epoch=$(date -u -j -f '%Y%m%dT%H%M%SZ' "$timestamp" +%s 2>/dev/null); then
+    :
+  else
+    return 1
+  fi
+  [[ "$epoch" =~ ^[0-9]+$ ]] || return 1
+  printf '%s' "$epoch"
+}
+
 verify_recovery_unit() {
   local root=$1 entries expected path actual declared_count=0 actual_count=0 file
+  local recovery_created_at recovery_created_epoch now
   [ -d "$root" ] && [ ! -L "$root" ] || refuse "$root is not a recovery directory"
   [ "$(path_mode "$root")" = 700 ] && [ "$(path_owner "$root")" = "$(id -u)" ] \
     || refuse "$root must be an operator-owned mode-0700 recovery directory"
@@ -919,12 +940,18 @@ verify_recovery_unit() {
   recovery_image=$(recovery_value "$root/recovery.conf" image)
   recovery_image_trust=$(recovery_value "$root/recovery.conf" image_trust)
   recovery_recipe=$(recovery_value "$root/recovery.conf" recipe)
+  recovery_created_at=$(recovery_value "$root/recovery.conf" created_at)
   [ "$recovery_schema" = 1 ] || refuse "$root uses an unsupported recovery schema"
   [[ "$recovery_release" =~ ^[0-9A-Za-z.+-]+$ ]] || refuse "$root has an invalid recovery release"
   [[ "$recovery_revision" =~ ^[0-9a-f]{40}$ ]] || refuse "$root has an invalid recovery revision"
   [[ "$recovery_image" =~ @sha256:[0-9a-f]{64}$ ]] || refuse "$root has an invalid recovery image"
   contains_word "official custom" "$recovery_image_trust" \
     || refuse "$root has an invalid recovery image trust mode"
+  recovery_created_epoch=$(recovery_timestamp_epoch "$recovery_created_at") \
+    || refuse "$root has an invalid recovery creation timestamp"
+  now=$(date +%s)
+  [ "$recovery_created_epoch" -le "$now" ] \
+    || refuse "$root has a future recovery creation timestamp"
   [ -f "$root/database.dump" ] || refuse "$root has no PostgreSQL dump"
   [ -f "$root/release/manifest.json" ] || refuse "$root has no release archive"
 }
@@ -2106,7 +2133,7 @@ path_owner() {
 
 command_doctor() {
   local format=text parsed="" mode path problem private_permissions=true secret_permissions=true
-  local operator
+  local operator state port response
   operator=$(id -u)
   [ $# -eq 0 ] || { [ "$1" = --json ] && [ $# -eq 1 ] || refuse "doctor accepts only --json"; format=json; }
   doctor_checks=()
@@ -2181,6 +2208,28 @@ command_doctor() {
     else
       doctor_result FAIL model "the selected Compose model does not render"
     fi
+    if [ "$config_recipe" = funnel ] || [ "$config_recipe" = existing-infrastructure ]; then
+      state=$(docker_components 2>/dev/null || true)
+      if grep -Eq '^proxy=(running|healthy)$' <<< "$state"; then
+        port=$(environment_value "$installation_directory/config/.env" COURTSIDE_PORT)
+        port=${port:-8080}
+        response=""
+        if [ -n "$curl_path" ]; then
+          response=$("$env_path" -i "PATH=$PATH" "$curl_path" -q --noproxy '*' \
+            --fail --silent --show-error --max-time 5 --header "Host: $config_domain" \
+            --header 'X-Forwarded-Proto: https' "http://127.0.0.1:$port/api/session" 2>/dev/null || true)
+        fi
+        if [[ "$response" == *'"authenticated":'* ]]; then
+          doctor_result PASS local-listener "the forwarded Caddy listener answers HTTP on 127.0.0.1:$port"
+        else
+          doctor_result FAIL local-listener "the forwarded Caddy listener does not answer HTTP on 127.0.0.1:$port"
+        fi
+      else
+        doctor_result FAIL local-listener "the proxy is not running, so the forwarded Caddy listener is unavailable"
+      fi
+    else
+      doctor_result PASS local-listener "the selected recipe has no forwarded loopback listener"
+    fi
   else
     doctor_result FAIL compose "Docker with Compose is unavailable"
   fi
@@ -2207,14 +2256,35 @@ docker_components() {
 }
 
 latest_backup_age() {
-  local file newest=0 modified now
-  for file in "$installation_directory"/backups/*; do
-    [ -f "$file" ] || continue
-    modified=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file")
-    [ "$modified" -le "$newest" ] || newest=$modified
+  local file newest=0 created created_epoch now index selected_index selected_epoch
+  local -a candidate_epochs=() candidate_paths=()
+  now=$(date +%s)
+  for file in "$installation_directory"/backups/recovery-*; do
+    [ -d "$file" ] && [ ! -L "$file" ] || continue
+    [ -f "$file/recovery.conf" ] && [ ! -L "$file/recovery.conf" ] || continue
+    created=$(recovery_value "$file/recovery.conf" created_at)
+    created_epoch=$(recovery_timestamp_epoch "$created") || continue
+    [ "$created_epoch" -le "$now" ] || continue
+    candidate_epochs+=("$created_epoch")
+    candidate_paths+=("$file")
+  done
+  while [ "${#candidate_epochs[@]}" -gt 0 ]; do
+    selected_index=""
+    selected_epoch=0
+    for index in "${!candidate_epochs[@]}"; do
+      if [ "${candidate_epochs[$index]}" -gt "$selected_epoch" ]; then
+        selected_index=$index
+        selected_epoch=${candidate_epochs[$index]}
+      fi
+    done
+    file=${candidate_paths[$selected_index]}
+    if (trap - EXIT; verify_recovery_unit "$file") >/dev/null 2>&1; then
+      newest=$selected_epoch
+      break
+    fi
+    unset 'candidate_epochs[selected_index]' 'candidate_paths[selected_index]'
   done
   [ "$newest" -gt 0 ] || { printf 'unknown'; return; }
-  now=$(date +%s)
   printf '%s' "$((now - newest))"
 }
 
@@ -2226,12 +2296,23 @@ command_up() {
 }
 
 command_mail_check() {
+  local components
   [ $# -eq 0 ] || refuse "mail-check accepts no options"
   acquire_lock
   compose_command
   if [ "$config_recipe" = full-self-hosted ]; then
     "${compose[@]}" --profile mail-check run --rm mail-check
     return 0
+  fi
+  if [ "$config_synthetic_mail" = true ]; then
+    components=$("${compose[@]}" ps --format '{{.Service}}={{if .Health}}{{.Health}}{{else}}{{.State}}{{end}}' \
+      2>/dev/null || true)
+    if grep -qx 'mailpit=healthy' <<< "$components"; then
+      printf 'mail_check=pass\nreason=synthetic-mailpit-running\n'
+      return 0
+    fi
+    printf 'mail_check=fail\nreason=synthetic-mailpit-unavailable\n'
+    return 2
   fi
   printf 'mail_check=unknown\nreason=external-relay-is-operator-owned\n'
   return 1
@@ -2255,7 +2336,11 @@ command_status() {
   printf 'infrastructure=%s\nbootstrap=%s\nclub_setup=%s\nmigration=%s\n' \
     "$infrastructure" "$bootstrap" "$club_setup" "$migration"
   printf 'component_health=%s\n' "${components%,}"
-  if [[ "$state" == *'"Service":"mail"'* ]]; then
+  if [ "$config_synthetic_mail" = true ] && [[ ",$components" == *',mailpit=healthy,'* ]]; then
+    printf 'mail_handover=synthetic\n'
+  elif [ "$config_synthetic_mail" = true ]; then
+    printf 'mail_handover=unavailable\n'
+  elif [[ "$state" == *'"Service":"mail"'* ]]; then
     printf 'mail_handover=running\n'
   elif [ "$config_recipe" = full-self-hosted ]; then
     printf 'mail_handover=unavailable\n'
@@ -2322,7 +2407,7 @@ command_diagnose() {
 }
 
 command_uninstall() {
-  local keep_data=false destroy=false confirmed=false confirmation="" expected volumes entry
+  local keep_data=false destroy=false confirmed=false confirmation="" expected volumes entry parent
   while [ $# -gt 0 ]; do
     case "$1" in
       --keep-data) keep_data=true; shift ;;
@@ -2361,9 +2446,28 @@ command_uninstall() {
   done < <(find "$installation_directory" -mindepth 1 -maxdepth 1 -print0)
   "${compose[@]}" down --volumes --remove-orphans
   owns_lock=false
-  chmod -R u+w "$installation_directory"
-  rm -rf -- "$installation_directory"
-  printf 'Removed project %s and installation path %s\n' "$config_project" "$installation_directory"
+  for entry in .courtside-installation .courtside.lock releases config secrets backups current; do
+    if [ -e "$installation_directory/$entry" ] || [ -L "$installation_directory/$entry" ]; then
+      if [ ! -L "$installation_directory/$entry" ]; then
+        chmod -R u+w "$installation_directory/$entry"
+      fi
+      rm -rf -- "$installation_directory/$entry"
+    fi
+  done
+  if [ -n "$(find "$installation_directory" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+    refuse "destructive removal stopped because an unowned installation entry appeared"
+  fi
+  if rmdir -- "$installation_directory" 2>/dev/null; then
+    printf 'Removed project %s and installation path %s\n' "$config_project" "$installation_directory"
+  else
+    parent=${installation_directory%/*}
+    if [ ! -w "$parent" ]; then
+      printf 'Removed project %s and emptied installation path %s\n' "$config_project" "$installation_directory"
+      printf 'Run: sudo rmdir -- %q\n' "$installation_directory"
+    else
+      refuse "destructive removal could not remove the empty installation path $installation_directory"
+    fi
+  fi
 }
 
 while [ $# -gt 0 ]; do
