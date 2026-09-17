@@ -559,6 +559,55 @@ describe("App build identity", () => {
     expect(document.documentElement.style.getPropertyValue("--club-primary-text")).toBe("#17211d");
   });
 
+  it("given a club logo, when the shell loads, then the browser tab shows the club logo", async () => {
+    // given
+    removeTabIcons();
+    document.head.insertAdjacentHTML("beforeend", '<link rel="icon" type="image/svg+xml" href="/icon.svg">');
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      logoUrl: "/api/public/config/logo?v=1",
+      defaultLocale: "en",
+      supportedLocales: ["de", "en"],
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<RoutedShell><App /></RoutedShell>);
+
+    // then
+    await waitFor(() => expect(tabIcon()?.getAttribute("href")).toBe("/api/public/config/logo?v=1"));
+    expect(tabIcon()).not.toHaveAttribute("type");
+    expect(document.head.querySelectorAll('link[rel="icon"]')).toHaveLength(1);
+  });
+
+  it("given no club logo, when the shell loads, then the browser tab shows the Courtside mark", async () => {
+    // given
+    removeTabIcons();
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      defaultLocale: "en",
+      supportedLocales: ["de", "en"],
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<RoutedShell><App /></RoutedShell>);
+
+    // then
+    await waitFor(() => expect(tabIcon()?.getAttribute("href")).toBe("/icon.svg"));
+    expect(document.head.querySelectorAll('link[rel="icon"]')).toHaveLength(1);
+  });
+
   it("given a club brand, when the shell loads, then the footer still names the product", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
@@ -681,3 +730,11 @@ describe("App build identity", () => {
     expect(document.documentElement.style.getPropertyValue("--club-primary-text")).toBe("#17211d");
   });
 });
+
+function removeTabIcons() {
+  document.head.querySelectorAll('link[rel="icon"]').forEach((link) => link.remove());
+}
+
+function tabIcon() {
+  return document.head.querySelector<HTMLLinkElement>('link[rel="icon"]');
+}

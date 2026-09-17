@@ -318,6 +318,7 @@ test("an admin changes club configuration and a booking rule through the browser
   await page.getByTestId("upload-logo").click();
   expect((await logoUploaded).status()).toBe(200);
   await expect(page.getByTestId("club-logo")).toHaveAttribute("src", /\/api\/public\/config\/logo\?v=[0-9a-f]{64}$/);
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", /\/api\/public\/config\/logo\?v=[0-9a-f]{64}$/);
   const logoRemoved = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/config/logo") && response.request().method() === "DELETE"
   );
