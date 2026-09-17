@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.1.0-rc.2](https://github.com/jegr78/courtside/compare/v0.1.0-rc.1...v0.1.0-rc.2) (2026-09-17)
+
+
+### Features
+
+* add deployment lifecycle CLI ([#1024](https://github.com/jegr78/courtside/issues/1024)) ([9a43efe](https://github.com/jegr78/courtside/commit/9a43efed3b9f8312c555f3b13183188fcca17d61))
+* bind deployment images to explicit trust sources ([#1023](https://github.com/jegr78/courtside/issues/1023)) ([d4fb928](https://github.com/jegr78/courtside/commit/d4fb9285cb9a0eb1c45138e6fa6641ec98bc595a))
+* install the reference deployment from four recipes ([#994](https://github.com/jegr78/courtside/issues/994)) ([b2c2cb8](https://github.com/jegr78/courtside/commit/b2c2cb858cb21d09a991c8fc4f8136b19aa5b926))
+* let the court plan jump to a date ([#993](https://github.com/jegr78/courtside/issues/993)) ([14ccc52](https://github.com/jegr78/courtside/commit/14ccc52934011b7f452c990390aa0dc6bc8f0356))
+* make deployment recovery lifecycle safe ([#1025](https://github.com/jegr78/courtside/issues/1025)) ([23549ec](https://github.com/jegr78/courtside/commit/23549ecacfce42ac999b801f65b28f389b70106c))
+* name the rows an instance ships with in the club's own language ([#983](https://github.com/jegr78/courtside/issues/983)) ([45abd0a](https://github.com/jegr78/courtside/commit/45abd0abc7a1ad936459d29bfb129f6b415d2548))
+* publish a deployment archive a club can install from ([#1022](https://github.com/jegr78/courtside/issues/1022)) ([3c0da67](https://github.com/jegr78/courtside/commit/3c0da674de6208b67b4bdf0a19d66dc1b3b0efbb))
+* qualify deployment recipes and publish operator handbook ([#1026](https://github.com/jegr78/courtside/issues/1026)) ([ddb262b](https://github.com/jegr78/courtside/commit/ddb262be645db784d9919c5da0f6cc3f3872cfae))
+* route every supported web ingress through Caddy ([#1016](https://github.com/jegr78/courtside/issues/1016)) ([8755959](https://github.com/jegr78/courtside/commit/875595984e67fe5e36d336862752ac1bd3a1adc8))
+* separate database identities on an external database ([#1017](https://github.com/jegr78/courtside/issues/1017)) ([cb36246](https://github.com/jegr78/courtside/commit/cb3624646c580711ca7641828739cdee080c5972))
+
+
+### Bug fixes
+
+* build the local image from the jar this build packaged ([#1001](https://github.com/jegr78/courtside/issues/1001)) ([bbdca60](https://github.com/jegr78/courtside/commit/bbdca60f1aef4288311508eb756918806d7cb582))
+* harden deployment acceptance paths ([3010f55](https://github.com/jegr78/courtside/commit/3010f552825bfea1825c1f641ae864bfaa10a610)), closes [#991](https://github.com/jegr78/courtside/issues/991)
+* keep a cookieless fetch from replacing the csrf token a page holds ([#999](https://github.com/jegr78/courtside/issues/999)) ([38166f5](https://github.com/jegr78/courtside/commit/38166f51dab0fd6a0196a9dd5f8cc95de25c81df))
+* let an account change and its credential mail both survive ([#1021](https://github.com/jegr78/courtside/issues/1021)) ([c7bc948](https://github.com/jegr78/courtside/commit/c7bc948aa1f3021c07ecb436b900ef2b224f29dc))
+* let nightly retention clear its eligible backlog ([#998](https://github.com/jegr78/courtside/issues/998)) ([b915b35](https://github.com/jegr78/courtside/commit/b915b35167c629781515c47341a8a96e15ce2891))
+* normalize prerelease changelog ([#984](https://github.com/jegr78/courtside/issues/984)) ([381672d](https://github.com/jegr78/courtside/commit/381672d4805b9ffea409aecbd66e7f04c4936f7a))
+* preserve cumulative release-line history ([#982](https://github.com/jegr78/courtside/issues/982)) ([6b183ca](https://github.com/jegr78/courtside/commit/6b183ca8d701161ad6b5974df2d99eb1d1f183e9))
+* provision separate database identities without a superuser owner ([#1002](https://github.com/jegr78/courtside/issues/1002)) ([3d76339](https://github.com/jegr78/courtside/commit/3d76339880c1f7572330c432d0707750b3919604))
+* refuse a release tag the repository does not record as its release ([#986](https://github.com/jegr78/courtside/issues/986)) ([62fccb2](https://github.com/jegr78/courtside/commit/62fccb276225d3a1b60f08210c8517cd3ac35e69))
+* show the club logo as the browser tab icon ([#1027](https://github.com/jegr78/courtside/issues/1027)) ([9caa7b0](https://github.com/jegr78/courtside/commit/9caa7b0c9f48e82f42fb18c2237d878d72c8850d))
+* start the identity overlay in the reference recipes ([#1015](https://github.com/jegr78/courtside/issues/1015)) ([c5e9506](https://github.com/jegr78/courtside/commit/c5e9506db9e95600017731962d6f47dc1d4a367a))
+* tolerate unchanged release pull requests ([#1019](https://github.com/jegr78/courtside/issues/1019)) ([e1a8583](https://github.com/jegr78/courtside/commit/e1a8583177f5dffd2df015a4f2d96f3e123b95a6))
+
+
+### Documentation
+
+* capture each guide in a browser that speaks its language ([#979](https://github.com/jegr78/courtside/issues/979)) ([e1fe7d1](https://github.com/jegr78/courtside/commit/e1fe7d154a5e0a23f3778c1f68ddd5e1211184c3))
+* make design specification current ([fd6c036](https://github.com/jegr78/courtside/commit/fd6c036bf9c25cc773e0965cbeb63c4f9cf8761e))
+* make the design specification current ([#1014](https://github.com/jegr78/courtside/issues/1014)) ([fd6c036](https://github.com/jegr78/courtside/commit/fd6c036bf9c25cc773e0965cbeb63c4f9cf8761e))
+* publish the contract a platform runs the image against ([#1003](https://github.com/jegr78/courtside/issues/1003)) ([ae493dc](https://github.com/jegr78/courtside/commit/ae493dce309d39c6b4c0fb02cd2b210d454731ee))
+* rewrite user guidance as handbooks ([#985](https://github.com/jegr78/courtside/issues/985)) ([874a407](https://github.com/jegr78/courtside/commit/874a407f61e5f60974dbd74056abd0ba2053c2bb))
+* show every guide section the surface it describes ([#977](https://github.com/jegr78/courtside/issues/977)) ([1907e7f](https://github.com/jegr78/courtside/commit/1907e7f3a146c27e9e1183bce7fb7ebc61017d72))
+
 ## 0.1.0 (2026-09-14)
 
 ### Notable changes
