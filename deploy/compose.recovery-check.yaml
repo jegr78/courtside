@@ -1,0 +1,50 @@
+name: courtside-recovery-check
+
+services:
+  db:
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+    environment:
+      POSTGRES_DB: courtside
+      POSTGRES_USER: courtside
+      POSTGRES_PASSWORD: ${COURTSIDE_RECOVERY_DATABASE_PASSWORD:?set COURTSIDE_RECOVERY_DATABASE_PASSWORD}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U courtside -d courtside"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    image: ${COURTSIDE_RECOVERY_IMAGE_REPOSITORY:?set COURTSIDE_RECOVERY_IMAGE_REPOSITORY}@sha256:${COURTSIDE_RECOVERY_IMAGE_DIGEST:?set COURTSIDE_RECOVERY_IMAGE_DIGEST}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
+      SPRING_DATASOURCE_USERNAME: courtside
+      SPRING_DATASOURCE_PASSWORD: ${COURTSIDE_RECOVERY_DATABASE_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      COURTSIDE_COOKIE_SECURE: "false"
+      COURTSIDE_ENVIRONMENT: UAT
+      COURTSIDE_SOURCE_URL: ${COURTSIDE_RECOVERY_SOURCE_URL:?set COURTSIDE_RECOVERY_SOURCE_URL}
+      COURTSIDE_MAIL_RELAY_HOST: mail.invalid
+      COURTSIDE_MAIL_FROM: no-reply@example.org
+      COURTSIDE_MAIL_REPLY_TO: board@example.org
+    ports:
+      - "127.0.0.1::8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+
+volumes:
+  db:

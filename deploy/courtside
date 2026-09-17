@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly configuration_schema=1
-readonly usage="usage: courtside [--directory <path>] <init|reconfigure|doctor|up|status|finalize-bootstrap|diagnose|uninstall> [options]"
+readonly usage="usage: courtside [--directory <path>] <init|reconfigure|backup|restore-check|update|update-check|adopt|rotate-secret|mail-check|doctor|up|status|finalize-bootstrap|diagnose|uninstall> [options]"
 script_path=${BASH_SOURCE[0]}
 case "$script_path" in
   */*) script_parent=${script_path%/*} ;;
@@ -24,6 +24,11 @@ openssl_path=""
 sha256sum_path=""
 shasum_path=""
 env_path=""
+curl_path=""
+restore_cleanup_active=false
+declare -a restore_compose=()
+mail_restart_required=false
+declare -a mail_restart_compose=()
 
 refuse() {
   printf 'courtside: %s\n' "$1" >&2
@@ -32,7 +37,7 @@ refuse() {
 
 prepare_executables() {
   local original_path=$PATH safe_path="" directory name resolved
-  local required="mkdir chmod rm rmdir sed head mktemp cp mv ln grep stat find awk tr date df id readlink env"
+  local required="mkdir chmod rm rmdir sed head tail mktemp cp mv ln grep stat find awk tr date df id readlink env sort wc"
   IFS=':' read -r -a path_directories <<< "$original_path"
   for directory in "${path_directories[@]}"; do
     case "$directory" in
@@ -51,7 +56,7 @@ prepare_executables() {
     hash -p "$resolved" "$name"
     [ "$name" != env ] || env_path=$resolved
   done
-  for name in docker openssl sha256sum shasum; do
+  for name in docker openssl sha256sum shasum curl; do
     resolved=$(command -v "$name" 2>/dev/null || true)
     case "$resolved" in
       /*)
@@ -80,8 +85,16 @@ prepare_executables
 
 cleanup() {
   local result=$?
+  if [ "$restore_cleanup_active" = true ] && [ "${#restore_compose[@]}" -gt 0 ]; then
+    "${restore_compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  fi
+  if [ "$mail_restart_required" = true ] && [ "${#mail_restart_compose[@]}" -gt 0 ]; then
+    if "${mail_restart_compose[@]}" up -d --wait mail >/dev/null 2>&1; then
+      rm -f -- "$installation_directory/.courtside-mail-backup-interrupted"
+    fi
+  fi
   if [ -n "$temporary_path" ]; then
-    chmod -R u+w -- "$temporary_path" 2>/dev/null || true
+    chmod -R u+w "$temporary_path" 2>/dev/null || true
     rm -rf -- "$temporary_path"
   fi
   if [ "$owns_lock" = true ] && [ -n "$lock_directory" ]; then
@@ -133,9 +146,10 @@ infer_installation_directory() {
 }
 
 acquire_lock() {
-  local owner child
+  local owner child marker entry
   mkdir -p -- "$installation_directory"
-  chmod 700 "$installation_directory"
+  [[ "$installation_directory" != *$'\n'* ]] && [[ "$installation_directory" != *$'\r'* ]] \
+    || refuse "installation directory must not contain control characters"
   for child in releases config secrets backups; do
     [ ! -L "$installation_directory/$child" ] \
       || refuse "$installation_directory/$child must not be a symbolic link"
@@ -157,21 +171,53 @@ acquire_lock() {
   chmod 700 "$lock_directory"
   printf '%s\n' "$$" > "$lock_directory/owner"
   chmod 600 "$lock_directory/owner"
+  marker="$installation_directory/.courtside-installation"
+  if [ -e "$marker" ] || [ -L "$marker" ]; then
+    [ -f "$marker" ] && [ ! -L "$marker" ] || refuse "$marker must be a regular file"
+    [ "$(path_mode "$marker")" = 600 ] && [ "$(path_owner "$marker")" = "$(id -u)" ] \
+      || refuse "$marker must be owned by the operator with mode 0600"
+    [ "$(sed -n '1p' "$marker")" = "schema=1" ] \
+      && [ "$(sed -n '2p' "$marker")" = "root=$installation_directory" ] \
+      && [ "$(sed -n '3p' "$marker")" = "" ] \
+      || refuse "$marker does not identify this installation root"
+  else
+    while IFS= read -r -d '' entry; do
+      case "${entry##*/}" in
+        .courtside.lock | releases | config | secrets | backups | current) ;;
+        *) refuse "installation directory is not an empty or recognized Courtside root: ${entry##*/}" ;;
+      esac
+    done < <(find "$installation_directory" -mindepth 1 -maxdepth 1 -print0)
+    if [ -d "$installation_directory/config" ] \
+      && [ ! -f "$installation_directory/config/installation.conf" ]; then
+      refuse "installation directory has unrecognized configuration state"
+    fi
+    printf 'schema=1\nroot=%s\n' "$installation_directory" > "$marker"
+    chmod 600 "$marker"
+  fi
+  chmod 700 "$installation_directory"
   cleanup_abandoned_staging
   recover_configuration_transaction
+  if [ -e "$installation_directory/.courtside-rotation" ] \
+    && [ "${command:-}" != rotate-secret ]; then
+    refuse "an interrupted secret rotation requires rotate-secret recovery before other commands"
+  fi
 }
 
 cleanup_abandoned_staging() {
   local path
   for path in "$installation_directory"/.transaction.partial.* \
     "$installation_directory"/.config.partial.* \
+    "$installation_directory"/.rotation.partial.* \
+    "$installation_directory"/.rotation.complete.* \
+    "$installation_directory"/.mail-marker.partial.* \
     "$installation_directory"/releases/.*.partial.* \
     "$installation_directory"/config/.*.transaction.* \
     "$installation_directory"/config/.env.partial.* \
-    "$installation_directory"/config/installation.conf.partial.*; do
+    "$installation_directory"/config/installation.conf.partial.* \
+    "$installation_directory"/secrets/.database-*.partial.*; do
     [ -e "$path" ] || [ -L "$path" ] || continue
     if [ -d "$path" ] && [ ! -L "$path" ]; then
-      chmod -R u+w -- "$path" 2>/dev/null || true
+      chmod -R u+w "$path" 2>/dev/null || true
       rm -rf -- "$path"
     else
       rm -f -- "$path"
@@ -187,7 +233,7 @@ apply_configuration_transaction() {
     [ -e "$entry" ] || continue
     [ -f "$entry" ] && [ ! -L "$entry" ] || refuse "$transaction contains an unsafe entry"
     case "${entry##*/}" in
-      .env | installation.conf | remove-bootstrap) ;;
+      .env | installation.conf | remove-bootstrap | current-release) ;;
       *) refuse "$transaction contains an unknown entry" ;;
     esac
   done
@@ -202,10 +248,18 @@ apply_configuration_transaction() {
     mv "$pending" "$destination"
     temporary_path=""
   done
+  if [ -f "$transaction/current-release" ]; then
+    pending=$(sed -n '1p' "$transaction/current-release")
+    [[ "$pending" =~ ^[0-9A-Za-z.+-]+$ ]] || refuse "$transaction carries an invalid current release"
+    [ -d "$installation_directory/releases/$pending" ] \
+      || refuse "$transaction names a release that is not installed"
+    publish_current_release "$pending"
+  fi
   if [ -f "$transaction/remove-bootstrap" ]; then
     rm -f -- "$installation_directory/secrets/bootstrap-admin-password"
   fi
-  rm -f -- "$transaction/.env" "$transaction/installation.conf" "$transaction/remove-bootstrap"
+  rm -f -- "$transaction/.env" "$transaction/installation.conf" "$transaction/remove-bootstrap" \
+    "$transaction/current-release"
   rmdir -- "$transaction"
 }
 
@@ -227,9 +281,12 @@ read_manifest() {
   manifest_version=$(json_value "$manifest" version)
   manifest_revision=$(json_value "$manifest" revision)
   manifest_image=$(json_value "$manifest" image)
+  manifest_signer=$(json_value "$manifest" signer)
   [[ "$manifest_version" =~ ^[0-9A-Za-z.+-]+$ ]] || refuse "manifest carries an invalid version"
   [[ "$manifest_revision" =~ ^[0-9a-f]{40}$ ]] || refuse "manifest carries an invalid revision"
   [[ "$manifest_image" =~ @sha256:([0-9a-f]{64})$ ]] || refuse "manifest image is not digest-pinned"
+  [ "$manifest_signer" = "https://github.com/jegr78/courtside/.github/workflows/release.yml@refs/tags/v$manifest_version" ] \
+    || refuse "manifest signer does not bind release $manifest_version"
   manifest_digest=${BASH_REMATCH[1]}
   manifest_sha256=$(file_digest "$manifest") || refuse "cannot digest $manifest"
 }
@@ -254,7 +311,7 @@ manifest_declares() {
 }
 
 verify_release() {
-  local root=$1 entries path expected actual declared_count=0 actual_count=0 mode
+  local root=$1 require_immutable=${2:-true} entries path expected actual declared_count=0 actual_count=0 mode
   entries=$(sed -n 's/^    "\([^"]*\)": "\([0-9a-f]\{64\}\)"[,]*$/\1 \2/p' "$root/manifest.json")
   [ -n "$entries" ] || { printf 'manifest has no file inventory\n' >&2; return 1; }
   while IFS=' ' read -r path expected; do
@@ -283,11 +340,13 @@ verify_release() {
     printf 'release contains a symbolic link\n' >&2
     return 1
   fi
-  while IFS= read -r path; do
-    mode=$(path_mode "$path")
-    [ $((8#$mode & 0222)) -eq 0 ] \
-      || { printf 'release path is writable: %s\n' "${path#"$root"/}" >&2; return 1; }
-  done < <(find "$root" -print)
+  if [ "$require_immutable" = true ]; then
+    while IFS= read -r path; do
+      mode=$(path_mode "$path")
+      [ $((8#$mode & 0222)) -eq 0 ] \
+        || { printf 'release path is writable: %s\n' "${path#"$root"/}" >&2; return 1; }
+    done < <(find "$root" -print)
+  fi
 }
 
 answer_defaults() {
@@ -309,6 +368,7 @@ answer_defaults() {
   answer_database_username=""
   answer_custom_image_repository=""
   answer_custom_image_digest=""
+  answer_recovery_material=included
 }
 
 answer_key() {
@@ -335,6 +395,7 @@ answer_key() {
     database_username) answer_database_username=$value ;;
     custom_image_repository) answer_custom_image_repository=$value ;;
     custom_image_digest) answer_custom_image_digest=$value ;;
+    recovery_material) answer_recovery_material=$value ;;
     *) refuse "unknown answer key $key" ;;
   esac
 }
@@ -379,6 +440,8 @@ validate_answers() {
   [[ "$answer_project" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || refuse "invalid project $answer_project"
   [[ "$answer_overlays" =~ ^$|^[a-z][a-z-]*(,[a-z][a-z-]*)*$ ]] || refuse "overlays must be comma-separated names"
   contains_word "true false" "$answer_synthetic_mail" || refuse "synthetic_mail must be true or false"
+  contains_word "included external-verified" "$answer_recovery_material" \
+    || refuse "recovery_material must be included or external-verified"
   if [ -n "$answer_rootless_port_start" ]; then
     [[ "$answer_rootless_port_start" =~ ^[0-9]{1,5}$ ]] && [ "$answer_rootless_port_start" -le 65535 ] \
       || refuse "rootless_port_start must be a port"
@@ -482,6 +545,7 @@ write_installation_configuration() {
     printf 'database_username=%s\n' "$answer_database_username"
     printf 'custom_image_repository=%s\n' "$answer_custom_image_repository"
     printf 'custom_image_digest=%s\n' "$answer_custom_image_digest"
+    printf 'recovery_material=%s\n' "$answer_recovery_material"
   } > "$destination"
   chmod 600 "$destination"
 }
@@ -493,6 +557,12 @@ environment_line() {
   encoded=${encoded//\"/\\\"}
   encoded=${encoded//\$/\$\$}
   printf '%s="%s"\n' "$key" "$encoded"
+}
+
+docker_environment_line() {
+  local key=$1 value=$2
+  [[ "$value" != *$'\n'* ]] && [[ "$value" != *$'\r'* ]] || refuse "$key contains a line break"
+  printf '%s=%s\n' "$key" "$value"
 }
 
 write_initial_environment() {
@@ -511,7 +581,9 @@ write_initial_environment() {
     environment_line COURTSIDE_MAIL_REPLY_TO "$answer_mail_reply_to"
     environment_line COURTSIDE_MAIL_RELAY_HOST "$answer_mail_relay_host"
     environment_line COURTSIDE_MAIL_RELAY_USERNAME "$answer_mail_relay_username"
-    if [ -n "$answer_mail_relay_username" ]; then
+    if [ "$answer_recipe" = full-self-hosted ]; then
+      environment_line COURTSIDE_MAIL_PASSWORD "$(random_secret)"
+    elif [ -n "$answer_mail_relay_username" ]; then
       [ -n "${COURTSIDE_MAIL_PASSWORD:-}" ] \
         || refuse "COURTSIDE_MAIL_PASSWORD must be supplied outside the answer file for an authenticated relay"
       environment_line COURTSIDE_MAIL_PASSWORD "$COURTSIDE_MAIL_PASSWORD"
@@ -562,16 +634,17 @@ write_identity_secrets() {
 }
 
 publish_release() {
+  local source_root=${1:-$script_directory}
   local release_directory="$installation_directory/releases/$manifest_version"
   local expected_version=$manifest_version expected_revision=$manifest_revision expected_image=$manifest_image problem
   local expected_manifest_digest
-  expected_manifest_digest=$(file_digest "$script_directory/manifest.json") || refuse "cannot digest archive manifest"
+  expected_manifest_digest=$(file_digest "$source_root/manifest.json") || refuse "cannot digest archive manifest"
   mkdir -p "$installation_directory/releases"
   chmod 700 "$installation_directory/releases"
   [ ! -L "$release_directory" ] || refuse "$release_directory must not be a symbolic link"
   if [ ! -d "$release_directory" ]; then
     temporary_path=$(mktemp -d "$installation_directory/releases/.$manifest_version.partial.XXXXXX")
-    cp -R "$script_directory"/. "$temporary_path"/
+    cp -R "$source_root"/. "$temporary_path"/
     chmod 700 "$temporary_path"
     chmod -R a-w "$temporary_path"
     if ! problem=$(verify_release "$temporary_path" 2>&1); then
@@ -613,13 +686,25 @@ publish_initial_configuration() {
 }
 
 publish_current() {
-  local candidate="$installation_directory/.current.$$"
-  ln -s "releases/$manifest_version" "$candidate"
-  mv -f "$candidate" "$installation_directory/current"
+  publish_current_release "$manifest_version"
+}
+
+publish_current_release() {
+  local release=$1 candidate="$installation_directory/.current.$$"
+  ln -s "releases/$release" "$candidate"
+  if mv -Tf "$candidate" "$installation_directory/current" 2>/dev/null; then
+    return 0
+  fi
+  if mv -fh "$candidate" "$installation_directory/current" 2>/dev/null; then
+    return 0
+  fi
+  rm -f -- "$candidate"
+  refuse "current release link could not be replaced atomically"
 }
 
 load_configuration() {
   local file="$installation_directory/config/installation.conf" line key value seen="" number=0
+  local bundled_database_material
   [ -f "$file" ] || refuse "$file is missing"
   [ ! -L "$installation_directory/config" ] && [ ! -L "$file" ] \
     && [ ! -L "$installation_directory/config/.env" ] \
@@ -648,6 +733,7 @@ load_configuration() {
   config_database_username=""
   config_custom_image_repository=""
   config_custom_image_digest=""
+  config_recovery_material=""
   while IFS= read -r line || [ -n "$line" ]; do
     number=$((number + 1))
     [[ ! "$line" =~ [[:cntrl:]] ]] \
@@ -678,9 +764,11 @@ load_configuration() {
       database_username) config_database_username=$value ;;
       custom_image_repository) config_custom_image_repository=$value ;;
       custom_image_digest) config_custom_image_digest=$value ;;
+      recovery_material) config_recovery_material=$value ;;
       *) refuse "installation.conf has unknown key $key" ;;
     esac
   done < "$file"
+  [ -n "$config_recovery_material" ] || config_recovery_material=included
   [ "$config_schema" = "$configuration_schema" ] \
     || refuse "installation.conf is schema $config_schema, and this command reads schema $configuration_schema"
   [[ "$config_release" =~ ^[0-9A-Za-z.+-]+$ ]] || refuse "installation.conf has an invalid release"
@@ -706,12 +794,18 @@ load_configuration() {
   answer_database_username=$config_database_username
   answer_custom_image_repository=$config_custom_image_repository
   answer_custom_image_digest=$config_custom_image_digest
+  answer_recovery_material=$config_recovery_material
   manifest_version=$config_release
   manifest_revision=$config_revision
   manifest_image=$config_image
   manifest_digest=${config_image##*@sha256:}
   manifest_sha256=$config_release_manifest_sha256
   validate_answers false
+  if [ "$config_recipe" != existing-infrastructure ]; then
+    bundled_database_material=$(environment_value "$installation_directory/config/.env" POSTGRES_PASSWORD)
+    [[ "$bundled_database_material" =~ ^[0-9a-f]{48}$ ]] \
+      || refuse "bundled PostgreSQL password must be a generated 48-character hexadecimal value"
+  fi
 }
 
 validate_installed_release() {
@@ -754,6 +848,252 @@ compose_command() {
   if [ -f "$installation_directory/config/local.override.yaml" ]; then
     compose+=(-f "$installation_directory/config/local.override.yaml")
   fi
+  if [ -f "$installation_directory/.courtside-mail-backup-interrupted" ]; then
+    [ ! -L "$installation_directory/.courtside-mail-backup-interrupted" ] \
+      || refuse "mail backup recovery marker must not be a symbolic link"
+    [ "$config_recipe" = full-self-hosted ] \
+      || refuse "mail backup recovery marker exists for a recipe without managed mail"
+    "${compose[@]}" up -d --wait mail \
+      || refuse "Stalwart is still stopped after an interrupted backup"
+    rm -f -- "$installation_directory/.courtside-mail-backup-interrupted"
+  fi
+}
+
+write_recovery_checksums() {
+  local root=$1 path digest
+  : > "$root/SHA256SUMS"
+  while IFS= read -r path; do
+    path=${path#./}
+    digest=$(file_digest "$root/$path") || refuse "cannot digest recovery file $path"
+    printf '%s  %s\n' "$digest" "$path" >> "$root/SHA256SUMS"
+  done < <(cd "$root" && find . -type f ! -name SHA256SUMS -print | sort)
+  chmod 600 "$root/SHA256SUMS"
+}
+
+recovery_value() {
+  local file=$1 key=$2
+  sed -n "s/^$key=\(.*\)$/\1/p" "$file" | head -n 1
+}
+
+recovery_declares() {
+  local entries=$1 wanted=$2 expected declared
+  while IFS=' ' read -r expected declared; do
+    [ "$declared" != "$wanted" ] || return 0
+  done <<< "$entries"
+  return 1
+}
+
+verify_recovery_unit() {
+  local root=$1 entries expected path actual declared_count=0 actual_count=0 file
+  [ -d "$root" ] && [ ! -L "$root" ] || refuse "$root is not a recovery directory"
+  [ "$(path_mode "$root")" = 700 ] && [ "$(path_owner "$root")" = "$(id -u)" ] \
+    || refuse "$root must be an operator-owned mode-0700 recovery directory"
+  [ -f "$root/recovery.conf" ] && [ -f "$root/SHA256SUMS" ] \
+    || refuse "$root is not a complete recovery unit"
+  [ ! -L "$root/recovery.conf" ] && [ ! -L "$root/SHA256SUMS" ] \
+    || refuse "$root recovery metadata must not use symbolic links"
+  entries=$(< "$root/SHA256SUMS")
+  [ -n "$entries" ] || refuse "$root has no recovery checksums"
+  while IFS=' ' read -r expected path; do
+    [[ "$expected" =~ ^[0-9a-f]{64}$ ]] \
+      && [[ "$path" =~ ^[A-Za-z0-9._/-]+$ ]] && [[ "$path" != /* ]] \
+      && [[ "/$path/" != */../* ]] \
+      || refuse "$root has an unsafe recovery checksum entry"
+    [ -f "$root/$path" ] && [ ! -L "$root/$path" ] \
+      || refuse "$root recovery checksum names a missing or unsafe file"
+    actual=$(file_digest "$root/$path") || refuse "cannot digest recovery file $path"
+    [ "$actual" = "$expected" ] || refuse "recovery checksum failed for $path"
+    declared_count=$((declared_count + 1))
+  done <<< "$entries"
+  while IFS= read -r file; do
+    path=${file#"$root"/}
+    [ "$path" = SHA256SUMS ] && continue
+    recovery_declares "$entries" "$path" || refuse "recovery file $path has no checksum"
+    actual_count=$((actual_count + 1))
+  done < <(find "$root" -type f -print)
+  [ "$actual_count" -eq "$declared_count" ] || refuse "$root recovery file count is inconsistent"
+  [ -z "$(find "$root" -type l -print -quit)" ] || refuse "$root recovery unit contains a symbolic link"
+  recovery_schema=$(recovery_value "$root/recovery.conf" schema)
+  recovery_release=$(recovery_value "$root/recovery.conf" release)
+  recovery_revision=$(recovery_value "$root/recovery.conf" revision)
+  recovery_image=$(recovery_value "$root/recovery.conf" image)
+  recovery_image_trust=$(recovery_value "$root/recovery.conf" image_trust)
+  recovery_recipe=$(recovery_value "$root/recovery.conf" recipe)
+  [ "$recovery_schema" = 1 ] || refuse "$root uses an unsupported recovery schema"
+  [[ "$recovery_release" =~ ^[0-9A-Za-z.+-]+$ ]] || refuse "$root has an invalid recovery release"
+  [[ "$recovery_revision" =~ ^[0-9a-f]{40}$ ]] || refuse "$root has an invalid recovery revision"
+  [[ "$recovery_image" =~ @sha256:[0-9a-f]{64}$ ]] || refuse "$root has an invalid recovery image"
+  contains_word "official custom" "$recovery_image_trust" \
+    || refuse "$root has an invalid recovery image trust mode"
+  [ -f "$root/database.dump" ] || refuse "$root has no PostgreSQL dump"
+  [ -f "$root/release/manifest.json" ] || refuse "$root has no release archive"
+}
+
+postgres_image() {
+  local image
+  image=$(sed -n 's/^[[:space:]]*image: \(postgres:17-alpine@sha256:[0-9a-f]\{64\}\)$/\1/p' \
+    "$installation_directory/current/compose.yaml" | head -n 1)
+  [[ "$image" =~ ^postgres:17-alpine@sha256:[0-9a-f]{64}$ ]] \
+    || refuse "the installed release has no pinned PostgreSQL 17 image"
+  printf '%s' "$image"
+}
+
+database_backup() {
+  local destination=$1 image connection authority database host port pg_environment
+  compose_command
+  if [ "$config_recipe" != existing-infrastructure ]; then
+    "${compose[@]}" exec -T db pg_dump --format=custom --no-owner -U courtside courtside > "$destination"
+    "${compose[@]}" exec -T db pg_restore --list < "$destination" >/dev/null
+    return 0
+  fi
+  connection=${config_database_url#jdbc:postgresql://}
+  authority=${connection%%/*}
+  database=${connection#*/}
+  database=${database%%\?*}
+  host=${authority%%:*}
+  port=${authority#*:}
+  [ "$port" != "$authority" ] || port=5432
+  [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] && [[ "$port" =~ ^[0-9]+$ ]] \
+    && [[ "$database" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] \
+    || refuse "external database URL cannot be represented safely for backup"
+  pg_environment=$(mktemp "$installation_directory/.pg-backup.XXXXXX")
+  temporary_path=$pg_environment
+  chmod 600 "$pg_environment"
+  docker_environment_line PGPASSWORD "$(environment_value "$installation_directory/config/.env" COURTSIDE_DATABASE_PASSWORD)" \
+    > "$pg_environment"
+  image=$(postgres_image)
+  "${docker_command[@]}" run --rm --network host --env-file "$pg_environment" "$image" \
+    pg_dump --format=custom --no-owner --host "$host" --port "$port" \
+    --username "$config_database_username" "$database" > "$destination"
+  "${docker_command[@]}" run --rm --network none "$image" pg_restore --list < "$destination" >/dev/null
+  rm -f -- "$pg_environment"
+  temporary_path=""
+}
+
+backup_mail_stores() {
+  local root=$1 helper volume failed=false marker marker_staging
+  [ "$config_recipe" = full-self-hosted ] || return 0
+  helper=$(sed -n 's/^[[:space:]]*image: \(alpine:3@sha256:[0-9a-f]\{64\}\)$/\1/p' \
+    "$installation_directory/current/compose.stalwart.yaml" | head -n 1)
+  [[ "$helper" =~ ^alpine:3@sha256:[0-9a-f]{64}$ ]] \
+    || refuse "the installed release has no pinned mail backup helper"
+  marker="$installation_directory/.courtside-mail-backup-interrupted"
+  [ ! -e "$marker" ] && [ ! -L "$marker" ] \
+    || refuse "mail backup recovery marker already exists"
+  marker_staging=$(mktemp "$installation_directory/.mail-marker.partial.XXXXXX")
+  printf 'schema=1\n' > "$marker_staging"
+  chmod 600 "$marker_staging"
+  mv "$marker_staging" "$marker"
+  mail_restart_required=true
+  mail_restart_compose=("${compose[@]}")
+  "${compose[@]}" stop mail
+  for volume in mail-config mail-data; do
+    if ! "${docker_command[@]}" run --rm --network none \
+      --volume "${config_project}_$volume:/source:ro" "$helper" tar -C /source -cf - . \
+      > "$root/$volume.tar"; then
+      failed=true
+      break
+    fi
+    chmod 600 "$root/$volume.tar"
+  done
+  if ! "${compose[@]}" up -d --wait mail; then
+    refuse "Stalwart did not become healthy after its backup interruption"
+  fi
+  rm -f -- "$marker"
+  mail_restart_required=false
+  mail_restart_compose=()
+  [ "$failed" = false ] || refuse "Stalwart backup failed; mail was restarted and no recovery unit was published"
+}
+
+prune_recovery_units() {
+  local retain=$1 path candidate
+  local units=()
+  while IFS= read -r path; do units+=("$path"); done \
+    < <(printf '%s\n' "$installation_directory"/backups/recovery-* | sort)
+  [ "${units[0]:-}" != "$installation_directory/backups/recovery-*" ] || return 0
+  while [ "${#units[@]}" -gt "$retain" ]; do
+    candidate=${units[0]}
+    verify_recovery_unit "$candidate"
+    case "$candidate" in
+      "$installation_directory"/backups/recovery-*) ;;
+      *) refuse "retention resolved outside the configured backup directory" ;;
+    esac
+    chmod -R u+w "$candidate"
+    rm -rf -- "$candidate"
+    units=("${units[@]:1}")
+  done
+}
+
+create_backup() {
+  local retain=$1 staging final timestamp path effective_image image_trust=official
+  load_configuration
+  compose_command
+  mkdir -p "$installation_directory/backups"
+  chmod 700 "$installation_directory/backups"
+  timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+  staging=$(mktemp -d "$installation_directory/backups/.recovery.partial.XXXXXX")
+  temporary_path=$staging
+  chmod 700 "$staging"
+  database_backup "$staging/database.dump"
+  chmod 600 "$staging/database.dump"
+  mkdir "$staging/configuration" "$staging/secrets"
+  chmod 700 "$staging/configuration" "$staging/secrets"
+  cp "$installation_directory/config/installation.conf" "$staging/configuration/installation.conf"
+  if [ "$config_recovery_material" = included ]; then
+    cp "$installation_directory/config/.env" "$staging/configuration/.env"
+  fi
+  if [ -f "$installation_directory/config/local.override.yaml" ]; then
+    [ ! -L "$installation_directory/config/local.override.yaml" ] \
+      || refuse "config/local.override.yaml must not be a symbolic link"
+    cp "$installation_directory/config/local.override.yaml" "$staging/configuration/local.override.yaml"
+  fi
+  if [ "$config_recovery_material" = included ]; then
+    for path in "$installation_directory"/secrets/*; do
+      [ -e "$path" ] || continue
+      [ -f "$path" ] && [ ! -L "$path" ] || refuse "secret material must be regular files"
+      cp "$path" "$staging/secrets/${path##*/}"
+    done
+  fi
+  cp -R "$installation_directory/releases/$config_release" "$staging/release"
+  backup_mail_stores "$staging"
+  effective_image=$config_image
+  if contains_word "${config_overlays//,/ }" custom-image; then
+    effective_image="$config_custom_image_repository@sha256:$config_custom_image_digest"
+    image_trust=custom
+  fi
+  umask 077
+  {
+    printf 'schema=1\nrelease=%s\nrevision=%s\nimage=%s\nimage_trust=%s\nrecipe=%s\n' \
+      "$config_release" "$config_revision" "$effective_image" "$image_trust" "$config_recipe"
+    printf 'created_at=%s\nenvironment=%s\nlocal_override=%s\nmail_state=%s\n' \
+      "$timestamp" "$config_recovery_material" \
+      "$([ -f "$staging/configuration/local.override.yaml" ] && printf present || printf absent)" \
+      "$([ "$config_recipe" = full-self-hosted ] && printf captured || printf external)"
+  } > "$staging/recovery.conf"
+  printf 'Restore with: %s/current/courtside restore-check --recovery %s/backups/<recovery-unit>\n' \
+    "$installation_directory" "$installation_directory" > "$staging/restore-instructions.txt"
+  chmod -R go-rwx "$staging"
+  write_recovery_checksums "$staging"
+  final="$installation_directory/backups/recovery-$timestamp-$config_release-$$"
+  mv "$staging" "$final"
+  temporary_path=""
+  verify_recovery_unit "$final"
+  created_recovery=$final
+  prune_recovery_units "$retain"
+}
+
+command_backup() {
+  local retain=7
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --retain) [ $# -ge 2 ] || refuse "--retain needs a count"; retain=$2; shift 2 ;;
+      *) refuse "unknown backup option $1" ;;
+    esac
+  done
+  [[ "$retain" =~ ^[1-9][0-9]*$ ]] || refuse "backup retention must be a positive count"
+  acquire_lock
+  create_backup "$retain"
+  printf 'Recovery unit written to %s\n' "$created_recovery"
 }
 
 command_init() {
@@ -912,6 +1252,7 @@ write_reconfigured_environment() {
     postgres_password=$(random_secret)
   fi
   if [ "$answer_recipe" = full-self-hosted ]; then
+    [ -n "$mail_password" ] || mail_password=$(random_secret)
     [ -n "$mail_admin" ] || mail_admin=$(random_secret)
     [ -n "$mail_setup" ] || mail_setup=$(random_secret)
     [ -n "$mail_reload" ] || mail_reload=$(random_secret)
@@ -987,6 +1328,730 @@ command_reconfigure() {
   temporary_path=""
   apply_configuration_transaction
   printf 'Reconfigured recipe %s\n' "$answer_recipe"
+}
+
+recovery_path() {
+  local requested=$1 parent base backup_root
+  case "$requested" in
+    /*) ;;
+    *) requested="$PWD/$requested" ;;
+  esac
+  [ -d "$requested" ] && [ ! -L "$requested" ] || refuse "$requested is not a recovery directory"
+  parent=${requested%/*}
+  base=${requested##*/}
+  parent=$(cd "$parent" && pwd -P)
+  backup_root=$(cd "$installation_directory/backups" && pwd -P)
+  [ "$parent" = "$backup_root" ] && [[ "$base" =~ ^recovery-[A-Za-z0-9.+-]+$ ]] \
+    || refuse "recovery unit must be a direct child of $backup_root"
+  selected_recovery="$parent/$base"
+}
+
+restore_probe() {
+  local port=$1 cookie_jar=$2 username_file=$3 password_file=$4 after courts token
+  local -a safe_curl
+  [ -n "$curl_path" ] || { printf 'curl is required for the restored application probe\n' >&2; return 1; }
+  safe_curl=("$env_path" -i "PATH=$PATH" "$curl_path" -q --noproxy '*')
+  "${safe_curl[@]}" -fsS -c "$cookie_jar" "http://$port/api/session" >/dev/null \
+    || { printf 'the restored application did not answer its session endpoint\n' >&2; return 1; }
+  token=$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$cookie_jar" | tail -n 1)
+  [ -n "$token" ] || { printf 'the restored application issued no CSRF token\n' >&2; return 1; }
+  "${safe_curl[@]}" -fsS -b "$cookie_jar" -c "$cookie_jar" -H "X-XSRF-TOKEN: $token" \
+    --data-urlencode "username@$username_file" --data-urlencode "password@$password_file" \
+    "http://$port/api/session" >/dev/null \
+    || { printf 'the restored account could not sign in\n' >&2; return 1; }
+  after=$("${safe_curl[@]}" -fsS -b "$cookie_jar" "http://$port/api/session") \
+    || { printf 'the restored signed-in session could not be read\n' >&2; return 1; }
+  [[ "$after" == *'"authenticated":true'* ]] \
+    || { printf 'the restored account did not produce an authenticated session\n' >&2; return 1; }
+  courts=$("${safe_curl[@]}" -fsS -b "$cookie_jar" "http://$port/api/public/courts") \
+    || { printf 'the restored application could not read persisted courts\n' >&2; return 1; }
+  [[ "$courts" == \[* ]] && [ "$courts" != "[]" ] \
+    || { printf 'the restored application contains no persisted court data\n' >&2; return 1; }
+}
+
+command_restore_check() {
+  local requested="" restore_project restore_environment restore_output port cookie_jar username_file password_file
+  local restore_runtime table_count failure="" recovery_source_url recovery_config_recipe helper archive
+  local trusted_recovery_release trusted_manifest_sha configured_manifest_sha recovery_overlays
+  local recovery_custom_repository recovery_custom_digest expected_recovery_image expected_image_trust
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --recovery) [ $# -ge 2 ] || refuse "--recovery needs a directory"; requested=$2; shift 2 ;;
+      *) refuse "unknown restore-check option $1" ;;
+    esac
+  done
+  [ -n "$requested" ] || refuse "restore-check requires --recovery"
+  [ -n "${COURTSIDE_RESTORE_USERNAME:-}" ] && [ -n "${COURTSIDE_RESTORE_PASSWORD:-}" ] \
+    || refuse "COURTSIDE_RESTORE_USERNAME and COURTSIDE_RESTORE_PASSWORD are required for the login probe"
+  acquire_lock
+  load_configuration
+  recovery_path "$requested"
+  verify_recovery_unit "$selected_recovery"
+  trusted_recovery_release="$installation_directory/releases/$recovery_release"
+  [ -d "$trusted_recovery_release" ] && [ ! -L "$trusted_recovery_release" ] \
+    || refuse "the installed immutable release $recovery_release is required to check this recovery unit"
+  verify_release "$trusted_recovery_release" \
+    || refuse "the installed recovery release failed its integrity check"
+  read_manifest "$trusted_recovery_release/manifest.json"
+  [ "$recovery_release" = "$manifest_version" ] && [ "$recovery_revision" = "$manifest_revision" ] \
+    || refuse "recovery metadata does not match the installed immutable release"
+  trusted_manifest_sha=$(file_digest "$trusted_recovery_release/manifest.json")
+  configured_manifest_sha=$(recovery_value \
+    "$selected_recovery/configuration/installation.conf" release_manifest_sha256)
+  [ "$configured_manifest_sha" = "$trusted_manifest_sha" ] \
+    || refuse "recovery configuration does not bind the installed immutable release manifest"
+  recovery_source_url=$(recovery_value "$selected_recovery/configuration/installation.conf" source_url)
+  recovery_config_recipe=$(recovery_value "$selected_recovery/configuration/installation.conf" recipe)
+  recovery_overlays=$(recovery_value "$selected_recovery/configuration/installation.conf" overlays)
+  expected_recovery_image=$manifest_image
+  expected_image_trust=official
+  if contains_word "${recovery_overlays//,/ }" custom-image; then
+    recovery_custom_repository=$(recovery_value \
+      "$selected_recovery/configuration/installation.conf" custom_image_repository)
+    recovery_custom_digest=$(recovery_value \
+      "$selected_recovery/configuration/installation.conf" custom_image_digest)
+    [[ "$recovery_custom_repository" =~ ^[A-Za-z0-9._:/-]+$ ]] \
+      && [[ "$recovery_custom_digest" =~ ^[0-9a-f]{64}$ ]] \
+      || refuse "recovery configuration has an invalid custom image identity"
+    expected_recovery_image="$recovery_custom_repository@sha256:$recovery_custom_digest"
+    expected_image_trust=custom
+  fi
+  [ "$recovery_image" = "$expected_recovery_image" ] \
+    && [ "$recovery_image_trust" = "$expected_image_trust" ] \
+    || refuse "recovery metadata does not match its effective application image"
+  [[ "$recovery_source_url" =~ ^https?://[^/@:]+(:[0-9]+)?(/.*)?$ ]] \
+    || refuse "recovery configuration has an invalid source URL"
+  [ "$recovery_config_recipe" = "$recovery_recipe" ] \
+    || refuse "recovery metadata does not match its installation recipe"
+  prepare_docker_command
+  if [ "$(recovery_value "$selected_recovery/recovery.conf" mail_state)" = captured ]; then
+    helper=$(sed -n 's/^[[:space:]]*image: \(alpine:3@sha256:[0-9a-f]\{64\}\)$/\1/p' \
+      "$trusted_recovery_release/compose.stalwart.yaml" | head -n 1)
+    [[ "$helper" =~ ^alpine:3@sha256:[0-9a-f]{64}$ ]] \
+      || refuse "the recovery release has no pinned mail archive reader"
+    for archive in mail-config mail-data; do
+      "${docker_command[@]}" run --rm --network none -i "$helper" tar -tf - \
+        < "$selected_recovery/$archive.tar" >/dev/null \
+        || refuse "$archive in the recovery unit is not a readable archive"
+    done
+  fi
+  restore_project="$config_project-restore-check-$$"
+  restore_output=$("${docker_command[@]}" compose ls --format json)
+  [[ "$restore_output" != *'"Name":"'"$config_project"'-restore-check-'* ]] \
+    || refuse "a stale restore-check project exists and requires operator inspection"
+  if "${docker_command[@]}" volume inspect "${restore_project}_db" >/dev/null 2>&1; then
+    refuse "restore target $restore_project already has a database volume"
+  fi
+  restore_runtime=$(mktemp -d "$installation_directory/.restore.partial.XXXXXX")
+  temporary_path=$restore_runtime
+  chmod 700 "$restore_runtime"
+  restore_environment="$restore_runtime/environment"
+  {
+    environment_line COURTSIDE_RECOVERY_IMAGE_REPOSITORY "${recovery_image%@sha256:*}"
+    environment_line COURTSIDE_RECOVERY_IMAGE_DIGEST "${recovery_image##*@sha256:}"
+    environment_line COURTSIDE_RECOVERY_DATABASE_PASSWORD "$(random_secret)"
+    environment_line COURTSIDE_RECOVERY_SOURCE_URL "$recovery_source_url"
+  } > "$restore_environment"
+  restore_compose=("${docker_command[@]}" compose --project-name "$restore_project" \
+    --project-directory "$trusted_recovery_release" --env-file "$restore_environment" \
+    -f "$trusted_recovery_release/compose.recovery-check.yaml")
+  restore_output=$("${restore_compose[@]}" ps -a --format json)
+  [ -z "$restore_output" ] || [ "$restore_output" = "[]" ] \
+    || refuse "restore target $restore_project is not empty"
+  password_file="$restore_runtime/password"
+  printf '%s' "$COURTSIDE_RESTORE_PASSWORD" > "$password_file"
+  chmod 600 "$password_file"
+  username_file="$restore_runtime/username"
+  printf '%s' "$COURTSIDE_RESTORE_USERNAME" > "$username_file"
+  chmod 600 "$username_file"
+  cookie_jar="$restore_runtime/cookies"
+  : > "$cookie_jar"
+  chmod 600 "$cookie_jar"
+  restore_cleanup_active=true
+  if ! "${restore_compose[@]}" up -d --wait db; then
+    failure="PostgreSQL 17 did not become healthy"
+  else
+    table_count=$("${restore_compose[@]}" exec -T db psql -U courtside -d courtside -tAc \
+      "select count(*) from pg_tables where schemaname = 'public'") || failure="the empty-target check failed"
+    table_count=${table_count//[[:space:]]/}
+    [ -n "$failure" ] || [ "$table_count" = 0 ] || failure="the PostgreSQL 17 restore target was not empty"
+  fi
+  if [ -z "$failure" ] && ! "${restore_compose[@]}" exec -T db pg_restore --clean --if-exists --no-owner \
+    --single-transaction --exit-on-error -U courtside -d courtside < "$selected_recovery/database.dump"; then
+    failure="the PostgreSQL dump could not be restored transactionally"
+  fi
+  if [ -z "$failure" ] && ! "${restore_compose[@]}" up -d --wait app; then
+    failure="the restored application did not become healthy"
+  fi
+  if [ -z "$failure" ]; then
+    port=$("${restore_compose[@]}" port app 8080)
+    port=${port##*:}
+    [[ "$port" =~ ^[0-9]+$ ]] || failure="restore-check could not resolve the application port"
+  fi
+  if [ -z "$failure" ] \
+    && ! restore_probe "127.0.0.1:$port" "$cookie_jar" "$username_file" "$password_file"; then
+    failure="the restored application failed its login or domain-data probe"
+  fi
+  if ! "${restore_compose[@]}" down --volumes --remove-orphans; then
+    [ -n "$failure" ] || failure="the isolated restore target could not be removed"
+  else
+    restore_cleanup_active=false
+  fi
+  chmod -R u+w "$restore_runtime"
+  rm -rf -- "$restore_runtime"
+  temporary_path=""
+  [ -z "$failure" ] || refuse "restore-check failed: $failure"
+  printf 'Recovery unit %s restored into empty PostgreSQL 17 and passed login and domain-data probes\n' \
+    "$selected_recovery"
+}
+
+prerelease_is_newer() {
+  local candidate=$1 installed=$2 index candidate_identifier installed_identifier
+  local candidate_identifiers installed_identifiers
+  IFS='.' read -r -a candidate_identifiers <<< "$candidate"
+  IFS='.' read -r -a installed_identifiers <<< "$installed"
+  for ((index = 0; ; index++)); do
+    candidate_identifier=${candidate_identifiers[$index]:-}
+    installed_identifier=${installed_identifiers[$index]:-}
+    [ -n "$candidate_identifier" ] || return 1
+    [ -n "$installed_identifier" ] || return 0
+    [ "$candidate_identifier" != "$installed_identifier" ] || continue
+    if [[ "$candidate_identifier" =~ ^[0-9]+$ ]] && [[ "$installed_identifier" =~ ^[0-9]+$ ]]; then
+      [ $((10#$candidate_identifier)) -gt $((10#$installed_identifier)) ]
+      return $?
+    fi
+    [[ "$candidate_identifier" =~ ^[0-9]+$ ]] && return 1
+    [[ "$installed_identifier" =~ ^[0-9]+$ ]] && return 0
+    [[ "$candidate_identifier" > "$installed_identifier" ]]
+    return $?
+  done
+}
+
+version_is_newer() {
+  local candidate=$1 installed=$2 candidate_core installed_core candidate_pre installed_pre index
+  local candidate_parts installed_parts
+  [[ "$candidate" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-([0-9A-Za-z.-]+))?$ ]] || return 1
+  candidate_core="${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]}"
+  candidate_pre=${BASH_REMATCH[5]:-}
+  [[ "$installed" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-([0-9A-Za-z.-]+))?$ ]] || return 1
+  installed_core="${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]}"
+  installed_pre=${BASH_REMATCH[5]:-}
+  read -r -a candidate_parts <<< "$candidate_core"
+  read -r -a installed_parts <<< "$installed_core"
+  for index in 0 1 2; do
+    [ $((10#${candidate_parts[$index]})) -gt $((10#${installed_parts[$index]})) ] && return 0
+    [ $((10#${candidate_parts[$index]})) -lt $((10#${installed_parts[$index]})) ] && return 1
+  done
+  [ -z "$candidate_pre" ] && [ -n "$installed_pre" ] && return 0
+  [ -n "$candidate_pre" ] && [ -n "$installed_pre" ] \
+    && prerelease_is_newer "$candidate_pre" "$installed_pre" && return 0
+  return 1
+}
+
+write_updated_environment() {
+  local destination=$1 digest=$2 line
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      COURTSIDE_IMAGE_DIGEST=*) environment_line COURTSIDE_IMAGE_DIGEST "$digest" ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  done < "$installation_directory/config/.env" > "$destination"
+  chmod 600 "$destination"
+}
+
+command_update_check() {
+  local archive=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --archive) [ $# -ge 2 ] || refuse "--archive needs a directory"; archive=$2; shift 2 ;;
+      *) refuse "unknown update-check option $1" ;;
+    esac
+  done
+  acquire_lock
+  load_configuration
+  if [ -z "$archive" ]; then
+    printf 'installed_release=%s\nupdate=unknown\nreason=no-exact-release-archive\n' "$config_release"
+    return 1
+  fi
+  [ -d "$archive" ] && [ ! -L "$archive" ] || refuse "$archive is not a release archive"
+  read_manifest "$archive/manifest.json"
+  verify_release "$archive" false || refuse "release archive integrity check failed"
+  if version_is_newer "$manifest_version" "$config_release"; then
+    printf 'installed_release=%s\ncandidate_release=%s\nupdate=available\n' "$config_release" "$manifest_version"
+  else
+    printf 'installed_release=%s\ncandidate_release=%s\nupdate=refused\n' "$config_release" "$manifest_version"
+    return 1
+  fi
+}
+
+command_update() {
+  local archive="" confirmed=false installed_release target_release target_revision target_image target_digest
+  local target_manifest_sha transaction old_compose
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --archive) [ $# -ge 2 ] || refuse "--archive needs a directory"; archive=$2; shift 2 ;;
+      --yes) confirmed=true; shift ;;
+      *) refuse "unknown update option $1" ;;
+    esac
+  done
+  [ -n "$archive" ] || refuse "update requires --archive with one exact release"
+  [ -d "$archive" ] && [ ! -L "$archive" ] || refuse "$archive is not a release archive"
+  acquire_lock
+  load_configuration
+  installed_release=$config_release
+  read_manifest "$archive/manifest.json"
+  if ! verify_release "$archive" false; then refuse "release archive integrity check failed"; fi
+  version_is_newer "$manifest_version" "$installed_release" \
+    || refuse "update requires a release newer than $installed_release; downgrade needs a complete recovery-unit restore"
+  target_release=$manifest_version
+  target_revision=$manifest_revision
+  target_image=$manifest_image
+  target_digest=$manifest_digest
+  target_manifest_sha=$manifest_sha256
+  [ -f "$archive/README.md" ] || refuse "release archive has no upgrade notes"
+  printf 'Plan: update %s to exact release %s in %s\n' "$installed_release" "$target_release" "$installation_directory"
+  printf 'Upgrade notes: %s/README.md\n' "$archive"
+  confirm "$confirmed"
+  create_backup 7
+  manifest_version=$target_release
+  manifest_revision=$target_revision
+  manifest_image=$target_image
+  manifest_digest=$target_digest
+  manifest_sha256=$target_manifest_sha
+  publish_release "$archive"
+  if ! "${docker_command[@]}" image pull "$target_image"; then
+    refuse "update pull failed; recovery unit $created_recovery is ready and database rollback was not attempted"
+  fi
+  compose_command
+  old_compose=("${compose[@]}")
+  if ! "${old_compose[@]}" stop app; then
+    refuse "update could not stop the old application; recovery unit $created_recovery is ready and database rollback was not attempted"
+  fi
+  manifest_version=$target_release
+  manifest_revision=$target_revision
+  manifest_image=$target_image
+  manifest_digest=$target_digest
+  manifest_sha256=$target_manifest_sha
+  transaction=$(mktemp -d "$installation_directory/.transaction.partial.XXXXXX")
+  temporary_path=$transaction
+  chmod 700 "$transaction"
+  write_updated_environment "$transaction/.env" "$target_digest"
+  write_installation_configuration "$transaction/installation.conf"
+  printf '%s\n' "$target_release" > "$transaction/current-release"
+  chmod 600 "$transaction/current-release"
+  mv "$transaction" "$installation_directory/.courtside-transaction"
+  temporary_path=""
+  apply_configuration_transaction
+  if ! compose_command || ! "${compose[@]}" up -d --wait; then
+    refuse "release $target_release did not become healthy; recovery unit $created_recovery is ready and database rollback was not attempted"
+  fi
+  printf 'Updated from %s to %s after recovery unit %s\n' \
+    "$installed_release" "$target_release" "$created_recovery"
+}
+
+analyse_adoption() {
+  local project=$1 environment_file=$2 projects volumes exact_count related_count=0 name image matches
+  local containers service running_image app_count=0 labels label_project label_volume
+  [[ "$project" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || refuse "invalid adoption project $project"
+  [ -f "$environment_file" ] && [ ! -L "$environment_file" ] \
+    || refuse "adoption environment must be a regular file"
+  validate_environment_file "$environment_file"
+  image=$(environment_value "$environment_file" COURTSIDE_IMAGE_DIGEST)
+  [ "$image" = "$manifest_digest" ] || refuse "adoption environment does not select this release image"
+  prepare_docker_command
+  projects=$("${docker_command[@]}" compose ls --format json)
+  matches=$(grep -o '"Name":"[^"]*"' <<< "$projects" || true)
+  exact_count=$( (grep -o '"Name":"'"$project"'"' <<< "$matches" || true) | wc -l | tr -d ' ')
+  while IFS= read -r name; do
+    name=${name#'"Name":"'}
+    name=${name%'"'}
+    case "$name" in
+      "$project" | "$project"-*) related_count=$((related_count + 1)) ;;
+    esac
+  done <<< "$matches"
+  [ "$exact_count" -eq 1 ] && [ "$related_count" -eq 1 ] \
+    || refuse "ambiguous ownership: expected exactly one Compose project named $project"
+  containers=$("${docker_command[@]}" ps -a \
+    --filter "label=com.docker.compose.project=$project" \
+    --format '{{.Label "com.docker.compose.service"}}|{{.Image}}')
+  while IFS='|' read -r service running_image; do
+    [ -n "$service" ] || continue
+    if [ "$service" = app ]; then
+      app_count=$((app_count + 1))
+      [ "$running_image" = "$manifest_image" ] \
+        || refuse "ambiguous ownership: adopted app does not run the selected immutable image"
+    fi
+  done <<< "$containers"
+  [ "$app_count" -eq 1 ] \
+    || refuse "ambiguous ownership: expected exactly one app container for project $project"
+  volumes=$("${docker_command[@]}" volume ls \
+    --filter "label=com.docker.compose.project=$project" --format '{{.Name}}')
+  [ -n "$volumes" ] \
+    || refuse "ambiguous ownership: project $project has no labelled persistent volumes"
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    [[ "$name" == "$project"_* ]] \
+      || refuse "ambiguous ownership: volume $name is not owned by project $project"
+    labels=$("${docker_command[@]}" volume inspect "$name" \
+      --format '{{ index .Labels "com.docker.compose.project" }}|{{ index .Labels "com.docker.compose.volume" }}')
+    IFS='|' read -r label_project label_volume <<< "$labels"
+    [ "$label_project" = "$project" ] && [ -n "$label_volume" ] \
+      || refuse "ambiguous ownership: volume $name has inconsistent Compose labels"
+  done <<< "$volumes"
+  adoption_volumes=$volumes
+}
+
+validate_adoption_model() {
+  local release_root=$1 environment_file=$2 project=$3 file expected_services running_services
+  local expected_hashes running_hashes expected_volumes actual_volumes="" names name labels
+  local label_project label_resource expected_networks actual_networks=""
+  validate_selection "$release_root"
+  adoption_compose=("${docker_command[@]}" compose --project-name "$project" \
+    --project-directory "$release_root" --env-file "$environment_file")
+  selection_arguments
+  while IFS= read -r file; do
+    adoption_compose+=(-f "$release_root/$file")
+  done < <("$release_root/recipe.sh" files "${selection[@]}")
+  "${adoption_compose[@]}" config --quiet >/dev/null \
+    || refuse "the adopted environment does not render the selected recipe"
+  expected_services=$("${adoption_compose[@]}" config --services | sort)
+  running_services=$("${docker_command[@]}" ps -a \
+    --filter "label=com.docker.compose.project=$project" \
+    --format '{{.Label "com.docker.compose.service"}}' | sort)
+  [ -n "$expected_services" ] && [ "$running_services" = "$expected_services" ] \
+    || refuse "the adopted project service set does not match the selected recipe"
+  expected_hashes=$("${adoption_compose[@]}" config --hash '*' | sort)
+  running_hashes=$("${docker_command[@]}" ps -a \
+    --filter "label=com.docker.compose.project=$project" \
+    --format '{{.Label "com.docker.compose.service"}} {{.Label "com.docker.compose.config-hash"}}' | sort)
+  [ -n "$expected_hashes" ] && [ "$running_hashes" = "$expected_hashes" ] \
+    || refuse "the adopted project configuration hashes do not match the selected recipe"
+  expected_volumes=$("${adoption_compose[@]}" config --volumes | sort)
+  names=$("${docker_command[@]}" volume ls \
+    --filter "label=com.docker.compose.project=$project" --format '{{.Name}}')
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    labels=$("${docker_command[@]}" volume inspect "$name" \
+      --format '{{ index .Labels "com.docker.compose.project" }}|{{ index .Labels "com.docker.compose.volume" }}')
+    IFS='|' read -r label_project label_resource <<< "$labels"
+    [ "$label_project" = "$project" ] && [ -n "$label_resource" ] \
+      || refuse "the adopted project has inconsistent volume ownership"
+    actual_volumes+="$label_resource"$'\n'
+  done <<< "$names"
+  actual_volumes=$(printf '%s' "$actual_volumes" | sort)
+  [ -n "$expected_volumes" ] && [ "$actual_volumes" = "$expected_volumes" ] \
+    || refuse "the adopted project volume set does not match the selected recipe"
+  expected_networks=$("${adoption_compose[@]}" config --networks | sort)
+  names=$("${docker_command[@]}" network ls \
+    --filter "label=com.docker.compose.project=$project" --format '{{.Name}}')
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    labels=$("${docker_command[@]}" network inspect "$name" \
+      --format '{{ index .Labels "com.docker.compose.project" }}|{{ index .Labels "com.docker.compose.network" }}')
+    IFS='|' read -r label_project label_resource <<< "$labels"
+    [ "$label_project" = "$project" ] && [ -n "$label_resource" ] \
+      || refuse "the adopted project has inconsistent network ownership"
+    actual_networks+="$label_resource"$'\n'
+  done <<< "$names"
+  actual_networks=$(printf '%s' "$actual_networks" | sort)
+  [ -n "$expected_networks" ] && [ "$actual_networks" = "$expected_networks" ] \
+    || refuse "the adopted project network set does not match the selected recipe"
+}
+
+command_adopt() {
+  local mode="" project="" environment_file="" answers_file="" confirmed=false
+  local adoption_environment config_staging adopted_database_material
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --analyze) [ -z "$mode" ] || refuse "choose one adoption mode"; mode=analyze; shift ;;
+      --apply) [ -z "$mode" ] || refuse "choose one adoption mode"; mode=apply; shift ;;
+      --project) [ $# -ge 2 ] || refuse "--project needs a name"; project=$2; shift 2 ;;
+      --environment) [ $# -ge 2 ] || refuse "--environment needs a file"; environment_file=$2; shift 2 ;;
+      --answers) [ $# -ge 2 ] || refuse "--answers needs a file"; answers_file=$2; shift 2 ;;
+      --yes) confirmed=true; shift ;;
+      *) refuse "unknown adopt option $1" ;;
+    esac
+  done
+  [ -n "$mode" ] && [ -n "$project" ] && [ -n "$environment_file" ] \
+    || refuse "adopt requires a mode, --project and --environment"
+  read_manifest "$script_directory/manifest.json"
+  verify_release "$script_directory" false || refuse "release archive integrity check failed"
+  analyse_adoption "$project" "$environment_file"
+  printf 'analysis=adoptable\nproject=%s\nrelease=%s\n' "$project" "$manifest_version"
+  while IFS= read -r volume; do [ -z "$volume" ] || printf 'volume=%s\n' "$volume"; done <<< "$adoption_volumes"
+  [ "$mode" = apply ] || return 0
+  [ -n "$answers_file" ] || refuse "adopt --apply requires --answers"
+  answer_defaults
+  read_answers "$answers_file"
+  validate_answers
+  [ "$answer_project" = "$project" ] || refuse "adoption answers name another Compose project"
+  adoption_environment=$(mktemp "$installation_directory.adoption-environment.XXXXXX")
+  temporary_path=$adoption_environment
+  cp "$environment_file" "$adoption_environment"
+  chmod 600 "$adoption_environment"
+  if [ "$answer_recipe" != existing-infrastructure ]; then
+    adopted_database_material=$(environment_value "$adoption_environment" POSTGRES_PASSWORD)
+    [[ "$adopted_database_material" =~ ^[0-9a-f]{48}$ ]] \
+      || refuse "bundled PostgreSQL adoption requires a generated 48-character hexadecimal password"
+  fi
+  validate_adoption_model "$script_directory" "$adoption_environment" "$project"
+  printf 'Plan: adopt project %s into %s without recreating its resources\n' "$project" "$installation_directory"
+  confirm "$confirmed"
+  analyse_adoption "$project" "$adoption_environment"
+  validate_adoption_model "$script_directory" "$adoption_environment" "$project"
+  acquire_lock
+  [ ! -e "$installation_directory/config" ] || refuse "installation state already exists"
+  publish_release
+  mkdir -p "$installation_directory/secrets" "$installation_directory/backups"
+  chmod 700 "$installation_directory/secrets" "$installation_directory/backups"
+  config_staging=$(mktemp -d "$installation_directory/.config.partial.XXXXXX")
+  cp "$adoption_environment" "$config_staging/.env"
+  rm -f -- "$adoption_environment"
+  temporary_path=$config_staging
+  chmod 700 "$config_staging"
+  chmod 600 "$config_staging/.env"
+  write_installation_configuration "$config_staging/installation.conf"
+  mv "$config_staging" "$installation_directory/config"
+  temporary_path=""
+  publish_current
+  printf 'Adopted project %s without changing its containers or volumes\n' "$project"
+}
+
+replace_environment_secret() {
+  local source=$1 destination=$2 wanted=$3 replacement=$4 line key found=false
+  while IFS= read -r line || [ -n "$line" ]; do
+    key=${line%%=*}
+    if [ "$key" = "$wanted" ]; then
+      environment_line "$wanted" "$replacement"
+      found=true
+    else
+      printf '%s\n' "$line"
+    fi
+  done < "$source" > "$destination"
+  [ "$found" = true ] || refuse "the selected secret is not configured for this installation"
+  chmod 600 "$destination"
+}
+
+publish_environment_file() {
+  local source=$1 transaction
+  transaction=$(mktemp -d "$installation_directory/.transaction.partial.XXXXXX")
+  temporary_path=$transaction
+  chmod 700 "$transaction"
+  cp "$source" "$transaction/.env"
+  chmod 600 "$transaction/.env"
+  mv "$transaction" "$installation_directory/.courtside-transaction"
+  temporary_path=""
+  apply_configuration_transaction
+}
+
+retire_rotation_journal() {
+  local journal=$1 tombstone="$installation_directory/.rotation.complete.$$"
+  mv "$journal" "$tombstone"
+  rm -f -- "$tombstone"/*
+  rmdir -- "$tombstone"
+}
+
+recover_secret_rotation() {
+  local requested=$1 journal="$installation_directory/.courtside-rotation"
+  local saved_name kind role component old_value
+  [ -e "$journal" ] || return 0
+  [ -d "$journal" ] && [ ! -L "$journal" ] || refuse "$journal is not a safe rotation journal"
+  [ "$(path_mode "$journal")" = 700 ] && [ "$(path_owner "$journal")" = "$(id -u)" ] \
+    || refuse "$journal must be owned by the operator with mode 0700"
+  for component in "$journal"/*; do
+    [ -f "$component" ] && [ ! -L "$component" ] \
+      || refuse "$journal contains an unsafe entry"
+    [ "$(path_mode "$component")" = 600 ] && [ "$(path_owner "$component")" = "$(id -u)" ] \
+      || refuse "$component must be owned by the operator with mode 0600"
+    case "${component##*/}" in meta | old.env | new.env | old.secret | new.secret) ;;
+      *) refuse "$journal contains an unknown entry" ;;
+    esac
+  done
+  saved_name=$(recovery_value "$journal/meta" name)
+  kind=$(recovery_value "$journal/meta" kind)
+  [ "$saved_name" = "$requested" ] \
+    || refuse "interrupted $saved_name rotation must be recovered before rotating $requested"
+  case "$kind:$saved_name" in
+    env:mail-relay)
+      publish_environment_file "$journal/new.env"
+      compose_command
+      "${compose[@]}" up -d --wait app \
+        || refuse "interrupted mail-relay rotation still requires provider reconciliation"
+      ;;
+    env:*)
+      publish_environment_file "$journal/old.env"
+      compose_command
+      if [[ "$saved_name" == mail-* ]]; then
+        "${compose[@]}" --profile mail-setup run --rm mail-configure \
+          || refuse "interrupted $saved_name rotation could not restore Stalwart"
+        component=mail
+        [ "$saved_name" != mail-reload ] || component=mail-reload
+      elif [ "$saved_name" = postgres ]; then
+        old_value=$(environment_value "$journal/old.env" POSTGRES_PASSWORD)
+        printf "ALTER ROLE courtside PASSWORD '%s';\n" "$old_value" \
+          | "${compose[@]}" exec -T db psql -v ON_ERROR_STOP=1 -U courtside -d courtside \
+          || refuse "interrupted postgres rotation could not restore the database credential"
+        component=app
+      else
+        refuse "rotation journal names an unknown environment secret"
+      fi
+      "${compose[@]}" up -d --wait "$component" \
+        || refuse "interrupted $saved_name rotation could not restore service health"
+      ;;
+    file:database-owner) role=courtside_owner; component="database-setup" ;;
+    file:database-migration) role=courtside_migration; component="database-migrate" ;;
+    file:database-runtime) role=courtside_runtime; component=app ;;
+    *) refuse "rotation journal has an unsupported identity" ;;
+  esac
+  if [ "$kind" = file ]; then
+    old_value=$(< "$journal/old.secret")
+    compose_command
+    printf "ALTER ROLE %s PASSWORD '%s';\n" "$role" "$old_value" \
+      | "${compose[@]}" exec -T db psql -v ON_ERROR_STOP=1 -U courtside_owner -d courtside \
+      || refuse "interrupted $saved_name rotation could not restore its database role"
+    cp "$journal/old.secret" "$installation_directory/secrets/$saved_name-password"
+    chmod 600 "$installation_directory/secrets/$saved_name-password"
+    "${compose[@]}" up -d --wait "$component" \
+      || refuse "interrupted $saved_name rotation could not restore service health"
+  fi
+  retire_rotation_journal "$journal"
+  printf 'Recovered interrupted %s rotation before continuing\n' "$saved_name"
+}
+
+command_rotate_secret() {
+  local name=${1:-} confirmed=false key="" component transaction replacement rollback journal staging
+  local file_identity=false role="" material_path pending previous_value
+  [ -n "$name" ] || refuse "rotate-secret requires a secret name"
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --yes) confirmed=true; shift ;;
+      *) refuse "unknown rotate-secret option $1" ;;
+    esac
+  done
+  case "$name" in
+    postgres) key=POSTGRES_PASSWORD; component=app ;;
+    mail-admin) key=COURTSIDE_MAIL_ADMIN_PASSWORD; component=mail ;;
+    mail-setup) key=COURTSIDE_MAIL_SETUP_PASSWORD; component=mail ;;
+    mail-reload) key=COURTSIDE_MAIL_RELOAD_PASSWORD; component=mail-reload ;;
+    mail-relay) key=COURTSIDE_MAIL_PASSWORD; component=app ;;
+    database-owner) file_identity=true; role=courtside_owner; component="database-setup" ;;
+    database-migration) file_identity=true; role=courtside_migration; component="database-migrate" ;;
+    database-runtime) file_identity=true; role=courtside_runtime; component=app ;;
+    *) refuse "unknown rotatable secret $name" ;;
+  esac
+  acquire_lock
+  load_configuration
+  case "$name:$config_recipe" in
+    postgres:existing-infrastructure) refuse "postgres rotation is available only for the bundled database" ;;
+    mail-admin:full-self-hosted | mail-setup:full-self-hosted | mail-reload:full-self-hosted) ;;
+    mail-*:*) [ "$name" = mail-relay ] || refuse "$name is available only for full-self-hosted" ;;
+  esac
+  if [ "$file_identity" = true ]; then
+    [ "$config_recipe" != existing-infrastructure ] \
+      || refuse "database identity rotation for an external database remains operator-owned"
+    contains_word "${config_overlays//,/ }" database-identities \
+      || refuse "$name requires the database-identities overlay"
+  fi
+  recover_secret_rotation "$name"
+  printf 'Plan: rotate only %s and restart %s\n' "$name" "$component"
+  confirm "$confirmed"
+  if [ "$name" = mail-relay ]; then
+    replacement=${COURTSIDE_NEW_SECRET:-}
+    [ -n "$replacement" ] || refuse "mail-relay rotation requires COURTSIDE_NEW_SECRET after the relay changed"
+  else
+    replacement=$(random_secret)
+  fi
+  if [ "$file_identity" = true ]; then
+    material_path="$installation_directory/secrets/$name-password"
+    [ -f "$material_path" ] && [ ! -L "$material_path" ] || refuse "$material_path is not a safe secret file"
+    previous_value=$(< "$material_path")
+    [[ "$previous_value" =~ ^[0-9a-f]{48}$ ]] || refuse "$material_path has an unexpected value"
+    pending=$(mktemp "$installation_directory/secrets/.$name.partial.XXXXXX")
+    printf '%s\n' "$replacement" > "$pending"
+    chmod 600 "$pending"
+    staging=$(mktemp -d "$installation_directory/.rotation.partial.XXXXXX")
+    chmod 700 "$staging"
+    printf 'name=%s\nkind=file\n' "$name" > "$staging/meta"
+    cp "$material_path" "$staging/old.secret"
+    cp "$pending" "$staging/new.secret"
+    chmod 600 "$staging"/*
+    journal="$installation_directory/.courtside-rotation"
+    mv "$staging" "$journal"
+    compose_command
+    if ! printf "ALTER ROLE %s PASSWORD '%s';\n" "$role" "$replacement" \
+      | "${compose[@]}" exec -T db psql -v ON_ERROR_STOP=1 -U courtside_owner -d courtside; then
+      rm -f -- "$pending"
+      retire_rotation_journal "$journal"
+      refuse "$name rotation failed before local state changed"
+    fi
+    mv "$pending" "$material_path"
+    if ! "${compose[@]}" up -d --wait "$component"; then
+      printf "ALTER ROLE %s PASSWORD '%s';\n" "$role" "$previous_value" \
+        | "${compose[@]}" exec -T db psql -v ON_ERROR_STOP=1 -U courtside_owner -d courtside >/dev/null 2>&1 \
+        || refuse "$name rotation failed and its database rollback also failed"
+      printf '%s\n' "$previous_value" > "$material_path"
+      chmod 600 "$material_path"
+      retire_rotation_journal "$journal"
+      refuse "$name rotation did not become healthy; the previous identity was restored"
+    fi
+    retire_rotation_journal "$journal"
+    printf 'Rotated %s without changing another stored identity\n' "$name"
+    return 0
+  fi
+  staging=$(mktemp -d "$installation_directory/.rotation.partial.XXXXXX")
+  temporary_path=$staging
+  chmod 700 "$staging"
+  printf 'name=%s\nkind=env\n' "$name" > "$staging/meta"
+  cp "$installation_directory/config/.env" "$staging/old.env"
+  replace_environment_secret "$staging/old.env" "$staging/new.env" "$key" "$replacement"
+  chmod 600 "$staging"/*
+  journal="$installation_directory/.courtside-rotation"
+  mv "$staging" "$journal"
+  temporary_path=""
+  rollback="$journal/old.env"
+  publish_environment_file "$journal/new.env"
+  compose_command
+  if [[ "$name" == mail-* ]] && [ "$name" != mail-relay ]; then
+    if ! "${compose[@]}" --profile mail-setup run --rm mail-configure; then
+      publish_environment_file "$rollback"
+      compose_command
+      if ! "${compose[@]}" --profile mail-setup run --rm mail-configure >/dev/null 2>&1; then
+        refuse "$name rotation failed and Stalwart also refused the previous configuration"
+      fi
+      retire_rotation_journal "$journal"
+      refuse "$name rotation was refused by Stalwart; the previous local value was restored"
+    fi
+  elif [ "$name" = postgres ]; then
+    if ! printf "ALTER ROLE courtside PASSWORD '%s';\n" "$replacement" \
+      | "${compose[@]}" exec -T db psql -v ON_ERROR_STOP=1 -U courtside -d courtside; then
+      publish_environment_file "$rollback"
+      retire_rotation_journal "$journal"
+      refuse "database secret rotation failed; the previous local value was restored"
+    fi
+  fi
+  if ! "${compose[@]}" up -d --wait "$component"; then
+    if [ "$name" = mail-relay ]; then
+      refuse "mail-relay did not become healthy; the new local value was retained because provider rollback is operator-owned"
+    fi
+    publish_environment_file "$rollback"
+    compose_command
+    if [[ "$name" == mail-* ]] && [ "$name" != mail-relay ]; then
+      if ! "${compose[@]}" --profile mail-setup run --rm mail-configure >/dev/null 2>&1; then
+        refuse "$name restart failed and Stalwart also refused the previous configuration"
+      fi
+    elif [ "$name" = postgres ]; then
+      printf "ALTER ROLE courtside PASSWORD '%s';\n" \
+        "$(environment_value "$rollback" POSTGRES_PASSWORD)" \
+        | "${compose[@]}" exec -T db psql -v ON_ERROR_STOP=1 -U courtside -d courtside >/dev/null 2>&1 \
+        || true
+    fi
+    "${compose[@]}" up -d --wait "$component" >/dev/null 2>&1 || true
+    retire_rotation_journal "$journal"
+    refuse "$name rotation did not become healthy; the previous local value was restored"
+  fi
+  retire_rotation_journal "$journal"
+  printf 'Rotated %s without changing another stored identity\n' "$name"
 }
 
 json_escape() {
@@ -1160,6 +2225,18 @@ command_up() {
   "${compose[@]}" up -d
 }
 
+command_mail_check() {
+  [ $# -eq 0 ] || refuse "mail-check accepts no options"
+  acquire_lock
+  compose_command
+  if [ "$config_recipe" = full-self-hosted ]; then
+    "${compose[@]}" --profile mail-check run --rm mail-check
+    return 0
+  fi
+  printf 'mail_check=unknown\nreason=external-relay-is-operator-owned\n'
+  return 1
+}
+
 command_status() {
   local state components infrastructure=unknown bootstrap=pending club_setup=unknown migration=application-startup
   [ $# -eq 0 ] || refuse "status accepts no options"
@@ -1193,7 +2270,7 @@ command_status() {
 }
 
 command_finalize_bootstrap() {
-  local confirmed=false line transaction
+  local confirmed=false line transaction path latest=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --yes) confirmed=true; shift ;;
@@ -1203,6 +2280,13 @@ command_finalize_bootstrap() {
   [ "$confirmed" = true ] || refuse "finalize-bootstrap requires --yes after the password was replaced"
   acquire_lock
   load_configuration
+  while IFS= read -r path; do latest=$path; done \
+    < <(printf '%s\n' "$installation_directory"/backups/recovery-* | sort)
+  [ -n "$latest" ] && [ "$latest" != "$installation_directory/backups/recovery-*" ] \
+    || refuse "finalize-bootstrap requires a verified backup of the current release"
+  verify_recovery_unit "$latest"
+  [ "$recovery_release" = "$config_release" ] && [ "$recovery_revision" = "$config_revision" ] \
+    || refuse "finalize-bootstrap requires a verified backup of the current release"
   transaction=$(mktemp -d "$installation_directory/.transaction.partial.XXXXXX")
   temporary_path=$transaction
   chmod 700 "$transaction"
@@ -1238,20 +2322,48 @@ command_diagnose() {
 }
 
 command_uninstall() {
-  local keep_data=false confirmed=false
+  local keep_data=false destroy=false confirmed=false confirmation="" expected volumes entry
   while [ $# -gt 0 ]; do
     case "$1" in
       --keep-data) keep_data=true; shift ;;
+      --destroy) destroy=true; shift ;;
       --yes) confirmed=true; shift ;;
+      --confirm) [ $# -ge 2 ] || refuse "--confirm needs the exact phrase"; confirmation=$2; shift 2 ;;
       *) refuse "unknown uninstall option $1" ;;
     esac
   done
-  [ "$keep_data" = true ] || refuse "only uninstall --keep-data is supported"
-  [ "$confirmed" = true ] || refuse "uninstall --keep-data requires --yes"
+  [ "$keep_data" != "$destroy" ] || refuse "choose either uninstall --keep-data or --destroy"
+  if [ "$destroy" = true ]; then
+    case "$installation_directory" in
+      / | /usr | /var | /srv | /opt | /home | /Users) refuse "installation path is too broad to remove" ;;
+    esac
+  fi
   acquire_lock
   compose_command
-  "${compose[@]}" down
-  printf 'Containers removed; volumes and %s were kept\n' "$installation_directory"
+  if [ "$keep_data" = true ]; then
+    [ "$confirmed" = true ] || refuse "uninstall --keep-data requires --yes"
+    "${compose[@]}" down
+    printf 'Containers removed; volumes and %s were kept\n' "$installation_directory"
+    return 0
+  fi
+  expected="delete $config_project at $installation_directory"
+  volumes=$("${docker_command[@]}" volume ls \
+    --filter "label=com.docker.compose.project=$config_project" --format '{{.Name}}')
+  printf 'Plan: remove project %s, installation path %s and these project volumes:\n' \
+    "$config_project" "$installation_directory"
+  printf '%s\n' "$volumes"
+  [ "$confirmation" = "$expected" ] || refuse "destructive removal requires --confirm '$expected'"
+  while IFS= read -r -d '' entry; do
+    case "${entry##*/}" in
+      .courtside-installation | .courtside.lock | releases | config | secrets | backups | current) ;;
+      *) refuse "destructive removal found an unowned installation entry: ${entry##*/}" ;;
+    esac
+  done < <(find "$installation_directory" -mindepth 1 -maxdepth 1 -print0)
+  "${compose[@]}" down --volumes --remove-orphans
+  owns_lock=false
+  chmod -R u+w "$installation_directory"
+  rm -rf -- "$installation_directory"
+  printf 'Removed project %s and installation path %s\n' "$config_project" "$installation_directory"
 }
 
 while [ $# -gt 0 ]; do
@@ -1273,6 +2385,13 @@ shift
 case "$command" in
   init) command_init "$@" ;;
   reconfigure) command_reconfigure "$@" ;;
+  backup) command_backup "$@" ;;
+  restore-check) command_restore_check "$@" ;;
+  update) command_update "$@" ;;
+  update-check) command_update_check "$@" ;;
+  adopt) command_adopt "$@" ;;
+  rotate-secret) command_rotate_secret "$@" ;;
+  mail-check) command_mail_check "$@" ;;
   doctor) command_doctor "$@" ;;
   up) command_up "$@" ;;
   status) command_status "$@" ;;

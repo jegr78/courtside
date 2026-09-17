@@ -130,8 +130,10 @@ All three processes read `SPRING_DATASOURCE_URL`, `COURTSIDE_DB_TLS_MODE` and
 `COURTSIDE_DB_TLS_ROOT_CERTIFICATE`. [Separating database identities](README.md#separating-database-identities)
 describes what each role may do.
 
-Either way, a new version migrates the schema forward, and a version may be skipped. Make a backup
-first, as [Upgrading](README.md#upgrading) describes.
+Either way, a new version migrates the schema forward, and a version may be skipped. Create and
+verify a complete recovery unit first, as [Upgrading](README.md#upgrading) describes. Unless release
+notes explicitly declare backward schema compatibility, rollback restores that unit; it never
+starts the older image against the migrated database.
 
 ## HTTPS ingress
 

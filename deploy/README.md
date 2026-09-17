@@ -52,7 +52,9 @@ sudo install -d -m 0700 -o "$USER" /srv/courtside
 installation. It publishes the archive as a read-only `releases/<version>` directory, changes the
 `current` symlink only after the release and configuration are ready, and keeps mutable state in
 private `config`, `secrets` and `backups` directories. The generated bootstrap credential is shown
-only through a retrieval command; the command never prints the credential itself.
+only through a retrieval command; the command never prints the credential itself. The root gets a
+path-bound `.courtside-installation` marker. Initialization refuses a non-empty unmarked directory,
+and destructive uninstall refuses entries outside the launcher's known inventory.
 
 For repeatable installation, put decisions in an answer file and confirm non-interactively:
 
@@ -68,6 +70,7 @@ mail_domain=courts.example.org
 mail_reply_to=board@example.org
 mail_relay_host=smtp.example.org
 mail_relay_username=
+recovery_material=included
 ```
 
 ```sh
@@ -82,6 +85,11 @@ answer file. Optional decisions are `overlays` as a comma-separated list, `synth
 select only a forwarded-ingress recipe such as `funnel` or `existing-infrastructure` when its
 unprivileged port threshold excludes ports 80 or 25.
 
+`recovery_material=included` keeps `.env` and local secret files inside each private recovery unit.
+Use `external-verified` only after a separate secret store has proved that it can restore every
+value and file. Recovery units then omit both `.env` and `secrets/` contents rather than pretending
+that application data alone is enough.
+
 After installation, use the installed launcher so every command follows the selected release:
 
 ```sh
@@ -90,6 +98,7 @@ After installation, use the installed launcher so every command follows the sele
 /srv/courtside/current/courtside up
 /srv/courtside/current/courtside status
 /srv/courtside/current/courtside diagnose
+/srv/courtside/current/courtside backup --retain 7
 ```
 
 `doctor --json` exits 0 for `PASS`, 1 for `WARN` and 2 for `FAIL`. `status` reports infrastructure,
@@ -102,15 +111,24 @@ last and reports its keys as operator-owned and unknown rather than claiming sup
 Edit `config/installation.conf` only as data: commands strictly parse and validate its schema and
 never source it as shell. `reconfigure` takes a complete answer file, validates and shows the new
 plan before applying it while preserving `.env` secrets and the local override. Once the bootstrap
-password has been replaced in the application, remove its one-time values with:
+password has been replaced in the application, create a recovery unit and then remove its one-time
+values:
 
 ```sh
+/srv/courtside/current/courtside backup --retain 7
 /srv/courtside/current/courtside finalize-bootstrap --yes
 ```
 
+`finalize-bootstrap` refuses until a checksummed recovery unit for the current release exists.
 `uninstall --keep-data --yes` removes containers without requesting Compose volume deletion and
-leaves the installation files in place. The launcher never installs packages, changes DNS or
-firewall rules, uploads diagnostics or enables timers.
+leaves the installation files in place. Destructive removal first prints the exact project, path
+and project-labelled volumes. It accepts only `uninstall --destroy --confirm 'delete <project> at
+<absolute-path>'`; it never invokes a global Docker prune.
+
+The files under `examples/` are inert systemd and cron examples for backup, doctor, exact-archive
+update checks and mail checks. Copy and enable one only after adapting its paths and schedule. The
+launcher never installs packages, changes DNS or firewall rules, uploads diagnostics or enables a
+timer.
 
 ## Choose a recipe
 
@@ -738,11 +756,11 @@ answer is usually the reverse name or outbound port 25 rather than anything in t
 
 ### Back up the mail volumes too
 
-The backup below covers PostgreSQL. Neither mail volume is in it, and the two are not alike:
+The CLI recovery unit captures both mail volumes during one controlled Stalwart interruption.
 `mail-config` holds one small file naming where the store lives, and **`mail-data` is the store**,
 the private DKIM key, every account and its credentials. Losing it means generating a new key and
 publishing a new selector; leaking it means somebody can sign mail as your domain until you notice.
-Include both volumes in whatever backs this host up, and treat `mail-data` as a secret when you do.
+Treat the whole recovery unit as a secret and verify its restore before depending on it.
 
 ### When the mail administrator password is lost
 
@@ -753,8 +771,8 @@ that one variable, so choosing anything else means they can no longer authentica
 **The server stops accepting and delivering mail while that variable is set**, it runs in recovery
 mode and serves only its admin port. Clear it and recreate the container once you are back in.
 
-To change the administrator password instead, edit `COURTSIDE_MAIL_ADMIN_PASSWORD` and run
-`mail-configure` again: the plan upserts the account, so it reconciles rather than duplicates.
+To change the administrator password instead, run `courtside rotate-secret mail-admin --yes`. The
+flow renders and applies the new account plan before it accepts the local value.
 
 
 ## Encrypting the connection to the database
@@ -1205,54 +1223,104 @@ whose own message names what it turned down, and assert that it stays out of the
 
 ## Upgrading
 
-Download and verify the archive of the new release as described at the top of this guide, and
-replace the deployment files with its contents, keeping your `.env`. Set `COURTSIDE_IMAGE_DIGEST`
-to the 64 hexadecimal characters after `sha256:` in its `manifest.json`, then:
+Download, attest, verify and unpack the new release archive as described at the top of this guide.
+Ask the installed launcher to inspect that exact archive before changing anything:
 
 ```sh
-docker compose pull app
-docker compose up -d
+/srv/courtside/current/courtside update-check \
+  --archive /srv/courtside/candidate/courtside-deployment-<version>
+/srv/courtside/current/courtside update \
+  --archive /srv/courtside/candidate/courtside-deployment-<version> --yes
 ```
 
-Both commands read the recipe from `COMPOSE_FILE`, so every recipe upgrades the same way.
+`update` accepts one newer, exact release. It verifies the archive inventory and signer identity,
+shows the archive's upgrade notes, creates and validates a recovery unit, pulls the digest-pinned
+image, stops the old application, migrates the configuration atomically and waits for component
+health. A pull failure leaves the old release selected. A startup or migration failure leaves the
+new release selected and the application stopped or unhealthy, with the recovery-unit path in the
+diagnostic. The command never claims that it rolled a database back.
 
 Migrations run on the application's startup, or in the one-shot migration command when the database
 identities are separated, and support skipping versions, so an instance that has not been updated
 for a year goes to the current release directly. Read the release notes first: every release opens
 with upgrade notes, names the database versions exercised by the release gate, and identifies any
 change to a published surface. If a migration is rejected, do not attempt to reverse Flyway or
-edit an applied migration. Keep the application stopped and restore the pre-upgrade backup.
+edit an applied migration. An older application may not run against a newer schema unless its
+release explicitly declares that combination. Restore the complete earlier recovery unit instead.
 
-Back up before an upgrade. The database holds everything; the containers hold nothing. The
-commands below address the bundled `db` service; with `existing-infrastructure`, back up the
-database with the tools of wherever it runs:
+## Recovery units
 
-```sh
-set -eu
-umask 077
-temporary=$(mktemp "./.courtside-$(date -u +%Y%m%dT%H%M%SZ).XXXXXX.partial")
-backup=${temporary#./.}
-backup=${backup%.partial}.dump
-trap 'rm -f "$temporary"' EXIT
-docker compose exec -T db pg_dump -Fc --no-owner -U courtside courtside > "$temporary"
-docker compose exec -T db pg_restore --list < "$temporary" > /dev/null
-mv "$temporary" "$backup"
-trap - EXIT
-echo "Backup written to $backup"
-```
-
-Treat the archive, the matching Courtside image reference and the `.env` configuration as one
-versioned recovery unit. Test the archive on a separate empty PostgreSQL 17 instance. With the
-application stopped, restore it atomically:
+Create a recovery unit before a configuration or infrastructure change:
 
 ```sh
-docker compose stop app
-docker compose exec -T db pg_restore --clean --if-exists --no-owner --single-transaction --exit-on-error -U courtside -d courtside < courtside-YYYY-MM-DD.dump
-docker compose up -d app
+/srv/courtside/current/courtside backup --retain 7
 ```
 
-If `pg_restore` fails, keep the application stopped. Do not serve traffic from a partially restored
-database and do not combine the archive with an image or configuration from a different release.
+The private directory under `backups/` contains a validated PostgreSQL custom-format dump produced
+with `pg_dump -Fc`, the
+exact release and effective image identity, installation configuration, optional local override, restore
+instructions and a checksum inventory. With local secret recovery it also contains `.env` and the
+local secret files. A full-self-hosted backup stops Stalwart once, captures `mail-config` and
+`mail-data` from that same interval, then waits for mail health before publishing the unit.
+The launcher stages the directory with `mktemp`, checks the dump with `pg_restore --list`, and
+publishes it only with `mv "$temporary" "$backup"` after every artifact is durable. Restore uses
+`pg_restore --clean --if-exists --no-owner --single-transaction --exit-on-error` and starts the
+matching Courtside image for its behavioral probe.
+For `custom-image`, the recovery metadata records that repository and digest with an explicit
+custom trust mode rather than substituting the official release image.
+Retention reads and verifies only recovery units directly below the configured `backups/`
+directory. An unknown or malformed target stops pruning.
+
+Prove a recovery unit in a disposable PostgreSQL 17 target. Supply an existing account whose
+persisted password and court data should survive the restore. In a private shell, read the password
+without echo into <code>COURTSIDE_RESTORE_PASSWORD</code>, export it, set
+<code>COURTSIDE_RESTORE_USERNAME</code>, and run
+<code>/srv/courtside/current/courtside restore-check --recovery
+/srv/courtside/backups/recovery-&lt;timestamp&gt;-&lt;version&gt;-&lt;id&gt;</code>. Unset the password
+variable when the check finishes.
+
+`restore-check` refuses a changed checksum or a non-empty target, restores with
+`--single-transaction --exit-on-error`, starts the matching image, signs in and reads persisted
+court data. It executes the restore model only from the corresponding locally installed and
+manifest-verified immutable release; the release copy inside the recovery unit is evidence, not
+executable input. Host curl configuration and proxy variables are excluded from the login probe.
+It then removes the isolated target, including after an interrupted or failed check. This command
+proves the unit; restoring a live installation remains an explicit replacement of the complete
+installation state, never an in-place database rollback. Keep installed releases for as long as
+their recovery units must remain verifiable.
+
+## Adoption and secret rotation
+
+Analyse an existing Compose installation without changing it:
+
+```sh
+./courtside --directory /srv/courtside adopt --analyze \
+  --project example-club --environment /path/to/existing/.env
+```
+
+The analysis requires one exact Compose project, consistent project and volume labels, and the
+immutable application image of the archive that runs it. Apply also requires exact service,
+Compose configuration-hash, named-volume and network sets. A second related project, foreign image
+or inconsistent storage makes ownership ambiguous. Apply repeats those checks after confirmation
+to close the operator decision window and publishes the same private environment snapshot that was
+validated. Bundled PostgreSQL adoption accepts only the launcher's generated hexadecimal password
+format; external database credentials remain operator-owned.
+`adopt --apply` additionally requires a complete answer file and `--yes`; it records the existing
+environment without recreating containers, identities or volumes.
+
+Rotate one supported identity at a time with `rotate-secret <name> --yes`. The names are
+`postgres`, `database-owner`, `database-migration`, `database-runtime`, `mail-admin`, `mail-setup`,
+`mail-reload` and `mail-relay`. Separate database-identity rotation currently applies to the
+bundled database. An external database owns its role rotation. Each flow changes the backing
+identity before restarting its dependent component and restores the previous value when the
+component rejects the change. For `mail-relay`, change the provider credential first and pass the
+new value only through <code>COURTSIDE_NEW_SECRET</code>; answer files and command arguments never
+carry it.
+If the restart then fails, the CLI retains that new local value because it cannot roll the provider
+back and says so in the diagnostic.
+Rotation state is journalled privately before either side changes. A later invocation of the same
+rotation deterministically restores the old local and backing identity first; mail-relay instead
+retains the provider-first new value. Other lifecycle commands stop while such recovery is due.
 
 ## Image updates between releases
 
