@@ -123,7 +123,9 @@ values:
 `uninstall --keep-data --yes` removes containers without requesting Compose volume deletion and
 leaves the installation files in place. Destructive removal first prints the exact project, path
 and project-labelled volumes. It accepts only `uninstall --destroy --confirm 'delete <project> at
-<absolute-path>'`; it never invokes a global Docker prune.
+<absolute-path>'`; it never invokes a global Docker prune. When the operator cannot remove the
+installation entry from a root-owned parent such as `/srv`, the command removes the verified
+contents, succeeds and prints the exact `sudo rmdir -- ...` command that removes the empty root.
 
 The files under `examples/` are inert systemd and cron examples for backup, doctor, exact-archive
 update checks and mail checks. Copy and enable one only after adapting its paths and schedule. The
@@ -167,6 +169,8 @@ in this guide use the recipe. A hardening overlay described further down is adde
 and delivers none. It is for trying out an installation, never for running a club: the component
 sets `COURTSIDE_ENVIRONMENT` to `UAT`, which marks every page as a test instance, and no value in
 `.env` changes that. A recipe with its own mail server has no relay to replace and refuses the flag.
+For this mode, `status` reports `mail_handover=synthetic` and `mail-check` verifies that the
+controlled Mailpit service is healthy. Neither result claims delivery to an external recipient.
 
 Mailpit requires STARTTLS with a certificate you supply. Put `cert.pem` and `key.pem` in a
 directory, name it in `COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES`, and set
@@ -287,6 +291,20 @@ installation must keep running the exact candidate it tested:
 docker pull ghcr.io/jegr78/courtside:nightly-<yyyymmdd>-<sha7>@sha256:<digest>
 ```
 
+Each nightly run that builds and qualifies a new image retains `nightly-deployment-archive` for 14
+days. Download it from the run's Artifacts section or with an authenticated GitHub CLI:
+
+```sh
+gh run download <run-id> --repo jegr78/courtside \
+  --name nightly-deployment-archive --dir ./nightly-deployment
+(cd ./nightly-deployment && sha256sum --check *.sha256)
+```
+
+The archive version is `<release-core>-nightly.<run-id>`. Its numeric run
+identifier gives `update-check` and `update` an unambiguous order. Install only an archive from a
+successful `main` run. A branch dispatch retains an artifact for workflow testing, but its manifest
+names that branch and the official launcher refuses it.
+
 The registry keeps the seven newest dated nightly tags and their image, signature and attestation
 manifests. With daily changes to `main`, that is a seven-day availability window. A day without a
 new fully verified commit creates no dated image, so the seven retained publications may span
@@ -336,7 +354,7 @@ loopback listener, and Caddy remains the only route to the application:
 
 ```sh
 docker compose up -d
-tailscale funnel --bg https+insecure://127.0.0.1:${COURTSIDE_PORT:-8080}
+tailscale funnel --bg http://127.0.0.1:${COURTSIDE_PORT:-8080}
 ```
 
 Funnel owns the public `*.ts.net` certificate. Caddy does not ask an ACME authority for another

@@ -190,11 +190,44 @@ test("given a release, when its archive is built, then the manifest it carries n
   });
 });
 
+test("given a nightly run, when its archive is built, then the manifest binds the main nightly workflow", () => {
+  // given
+  const nightly = { ...release, version: "0.1.0-nightly.35218587836",
+    ref: "refs/heads/main", workflow: "nightly-image.yml" };
+
+  // when
+  const { manifest } = buildArchive({ deploy, ...nightly });
+
+  // then
+  assert.equal(manifest.signer,
+    "https://github.com/jegr78/courtside/.github/workflows/nightly-image.yml@refs/heads/main");
+});
+
+test("given a branch nightly run, when its manifest is built, then it cannot claim the main identity", () => {
+  // when
+  const { manifest } = buildArchive({ deploy, ...release, version: "0.1.0-nightly.1",
+    ref: "refs/heads/feature", workflow: "nightly-image.yml" });
+
+  // then
+  assert.equal(manifest.signer,
+    "https://github.com/jegr78/courtside/.github/workflows/nightly-image.yml@refs/heads/feature");
+});
+
 test("given an image no digest pins or a short revision, when the archive is built, then it is refused", () => {
   // when / then
   assert.throws(() => buildArchive({ deploy, ...release, image: "ghcr.io/jegr78/courtside:0.1.0" }),
     /digest/);
   assert.throws(() => buildArchive({ deploy, ...release, revision: "0123456" }), /revision/);
+});
+
+test("given an invalid release or nightly identity, when the archive is built, then it is refused", () => {
+  // when / then
+  assert.throws(() => buildArchive({ deploy, ...release, ref: "refs/tags/v0.1.1" }), /exact release tag/);
+  assert.throws(() => buildArchive({ deploy, ...release, version: "0.1.0-nightly.0",
+    ref: "refs/heads/main", workflow: "nightly-image.yml" }), /ordered SemVer/);
+  assert.throws(() => buildArchive({ deploy, ...release, version: "0.1.0-nightly.1",
+    ref: "refs/heads/../main", workflow: "nightly-image.yml" }), /source branch/);
+  assert.throws(() => buildArchive({ deploy, ...release, workflow: "unknown.yml" }), /supported signing workflow/);
 });
 
 test("given the shipped deployment, when its files are read, then none carries a credential", () => {

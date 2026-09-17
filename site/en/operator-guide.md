@@ -51,12 +51,17 @@ An update creates a recovery unit first. It does not promise an automatic databa
 a newer migration has run. Retain the previous release and regularly test recovery against an empty
 PostgreSQL 17 target.
 
+For acceptance testing, each nightly run that builds and qualifies a new image retains
+`nightly-deployment-archive` for 14 days. Download it from a successful `main` run. Its
+`<release-core>-nightly.<run-id>` version gives the launcher an unambiguous order for later
+nightlies. Branch-run artifacts only test the workflow and the official launcher refuses them.
+
 ## Tailscale Funnel
 
 The Funnel recipe publishes only the local Caddy listener:
 
 ```sh
-tailscale funnel --bg https+insecure://127.0.0.1:8080
+tailscale funnel --bg http://127.0.0.1:8080
 ```
 
 `--bg` keeps the service active after the shell session ends. Never point Funnel directly at the

@@ -35,6 +35,7 @@ jobs:
       publish: ${{ steps.selection.outputs.publish }}
       short_sha: ${{ steps.selection.outputs.short_sha }}
       verification_run: ${{ steps.selection.outputs.verification_run }}
+      version: ${{ steps.selection.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -98,6 +99,9 @@ jobs:
           if [[ "$published_revision" = "$commit" ]]; then
             build=false
           fi
+          base_version=$(git show "$commit:frontend/package.json" | jq -r '.version | split("-")[0]')
+          [[ "$base_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          version="$base_version-nightly.${GITHUB_RUN_ID}"
           {
             echo "build=$build"
             echo "commit=$commit"
@@ -105,6 +109,7 @@ jobs:
             echo "publish=$publish"
             echo "short_sha=${commit:0:7}"
             echo "verification_run=$verification_run"
+            echo "version=$version"
           } >> "$GITHUB_OUTPUT"
           {
             echo '## Nightly image selection'
@@ -113,6 +118,7 @@ jobs:
             echo "- Existing nightly revision: \`${published_revision:-none}\`"
             echo "- Build required: \`$build\`"
             echo "- Publication allowed: \`$publish\`"
+            echo "- Deployment archive: \`$version\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   retention-plan:
@@ -209,8 +215,40 @@ jobs:
             org.opencontainers.image.revision=${{ needs.select.outputs.commit }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
-  qualify:
+  archive:
     needs: [select, image]
+    if: needs.select.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.select.outputs.commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+
+      - name: Build the ordered nightly deployment archive
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          VERSION: ${{ needs.select.outputs.version }}
+        run: |
+          mkdir -p build/deployment-archive
+          node tools/deployment-archive.mjs --version "$VERSION" \
+            --revision "${{ needs.select.outputs.commit }}" --image "$IMAGE" \
+            --repository "$GITHUB_REPOSITORY" --workflow nightly-image.yml \
+            --ref "$GITHUB_REF" --output build/deployment-archive
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: nightly-deployment-archive
+          path: build/deployment-archive
+          retention-days: 14
+          if-no-files-found: error
+
+  qualify:
+    needs: [select, image, archive]
     if: needs.select.outputs.build == 'true'
     strategy:
       fail-fast: false
@@ -234,17 +272,18 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
 
-      - name: Build and inspect the candidate deployment archive
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: nightly-deployment-archive
+          path: build/deployment-archive
+
+      - name: Inspect the candidate deployment archive
         env:
           IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          VERSION: ${{ needs.select.outputs.version }}
         run: |
-          mkdir -p build/deployment-archive build/uat-smoke
-          version="nightly-${{ needs.select.outputs.short_sha }}"
-          node tools/deployment-archive.mjs --version "$version" \
-            --revision "${{ needs.select.outputs.commit }}" --image "$IMAGE" \
-            --repository "$GITHUB_REPOSITORY" --ref "refs/tags/v$version" \
-            --output build/deployment-archive
-          archive="$GITHUB_WORKSPACE/build/deployment-archive/courtside-deployment-$version.zip"
+          mkdir -p build/uat-smoke
+          archive="$GITHUB_WORKSPACE/build/deployment-archive/courtside-deployment-$VERSION.zip"
           node tools/deployment-qualification.mjs --inspect-archive \
             --archive "$archive" --destination "$RUNNER_TEMP/courtside-deployment" \
             --image "$IMAGE" --recipes standard,full-self-hosted,existing-infrastructure,funnel \

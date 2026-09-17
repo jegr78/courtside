@@ -7,7 +7,7 @@ the policy boundary in front of the application.
 Install with a `funnel` answer file, then publish the Caddy listener persistently:
 
 ```sh
-tailscale funnel --bg https+insecure://127.0.0.1:8080
+tailscale funnel --bg http://127.0.0.1:8080
 ```
 
 The `--bg` setting survives the terminal session. Record the Funnel configuration alongside the

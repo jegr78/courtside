@@ -221,20 +221,34 @@ function digestOf(content) {
   return createHash("sha256").update(content).digest("hex");
 }
 
-export function manifestOf({ version, revision, image, repository, ref, entries }) {
+export function manifestOf({ version, revision, image, repository, ref, workflow = "release.yml", entries }) {
   if (!/^[0-9a-f]{40}$/.test(revision ?? "")) throw new Error("the archive needs a full source revision");
   if (!/@sha256:[0-9a-f]{64}$/.test(image ?? "")) {
     throw new Error("the archive needs an image a digest pins, not a floating tag");
   }
   if (!/^[\w.+-]+$/.test(version ?? "")) throw new Error("the archive needs a plain version");
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository ?? "")) throw new Error("the archive needs its repository");
-  if (!/^refs\/tags\/[\w.+-]+$/.test(ref ?? "")) throw new Error("the archive needs the release tag");
+  let signer;
+  if (workflow === "release.yml") {
+    if (ref !== `refs/tags/v${version}`) throw new Error("the archive needs its exact release tag");
+    signer = `https://github.com/${repository}/.github/workflows/release.yml@${ref}`;
+  } else if (workflow === "nightly-image.yml") {
+    if (!/^[0-9]+\.[0-9]+\.[0-9]+-nightly\.[1-9][0-9]*$/.test(version)) {
+      throw new Error("the nightly archive needs an ordered SemVer version");
+    }
+    if (!/^refs\/heads\/[A-Za-z0-9._/-]+$/.test(ref ?? "") || ref.includes("..")) {
+      throw new Error("the nightly archive needs its source branch");
+    }
+    signer = `https://github.com/${repository}/.github/workflows/nightly-image.yml@${ref}`;
+  } else {
+    throw new Error("the archive needs a supported signing workflow");
+  }
   return {
     schema: 1,
     version,
     revision,
     image,
-    signer: `https://github.com/${repository}/.github/workflows/release.yml@${ref}`,
+    signer,
     recipes: entries.filter((entry) => entry.path.startsWith("recipes/"))
       .map((entry) => basename(entry.path, ".recipe")),
     files: Object.fromEntries(entries.map((entry) => [entry.path, digestOf(entry.content)])),
@@ -281,10 +295,10 @@ function zipOf(entries) {
   return Buffer.concat([...locals, directory, end]);
 }
 
-export function buildArchive({ deploy, version, revision, image, repository, ref }) {
+export function buildArchive({ deploy, version, revision, image, repository, ref, workflow }) {
   const entries = archiveEntries(deploy);
   refuseSecrets(entries);
-  const manifest = manifestOf({ version, revision, image, repository, ref, entries });
+  const manifest = manifestOf({ version, revision, image, repository, ref, workflow, entries });
   const prefix = `courtside-deployment-${version}`;
   const carried = [...entries, { path: "manifest.json", mode: 0o644,
     content: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8") }]
@@ -312,6 +326,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     image: option("image"),
     repository: option("repository"),
     ref: option("ref"),
+    workflow: process.argv.includes("--workflow") ? option("workflow") : undefined,
   });
   const output = join(option("output"), built.name);
   writeFileSync(output, built.zip);

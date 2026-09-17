@@ -52,12 +52,18 @@ Ein Update erstellt zuerst eine Recovery Unit. Es verspricht kein automatisches 
 falls eine neue Migration bereits gelaufen ist. Bewahre die vorherige Release-Version auf und prüfe
 die Wiederherstellung regelmäßig auf einem leeren PostgreSQL-17-Ziel.
 
+Für Abnahmetests stellt jeder Nightly-Lauf, der ein neues Image baut und qualifiziert, 14 Tage lang
+das Artefakt `nightly-deployment-archive` bereit. Lade es aus einem erfolgreichen Lauf auf `main`.
+Seine Version `<Release-Kern>-nightly.<Lauf-ID>` kann der Launcher eindeutig mit späteren Nightlies
+vergleichen. Artefakte aus Branch-Läufen dienen nur der Workflow-Prüfung und werden vom offiziellen
+Launcher abgewiesen.
+
 ## Tailscale Funnel
 
 Das Funnel-Rezept veröffentlicht ausschließlich den lokalen Caddy-Eingang:
 
 ```sh
-tailscale funnel --bg https+insecure://127.0.0.1:8080
+tailscale funnel --bg http://127.0.0.1:8080
 ```
 
 `--bg` hält den Dienst unabhängig von deiner Shell-Sitzung aktiv. Richte Funnel nie direkt auf den
