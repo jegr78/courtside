@@ -26,7 +26,7 @@ const dockerfile = repositoryFile("Dockerfile");
 const properties = repositoryFile("src/main/resources/application.yaml");
 const compose = repositoryFile("deploy/compose.yaml");
 const caddyfile = repositoryFile("deploy/Caddyfile");
-const readme = repositoryFile("deploy/README.md");
+const readme = [repositoryFile("deploy/README.md"), repositoryFile("deploy/guides/operations.md")].join("\n");
 const productionOverlays = /^x-courtside-production-overlays:\n(?<entries>(?:  - compose[\w.-]+\.yaml\n)+)/m
   .exec(compose)?.groups.entries.match(/compose[\w.-]+\.yaml/g) ?? [];
 const pom = repositoryFile("pom.xml");

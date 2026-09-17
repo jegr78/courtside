@@ -17,7 +17,8 @@ export default defineConfig({
       themeConfig: {
         nav: [{ text: "Start", link: "/" },
           { text: "Für Mitglieder", link: "/member-guide" },
-          { text: "Für Vorstände", link: "/board-guide" }],
+          { text: "Für Vorstände", link: "/board-guide" },
+          { text: "Betrieb", link: "/operator-guide" }],
         socialLinks: [{ icon: "github", link: repository }],
         footer: {
           message: "AGPL-3.0",
@@ -36,7 +37,8 @@ export default defineConfig({
       themeConfig: {
         nav: [{ text: "Start", link: "/en/" },
           { text: "For members", link: "/en/member-guide" },
-          { text: "For boards", link: "/en/board-guide" }],
+          { text: "For boards", link: "/en/board-guide" },
+          { text: "Operations", link: "/en/operator-guide" }],
         socialLinks: [{ icon: "github", link: repository }],
         footer: {
           message: "AGPL-3.0",

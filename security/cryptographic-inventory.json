@@ -776,6 +776,7 @@
         "deploy/compose.stalwart.yaml",
         "deploy/courtside",
         "deploy/mail-check.sh",
+        "tools/deployment-qualification.mjs",
         "tools/deployment-archive.test.mjs",
         "tools/deployment-recipes.test.mjs",
         "tools/mail-check.test.mjs"

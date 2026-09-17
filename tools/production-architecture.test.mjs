@@ -42,7 +42,8 @@ const openapi = YAML.parse(readFileSync(new URL(
   "../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
 const applicationConfigurations = productionApplicationConfigurations();
 const caddy = readFileSync(new URL("../deploy/Caddyfile", import.meta.url), "utf8");
-const deploymentDocumentation = readFileSync(new URL("../deploy/README.md", import.meta.url), "utf8");
+const deploymentDocumentation = ["../deploy/README.md", "../deploy/guides/operations.md"]
+  .map((path) => readFileSync(new URL(path, import.meta.url), "utf8")).join("\n");
 const mailPlan = readFileSync(new URL("../deploy/mail/base.ndjson", import.meta.url), "utf8")
   .split("\n").filter((line) => line.trim()).map((line) => JSON.parse(line));
 

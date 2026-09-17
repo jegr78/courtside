@@ -60,7 +60,7 @@ class ReferenceDeploymentDocumentationTest {
     void whenReadingCompose_thenEveryVariableItReadsIsInTheOperatorDocumentation() throws IOException {
         // given
         List<String> variables = variablesReadByCompose();
-        String readme = Files.readString(Path.of("deploy/README.md"));
+        String readme = operatorDocumentation();
 
         // when / then
         assertThat(variables)
@@ -108,9 +108,9 @@ class ReferenceDeploymentDocumentationTest {
     }
 
     private static List<String> dnsTableRecordColumn() throws IOException {
-        List<String> lines = Files.readAllLines(Path.of("deploy/README.md"));
+        List<String> lines = Files.readAllLines(Path.of("deploy/guides/operations.md"));
         int header = lines.indexOf("| Record | Where | Why |");
-        assertThat(header).as("deploy/README.md holds a table of the records DNS has to publish")
+        assertThat(header).as("the operations guide holds a table of the records DNS has to publish")
                 .isNotNegative();
         List<String> column = new ArrayList<>();
         for (String line : lines.subList(header + 2, lines.size())) {
@@ -121,6 +121,11 @@ class ReferenceDeploymentDocumentationTest {
         }
         assertThat(column).as("the table of published records has rows").isNotEmpty();
         return column;
+    }
+
+    private static String operatorDocumentation() throws IOException {
+        return Files.readString(Path.of("deploy/README.md"))
+                + Files.readString(Path.of("deploy/guides/operations.md"));
     }
 
     private static List<String> publishedPortsOf(String service) throws IOException {

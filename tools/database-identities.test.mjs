@@ -13,7 +13,7 @@ function source(path) {
 
 const base = source("../deploy/compose.yaml");
 const identities = source("../deploy/compose.database-identities.yaml");
-const documentation = source("../deploy/README.md");
+const documentation = [source("../deploy/README.md"), source("../deploy/guides/operations.md")].join("\n");
 const baseCompose = YAML.parse(base);
 const identityCompose = YAML.parse(identities.replaceAll("!reset null", "null"));
 const networkNames = (networks) => Array.isArray(networks) ? networks : Object.keys(networks ?? {});

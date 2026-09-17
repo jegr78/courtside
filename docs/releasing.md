@@ -40,6 +40,30 @@ and qualifies the real multi-architecture candidate from the selected branch hea
 publish or apply retention. Its evidence counts only while its commit equals the current pull-request
 head; a commit or rebase makes the earlier dispatch obsolete.
 
+For an additional private Linux target, stage the candidate archive and an `answers.conf` in a new
+mode-0700 directory whose final path segment is a unique `courtside-*` namespace. Then run the
+generic acceptance client with the remote paths, the expected identities and its exact confirmation
+phrase:
+
+```sh
+node tools/deployment-acceptance-ssh.mjs \
+  --host qualification-box \
+  --archive /srv/courtside-acceptance/archive.zip \
+  --archive-sha256 <archive-sha256> \
+  --revision <40-character-revision> \
+  --image ghcr.io/jegr78/courtside@sha256:<image-digest> \
+  --namespace courtside-acceptance-standard \
+  --remote-root /srv/courtside-acceptance-standard \
+  --recipe standard \
+  --confirm 'qualify courtside-acceptance-standard at /srv/courtside-acceptance-standard'
+```
+
+The remote root and `answers.conf` must be owned by the SSH account with modes 0700 and 0600. The
+client refuses any other initial entry or a reused installation, snapshots the archive below that
+private root, verifies its identity and member paths before extraction and never installs packages,
+changes the firewall or prunes Docker globally. It leaves the installation running for inspection;
+removal remains an explicit operator action through the installed lifecycle CLI.
+
 This does not replace the release gate. A release stamps its version, runs its complete build,
 active assessment, upgrade and restore checks, and publishes a different digest under versioned
 tags. The nightly image is an acceptance artifact for the current code. The release workflow still
@@ -182,7 +206,8 @@ Permission failures and malformed evidence still stop the build.
 | `build` | Dependency-remediation deadlines hold, the version is stamped, backend, frontend, tooling and artifact tests pass on the tagged commit, CodeQL analyses the sources, npm audit evidence is captured, and the release-build security policy holds |
 | `browser` | The packaged tagged source passes the complete Chromium and WebKit browser matrix; it runs beside `build` so browser duration cannot consume the security-analysis budget |
 | `image` | One multi-architecture image is built and pushed as `release-candidate-<sha>` |
-| `qualify` | That exact digest is brought up through the reference deployment on `amd64` and `arm64`, and its vulnerabilities are checked against the candidate-image policy |
+| `qualify` | The exact deployment archive is checked against that digest and all four recipes, then the digest is brought up through the reference deployment on `amd64` and `arm64` and checked against the candidate-image policy |
+| `mail` | The archive's self-hosted-mail recipe is bound to the candidate digest and exercised against controlled DNS, TLS and SMTP peers |
 | `active-security` | The running candidate is exercised by the scanners of the `active` profile. The `destructive` profile, resource abuse, does not run here |
 | `upgrade` | The database upgrade path from each resolved origin is executed against the candidate |
 | `restore` | A backup taken from the candidate is restored into it |
@@ -198,11 +223,17 @@ its checksum. `archive` builds those bytes once and `publish` attaches the artif
 what a club unpacks is what was attested. Before anything reaches the registry, `publish` builds
 the archive again from the tagged tree and requires the same bytes. The contents are derived rather
 than listed by hand: every Compose file the shipped resolver can emit, every file those Compose
-files name, the recipes, the configuration example, the deployment guide and the container
+files name, the recipes, the configuration example, the recipe and operations guides and the container
 contract, together with the standalone Bash lifecycle launcher. `tools/deployment-archive.test.mjs`
 unpacks the archive into an empty directory and renders every recipe with every overlay from there,
 which fails if anything they bind lives only in this repository or if the launcher loses its
 executable mode.
+
+Both architecture jobs download the archive built by `archive`; they do not reconstruct its
+deployment files from the checkout. They verify its complete checksum inventory and require its
+manifest to name the candidate digest and every supported recipe. The retained image-qualification
+artifact carries that archive identity beside the runtime result. The mail job performs the same
+binding before its controlled Stalwart journey. `publish` waits for both.
 
 ## When a release fails
 

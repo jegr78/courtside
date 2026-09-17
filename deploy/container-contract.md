@@ -21,14 +21,14 @@ define.
 
 - `ghcr.io/jegr78/courtside@sha256:<digest>`. The reference recipes require the digest from their
   release archive. Check its signature before you run it, as
-  [Verifying what you are about to run](README.md#verifying-what-you-are-about-to-run) describes.
+  [Verifying what you are about to run](guides/operations.md#verifying-what-you-are-about-to-run) describes.
 - The process runs as UID 10001 and GID 10001. It needs no root and no Linux capability. The
   reference deployment drops every capability and sets `no-new-privileges`.
 - It runs on a read-only root filesystem. The only writable path it needs is `/tmp`, which the
   reference deployment mounts as a tmpfs.
 - It listens on port 8080. `COURTSIDE_APP_TLS_MODE` is `plaintext` by default. Set it to `serve`
   with `COURTSIDE_APP_TLS_CERTIFICATE` and `COURTSIDE_APP_TLS_KEY` to serve TLS on the same port, as
-  [Encrypting the connection between the proxy and the application](README.md#encrypting-the-connection-between-the-proxy-and-the-application)
+  [Encrypting the connection between the proxy and the application](guides/operations.md#encrypting-the-connection-between-the-proxy-and-the-application)
   describes.
 - The Java heap takes at most 75 percent of the container's memory limit, so set a limit. The
   reference deployment sets 1 GiB. The process exits on an `OutOfMemoryError` instead of running
@@ -83,7 +83,7 @@ The application connects with `SPRING_DATASOURCE_URL`, a `jdbc:postgresql://host
 address. `COURTSIDE_DB_TLS_MODE` is `prefer` by default. `verify-full` requires a certificate
 issued for the host name in that address, signed by the authority in the PEM file
 `COURTSIDE_DB_TLS_ROOT_CERTIFICATE` names, as
-[Encrypting the connection to the database](README.md#encrypting-the-connection-to-the-database)
+[Encrypting the connection to the database](guides/operations.md#encrypting-the-connection-to-the-database)
 describes. With `verify-full`, an address that carries an `ssl…` or `gssenc…` argument or `service`,
 such as the `?sslmode=require` a managed service often hands out, refuses to start, because that
 argument would decide the transport instead.
@@ -111,7 +111,7 @@ stop the rollout.
    `COURTSIDE_DB_OWNER_PASSWORD_FILE`. That role owns the database and may create roles; it does
    not have to be a superuser. For a migration or runtime role that already exists and that the
    owner did not create, it needs more, as
-   [Separating database identities](README.md#separating-database-identities) lists. Setup creates
+   [Separating database identities](guides/operations.md#separating-database-identities) lists. Setup creates
    or reconciles the roles `COURTSIDE_DB_MIGRATION_USERNAME` and `COURTSIDE_DB_RUNTIME_USERNAME`
    with the passwords in `COURTSIDE_DB_MIGRATION_PASSWORD_FILE` and
    `COURTSIDE_DB_RUNTIME_PASSWORD_FILE`, installs the extension, gives the runtime role its
@@ -127,11 +127,11 @@ stop the rollout.
    `service` in the address.
 
 All three processes read `SPRING_DATASOURCE_URL`, `COURTSIDE_DB_TLS_MODE` and
-`COURTSIDE_DB_TLS_ROOT_CERTIFICATE`. [Separating database identities](README.md#separating-database-identities)
+`COURTSIDE_DB_TLS_ROOT_CERTIFICATE`. [Separating database identities](guides/operations.md#separating-database-identities)
 describes what each role may do.
 
 Either way, a new version migrates the schema forward, and a version may be skipped. Create and
-verify a complete recovery unit first, as [Upgrading](README.md#upgrading) describes. Unless release
+verify a complete recovery unit first, as [Upgrading](guides/operations.md#upgrading) describes. Unless release
 notes explicitly declare backward schema compatibility, rollback restores that unit; it never
 starts the older image against the migrated database.
 
@@ -167,7 +167,7 @@ It does not contact the relay at startup. It sends through
 offers TLS from the first byte, usually on port 465, cannot be used. Set `COURTSIDE_MAIL_USERNAME`
 and `COURTSIDE_MAIL_PASSWORD` together or not at all. `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE`
 turns off checking the relay's certificate. Leave it `false` unless the
-[environment variables](README.md#environment-variables) table says otherwise for your relay.
+[environment variables](guides/operations.md#environment-variables) table says otherwise for your relay.
 
 ## Required input and refusals
 
@@ -232,7 +232,7 @@ variables with other names:
 
 The three `COURTSIDE_DB_*_PASSWORD_FILE` variables keep their names but not their meaning: in `.env`
 they name a file on the host, in the container the path it is mounted at. The
-[environment variables](README.md#environment-variables) table describes each variable from the
+[environment variables](guides/operations.md#environment-variables) table describes each variable from the
 `.env` side, except `COURTSIDE_DB_IDENTITY_MODE`, `COURTSIDE_MAIL_FROM`, `COURTSIDE_MAIL_USERNAME` and
 `COURTSIDE_PASSWORD_BREACH_ENDPOINT`, which this page describes.
 

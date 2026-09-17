@@ -199,9 +199,9 @@
           "negativeBoundaries": "Read-only filesystem, non-root execution, TLS, cookie and management-isolation checks cannot be bypassed.",
           "level": "Deployment smoke, release qualification", "frequency": ["release"],
           "environment": "Reference Compose topology", "syntheticData": "Production-shaped synthetic club",
-          "evidenceType": "Image-digest qualification report", "owner": "Operations and release",
-          "openGap": "Exact-image qualification is tracked by #219.",
-          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+          "evidenceType": "Archive- and image-digest qualification report on both architectures", "owner": "Operations and release",
+          "openGap": "The public network and host remain operator-owned and are reported separately from software results.",
+          "lastReviewedOn": "2026-09-17", "nextReviewOn": "2026-12-16"
         },
         {
           "id": "OP-2", "impact": "P0", "likelihood": "Medium",
@@ -211,7 +211,7 @@
           "level": "CLI contract, release qualification", "frequency": ["PR", "release"],
           "environment": "PostgreSQL 17 and candidate image", "syntheticData": "Version-owned synthetic dataset",
           "evidenceType": "CLI state-transition tests, migration logs and invariant checksums", "owner": "Database and release",
-          "openGap": "Upgrade harness is tracked by #220.",
+          "openGap": "No downgrade is promised after a newer schema has run; recovery uses the pre-update recovery unit.",
           "lastReviewedOn": "2026-09-17", "nextReviewOn": "2026-12-16"
         },
         {
@@ -222,7 +222,7 @@
           "level": "CLI contract, release qualification", "frequency": ["PR", "periodic", "release"],
           "environment": "Fresh PostgreSQL 17", "syntheticData": "API-written and legacy-schema synthetic datasets, including an outstanding event publication",
           "evidenceType": "CLI recovery-unit checks, before-and-after table and sequence evidence, backup sizes, image ID and schema version", "owner": "Operations",
-          "openGap": "The relay is stopped before a second API booking so the backup contains an application-written outstanding Modulith publication.",
+          "openGap": "The relay is stopped before a second API booking so the backup contains an application-written outstanding Modulith publication; remote storage remains operator-owned.",
           "lastReviewedOn": "2026-09-17", "nextReviewOn": "2026-12-16"
         },
         {
