@@ -89,6 +89,8 @@
     { "path": "tools/prerelease-changelog.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/prerelease-changelog.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/production-architecture.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/published-release-tags.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/published-release-tags.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/pwa-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/quality-strategy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/risk-register.mjs", "profiles": ["full"], "test": false },

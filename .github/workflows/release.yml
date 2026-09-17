@@ -251,9 +251,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          releases=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" --slurp \
-            --jq 'map(.[]) | map({tag_name, draft})')
-          tags=$(node tools/courtside.upgrade-smoke.mjs --published-tags "$releases")
+          tags=$(node tools/published-release-tags.mjs)
           echo "tags=$tags" >> "$GITHUB_OUTPUT"
 
       - name: Collect cumulative release-line notes
