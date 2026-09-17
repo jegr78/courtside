@@ -25,16 +25,24 @@ function fileInventory(root, relative = "") {
     }));
 }
 
-function fixture(use) {
+function writeRecoveryChecksums(root) {
+  const inventory = fileInventory(root);
+  delete inventory.SHA256SUMS;
+  writeFileSync(join(root, "SHA256SUMS"), `${Object.entries(inventory)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([path, hash]) => `${hash}  ${path}`).join("\n")}\n`, { mode: 0o600 });
+}
+
+function fixture(use, releaseVersion = "0.1.0") {
   const root = mkdtempSync(join(tmpdir(), "courtside-cli-"));
-  const archive = join(root, "courtside-deployment-0.1.0");
+  const archive = join(root, `courtside-deployment-${releaseVersion}`);
   cpSync(deploy, archive, { recursive: true });
   writeFileSync(join(archive, "manifest.json"), `${JSON.stringify({
     schema: 1,
-    version: "0.1.0",
+    version: releaseVersion,
     revision,
     image: `ghcr.io/jegr78/courtside@sha256:${digest}`,
-    signer: "https://github.com/jegr78/courtside/.github/workflows/release.yml@refs/tags/v0.1.0",
+    signer: `https://github.com/jegr78/courtside/.github/workflows/release.yml@refs/tags/v${releaseVersion}`,
     recipes: ["existing-infrastructure", "full-self-hosted", "funnel", "standard"],
     files: fileInventory(archive),
   }, null, 2)}\n`);
@@ -45,11 +53,69 @@ function fixture(use) {
 if [ "$1 $2" = "compose version" ]; then echo 'Docker Compose version v2.33.1'; exit 0; fi
 if [ "$1" = "info" ]; then printf '%s\\n' "\${FAKE_DOCKER_SECURITY:-[]}"; exit 0; fi
 printf '%s\\n' "$*" >> "${dockerLog}"
+previous=''
+for argument in "$@"; do
+  if [ "$previous" = '--env-file' ] && [ -f "$argument" ]; then
+    sed -n 's/^COURTSIDE_RECOVERY_IMAGE_//p' "$argument" | sed 's/^/recovery-image=/' >> "${dockerLog}"
+  fi
+  previous=$argument
+done
+if [ -f "${join(root, "docker-fail-match")}" ]; then
+  failure=$(cat "${join(root, "docker-fail-match")}")
+  case "$*" in *"$failure"*) exit 9 ;; esac
+fi
+case "$*" in
+  *' config --hash '*)
+    if [ -f "${join(root, "docker-mutate-adoption-source")}" ]; then
+      source=$(cat "${join(root, "docker-mutate-adoption-source")}")
+      printf '%s\n' 'COURTSIDE_MAIL_REPLY_TO="changed@example.org"' >> "$source"
+      rm -f "${join(root, "docker-mutate-adoption-source")}"
+    fi
+    ;;
+esac
 [ "\${COURTSIDE_IMAGE_DIGEST+x}" != x ] || printf '%s\\n' 'leaked COURTSIDE_IMAGE_DIGEST' >> "${dockerLog}"
 [ "\${POSTGRES_PASSWORD+x}" != x ] || printf '%s\\n' 'leaked POSTGRES_PASSWORD' >> "${dockerLog}"
 case "$*" in
+  *' pg_dump '*) printf '%s\\n' 'PGDMP courtside fixture' ;;
+  *' pg_restore --list'*) cat >/dev/null ;;
+  *"select count(*) from pg_tables where schemaname = 'public'"*) printf '%s\\n' '0' ;;
+  *' tar -C /source -cf - .'*) printf '%s\\n' 'TAR courtside fixture' ;;
+  *'compose ls --format json') [ ! -f "${join(root, "docker-compose-list")}" ] || cat "${join(root, "docker-compose-list")}" ;;
+  *'volume ls --filter label=com.docker.compose.project='*) [ ! -f "${join(root, "docker-volumes")}" ] || cat "${join(root, "docker-volumes")}" ;;
+  *'volume inspect '*'--format'*) if [ -f "${join(root, "docker-volume-labels")}" ]; then cat "${join(root, "docker-volume-labels")}"; else printf '%s\n' 'example-club|db'; fi ;;
+  *'volume inspect '*) [ -f "${join(root, "docker-volume-exists")}" ] && exit 0 || exit 1 ;;
+  *'network ls --filter label=com.docker.compose.project='*) printf '%s\n' 'example-club_default' ;;
+  *'network inspect '*'--format'*) printf '%s\n' 'example-club|default' ;;
+  *'ps -a --filter label=com.docker.compose.project='*'{{.Label "com.docker.compose.service"}}|{{.Image}}'*) if [ -f "${join(root, "docker-adoption-containers")}" ]; then cat "${join(root, "docker-adoption-containers")}"; else printf '%s\n' 'app|ghcr.io/jegr78/courtside@sha256:${digest}' 'db|postgres:17-alpine' 'proxy|caddy:2'; fi ;;
+  *'ps -a --filter label=com.docker.compose.project='*'com.docker.compose.config-hash'*) printf '%s\n' 'app hash-app' 'db hash-db' 'proxy hash-proxy' ;;
+  *'ps -a --filter label=com.docker.compose.project='*'{{.Label "com.docker.compose.service"}}'*) if [ -f "${join(root, "docker-adoption-services")}" ]; then cat "${join(root, "docker-adoption-services")}"; else printf '%s\n' 'app' 'db' 'proxy'; fi ;;
+  *' config --services') if [ -f "${join(root, "docker-expected-services")}" ]; then cat "${join(root, "docker-expected-services")}"; else printf '%s\n' 'app' 'db' 'proxy'; fi ;;
+  *' config --hash *') printf '%s\n' 'app hash-app' 'db hash-db' 'proxy hash-proxy' ;;
+  *' config --volumes') printf '%s\n' 'db' ;;
+  *' config --networks') printf '%s\n' 'default' ;;
+  *' ps -a --format json') printf '%s\\n' '[]' ;;
+  *' port app 8080') printf '%s\\n' '127.0.0.1:49152' ;;
   *' ps --format json') printf '%s\\n' '[{"Service":"app","State":"running","Health":"healthy"},{"Service":"mail","State":"running","Health":"healthy"}]' ;;
   *' ps --format {{.Service}}='*) printf '%s\\n' 'app=healthy' 'mail=healthy' ;;
+esac
+`, { mode: 0o755 });
+  writeFileSync(join(bin, "curl"), `#!/bin/sh
+printf '%s\\n' "$*" >> "${join(root, "curl.log")}"
+[ "\${HTTP_PROXY+x}" != x ] || printf '%s\\n' 'leaked HTTP_PROXY' >> "${join(root, "curl.log")}"
+[ "\${HTTPS_PROXY+x}" != x ] || printf '%s\\n' 'leaked HTTPS_PROXY' >> "${join(root, "curl.log")}"
+[ "\${ALL_PROXY+x}" != x ] || printf '%s\\n' 'leaked ALL_PROXY' >> "${join(root, "curl.log")}"
+[ "\${CURL_HOME+x}" != x ] || printf '%s\\n' 'leaked CURL_HOME' >> "${join(root, "curl.log")}"
+[ "\${HOME+x}" != x ] || printf '%s\\n' 'leaked HOME' >> "${join(root, "curl.log")}"
+previous=''
+for argument in "$@"; do
+  if [ "$previous" = '-c' ]; then
+    printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' '127.0.0.1' 'FALSE' '/' 'FALSE' '0' 'XSRF-TOKEN' 'restore-xsrf' > "$argument"
+  fi
+  previous=$argument
+done
+case "$*" in
+  *'/api/session'*) printf '%s\\n' '{"authenticated":true}' ;;
+  *'/api/public/courts'*) printf '%s\\n' '[{"id":"court-1"}]' ;;
 esac
 `, { mode: 0o755 });
   const environment = {
@@ -62,6 +128,21 @@ esac
     spawnSync("chmod", ["-R", "u+w", root]);
     rmSync(root, { recursive: true, force: true });
   }
+}
+
+function releaseArchive(root, version, imageDigest = "b".repeat(64)) {
+  const archive = join(root, `candidate-release-${version}`);
+  cpSync(deploy, archive, { recursive: true });
+  writeFileSync(join(archive, "manifest.json"), `${JSON.stringify({
+    schema: 1,
+    version,
+    revision: "fedcba9876543210fedcba9876543210fedcba98",
+    image: `ghcr.io/jegr78/courtside@sha256:${imageDigest}`,
+    signer: `https://github.com/jegr78/courtside/.github/workflows/release.yml@refs/tags/v${version}`,
+    recipes: ["existing-infrastructure", "full-self-hosted", "funnel", "standard"],
+    files: fileInventory(archive),
+  }, null, 2)}\n`);
+  return archive;
 }
 
 function answers(root, changes = {}) {
@@ -134,6 +215,21 @@ test("given a release archive, when init is confirmed, then it publishes one pri
     assert.equal(statSync(join(context.target, "secrets", "bootstrap-admin-password")).mode & 0o777, 0o600);
     assert.doesNotMatch(result.stdout + result.stderr, /POSTGRES_PASSWORD|BOOTSTRAP_ADMIN_PASSWORD|[0-9a-f]{48}/);
     assert.deepEqual(readdirSync(join(context.target, "releases")).filter((name) => name.includes("partial")), []);
+  });
+});
+
+test("given a nonempty unmarked directory, when init starts, then it preserves and refuses foreign state", () => {
+  fixture((context) => {
+    mkdirSync(context.target);
+    const sentinel = join(context.target, "..operator-owned.txt");
+    writeFileSync(sentinel, "keep\n");
+
+    const result = initialize(context);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /not an empty or recognized Courtside root/);
+    assert.equal(readFileSync(sentinel, "utf8"), "keep\n");
+    assert.ok(!existsSync(join(context.target, "config")));
   });
 });
 
@@ -557,6 +653,7 @@ test("given a replaced bootstrap password, when finalization is confirmed, then 
 
     // when
     const refused = run(context.archive, context.target, ["finalize-bootstrap"], context.environment);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
     const result = run(context.archive, context.target, ["finalize-bootstrap", "--yes"], context.environment);
 
     // then
@@ -588,6 +685,733 @@ test("given an installed instance, when uninstall keeps data, then no volume or 
     assert.ok(existsSync(join(context.target, "config", ".env")));
     assert.ok(existsSync(join(context.target, "backups")));
   });
+});
+
+test("given an installed instance, when backup succeeds, then one private verified recovery unit is published", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    writeFileSync(join(context.target, "config", "local.override.yaml"), "services: {}\n");
+
+    // when
+    const result = run(context.archive, context.target, ["backup", "--retain", "2"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const units = readdirSync(join(context.target, "backups"));
+    assert.equal(units.length, 1);
+    const recovery = join(context.target, "backups", units[0]);
+    assert.equal(statSync(recovery).mode & 0o777, 0o700);
+    assert.ok(existsSync(join(recovery, "database.dump")));
+    assert.ok(existsSync(join(recovery, "configuration", "installation.conf")));
+    assert.ok(existsSync(join(recovery, "configuration", ".env")));
+    assert.ok(existsSync(join(recovery, "configuration", "local.override.yaml")));
+    assert.ok(existsSync(join(recovery, "release", "manifest.json")));
+    assert.ok(existsSync(join(recovery, "SHA256SUMS")));
+    assert.match(readFileSync(join(recovery, "recovery.conf"), "utf8"), /^schema=1$/m);
+    assert.match(readFileSync(join(recovery, "recovery.conf"), "utf8"), /^release=0\.1\.0$/m);
+    assert.match(readFileSync(context.dockerLog, "utf8"), /pg_dump/);
+    assert.match(readFileSync(context.dockerLog, "utf8"), /pg_restore --list/);
+    assert.doesNotMatch(result.stdout + result.stderr, /POSTGRES_PASSWORD|member-private-value/);
+  });
+});
+
+test("given self-hosted mail, when backup runs, then both Stalwart stores share one controlled interruption", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+
+    // when
+    const result = run(context.archive, context.target, ["backup"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    assert.ok(existsSync(join(recovery, "mail-config.tar")));
+    assert.ok(existsSync(join(recovery, "mail-data.tar")));
+    assert.match(readFileSync(join(context.target, "config", ".env"), "utf8"),
+      /^COURTSIDE_MAIL_PASSWORD="[0-9a-f]{48}"$/m);
+    const invocations = readFileSync(context.dockerLog, "utf8");
+    assert.match(invocations, / stop mail[\s\S]*mail-config[\s\S]*mail-data[\s\S]* up -d --wait mail/);
+  });
+});
+
+test("given an interrupted mail backup marker, when the next managed command runs, then Stalwart is recovered", () => {
+  fixture((context) => {
+    assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+    const marker = join(context.target, ".courtside-mail-backup-interrupted");
+    writeFileSync(marker, "schema=1\n", { mode: 0o600 });
+    rmSync(context.dockerLog, { force: true });
+
+    const result = run(context.archive, context.target, ["status"], context.environment);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(!existsSync(marker));
+    assert.match(readFileSync(context.dockerLog, "utf8"), / up -d --wait mail/);
+  });
+});
+
+test("given external secret recovery and retention, when backups repeat, then secrets and foreign targets stay untouched", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recovery_material: "external-verified" }).status, 0);
+    const sentinel = join(context.target, "backups", "operator-note");
+    writeFileSync(sentinel, "keep\n");
+
+    // when
+    const first = run(context.archive, context.target, ["backup", "--retain", "1"], context.environment);
+    const second = run(context.archive, context.target, ["backup", "--retain", "1"], context.environment);
+
+    // then
+    assert.equal(first.status, 0, first.stderr);
+    assert.equal(second.status, 0, second.stderr);
+    const units = readdirSync(join(context.target, "backups")).filter((name) => name.startsWith("recovery-"));
+    assert.equal(units.length, 1);
+    const recovery = join(context.target, "backups", units[0]);
+    assert.ok(!existsSync(join(recovery, "configuration", ".env")));
+    assert.deepEqual(readdirSync(join(recovery, "secrets")), []);
+    assert.equal(readFileSync(sentinel, "utf8"), "keep\n");
+  });
+});
+
+test("given a custom image installation, when backup and restore-check run, then they use that exact image", () => {
+  fixture((context) => {
+    const customDigest = "c".repeat(64);
+    const customImage = `registry.example.org/club/courtside@sha256:${customDigest}`;
+    assert.equal(initialize(context, {
+      overlays: "custom-image",
+      custom_image_repository: "registry.example.org/club/courtside",
+      custom_image_digest: customDigest,
+    }).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    rmSync(context.dockerLog, { force: true });
+
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment,
+      COURTSIDE_RESTORE_USERNAME: "doe.jane",
+      COURTSIDE_RESTORE_PASSWORD: "restore-private-value",
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(readFileSync(join(recovery, "recovery.conf"), "utf8")
+      .includes(`image=${customImage}\nimage_trust=custom\n`));
+    assert.match(readFileSync(context.dockerLog, "utf8"), new RegExp(customDigest));
+  });
+});
+
+test("given a backup command owns the installation lock, when another lifecycle command starts, then it does nothing", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    mkdirSync(join(context.target, ".courtside.lock"));
+    writeFileSync(join(context.target, ".courtside.lock", "owner"), `${process.pid}\n`);
+
+    // when
+    const backup = run(context.archive, context.target, ["backup"], context.environment);
+    const update = run(context.archive, context.target,
+      ["update", "--archive", releaseArchive(context.root, "0.1.1"), "--yes"], context.environment);
+
+    // then
+    assert.equal(backup.status, 2);
+    assert.equal(update.status, 2);
+    assert.match(backup.stderr + update.stderr, /another Courtside command holds/);
+    assert.ok(!existsSync(context.dockerLog));
+  });
+});
+
+test("given a recovery unit, when restore-check runs, then it uses an empty PostgreSQL 17 target and probes restored behavior", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment,
+      COURTSIDE_RESTORE_USERNAME: "doe.jane",
+      COURTSIDE_RESTORE_PASSWORD: "restore-private-value",
+      HTTP_PROXY: "http://attacker.invalid:8080",
+      HTTPS_PROXY: "http://attacker.invalid:8080",
+      ALL_PROXY: "socks5://attacker.invalid:1080",
+      CURL_HOME: join(context.root, "hostile-curl-home"),
+      HOME: join(context.root, "hostile-home"),
+    });
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const invocations = readFileSync(context.dockerLog, "utf8");
+    assert.match(invocations, /ps -a --format json/);
+    assert.match(readFileSync(join(recovery, "release", "compose.recovery-check.yaml"), "utf8"),
+      /postgres:17-alpine@sha256:/);
+    assert.match(invocations, /pg_restore .*--exit-on-error/);
+    assert.match(invocations, / up -d --wait app/);
+    const curlLog = readFileSync(join(context.root, "curl.log"), "utf8");
+    assert.match(curlLog, /-q --noproxy \*.*api\/session[\s\S]*api\/public\/courts/);
+    assert.doesNotMatch(curlLog, /leaked/);
+    assert.doesNotMatch(result.stdout + result.stderr, /restore-private-value/);
+  });
+});
+
+test("given a colliding restore volume, when restore-check starts, then it refuses without deleting it", () => {
+  fixture((context) => {
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "docker-volume-exists"), "yes\n");
+    rmSync(context.dockerLog, { force: true });
+
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment,
+      COURTSIDE_RESTORE_USERNAME: "doe.jane",
+      COURTSIDE_RESTORE_PASSWORD: "restore-private-value",
+    });
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /already has a database volume/);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), / up | down /);
+    assert.ok(existsSync(join(context.root, "docker-volume-exists")));
+  });
+});
+
+test("given self-consistent modified backup code, when restore-check runs, then only the trusted installed release executes", () => {
+  fixture((context) => {
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    const copiedModel = join(recovery, "release", "compose.recovery-check.yaml");
+    chmodSync(copiedModel, 0o600);
+    writeFileSync(copiedModel, "services: {}\n");
+    writeRecoveryChecksums(recovery);
+    rmSync(context.dockerLog, { force: true });
+
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment,
+      COURTSIDE_RESTORE_USERNAME: "doe.jane",
+      COURTSIDE_RESTORE_PASSWORD: "restore-private-value",
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    const invocations = readFileSync(context.dockerLog, "utf8");
+    assert.doesNotMatch(invocations, new RegExp(recovery.replaceAll("/", "\\/")));
+    assert.match(invocations, new RegExp(join(context.target, "releases", "0.1.0").replaceAll("/", "\\/")));
+  });
+});
+
+test("given restore failure after target creation, when restore-check exits, then it removes the isolated target", () => {
+  fixture((context) => {
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(context.root, "docker-fail-match"), "pg_restore --clean");
+    rmSync(context.dockerLog, { force: true });
+
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment,
+      COURTSIDE_RESTORE_USERNAME: "doe.jane",
+      COURTSIDE_RESTORE_PASSWORD: "restore-private-value",
+    });
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /could not be restored transactionally/);
+    assert.match(readFileSync(context.dockerLog, "utf8"), / down --volumes --remove-orphans/);
+  });
+});
+
+test("given a corrupt recovery unit, when restore-check starts, then it refuses before creating a target", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    assert.equal(run(context.archive, context.target, ["backup"], context.environment).status, 0);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    writeFileSync(join(recovery, "database.dump"), "changed\n");
+    rmSync(context.dockerLog, { force: true });
+
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment,
+      COURTSIDE_RESTORE_USERNAME: "doe.jane",
+      COURTSIDE_RESTORE_PASSWORD: "restore-private-value",
+    });
+
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /recovery checksum/);
+    assert.ok(!existsSync(context.dockerLog));
+  });
+});
+
+test("given a newer exact release, when update becomes healthy, then it selects only that verified release", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+
+    // when
+    const result = run(context.archive, context.target,
+      ["update", "--archive", next, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(realpathSync(join(context.target, "current")),
+      realpathSync(join(context.target, "releases", "0.1.1")));
+    assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.1$/m);
+    assert.match(readFileSync(join(context.target, "config", ".env"), "utf8"),
+      new RegExp(`^COURTSIDE_IMAGE_DIGEST="${"b".repeat(64)}"$`, "m"));
+    assert.equal(readdirSync(join(context.target, "backups")).length, 1);
+    const invocations = readFileSync(context.dockerLog, "utf8");
+    assert.match(invocations, /image pull ghcr\.io\/jegr78\/courtside@sha256:/);
+    assert.match(invocations, / stop app/);
+    assert.match(invocations, / up -d --wait/);
+  });
+});
+
+test("given update pull or health failure, when update runs, then it reports the recoverable state without database rollback", () => {
+  for (const [failure, expectedRelease] of [["image pull", "0.1.0"], ["up -d --wait", "0.1.1"]]) {
+    fixture((context) => {
+      // given
+      assert.equal(initialize(context).status, 0);
+      const next = releaseArchive(context.root, "0.1.1");
+      writeFileSync(join(context.root, "docker-fail-match"), failure);
+
+      // when
+      const result = run(context.archive, context.target, ["update", "--archive", next, "--yes"],
+        context.environment);
+
+      // then
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /recovery unit/);
+      assert.match(result.stderr, /database rollback was not attempted/);
+      assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"),
+        new RegExp(`^release=${expectedRelease.replaceAll(".", "\\.")}$`, "m"));
+    });
+  }
+});
+
+test("given the same or an older release, when update is requested, then Docker never runs it against the current schema", () => {
+  for (const version of ["0.1.0", "0.0.9", "0.1.0-rc.9"]) {
+    fixture((context) => {
+      // given
+      assert.equal(initialize(context).status, 0);
+      const candidate = releaseArchive(context.root, version);
+
+      // when
+      const result = run(context.archive, context.target,
+        ["update", "--archive", candidate, "--yes"], context.environment);
+
+      // then
+      assert.equal(result.status, 2);
+      assert.match(result.stderr, /downgrade needs a complete recovery-unit restore/);
+      assert.ok(!existsSync(context.dockerLog));
+      assert.match(readFileSync(join(context.target, "config", "installation.conf"), "utf8"), /^release=0\.1\.0$/m);
+    });
+  }
+});
+
+test("given numeric release candidates, when update compares them, then semantic identifier order wins", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const older = releaseArchive(context.root, "0.1.0-rc.9");
+
+    // when
+    const result = run(context.archive, context.target,
+      ["update", "--archive", older, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /downgrade needs a complete recovery-unit restore/);
+  }, "0.1.0-rc.10");
+
+  fixture((context) => {
+    assert.equal(initialize(context).status, 0);
+    const newer = releaseArchive(context.root, "0.1.0-rc.11");
+    const result = run(context.archive, context.target,
+      ["update", "--archive", newer, "--yes"], context.environment);
+    assert.equal(result.status, 0, result.stderr);
+  }, "0.1.0-rc.10");
+});
+
+test("given a recovery unit from the prior release, when the installation has updated, then its own image validates it", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const next = releaseArchive(context.root, "0.1.1");
+    assert.equal(run(context.archive, context.target,
+      ["update", "--archive", next, "--yes"], context.environment).status, 0);
+    const recovery = join(context.target, "backups",
+      readdirSync(join(context.target, "backups")).find((name) => name.includes("-0.1.0-")));
+
+    // when
+    const result = run(context.archive, context.target, ["restore-check", "--recovery", recovery], {
+      ...context.environment,
+      COURTSIDE_RESTORE_USERNAME: "doe.jane",
+      COURTSIDE_RESTORE_PASSWORD: "restore-private-value",
+    });
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Recovery unit .*0\.1\.0.* passed login and domain-data probes/);
+  });
+});
+
+test("given configuration from before recovery material was explicit, when update runs, then it migrates to included recovery", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const configuration = join(context.target, "config", "installation.conf");
+    writeFileSync(configuration, readFileSync(configuration, "utf8")
+      .split("\n").filter((line) => !line.startsWith("recovery_material=")).join("\n"));
+    const next = releaseArchive(context.root, "0.1.1");
+
+    // when
+    const result = run(context.archive, context.target,
+      ["update", "--archive", next, "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(readFileSync(configuration, "utf8"), /^recovery_material=included$/m);
+    const recovery = join(context.target, "backups", readdirSync(join(context.target, "backups"))[0]);
+    assert.ok(existsSync(join(recovery, "configuration", ".env")));
+  });
+});
+
+test("given an existing Compose project, when adopt analyses it, then analysis is read-only and ambiguity is refused", () => {
+  fixture((context) => {
+    // given
+    const source = join(context.root, "existing.env");
+    writeFileSync(source, 'COURTSIDE_IMAGE_DIGEST="' + digest + '"\n');
+    writeFileSync(join(context.root, "docker-compose-list"),
+      '[{"Name":"example-club","Status":"running(2)"}]\n');
+    writeFileSync(join(context.root, "docker-volumes"), "example-club_db\n");
+
+    // when
+    const result = run(context.archive, context.target,
+      ["adopt", "--analyze", "--project", "example-club", "--environment", source], context.environment);
+    writeFileSync(join(context.root, "docker-compose-list"),
+      '[{"Name":"example-club"},{"Name":"example-club-old"}]\n');
+    const ambiguous = run(context.archive, context.target,
+      ["adopt", "--analyze", "--project", "example-club", "--environment", source], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /analysis=adoptable/);
+    assert.ok(!existsSync(join(context.target, "config")));
+    assert.equal(ambiguous.status, 2);
+    assert.match(ambiguous.stderr, /ambiguous ownership/);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), / down| rm| stop| up/);
+  });
+});
+
+test("given unambiguous ownership, when adoption is applied, then existing identities are recorded without resource changes", () => {
+  fixture((context) => {
+    // given
+    const sourceTarget = join(context.root, "source-instance");
+    assert.equal(run(context.archive, sourceTarget,
+      ["init", "--answers", answers(context.root), "--yes"], context.environment).status, 0);
+    const environment = join(sourceTarget, "config", ".env");
+    const before = readFileSync(environment, "utf8");
+    writeFileSync(join(context.root, "docker-compose-list"), '[{"Name":"example-club"}]\n');
+    writeFileSync(join(context.root, "docker-volumes"), "example-club_db\n");
+    rmSync(context.dockerLog, { force: true });
+
+    // when
+    const result = run(context.archive, context.target,
+      ["adopt", "--apply", "--project", "example-club", "--environment", environment,
+        "--answers", answers(context.root), "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(join(context.target, "config", ".env"), "utf8"), before);
+    assert.equal(realpathSync(join(context.target, "current")),
+      realpathSync(join(context.target, "releases", "0.1.0")));
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), / down| rm| stop| up/);
+  });
+});
+
+test("given the adoption source changes during validation, when apply publishes, then it uses the validated snapshot", () => {
+  fixture((context) => {
+    const sourceTarget = join(context.root, "source-instance");
+    assert.equal(run(context.archive, sourceTarget,
+      ["init", "--answers", answers(context.root), "--yes"], context.environment).status, 0);
+    const environment = join(sourceTarget, "config", ".env");
+    const before = readFileSync(environment, "utf8");
+    writeFileSync(join(context.root, "docker-compose-list"), '[{"Name":"example-club"}]\n');
+    writeFileSync(join(context.root, "docker-volumes"), "example-club_db\n");
+    writeFileSync(join(context.root, "docker-mutate-adoption-source"), environment);
+
+    const result = run(context.archive, context.target,
+      ["adopt", "--apply", "--project", "example-club", "--environment", environment,
+        "--answers", answers(context.root), "--yes"], context.environment);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.notEqual(readFileSync(environment, "utf8"), before);
+    assert.equal(readFileSync(join(context.target, "config", ".env"), "utf8"), before);
+  });
+});
+
+test("given an unsafe adopted bundled database password, when apply starts, then it refuses SQL-capable input", () => {
+  fixture((context) => {
+    const sourceTarget = join(context.root, "source-instance");
+    assert.equal(run(context.archive, sourceTarget,
+      ["init", "--answers", answers(context.root), "--yes"], context.environment).status, 0);
+    const environment = join(sourceTarget, "config", ".env");
+    writeFileSync(environment, readFileSync(environment, "utf8").replace(/^POSTGRES_PASSWORD=.*$/m,
+      'POSTGRES_PASSWORD="a\'; SELECT pg_sleep(10); --"'));
+    writeFileSync(join(context.root, "docker-compose-list"), '[{"Name":"example-club"}]\n');
+    writeFileSync(join(context.root, "docker-volumes"), "example-club_db\n");
+
+    const result = run(context.archive, context.target,
+      ["adopt", "--apply", "--project", "example-club", "--environment", environment,
+        "--answers", answers(context.root), "--yes"], context.environment);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /generated 48-character hexadecimal password/);
+    assert.ok(!existsSync(context.target));
+  });
+});
+
+test("given misleading Compose ownership labels, when adoption is analysed, then it refuses the project", () => {
+  fixture((context) => {
+    const source = join(context.root, "existing.env");
+    writeFileSync(source, 'COURTSIDE_IMAGE_DIGEST="' + digest + '"\n');
+    writeFileSync(join(context.root, "docker-compose-list"), '[{"Name":"example-club"}]\n');
+    writeFileSync(join(context.root, "docker-volumes"), "example-club_db\n");
+    writeFileSync(join(context.root, "docker-adoption-containers"),
+      "app|ghcr.io/foreign/application@sha256:" + digest + "\n");
+
+    const result = run(context.archive, context.target,
+      ["adopt", "--analyze", "--project", "example-club", "--environment", source], context.environment);
+    rmSync(join(context.root, "docker-adoption-containers"));
+    writeFileSync(join(context.root, "docker-volume-labels"), "foreign-project|db\n");
+    const foreignStorage = run(context.archive, context.target,
+      ["adopt", "--analyze", "--project", "example-club", "--environment", source], context.environment);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /does not run the selected immutable image/);
+    assert.equal(foreignStorage.status, 2);
+    assert.match(foreignStorage.stderr, /inconsistent Compose labels/);
+    assert.ok(!existsSync(context.target));
+  });
+});
+
+test("given an adopted environment cannot render, when apply is requested, then no local state or resource changes occur", () => {
+  fixture((context) => {
+    // given
+    const sourceTarget = join(context.root, "source-instance");
+    assert.equal(run(context.archive, sourceTarget,
+      ["init", "--answers", answers(context.root), "--yes"], context.environment).status, 0);
+    writeFileSync(join(context.root, "docker-compose-list"), '[{"Name":"example-club"}]\n');
+    writeFileSync(join(context.root, "docker-volumes"), "example-club_db\n");
+    writeFileSync(join(context.root, "docker-fail-match"), "config --quiet");
+
+    // when
+    const result = run(context.archive, context.target,
+      ["adopt", "--apply", "--project", "example-club",
+        "--environment", join(sourceTarget, "config", ".env"),
+        "--answers", answers(context.root), "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /does not render/);
+    assert.ok(!existsSync(context.target));
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), / down| rm| stop| up/);
+  });
+});
+
+test("given matching adoption services but foreign storage topology, when apply is requested, then it publishes nothing", () => {
+  fixture((context) => {
+    const sourceTarget = join(context.root, "source-instance");
+    assert.equal(run(context.archive, sourceTarget,
+      ["init", "--answers", answers(context.root), "--yes"], context.environment).status, 0);
+    writeFileSync(join(context.root, "docker-compose-list"), '[{"Name":"example-club"}]\n');
+    writeFileSync(join(context.root, "docker-volumes"), "example-club_foreign\n");
+    writeFileSync(join(context.root, "docker-volume-labels"), "example-club|foreign\n");
+
+    const result = run(context.archive, context.target,
+      ["adopt", "--apply", "--project", "example-club",
+        "--environment", join(sourceTarget, "config", ".env"),
+        "--answers", answers(context.root), "--yes"], context.environment);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /volume set does not match/);
+    assert.ok(!existsSync(context.target));
+  });
+});
+
+test("given an installed secret, when one identity rotates, then unrelated identities stay byte-identical", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+    const envPath = join(context.target, "config", ".env");
+    const before = readFileSync(envPath, "utf8");
+
+    // when
+    const result = run(context.archive, context.target,
+      ["rotate-secret", "mail-reload", "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    const after = readFileSync(envPath, "utf8");
+    assert.notEqual(after.match(/^COURTSIDE_MAIL_RELOAD_PASSWORD=(.+)$/m)?.[1],
+      before.match(/^COURTSIDE_MAIL_RELOAD_PASSWORD=(.+)$/m)?.[1]);
+    for (const key of ["POSTGRES_PASSWORD", "COURTSIDE_MAIL_ADMIN_PASSWORD", "COURTSIDE_MAIL_SETUP_PASSWORD"]) {
+      assert.equal(after.match(new RegExp(`^${key}=(.+)$`, "m"))?.[1],
+        before.match(new RegExp(`^${key}=(.+)$`, "m"))?.[1]);
+    }
+    assert.match(readFileSync(context.dockerLog, "utf8"), / up -d --wait mail-reload/);
+    assert.doesNotMatch(result.stdout + result.stderr, /[0-9a-f]{48}/);
+  });
+});
+
+test("given separate database identities, when the runtime identity rotates, then owner and migration stay unchanged", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { overlays: "database-identities" }).status, 0);
+    const paths = Object.fromEntries(["owner", "migration", "runtime"].map((name) =>
+      [name, join(context.target, "secrets", `database-${name}-password`)]));
+    const before = Object.fromEntries(Object.entries(paths).map(([name, path]) =>
+      [name, readFileSync(path, "utf8")]));
+
+    // when
+    const result = run(context.archive, context.target,
+      ["rotate-secret", "database-runtime", "--yes"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(readFileSync(paths.owner, "utf8"), before.owner);
+    assert.equal(readFileSync(paths.migration, "utf8"), before.migration);
+    assert.notEqual(readFileSync(paths.runtime, "utf8"), before.runtime);
+    assert.match(readFileSync(context.dockerLog, "utf8"), /psql .*courtside_owner[\s\S]*up -d --wait app/);
+  });
+});
+
+test("given a durable interrupted rotation, when that identity is retried, then old state is recovered first", () => {
+  fixture((context) => {
+    assert.equal(initialize(context).status, 0);
+    const environmentPath = join(context.target, "config", ".env");
+    const oldEnvironment = readFileSync(environmentPath, "utf8");
+    const newEnvironment = oldEnvironment.replace(/^POSTGRES_PASSWORD=.*$/m,
+      'POSTGRES_PASSWORD="' + "b".repeat(48) + '"');
+    writeFileSync(environmentPath, newEnvironment, { mode: 0o600 });
+    const journal = join(context.target, ".courtside-rotation");
+    mkdirSync(journal, { mode: 0o700 });
+    writeFileSync(join(journal, "meta"), "name=postgres\nkind=env\n", { mode: 0o600 });
+    writeFileSync(join(journal, "old.env"), oldEnvironment, { mode: 0o600 });
+    writeFileSync(join(journal, "new.env"), newEnvironment, { mode: 0o600 });
+
+    const result = run(context.archive, context.target,
+      ["rotate-secret", "postgres", "--yes"], context.environment);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Recovered interrupted postgres rotation/);
+    assert.ok(!existsSync(journal));
+    assert.doesNotMatch(readFileSync(environmentPath, "utf8"), new RegExp("b{48}"));
+  });
+});
+
+test("given an atomically retired rotation journal, when the next command starts, then it discards the tombstone", () => {
+  fixture((context) => {
+    assert.equal(initialize(context).status, 0);
+    const tombstone = join(context.target, ".rotation.complete.interrupted");
+    mkdirSync(tombstone, { mode: 0o700 });
+    writeFileSync(join(tombstone, "old.env"), "discard\n", { mode: 0o600 });
+
+    const result = run(context.archive, context.target, ["status"], context.environment);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(!existsSync(tombstone));
+  });
+});
+
+test("given local and external mail, when mail-check runs, then only the local service is asserted", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+
+    // when
+    const local = run(context.archive, context.target, ["mail-check"], context.environment);
+
+    // then
+    assert.equal(local.status, 0, local.stderr);
+    assert.match(readFileSync(context.dockerLog, "utf8"), /--profile mail-check run --rm mail-check/);
+  });
+  fixture((context) => {
+    assert.equal(initialize(context).status, 0);
+    const external = run(context.archive, context.target, ["mail-check"], context.environment);
+    assert.equal(external.status, 1);
+    assert.match(external.stdout, /external-relay-is-operator-owned/);
+  });
+});
+
+test("given bootstrap is still live, when finalization has no verified backup, then it keeps the credential", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+
+    // when
+    const refused = run(context.archive, context.target, ["finalize-bootstrap", "--yes"], context.environment);
+    const backup = run(context.archive, context.target, ["backup"], context.environment);
+    const completed = run(context.archive, context.target, ["finalize-bootstrap", "--yes"], context.environment);
+
+    // then
+    assert.equal(refused.status, 2);
+    assert.match(refused.stderr, /verified backup/);
+    assert.equal(backup.status, 0, backup.stderr);
+    assert.equal(completed.status, 0, completed.stderr);
+    assert.ok(!existsSync(join(context.target, "secrets", "bootstrap-admin-password")));
+  });
+});
+
+test("given destructive removal, when the exact installation phrase is confirmed, then only its project and path are removed", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const phrase = `delete example-club at ${realpathSync(context.target)}`;
+
+    // when
+    const refused = run(context.archive, context.target,
+      ["uninstall", "--destroy", "--confirm", "delete example-club"], context.environment);
+    assert.equal(refused.status, 2);
+    assert.ok(existsSync(context.target));
+    const removed = run(context.archive, context.target,
+      ["uninstall", "--destroy", "--confirm", phrase], context.environment);
+
+    // then
+    assert.equal(removed.status, 0, removed.stderr);
+    assert.ok(!existsSync(context.target));
+    assert.match(readFileSync(context.dockerLog, "utf8"), / down --volumes --remove-orphans/);
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), /system prune|volume prune/);
+  });
+});
+
+test("given an unknown installation entry, when destructive removal is confirmed, then it preserves the root", () => {
+  fixture((context) => {
+    assert.equal(initialize(context).status, 0);
+    const sentinel = join(context.target, "..operator-owned.txt");
+    writeFileSync(sentinel, "keep\n");
+    const phrase = `delete example-club at ${realpathSync(context.target)}`;
+
+    const result = run(context.archive, context.target,
+      ["uninstall", "--destroy", "--confirm", phrase], context.environment);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /unowned installation entry/);
+    assert.equal(readFileSync(sentinel, "utf8"), "keep\n");
+    assert.doesNotMatch(readFileSync(context.dockerLog, "utf8"), / down --volumes/);
+  });
+});
+
+test("given scheduler examples, when the archive is inspected, then they install or enable nothing", () => {
+  for (const file of ["examples/courtside-backup.service", "examples/courtside-backup.timer",
+    "examples/courtside-maintenance.cron"]) {
+    const path = join(deploy, file);
+    assert.ok(existsSync(path), `${file} is missing`);
+    const content = readFileSync(path, "utf8");
+    assert.doesNotMatch(content, /systemctl\s+(?:enable|start)|apt(?:-get)?|dnf|yum|crontab\s/);
+    if (!file.endsWith(".timer")) assert.match(content, /\/srv\/courtside\/current\/courtside/);
+  }
 });
 
 test("given no answer file, when init is used interactively, then it plans and confirms before writing", () => {

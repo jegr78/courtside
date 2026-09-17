@@ -1,0 +1,4 @@
+17 3 * * * /srv/courtside/current/courtside --directory /srv/courtside backup --retain 7
+43 3 * * * /srv/courtside/current/courtside --directory /srv/courtside doctor
+11 4 * * * /srv/courtside/current/courtside --directory /srv/courtside update-check --archive /srv/courtside/candidate
+29 4 * * * /srv/courtside/current/courtside --directory /srv/courtside mail-check

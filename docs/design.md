@@ -61,12 +61,18 @@ files any recipe can select, the files those Compose files bind, the configurati
 deployment guide, the container contract and the Bash `courtside` lifecycle launcher, with a
 manifest naming the release, its image digest, its source revision and the release workflow that
 attests it. The launcher publishes read-only versioned releases separately from private mutable
-configuration, secrets and backups. It strictly parses its versioned configuration as data and
-resolves every Compose invocation from the selected recipe. The manifest carries a checksum per
-file and the release page carries one for the archive. Installing from it needs no clone of this
-repository or application runtime. The official recipes compose the fixed GHCR repository and
-SHA-256 algorithm with that manifest digest, so they cannot run a moving tag. An explicit
-`custom-image` overlay composes another repository with a required SHA-256 digest and source URL,
+configuration, secrets and backups beneath a path-bound installation marker. It strictly parses
+its versioned configuration as data and resolves every Compose invocation from the selected
+recipe. Its recovery units bind a validated
+PostgreSQL dump to that release, image, configuration, local material and checksum inventory;
+restore checks use the locally trusted immutable release model, an empty PostgreSQL 17 target and
+the matching application image, with cleanup recorded before the target starts. Exact-release
+updates create a recovery unit before pulling or migrating, never start an older application after
+a newer schema may have run and never claim an automatic database rollback. The manifest carries
+a checksum per file and the release page carries one for the archive. Installing from it needs no
+clone of this repository or application runtime. The official recipes compose the fixed GHCR
+repository and SHA-256 algorithm with that manifest digest, so they cannot run a moving tag. An
+explicit `custom-image` overlay composes another repository with a required SHA-256 digest and source URL,
 marks the rendered service as custom, and warns that the official release trust guarantee no
 longer applies.
 

@@ -208,22 +208,22 @@
           "invariant": "Every supported upgrade preserves data and either completes atomically or fails without serving inconsistent state.",
           "positiveBoundaries": "Previous patch, minor and supported skipped-version upgrades preserve data and invariants.",
           "negativeBoundaries": "Interrupted or invalid migrations fail without serving an inconsistent schema.",
-          "level": "Release qualification", "frequency": ["release"],
+          "level": "CLI contract, release qualification", "frequency": ["PR", "release"],
           "environment": "PostgreSQL 17 and candidate image", "syntheticData": "Version-owned synthetic dataset",
-          "evidenceType": "Migration logs and invariant checksums", "owner": "Database and release",
+          "evidenceType": "CLI state-transition tests, migration logs and invariant checksums", "owner": "Database and release",
           "openGap": "Upgrade harness is tracked by #220.",
-          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+          "lastReviewedOn": "2026-09-17", "nextReviewOn": "2026-12-16"
         },
         {
           "id": "OP-3", "impact": "P0", "likelihood": "Low",
           "invariant": "A documented backup restores into an empty compatible environment and passes functional and integrity checks.",
           "positiveBoundaries": "The application writes a synthetic club through its public API; its backup and the legacy-schema fixture each restore into empty PostgreSQL 17, and the matching image reads the restored login, booking and logo.",
           "negativeBoundaries": "A corrupt archive leaves no database objects, an interrupted restore preserves the usable database, and the restored exclusion constraint still rejects overlap.",
-          "level": "Release qualification", "frequency": ["periodic", "release"],
+          "level": "CLI contract, release qualification", "frequency": ["PR", "periodic", "release"],
           "environment": "Fresh PostgreSQL 17", "syntheticData": "API-written and legacy-schema synthetic datasets, including an outstanding event publication",
-          "evidenceType": "Before-and-after table and sequence evidence, backup sizes, image ID and schema version", "owner": "Operations",
+          "evidenceType": "CLI recovery-unit checks, before-and-after table and sequence evidence, backup sizes, image ID and schema version", "owner": "Operations",
           "openGap": "The relay is stopped before a second API booking so the backup contains an application-written outstanding Modulith publication.",
-          "lastReviewedOn": "2026-09-05", "nextReviewOn": "2026-12-04"
+          "lastReviewedOn": "2026-09-17", "nextReviewOn": "2026-12-16"
         },
         {
           "id": "OP-4", "impact": "P1", "likelihood": "Medium",

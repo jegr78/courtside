@@ -1,0 +1,11 @@
+[Unit]
+Description=Create a daily Courtside recovery unit
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=30m
+Unit=courtside-backup.service
+
+[Install]
+WantedBy=timers.target

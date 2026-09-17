@@ -1,0 +1,8 @@
+[Unit]
+Description=Create a Courtside recovery unit
+
+[Service]
+Type=oneshot
+ExecStart=/srv/courtside/current/courtside --directory /srv/courtside backup --retain 7
+UMask=0077
+NoNewPrivileges=true
