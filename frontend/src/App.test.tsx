@@ -561,6 +561,8 @@ describe("App build identity", () => {
 
   it("given a club logo, when the shell loads, then the browser tab shows the club logo", async () => {
     // given
+    document.head.querySelectorAll('link[rel="icon"]').forEach((link) => link.remove());
+    document.head.insertAdjacentHTML("beforeend", '<link rel="icon" type="image/svg+xml" href="/icon.svg">');
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockResolvedValue({
       clubName: "Example Tennis Club",
@@ -579,6 +581,8 @@ describe("App build identity", () => {
 
     // then
     await waitFor(() => expect(tabIcon()?.getAttribute("href")).toBe("/api/public/config/logo?v=1"));
+    expect(tabIcon()).not.toHaveAttribute("type");
+    expect(document.head.querySelectorAll('link[rel="icon"]')).toHaveLength(1);
   });
 
   it("given no club logo, when the shell loads, then the browser tab shows the Courtside mark", async () => {
