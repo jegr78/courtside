@@ -120,8 +120,9 @@ test("given a tag that never published, when the release reads its history, then
       .find((step) => step.name === "Resolve supported database upgrade origins");
 
     // when / then
-    assert.match(published.run, /gh api --paginate "repos\/\$\{GITHUB_REPOSITORY\}\/releases"/);
-    assert.match(published.run, /--published-tags/);
+    assert.match(published.run, /node tools\/published-release-tags\.mjs/);
+    assert.doesNotMatch(published.run, /gh api/,
+      "the workflow delegates API pagination to the locally executable release-history tool");
     assert.doesNotMatch(collect.run, /git describe/,
       "the notes anchor comes from what was published, not from the tags that happen to exist");
     for (const step of [collect, origins]) {
