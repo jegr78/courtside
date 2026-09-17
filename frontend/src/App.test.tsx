@@ -561,7 +561,7 @@ describe("App build identity", () => {
 
   it("given a club logo, when the shell loads, then the browser tab shows the club logo", async () => {
     // given
-    document.head.querySelectorAll('link[rel="icon"]').forEach((link) => link.remove());
+    removeTabIcons();
     document.head.insertAdjacentHTML("beforeend", '<link rel="icon" type="image/svg+xml" href="/icon.svg">');
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockResolvedValue({
@@ -587,7 +587,7 @@ describe("App build identity", () => {
 
   it("given no club logo, when the shell loads, then the browser tab shows the Courtside mark", async () => {
     // given
-    document.head.querySelectorAll('link[rel="icon"]').forEach((link) => link.remove());
+    removeTabIcons();
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
     vi.spyOn(api, "config").mockResolvedValue({
       clubName: "Example Tennis Club",
@@ -730,6 +730,10 @@ describe("App build identity", () => {
     expect(document.documentElement.style.getPropertyValue("--club-primary-text")).toBe("#17211d");
   });
 });
+
+function removeTabIcons() {
+  document.head.querySelectorAll('link[rel="icon"]').forEach((link) => link.remove());
+}
 
 function tabIcon() {
   return document.head.querySelector<HTMLLinkElement>('link[rel="icon"]');
