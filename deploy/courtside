@@ -1,0 +1,1283 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly configuration_schema=1
+readonly usage="usage: courtside [--directory <path>] <init|reconfigure|doctor|up|status|finalize-bootstrap|diagnose|uninstall> [options]"
+script_path=${BASH_SOURCE[0]}
+case "$script_path" in
+  */*) script_parent=${script_path%/*} ;;
+  *)
+    script_path=$(command -v "$script_path")
+    case "$script_path" in
+      */*) script_parent=${script_path%/*} ;;
+      *) script_parent=$PWD ;;
+    esac
+    ;;
+esac
+script_directory="$(cd "$script_parent" && pwd -P)"
+installation_directory=""
+lock_directory=""
+owns_lock=false
+temporary_path=""
+docker_path=""
+openssl_path=""
+sha256sum_path=""
+shasum_path=""
+env_path=""
+
+refuse() {
+  printf 'courtside: %s\n' "$1" >&2
+  exit 2
+}
+
+prepare_executables() {
+  local original_path=$PATH safe_path="" directory name resolved
+  local required="mkdir chmod rm rmdir sed head mktemp cp mv ln grep stat find awk tr date df id readlink env"
+  IFS=':' read -r -a path_directories <<< "$original_path"
+  for directory in "${path_directories[@]}"; do
+    case "$directory" in
+      /*) safe_path=${safe_path:+$safe_path:}$directory ;;
+    esac
+  done
+  [ -n "$safe_path" ] || refuse "PATH contains no absolute executable directory"
+  PATH=$safe_path
+  export PATH
+  for name in $required; do
+    resolved=$(command -v "$name" 2>/dev/null || true)
+    case "$resolved" in
+      /*) [ -x "$resolved" ] || refuse "$name is not executable" ;;
+      *) refuse "$name is required in an absolute PATH directory" ;;
+    esac
+    hash -p "$resolved" "$name"
+    [ "$name" != env ] || env_path=$resolved
+  done
+  for name in docker openssl sha256sum shasum; do
+    resolved=$(command -v "$name" 2>/dev/null || true)
+    case "$resolved" in
+      /*)
+        if [ -x "$resolved" ]; then
+          hash -p "$resolved" "$name"
+          printf -v "${name}_path" '%s' "$resolved"
+        fi
+        ;;
+    esac
+  done
+}
+
+prepare_docker_command() {
+  local name value
+  [ -n "$docker_path" ] || refuse "docker is required"
+  docker_command=("$env_path" -i "PATH=$PATH")
+  for name in HOME DOCKER_HOST DOCKER_CONTEXT DOCKER_CONFIG DOCKER_TLS_VERIFY DOCKER_CERT_PATH \
+    XDG_RUNTIME_DIR XDG_CONFIG_HOME TMPDIR; do
+    value=${!name:-}
+    [ -z "$value" ] || docker_command+=("$name=$value")
+  done
+  docker_command+=("$docker_path")
+}
+
+prepare_executables
+
+cleanup() {
+  local result=$?
+  if [ -n "$temporary_path" ]; then
+    chmod -R u+w -- "$temporary_path" 2>/dev/null || true
+    rm -rf -- "$temporary_path"
+  fi
+  if [ "$owns_lock" = true ] && [ -n "$lock_directory" ]; then
+    rm -f -- "$lock_directory/owner"
+    rmdir -- "$lock_directory" 2>/dev/null || true
+  fi
+  owns_lock=false
+  exit "$result"
+}
+
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+contains_word() {
+  case " $1 " in
+    *" $2 "*) return 0 ;;
+  esac
+  return 1
+}
+
+absolute_installation_directory() {
+  local requested=$1 parent base
+  case "$requested" in
+    */../* | */.. | ../* | ..) refuse "installation directory must not contain .." ;;
+  esac
+  case "$requested" in
+    /*) ;;
+    *) requested="$PWD/$requested" ;;
+  esac
+  parent=${requested%/*}
+  base=${requested##*/}
+  [ -n "$base" ] && [ "$base" != "." ] || refuse "installation directory needs a final name"
+  [ -d "$parent" ] || refuse "installation directory parent $parent does not exist"
+  parent="$(cd "$parent" && pwd -P)"
+  installation_directory="$parent/$base"
+  if [ -L "$installation_directory" ]; then
+    refuse "installation directory must not be a symbolic link"
+  fi
+}
+
+infer_installation_directory() {
+  case "$script_directory" in
+    */releases/*) installation_directory=${script_directory%/releases/*} ;;
+    *) installation_directory=$PWD ;;
+  esac
+  absolute_installation_directory "$installation_directory"
+}
+
+acquire_lock() {
+  local owner child
+  mkdir -p -- "$installation_directory"
+  chmod 700 "$installation_directory"
+  for child in releases config secrets backups; do
+    [ ! -L "$installation_directory/$child" ] \
+      || refuse "$installation_directory/$child must not be a symbolic link"
+  done
+  lock_directory="$installation_directory/.courtside.lock"
+  [ ! -L "$lock_directory" ] || refuse "$lock_directory must not be a symbolic link"
+  if ! mkdir -- "$lock_directory" 2>/dev/null; then
+    owner=$(sed -n '1p' "$lock_directory/owner" 2>/dev/null || true)
+    if [[ "$owner" =~ ^[0-9]+$ ]] && ! kill -0 "$owner" 2>/dev/null; then
+      rm -f -- "$lock_directory/owner"
+      rmdir -- "$lock_directory" 2>/dev/null \
+        || refuse "stale command lock $lock_directory could not be recovered"
+      mkdir -- "$lock_directory"
+    else
+      refuse "another Courtside command holds $lock_directory"
+    fi
+  fi
+  owns_lock=true
+  chmod 700 "$lock_directory"
+  printf '%s\n' "$$" > "$lock_directory/owner"
+  chmod 600 "$lock_directory/owner"
+  cleanup_abandoned_staging
+  recover_configuration_transaction
+}
+
+cleanup_abandoned_staging() {
+  local path
+  for path in "$installation_directory"/.transaction.partial.* \
+    "$installation_directory"/.config.partial.* \
+    "$installation_directory"/releases/.*.partial.* \
+    "$installation_directory"/config/.*.transaction.* \
+    "$installation_directory"/config/.env.partial.* \
+    "$installation_directory"/config/installation.conf.partial.*; do
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    if [ -d "$path" ] && [ ! -L "$path" ]; then
+      chmod -R u+w -- "$path" 2>/dev/null || true
+      rm -rf -- "$path"
+    else
+      rm -f -- "$path"
+    fi
+  done
+}
+
+apply_configuration_transaction() {
+  local transaction="$installation_directory/.courtside-transaction" name source destination pending entry
+  [ -d "$transaction" ] && [ ! -L "$transaction" ] \
+    || refuse "$transaction must be a private transaction directory"
+  for entry in "$transaction"/* "$transaction"/.[!.]*; do
+    [ -e "$entry" ] || continue
+    [ -f "$entry" ] && [ ! -L "$entry" ] || refuse "$transaction contains an unsafe entry"
+    case "${entry##*/}" in
+      .env | installation.conf | remove-bootstrap) ;;
+      *) refuse "$transaction contains an unknown entry" ;;
+    esac
+  done
+  for name in .env installation.conf; do
+    source="$transaction/$name"
+    [ -f "$source" ] || continue
+    destination="$installation_directory/config/$name"
+    pending=$(mktemp "$installation_directory/config/.$name.transaction.XXXXXX")
+    temporary_path=$pending
+    cp "$source" "$pending"
+    chmod 600 "$pending"
+    mv "$pending" "$destination"
+    temporary_path=""
+  done
+  if [ -f "$transaction/remove-bootstrap" ]; then
+    rm -f -- "$installation_directory/secrets/bootstrap-admin-password"
+  fi
+  rm -f -- "$transaction/.env" "$transaction/installation.conf" "$transaction/remove-bootstrap"
+  rmdir -- "$transaction"
+}
+
+recover_configuration_transaction() {
+  local transaction="$installation_directory/.courtside-transaction"
+  [ ! -L "$transaction" ] || refuse "$transaction must not be a symbolic link"
+  [ ! -e "$transaction" ] || apply_configuration_transaction
+}
+
+json_value() {
+  local file=$1 key=$2
+  sed -n "s/^[[:space:]]*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\"[,]*[[:space:]]*$/\1/p" "$file" \
+    | head -n 1
+}
+
+read_manifest() {
+  local manifest=$1
+  [ -f "$manifest" ] || refuse "$manifest is missing"
+  manifest_version=$(json_value "$manifest" version)
+  manifest_revision=$(json_value "$manifest" revision)
+  manifest_image=$(json_value "$manifest" image)
+  [[ "$manifest_version" =~ ^[0-9A-Za-z.+-]+$ ]] || refuse "manifest carries an invalid version"
+  [[ "$manifest_revision" =~ ^[0-9a-f]{40}$ ]] || refuse "manifest carries an invalid revision"
+  [[ "$manifest_image" =~ @sha256:([0-9a-f]{64})$ ]] || refuse "manifest image is not digest-pinned"
+  manifest_digest=${BASH_REMATCH[1]}
+  manifest_sha256=$(file_digest "$manifest") || refuse "cannot digest $manifest"
+}
+
+file_digest() {
+  if [ -n "$sha256sum_path" ]; then
+    "$sha256sum_path" "$1" | awk '{ print $1 }'
+  elif [ -n "$shasum_path" ]; then
+    "$shasum_path" -a 256 "$1" | awk '{ print $1 }'
+  else
+    printf 'neither sha256sum nor shasum is available\n' >&2
+    return 1
+  fi
+}
+
+manifest_declares() {
+  local entries=$1 wanted=$2 declared
+  while IFS=' ' read -r declared _; do
+    [ "$declared" != "$wanted" ] || return 0
+  done <<< "$entries"
+  return 1
+}
+
+verify_release() {
+  local root=$1 entries path expected actual declared_count=0 actual_count=0 mode
+  entries=$(sed -n 's/^    "\([^"]*\)": "\([0-9a-f]\{64\}\)"[,]*$/\1 \2/p' "$root/manifest.json")
+  [ -n "$entries" ] || { printf 'manifest has no file inventory\n' >&2; return 1; }
+  while IFS=' ' read -r path expected; do
+    [[ "$path" =~ ^[A-Za-z0-9._/-]+$ ]] && [[ "$path" != /* ]] \
+      && [[ "/$path/" != */../* ]] \
+      || { printf 'manifest has an unsafe file path\n' >&2; return 1; }
+    [ -f "$root/$path" ] && [ ! -L "$root/$path" ] \
+      || { printf '%s is missing or not a regular release file\n' "$path" >&2; return 1; }
+    actual=$(file_digest "$root/$path") || return 1
+    [ "$actual" = "$expected" ] \
+      || { printf '%s does not match its manifest digest\n' "$path" >&2; return 1; }
+    declared_count=$((declared_count + 1))
+  done <<< "$entries"
+  while IFS= read -r actual; do
+    path=${actual#"$root"/}
+    [ "$path" = manifest.json ] && continue
+    [[ "$path" =~ ^[A-Za-z0-9._/-]+$ ]] \
+      || { printf 'release contains an unsafe file path\n' >&2; return 1; }
+    manifest_declares "$entries" "$path" \
+      || { printf '%s is not declared by the manifest\n' "$path" >&2; return 1; }
+    actual_count=$((actual_count + 1))
+  done < <(find "$root" -type f -print)
+  [ "$actual_count" -eq "$declared_count" ] \
+    || { printf 'release file count does not match its manifest\n' >&2; return 1; }
+  if [ -n "$(find "$root" -type l -print -quit)" ]; then
+    printf 'release contains a symbolic link\n' >&2
+    return 1
+  fi
+  while IFS= read -r path; do
+    mode=$(path_mode "$path")
+    [ $((8#$mode & 0222)) -eq 0 ] \
+      || { printf 'release path is writable: %s\n' "${path#"$root"/}" >&2; return 1; }
+  done < <(find "$root" -print)
+}
+
+answer_defaults() {
+  answer_schema=1
+  answer_recipe=standard
+  answer_overlays=""
+  answer_synthetic_mail=false
+  answer_rootless_port_start=""
+  answer_project=courtside
+  answer_domain=""
+  answer_bootstrap_username=""
+  answer_bootstrap_display_name=""
+  answer_source_url=""
+  answer_mail_domain=""
+  answer_mail_reply_to=""
+  answer_mail_relay_host=""
+  answer_mail_relay_username=""
+  answer_database_url=""
+  answer_database_username=""
+  answer_custom_image_repository=""
+  answer_custom_image_digest=""
+}
+
+answer_key() {
+  local key=$1 value=$2
+  if [[ "$key" =~ (password|passwd|secret|token|credential|private_key) ]]; then
+    refuse "answer files contain decisions, never secrets: $key"
+  fi
+  case "$key" in
+    schema) answer_schema=$value ;;
+    recipe) answer_recipe=$value ;;
+    overlays) answer_overlays=$value ;;
+    synthetic_mail) answer_synthetic_mail=$value ;;
+    rootless_port_start) answer_rootless_port_start=$value ;;
+    project) answer_project=$value ;;
+    domain) answer_domain=$value ;;
+    bootstrap_username) answer_bootstrap_username=$value ;;
+    bootstrap_display_name) answer_bootstrap_display_name=$value ;;
+    source_url) answer_source_url=$value ;;
+    mail_domain) answer_mail_domain=$value ;;
+    mail_reply_to) answer_mail_reply_to=$value ;;
+    mail_relay_host) answer_mail_relay_host=$value ;;
+    mail_relay_username) answer_mail_relay_username=$value ;;
+    database_url) answer_database_url=$value ;;
+    database_username) answer_database_username=$value ;;
+    custom_image_repository) answer_custom_image_repository=$value ;;
+    custom_image_digest) answer_custom_image_digest=$value ;;
+    *) refuse "unknown answer key $key" ;;
+  esac
+}
+
+read_answers() {
+  local file=$1 line key value number=0 seen=""
+  [ -f "$file" ] || refuse "answer file $file does not exist"
+  while IFS= read -r line || [ -n "$line" ]; do
+    number=$((number + 1))
+    [[ ! "$line" =~ [[:cntrl:]] ]] || refuse "answer file line $number contains a control character"
+    case "$line" in
+      "" | "#"*) continue ;;
+    esac
+    [[ "$line" =~ ^([a-z][a-z0-9_]*)=(.*)$ ]] || refuse "answer file line $number is malformed"
+    key=${BASH_REMATCH[1]}
+    value=${BASH_REMATCH[2]}
+    contains_word "$seen" "$key" && refuse "answer key $key is declared twice"
+    seen="$seen $key"
+    answer_key "$key" "$value"
+  done < "$file"
+}
+
+read_interactive_answers() {
+  read -r -p "Recipe [standard]: " answer_recipe
+  answer_recipe=${answer_recipe:-standard}
+  read -r -p "Docker Compose project: " answer_project
+  read -r -p "Public domain: " answer_domain
+  read -r -p "Bootstrap administrator username: " answer_bootstrap_username
+  read -r -p "Bootstrap administrator display name: " answer_bootstrap_display_name
+  read -r -p "Source URL: " answer_source_url
+  read -r -p "Mail domain: " answer_mail_domain
+  read -r -p "Mail reply-to address: " answer_mail_reply_to
+  read -r -p "SMTP relay host: " answer_mail_relay_host
+  read -r -p "SMTP relay username, empty for none: " answer_mail_relay_username
+}
+
+validate_answers() {
+  local require_bootstrap=${1:-true}
+  [ "$answer_schema" = "$configuration_schema" ] \
+    || refuse "answer file is schema $answer_schema, and this command reads schema $configuration_schema"
+  [[ "$answer_recipe" =~ ^[a-z][a-z-]*$ ]] || refuse "invalid recipe $answer_recipe"
+  [[ "$answer_project" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || refuse "invalid project $answer_project"
+  [[ "$answer_overlays" =~ ^$|^[a-z][a-z-]*(,[a-z][a-z-]*)*$ ]] || refuse "overlays must be comma-separated names"
+  contains_word "true false" "$answer_synthetic_mail" || refuse "synthetic_mail must be true or false"
+  if [ -n "$answer_rootless_port_start" ]; then
+    [[ "$answer_rootless_port_start" =~ ^[0-9]{1,5}$ ]] && [ "$answer_rootless_port_start" -le 65535 ] \
+      || refuse "rootless_port_start must be a port"
+  fi
+  [[ "$answer_domain" =~ ^[A-Za-z0-9.-]+$ ]] || refuse "domain must be a DNS name"
+  if [ "$require_bootstrap" = true ]; then
+    [[ "$answer_bootstrap_username" =~ ^[A-Za-z0-9._@+-]+$ ]] || refuse "bootstrap_username is invalid"
+    [ -n "$answer_bootstrap_display_name" ] && [[ "$answer_bootstrap_display_name" != *$'\n'* ]] \
+      && [[ "$answer_bootstrap_display_name" != *$'\r'* ]] \
+      || refuse "bootstrap_display_name is invalid"
+  fi
+  [[ "$answer_source_url" =~ ^https?://[^/@:]+(:[0-9]+)?(/.*)?$ ]] \
+    || refuse "source_url must be an absolute HTTP or HTTPS URL without credentials"
+  [[ "$answer_mail_domain" =~ ^[A-Za-z0-9.-]+$ ]] || refuse "mail_domain must be a DNS name"
+  [[ "$answer_mail_reply_to" =~ ^[^[:space:]@]+@[^[:space:]@]+$ ]] || refuse "mail_reply_to must be an address"
+  [ -n "$answer_mail_relay_host" ] || [ "$answer_recipe" = full-self-hosted ] \
+    || refuse "mail_relay_host is required for $answer_recipe"
+  if [ "$answer_recipe" = existing-infrastructure ]; then
+    [[ "$answer_database_url" =~ ^jdbc:postgresql://[^[:space:]]+$ ]] \
+      || refuse "database_url must be a PostgreSQL JDBC URL"
+    [[ "$answer_database_username" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] \
+      || refuse "database_username is invalid"
+  fi
+  if contains_word "${answer_overlays//,/ }" custom-image; then
+    [[ "$answer_custom_image_repository" =~ ^[A-Za-z0-9._:/-]+$ ]] \
+      || refuse "custom_image_repository is invalid"
+    [[ "$answer_custom_image_digest" =~ ^[0-9a-f]{64}$ ]] \
+      || refuse "custom_image_digest must be 64 lowercase hexadecimal characters"
+  fi
+}
+
+selection_arguments() {
+  selection=("$answer_recipe")
+  local overlay
+  if [ -n "$answer_overlays" ]; then
+    selected_overlays=()
+    IFS=',' read -r -a selected_overlays <<< "$answer_overlays"
+    for overlay in "${selected_overlays[@]}"; do
+      selection+=(--overlay "$overlay")
+    done
+  fi
+  [ "$answer_synthetic_mail" = false ] || selection+=(--synthetic-mail)
+  [ -z "$answer_rootless_port_start" ] || selection+=(--rootless-port-start "$answer_rootless_port_start")
+}
+
+validate_selection() {
+  local release_root=$1 error
+  selection_arguments
+  if ! error=$("$release_root/recipe.sh" files "${selection[@]}" 2>&1); then
+    refuse "$error"
+  fi
+}
+
+confirm() {
+  local already_confirmed=$1 response
+  [ "$already_confirmed" = true ] && return 0
+  read -r -p "Apply this plan? Type yes: " response
+  [ "$response" = yes ] || refuse "plan was not confirmed"
+}
+
+random_secret() {
+  [ -n "$openssl_path" ] || refuse "openssl is required to generate local secrets"
+  "$openssl_path" rand -hex 24
+}
+
+ensure_secret_file() {
+  local path=$1 pending
+  [ ! -L "$path" ] || refuse "$path must not be a symbolic link"
+  if [ -f "$path" ]; then
+    chmod 600 "$path"
+    return 0
+  fi
+  pending=$(mktemp "$installation_directory/secrets/.secret.partial.XXXXXX")
+  umask 077
+  random_secret > "$pending"
+  chmod 600 "$pending"
+  mv "$pending" "$path"
+}
+
+write_installation_configuration() {
+  local destination=$1
+  umask 077
+  {
+    printf 'schema=%s\n' "$configuration_schema"
+    printf 'release=%s\n' "$manifest_version"
+    printf 'revision=%s\n' "$manifest_revision"
+    printf 'image=%s\n' "$manifest_image"
+    printf 'release_manifest_sha256=%s\n' "$manifest_sha256"
+    printf 'recipe=%s\n' "$answer_recipe"
+    printf 'overlays=%s\n' "$answer_overlays"
+    printf 'synthetic_mail=%s\n' "$answer_synthetic_mail"
+    printf 'rootless_port_start=%s\n' "$answer_rootless_port_start"
+    printf 'project=%s\n' "$answer_project"
+    printf 'domain=%s\n' "$answer_domain"
+    printf 'source_url=%s\n' "$answer_source_url"
+    printf 'mail_domain=%s\n' "$answer_mail_domain"
+    printf 'mail_reply_to=%s\n' "$answer_mail_reply_to"
+    printf 'mail_relay_host=%s\n' "$answer_mail_relay_host"
+    printf 'mail_relay_username=%s\n' "$answer_mail_relay_username"
+    printf 'database_url=%s\n' "$answer_database_url"
+    printf 'database_username=%s\n' "$answer_database_username"
+    printf 'custom_image_repository=%s\n' "$answer_custom_image_repository"
+    printf 'custom_image_digest=%s\n' "$answer_custom_image_digest"
+  } > "$destination"
+  chmod 600 "$destination"
+}
+
+environment_line() {
+  local key=$1 value=$2 encoded
+  [[ "$value" != *$'\n'* ]] && [[ "$value" != *$'\r'* ]] || refuse "$key contains a line break"
+  encoded=${value//\\/\\\\}
+  encoded=${encoded//\"/\\\"}
+  encoded=${encoded//\$/\$\$}
+  printf '%s="%s"\n' "$key" "$encoded"
+}
+
+write_initial_environment() {
+  local destination=$1 postgres_password bootstrap_password
+  postgres_password=$(random_secret)
+  bootstrap_password=$(< "$installation_directory/secrets/bootstrap-admin-password")
+  umask 077
+  {
+    environment_line COURTSIDE_IMAGE_DIGEST "$manifest_digest"
+    environment_line COURTSIDE_SOURCE_URL "$answer_source_url"
+    environment_line COURTSIDE_DOMAIN "$answer_domain"
+    environment_line COURTSIDE_BOOTSTRAP_ADMIN_USERNAME "$answer_bootstrap_username"
+    environment_line COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD "$bootstrap_password"
+    environment_line COURTSIDE_BOOTSTRAP_ADMIN_DISPLAY_NAME "$answer_bootstrap_display_name"
+    environment_line COURTSIDE_MAIL_DOMAIN "$answer_mail_domain"
+    environment_line COURTSIDE_MAIL_REPLY_TO "$answer_mail_reply_to"
+    environment_line COURTSIDE_MAIL_RELAY_HOST "$answer_mail_relay_host"
+    environment_line COURTSIDE_MAIL_RELAY_USERNAME "$answer_mail_relay_username"
+    if [ -n "$answer_mail_relay_username" ]; then
+      [ -n "${COURTSIDE_MAIL_PASSWORD:-}" ] \
+        || refuse "COURTSIDE_MAIL_PASSWORD must be supplied outside the answer file for an authenticated relay"
+      environment_line COURTSIDE_MAIL_PASSWORD "$COURTSIDE_MAIL_PASSWORD"
+    else
+      environment_line COURTSIDE_MAIL_PASSWORD ""
+    fi
+    if [ "$answer_recipe" = existing-infrastructure ]; then
+      [ -n "${COURTSIDE_DATABASE_PASSWORD:-}" ] \
+        || refuse "COURTSIDE_DATABASE_PASSWORD must be supplied outside the answer file"
+      environment_line POSTGRES_PASSWORD ""
+      environment_line COURTSIDE_DATABASE_URL "$answer_database_url"
+      environment_line COURTSIDE_DATABASE_USERNAME "$answer_database_username"
+      environment_line COURTSIDE_DATABASE_PASSWORD "$COURTSIDE_DATABASE_PASSWORD"
+    else
+      environment_line POSTGRES_PASSWORD "$postgres_password"
+    fi
+    if [ "$answer_recipe" = full-self-hosted ]; then
+      environment_line COURTSIDE_MAIL_HOSTNAME "mail.$answer_domain"
+      environment_line COURTSIDE_MAIL_ADMIN_PASSWORD "$(random_secret)"
+      environment_line COURTSIDE_MAIL_SETUP_PASSWORD "$(random_secret)"
+      environment_line COURTSIDE_MAIL_RELOAD_PASSWORD "$(random_secret)"
+      environment_line COURTSIDE_MAIL_DKIM_SELECTOR courtside
+    fi
+    if contains_word "${answer_overlays//,/ }" custom-image; then
+      environment_line COURTSIDE_CUSTOM_IMAGE_REPOSITORY "$answer_custom_image_repository"
+      environment_line COURTSIDE_CUSTOM_IMAGE_DIGEST "$answer_custom_image_digest"
+    fi
+  } > "$destination"
+  chmod 600 "$destination"
+}
+
+write_identity_secrets() {
+  local environment_file=$1
+  contains_word "${answer_overlays//,/ }" database-identities || return 0
+  local name path key
+  for name in owner migration runtime; do
+    path="$installation_directory/secrets/database-$name-password"
+    ensure_secret_file "$path"
+    case "$name" in
+      owner) key=COURTSIDE_DB_OWNER_PASSWORD_FILE ;;
+      migration) key=COURTSIDE_DB_MIGRATION_PASSWORD_FILE ;;
+      runtime) key=COURTSIDE_DB_RUNTIME_PASSWORD_FILE ;;
+    esac
+    if ! grep -q "^$key=" "$environment_file"; then
+      environment_line "$key" "$path" >> "$environment_file"
+    fi
+  done
+}
+
+publish_release() {
+  local release_directory="$installation_directory/releases/$manifest_version"
+  local expected_version=$manifest_version expected_revision=$manifest_revision expected_image=$manifest_image problem
+  local expected_manifest_digest
+  expected_manifest_digest=$(file_digest "$script_directory/manifest.json") || refuse "cannot digest archive manifest"
+  mkdir -p "$installation_directory/releases"
+  chmod 700 "$installation_directory/releases"
+  [ ! -L "$release_directory" ] || refuse "$release_directory must not be a symbolic link"
+  if [ ! -d "$release_directory" ]; then
+    temporary_path=$(mktemp -d "$installation_directory/releases/.$manifest_version.partial.XXXXXX")
+    cp -R "$script_directory"/. "$temporary_path"/
+    chmod 700 "$temporary_path"
+    chmod -R a-w "$temporary_path"
+    if ! problem=$(verify_release "$temporary_path" 2>&1); then
+      refuse "release integrity check failed: $problem"
+    fi
+    mv "$temporary_path" "$release_directory"
+    temporary_path=""
+  else
+    [ "$(file_digest "$release_directory/manifest.json")" = "$expected_manifest_digest" ] \
+      || refuse "$release_directory manifest does not match the archive being installed"
+    read_manifest "$release_directory/manifest.json"
+    [ "$manifest_version" = "$expected_version" ] && [ "$manifest_revision" = "$expected_revision" ] \
+      && [ "$manifest_image" = "$expected_image" ] \
+      || refuse "$release_directory does not match the archive being installed"
+    if ! problem=$(verify_release "$release_directory" 2>&1); then
+      refuse "release integrity check failed: $problem"
+    fi
+  fi
+  manifest_version=$expected_version
+  manifest_revision=$expected_revision
+  manifest_image=$expected_image
+  manifest_digest=${expected_image##*@sha256:}
+}
+
+publish_initial_configuration() {
+  local config_directory="$installation_directory/config"
+  mkdir -p "$installation_directory/secrets" "$installation_directory/backups"
+  chmod 700 "$installation_directory/secrets" "$installation_directory/backups"
+  if [ ! -d "$config_directory" ]; then
+    ensure_secret_file "$installation_directory/secrets/bootstrap-admin-password"
+    temporary_path=$(mktemp -d "$installation_directory/.config.partial.XXXXXX")
+    chmod 700 "$temporary_path"
+    write_installation_configuration "$temporary_path/installation.conf"
+    write_initial_environment "$temporary_path/.env"
+    write_identity_secrets "$temporary_path/.env"
+    mv "$temporary_path" "$config_directory"
+    temporary_path=""
+  fi
+}
+
+publish_current() {
+  local candidate="$installation_directory/.current.$$"
+  ln -s "releases/$manifest_version" "$candidate"
+  mv -f "$candidate" "$installation_directory/current"
+}
+
+load_configuration() {
+  local file="$installation_directory/config/installation.conf" line key value seen="" number=0
+  [ -f "$file" ] || refuse "$file is missing"
+  [ ! -L "$installation_directory/config" ] && [ ! -L "$file" ] \
+    && [ ! -L "$installation_directory/config/.env" ] \
+    || refuse "installation configuration must not use symbolic links"
+  [ ! -L "$installation_directory/secrets" ] && [ ! -L "$installation_directory/backups" ] \
+    && [ ! -L "$installation_directory/releases" ] \
+    || refuse "installation state directories must not use symbolic links"
+  validate_environment_file "$installation_directory/config/.env"
+  config_schema=""
+  config_release=""
+  config_revision=""
+  config_image=""
+  config_release_manifest_sha256=""
+  config_recipe=""
+  config_overlays=""
+  config_synthetic_mail=""
+  config_rootless_port_start=""
+  config_project=""
+  config_domain=""
+  config_source_url=""
+  config_mail_domain=""
+  config_mail_reply_to=""
+  config_mail_relay_host=""
+  config_mail_relay_username=""
+  config_database_url=""
+  config_database_username=""
+  config_custom_image_repository=""
+  config_custom_image_digest=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    number=$((number + 1))
+    [[ ! "$line" =~ [[:cntrl:]] ]] \
+      || refuse "installation.conf line $number contains a control character"
+    [[ "$line" =~ ^([a-z][a-z0-9_]*)=(.*)$ ]] || refuse "installation.conf line $number is malformed"
+    key=${BASH_REMATCH[1]}
+    value=${BASH_REMATCH[2]}
+    contains_word "$seen" "$key" && refuse "installation.conf declares $key twice"
+    seen="$seen $key"
+    case "$key" in
+      schema) config_schema=$value ;;
+      release) config_release=$value ;;
+      revision) config_revision=$value ;;
+      image) config_image=$value ;;
+      release_manifest_sha256) config_release_manifest_sha256=$value ;;
+      recipe) config_recipe=$value ;;
+      overlays) config_overlays=$value ;;
+      synthetic_mail) config_synthetic_mail=$value ;;
+      rootless_port_start) config_rootless_port_start=$value ;;
+      project) config_project=$value ;;
+      domain) config_domain=$value ;;
+      source_url) config_source_url=$value ;;
+      mail_domain) config_mail_domain=$value ;;
+      mail_reply_to) config_mail_reply_to=$value ;;
+      mail_relay_host) config_mail_relay_host=$value ;;
+      mail_relay_username) config_mail_relay_username=$value ;;
+      database_url) config_database_url=$value ;;
+      database_username) config_database_username=$value ;;
+      custom_image_repository) config_custom_image_repository=$value ;;
+      custom_image_digest) config_custom_image_digest=$value ;;
+      *) refuse "installation.conf has unknown key $key" ;;
+    esac
+  done < "$file"
+  [ "$config_schema" = "$configuration_schema" ] \
+    || refuse "installation.conf is schema $config_schema, and this command reads schema $configuration_schema"
+  [[ "$config_release" =~ ^[0-9A-Za-z.+-]+$ ]] || refuse "installation.conf has an invalid release"
+  [[ "$config_revision" =~ ^[0-9a-f]{40}$ ]] || refuse "installation.conf has an invalid revision"
+  [[ "$config_image" =~ @sha256:[0-9a-f]{64}$ ]] || refuse "installation.conf has an invalid image"
+  [[ "$config_release_manifest_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || refuse "installation.conf has an invalid release manifest digest"
+  answer_schema=$config_schema
+  answer_bootstrap_username=""
+  answer_bootstrap_display_name=""
+  answer_recipe=$config_recipe
+  answer_overlays=$config_overlays
+  answer_synthetic_mail=$config_synthetic_mail
+  answer_rootless_port_start=$config_rootless_port_start
+  answer_project=$config_project
+  answer_domain=$config_domain
+  answer_source_url=$config_source_url
+  answer_mail_domain=$config_mail_domain
+  answer_mail_reply_to=$config_mail_reply_to
+  answer_mail_relay_host=$config_mail_relay_host
+  answer_mail_relay_username=$config_mail_relay_username
+  answer_database_url=$config_database_url
+  answer_database_username=$config_database_username
+  answer_custom_image_repository=$config_custom_image_repository
+  answer_custom_image_digest=$config_custom_image_digest
+  manifest_version=$config_release
+  manifest_revision=$config_revision
+  manifest_image=$config_image
+  manifest_digest=${config_image##*@sha256:}
+  manifest_sha256=$config_release_manifest_sha256
+  validate_answers false
+}
+
+validate_installed_release() {
+  local release_root="$installation_directory/releases/$config_release" problem actual_manifest_sha256
+  [ -L "$installation_directory/current" ] \
+    && [ "$(readlink "$installation_directory/current")" = "releases/$config_release" ] \
+    || refuse "$installation_directory/current does not select releases/$config_release"
+  actual_manifest_sha256=$(file_digest "$release_root/manifest.json") \
+    || refuse "cannot digest $release_root/manifest.json"
+  [ "$actual_manifest_sha256" = "$config_release_manifest_sha256" ] \
+    || refuse "$release_root manifest does not match installation.conf"
+  read_manifest "$release_root/manifest.json"
+  [ "$manifest_version" = "$config_release" ] && [ "$manifest_revision" = "$config_revision" ] \
+    && [ "$manifest_image" = "$config_image" ] \
+    || refuse "$release_root does not match installation.conf"
+  if ! problem=$(verify_release "$release_root" 2>&1); then
+    refuse "release integrity check failed: $problem"
+  fi
+}
+
+compose_command() {
+  load_configuration
+  local release_root="$installation_directory/current" file
+  validate_installed_release
+  [ ! -L "$installation_directory/config/local.override.yaml" ] \
+    || refuse "config/local.override.yaml must not be a symbolic link"
+  validate_environment_images
+  validate_selection "$release_root"
+  prepare_docker_command
+  compose=("${docker_command[@]}" compose --project-name "$config_project" --project-directory "$release_root"
+    --env-file "$installation_directory/config/.env")
+  selection_arguments
+  compose_files=()
+  while IFS= read -r file; do
+    compose_files+=("$file")
+  done < <("$release_root/recipe.sh" files "${selection[@]}")
+  for file in "${compose_files[@]}"; do
+    compose+=(-f "$release_root/$file")
+  done
+  if [ -f "$installation_directory/config/local.override.yaml" ]; then
+    compose+=(-f "$installation_directory/config/local.override.yaml")
+  fi
+}
+
+command_init() {
+  local answers_file="" confirmed=false requested_recipe requested_release requested_revision requested_image
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --answers) [ $# -ge 2 ] || refuse "--answers needs a file"; answers_file=$2; shift 2 ;;
+      --yes) confirmed=true; shift ;;
+      *) refuse "unknown init option $1" ;;
+    esac
+  done
+  read_manifest "$script_directory/manifest.json"
+  answer_defaults
+  if [ -n "$answers_file" ]; then read_answers "$answers_file"; else read_interactive_answers; fi
+  validate_answers
+  validate_selection "$script_directory"
+  requested_recipe=$answer_recipe
+  requested_release=$manifest_version
+  requested_revision=$manifest_revision
+  requested_image=$manifest_image
+  printf 'Plan: install release %s with recipe %s in %s\n' \
+    "$manifest_version" "$answer_recipe" "$installation_directory"
+  confirm "$confirmed"
+  acquire_lock
+  if [ -f "$installation_directory/config/installation.conf" ] && [ -L "$installation_directory/current" ]; then
+    load_configuration
+    [ "$config_release" = "$requested_release" ] && [ "$config_revision" = "$requested_revision" ] \
+      && [ "$config_image" = "$requested_image" ] && [ "$config_recipe" = "$requested_recipe" ] \
+      || refuse "installation already exists; use reconfigure for changed decisions"
+    [ "$(file_digest "$installation_directory/releases/$config_release/manifest.json")" \
+      = "$(file_digest "$script_directory/manifest.json")" ] \
+      || refuse "installed release manifest does not match this archive"
+    validate_installed_release
+    printf 'Installation already matches release %s and recipe %s\n' "$config_release" "$config_recipe"
+    return 0
+  fi
+  publish_release
+  publish_initial_configuration
+  publish_current
+  printf 'Installed release %s. Retrieve the bootstrap password with: cat %q\n' \
+    "$manifest_version" "$installation_directory/secrets/bootstrap-admin-password"
+}
+
+environment_value() {
+  local file=$1 wanted=$2 line value decoded character next index
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      "$wanted="*)
+        value=${line#*=}
+        case "$value" in
+          \"*\")
+            value=${value:1:${#value}-2}
+            decoded=""
+            index=0
+            while [ "$index" -lt "${#value}" ]; do
+              character=${value:$index:1}
+              next=${value:$((index + 1)):1}
+              if [ "$character" = "\\" ] && { [ "$next" = "\\" ] || [ "$next" = '"' ]; }; then
+                decoded="$decoded$next"
+                index=$((index + 1))
+              elif [ "$character" = '$' ] && [ "$next" = '$' ]; then
+                decoded="${decoded}\$"
+                index=$((index + 1))
+              else
+                decoded="$decoded$character"
+              fi
+              index=$((index + 1))
+            done
+            printf '%s' "$decoded"
+            ;;
+          *) printf '%s' "$value" ;;
+        esac
+        return 0
+        ;;
+    esac
+  done < "$file"
+}
+
+validate_environment_file() {
+  local file=$1 line key seen="" number=0
+  [ -f "$file" ] || refuse "$file is missing"
+  while IFS= read -r line || [ -n "$line" ]; do
+    number=$((number + 1))
+    case "$line" in
+      "" | "#"*) continue ;;
+    esac
+    if ! [[ "$line" =~ ^([A-Z][A-Z0-9_]*)=\"([^\"\\\$]|\\[\\\"]|\$\$)*\"$ ]]; then
+      refuse ".env line $number is not in canonical KEY=\"value\" form"
+    fi
+    key=${BASH_REMATCH[1]}
+    contains_word "$seen" "$key" && refuse ".env declares $key twice"
+    seen="$seen $key"
+  done < "$file"
+}
+
+validate_environment_images() {
+  local file="$installation_directory/config/.env" line key seen="" official custom_repository custom_digest
+  while IFS= read -r line || [ -n "$line" ]; do
+    key=${line%%=*}
+    case "$key" in
+      COURTSIDE_IMAGE_DIGEST | COURTSIDE_CUSTOM_IMAGE_REPOSITORY | COURTSIDE_CUSTOM_IMAGE_DIGEST)
+        contains_word "$seen" "$key" && refuse ".env declares $key twice"
+        seen="$seen $key"
+        ;;
+      COURTSIDE_*IMAGE*) refuse ".env has unknown image setting $key" ;;
+    esac
+  done < "$file"
+  contains_word "$seen" COURTSIDE_IMAGE_DIGEST || refuse ".env has no COURTSIDE_IMAGE_DIGEST"
+  official=$(environment_value "$file" COURTSIDE_IMAGE_DIGEST)
+  [ "$official" = "${config_image##*@sha256:}" ] \
+    || refuse ".env image digest does not match installation.conf"
+  if contains_word "${config_overlays//,/ }" custom-image; then
+    if ! contains_word "$seen" COURTSIDE_CUSTOM_IMAGE_REPOSITORY \
+      || ! contains_word "$seen" COURTSIDE_CUSTOM_IMAGE_DIGEST; then
+      refuse ".env is missing the selected custom image"
+    fi
+    custom_repository=$(environment_value "$file" COURTSIDE_CUSTOM_IMAGE_REPOSITORY)
+    custom_digest=$(environment_value "$file" COURTSIDE_CUSTOM_IMAGE_DIGEST)
+    [ "$custom_repository" = "$config_custom_image_repository" ] \
+      && [ "$custom_digest" = "$config_custom_image_digest" ] \
+      || refuse ".env custom image does not match installation.conf"
+  elif contains_word "$seen" COURTSIDE_CUSTOM_IMAGE_REPOSITORY \
+    || contains_word "$seen" COURTSIDE_CUSTOM_IMAGE_DIGEST; then
+    refuse ".env carries a custom image that installation.conf did not select"
+  fi
+}
+
+validate_reconfigure_secrets() {
+  local file="$installation_directory/config/.env" value
+  if [ "$answer_recipe" = existing-infrastructure ]; then
+    value=${COURTSIDE_DATABASE_PASSWORD:-}
+    [ -n "$value" ] || value=$(environment_value "$file" COURTSIDE_DATABASE_PASSWORD)
+    [ -n "$value" ] || refuse "COURTSIDE_DATABASE_PASSWORD must be supplied outside the answer file"
+  fi
+  if [ "$answer_recipe" != full-self-hosted ] && [ -n "$answer_mail_relay_username" ]; then
+    value=${COURTSIDE_MAIL_PASSWORD:-}
+    [ -n "$value" ] || value=$(environment_value "$file" COURTSIDE_MAIL_PASSWORD)
+    [ -n "$value" ] \
+      || refuse "COURTSIDE_MAIL_PASSWORD must be supplied outside the answer file for an authenticated relay"
+  fi
+}
+
+write_reconfigured_environment() {
+  local destination=$1 file="$installation_directory/config/.env" key line
+  local postgres_password database_password mail_password mail_admin mail_setup mail_reload
+  postgres_password=$(environment_value "$file" POSTGRES_PASSWORD)
+  database_password=${COURTSIDE_DATABASE_PASSWORD:-}
+  [ -n "$database_password" ] \
+    || database_password=$(environment_value "$file" COURTSIDE_DATABASE_PASSWORD)
+  mail_password=${COURTSIDE_MAIL_PASSWORD:-}
+  [ -n "$mail_password" ] || mail_password=$(environment_value "$file" COURTSIDE_MAIL_PASSWORD)
+  mail_admin=$(environment_value "$file" COURTSIDE_MAIL_ADMIN_PASSWORD)
+  mail_setup=$(environment_value "$file" COURTSIDE_MAIL_SETUP_PASSWORD)
+  mail_reload=$(environment_value "$file" COURTSIDE_MAIL_RELOAD_PASSWORD)
+  if [ "$answer_recipe" != existing-infrastructure ] && [ -z "$postgres_password" ]; then
+    postgres_password=$(random_secret)
+  fi
+  if [ "$answer_recipe" = full-self-hosted ]; then
+    [ -n "$mail_admin" ] || mail_admin=$(random_secret)
+    [ -n "$mail_setup" ] || mail_setup=$(random_secret)
+    [ -n "$mail_reload" ] || mail_reload=$(random_secret)
+  fi
+  umask 077
+  while IFS= read -r line || [ -n "$line" ]; do
+    key=${line%%=*}
+    case "$key" in
+      COURTSIDE_SOURCE_URL | COURTSIDE_DOMAIN | COURTSIDE_MAIL_DOMAIN | COURTSIDE_MAIL_REPLY_TO \
+        | COURTSIDE_MAIL_RELAY_HOST | COURTSIDE_MAIL_RELAY_USERNAME | COURTSIDE_MAIL_PASSWORD \
+        | POSTGRES_PASSWORD | COURTSIDE_DATABASE_URL | COURTSIDE_DATABASE_USERNAME \
+        | COURTSIDE_DATABASE_PASSWORD | COURTSIDE_MAIL_HOSTNAME | COURTSIDE_MAIL_ADMIN_PASSWORD \
+        | COURTSIDE_MAIL_SETUP_PASSWORD | COURTSIDE_MAIL_RELOAD_PASSWORD \
+        | COURTSIDE_MAIL_DKIM_SELECTOR | COURTSIDE_CUSTOM_IMAGE_REPOSITORY \
+        | COURTSIDE_CUSTOM_IMAGE_DIGEST) ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  done < "$file" > "$destination"
+  {
+    environment_line COURTSIDE_SOURCE_URL "$answer_source_url"
+    environment_line COURTSIDE_DOMAIN "$answer_domain"
+    environment_line COURTSIDE_MAIL_DOMAIN "$answer_mail_domain"
+    environment_line COURTSIDE_MAIL_REPLY_TO "$answer_mail_reply_to"
+    environment_line COURTSIDE_MAIL_RELAY_HOST "$answer_mail_relay_host"
+    environment_line COURTSIDE_MAIL_RELAY_USERNAME "$answer_mail_relay_username"
+    environment_line COURTSIDE_MAIL_PASSWORD "$mail_password"
+    environment_line POSTGRES_PASSWORD "$postgres_password"
+    environment_line COURTSIDE_DATABASE_URL "$answer_database_url"
+    environment_line COURTSIDE_DATABASE_USERNAME "$answer_database_username"
+    environment_line COURTSIDE_DATABASE_PASSWORD "$database_password"
+    if [ "$answer_recipe" = full-self-hosted ]; then
+      environment_line COURTSIDE_MAIL_HOSTNAME "mail.$answer_domain"
+      environment_line COURTSIDE_MAIL_ADMIN_PASSWORD "$mail_admin"
+      environment_line COURTSIDE_MAIL_SETUP_PASSWORD "$mail_setup"
+      environment_line COURTSIDE_MAIL_RELOAD_PASSWORD "$mail_reload"
+      environment_line COURTSIDE_MAIL_DKIM_SELECTOR courtside
+    fi
+    if contains_word "${answer_overlays//,/ }" custom-image; then
+      environment_line COURTSIDE_CUSTOM_IMAGE_REPOSITORY "$answer_custom_image_repository"
+      environment_line COURTSIDE_CUSTOM_IMAGE_DIGEST "$answer_custom_image_digest"
+    fi
+  } >> "$destination"
+  chmod 600 "$destination"
+}
+
+command_reconfigure() {
+  local answers_file="" confirmed=false old_recipe transaction
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --answers) [ $# -ge 2 ] || refuse "--answers needs a file"; answers_file=$2; shift 2 ;;
+      --yes) confirmed=true; shift ;;
+      *) refuse "unknown reconfigure option $1" ;;
+    esac
+  done
+  acquire_lock
+  load_configuration
+  old_recipe=$config_recipe
+  answer_defaults
+  if [ -n "$answers_file" ]; then read_answers "$answers_file"; else read_interactive_answers; fi
+  validate_answers
+  read_manifest "$installation_directory/current/manifest.json"
+  validate_selection "$installation_directory/current"
+  validate_reconfigure_secrets
+  printf 'Plan: reconfigure recipe %s to %s in %s\n' "$old_recipe" "$answer_recipe" "$installation_directory"
+  confirm "$confirmed"
+  transaction=$(mktemp -d "$installation_directory/.transaction.partial.XXXXXX")
+  temporary_path=$transaction
+  chmod 700 "$transaction"
+  write_reconfigured_environment "$transaction/.env"
+  write_identity_secrets "$transaction/.env"
+  write_installation_configuration "$transaction/installation.conf"
+  mv "$transaction" "$installation_directory/.courtside-transaction"
+  temporary_path=""
+  apply_configuration_transaction
+  printf 'Reconfigured recipe %s\n' "$answer_recipe"
+}
+
+json_escape() {
+  local value=$1
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//$'\b'/\\b}
+  value=${value//$'\f'/\\f}
+  value=${value//$'\n'/\\n}
+  value=${value//$'\r'/\\r}
+  value=${value//$'\t'/\\t}
+  printf '%s' "$value"
+}
+
+doctor_result() {
+  local state=$1 name=$2 detail=$3
+  doctor_checks+=("{\"state\":\"$state\",\"name\":\"$name\",\"detail\":\"$(json_escape "$detail")\"}")
+  case "$state" in
+    WARN) doctor_warnings=$((doctor_warnings + 1)) ;;
+    FAIL) doctor_failures=$((doctor_failures + 1)) ;;
+  esac
+}
+
+emit_doctor() {
+  local format=$1 result=PASS separator="" check
+  [ "$doctor_warnings" -eq 0 ] || result=WARN
+  [ "$doctor_failures" -eq 0 ] || result=FAIL
+  if [ "$format" = json ]; then
+    printf '{"schema":1,"result":"%s","checks":[' "$result"
+    for check in "${doctor_checks[@]}"; do
+      printf '%s%s' "$separator" "$check"
+      separator=,
+    done
+    printf ']}\n'
+  else
+    for check in "${doctor_checks[@]}"; do
+      printf '%s\n' "$check"
+    done
+    printf 'RESULT %s\n' "$result"
+  fi
+  [ "$doctor_failures" -eq 0 ] || return 2
+  [ "$doctor_warnings" -eq 0 ] || return 1
+}
+
+path_mode() {
+  stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1" 2>/dev/null || true
+}
+
+path_owner() {
+  stat -c %u "$1" 2>/dev/null || stat -f %u "$1" 2>/dev/null || true
+}
+
+command_doctor() {
+  local format=text parsed="" mode path problem private_permissions=true secret_permissions=true
+  local operator
+  operator=$(id -u)
+  [ $# -eq 0 ] || { [ "$1" = --json ] && [ $# -eq 1 ] || refuse "doctor accepts only --json"; format=json; }
+  doctor_checks=()
+  doctor_warnings=0
+  doctor_failures=0
+  if [ ! -f "$installation_directory/config/installation.conf" ]; then
+    doctor_result FAIL installation "installation.conf is missing"
+    emit_doctor "$format"
+    return $?
+  fi
+  if ! parsed=$( (load_configuration) 2>&1); then
+    doctor_result FAIL configuration "$parsed"
+    emit_doctor "$format"
+    return $?
+  fi
+  acquire_lock
+  load_configuration
+  doctor_result PASS configuration "schema $config_schema, release $config_release, recipe $config_recipe"
+  if [ -L "$installation_directory/current" ] \
+    && [ "$(readlink "$installation_directory/current")" = "releases/$config_release" ] \
+    && [ -f "$installation_directory/current/manifest.json" ]; then
+    read_manifest "$installation_directory/current/manifest.json"
+    if [ "$manifest_revision" = "$config_revision" ] && [ "$manifest_image" = "$config_image" ] \
+      && [ "$manifest_sha256" = "$config_release_manifest_sha256" ]; then
+      if problem=$(verify_release "$installation_directory/releases/$config_release" 2>&1); then
+        doctor_result PASS release "current matches the configured revision, image and file inventory"
+      else
+        doctor_result FAIL release "$problem"
+      fi
+    else
+      doctor_result FAIL release "current does not match installation.conf"
+    fi
+  else
+    doctor_result FAIL release "current is not a release link"
+  fi
+  mode=$(path_mode "$installation_directory/config/.env")
+  if [ "$mode" = 600 ]; then
+    doctor_result PASS permissions ".env is mode 0600"
+  else
+    doctor_result FAIL permissions ".env must be mode 0600"
+  fi
+  for path in "$installation_directory" "$installation_directory/config" \
+    "$installation_directory/secrets" "$installation_directory/backups" \
+    "$installation_directory/releases"; do
+    [ "$(path_mode "$path")" = 700 ] && [ "$(path_owner "$path")" = "$operator" ] \
+      || private_permissions=false
+  done
+  if [ "$private_permissions" = true ]; then
+    doctor_result PASS private-directories "installation state directories are mode 0700"
+  else
+    doctor_result FAIL private-directories "installation state directories must be mode 0700"
+  fi
+  for path in "$installation_directory"/secrets/*; do
+    [ -e "$path" ] || continue
+    if [ -L "$path" ] || [ ! -f "$path" ] || [ "$(path_mode "$path")" != 600 ] \
+      || [ "$(path_owner "$path")" != "$operator" ]; then
+      secret_permissions=false
+    fi
+  done
+  if [ "$secret_permissions" = true ]; then
+    doctor_result PASS secret-files "secret files are regular files with mode 0600"
+  else
+    doctor_result FAIL secret-files "secret files must be regular mode-0600 files"
+  fi
+  if [ -n "$docker_path" ]; then
+    prepare_docker_command
+  fi
+  if [ -n "$docker_path" ] && "${docker_command[@]}" compose version >/dev/null 2>&1; then
+    doctor_result PASS compose "Docker Compose is available"
+    if (compose_command && "${compose[@]}" config --quiet >/dev/null 2>&1); then
+      doctor_result PASS model "the selected Compose model renders"
+    else
+      doctor_result FAIL model "the selected Compose model does not render"
+    fi
+  else
+    doctor_result FAIL compose "Docker with Compose is unavailable"
+  fi
+  if [ -f "$installation_directory/config/local.override.yaml" ]; then
+    doctor_result WARN local-override "config/local.override.yaml is applied but its keys are operator-owned"
+    mode=$(path_mode "$installation_directory/config/local.override.yaml")
+    if [ -L "$installation_directory/config/local.override.yaml" ] \
+      || [ $((8#$mode & 0022)) -ne 0 ] \
+      || [ "$(path_owner "$installation_directory/config/local.override.yaml")" != "$operator" ]; then
+      doctor_result FAIL override-permissions "config/local.override.yaml must be operator-owned and not group- or world-writable"
+    fi
+  fi
+  emit_doctor "$format"
+}
+
+docker_ps() {
+  compose_command
+  "${compose[@]}" ps --format json
+}
+
+docker_components() {
+  compose_command
+  "${compose[@]}" ps --format '{{.Service}}={{if .Health}}{{.Health}}{{else}}{{.State}}{{end}}'
+}
+
+latest_backup_age() {
+  local file newest=0 modified now
+  for file in "$installation_directory"/backups/*; do
+    [ -f "$file" ] || continue
+    modified=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file")
+    [ "$modified" -le "$newest" ] || newest=$modified
+  done
+  [ "$newest" -gt 0 ] || { printf 'unknown'; return; }
+  now=$(date +%s)
+  printf '%s' "$((now - newest))"
+}
+
+command_up() {
+  [ $# -eq 0 ] || refuse "up accepts no options"
+  acquire_lock
+  compose_command
+  "${compose[@]}" up -d
+}
+
+command_status() {
+  local state components infrastructure=unknown bootstrap=pending club_setup=unknown migration=application-startup
+  [ $# -eq 0 ] || refuse "status accepts no options"
+  acquire_lock
+  load_configuration
+  state=$(docker_ps)
+  components=$(docker_components | tr '\n' ',' || true)
+  if [[ "$state" == *'"Health":"healthy"'* ]] && [[ "$state" != *'"State":"exited"'* ]] \
+    && [[ "$state" != *'"Health":"unhealthy"'* ]]; then
+    infrastructure=healthy
+  fi
+  grep -q '^COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD=' "$installation_directory/config/.env" || bootstrap=finalized
+  contains_word "${config_overlays//,/ }" database-identities && migration=one-shot
+  printf 'release=%s\nrevision=%s\nimage=%s\nrecipe=%s\n' \
+    "$config_release" "$config_revision" "$config_image" "$config_recipe"
+  printf 'infrastructure=%s\nbootstrap=%s\nclub_setup=%s\nmigration=%s\n' \
+    "$infrastructure" "$bootstrap" "$club_setup" "$migration"
+  printf 'component_health=%s\n' "${components%,}"
+  if [[ "$state" == *'"Service":"mail"'* ]]; then
+    printf 'mail_handover=running\n'
+  elif [ "$config_recipe" = full-self-hosted ]; then
+    printf 'mail_handover=unavailable\n'
+  else
+    printf 'mail_handover=external\n'
+  fi
+  printf 'backup_age_seconds=%s\n' "$(latest_backup_age)"
+  printf 'free_storage_kib=%s\n' "$(df -Pk "$installation_directory" | awk 'NR == 2 { print $4 }')"
+  [ -f "$installation_directory/config/local.override.yaml" ] \
+    && printf 'local_override=present support=operator-owned keys=unknown\nwarnings=local-override-keys-unknown\n' \
+    || printf 'local_override=absent\nwarnings=none\n'
+}
+
+command_finalize_bootstrap() {
+  local confirmed=false line transaction
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --yes) confirmed=true; shift ;;
+      *) refuse "unknown finalize-bootstrap option $1" ;;
+    esac
+  done
+  [ "$confirmed" = true ] || refuse "finalize-bootstrap requires --yes after the password was replaced"
+  acquire_lock
+  load_configuration
+  transaction=$(mktemp -d "$installation_directory/.transaction.partial.XXXXXX")
+  temporary_path=$transaction
+  chmod 700 "$transaction"
+  umask 077
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      COURTSIDE_BOOTSTRAP_ADMIN_*=*) ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  done < "$installation_directory/config/.env" > "$transaction/.env"
+  chmod 600 "$transaction/.env"
+  : > "$transaction/remove-bootstrap"
+  chmod 600 "$transaction/remove-bootstrap"
+  mv "$transaction" "$installation_directory/.courtside-transaction"
+  temporary_path=""
+  apply_configuration_transaction
+  printf 'Bootstrap values and the bootstrap credential file removed after operator confirmation\n'
+}
+
+command_diagnose() {
+  local state infrastructure=unknown
+  [ $# -eq 0 ] || refuse "diagnose accepts no options"
+  acquire_lock
+  load_configuration
+  state=$(docker_ps 2>/dev/null || true)
+  [[ "$state" == *'"Health":"healthy"'* ]] && infrastructure=healthy
+  printf 'schema=1\nrelease=%s\nrevision=%s\nimage=%s\nrecipe=%s\ninfrastructure=%s\n' \
+    "$config_release" "$config_revision" "$config_image" "$config_recipe" "$infrastructure"
+  [ -f "$installation_directory/config/local.override.yaml" ] \
+    && printf 'local_override=present support=operator-owned\n' \
+    || printf 'local_override=absent\n'
+  printf 'backup_age_seconds=%s\n' "$(latest_backup_age)"
+}
+
+command_uninstall() {
+  local keep_data=false confirmed=false
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --keep-data) keep_data=true; shift ;;
+      --yes) confirmed=true; shift ;;
+      *) refuse "unknown uninstall option $1" ;;
+    esac
+  done
+  [ "$keep_data" = true ] || refuse "only uninstall --keep-data is supported"
+  [ "$confirmed" = true ] || refuse "uninstall --keep-data requires --yes"
+  acquire_lock
+  compose_command
+  "${compose[@]}" down
+  printf 'Containers removed; volumes and %s were kept\n' "$installation_directory"
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --directory)
+      [ $# -ge 2 ] || refuse "--directory needs a path"
+      absolute_installation_directory "$2"
+      shift 2
+      ;;
+    --*) refuse "unknown global option $1" ;;
+    *) break ;;
+  esac
+done
+
+[ -n "$installation_directory" ] || infer_installation_directory
+[ $# -ge 1 ] || refuse "$usage"
+command=$1
+shift
+case "$command" in
+  init) command_init "$@" ;;
+  reconfigure) command_reconfigure "$@" ;;
+  doctor) command_doctor "$@" ;;
+  up) command_up "$@" ;;
+  status) command_status "$@" ;;
+  finalize-bootstrap) command_finalize_bootstrap "$@" ;;
+  diagnose) command_diagnose "$@" ;;
+  uninstall) command_uninstall "$@" ;;
+  *) refuse "$usage" ;;
+esac

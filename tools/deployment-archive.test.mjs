@@ -119,6 +119,8 @@ test("given every recipe the archive ships, when each is resolved from an extrac
   const { zip } = buildArchive({ deploy, ...release });
   scratch((directory) => {
     const root = extracted(zip, directory);
+    assert.ok(statSync(join(root, "courtside")).mode & 0o111,
+      "the archive launcher is not executable");
 
     // when / then
     for (const recipe of recipes) {

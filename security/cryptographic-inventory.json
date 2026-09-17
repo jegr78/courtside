@@ -517,6 +517,36 @@
       ]
     },
     {
+      "id": "deployment-generated-credential",
+      "purpose": "Generate the database, bootstrap administrator, mail and identity credentials for a local club installation",
+      "algorithm": "CSPRNG",
+      "parameters": {
+        "entropyBytes": 24,
+        "encoding": "hexadecimal"
+      },
+      "implementation": "openssl",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 192,
+        "basis": "Twenty-four bytes drawn by openssl rand, so each generated installation credential carries 192 bits of entropy."
+      },
+      "class": "credential-protection",
+      "owner": "club-operator",
+      "storageBoundary": "Owner-only files below the installation's config and secrets directories. The bootstrap administrator credential is kept separately until the operator finalizes bootstrap; no generated credential is printed or written into a release directory.",
+      "permittedUse": "Authenticating the services of one local club installation and the first administrator sign-in. A generated value is never reused across installations.",
+      "rotation": "Reconfiguration retains existing credentials unless the operator deliberately replaces them. The bootstrap credential is replaced through the application and then removed with finalize-bootstrap.",
+      "revocation": "Replace the affected service credential and restart its consumers; finalize-bootstrap removes the initial administrator credential after it has been replaced.",
+      "recovery": "Restore the owner-only configuration and secret backup. If no backup exists, replace the affected credential through that service's recovery procedure rather than attempting to derive it.",
+      "retirement": "Remove the credential with the installation after any retained data has been migrated or destroyed.",
+      "evidence": "tools/deployment-cli.test.mjs",
+      "detects": [
+        "openssl"
+      ],
+      "locations": [
+        "deploy/courtside"
+      ]
+    },
+    {
       "id": "harness-test-certificate",
       "purpose": "Generate the throwaway certificates and key pairs a verification run needs to exercise a TLS path",
       "algorithm": "RSA-3072",
@@ -744,6 +774,7 @@
         "deploy/mail/*.ndjson",
         "deploy/.env.example",
         "deploy/compose.stalwart.yaml",
+        "deploy/courtside",
         "deploy/mail-check.sh",
         "tools/deployment-archive.test.mjs",
         "tools/deployment-recipes.test.mjs",

@@ -36,6 +36,82 @@ To run the image on another platform without these recipes, read the
 [container contract](container-contract.md): what the image requires and what the recipes would
 otherwise supply.
 
+## Install with the deployment CLI
+
+The archive's `courtside` launcher is the supported way to turn a recipe into an installation. It
+is a Bash program and needs no repository checkout or application runtime. The conventional
+location is `/srv/courtside`, but any writable directory works. Create the conventional directory
+once as an administrator, then run the launcher as its owner:
+
+```sh
+sudo install -d -m 0700 -o "$USER" /srv/courtside
+./courtside --directory /srv/courtside init
+```
+
+`init` validates the answers, prints its plan and waits for an explicit `yes` before changing the
+installation. It publishes the archive as a read-only `releases/<version>` directory, changes the
+`current` symlink only after the release and configuration are ready, and keeps mutable state in
+private `config`, `secrets` and `backups` directories. The generated bootstrap credential is shown
+only through a retrieval command; the command never prints the credential itself.
+
+For repeatable installation, put decisions in an answer file and confirm non-interactively:
+
+```ini
+schema=1
+recipe=standard
+project=example-club
+domain=courts.example.org
+bootstrap_username=admin
+bootstrap_display_name=Jane Doe
+source_url=https://github.com/example/courtside
+mail_domain=courts.example.org
+mail_reply_to=board@example.org
+mail_relay_host=smtp.example.org
+mail_relay_username=
+```
+
+```sh
+./courtside --directory /srv/courtside init --answers answers.conf --yes
+```
+
+Answer files contain decisions only. Supply an authenticated relay password as
+`COURTSIDE_MAIL_PASSWORD` and an external database password as `COURTSIDE_DATABASE_PASSWORD` in
+the process environment; the launcher refuses password, token, secret and credential keys in an
+answer file. Optional decisions are `overlays` as a comma-separated list, `synthetic_mail`,
+`rootless_port_start`, external-database settings and custom-image settings. A rootless host may
+select only a forwarded-ingress recipe such as `funnel` or `existing-infrastructure` when its
+unprivileged port threshold excludes ports 80 or 25.
+
+After installation, use the installed launcher so every command follows the selected release:
+
+```sh
+/srv/courtside/current/courtside doctor
+/srv/courtside/current/courtside doctor --json
+/srv/courtside/current/courtside up
+/srv/courtside/current/courtside status
+/srv/courtside/current/courtside diagnose
+```
+
+`doctor --json` exits 0 for `PASS`, 1 for `WARN` and 2 for `FAIL`. `status` reports infrastructure,
+component, bootstrap and club-setup states separately, together with the pinned release identity,
+migration mode, mail handover, backup age, free storage and unresolved warnings. `diagnose` emits
+only operational metadata; it never reads `.env`, backups, mail or member data.
+
+Put deliberate Compose changes in `config/local.override.yaml`. The launcher applies that file
+last and reports its keys as operator-owned and unknown rather than claiming support for them.
+Edit `config/installation.conf` only as data: commands strictly parse and validate its schema and
+never source it as shell. `reconfigure` takes a complete answer file, validates and shows the new
+plan before applying it while preserving `.env` secrets and the local override. Once the bootstrap
+password has been replaced in the application, remove its one-time values with:
+
+```sh
+/srv/courtside/current/courtside finalize-bootstrap --yes
+```
+
+`uninstall --keep-data --yes` removes containers without requesting Compose volume deletion and
+leaves the installation files in place. The launcher never installs packages, changes DNS or
+firewall rules, uploads diagnostics or enables timers.
+
 ## Choose a recipe
 
 `compose.yaml` holds only the database and the application. Everything else is a component file,
