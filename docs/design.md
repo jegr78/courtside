@@ -14,7 +14,8 @@ The detailed contracts have their own sources:
 - [`production-architecture.json`](../security/production-architecture.json) records deployed
   services and trust boundaries.
 - [`security-risks.md`](security-risks.md) records accepted limitations and their bounds.
-- [`deploy/README.md`](../deploy/README.md) is the operator handbook.
+- [`deploy/README.md`](../deploy/README.md) selects a deployment recipe; its linked guides are the
+  canonical English operator handbook.
 
 ## Product boundaries
 
@@ -58,7 +59,7 @@ The reference deployment lives in `deploy/`. Its recipes are `standard`, `full-s
 `existing-infrastructure` and `funnel`. A tagged release also publishes
 `courtside-deployment-<version>.zip`: the four recipes and the resolver that reads them, the Compose
 files any recipe can select, the files those Compose files bind, the configuration example, the
-deployment guide, the container contract and the Bash `courtside` lifecycle launcher, with a
+recipe and operations guides, the container contract and the Bash `courtside` lifecycle launcher, with a
 manifest naming the release, its image digest, its source revision and the release workflow that
 attests it. The launcher publishes read-only versioned releases separately from private mutable
 configuration, secrets and backups beneath a path-bound installation marker. It strictly parses
@@ -75,6 +76,15 @@ repository and SHA-256 algorithm with that manifest digest, so they cannot run a
 explicit `custom-image` overlay composes another repository with a required SHA-256 digest and source URL,
 marks the rendered service as custom, and warns that the official release trust guarantee no
 longer applies.
+
+The CLI recipe files also generate the English and German command fragments. Documentation checks
+fail when a recipe, its resolved Compose files or either committed fragment changes alone. Release
+qualification downloads the archive job's exact bytes, verifies every manifest checksum and binds
+all four recipes to the candidate image digest before the `amd64` and `arm64` runtime journeys.
+The controlled Stalwart journey is a separate publication gate. Its evidence and the image journey
+record archive and image identities, platform and tool versions, and individual results without
+credentials or target addresses. Provider-owned DNS, routing, reputation and delivery observations
+remain warnings or unknown; they never become software passes.
 
 Two interfaces are public compatibility contracts:
 
@@ -421,8 +431,9 @@ single-host installation remains supported without these optional components.
 
 The self-hosted mail recipe uses Stalwart. The application requires STARTTLS and validates its relay
 certificate by default. An operator may explicitly disable issuer and hostname verification for a
-relay whose certificate the container cannot validate; [`deploy/README.md`](../deploy/README.md)
-states what that permits. Other recipes use an operator-selected relay.
+relay whose certificate the container cannot validate; the
+[`operations guide`](../deploy/guides/operations.md) states what that permits. Other recipes use an
+operator-selected relay.
 
 GitHub Actions are pinned by commit. Dependabot reports updates. Build and release scan source and
 images with Trivy. Release and nightly images are signed and carry SBOM and provenance attestations.

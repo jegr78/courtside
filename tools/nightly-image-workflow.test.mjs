@@ -184,7 +184,7 @@ test("given any non-main dispatch, when jobs are evaluated, then publication and
 
 test("given acceptance image documentation, when users read it, then it cannot be mistaken for a release", () => {
   // given
-  const deployment = readFileSync(new URL("../deploy/README.md", import.meta.url), "utf8");
+  const deployment = readFileSync(new URL("../deploy/guides/operations.md", import.meta.url), "utf8");
   const releasing = readFileSync(new URL("../docs/releasing.md", import.meta.url), "utf8");
   const inventory = JSON.parse(readFileSync(
     new URL("../security/cryptographic-inventory.json", import.meta.url), "utf8"));

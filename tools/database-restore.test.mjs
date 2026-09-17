@@ -59,7 +59,7 @@ test("given a release candidate, when release qualification runs, then restore b
   assert.match(workflow, /COURTSIDE_RESTORE_IMAGE:[^\n]+needs\.image\.outputs\.digest/);
   assert.match(workflow, /node tools\/courtside\.restore-smoke\.mjs --confirm courtside-restore/);
   assert.match(workflow,
-    /needs: \[archive, build, browser, image, qualify, security-record, upgrade, restore\]/);
+    /needs: \[archive, build, browser, image, qualify, mail, security-record, upgrade, restore\]/);
   assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.dump/);
   assert.match(workflow, /!build\/database-restore\/\*\*\/\*\.sql/);
 });
@@ -160,7 +160,7 @@ test("given different Docker hosts, when the mail identity is selected, then it 
 
 test("given operator documentation, when backup and restore are followed, then both use the qualified archive format", () => {
   // given
-  const documentation = source("../deploy/README.md");
+  const documentation = source("../deploy/guides/operations.md");
 
   // when / then
   assert.match(documentation, /pg_dump -Fc/);

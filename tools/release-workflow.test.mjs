@@ -20,14 +20,14 @@ test("given a release image, when publishing it, then the same digest is qualifi
   // when / then
   assert.match(workflow, /jobs:\n  nightly-evidence:[\s\S]+\n  build:[\s\S]+\n  image:/);
   assert.match(workflow, /\n  build:\n    needs: nightly-evidence/);
-  assert.match(workflow, /\n  qualify:\n    needs: image/);
+  assert.match(workflow, /\n  qualify:\n    needs: \[archive, image\]/);
   assert.match(workflow, /architecture: amd64[\s\S]+runs-on: ubuntu-latest/);
   assert.match(workflow, /architecture: arm64[\s\S]+runs-on: ubuntu-24\.04-arm/);
   assert.match(workflow, /COURTSIDE_UAT_VERSION: release-candidate-\$\{\{ github\.sha \}\}@\$\{\{ needs\.image\.outputs\.digest \}\}/);
   assert.match(workflow, /node tools\/courtside\.uat-smoke\.mjs --confirm courtside-uat/);
   assert.match(workflow, /\n  security-record:\n    needs: \[build, image, qualify, active-security\]/);
   assert.match(workflow,
-    /\n  publish:\n    needs: \[archive, build, browser, image, qualify, security-record, upgrade, restore\]/);
+    /\n  publish:\n    needs: \[archive, build, browser, image, qualify, mail, security-record, upgrade, restore\]/);
 });
 
 test("given a release build, when browser tests run, then WebKit axe qualification is required", () => {

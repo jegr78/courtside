@@ -9,7 +9,7 @@ import { crc32 } from "node:zlib";
 const YAML = createRequire(new URL("../frontend/package.json", import.meta.url))("yaml");
 
 const roots = ["courtside", "recipe.sh", ".env.example", "README.md", "container-contract.md",
-  "compose.recovery-check.yaml", "examples"];
+  "compose.recovery-check.yaml", "examples", "guides"];
 
 export function recipeNames(deploy) {
   return readdirSync(join(deploy, "recipes")).filter((entry) => entry.endsWith(".recipe"))

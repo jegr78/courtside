@@ -234,6 +234,22 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
 
+      - name: Build and inspect the candidate deployment archive
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+        run: |
+          mkdir -p build/deployment-archive build/uat-smoke
+          version="nightly-${{ needs.select.outputs.short_sha }}"
+          node tools/deployment-archive.mjs --version "$version" \
+            --revision "${{ needs.select.outputs.commit }}" --image "$IMAGE" \
+            --repository "$GITHUB_REPOSITORY" --ref "refs/tags/v$version" \
+            --output build/deployment-archive
+          archive="$GITHUB_WORKSPACE/build/deployment-archive/courtside-deployment-$version.zip"
+          node tools/deployment-qualification.mjs --inspect-archive \
+            --archive "$archive" --destination "$RUNNER_TEMP/courtside-deployment" \
+            --image "$IMAGE" --recipes standard,full-self-hosted,existing-infrastructure,funnel \
+            --output "build/uat-smoke/archive-${{ matrix.architecture }}.json"
+
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io

@@ -868,7 +868,8 @@ public class ReferenceDeploymentSecurityTest {
     void whenReadingSecurityHeaderDocumentation_thenApplicationAndProxyResponsibilitiesStayDistinct()
             throws IOException {
         // given
-        String deploymentGuide = normalized(Files.readString(Path.of("deploy/README.md")));
+        String deploymentGuide = normalized(Files.readString(Path.of("deploy/README.md"))
+                + Files.readString(Path.of("deploy/guides/operations.md")));
         String design = normalized(Files.readString(Path.of("docs/design.md")));
 
         // when / then

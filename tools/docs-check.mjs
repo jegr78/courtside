@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkRiskRegister } from "./risk-register.mjs";
+import { assertGeneratedHandbooks } from "./deployment-handbook.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const documentationTests = [
@@ -100,6 +101,12 @@ function main() {
   if (process.argv.includes("--check")) {
     checkDocumentation(repository);
     checkRiskRegister(repository);
+    assertGeneratedHandbooks({
+      deploy: join(repository, "deploy"),
+      english: join(repository, "deploy/guides/generated-recipes.md"),
+      siteEnglish: join(repository, "site/en/generated-operator-recipes.md"),
+      german: join(repository, "site/generated-operator-recipes.md"),
+    });
     execFileSync(process.execPath, ["--test", ...documentationTests],
       { cwd: repository, shell: false, stdio: "inherit" });
   }

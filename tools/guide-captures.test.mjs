@@ -30,7 +30,11 @@ function sections(source) {
 // picture of another one would illustrate the wrong thing.
 const NO_SCREEN_SHOWS_THIS = {
   "site/member-guide.md": ["Wenn sich unter deiner Buchung etwas ändert"],
-  "site/en/member-guide.md": ["When something under your booking changes"]
+  "site/en/member-guide.md": ["When something under your booking changes"],
+  "site/operator-guide.md": ["Das passende Rezept", "Installation", "Backups und Updates",
+    "Tailscale Funnel", "Was Courtside prüfen kann"],
+  "site/en/operator-guide.md": ["Choose a recipe", "Install", "Backups and updates",
+    "Tailscale Funnel", "What Courtside can verify"]
 };
 
 test("given the captured surfaces, when the guides are read, then each page shows what the "

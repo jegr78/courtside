@@ -23,11 +23,14 @@ assert.ok(acceptanceBlock, "compose.yaml has no closed acceptance-component mani
 const OPERATOR_FACING = ["compose.yaml", ...[overlayBlock, acceptanceBlock].flatMap((block) => [...block.groups
   .entries.matchAll(/^  - (compose[\w.-]+\.yaml)$/gm)].map((match) => match[1]))];
 const compose = OPERATOR_FACING.map(deploymentFile).join("\n");
-const readme = deploymentFile("README.md");
+const operatorDocumentation = ["README.md", "guides/standard.md", "guides/full-self-hosted.md",
+  "guides/existing-infrastructure.md", "guides/funnel.md", "guides/operations.md",
+  "guides/stalwart.md", "guides/hardening.md", "guides/generated-recipes.md"]
+  .map(deploymentFile).join("\n");
 const example = deploymentFile(".env.example");
 const properties = repositoryFile("src/main/resources/application.yaml");
 // A README wraps its lines, so a message quoted in a table may be split anywhere a space is.
-const reflowed = readme.replace(/\s+/g, " ");
+const reflowed = operatorDocumentation.replace(/\s+/g, " ");
 const scripts = {
   "mail-certificate.sh": deploymentFile("mail-certificate.sh"),
   "mail-reload.sh": deploymentFile("mail-reload.sh"),
@@ -72,7 +75,7 @@ test("given the reference deployment, when a variable is read, then it is docume
   () => {
     // given
     const interpolated = named(compose, /\$\{(COURTSIDE_[A-Z0-9_]+)/g);
-    const documented = named(readme, /`(COURTSIDE_[A-Z0-9_]+)`/g);
+    const documented = named(operatorDocumentation, /`(COURTSIDE_[A-Z0-9_]+)`/g);
     const offered = named(example, /^#?\s*(COURTSIDE_[A-Z0-9_]+)=/gm);
 
     // when / then
@@ -92,7 +95,7 @@ test("given the reference deployment, when a variable is read, then it is docume
     }
     // The README says in one sentence which variables it still names after they stopped being read,
     // so the exemption is the documentation's own and not a list kept beside it.
-    const retirement = readme.split("\n\n")
+    const retirement = operatorDocumentation.split("\n\n")
       .find((paragraph) => paragraph.includes("no longer read")) ?? "";
     const retired = named(retirement, /`(COURTSIDE_[A-Z0-9_]+)`/g);
     const read = named(properties, /\$\{(COURTSIDE_[A-Z0-9_]+)/g);
@@ -121,7 +124,7 @@ test("given a certificate container, when it announces a state, then the documen
 
 test("given a documented command, when an operator runs it, then it prints no secret", () => {
   // given
-  const commands = [...readme.matchAll(/```sh\n([\s\S]*?)```/g)].map((match) => match[1]);
+  const commands = [...operatorDocumentation.matchAll(/```sh\n([\s\S]*?)```/g)].map((match) => match[1]);
 
   // when / then
   assert.ok(commands.length > 5, `README.md carries only ${commands.length} shell examples`);
