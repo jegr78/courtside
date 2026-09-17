@@ -1,7 +1,15 @@
 # Changelog
 
-## [0.1.0-rc.2](https://github.com/jegr78/courtside/compare/v0.1.0-rc.1...v0.1.0-rc.2) (2026-09-17)
+## 0.1.0 (2026-09-14)
 
+
+### Notable changes
+
+* a club that points COURTSIDE_MAIL_RELAY_HOST at a relay whose certificate this instance cannot verify must now set COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE=true itself. Until it does, every handover over that hop fails: a message is attempted four times across about a minute and is then settled FAILED with its reason, and the event behind it is replayed only when the instance restarts — which writes a second row and issues a fresh credential, because the first exists only as a hash.
+* load a renewed mail certificate into the running server ([#779](https://github.com/jegr78/courtside/issues/779))
+* the proxy service now requires COURTSIDE_MAIL_HOSTNAME and Caddy obtains a certificate for it, so that name has to point at this host. A deployment that runs the proxy without this deployment's mail server deletes the new site block from Caddyfile; the README says so on the variable's own row.
+* have the instance issue and send every credential, so no board member sees one ([#454](https://github.com/jegr78/courtside/issues/454))
+* **api:** validation codes in fieldErrors entries change for missing, blank, non-positive and unknown-enum values, and field names now carry array indices. The problem type, the status and the fieldErrors shape are unchanged.
 
 ### Features
 
@@ -15,44 +23,6 @@
 * qualify deployment recipes and publish operator handbook ([#1026](https://github.com/jegr78/courtside/issues/1026)) ([ddb262b](https://github.com/jegr78/courtside/commit/ddb262be645db784d9919c5da0f6cc3f3872cfae))
 * route every supported web ingress through Caddy ([#1016](https://github.com/jegr78/courtside/issues/1016)) ([8755959](https://github.com/jegr78/courtside/commit/875595984e67fe5e36d336862752ac1bd3a1adc8))
 * separate database identities on an external database ([#1017](https://github.com/jegr78/courtside/issues/1017)) ([cb36246](https://github.com/jegr78/courtside/commit/cb3624646c580711ca7641828739cdee080c5972))
-
-
-### Bug fixes
-
-* build the local image from the jar this build packaged ([#1001](https://github.com/jegr78/courtside/issues/1001)) ([bbdca60](https://github.com/jegr78/courtside/commit/bbdca60f1aef4288311508eb756918806d7cb582))
-* harden deployment acceptance paths ([3010f55](https://github.com/jegr78/courtside/commit/3010f552825bfea1825c1f641ae864bfaa10a610)), closes [#991](https://github.com/jegr78/courtside/issues/991)
-* keep a cookieless fetch from replacing the csrf token a page holds ([#999](https://github.com/jegr78/courtside/issues/999)) ([38166f5](https://github.com/jegr78/courtside/commit/38166f51dab0fd6a0196a9dd5f8cc95de25c81df))
-* let an account change and its credential mail both survive ([#1021](https://github.com/jegr78/courtside/issues/1021)) ([c7bc948](https://github.com/jegr78/courtside/commit/c7bc948aa1f3021c07ecb436b900ef2b224f29dc))
-* let nightly retention clear its eligible backlog ([#998](https://github.com/jegr78/courtside/issues/998)) ([b915b35](https://github.com/jegr78/courtside/commit/b915b35167c629781515c47341a8a96e15ce2891))
-* normalize prerelease changelog ([#984](https://github.com/jegr78/courtside/issues/984)) ([381672d](https://github.com/jegr78/courtside/commit/381672d4805b9ffea409aecbd66e7f04c4936f7a))
-* preserve cumulative release-line history ([#982](https://github.com/jegr78/courtside/issues/982)) ([6b183ca](https://github.com/jegr78/courtside/commit/6b183ca8d701161ad6b5974df2d99eb1d1f183e9))
-* provision separate database identities without a superuser owner ([#1002](https://github.com/jegr78/courtside/issues/1002)) ([3d76339](https://github.com/jegr78/courtside/commit/3d76339880c1f7572330c432d0707750b3919604))
-* refuse a release tag the repository does not record as its release ([#986](https://github.com/jegr78/courtside/issues/986)) ([62fccb2](https://github.com/jegr78/courtside/commit/62fccb276225d3a1b60f08210c8517cd3ac35e69))
-* show the club logo as the browser tab icon ([#1027](https://github.com/jegr78/courtside/issues/1027)) ([9caa7b0](https://github.com/jegr78/courtside/commit/9caa7b0c9f48e82f42fb18c2237d878d72c8850d))
-* start the identity overlay in the reference recipes ([#1015](https://github.com/jegr78/courtside/issues/1015)) ([c5e9506](https://github.com/jegr78/courtside/commit/c5e9506db9e95600017731962d6f47dc1d4a367a))
-* tolerate unchanged release pull requests ([#1019](https://github.com/jegr78/courtside/issues/1019)) ([e1a8583](https://github.com/jegr78/courtside/commit/e1a8583177f5dffd2df015a4f2d96f3e123b95a6))
-
-
-### Documentation
-
-* capture each guide in a browser that speaks its language ([#979](https://github.com/jegr78/courtside/issues/979)) ([e1fe7d1](https://github.com/jegr78/courtside/commit/e1fe7d154a5e0a23f3778c1f68ddd5e1211184c3))
-* make design specification current ([fd6c036](https://github.com/jegr78/courtside/commit/fd6c036bf9c25cc773e0965cbeb63c4f9cf8761e))
-* make the design specification current ([#1014](https://github.com/jegr78/courtside/issues/1014)) ([fd6c036](https://github.com/jegr78/courtside/commit/fd6c036bf9c25cc773e0965cbeb63c4f9cf8761e))
-* publish the contract a platform runs the image against ([#1003](https://github.com/jegr78/courtside/issues/1003)) ([ae493dc](https://github.com/jegr78/courtside/commit/ae493dce309d39c6b4c0fb02cd2b210d454731ee))
-* rewrite user guidance as handbooks ([#985](https://github.com/jegr78/courtside/issues/985)) ([874a407](https://github.com/jegr78/courtside/commit/874a407f61e5f60974dbd74056abd0ba2053c2bb))
-* show every guide section the surface it describes ([#977](https://github.com/jegr78/courtside/issues/977)) ([1907e7f](https://github.com/jegr78/courtside/commit/1907e7f3a146c27e9e1183bce7fb7ebc61017d72))
-
-## 0.1.0 (2026-09-14)
-
-### Notable changes
-
-* a club that points COURTSIDE_MAIL_RELAY_HOST at a relay whose certificate this instance cannot verify must now set COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE=true itself. Until it does, every handover over that hop fails: a message is attempted four times across about a minute and is then settled FAILED with its reason, and the event behind it is replayed only when the instance restarts — which writes a second row and issues a fresh credential, because the first exists only as a hash.
-* load a renewed mail certificate into the running server ([#779](https://github.com/jegr78/courtside/issues/779))
-* the proxy service now requires COURTSIDE_MAIL_HOSTNAME and Caddy obtains a certificate for it, so that name has to point at this host. A deployment that runs the proxy without this deployment's mail server deletes the new site block from Caddyfile; the README says so on the variable's own row.
-* have the instance issue and send every credential, so no board member sees one ([#454](https://github.com/jegr78/courtside/issues/454))
-* **api:** validation codes in fieldErrors entries change for missing, blank, non-positive and unknown-enum values, and field names now carry array indices. The problem type, the status and the fieldErrors shape are unchanged.
-
-### Features
 
 * add a dedicated tooling test profile ([#625](https://github.com/jegr78/courtside/issues/625)) ([2722b3d](https://github.com/jegr78/courtside/commit/2722b3d4325a38e8e1bafc30865138134c2ff6b9))
 * add bounded database identities ([#862](https://github.com/jegr78/courtside/issues/862)) ([156c8f5](https://github.com/jegr78/courtside/commit/156c8f52ba68d69b8770bbef3db6f0ddc4ea1394))
@@ -177,8 +147,20 @@
 * verify the bundled mail server's certificate instead of trusting it ([#783](https://github.com/jegr78/courtside/issues/783)) ([e0be4af](https://github.com/jegr78/courtside/commit/e0be4af4c33e1b62d0021d02b50da1617bfdbdc7))
 * write to a member in the language they read ([#447](https://github.com/jegr78/courtside/issues/447)) ([596ce57](https://github.com/jegr78/courtside/commit/596ce576320ebf65ae3727d3e5059afdac42c5ef))
 
-
 ### Bug fixes
+
+* build the local image from the jar this build packaged ([#1001](https://github.com/jegr78/courtside/issues/1001)) ([bbdca60](https://github.com/jegr78/courtside/commit/bbdca60f1aef4288311508eb756918806d7cb582))
+* harden deployment acceptance paths ([3010f55](https://github.com/jegr78/courtside/commit/3010f552825bfea1825c1f641ae864bfaa10a610)), closes [#991](https://github.com/jegr78/courtside/issues/991)
+* keep a cookieless fetch from replacing the csrf token a page holds ([#999](https://github.com/jegr78/courtside/issues/999)) ([38166f5](https://github.com/jegr78/courtside/commit/38166f51dab0fd6a0196a9dd5f8cc95de25c81df))
+* let an account change and its credential mail both survive ([#1021](https://github.com/jegr78/courtside/issues/1021)) ([c7bc948](https://github.com/jegr78/courtside/commit/c7bc948aa1f3021c07ecb436b900ef2b224f29dc))
+* let nightly retention clear its eligible backlog ([#998](https://github.com/jegr78/courtside/issues/998)) ([b915b35](https://github.com/jegr78/courtside/commit/b915b35167c629781515c47341a8a96e15ce2891))
+* normalize prerelease changelog ([#984](https://github.com/jegr78/courtside/issues/984)) ([381672d](https://github.com/jegr78/courtside/commit/381672d4805b9ffea409aecbd66e7f04c4936f7a))
+* preserve cumulative release-line history ([#982](https://github.com/jegr78/courtside/issues/982)) ([6b183ca](https://github.com/jegr78/courtside/commit/6b183ca8d701161ad6b5974df2d99eb1d1f183e9))
+* provision separate database identities without a superuser owner ([#1002](https://github.com/jegr78/courtside/issues/1002)) ([3d76339](https://github.com/jegr78/courtside/commit/3d76339880c1f7572330c432d0707750b3919604))
+* refuse a release tag the repository does not record as its release ([#986](https://github.com/jegr78/courtside/issues/986)) ([62fccb2](https://github.com/jegr78/courtside/commit/62fccb276225d3a1b60f08210c8517cd3ac35e69))
+* show the club logo as the browser tab icon ([#1027](https://github.com/jegr78/courtside/issues/1027)) ([9caa7b0](https://github.com/jegr78/courtside/commit/9caa7b0c9f48e82f42fb18c2237d878d72c8850d))
+* start the identity overlay in the reference recipes ([#1015](https://github.com/jegr78/courtside/issues/1015)) ([c5e9506](https://github.com/jegr78/courtside/commit/c5e9506db9e95600017731962d6f47dc1d4a367a))
+* tolerate unchanged release pull requests ([#1019](https://github.com/jegr78/courtside/issues/1019)) ([e1a8583](https://github.com/jegr78/courtside/commit/e1a8583177f5dffd2df015a4f2d96f3e123b95a6))
 
 * accept project-local browser lifecycle positions ([#636](https://github.com/jegr78/courtside/issues/636)) ([e6dc61e](https://github.com/jegr78/courtside/commit/e6dc61ea46d2b4a64dc317c27fbab37ed80121f1))
 * align profile evidence with five-job topology ([#627](https://github.com/jegr78/courtside/issues/627)) ([247e29e](https://github.com/jegr78/courtside/commit/247e29ec91fd8f7d5943e415b28a6f6890041f50))
@@ -353,15 +335,20 @@
 * verify local profiles from a pinned commit ([#696](https://github.com/jegr78/courtside/issues/696)) ([b1dda05](https://github.com/jegr78/courtside/commit/b1dda0590bf5371cd84faeb1008262d5f62f279c))
 * verify the certificate served after mail reload ([#832](https://github.com/jegr78/courtside/issues/832)) ([eb4fa0f](https://github.com/jegr78/courtside/commit/eb4fa0f8ce0134004a86ffadc3ee2eec757a25e9))
 
-
 ### Performance
 
 * bound booking series rule queries ([#316](https://github.com/jegr78/courtside/issues/316)) ([e96323e](https://github.com/jegr78/courtside/commit/e96323e31c7d35f81049728ae3c69583fcab8396))
 * load the club time zone without its logo ([#710](https://github.com/jegr78/courtside/issues/710)) ([0cbe52a](https://github.com/jegr78/courtside/commit/0cbe52a340aadad41184e1f3c1762d36489984bc))
 * resolve series move memberships once per batch ([#711](https://github.com/jegr78/courtside/issues/711)) ([8614451](https://github.com/jegr78/courtside/commit/8614451315b5cd24382dab52e2fc6e8375aa0631))
 
-
 ### Documentation
+
+* capture each guide in a browser that speaks its language ([#979](https://github.com/jegr78/courtside/issues/979)) ([e1fe7d1](https://github.com/jegr78/courtside/commit/e1fe7d154a5e0a23f3778c1f68ddd5e1211184c3))
+* make design specification current ([fd6c036](https://github.com/jegr78/courtside/commit/fd6c036bf9c25cc773e0965cbeb63c4f9cf8761e))
+* make the design specification current ([#1014](https://github.com/jegr78/courtside/issues/1014)) ([fd6c036](https://github.com/jegr78/courtside/commit/fd6c036bf9c25cc773e0965cbeb63c4f9cf8761e))
+* publish the contract a platform runs the image against ([#1003](https://github.com/jegr78/courtside/issues/1003)) ([ae493dc](https://github.com/jegr78/courtside/commit/ae493dce309d39c6b4c0fb02cd2b210d454731ee))
+* rewrite user guidance as handbooks ([#985](https://github.com/jegr78/courtside/issues/985)) ([874a407](https://github.com/jegr78/courtside/commit/874a407f61e5f60974dbd74056abd0ba2053c2bb))
+* show every guide section the surface it describes ([#977](https://github.com/jegr78/courtside/issues/977)) ([1907e7f](https://github.com/jegr78/courtside/commit/1907e7f3a146c27e9e1183bce7fb7ebc61017d72))
 
 * add a contributing guide and a code of conduct ([#852](https://github.com/jegr78/courtside/issues/852)) ([d3a98af](https://github.com/jegr78/courtside/commit/d3a98afab062010ddcf09f22025d7c5ff0b7a5b1))
 * answer what a club changes in its mail server before real use ([#757](https://github.com/jegr78/courtside/issues/757)) ([2e6b43a](https://github.com/jegr78/courtside/commit/2e6b43a3ef07639704845368c1cb59948a501ca5))
@@ -402,7 +389,6 @@
 * show the member and board guides what they describe ([#966](https://github.com/jegr78/courtside/issues/966)) ([a3696ed](https://github.com/jegr78/courtside/commit/a3696ed9216d1930bbe5c3a6177edeb0bd3ca465))
 * state the WebKit gate as final, not provisional ([#776](https://github.com/jegr78/courtside/issues/776)) ([ff14ab1](https://github.com/jegr78/courtside/commit/ff14ab1356bfce9eb33a4d6f559475736ca8e64d)), closes [#474](https://github.com/jegr78/courtside/issues/474)
 * stop the assessment from filing an issue for every unprovable control ([#910](https://github.com/jegr78/courtside/issues/910)) ([8740314](https://github.com/jegr78/courtside/commit/87403146786f632a5c7006fa0de871bb65978cf7))
-
 
 ### Build and dependencies
 
@@ -469,3 +455,4 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
+
