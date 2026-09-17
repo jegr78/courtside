@@ -199,9 +199,10 @@ what a club unpacks is what was attested. Before anything reaches the registry, 
 the archive again from the tagged tree and requires the same bytes. The contents are derived rather
 than listed by hand: every Compose file the shipped resolver can emit, every file those Compose
 files name, the recipes, the configuration example, the deployment guide and the container
-contract. `tools/deployment-archive.test.mjs` unpacks the archive into an empty directory and
-renders every recipe with every overlay from there, which fails if anything they bind lives only in
-this repository.
+contract, together with the standalone Bash lifecycle launcher. `tools/deployment-archive.test.mjs`
+unpacks the archive into an empty directory and renders every recipe with every overlay from there,
+which fails if anything they bind lives only in this repository or if the launcher loses its
+executable mode.
 
 ## When a release fails
 

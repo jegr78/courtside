@@ -58,13 +58,17 @@ The reference deployment lives in `deploy/`. Its recipes are `standard`, `full-s
 `existing-infrastructure` and `funnel`. A tagged release also publishes
 `courtside-deployment-<version>.zip`: the four recipes and the resolver that reads them, the Compose
 files any recipe can select, the files those Compose files bind, the configuration example, the
-deployment guide and the container contract, with a manifest naming the release, its image digest,
-its source revision and the release workflow that attests it. The manifest carries a checksum per
+deployment guide, the container contract and the Bash `courtside` lifecycle launcher, with a
+manifest naming the release, its image digest, its source revision and the release workflow that
+attests it. The launcher publishes read-only versioned releases separately from private mutable
+configuration, secrets and backups. It strictly parses its versioned configuration as data and
+resolves every Compose invocation from the selected recipe. The manifest carries a checksum per
 file and the release page carries one for the archive. Installing from it needs no clone of this
-repository. The official recipes compose the fixed GHCR repository and SHA-256 algorithm with that
-manifest digest, so they cannot run a moving tag. An explicit `custom-image` overlay composes
-another repository with a required SHA-256 digest and source URL, marks the rendered service as
-custom, and warns that the official release trust guarantee no longer applies.
+repository or application runtime. The official recipes compose the fixed GHCR repository and
+SHA-256 algorithm with that manifest digest, so they cannot run a moving tag. An explicit
+`custom-image` overlay composes another repository with a required SHA-256 digest and source URL,
+marks the rendered service as custom, and warns that the official release trust guarantee no
+longer applies.
 
 Two interfaces are public compatibility contracts:
 
