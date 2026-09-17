@@ -285,7 +285,8 @@ Routine board settings belong in the database and administration UI. Process wir
 dependencies belong to deployment configuration.
 
 The public configuration contains club identity, legal links, time zone, language and grid duration.
-The PWA manifest uses the same identity. Logo URLs are root-relative or HTTPS. Remote logos disclose
+The PWA manifest and the browser tab icon use the same identity: the club logo, or the Courtside mark
+while none is set. Logo URLs are root-relative or HTTPS. Remote logos disclose
 the visitor's address and Courtside origin to their host, so club-hosted images are preferred.
 
 Grid changes are refused when active or future bookings or opening hours no longer align. Time-zone

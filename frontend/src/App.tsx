@@ -115,6 +115,18 @@ function applyBranding(config: ClubConfig) {
   document.documentElement.style.setProperty("--club-primary", config.primaryColor);
   document.documentElement.style.setProperty("--club-primary-text", contrastColor(config.primaryColor));
   document.documentElement.style.setProperty("--club-accent", config.accentColor);
+  applyTabIcon(config.logoUrl ?? "/icon.svg");
+}
+
+function applyTabIcon(href: string) {
+  let icon = document.head.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (!icon) {
+    icon = document.createElement("link");
+    icon.rel = "icon";
+    document.head.appendChild(icon);
+  }
+  icon.removeAttribute("type");
+  icon.setAttribute("href", href);
 }
 
 function contrastColor(color: string): string {
