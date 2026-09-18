@@ -460,8 +460,16 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             <TextField data-testid="new-rule-set-name" disabled={pending} name="name" maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.newRuleSet")} />
             <Button variant="primary" data-testid="create-rule-set" disabled={pending} type="submit">{t("admin.create")}</Button>
           </form>
-          <div className="grid gap-4">
-            {ruleTypes.map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} remove={removeRule} />)}
+          <div data-testid="rule-set-rules" className="grid gap-4">
+            <h3 data-testid="rule-set-rules-heading" className="text-xl font-bold">{t("admin.rules.ofRuleSet")}</h3>
+            {ruleTypes.filter((type) => type.configurable).map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} remove={removeRule} />)}
+          </div>
+          <div data-testid="club-wide-rules" className="grid gap-4">
+            <div className="grid gap-1">
+              <h3 data-testid="club-wide-rules-heading" className="text-xl font-bold">{t("admin.rules.clubWide")}</h3>
+              <p data-testid="club-wide-rules-note" className="text-muted text-sm">{t("admin.rules.clubWideHelp")}</p>
+            </div>
+            {ruleTypes.filter((type) => !type.configurable).map((type) => <RuleEditor key={type.ruleType} type={type} definition={undefined} disabled save={saveRule} remove={removeRule} />)}
           </div>
         </div>
       </>}
@@ -483,7 +491,7 @@ function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTy
   const mark = `rule:${type.ruleType}`;
   const unsaved = differs(params, saved);
   return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
-    <div><h3 data-testid={`rule-${type.ruleType}-title`} className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h3>{!type.configurable && <GlobalRuleLink ruleType={type.ruleType} />}</div>
+    <div><h4 data-testid={`rule-${type.ruleType}-title`} className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>{!type.configurable && <GlobalRuleLink ruleType={type.ruleType} />}</div>
     {type.configurable && <>
       {type.parameters.length === 0 && <p data-testid={`rule-${type.ruleType}-description`} className="text-muted text-sm">{t(`admin.rules.description.${type.ruleType}`, { defaultValue: "" })}</p>}
       {type.parameters.map((parameter) => <div key={parameter.name} className="grid gap-1">
