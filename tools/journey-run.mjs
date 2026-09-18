@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { journeyIndex } from "./journey-index.mjs";
@@ -32,10 +32,13 @@ const run = spawnSync(process.execPath, [cli, "test", "--reporter=list,json,html
   }
 });
 
+const clicked = resolve(clickable, "index.html");
+const produced = existsSync(clicked) ? clicked : undefined;
+
 let written = false;
 try {
   writeFileSync(resolve(directory, "index.md"),
-    journeyIndex(JSON.parse(readFileSync(report, "utf8")), startedAt, directory));
+    journeyIndex(JSON.parse(readFileSync(report, "utf8")), startedAt, directory, produced));
   written = true;
 } catch (unreadable) {
   console.error(`The run left no report to index: ${unreadable.message}`);
@@ -43,5 +46,5 @@ try {
 
 console.log(`Journey run: ${directory}`);
 if (written) console.log(`Index: ${resolve(directory, "index.md")}`);
-console.log(`Report: ${resolve(clickable, "index.html")}`);
+if (produced) console.log(`Report: ${produced}`);
 process.exit(run.status ?? 1);

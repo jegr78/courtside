@@ -44,7 +44,7 @@ function cell(row, kind, directory) {
   return found ? `[${kind}](${encodeURI(relative(directory, found.path))})` : "—";
 }
 
-export function journeyIndex(report, startedAt, directory) {
+export function journeyIndex(report, startedAt, directory, clickable) {
   const rows = journeyRows(report);
   const failed = rows.filter((row) => row.outcome !== "expected").length;
   return [
@@ -52,8 +52,11 @@ export function journeyIndex(report, startedAt, directory) {
     "",
     `Started ${startedAt}. ${rows.length} runs, ${failed} of them not as expected.`,
     "",
-    "Every run with its video, trace and steps in one place: [report](report/index.html).",
-    "",
+    ...(clickable ? [
+      `Every run with its video, trace and steps in one place: [report](${
+        encodeURI(relative(directory, clickable))}).`,
+      ""
+    ] : []),
     "| Journey | Device | Language | Outcome | Seconds | Video | Trace | Screenshot |",
     "|---|---|---|---|---|---|---|---|",
     ...rows.map((row) => `| ${row.journey} | ${row.device} | ${row.language} | ${row.outcome}`

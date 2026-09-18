@@ -89,9 +89,18 @@ test("given a run that left nothing behind, when the index is written, then the 
 
 test("given a recorded run, when the index is written, then it opens with the report a reviewer clicks through", () => {
   // when
-  const index = journeyIndex(REPORT, "2026-09-13T20:00:00Z", "/runs");
+  const index = journeyIndex(REPORT, "2026-09-13T20:00:00Z", "/runs", "/runs/report/index.html");
 
   // then
   assert.match(index, /\[report\]\(report\/index\.html\)/);
   assert.ok(index.indexOf("[report](report/index.html)") < index.indexOf("| Journey |"));
+});
+
+test("given a run whose reporter wrote nothing, when the index is written, then it links no report", () => {
+  // when
+  const index = journeyIndex(REPORT, "2026-09-13T20:00:00Z", "/runs");
+
+  // then
+  assert.doesNotMatch(index, /\[report\]/);
+  assert.match(index, /1 runs, 0 of them not as expected/);
 });
