@@ -58,7 +58,7 @@ const separateIdentities = {
   COURTSIDE_DB_RUNTIME_PASSWORD_FILE: "/srv/courtside/database-runtime-password",
 };
 const syntheticMail = {
-  COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES: "/srv/courtside/acceptance-mail",
+  COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES: "/srv/courtside-acceptance-mail",
   COURTSIDE_ACCEPTANCE_MAIL_USER: "1000:1000",
 };
 
