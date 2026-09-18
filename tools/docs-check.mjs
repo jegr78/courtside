@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, normalize, resolve } from "node:path";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkRiskRegister } from "./risk-register.mjs";
 import { assertGeneratedHandbooks } from "./deployment-handbook.mjs";
@@ -10,6 +10,7 @@ export const documentationTests = [
   "tools/docs-check.test.mjs",
   "tools/github-template-metadata.test.mjs",
   "tools/quality-strategy.test.mjs",
+  "tools/roster-import-example.test.mjs",
   "tools/risk-register.test.mjs",
   "tools/post-merge-policy.test.mjs",
   "tools/test-profile-contract.test.mjs"
@@ -76,8 +77,12 @@ function validateLinks(root, sourcePath, source, documents) {
     if (/^(?:https?:|mailto:)/.test(target)) continue;
     const [rawPath, rawFragment] = target.split("#", 2);
     const decodedPath = decodeURIComponent(rawPath);
-    const resolved = normalize(join(dirname(sourcePath), decodedPath || "."));
-    if (resolved.startsWith("..") || resolve(root, resolved) === root && decodedPath !== "") {
+    const publicSitePath = sourcePath.startsWith("site/") && decodedPath.startsWith("/examples/");
+    const resolved = publicSitePath
+      ? normalize(join("site/public", decodedPath.slice(1)))
+      : normalize(join(dirname(sourcePath), decodedPath || "."));
+    if (resolved.startsWith("..") || publicSitePath && !resolved.startsWith(normalize("site/public/"))
+      || resolve(root, resolved) === root && decodedPath !== "") {
       throw new Error(`${sourcePath} links outside the repository`);
     }
     const repositoryPath = decodedPath === "" ? sourcePath : resolved.replaceAll("\\", "/");
@@ -85,9 +90,37 @@ function validateLinks(root, sourcePath, source, documents) {
     if (document === undefined && !existsSync(join(root, repositoryPath))) {
       throw new Error(`${sourcePath} links to ${repositoryPath}, which does not exist`);
     }
+    if (publicSitePath) validatePublishedAsset(root, repositoryPath, sourcePath);
     if (rawFragment && document !== undefined && !headingAnchors(document).has(decodeURIComponent(rawFragment))) {
       throw new Error(`${sourcePath} links to missing anchor ${rawFragment} in ${repositoryPath}`);
     }
+  }
+}
+
+function validatePublishedAsset(root, repositoryPath, sourcePath) {
+  const publicRoot = resolve(root, "site/public");
+  const candidate = resolve(root, repositoryPath);
+  const relativeToPublic = relative(publicRoot, candidate);
+  if (relativeToPublic.startsWith(`..${sep}`) || relativeToPublic === ".." || isAbsolute(relativeToPublic)) {
+    throw new Error(`${sourcePath} links outside the public site directory`);
+  }
+
+  let component = resolve(root);
+  for (const segment of relative(resolve(root), candidate).split(sep)) {
+    component = join(component, segment);
+    if (lstatSync(component).isSymbolicLink()) {
+      throw new Error(`${sourcePath} links through a symbolic link at ${relative(root, component)}`);
+    }
+  }
+  if (!lstatSync(candidate).isFile()) {
+    throw new Error(`${sourcePath} links to ${repositoryPath}, which is not a regular file`);
+  }
+
+  const canonicalPublicRoot = realpathSync(publicRoot);
+  const canonicalTarget = realpathSync(candidate);
+  const canonicalRelative = relative(canonicalPublicRoot, canonicalTarget);
+  if (canonicalRelative.startsWith(`..${sep}`) || canonicalRelative === ".." || isAbsolute(canonicalRelative)) {
+    throw new Error(`${sourcePath} links outside the public site directory`);
   }
 }
 

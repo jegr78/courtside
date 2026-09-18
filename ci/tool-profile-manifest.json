@@ -106,6 +106,7 @@
     { "path": "tools/release-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/resource-demand-inventory.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/role-inventory.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/roster-import-example.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-anchored-control-run.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/security-anchored-control-run.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-api-document.mjs", "profiles": ["full"], "test": false },

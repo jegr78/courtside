@@ -12,6 +12,8 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -21,6 +23,31 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SnapshotParserTest {
 
     private static final Map<String, CanonicalField> COLUMNS = columns();
+
+    @Test
+    void givenThePublishedAcceptanceRoster_whenParsing_thenEverySyntheticMemberIsAccepted() {
+        // given
+        byte[] content = repositoryFixture("site/public/examples/roster-import-example.csv");
+        byte[] update = repositoryFixture("site/public/examples/roster-import-example-update.csv");
+
+        // when
+        CsvSnapshot snapshot = SnapshotParser.parse(content, COLUMNS, StandardCharsets.UTF_8, ';');
+        CsvSnapshot updatedSnapshot = SnapshotParser.parse(update, COLUMNS, StandardCharsets.UTF_8, ';');
+
+        // then
+        assertThat(snapshot.errors()).isEmpty();
+        assertThat(snapshot.ignoredColumns()).isEmpty();
+        assertThat(snapshot.rows()).hasSize(24);
+        assertThat(snapshot.rows())
+                .filteredOn(row -> "Adult".equals(row.values().get(CanonicalField.MEMBERSHIP_TYPE)))
+                .hasSize(18);
+        assertThat(snapshot.rows())
+                .filteredOn(row -> "Junior".equals(row.values().get(CanonicalField.MEMBERSHIP_TYPE)))
+                .hasSize(6);
+        assertThat(updatedSnapshot.errors()).isEmpty();
+        assertThat(updatedSnapshot.ignoredColumns()).isEmpty();
+        assertThat(updatedSnapshot.rows()).hasSize(23);
+    }
 
     @Test
     void givenAFileWrittenWithAByteOrderMark_whenParsing_thenTheFirstHeaderIsStillRecognised() {
@@ -460,6 +487,14 @@ class SnapshotParserTest {
                 .getResourceAsStream("/dataexchange/" + name)) {
             assertThat(stream).as(name).isNotNull();
             return stream.readAllBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static byte[] repositoryFixture(String path) {
+        try {
+            return Files.readAllBytes(Path.of(path));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

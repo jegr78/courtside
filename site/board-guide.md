@@ -222,6 +222,46 @@ Mitgliedsnummern einer Importquelle.
 Nutze den Import, wenn eine andere Mitgliederverwaltung die führende Liste des Vereins
 enthält. Der Ablauf besteht aus Quelle, Vorschau und Ausführung.
 
+### Beispiel für einen Probelauf
+
+Die [vollständige Beispieldatei](/examples/roster-import-example.csv) enthält 24 erfundene
+Personen: 18 Erwachsene und 6 Jugendliche. Die
+[geänderte Beispieldatei](/examples/roster-import-example-update.csv) enthält 23 dieser Personen.
+Sie ändert die E-Mail-Adresse von `EX-1001`, ordnet `EX-1002` der Kategorie `Junior` zu und lässt
+`EX-2006` weg. Alle Adressen verwenden die reservierte Domain `example.org`.
+
+Bereite für einen reproduzierbaren Probelauf eine frische Testinstanz so vor:
+
+1. Lege aktive Mitgliedsarten namens `Adult` und `Junior` an. Aktiviere bei beiden
+   *Zugang beim Import anlegen*, wenn der Probelauf auch die Kontoerstellung prüfen soll.
+2. Lege eine Importquelle namens `Acceptance example` mit UTF-8 und dem Trennzeichen Semikolon an.
+3. Ordne die Spalten wie folgt zu:
+
+| CSV-Spalte | Courtside-Feld |
+|---|---|
+| `Member number` | Mitgliedsnummer |
+| `First name` | Vorname |
+| `Last name` | Nachname |
+| `Email` | E-Mail-Adresse |
+| `Category` | Kategorie |
+
+4. Ordne den Wert `Adult` der gleichnamigen Mitgliedsart und `Junior` der gleichnamigen
+   Mitgliedsart zu. Markiere Vorname, Nachname, E-Mail-Adresse und Kategorie als von der Quelle
+   geführte Felder.
+
+Spiele die Dateien in dieser Reihenfolge durch:
+
+| Schritt | Datei und Modus | Erwartetes Ergebnis |
+|---|---|---|
+| Erstimport | vollständige Datei, vollständige Liste | Die Vorschau zeigt 24 neue Personen, davon 18 `Adult` und 6 `Junior`. Bei aktivierter Kontoerstellung plant sie 24 Konten. Nach der Ausführung enthält eine Personenliste, die vorher nur das Administratorkonto enthielt, zusätzlich 24 Personen. |
+| Wiederholung | vollständige Datei, vollständige Liste | Die Vorschau enthält keine Personenänderung, keine neue Mitgliedschaft und kein neues Konto. |
+| Teilliste | geänderte Datei, Teilliste | Die Vorschau ändert zwei Personen. `EX-2006` bleibt mit laufender Mitgliedschaft erhalten, weil eine Teilliste fehlende Zeilen ignoriert. |
+| Ausgangsdaten wiederherstellen | vollständige Datei, Teilliste | Die beiden geänderten Werte werden zurückgesetzt. Alle 24 importierten Mitgliedschaften laufen wieder im Ausgangszustand. |
+| Vollständige Liste | geänderte Datei, vollständige Liste | Die Vorschau ändert zwei Personen und warnt vor einer endenden Mitgliedschaft. Nach der Ausführung bleiben 24 Personen gespeichert, davon haben 23 eine laufende Mitgliedschaft. Das reine Mitgliedskonto von `EX-2006` wird deaktiviert. |
+
+Führe den letzten Schritt nur in einer Testinstanz aus. Ein späterer Import aktiviert ein dadurch
+deaktiviertes Konto oder eine entfernte Mitgliedsrolle nicht automatisch wieder.
+
 ### 1. Quelle beschreiben
 
 Hinterlege Bezeichnung, Trennzeichen, Zeichensatz und Spaltenzuordnung. Ordne externe
