@@ -86,3 +86,12 @@ test("given a run that left nothing behind, when the index is written, then the 
   // then
   assert.match(index, /\| — \| — \| — \|/);
 });
+
+test("given a recorded run, when the index is written, then it opens with the report a reviewer clicks through", () => {
+  // when
+  const index = journeyIndex(REPORT, "2026-09-13T20:00:00Z", "/runs");
+
+  // then
+  assert.match(index, /\[report\]\(report\/index\.html\)/);
+  assert.ok(index.indexOf("[report](report/index.html)") < index.indexOf("| Journey |"));
+});

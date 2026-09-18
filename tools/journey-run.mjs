@@ -11,19 +11,24 @@ const startedAt = new Date().toISOString();
 // The directory carries the moment, so the run a release cites cannot be overwritten by the next.
 const directory = resolve(root, "build", "journeys", startedAt.replace(/[:.]/g, "-"));
 const report = resolve(directory, "results.json");
+const clickable = resolve(directory, "report");
 mkdirSync(directory, { recursive: true });
 
 const cli = createRequire(resolve(frontend, "package.json")).resolve("@playwright/test/cli");
 // The catalogue is what this run records; without the path every other project in the
 // configuration runs too, and the index refuses a run it cannot name a device and a language for.
-const run = spawnSync(process.execPath, [cli, "test", "--reporter=list,json",
+const run = spawnSync(process.execPath, [cli, "test", "--reporter=list,json,html",
   `--output=${resolve(directory, "artefacts")}`, "e2e/journeys", ...process.argv.slice(2)], {
   cwd: frontend,
   stdio: "inherit",
   env: {
     ...process.env,
     COURTSIDE_JOURNEY_RUN: "true",
-    PLAYWRIGHT_JSON_OUTPUT_NAME: report
+    PLAYWRIGHT_JSON_OUTPUT_NAME: report,
+    PLAYWRIGHT_HTML_OUTPUT_DIR: clickable,
+    // Without this the reporter serves the report and waits, so a run that walked 78 journeys
+    // would hold the terminal instead of ending.
+    PLAYWRIGHT_HTML_OPEN: "never"
   }
 });
 
@@ -38,4 +43,5 @@ try {
 
 console.log(`Journey run: ${directory}`);
 if (written) console.log(`Index: ${resolve(directory, "index.md")}`);
+console.log(`Report: ${resolve(clickable, "index.html")}`);
 process.exit(run.status ?? 1);

@@ -52,6 +52,8 @@ export function journeyIndex(report, startedAt, directory) {
     "",
     `Started ${startedAt}. ${rows.length} runs, ${failed} of them not as expected.`,
     "",
+    "Every run with its video, trace and steps in one place: [report](report/index.html).",
+    "",
     "| Journey | Device | Language | Outcome | Seconds | Video | Trace | Screenshot |",
     "|---|---|---|---|---|---|---|---|",
     ...rows.map((row) => `| ${row.journey} | ${row.device} | ${row.language} | ${row.outcome}`
