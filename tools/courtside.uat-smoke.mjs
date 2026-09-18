@@ -122,10 +122,11 @@ const plaintextBody = "plaintext-body-canary";
 const cookies = new Map();
 let resetPassword;
 
+// The bootstrap password only reaches an instance whose database has no account yet, so a run
+// against a started UAT would sign in with a password that instance never had.
+cli(["uat-reset", "courtside-uat"]);
+
 try {
-  // The bootstrap password only reaches an instance whose database has no account yet, so a run
-  // against a started UAT would sign in with a password that instance never had.
-  cli(["uat-reset", "courtside-uat", "--all"]);
   const startArguments = ["uat", "--no-credential-output", ...(version ? ["--version", version] : ["--skip-verify"])];
   cli(startArguments, { ...smokeEnvironment, COURTSIDE_UAT_BOOTSTRAP_PASSWORD: password });
   const appBefore = composeRun("ps", "-q", "app");
