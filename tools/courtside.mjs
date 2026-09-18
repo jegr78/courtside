@@ -1709,7 +1709,9 @@ export function uatResetPlans(all) {
   }
   return [
     { command: "docker", args: [...uatComposeArgs(), "down", "--remove-orphans"] },
-    { command: "docker", args: ["volume", "rm", `${uatProject}_db`] }
+    // A reset states that nothing is left, so it also answers for an environment that never existed:
+    // without --force, docker refuses a volume it cannot find.
+    { command: "docker", args: ["volume", "rm", "--force", `${uatProject}_db`] }
   ];
 }
 

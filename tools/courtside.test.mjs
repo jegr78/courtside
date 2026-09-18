@@ -1441,9 +1441,17 @@ test("given UAT reset modes, when planning cleanup, then the CA is removed only 
   const all = uatResetPlans(true);
 
   // then
-  assert.deepEqual(databaseOnly[1].args, ["volume", "rm", "courtside-uat_db"]);
+  assert.deepEqual(databaseOnly[1].args, ["volume", "rm", "--force", "courtside-uat_db"]);
   assert.equal(databaseOnly.flatMap((plan) => plan.args).includes("--volumes"), false);
   assert.equal(all[0].args.includes("--volumes"), true);
+});
+
+test("given an environment that was never created, when it is reset, then the removal does not refuse a volume it cannot find", () => {
+  // when
+  const databaseOnly = uatResetPlans(false);
+
+  // then
+  assert.equal(databaseOnly[1].args.includes("--force"), true);
 });
 
 test("given no version to qualify, when the image is named, then the locally built one is used", () => {
