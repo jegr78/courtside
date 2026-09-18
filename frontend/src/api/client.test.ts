@@ -379,10 +379,14 @@ it("given a name fragment, when searching the roster, then the criteria are the 
   }));
 
   // when
-  await api.roster("Jane D", undefined, 50, "type-1");
+  await api.roster({ query: "Jane D", limit: 50, membershipTypeId: "type-1", role: "TRAINER",
+    sortBy: "USERNAME", sortDirection: "DESC" });
 
   // then
-  expect(sent).toEqual({ limit: 50, query: "Jane D", membershipTypeId: "type-1" });
+  expect(sent).toEqual({
+    limit: 50, query: "Jane D", membershipTypeId: "type-1", role: "TRAINER",
+    sortBy: "USERNAME", sortDirection: "DESC"
+  });
   expect(requested?.search).toBe("");
   expect(requested?.pathname).toBe("/api/admin/roster-search");
 });

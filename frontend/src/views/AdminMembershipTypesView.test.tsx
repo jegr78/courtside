@@ -104,9 +104,9 @@ describe("AdminMembershipTypesView", () => {
 
   it("given a membership type, when following its holders link, then the roster shows only those holders", async () => {
     // given
-    vi.spyOn(api, "roster").mockImplementation((_query, _cursor, _limit, membershipTypeId) =>
+    vi.spyOn(api, "roster").mockImplementation((criteria) =>
       Promise.resolve({
-        entries: membershipTypeId === "type-1" ? [holder("p1"), holder("p2")] : [],
+        entries: criteria?.membershipTypeId === "type-1" ? [holder("p1"), holder("p2")] : [],
         nextCursor: null
       }));
 
@@ -127,14 +127,14 @@ describe("AdminMembershipTypesView", () => {
     expect(await screen.findByTestId("roster-filter")).toHaveValue("type-1");
     expect(await screen.findByTestId("roster-row-p1")).toBeInTheDocument();
     expect(screen.getByTestId("roster-row-p2")).toBeInTheDocument();
-    expect(api.roster).toHaveBeenLastCalledWith(undefined, undefined, 50, "type-1");
+    expect(api.roster).toHaveBeenLastCalledWith({ limit: 20, membershipTypeId: "type-1" });
   });
 
   it("given more holders than one page carries, when counting them, then the count says it is a floor", async () => {
     // given
     const many = Array.from({ length: 200 }, (_, index) => holder(`p${index}`));
-    vi.spyOn(api, "roster").mockImplementation((_query, _cursor, _limit, membershipTypeId) =>
-      Promise.resolve({ entries: membershipTypeId === "type-1" ? many : [], nextCursor: "p199" }));
+    vi.spyOn(api, "roster").mockImplementation((criteria) =>
+      Promise.resolve({ entries: criteria?.membershipTypeId === "type-1" ? many : [], nextCursor: "p199" }));
 
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);

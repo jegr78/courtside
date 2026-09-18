@@ -6,6 +6,8 @@ import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.member.internal.RosterCursorUnknownException;
+import org.courtside.member.internal.MembershipType;
+import org.courtside.member.internal.MembershipTypeRepository;
 import org.courtside.shared.CursorPage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +19,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.courtside.member.MemberFixtures.memberSince;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,6 +48,9 @@ class RosterListTest extends AbstractIntegrationTest {
     private MemberRepository members;
 
     @Autowired
+    private MembershipTypeRepository membershipTypes;
+
+    @Autowired
     private RosterService roster;
 
     @Test
@@ -53,7 +59,8 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID child = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(null, null, null, 50);
+        CursorPage.Result<RosterService.RosterEntry> page = roster.search(
+                null, null, null, null, null, null, 50);
 
         // then
         assertThat(page.items())
@@ -107,6 +114,112 @@ class RosterListTest extends AbstractIntegrationTest {
         // then
         assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
                 .containsExactly(other);
+    }
+
+    @Test
+    void givenARole_whenFilteringTheRoster_thenOnlyAccountsHoldingItAreReturned() {
+        // given
+        UUID trainer = identity.createPerson("Tara", "Trainer", "tara@example.org");
+        UUID member = identity.createPerson("Mia", "Member", "mia@example.org");
+        identity.createEnabledAccount(trainer, "trainer.tara", Set.of(Role.MEMBER, Role.TRAINER));
+        identity.createEnabledAccount(member, "member.mia", Set.of(Role.MEMBER));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> page = roster.search(
+                null, null, Role.TRAINER, RosterService.SortField.NAME,
+                RosterService.SortDirection.ASC, null, 50);
+
+        // then
+        assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(trainer);
+        assertThatThrownBy(() -> roster.search(
+                null, null, Role.TRAINER, RosterService.SortField.NAME,
+                RosterService.SortDirection.ASC, member, 50))
+                .isInstanceOf(RosterCursorUnknownException.class);
+    }
+
+    @Test
+    void givenUsernameDescending_whenFollowingTheCursor_thenTheWholeRosterUsesThatOrder() {
+        // given
+        UUID alpha = identity.createPerson("Alpha", "Person", "alpha@example.org");
+        UUID beta = identity.createPerson("Beta", "Person", "beta@example.org");
+        UUID gamma = identity.createPerson("Gamma", "Person", "gamma@example.org");
+        identity.createEnabledAccount(alpha, "alpha", Set.of(Role.MEMBER));
+        identity.createEnabledAccount(beta, "beta", Set.of(Role.MEMBER));
+        identity.createEnabledAccount(gamma, "gamma", Set.of(Role.MEMBER));
+
+        // when
+        CursorPage.Result<RosterService.RosterEntry> first = roster.search(
+                null, null, null, RosterService.SortField.USERNAME,
+                RosterService.SortDirection.DESC, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.search(
+                null, null, null, RosterService.SortField.USERNAME,
+                RosterService.SortDirection.DESC, first.nextCursor(), 2);
+
+        // then
+        assertThat(first.items()).extracting(RosterService.RosterEntry::username)
+                .containsExactly("gamma", "beta");
+        assertThat(second.items()).extracting(RosterService.RosterEntry::username)
+                .containsExactly("alpha");
+
+        CursorPage.Result<RosterService.RosterEntry> firstByName = roster.search(
+                null, null, null, RosterService.SortField.NAME,
+                RosterService.SortDirection.DESC, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> secondByName = roster.search(
+                null, null, null, RosterService.SortField.NAME,
+                RosterService.SortDirection.DESC, firstByName.nextCursor(), 2);
+        assertThat(firstByName.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(gamma, beta);
+        assertThat(secondByName.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(alpha);
+    }
+
+    @Test
+    void givenEveryVisibleColumn_whenSorting_thenItsDisplayedMeaningDeterminesTheOrder() {
+        // given
+        UUID noAccount = identity.createPerson("No", "Account", "none@example.org");
+        UUID disabled = identity.createPerson("Disabled", "Account", "disabled@example.org");
+        UUID active = identity.createPerson("Active", "Account", "active@example.org");
+        identity.createAccount(disabled, "zulu", Set.of(Role.ADMIN));
+        identity.createEnabledAccount(active, "alpha", Set.of(Role.MEMBER, Role.TRAINER));
+        MembershipType adults = membershipTypes.save(new MembershipType("Adults", null, false));
+        MembershipType youth = membershipTypes.save(new MembershipType("Youth", null, false));
+        members.save(memberSince(active, adults.getId()));
+        members.save(memberSince(disabled, youth.getId()));
+
+        // when / then
+        assertThat(sortedIds(RosterService.SortField.ACCOUNT))
+                .containsExactly(active, disabled, noAccount);
+        assertThat(sortedIds(RosterService.SortField.USERNAME))
+                .containsExactly(active, disabled, noAccount);
+        assertThat(sortedIds(RosterService.SortField.MEMBERSHIP_TYPE))
+                .containsExactly(active, disabled, noAccount);
+        assertThat(sortedIds(RosterService.SortField.ROLES))
+                .containsExactly(disabled, active, noAccount);
+        assertThat(roster.search(null, adults.getId(), null, RosterService.SortField.USERNAME,
+                RosterService.SortDirection.ASC, null, 50).items())
+                .extracting(RosterService.RosterEntry::personId)
+                .containsExactly(active);
+
+        CursorPage.Result<RosterService.RosterEntry> first = roster.search(
+                null, null, null, RosterService.SortField.USERNAME,
+                RosterService.SortDirection.ASC, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.search(
+                null, null, null, RosterService.SortField.USERNAME,
+                RosterService.SortDirection.ASC, first.nextCursor(), 2);
+        assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(active, disabled);
+        assertThat(second.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(noAccount);
+    }
+
+    private List<UUID> sortedIds(RosterService.SortField field) {
+        CursorPage.Result<RosterService.RosterEntry> first = roster.search(
+                null, null, null, field, RosterService.SortDirection.ASC, null, 2);
+        CursorPage.Result<RosterService.RosterEntry> second = roster.search(
+                null, null, null, field, RosterService.SortDirection.ASC, first.nextCursor(), 2);
+        return Stream.concat(first.items().stream(), second.items().stream())
+                .map(RosterService.RosterEntry::personId).toList();
     }
 
     @Test

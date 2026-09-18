@@ -25,6 +25,11 @@ const departed: RosterEntry = {
   membershipTypeId: "type-1", membershipStartedOn: "2025-01-01", membershipEndedOn: "2026-03-31"
 };
 
+const trainer: RosterEntry = {
+  personId: "person-4", firstName: "Tara", lastName: "Trainer", email: "tara@example.org",
+  accountId: "account-4", username: "trainer.tara", enabled: true, roles: ["MEMBER", "TRAINER"]
+};
+
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
 
 function row(personId: string): HTMLElement {
@@ -53,7 +58,60 @@ describe("AdminRosterView", () => {
     expect(await screen.findByTestId("roster-row-person-1")).toBeInTheDocument();
     expect(within(row("person-1")).getByTestId("roster-account-person-1")).toHaveTextContent("Active");
     expect(within(row("person-2")).getByTestId("roster-account-person-2")).toHaveTextContent("No account");
-    expect(api.roster).toHaveBeenCalledWith(undefined, undefined, 50, undefined);
+    expect(api.roster).toHaveBeenCalledWith({ limit: 20 });
+  });
+
+  it("given account roles, when the roster loads, then translated roles are visible in their column", async () => {
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [trainer, withoutAccount], nextCursor: null });
+
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    expect(await screen.findByTestId("roster-roles-person-4")).toHaveTextContent("Member, Trainer");
+    expect(screen.getByTestId("roster-roles-person-2")).toHaveTextContent("—");
+    expect(within(row("person-4")).getByTestId("roster-label-roles")).toHaveTextContent("Roles");
+  });
+
+  it("given a role is selected, when filtering, then the first page asks the server for that role", async () => {
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    await userEvent.selectOptions(await screen.findByTestId("roster-role-filter"), "TRAINER");
+
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith({
+      limit: 20, role: "TRAINER", sortBy: "NAME", sortDirection: "ASC"
+    }));
+  });
+
+  it("given the name column is ascending, when selecting it, then it becomes descending and starts at page one", async () => {
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("roster-row-person-1");
+
+    const [heading] = screen.getAllByRole("columnheader");
+    expect(heading).toHaveAttribute("aria-sort", "ascending");
+    await userEvent.click(within(heading).getByRole("button"));
+
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith({
+      limit: 20, sortBy: "NAME", sortDirection: "DESC"
+    }));
+    expect(heading).toHaveAttribute("aria-sort", "descending");
+  });
+
+  it("given two pages, when navigating forward and back, then one page is shown at a time", async () => {
+    vi.spyOn(api, "roster")
+      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" })
+      .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null })
+      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("roster-row-person-1");
+
+    await userEvent.click(screen.getByTestId("roster-next-page"));
+    expect(await screen.findByTestId("roster-row-person-2")).toBeInTheDocument();
+    expect(screen.queryByTestId("roster-row-person-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("roster-page-number")).toHaveTextContent("Page 2");
+
+    await userEvent.click(screen.getByTestId("roster-previous-page"));
+    expect(await screen.findByTestId("roster-row-person-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("roster-row-person-2")).not.toBeInTheDocument();
+    expect(screen.getByTestId("roster-page-number")).toHaveTextContent("Page 1");
   });
 
   it("given a person on a phone, when their card is read, then every roster field carries its label", async () => {
@@ -69,7 +127,8 @@ describe("AdminRosterView", () => {
       ["roster-label-name", "Name"],
       ["roster-label-username", "Username"],
       ["roster-label-account", "Account"],
-      ["roster-label-membership", "Membership type"]
+      ["roster-label-membership", "Membership type"],
+      ["roster-label-roles", "Roles"]
     ]) {
       expect(within(person).getByTestId(testId)).toHaveTextContent(label);
       expect(within(person).getByTestId(testId)).toHaveAttribute("aria-hidden", "true");
@@ -89,7 +148,7 @@ describe("AdminRosterView", () => {
 
     // then
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(refused).toHaveBeenCalledWith(undefined, undefined, 50, "not-a-type");
+    expect(refused).toHaveBeenCalledWith({ limit: 20, membershipTypeId: "not-a-type" });
     expect(screen.queryByTestId("roster-row-person-1")).toBeNull();
   });
 
@@ -135,7 +194,9 @@ describe("AdminRosterView", () => {
     await userEvent.selectOptions(await screen.findByTestId("roster-filter"), "type-1");
 
     // then
-    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith(undefined, undefined, 50, "type-1"));
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith({
+      limit: 20, membershipTypeId: "type-1", sortBy: "NAME", sortDirection: "ASC"
+    }));
   });
 
   it("given the URL filter changes while its roster is loading, when the old answer arrives last, then it is discarded", async () => {
@@ -144,8 +205,8 @@ describe("AdminRosterView", () => {
     const filtered = new Promise<{ entries: RosterEntry[]; nextCursor: null }>((resolve) => {
       resolveFiltered = resolve;
     });
-    vi.spyOn(api, "roster").mockImplementation((_query, _cursor, _limit, membershipTypeId) =>
-      membershipTypeId === "type-1"
+    vi.spyOn(api, "roster").mockImplementation((criteria) =>
+      criteria?.membershipTypeId === "type-1"
         ? filtered
         : Promise.resolve({ entries: [withoutAccount], nextCursor: null }));
     const router = createMemoryRouter([{
@@ -153,7 +214,7 @@ describe("AdminRosterView", () => {
       element: <UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider>
     }], { initialEntries: ["/admin/roster?membershipTypeId=type-1"] });
     render(<RouterProvider router={router} />);
-    await waitFor(() => expect(api.roster).toHaveBeenCalledWith(undefined, undefined, 50, "type-1"));
+    await waitFor(() => expect(api.roster).toHaveBeenCalledWith({ limit: 20, membershipTypeId: "type-1" }));
 
     // when
     await act(() => router.navigate("/admin/roster"));
@@ -179,10 +240,12 @@ describe("AdminRosterView", () => {
     await userEvent.click(screen.getByTestId("roster-search-submit"));
 
     // then
-    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith("Roe", undefined, 50, undefined));
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith({
+      query: "Roe", limit: 20, sortBy: "NAME", sortDirection: "ASC"
+    }));
   });
 
-  it("given a further page, when reading it, then its people are appended", async () => {
+  it("given a further page, when reading it, then it replaces the current page", async () => {
     // given
     vi.spyOn(api, "roster")
       .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" })
@@ -191,11 +254,11 @@ describe("AdminRosterView", () => {
     await screen.findByTestId("roster-row-person-1");
 
     // when
-    await userEvent.click(screen.getByTestId("roster-load-more"));
+    await userEvent.click(screen.getByTestId("roster-next-page"));
 
     // then
     expect(await screen.findByTestId("roster-row-person-2")).toBeInTheDocument();
-    expect(screen.getByTestId("roster-row-person-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("roster-row-person-1")).not.toBeInTheDocument();
   });
 
   it("given a search and a filter with a further page, when reading it, then both are asked for again", async () => {
@@ -208,13 +271,15 @@ describe("AdminRosterView", () => {
     await screen.findByTestId("roster-row-person-1");
     await userEvent.type(screen.getByTestId("roster-search"), "Doe");
     await userEvent.click(screen.getByTestId("roster-search-submit"));
-    await screen.findByTestId("roster-load-more");
+    expect(await screen.findByTestId("roster-next-page")).toBeEnabled();
 
     // when
-    await userEvent.click(screen.getByTestId("roster-load-more"));
+    await userEvent.click(screen.getByTestId("roster-next-page"));
 
     // then
-    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith("Doe", "person-1", 50, undefined));
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith({
+      query: "Doe", cursor: "person-1", limit: 20, sortBy: "NAME", sortDirection: "ASC"
+    }));
   });
 
   it("when adding a person, then they join the roster and their page opens", async () => {
@@ -354,7 +419,7 @@ describe("AdminRosterView", () => {
     await userEvent.selectOptions(screen.getByTestId("roster-filter"), "type-1");
     await waitFor(() => expect(screen.getByTestId("roster-filter")).toHaveValue("type-1"));
     reading.mockResolvedValueOnce({ entries: [departed], nextCursor: null });
-    await userEvent.click(screen.getByTestId("roster-load-more"));
+    await userEvent.click(screen.getByTestId("roster-next-page"));
     await waitFor(() => expect(reading).toHaveBeenCalledTimes(3));
 
     // when
@@ -364,6 +429,8 @@ describe("AdminRosterView", () => {
     expect(screen.getByTestId("roster-search-submit")).toHaveTextContent("Suchen");
     expect(reading).toHaveBeenCalledTimes(3);
     expect(screen.getByTestId("roster-filter")).toHaveValue("type-1");
-    expect(reading).toHaveBeenLastCalledWith(undefined, "cursor-2", 50, "type-1");
+    expect(reading).toHaveBeenLastCalledWith({
+      cursor: "cursor-2", limit: 20, membershipTypeId: "type-1", sortBy: "NAME", sortDirection: "ASC"
+    });
   });
 });

@@ -155,7 +155,7 @@ describe("AdminSetupView", () => {
     // then
     await screen.findByTestId("setup-progress");
     expect(screen.getByTestId("setup-step-roster")).toHaveAttribute("data-state", "complete");
-    expect(api.roster).toHaveBeenNthCalledWith(2, undefined, "page-2", 200);
+    expect(api.roster).toHaveBeenNthCalledWith(2, { cursor: "page-2", limit: 200 });
     expect(api.roster).toHaveBeenCalledTimes(2);
   });
 

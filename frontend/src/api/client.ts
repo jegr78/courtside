@@ -19,6 +19,8 @@ export type BookingCardRequest = components["schemas"]["BookingCardRequest"];
 export type Role = components["schemas"]["Role"];
 export type RosterEntry = components["schemas"]["RosterEntry"];
 export type RosterPage = components["schemas"]["RosterPage"];
+export type RosterSortField = components["schemas"]["RosterSortField"];
+export type RosterSortDirection = components["schemas"]["RosterSortDirection"];
 export type AuditEntry = components["schemas"]["AuditEntry"];
 export type AuditPage = components["schemas"]["AuditPage"];
 export type MessageEntry = components["schemas"]["MessageEntry"];
@@ -92,6 +94,16 @@ export interface RosterExportParameters extends Record<string, string> {
   sourceId: string;
   separator: string;
   encoding: string;
+}
+
+export interface RosterCriteria {
+  query?: string;
+  cursor?: string;
+  limit?: number;
+  membershipTypeId?: string;
+  role?: Role;
+  sortBy?: RosterSortField;
+  sortDirection?: RosterSortDirection;
 }
 
 export class ApiError extends Error {
@@ -302,11 +314,12 @@ export const api = {
   setParticipantCardActive: (id: string, active: boolean) => request<ParticipantCard>(`/api/admin/participant-cards/${id}/active`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
-  roster: (query?: string, cursor?: string, limit = 50, membershipTypeId?: string) => request<RosterPage>(
+  roster: ({ query, cursor, limit = 50, membershipTypeId, role,
+    sortBy = "NAME", sortDirection = "ASC" }: RosterCriteria = {}) => request<RosterPage>(
     "/api/admin/roster-search", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ limit, ...(query ? { query } : {}), ...(cursor ? { cursor } : {}),
-        ...(membershipTypeId ? { membershipTypeId } : {}) })
+        ...(membershipTypeId ? { membershipTypeId } : {}), ...(role ? { role } : {}), sortBy, sortDirection })
     }
   ),
   person: (personId: string) => request<RosterEntry>(`/api/admin/roster/${personId}`),

@@ -139,6 +139,24 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenRoleAndSortCriteria_whenListingTheRoster_thenBothAreApplied() throws Exception {
+        // given
+        UUID alpha = identity.createPerson("Alpha", "Person", "alpha@example.org");
+        UUID zulu = identity.createPerson("Zulu", "Person", "zulu@example.org");
+        identity.createEnabledAccount(alpha, "alpha", Set.of(Role.MEMBER));
+        identity.createEnabledAccount(zulu, "zulu", Set.of(Role.MEMBER, Role.TRAINER));
+
+        // when / then
+        mockMvc.perform(searchRoster("""
+                        {"role":"TRAINER","sortBy":"USERNAME","sortDirection":"DESC"}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries.length()").value(1))
+                .andExpect(jsonPath("$.entries[0].personId").value(zulu.toString()));
+    }
+
+    @Test
     void givenNoSession_whenListingTheRoster_thenItIsUnauthenticated() throws Exception {
         // when / then
         mockMvc.perform(searchRoster("{}"))

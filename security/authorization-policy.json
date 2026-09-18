@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-16",
+  "reviewedAt": "2026-09-18",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "ca9e675264dca97bf89d0836b8797555e88d938578e14e2bf0dffcb31dc1356b",
+  "openApiFieldInventorySha256": "7eb05a6987080f4734fb06855525885848f4426c4268f661914669568bcff38e",
   "protectedFieldInventorySha256": "81c927f1d1117fdbf8db29f645b163c1fad53c4a05cb3b4917ec423b71bb3795",
-  "productionAuthorizationSha256": "0f31b59a80b8226d63d5efa8a409aa063b57a68e0af093dc3b999e9140fc056a",
+  "productionAuthorizationSha256": "e166dad6ee57670d4af575cd976ca89fa6239addcac0af47668673ff667d65c5",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1408,6 +1408,9 @@
     "searchRoster:request:RosterSearchRequest.limit",
     "searchRoster:request:RosterSearchRequest.membershipTypeId",
     "searchRoster:request:RosterSearchRequest.query",
+    "searchRoster:request:RosterSearchRequest.role",
+    "searchRoster:request:RosterSearchRequest.sortBy",
+    "searchRoster:request:RosterSearchRequest.sortDirection",
     "searchRoster:response:$response.header.Accept",
     "searchRoster:response:FieldError.code",
     "searchRoster:response:FieldError.field",

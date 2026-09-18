@@ -38,7 +38,7 @@ export function AdminMembershipTypesView() {
 
   const countHolders = useCallback(async (membershipTypes: MembershipType[]) => {
     const counted = await Promise.all(membershipTypes.map(async (type) => {
-      const page = await api.roster(undefined, undefined, HOLDER_PAGE, type.id);
+      const page = await api.roster({ limit: HOLDER_PAGE, membershipTypeId: type.id });
       return [type.id, { count: page.entries.length, more: Boolean(page.nextCursor) }] as const;
     }));
     setHolders(Object.fromEntries(counted));

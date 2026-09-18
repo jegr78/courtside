@@ -83,7 +83,7 @@ describe("ExternalReferencePanel", () => {
     expect(searching).not.toHaveBeenCalled();
     await act(() => vi.advanceTimersByTimeAsync(1));
     expect(searching).toHaveBeenCalledTimes(1);
-    expect(searching).toHaveBeenCalledWith("Doe", undefined, 10);
+    expect(searching).toHaveBeenCalledWith({ query: "Doe", limit: 10 });
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
