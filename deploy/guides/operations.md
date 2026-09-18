@@ -172,10 +172,22 @@ sets `COURTSIDE_ENVIRONMENT` to `UAT`, which marks every page as a test instance
 For this mode, `status` reports `mail_handover=synthetic` and `mail-check` verifies that the
 controlled Mailpit service is healthy. Neither result claims delivery to an external recipient.
 
-Mailpit requires STARTTLS with a certificate you supply. Put `cert.pem` and `key.pem` in a
-directory, name it in `COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES`, and set
-`COURTSIDE_ACCEPTANCE_MAIL_USER` to the `uid:gid` that can read the key. The messages are readable
-at `http://127.0.0.1:${COURTSIDE_ACCEPTANCE_MAIL_PORT}/`.
+Mailpit requires STARTTLS with a certificate you supply. Keep that operator-owned material beside
+the installation rather than inside it:
+
+```sh
+sudo install -d -m 0700 -o "$USER" /srv/courtside-acceptance-mail
+install -m 0600 cert.pem key.pem /srv/courtside-acceptance-mail/
+```
+
+The directory is mode 0700 and both certificate files are mode 0600. Set
+`COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES="/srv/courtside-acceptance-mail"` and set
+`COURTSIDE_ACCEPTANCE_MAIL_USER` to the `uid:gid` that owns and can read those files. Do not put the
+directory below `secrets/`, where `doctor` permits only regular mode-0600 files, or elsewhere below
+the installation root, where it would be an unowned entry that blocks destructive uninstall. The
+launcher neither backs up nor removes this external directory; remove it explicitly after the
+synthetic acceptance deployment has been retired. The messages are readable at
+`http://127.0.0.1:${COURTSIDE_ACCEPTANCE_MAIL_PORT}/`.
 
 ## Start the instance for the first time
 

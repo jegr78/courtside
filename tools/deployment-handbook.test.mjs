@@ -76,3 +76,25 @@ test("given the operator documentation, when its entry points are read, then sel
   assert.match(german, /tailscale funnel --bg http:\/\/127\.0\.0\.1:8080/);
   assert.doesNotMatch(german, /\b(?:Sie|Ihr(?:e|en|em|er|es)?)\b/);
 });
+
+test("given synthetic mail certificates, when the acceptance guidance is read, then their path survives installation teardown safely", () => {
+  // given
+  const operations = readFileSync(join(deploy, "guides", "operations.md"), "utf8");
+  const maintainedExamples = [
+    readFileSync(join(deploy, ".env.example"), "utf8"),
+    ...[
+      "deployment-archive.test.mjs",
+      "deployment-qualification.mjs",
+      "deployment-recipes.test.mjs",
+    ].map((file) => readFileSync(join(repository, "tools", file), "utf8")),
+  ];
+
+  // when / then
+  for (const text of [operations, ...maintainedExamples]) {
+    assert.match(text, /\/srv\/courtside-acceptance-mail/);
+    assert.doesNotMatch(text, /\/srv\/courtside\/acceptance-mail/);
+  }
+  assert.match(operations, /mode 0700/);
+  assert.match(operations, /mode 0600/);
+  assert.match(operations, /remove it explicitly after the\s+synthetic acceptance deployment/i);
+});
