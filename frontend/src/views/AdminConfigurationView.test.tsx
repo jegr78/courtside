@@ -454,6 +454,20 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("password-reset-credential-hours")).toHaveAttribute("max", "168");
   });
 
+  it("given rules no rule set can change, when configuration loads, then they stand apart from the ones it can", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const clubWide = await screen.findByTestId("club-wide-rules");
+
+    // then
+    expect(clubWide).toContainElement(screen.getByTestId("rule-OPENING_HOURS-title"));
+    expect(clubWide).toContainElement(screen.getByTestId("rule-SLOT_GRID-title"));
+    expect(clubWide).not.toContainElement(screen.getByTestId("rule-ADVANCE_WINDOW-title"));
+    expect(screen.getByTestId("rule-set-rules")).not.toContainElement(screen.getByTestId("rule-OPENING_HOURS-title"));
+    expect(screen.getByTestId("club-wide-rules-note")).toHaveTextContent(
+      "These apply to every rule set. The selected rule set does not change them.");
+  });
+
   it("given an admin, when configuration loads, then club settings and every rule type are visible", async () => {
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);

@@ -460,8 +460,15 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             <TextField data-testid="new-rule-set-name" disabled={pending} name="name" maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.newRuleSet")} />
             <Button variant="primary" data-testid="create-rule-set" disabled={pending} type="submit">{t("admin.create")}</Button>
           </form>
-          <div className="grid gap-4">
-            {ruleTypes.map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} remove={removeRule} />)}
+          <div data-testid="rule-set-rules" className="grid gap-4">
+            {ruleTypes.filter((type) => type.configurable).map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} remove={removeRule} />)}
+          </div>
+          <div data-testid="club-wide-rules" className="grid gap-4">
+            <div className="grid gap-1">
+              <h3 className="text-xl font-bold">{t("admin.rules.clubWide")}</h3>
+              <p data-testid="club-wide-rules-note" className="text-muted text-sm">{t("admin.rules.clubWideHelp")}</p>
+            </div>
+            {ruleTypes.filter((type) => !type.configurable).map((type) => <RuleEditor key={type.ruleType} type={type} definition={undefined} disabled save={saveRule} remove={removeRule} />)}
           </div>
         </div>
       </>}
