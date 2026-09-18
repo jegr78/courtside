@@ -1433,6 +1433,15 @@ components:
             ended does not match, even though the entry still names the type its holder last held
             — `membershipTypeId` on an entry answers "of what were they a member", and this
             field answers "of what are they one". Combining it with `query` narrows by both.
+        role:
+          $ref: "#/components/schemas/Role"
+          description: Only people whose displayed account holds this role.
+        sortBy:
+          $ref: "#/components/schemas/RosterSortField"
+          default: NAME
+        sortDirection:
+          $ref: "#/components/schemas/RosterSortDirection"
+          default: ASC
         cursor:
           type: string
           format: uuid
@@ -1442,6 +1451,19 @@ components:
           minimum: 1
           maximum: 200
           default: 50
+
+    RosterSortField:
+      type: string
+      description: |
+        The visible roster column that determines page order. `ACCOUNT` orders active accounts,
+        disabled accounts, then people without an account. `ROLES` compares the stable role codes.
+        Missing usernames, memberships, and roles stay after populated values in both directions.
+      enum: [NAME, USERNAME, ACCOUNT, MEMBERSHIP_TYPE, ROLES]
+
+    RosterSortDirection:
+      type: string
+      description: The direction of the selected column; the person-id tie-breaker stays ascending.
+      enum: [ASC, DESC]
 
     RosterExportRequest:
       type: object
@@ -4225,13 +4247,13 @@ paths:
         have none — so `accountId`, `username` and `roles` are absent for them and `enabled` reports
         the account's state only where one exists.
 
-        The page is ordered by last name, then first name, then person id, and `cursor` continues
-        after the entry it names in that same order. A cursor naming somebody the roster no longer
-        holds is answered `400` rather than silently ending the list, because a truncated page is
-        the one wrong answer a client cannot detect. The check and the page are separate statements,
-        so somebody removed between the two still yields an empty final page; a client that must be
-        certain a list was complete re-reads it from the first page. An unknown membership type is
-        not an error: nobody holds it, so the page is empty.
+        The default order is last name, then first name. Every requested order uses person id as a
+        deterministic tie-breaker, and `cursor` continues after the entry it names in that order.
+        A cursor naming somebody the filtered roster no longer holds is answered `400` rather than
+        silently ending the list, because a truncated page is the one wrong answer a client cannot
+        detect. The check and page are separate statements, so a concurrent removal after the check
+        can still produce an empty final page. An unknown membership type is not an error: nobody
+        holds it, so the page is empty.
 
         Reading the roster is a `POST` because the criteria name a person and a criterion in a URL
         outlives the request in places a response body never reaches. It changes nothing, and

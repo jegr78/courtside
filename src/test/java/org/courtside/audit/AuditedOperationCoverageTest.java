@@ -119,6 +119,7 @@ class AuditedOperationCoverageTest {
             "RosterService#person",
             "RosterService#personIdsHoldingAnAccount",
             "RosterService#requestCredentials",
+            "RosterService#search",
             "RosterService#setAccountEnabled",
             "RosterService#writeMembership",
             "RosterSyncService#apply",

@@ -47,8 +47,12 @@ class RosterAdminController implements AdminRosterApi {
 
     @Override
     public ResponseEntity<ApiRosterPage> searchRoster(ApiRosterSearchRequest request) {
-        CursorPage.Result<RosterService.RosterEntry> page = roster.list(request.getQuery(),
-                request.getMembershipTypeId(), request.getCursor(), request.getLimit());
+        CursorPage.Result<RosterService.RosterEntry> page = roster.search(request.getQuery(),
+                request.getMembershipTypeId(),
+                request.getRole() == null ? null : Role.valueOf(request.getRole().name()),
+                RosterService.SortField.valueOf(request.getSortBy().name()),
+                RosterService.SortDirection.valueOf(request.getSortDirection().name()),
+                request.getCursor(), request.getLimit());
         return ResponseEntity.ok(new ApiRosterPage(page.items().stream()
                 .map(RosterAdminController::toResponse)
                 .toList())

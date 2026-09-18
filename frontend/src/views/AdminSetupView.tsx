@@ -46,7 +46,7 @@ function configurationChanged(configuration: AdminClubConfig): boolean {
 async function hasCurrentMember(isActive: () => boolean): Promise<boolean> {
   let cursor: string | undefined;
   do {
-    const page = await api.roster(undefined, cursor, 200);
+    const page = await api.roster({ limit: 200, ...(cursor ? { cursor } : {}) });
     if (page.entries.some((entry) => entry.membershipTypeId && !entry.membershipEndedOn)) return true;
     cursor = page.nextCursor ?? undefined;
   } while (cursor && isActive());

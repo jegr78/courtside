@@ -50,7 +50,7 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
     setCandidates([]);
     setSearchingFor(currentQuery);
     const timeout = window.setTimeout(() => {
-      void api.roster(currentQuery, undefined, SEARCH_RESULTS)
+      void api.roster({ query: currentQuery, limit: SEARCH_RESULTS })
         .then((page) => { if (active) setCandidates(page.entries); })
         .catch((failure: unknown) => { if (active) reportError(failure); })
         .finally(() => { if (active) setSearchingFor(undefined); });

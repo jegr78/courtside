@@ -17,6 +17,7 @@ import org.courtside.member.internal.LastAdministratorException;
 import org.courtside.member.internal.PersonAccountExistsException;
 import org.courtside.member.internal.PersonNotFoundException;
 import org.courtside.member.internal.PersonText;
+import org.courtside.member.internal.RosterListQuery;
 import org.courtside.member.internal.RosterCursorUnknownException;
 import org.courtside.member.internal.UsernameTakenException;
 import org.courtside.shared.CursorPage;
@@ -59,6 +60,7 @@ public class RosterService {
     private final PersonRepository persons;
     private final UserAccountRepository accounts;
     private final MemberRepository members;
+    private final RosterListQuery rosterQuery;
     private final MemberService memberships;
     private final AdministratorLock administrators;
     private final AccountSessions sessions;
@@ -83,6 +85,21 @@ public class RosterService {
         }
         List<UUID> ids = persons.findIdsByNameFragmentAfter(
                 normalize(query), membershipTypeId != null, holders, cursor, PageRequest.of(0, limit + 1));
+        return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
+    }
+
+    public CursorPage.Result<RosterEntry> search(String query, UUID membershipTypeId, Role role,
+                                                  SortField sortField, SortDirection sortDirection,
+                                                  UUID cursor, int limit) {
+        SortField field = sortField == null ? SortField.NAME : sortField;
+        SortDirection direction = sortDirection == null ? SortDirection.ASC : sortDirection;
+        if (role == null && field == SortField.NAME && direction == SortDirection.ASC) {
+            return list(query, membershipTypeId, cursor, limit);
+        }
+        validateLimit(limit);
+        requireKnownCursor(cursor);
+        List<UUID> ids = rosterQuery.findIds(normalize(query), membershipTypeId, role,
+                field, direction, cursor, limit + 1);
         return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
     }
 
@@ -555,5 +572,13 @@ public class RosterService {
     }
 
     public record Membership(UUID typeId, LocalDate startedOn, LocalDate endedOn) {
+    }
+
+    public enum SortField {
+        NAME, USERNAME, ACCOUNT, MEMBERSHIP_TYPE, ROLES
+    }
+
+    public enum SortDirection {
+        ASC, DESC
     }
 }

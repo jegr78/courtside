@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { api, type MembershipType, type RosterEntry } from "../api/client";
+import { api, type MembershipType, type Role, type RosterEntry, type RosterSortField,
+  type RosterSortDirection } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -11,7 +12,8 @@ import { useUnsavedForm } from "../unsaved/useUnsavedForm";
 
 const NAME_LENGTH = 60;
 const EMAIL_LENGTH = 120;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
+const ROLES: Role[] = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER", "TREASURER", "ADMIN"];
 
 type Translate = (key: string, values?: Record<string, unknown>) => string;
 
@@ -28,6 +30,22 @@ function membershipLabel(entry: RosterEntry, names: Map<string, string>, t: Tran
   return names.get(entry.membershipTypeId) ?? entry.membershipTypeId;
 }
 
+function roleLabel(entry: RosterEntry, t: Translate): string {
+  return entry.roles.length === 0 ? "—" : entry.roles.map((role) => t(`role.${role}`)).join(", ");
+}
+
+function SortableHeading({ field, active, direction, label, changed, disabled }: {
+  field: RosterSortField; active: RosterSortField; direction: RosterSortDirection; label: string;
+  changed: (field: RosterSortField) => void; disabled: boolean;
+}) {
+  const selected = field === active;
+  return <th className="border-b p-2" aria-sort={selected ? (direction === "ASC" ? "ascending" : "descending") : "none"}>
+    <button type="button" disabled={disabled} className="inline-flex items-center gap-2 underline disabled:no-underline" onClick={() => changed(field)}>
+      {label}<span aria-hidden="true">{selected ? (direction === "ASC" ? "↑" : "↓") : "↕"}</span>
+    </button>
+  </th>;
+}
+
 export function AdminRosterView() {
   const { t } = useTranslation();
   const newPerson = useUnsavedForm("person:new");
@@ -36,20 +54,28 @@ export function AdminRosterView() {
   const requestedMembershipTypeId = searchParams.get("membershipTypeId") || undefined;
   const [entries, setEntries] = useState<RosterEntry[]>();
   const [types, setTypes] = useState<MembershipType[]>([]);
-  const [cursor, setCursor] = useState<string>();
+  const [nextCursor, setNextCursor] = useState<string>();
+  const [pageCursor, setPageCursor] = useState<string>();
+  const [previousCursors, setPreviousCursors] = useState<(string | undefined)[]>([]);
   const [query, setQuery] = useState<string>();
   const [membershipTypeId, setMembershipTypeId] = useState<string | undefined>(requestedMembershipTypeId);
+  const [role, setRole] = useState<Role>();
+  const [sortBy, setSortBy] = useState<RosterSortField>("NAME");
+  const [sortDirection, setSortDirection] = useState<RosterSortDirection>("ASC");
   const { message: error, report: reportError, clear } = useReportedFailure();
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([api.roster(undefined, undefined, PAGE_SIZE, requestedMembershipTypeId), api.membershipTypes()])
+    void Promise.all([api.roster({ limit: PAGE_SIZE,
+      ...(requestedMembershipTypeId ? { membershipTypeId: requestedMembershipTypeId } : {}) }), api.membershipTypes()])
       .then(([page, membershipTypes]) => {
         if (!active) return;
         setMembershipTypeId(requestedMembershipTypeId);
         setEntries(page.entries);
-        setCursor(page.nextCursor ?? undefined);
+        setNextCursor(page.nextCursor ?? undefined);
+        setPageCursor(undefined);
+        setPreviousCursors([]);
         setTypes(membershipTypes);
       })
       .catch((failure: unknown) => {
@@ -60,15 +86,24 @@ export function AdminRosterView() {
     };
   }, [reportError, requestedMembershipTypeId]);
 
-  async function read(term: string | undefined, typeId: string | undefined) {
+  async function read(term: string | undefined, typeId: string | undefined, selectedRole: Role | undefined,
+    field: RosterSortField, direction: RosterSortDirection, requestedCursor?: string,
+    history: (string | undefined)[] = []) {
     if (pending) return;
     setPending(true);
     try {
-      const page = await api.roster(term, undefined, PAGE_SIZE, typeId);
+      const page = await api.roster({ limit: PAGE_SIZE, sortBy: field, sortDirection: direction,
+        ...(term ? { query: term } : {}), ...(requestedCursor ? { cursor: requestedCursor } : {}),
+        ...(typeId ? { membershipTypeId: typeId } : {}), ...(selectedRole ? { role: selectedRole } : {}) });
       setQuery(term);
       setMembershipTypeId(typeId);
+      setRole(selectedRole);
+      setSortBy(field);
+      setSortDirection(direction);
       setEntries(page.entries);
-      setCursor(page.nextCursor ?? undefined);
+      setNextCursor(page.nextCursor ?? undefined);
+      setPageCursor(requestedCursor);
+      setPreviousCursors(history);
       clear();
     } catch (failure) {
       reportError(failure);
@@ -78,24 +113,27 @@ export function AdminRosterView() {
   }
 
   async function readNextPage() {
-    if (pending) return;
-    setPending(true);
-    try {
-      const page = await api.roster(query, cursor, PAGE_SIZE, membershipTypeId);
-      setEntries((current) => [...(current ?? []), ...page.entries]);
-      setCursor(page.nextCursor ?? undefined);
-      clear();
-    } catch (failure) {
-      reportError(failure);
-    } finally {
-      setPending(false);
-    }
+    if (!nextCursor) return;
+    await read(query, membershipTypeId, role, sortBy, sortDirection, nextCursor,
+      [...previousCursors, pageCursor]);
+  }
+
+  async function readPreviousPage() {
+    if (previousCursors.length === 0) return;
+    const requestedCursor = previousCursors.at(-1);
+    await read(query, membershipTypeId, role, sortBy, sortDirection, requestedCursor,
+      previousCursors.slice(0, -1));
   }
 
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const term = formString(new FormData(event.currentTarget), "query").trim();
-    await read(term || undefined, membershipTypeId);
+    await read(term || undefined, membershipTypeId, role, sortBy, sortDirection);
+  }
+
+  async function changeSort(field: RosterSortField) {
+    const direction = field === sortBy && sortDirection === "ASC" ? "DESC" : "ASC";
+    await read(query, membershipTypeId, role, field, direction);
   }
 
   async function createPerson(event: FormEvent<HTMLFormElement>) {
@@ -126,7 +164,7 @@ export function AdminRosterView() {
       ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert>{error}</Alert>}
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
           <form noValidate onSubmit={(event) => void search(event)} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
             <TextField data-testid="roster-search" name="query" maxLength={NAME_LENGTH} label={t("admin.roster.search")} />
             <Button variant="secondary" data-testid="roster-search-submit" disabled={pending} type="submit">{t("admin.roster.searchSubmit")}</Button>
@@ -136,11 +174,26 @@ export function AdminRosterView() {
             <select
               data-testid="roster-filter"
               className="form-control rounded-lg border px-3 py-3 outline-none"
+              disabled={pending}
               value={membershipTypeId ?? ""}
-              onChange={(event) => void read(query, event.target.value || undefined)}
+              onChange={(event) => void read(query, event.target.value || undefined, role, sortBy, sortDirection)}
             >
               <option value="">{t("admin.roster.filterAll")}</option>
               {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-2 font-medium">
+            {t("admin.roster.roleFilter")}
+            <select
+              data-testid="roster-role-filter"
+              className="form-control rounded-lg border px-3 py-3 outline-none"
+              disabled={pending}
+              value={role ?? ""}
+              onChange={(event) => void read(query, membershipTypeId,
+                (event.target.value || undefined) as Role | undefined, sortBy, sortDirection)}
+            >
+              <option value="">{t("admin.roster.filterAll")}</option>
+              {ROLES.map((item) => <option key={item} value={item}>{t(`role.${item}`)}</option>)}
             </select>
           </label>
         </div>
@@ -149,13 +202,14 @@ export function AdminRosterView() {
           {entries.length === 0
             ? <p data-testid="roster-empty">{t("admin.roster.empty")}</p>
             : <div>
-              <table className="block w-full border-collapse text-left sm:table">
+              <table className="block w-full border-collapse text-left sm:table sm:table-fixed">
                 <thead className="sr-only sm:not-sr-only">
                   <tr>
-                    <th className="border-b p-2">{t("admin.roster.columnName")}</th>
-                    <th className="border-b p-2">{t("admin.roster.columnUsername")}</th>
-                    <th className="border-b p-2">{t("admin.roster.columnAccount")}</th>
-                    <th className="border-b p-2">{t("admin.roster.columnMembership")}</th>
+                    <SortableHeading field="NAME" active={sortBy} direction={sortDirection} label={t("admin.roster.columnName")} disabled={pending} changed={(field) => void changeSort(field)} />
+                    <SortableHeading field="USERNAME" active={sortBy} direction={sortDirection} label={t("admin.roster.columnUsername")} disabled={pending} changed={(field) => void changeSort(field)} />
+                    <SortableHeading field="ACCOUNT" active={sortBy} direction={sortDirection} label={t("admin.roster.columnAccount")} disabled={pending} changed={(field) => void changeSort(field)} />
+                    <SortableHeading field="MEMBERSHIP_TYPE" active={sortBy} direction={sortDirection} label={t("admin.roster.columnMembership")} disabled={pending} changed={(field) => void changeSort(field)} />
+                    <SortableHeading field="ROLES" active={sortBy} direction={sortDirection} label={t("admin.roster.columnRoles")} disabled={pending} changed={(field) => void changeSort(field)} />
                   </tr>
                 </thead>
                 <tbody className="grid gap-3 sm:table-row-group">
@@ -178,11 +232,19 @@ export function AdminRosterView() {
                       <span aria-hidden="true" data-testid="roster-label-membership" className="font-medium sm:hidden">{t("admin.roster.columnMembership")}</span>
                       <span data-testid={`roster-membership-${entry.personId}`} className="min-w-0 break-words">{membershipLabel(entry, typeNames, t)}</span>
                     </td>
+                    <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
+                      <span aria-hidden="true" data-testid="roster-label-roles" className="font-medium sm:hidden">{t("admin.roster.columnRoles")}</span>
+                      <span data-testid={`roster-roles-${entry.personId}`} className="min-w-0 break-words">{roleLabel(entry, t)}</span>
+                    </td>
                   </tr>)}
                 </tbody>
               </table>
             </div>}
-          {cursor && <Button variant="secondary" data-testid="roster-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("admin.roster.loadMore")}</Button>}
+          <nav aria-label={t("admin.roster.pagination")} className="flex items-center gap-3">
+            <Button variant="secondary" data-testid="roster-previous-page" disabled={pending || previousCursors.length === 0} type="button" onClick={() => void readPreviousPage()}>{t("admin.roster.previousPage")}</Button>
+            <span data-testid="roster-page-number">{t("admin.roster.page", { page: previousCursors.length + 1 })}</span>
+            <Button variant="secondary" data-testid="roster-next-page" disabled={pending || !nextCursor} type="button" onClick={() => void readNextPage()}>{t("admin.roster.nextPage")}</Button>
+          </nav>
         </section>
         <form noValidate {...newPerson.form} onSubmit={(event) => void createPerson(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
           <h2 className="text-2xl font-bold">{t("admin.roster.newPerson")}</h2>

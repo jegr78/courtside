@@ -145,8 +145,8 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await expect(rosterRow).toBeVisible();
   expect(await rosterRow.evaluate((element) => getComputedStyle(element).display)).toBe("grid");
   await expect(rosterRow.getByTestId("roster-label-membership")).toBeVisible();
-  await expect(page.getByRole("table").getByRole("columnheader")).toHaveCount(4);
-  await expect(rosterRow.getByRole("cell")).toHaveCount(4);
+  await expect(page.getByRole("table").getByRole("columnheader")).toHaveCount(5);
+  await expect(rosterRow.getByRole("cell")).toHaveCount(5);
   expect(await rosterRow.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await expectNoHorizontalOverflow(page);
 
