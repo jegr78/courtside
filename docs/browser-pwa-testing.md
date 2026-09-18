@@ -99,6 +99,10 @@ git-ignored and carries the moment of the run so a later one cannot overwrite th
 cites. It generates `index.md` from the run's own report, journey, device, language, outcome,
 duration and a link to each artefact, and prints the absolute path of both.
 
+It also writes Playwright's own report to `report/` inside that directory, which plays the video,
+opens the trace and lists the steps of a run in a browser. The reporter keeps its own copy of every
+attachment, so a recorded matrix takes about twice the disk a bare run takes.
+
 ## Physical-device evidence
 
 Before 1.0, every major UI release and every release that changes the PWA lifecycle, run this short
