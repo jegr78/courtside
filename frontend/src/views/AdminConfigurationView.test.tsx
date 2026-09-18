@@ -468,6 +468,18 @@ describe("AdminConfigurationView", () => {
       "These apply to every rule set. The selected rule set does not change them.");
   });
 
+  it("given both groups of rules, when configuration loads, then each is named and outranks the rules it holds", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("rule-set-rules-heading")).toHaveTextContent("Rules of this rule set");
+    expect(screen.getByTestId("rule-set-rules-heading").tagName).toBe("H3");
+    expect(screen.getByTestId("club-wide-rules-heading").tagName).toBe("H3");
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-title").tagName).toBe("H4");
+    expect(screen.getByTestId("rule-OPENING_HOURS-title").tagName).toBe("H4");
+  });
+
   it("given an admin, when configuration loads, then club settings and every rule type are visible", async () => {
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
