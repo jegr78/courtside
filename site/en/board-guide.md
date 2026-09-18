@@ -211,6 +211,45 @@ source.
 Use the import when another membership system holds the club's authoritative list. The process has
 three stages: source, preview and execution.
 
+### Example acceptance run
+
+The [complete example file](/examples/roster-import-example.csv) contains 24 fictional people:
+18 adults and 6 juniors. The
+[changed example file](/examples/roster-import-example-update.csv) contains 23 of those people.
+It changes the email address of `EX-1001`, assigns `EX-1002` to the `Junior` category and omits
+`EX-2006`. Every address uses the reserved `example.org` domain.
+
+Prepare a fresh test instance for a repeatable run:
+
+1. Create active membership types named `Adult` and `Junior`. Enable *Open an account on import* for
+   both when the run should also exercise account creation.
+2. Create an import source named `Acceptance example` with UTF-8 and a semicolon separator.
+3. Map the columns as follows:
+
+| CSV column | Courtside field |
+|---|---|
+| `Member number` | Member number |
+| `First name` | First name |
+| `Last name` | Last name |
+| `Email` | Email address |
+| `Category` | Category |
+
+4. Map `Adult` to the membership type with that name and `Junior` to the membership type with that
+   name. Mark first name, last name, email address and category as fields owned by the source.
+
+Run the files in this order:
+
+| Step | File and mode | Expected result |
+|---|---|---|
+| First import | complete file, complete list | The preview shows 24 new people, 18 `Adult` and 6 `Junior`. With account creation enabled, it plans 24 accounts. After execution, a roster that previously contained only the administrator account contains 24 additional people. |
+| Repeat | complete file, complete list | The preview contains no person change, new membership or new account. |
+| Partial list | changed file, partial list | The preview changes two people. `EX-2006` keeps an active membership because a partial list ignores missing rows. |
+| Restore the baseline | complete file, partial list | The two changed values return to their original values. All 24 imported memberships are active in their original state. |
+| Complete list | changed file, complete list | The preview changes two people and warns about one ending membership. After execution, all 24 people remain stored and 23 have an active membership. The member-only account belonging to `EX-2006` is disabled. |
+
+Run the last step only on a test instance. A later import does not automatically enable an account
+or restore a member role removed by a complete-list import.
+
 ### 1. Describe the source
 
 Enter the label, separator, character set and column mapping. Map external categories to membership

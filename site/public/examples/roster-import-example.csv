@@ -1,0 +1,25 @@
+Member number;First name;Last name;Email;Category
+EX-1001;Jane;Doe;jane.doe@example.org;Adult
+EX-1002;John;Roe;john.roe@example.org;Adult
+EX-1003;Mary;Major;mary.major@example.org;Adult
+EX-1004;Richard;Miles;richard.miles@example.org;Adult
+EX-1005;Alice;Example;alice.example@example.org;Adult
+EX-1006;Bob;Example;bob.example@example.org;Adult
+EX-1007;Carol;Example;carol.example@example.org;Adult
+EX-1008;David;Example;david.example@example.org;Adult
+EX-1009;Eve;Example;eve.example@example.org;Adult
+EX-1010;Frank;Example;frank.example@example.org;Adult
+EX-1011;Grace;Example;grace.example@example.org;Adult
+EX-1012;Henry;Example;henry.example@example.org;Adult
+EX-1013;Ivy;Example;ivy.example@example.org;Adult
+EX-1014;Jack;Example;jack.example@example.org;Adult
+EX-1015;Kate;Example;kate.example@example.org;Adult
+EX-1016;Liam;Example;liam.example@example.org;Adult
+EX-1017;Mia;Example;mia.example@example.org;Adult
+EX-1018;Noah;Example;noah.example@example.org;Adult
+EX-2001;Olivia;Sample;olivia.sample@example.org;Junior
+EX-2002;Peter;Sample;peter.sample@example.org;Junior
+EX-2003;Quinn;Sample;quinn.sample@example.org;Junior
+EX-2004;Rose;Sample;rose.sample@example.org;Junior
+EX-2005;Sam;Sample;sam.sample@example.org;Junior
+EX-2006;Taylor;Sample;taylor.sample@example.org;Junior

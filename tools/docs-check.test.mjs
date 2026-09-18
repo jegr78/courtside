@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -75,6 +75,56 @@ test("given a documentation tree, when checking it, then broken structure and re
     assert.throws(() => checkDocumentation(directory, inventory), /fence/);
     writeFileSync(join(directory, "README.md"), "# Readme\n\n```js\n[Ignored](docs/missing.md)\n```not-a-close\n");
     assert.throws(() => checkDocumentation(directory, inventory), /fence/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("given a published site download, when checking it, then the Courtside URL resolves to a public asset", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-docs-download-"));
+  mkdirSync(join(directory, "site", "public", "examples"), { recursive: true });
+  writeFileSync(join(directory, "site", "public", "examples", "members.csv"), "id;name\n1;Jane Doe\n");
+  const inventory = () => ["site/guide.md"];
+  const page = (target) => writeFileSync(join(directory, "site", "guide.md"),
+    `# Guide\n\n[Download](${target})\n`);
+
+  try {
+    // when / then
+    page("/examples/members.csv");
+    assert.doesNotThrow(() => checkDocumentation(directory, inventory));
+    page("/examples/missing.csv");
+    assert.throws(() => checkDocumentation(directory, inventory), /does not exist/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("given a published site download through a symbolic link, when checking it, then the link fails closed", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-docs-download-link-"));
+  const examples = join(directory, "site", "public", "examples");
+  const realAssets = join(directory, "site", "public", "real-assets");
+  mkdirSync(examples, { recursive: true });
+  mkdirSync(realAssets);
+  writeFileSync(join(directory, "outside.csv"), "id;name\n1;Outside\n");
+  writeFileSync(join(examples, "members.csv"), "id;name\n1;Jane Doe\n");
+  writeFileSync(join(realAssets, "members.csv"), "id;name\n1;Jane Doe\n");
+  symlinkSync(join(directory, "outside.csv"), join(examples, "outside.csv"));
+  symlinkSync("members.csv", join(examples, "alias.csv"));
+  symlinkSync(realAssets, join(examples, "linked-directory"));
+  const inventory = () => ["site/guide.md"];
+  const page = (target) => writeFileSync(join(directory, "site", "guide.md"),
+    `# Guide\n\n[Download](${target})\n`);
+
+  try {
+    // when / then
+    page("/examples/outside.csv");
+    assert.throws(() => checkDocumentation(directory, inventory), /symbolic link/);
+    page("/examples/alias.csv");
+    assert.throws(() => checkDocumentation(directory, inventory), /symbolic link/);
+    page("/examples/linked-directory/members.csv");
+    assert.throws(() => checkDocumentation(directory, inventory), /symbolic link/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
