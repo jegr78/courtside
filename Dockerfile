@@ -5,7 +5,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && rm -f /usr/bin/pebble \
  && groupadd --system --gid 10001 courtside \
- && useradd --system --uid 10001 --gid 10001 --no-create-home courtside
+ && useradd --system --uid 10001 --gid 10001 --no-create-home courtside \
+ && install -d -o 10001 -g 10001 /var/lib/courtside/operational-logs
 
 WORKDIR /app
 

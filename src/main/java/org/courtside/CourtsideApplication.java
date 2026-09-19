@@ -1,5 +1,6 @@
 package org.courtside;
 
+import org.courtside.operations.OperationalLogCollection;
 import org.courtside.shared.DatabaseMigration;
 import org.courtside.shared.DatabaseProvisioning;
 import org.springframework.boot.SpringApplication;
@@ -11,6 +12,10 @@ import org.springframework.modulith.Modulithic;
 public class CourtsideApplication {
 
     public static void main(String[] args) {
+        if (OperationalLogCollection.requested(args)) {
+            OperationalLogCollection.run(System.getenv());
+            return;
+        }
         if (DatabaseProvisioning.requested(args)) {
             DatabaseProvisioning.provision(System.getenv());
             return;

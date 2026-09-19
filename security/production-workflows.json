@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-13",
+  "reviewedAt": "2026-09-19",
   "source": "src/main/resources/api/openapi.yaml",
   "authorizationSource": "security/authorization-policy.json",
   "workflows": [
@@ -434,7 +434,7 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Impact, utilisation, message-history and audit-log endpoints.",
+      "entryPoints": "Impact, utilisation, message-history, audit-log and bounded operational-log endpoints.",
       "operationIds": [
         "courtImpact",
         "bookingCardImpact",
@@ -442,7 +442,8 @@
         "facilityUtilisation",
         "readMessageLog",
         "readAuditLog",
-        "searchAuditLog"
+        "searchAuditLog",
+        "searchOperationalLogs"
       ],
       "backgroundEntryPoints": [
         "DomainEventWriter#record(DomainEventRecord)"
@@ -453,21 +454,26 @@
       "alternatePaths": [
         "Impact reads page through all affected future bookings before a configuration write.",
         "Reports use the club time zone and bounded periods.",
-        "Message and audit records expose privacy-safe event metadata to the permitted board role."
+        "Message and audit records expose privacy-safe event metadata to the permitted board role.",
+        "Operational records come only from the fixed application, database and proxy sources and are redacted before bounded storage."
       ],
       "failurePaths": [
         "Unknown subjects, cross-scope cursors and invalid report periods refuse without disclosing another set.",
-        "Unavailable delivery evidence remains explicit rather than appearing successful."
+        "Unavailable delivery evidence remains explicit rather than appearing successful.",
+        "A stopped collector, dropped input, rotation and an incomplete scan remain explicit rather than appearing as an empty complete log."
       ],
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/ImpactService.java",
         "src/main/java/org/courtside/booking/internal/FacilityUtilisationService.java",
         "src/main/java/org/courtside/audit/internal/AuditService.java",
-        "src/main/java/org/courtside/notification/internal/MessageLogService.java"
+        "src/main/java/org/courtside/notification/internal/MessageLogService.java",
+        "src/main/java/org/courtside/operations/internal/OperationalLogService.java",
+        "src/main/java/org/courtside/operations/internal/OperationalLogCollector.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/web/ImpactControllerTest.java#givenACursorFromAnotherCourt_whenRequestingImpact_thenNoPositionedBookingsAreDisclosed",
-        "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenTheEndPrecedesTheStart_whenReportingUtilisation_thenThePeriodViolationIsReturned"
+        "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenTheEndPrecedesTheStart_whenReportingUtilisation_thenThePeriodViolationIsReturned",
+        "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused"
       ]
     },
     {

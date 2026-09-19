@@ -34,6 +34,12 @@ define.
   reference deployment sets 1 GiB. The process exits on an `OutOfMemoryError` instead of running
   on degraded, so give it a restart policy.
 - Logs go to standard output, one Elastic Common Schema JSON object per line.
+- `--collect-operational-logs` starts the bounded UDP collector instead of the web application. It
+  listens on `COURTSIDE_OPERATIONAL_LOG_PORT`, accepts only the fixed application, database and
+  proxy syslog tags, redacts each accepted message and writes rotating JSONL files below
+  `COURTSIDE_OPERATIONAL_LOG_PATH`. The collector needs that path writable. A web application may
+  mount the same path read-only to serve the administrator log view. Neither mode needs a Docker
+  socket.
 - Run one application container per database. The reference deployment runs one, and more than one
   is not tested. That includes an update: stop the old container before the schema migrates, as
   `docker compose up -d` does. In `shared` mode that is before the new container starts; in
@@ -73,6 +79,11 @@ replace it with a probe that requests HTTPS and trusts the application's certifi
 
 The probe groups under `/actuator/health/` require the session of an administrator who has already
 replaced a one-time password. An anonymous probe gets `401`, so they are not probe targets.
+
+When this image runs as the operational-log collector, the reference Compose health check reads
+the collector status file instead of the HTTP endpoint. It requires a non-empty status heartbeat
+from the preceding minute, checks every 10 seconds with a 3 second timeout and three retries, and
+lets the database and proxy start only after that check is healthy.
 
 ## The database
 
@@ -233,8 +244,8 @@ variables with other names:
 The three `COURTSIDE_DB_*_PASSWORD_FILE` variables keep their names but not their meaning: in `.env`
 they name a file on the host, in the container the path it is mounted at. The
 [environment variables](guides/operations.md#environment-variables) table describes each variable from the
-`.env` side, except `COURTSIDE_DB_IDENTITY_MODE`, `COURTSIDE_MAIL_FROM`, `COURTSIDE_MAIL_USERNAME` and
-`COURTSIDE_PASSWORD_BREACH_ENDPOINT`, which this page describes.
+`.env` side, except `COURTSIDE_DB_IDENTITY_MODE`, `COURTSIDE_MAIL_FROM`, `COURTSIDE_MAIL_USERNAME`,
+`COURTSIDE_OPERATIONAL_LOG_PATH` and `COURTSIDE_PASSWORD_BREACH_ENDPOINT`, which this page describes.
 
 | Variable | Default |
 |---|---|
@@ -279,6 +290,10 @@ they name a file on the host, in the container the path it is mounted at. The
 | `COURTSIDE_OTLP_ENABLED` | `false` |
 | `COURTSIDE_OTLP_METRICS_ENDPOINT` | `http://localhost:4318/v1/metrics` |
 | `COURTSIDE_OTLP_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` |
+| `COURTSIDE_OPERATIONAL_LOG_FILES` | `5` |
+| `COURTSIDE_OPERATIONAL_LOG_FILE_SIZE` | `2097152` |
+| `COURTSIDE_OPERATIONAL_LOG_PATH` | `/var/lib/courtside/operational-logs` |
+| `COURTSIDE_OPERATIONAL_LOG_PORT` | `1514` |
 | `COURTSIDE_PASSWORD_BREACH_CACHE_ENTRIES` | `128` |
 | `COURTSIDE_PASSWORD_BREACH_CACHE_LIFETIME` | `24h` |
 | `COURTSIDE_PASSWORD_BREACH_ENDPOINT` | `https://api.pwnedpasswords.com/range/` |

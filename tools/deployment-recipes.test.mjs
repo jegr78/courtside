@@ -66,13 +66,13 @@ const recipes = {
   standard: {
     files: ["compose.yaml", "compose.caddy.yaml", "compose.caddy-public.yaml", "compose.smtp-relay.yaml"],
     environment: { ...common, ...bundledDatabase, ...caddy, ...smtpRelay },
-    services: { app: "", db: "", proxy: "" },
+    services: { app: "", db: "", "log-collector": "", proxy: "" },
     required: "COURTSIDE_MAIL_RELAY_HOST",
   },
   "full-self-hosted": {
     files: ["compose.yaml", "compose.caddy.yaml", "compose.caddy-public.yaml", "compose.stalwart.yaml"],
     environment: { ...common, ...bundledDatabase, ...caddy, ...stalwart },
-    services: { app: "", db: "", proxy: "", mail: "mail", "mail-certificate": "mail", "mail-reload": "mail",
+    services: { app: "", db: "", "log-collector": "", proxy: "", mail: "mail", "mail-certificate": "mail", "mail-reload": "mail",
       "mail-plan": "mail-setup", "mail-bootstrap": "mail-setup", "mail-configure": "mail-setup", "mail-check": "mail-check" },
     required: "COURTSIDE_MAIL_HOSTNAME",
   },
@@ -80,13 +80,13 @@ const recipes = {
     files: ["compose.yaml", "compose.external-database.yaml", "compose.caddy.yaml",
       "compose.caddy-forwarded.yaml", "compose.smtp-relay.yaml"],
     environment: { ...common, ...externalDatabase, ...caddy, ...smtpRelay },
-    services: { app: "", proxy: "" },
+    services: { app: "", "log-collector": "", proxy: "" },
     required: "COURTSIDE_DATABASE_URL",
   },
   funnel: {
     files: ["compose.yaml", "compose.caddy.yaml", "compose.caddy-forwarded.yaml", "compose.smtp-relay.yaml"],
     environment: { ...common, ...bundledDatabase, ...caddy, ...smtpRelay },
-    services: { app: "", db: "", proxy: "" },
+    services: { app: "", db: "", "log-collector": "", proxy: "" },
     required: "COURTSIDE_MAIL_DOMAIN",
   },
 };

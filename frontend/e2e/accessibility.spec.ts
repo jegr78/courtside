@@ -75,6 +75,7 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
     await page.getByTestId("sign-in-link").click();
     await expectNoWcagViolations(page);
+
   });
 
   test(`${locale} member views and booking dialog meet automated WCAG 2.2 AA checks`, async ({ page, journeyService }) => {
@@ -201,6 +202,14 @@ for (const locale of ["de", "en"]) {
     await page.goto("/admin/audit");
     await expect(page.getByTestId("admin-audit-view")).toBeVisible();
     await expect(page.getByTestId("audit-row").first()).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+
+    // when — an unavailable collector is a first-class operational state, not a broken page
+    await page.goto("/admin/operational-logs");
+    await expect(page.getByTestId("admin-operational-logs-view")).toBeVisible();
+    await expect(page.getByTestId("operational-logs-unavailable")).toBeVisible();
 
     // then
     await expectNoWcagViolations(page);

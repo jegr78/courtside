@@ -216,7 +216,10 @@ public class ReferenceDeploymentSecurityTest {
         String forwardedCaddy = Files.readString(Path.of("deploy/compose.caddy-forwarded.yaml"));
 
         // then
-        assertThat(compose).doesNotContain("ports:", "COURTSIDE_PORT");
+        assertThat(compose)
+                .contains("127.0.0.1:${COURTSIDE_OPERATIONAL_LOG_PORT:-1514}:"
+                        + "${COURTSIDE_OPERATIONAL_LOG_PORT:-1514}/udp")
+                .doesNotContain("COURTSIDE_PORT:-8080", "/tcp");
         assertThat(publicCaddy).contains("80:80", "443:443");
         assertThat(forwardedCaddy)
                 .contains("127.0.0.1:${COURTSIDE_PORT:-8080}:8080")

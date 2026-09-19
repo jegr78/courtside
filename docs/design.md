@@ -469,7 +469,9 @@ An administrator can export all data held about one person. The response exclude
 identity even when they share a booking or audit event. Producing it is itself recorded.
 
 Application and security logs contain no names, email addresses, payment data or request content.
-Known accounts use immutable identifiers. Log storage, access and retention belong to the operator.
+Known accounts use immutable identifiers. The reference deployment also redacts database and proxy
+output before bounded local retention. Administrators can inspect only those normalized records;
+the operator still owns durable storage, external access and the longer retention policy.
 
 ## Operations and observability
 
@@ -478,6 +480,11 @@ The image exposes `/actuator/health`. Mail health is available to administrators
 
 Structured ECS logs go to standard output. Metrics and traces can use OTLP when the operator enables
 their separate endpoints. Courtside requires no monitoring backend.
+
+The reference deployment routes application, database and proxy output through a loopback-only,
+fixed-source collector. It writes a small rotating volume that the application reads without Docker
+control access. The administration distinguishes unavailable, dropped, rotated and incomplete
+evidence and never presents this lossy recent view as a durable audit log.
 
 Current domain metrics cover created bookings, rule rejections, booking conflicts, failed password
 rehashes and message outcomes. Spring metrics cover HTTP, JVM and connection pools. Slow-query logs

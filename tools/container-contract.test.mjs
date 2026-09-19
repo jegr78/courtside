@@ -250,6 +250,19 @@ test("given the image's variables, when the contract lists them, then the set an
     // given
     const expected = new Map([...bound.values()].map(({ name, fallback }) => [name,
       fallback === "" ? "unset" : fallback === "@project.url@" ? "this repository" : `\`${fallback}\``]));
+    const collector = javaFile("operations/internal/OperationalLogCollector");
+    const collectorDefaults = new Map([
+      ["COURTSIDE_OPERATIONAL_LOG_PATH",
+        /DEFAULT_DIRECTORY = Path\.of\("([^"]+)"\)/.exec(collector)?.[1]],
+      ["COURTSIDE_OPERATIONAL_LOG_PORT",
+        /DEFAULT_PORT = ([\d_]+);/.exec(collector)?.[1]?.replaceAll("_", "")],
+      ["COURTSIDE_OPERATIONAL_LOG_FILE_SIZE",
+        String(Number(/DEFAULT_FILE_SIZE = (\d+)L \* 1024 \* 1024;/.exec(collector)?.[1]) * 1024 * 1024)],
+      ["COURTSIDE_OPERATIONAL_LOG_FILES",
+        /DEFAULT_FILES = ([\d_]+);/.exec(collector)?.[1]?.replaceAll("_", "")]
+    ]);
+    assert.ok([...collectorDefaults.values()].every(Boolean), "the collector defaults changed shape");
+    for (const [name, fallback] of collectorDefaults) expected.set(name, `\`${fallback}\``);
     assert.ok(imageExcludes.length > 0, "the image excludes no source package");
     for (const name of all(java, /"(COURTSIDE_[A-Z0-9_]+)"/g)) {
       if (!expected.has(name)) expected.set(name, "unset");

@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AdminSurfaceTest extends AbstractIntegrationTest {
 
-    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 73;
+    private static final int KNOWN_PRIVILEGED_ENDPOINT_COUNT = 74;
 
     private static final String CATCH_ALL_UUID = "11111111-1111-1111-1111-111111111111";
 

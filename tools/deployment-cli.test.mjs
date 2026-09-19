@@ -1054,6 +1054,7 @@ test("given a newer exact release, when update becomes healthy, then it selects 
     assert.match(invocations, /image pull ghcr\.io\/jegr78\/courtside@sha256:/);
     assert.match(invocations, / stop app/);
     assert.match(invocations, / up -d --wait/);
+    assert.doesNotMatch(invocations, / down .*--volumes| down --volumes/);
   });
 });
 

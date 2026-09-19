@@ -40,6 +40,7 @@ describe("AdminNavigation", () => {
     const records = screen.getByTestId("admin-group-records");
     expect(within(records).getByTestId("admin-audit-link")).toBeInTheDocument();
     expect(within(records).getByTestId("admin-messages-link")).toBeInTheDocument();
+    expect(within(records).getByTestId("admin-operational-logs-link")).toBeInTheDocument();
   });
 
   it("given the administration, when the navigation is read, then the court plan is the way back", () => {

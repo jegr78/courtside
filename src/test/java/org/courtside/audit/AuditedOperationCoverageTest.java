@@ -104,6 +104,7 @@ class AuditedOperationCoverageTest {
             "MemberService#requireMembershipType",
             "MemberService#setMembershipTypeActive",
             "MessageLogService#page",
+            "OperationalLogService#search",
             "PreviewService#create",
             "PreviewService#read",
             "RosterExportService#roster",

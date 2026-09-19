@@ -178,6 +178,26 @@
       ]
     },
     {
+      "id": "operational-log-search",
+      "kind": "demanding",
+      "entryPoints": [
+        "searchOperationalLogs"
+      ],
+      "growthDrivers": "Reading, validating, sorting and filtering retained JSONL records grows with the bounded rotated log files.",
+      "inputOrDataBound": "One request reads at most 10 MiB and 50,000 records from at most ten fixed files, returns at most 100 entries and bounds every filter and stored message.",
+      "concurrencyOrRateBound": "Only administrators may search; there is no separate rate gate, so the application deployment memory and CPU limits bound concurrent scans.",
+      "executionModel": "The read is synchronous, state invariant and uses only the collector's read-only named volume; it never calls Docker or an arbitrary source.",
+      "failureBehavior": "Missing or stale collector evidence returns UNAVAILABLE; malformed or over-bound retained data is skipped and marks the result incomplete.",
+      "consumerTimeoutBehavior": "The scan has fixed byte and record ceilings. The reference proxy adds no separate response deadline, and a retry performs the same bounded read.",
+      "productionPaths": [
+        "src/main/java/org/courtside/operations/internal/OperationalLogService.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/operations/internal/OperationalLogServiceTest.java#givenACorruptStoredLine_whenSearching_thenItIsSkippedAndTheResultIsMarkedIncomplete",
+        "src/test/java/org/courtside/operations/internal/OperationalLogServiceTest.java#givenAnOversizedCollectorStatus_whenSearching_thenItIsRejectedWithoutReadingRecords"
+      ]
+    },
+    {
       "id": "booking-write",
       "kind": "demanding",
       "entryPoints": [
