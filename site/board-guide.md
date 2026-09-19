@@ -310,7 +310,7 @@ aktivieren und Mitgliedsrollen neu vergeben.
 
 ## Nachweise
 
-Unter **Nachweise** findest du vier Ansichten.
+Unter **Nachweise** findest du fünf Ansichten.
 
 * **Auslastung** zeigt bestätigte Spielzeit je Platz. Plätze ohne Buchung sind enthalten.
 * **Datenexport** erstellt CSV-Dateien für Buchungen oder Mitglieder. Der Buchungsexport enthält
@@ -322,6 +322,11 @@ Unter **Nachweise** findest du vier Ansichten.
   Filter bei; *Filter zurücksetzen* zeigt wieder das vollständige Protokoll.
 * **Nachrichtenprotokoll** zeigt den Versandstatus. *Übergeben* bedeutet nur, dass der Mailserver
   die Nachricht angenommen hat. Die endgültige Zustellung steht allein in dessen Protokoll.
+* **Betriebsprotokoll** zeigt jüngste, vor der Speicherung bereinigte Meldungen aus Anwendung,
+  Datenbank und Reverse-Proxy. Filtere nach gemeldeter Quelle, Schweregrad, Vereinszeit, Meldung oder Trace-ID.
+  Hinweise über fehlende, entfernte oder unvollständige Daten gehören zum Ergebnis. Die Ansicht ist
+  kein dauerhaftes Logarchiv und zeigt keine beliebigen Container des Servers. Die Quelle ist nicht
+  authentifiziert: Ein lokaler Prozess auf dem Server kann einen der festen Quellnamen nachahmen.
 
 ![Die Auslastung je Platz mit Buchungszahl, belegter Zeit und Anteil.](screenshots/de/utilisation.png)
 

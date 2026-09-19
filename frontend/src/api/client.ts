@@ -32,6 +32,9 @@ export type AuditSearch = {
   cursor?: string;
   limit?: number;
 };
+export type OperationalLogEntry = components["schemas"]["OperationalLogEntry"];
+export type OperationalLogPage = components["schemas"]["OperationalLogPage"];
+export type OperationalLogSearchRequest = components["schemas"]["OperationalLogSearchRequest"];
 export type MessageEntry = components["schemas"]["MessageEntry"];
 export type MessagePage = components["schemas"]["MessagePage"];
 export type MessageState = components["schemas"]["MessageState"];
@@ -462,6 +465,11 @@ export const api = {
   searchAudit: (criteria: AuditSearch) => request<AuditPage>("/api/admin/audit/search", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(criteria)
   }),
+  operationalLogs: (criteria: OperationalLogSearchRequest) => request<OperationalLogPage>(
+    "/api/admin/operational-logs/search", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(criteria)
+    }
+  ),
   messages: (cursor?: string, limit = 50, options: { unsettled?: boolean; personId?: string } = {}) =>
     request<MessagePage>(
       `/api/admin/messages?${new URLSearchParams({

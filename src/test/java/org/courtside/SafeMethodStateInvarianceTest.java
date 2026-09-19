@@ -101,7 +101,8 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
     private static final Map<String, String> READING_POSTS = Map.of(
             "/api/public/participant-members", "{\"query\":\"Miles\"}",
             "/api/admin/roster-search", "{\"query\":\"Miles\",\"limit\":10}",
-            "/api/admin/audit/search", "{\"query\":\"Miles\",\"limit\":10}");
+            "/api/admin/audit/search", "{\"query\":\"Miles\",\"limit\":10}",
+            "/api/admin/operational-logs/search", "{}");
 
     private record Probe(String identifier, String query) {
     }

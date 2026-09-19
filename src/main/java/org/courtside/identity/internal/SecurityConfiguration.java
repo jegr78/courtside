@@ -165,6 +165,7 @@ public class SecurityConfiguration {
                                 "/admin/export", "/admin/utilisation",
                                 "/admin/audit",
                                 "/admin/messages",
+                                "/admin/operational-logs",
                                 "/index.html",
                                 "/assets/**", "/font-licenses.txt", "/icon.svg",
                                 "/manifest.webmanifest", "/sw.js",

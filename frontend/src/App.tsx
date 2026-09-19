@@ -23,6 +23,7 @@ import { MyMessagesView } from "./views/MyMessagesView";
 import { AccountSecurityView } from "./views/AccountSecurityView";
 import { AdminAuditView } from "./views/AdminAuditView";
 import { AdminMessagesView } from "./views/AdminMessagesView";
+import { AdminOperationalLogsView } from "./views/AdminOperationalLogsView";
 import { AdminConfigurationView } from "./views/AdminConfigurationView";
 import { AdminBookingCardView } from "./views/facility/AdminBookingCardView";
 import { AdminBookingCardsView } from "./views/facility/AdminBookingCardsView";
@@ -102,6 +103,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       <Route path="utilisation" element={<AdminFacilityUtilisationView />} />
       <Route path="audit" element={<AdminAuditView />} />
       <Route path="messages" element={<AdminMessagesView />} />
+      <Route path="operational-logs" element={<AdminOperationalLogsView />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />

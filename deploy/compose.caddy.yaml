@@ -12,11 +12,18 @@ services:
   proxy:
     image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     restart: unless-stopped
-    logging: *logging
+    logging:
+      driver: syslog
+      options:
+        syslog-address: udp://127.0.0.1:${COURTSIDE_OPERATIONAL_LOG_PORT:-1514}
+        syslog-format: rfc5424micro
+        tag: courtside-proxy
     security_opt:
       - no-new-privileges:true
     depends_on:
       app:
+        condition: service_healthy
+      log-collector:
         condition: service_healthy
     environment:
       COURTSIDE_DOMAIN: ${COURTSIDE_DOMAIN:?set COURTSIDE_DOMAIN in .env}

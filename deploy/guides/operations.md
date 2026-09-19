@@ -1175,6 +1175,9 @@ default.
 | `COURTSIDE_IMPORT_SWEEP_INTERVAL` | `1h` | How often previews past their retention are swept, between a minute and a day. The sweep drops the resolved change set and the person fingerprints, and keeps the row, the file's name and hash, and the counts. |
 | `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` | `500` | Logs Hibernate queries slower than this threshold in milliseconds. Bind values are not logged. |
 | `COURTSIDE_LOG_LEVEL` | `INFO` | Log level of the application's ordinary loggers. `DEBUG` adds an `Answering` line for every error one of its exception handlers answers. The security-event logger remains at `INFO`, so changing this setting cannot silently remove its successful authentication, session, credential or administrative events. |
+| `COURTSIDE_OPERATIONAL_LOG_PORT` | `1514` | Host-loopback UDP port where Docker's fixed application, database and proxy logging drivers reach the collector. |
+| `COURTSIDE_OPERATIONAL_LOG_FILE_SIZE` | `2097152` | Maximum bytes in one retained operational-log file, from 1024 through 10485760. |
+| `COURTSIDE_OPERATIONAL_LOG_FILES` | `5` | Number of operational-log files retained in the named volume, from 1 through 10. |
 | `COURTSIDE_PORT` | `8080` | Host loopback port for Caddy when Funnel or another local ingress owns public TLS. The application is not published. |
 | `COURTSIDE_SOURCE_URL` | required | The absolute HTTP or HTTPS address without embedded credentials returned by `GET /api/source`. Point an unchanged installation here and a modified fork at the corresponding source for that fork. Compose refuses to start without this choice. |
 | `COURTSIDE_ENVIRONMENT` | `PRODUCTION` | Public environment designation: `PRODUCTION`, `UAT`, `DEVELOPMENT`, `PERFORMANCE` or `SECURITY`. `UAT` and `PERFORMANCE` are visibly marked in the frontend. `SECURITY` belongs to the disposable assessment target and also answers every request with the host and scheme the application observed; a club has no reason to set it. |
@@ -1212,11 +1215,48 @@ management using Spring's
 to `.env`. The collector and its retention policy remain the operator's responsibility.
 
 Courtside's security events use the stable catalogue described in `docs/security-events.md` in the
-Courtside repository and remain in the same ECS standard-output stream. Docker logging drivers,
-sidecars and collectors are optional ways to route that stream; the reference deployment makes no
-synchronous external delivery call and does not assert that a destination accepted an event.
-Operators remain responsible for choosing a logging configuration whose outage behavior cannot block
-requests, as well as storage, access, retention and alert thresholds for the installation.
+Courtside repository and remain in the same ECS standard-output stream. The reference deployment's
+Docker logging drivers send the application, database and proxy output over host-loopback UDP to a
+restricted collector. This path never blocks a request and does not assert that the collector
+accepted a datagram. External retention and alerts remain the operator's responsibility.
+
+## Inspect recent operational logs in the administration
+
+The **Records → Operational log** page gives an administrator recent diagnostics without shell
+access. It covers only the Courtside application, bundled PostgreSQL and reference Caddy proxy.
+Filters for source, severity, club-local time, message text and trace ID travel in a protected JSON
+body rather than the URL. The page states separately when collection is unavailable, rotation has
+removed older entries, input was dropped or a read was incomplete.
+
+The collector redacts request bodies, credentials, cookies, addresses and common direct identifiers
+before writing a record. Unknown service tags and malformed records are dropped. Treat the remaining
+messages as private operational data anyway: only administrators can read them, and they must not be
+copied into a public issue without another review.
+
+The displayed source is a claimed source, not an authenticated identity. Any process with access to
+the host loopback interface can imitate one of the three fixed tags. Courtside therefore timestamps
+accepted records when the collector receives them instead of trusting a supplied timestamp. The
+collector accepts at most 50 datagrams per second, counts excess input as dropped and writes its
+status at most once per second during continuous traffic. Use authenticated central logging when
+source authenticity or audit evidence is required.
+
+The defaults retain at most five files of 2 MiB each. Change
+`COURTSIDE_OPERATIONAL_LOG_FILE_SIZE` between 1024 and 10485760 bytes and
+`COURTSIDE_OPERATIONAL_LOG_FILES` between 1 and 10 only when the host has a reason to trade disk
+space for a longer window. `COURTSIDE_OPERATIONAL_LOG_PORT` defaults to 1514 and binds only to
+127.0.0.1. A local host process can still send untrusted datagrams there, so the fixed tags,
+redaction, receive-time timestamps and rate limits remain mandatory.
+
+The named `operational-logs` volume survives ordinary image updates. UDP delivery remains lossy:
+records emitted before the collector starts, while it is unavailable or faster than it can write
+may be absent. This page is for recent diagnosis, not audit evidence, durable central logging,
+alerting or arbitrary host and container logs. Use the machine's logging system or an external
+collector for those jobs.
+
+The reference stack reports the collector as healthy only while its status heartbeat is fresh.
+The database and proxy wait for that state, so `docker compose up --wait` does not report a ready
+stack whose first service logs have nowhere to go. If the collector is unhealthy, inspect
+`docker compose logs log-collector`; deleting the retained volume is not a repair procedure.
 
 ## When a member reports an error
 
@@ -1269,6 +1309,10 @@ image, stops the old application, migrates the configuration atomically and wait
 health. A pull failure leaves the old release selected. A startup or migration failure leaves the
 new release selected and the application stopped or unhealthy, with the recovery-unit path in the
 diagnostic. The command never claims that it rolled a database back.
+
+The update recreates neither the database volume nor the `operational-logs` volume. Existing club
+data and retained diagnostic records therefore remain in place; the latter can still expire through
+their normal bounded rotation while the updated services run.
 
 Migrations run on the application's startup, or in the one-shot migration command when the database
 identities are separated, and support skipping versions, so an instance that has not been updated

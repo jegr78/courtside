@@ -4,12 +4,21 @@ services:
   db:
     image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     restart: unless-stopped
+    logging:
+      driver: syslog
+      options:
+        syslog-address: udp://127.0.0.1:${COURTSIDE_OPERATIONAL_LOG_PORT:-1515}
+        syslog-format: rfc5424micro
+        tag: courtside-database
     environment:
       POSTGRES_DB: courtside
       POSTGRES_USER: courtside
       POSTGRES_PASSWORD: courtside-uat
     volumes:
       - db:/var/lib/postgresql/data
+    depends_on:
+      log-collector:
+        condition: service_healthy
     networks:
       - backend
     healthcheck:
@@ -21,6 +30,12 @@ services:
   app:
     image: ${COURTSIDE_UAT_IMAGE:-courtside:uat-local}
     restart: unless-stopped
+    logging:
+      driver: syslog
+      options:
+        syslog-address: udp://127.0.0.1:${COURTSIDE_OPERATIONAL_LOG_PORT:-1515}
+        syslog-format: rfc5424micro
+        tag: courtside-application
     read_only: true
     tmpfs:
       - /tmp
@@ -43,14 +58,53 @@ services:
       COURTSIDE_MAIL_RELAY_HOST: mail.invalid
       COURTSIDE_MAIL_FROM: no-reply@example.org
       COURTSIDE_MAIL_REPLY_TO: board@example.org
+      COURTSIDE_OPERATIONAL_LOG_PATH: /var/lib/courtside/operational-logs
     networks:
       - backend
       - frontend
+    volumes:
+      - operational-logs:/var/lib/courtside/operational-logs:ro
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
       interval: 5s
       timeout: 3s
       retries: 30
+
+  log-collector:
+    image: ${COURTSIDE_UAT_IMAGE:-courtside:uat-local}
+    command: ["--collect-operational-logs"]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    mem_limit: 256m
+    pids_limit: 64
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      COURTSIDE_OPERATIONAL_LOG_PATH: /var/lib/courtside/operational-logs
+      COURTSIDE_OPERATIONAL_LOG_PORT: ${COURTSIDE_OPERATIONAL_LOG_PORT:-1515}
+      COURTSIDE_OPERATIONAL_LOG_FILE_SIZE: ${COURTSIDE_OPERATIONAL_LOG_FILE_SIZE:-2097152}
+      COURTSIDE_OPERATIONAL_LOG_FILES: ${COURTSIDE_OPERATIONAL_LOG_FILES:-5}
+    ports:
+      - 127.0.0.1:${COURTSIDE_OPERATIONAL_LOG_PORT:-1515}:${COURTSIDE_OPERATIONAL_LOG_PORT:-1515}/udp
+    networks:
+      - log-collection
+    volumes:
+      - operational-logs:/var/lib/courtside/operational-logs
+    healthcheck:
+      test: ["CMD-SHELL", "find /var/lib/courtside/operational-logs/collector-status.json -mmin -1 -size +0c -print -quit | grep -q ."]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
   api-ui:
     image: swaggerapi/swagger-ui:v5.32.15@sha256:9ae209e3791e6fa78e1426769bf54562a043caa969287bfd3779428ece4930e5
@@ -68,11 +122,19 @@ services:
   proxy:
     image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     restart: unless-stopped
+    logging:
+      driver: syslog
+      options:
+        syslog-address: udp://127.0.0.1:${COURTSIDE_OPERATIONAL_LOG_PORT:-1515}
+        syslog-format: rfc5424micro
+        tag: courtside-proxy
     depends_on:
       app:
         condition: service_healthy
       api-ui:
         condition: service_started
+      log-collector:
+        condition: service_healthy
     ports:
       - "127.0.0.1:8081:80"
       - "127.0.0.1:8443:443"
@@ -86,9 +148,11 @@ services:
 
 volumes:
   db:
+  operational-logs:
   caddy-data:
   caddy-config:
 
 networks:
   backend:
   frontend:
+  log-collection:

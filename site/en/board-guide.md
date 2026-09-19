@@ -298,7 +298,7 @@ roles again.
 
 ## Records
 
-The **Records** area has four views.
+The **Records** area has five views.
 
 * **Utilisation** shows confirmed playing time by court. It includes courts without bookings.
 * **Data export** creates CSV files for bookings or members. The booking export omits the person who
@@ -308,6 +308,11 @@ The **Records** area has four views.
   more* keeps the active filters; *Clear filters* returns to the complete log.
 * **Message log** shows delivery state. *Handed over* only means that the mail server accepted the
   message. Final delivery is recorded by the mail server, not Courtside.
+* **Operational log** shows recent records from the application, database and reverse proxy after
+  pre-storage redaction. Filter by reported source, severity, club-local time, message or trace ID. Warnings
+  about unavailable, expired or incomplete evidence are part of the result. The view is not a
+  durable log archive and cannot inspect arbitrary server containers. The source is not
+  authenticated: a local process on the server can imitate one of the fixed source names.
 
 ![Utilisation by court with booking count, occupied time and share.](../screenshots/en/utilisation.png)
 

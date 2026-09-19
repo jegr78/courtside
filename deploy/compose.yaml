@@ -28,13 +28,21 @@ services:
   db:
     image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     restart: unless-stopped
-    logging: *logging
+    logging:
+      driver: syslog
+      options:
+        syslog-address: udp://127.0.0.1:${COURTSIDE_OPERATIONAL_LOG_PORT:-1514}
+        syslog-format: rfc5424micro
+        tag: courtside-database
     security_opt:
       - no-new-privileges:true
     environment:
       POSTGRES_DB: courtside
       POSTGRES_USER: courtside
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+    depends_on:
+      log-collector:
+        condition: service_healthy
     networks:
       - database
     volumes:
@@ -48,7 +56,12 @@ services:
   app:
     image: ghcr.io/jegr78/courtside@sha256:${COURTSIDE_IMAGE_DIGEST:?set COURTSIDE_IMAGE_DIGEST in .env}
     restart: unless-stopped
-    logging: *logging
+    logging:
+      driver: syslog
+      options:
+        syslog-address: udp://127.0.0.1:${COURTSIDE_OPERATIONAL_LOG_PORT:-1514}
+        syslog-format: rfc5424micro
+        tag: courtside-application
     mem_limit: ${COURTSIDE_MEMORY:-1g}
     read_only: true
     tmpfs:
@@ -101,6 +114,7 @@ services:
       COURTSIDE_IMPORT_PREVIEW_RETENTION: ${COURTSIDE_IMPORT_PREVIEW_RETENTION:-7d}
       COURTSIDE_IMPORT_SWEEP_INTERVAL: ${COURTSIDE_IMPORT_SWEEP_INTERVAL:-1h}
       COURTSIDE_SLOW_QUERY_THRESHOLD_MS: ${COURTSIDE_SLOW_QUERY_THRESHOLD_MS:-500}
+      COURTSIDE_OPERATIONAL_LOG_PATH: /var/lib/courtside/operational-logs
       COURTSIDE_MAIL_RELAY_PORT: ${COURTSIDE_MAIL_RELAY_PORT:-587}
       COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE: ${COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE:-false}
       LOGGING_LEVEL_ORG_COURTSIDE: ${COURTSIDE_LOG_LEVEL:-INFO}
@@ -108,10 +122,46 @@ services:
       app-egress:
         gw_priority: 1
       database: {}
+    volumes:
+      - operational-logs:/var/lib/courtside/operational-logs:ro
+
+  log-collector:
+    image: ghcr.io/jegr78/courtside@sha256:${COURTSIDE_IMAGE_DIGEST:?set COURTSIDE_IMAGE_DIGEST in .env}
+    command: ["--collect-operational-logs"]
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 256m
+    pids_limit: 64
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      COURTSIDE_OPERATIONAL_LOG_PATH: /var/lib/courtside/operational-logs
+      COURTSIDE_OPERATIONAL_LOG_PORT: ${COURTSIDE_OPERATIONAL_LOG_PORT:-1514}
+      COURTSIDE_OPERATIONAL_LOG_FILE_SIZE: ${COURTSIDE_OPERATIONAL_LOG_FILE_SIZE:-2097152}
+      COURTSIDE_OPERATIONAL_LOG_FILES: ${COURTSIDE_OPERATIONAL_LOG_FILES:-5}
+    ports:
+      - 127.0.0.1:${COURTSIDE_OPERATIONAL_LOG_PORT:-1514}:${COURTSIDE_OPERATIONAL_LOG_PORT:-1514}/udp
+    networks:
+      - log-collection
+    volumes:
+      - operational-logs:/var/lib/courtside/operational-logs
+    healthcheck:
+      test: ["CMD-SHELL", "find /var/lib/courtside/operational-logs/collector-status.json -mmin -1 -size +0c -print -quit | grep -q ."]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 networks:
   app-egress:
   database:
     internal: true
+  log-collection:
 
 volumes:
   db:
+  operational-logs:

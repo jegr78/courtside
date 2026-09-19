@@ -120,6 +120,41 @@ it("when an administrator ends sessions, then the target and global routes stay 
   expect(calls).toEqual(["person:person-1", "global"]);
 });
 
+it("given private operational-log filters, when searching, then they stay in the protected request body", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=test-token";
+  server.use(http.post("/api/admin/operational-logs/search", async ({ request }) => {
+    expect(new URL(request.url).search).toBe("");
+    expect(request.headers.get("X-XSRF-TOKEN")).toBe("test-token");
+    expect(await request.json()).toEqual({
+      source: "APPLICATION",
+      text: "member@example.org",
+      traceId: "0123456789abcdef0123456789abcdef",
+      limit: 50
+    });
+    return HttpResponse.json({
+      entries: [],
+      nextCursor: null,
+      availability: "AVAILABLE",
+      retentionTruncated: false,
+      searchIncomplete: false,
+      droppedRecords: 0,
+      oldestAvailableAt: null
+    });
+  }));
+
+  // when
+  const result = await api.operationalLogs({
+    source: "APPLICATION",
+    text: "member@example.org",
+    traceId: "0123456789abcdef0123456789abcdef",
+    limit: 50
+  });
+
+  // then
+  expect(result.entries).toEqual([]);
+});
+
 it("given an expired session, when an API call is rejected, then the app is notified", async () => {
   // given
   const listener = notifiedOfUnauthenticated();

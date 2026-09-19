@@ -6,6 +6,19 @@ or assessment findings belong in [`security/exceptions.json`](../security/except
 
 Each entry names the exposure, its current bound and the condition for reconsidering it.
 
+## Operational-log sources are claimed, not authenticated
+
+The reference deployment's Docker logging drivers send records to a UDP listener bound to host
+loopback. Any other local process can reach that listener and imitate the fixed application,
+database or proxy tag. The administrator view therefore labels sources as reported, timestamps
+records on receipt and warns that the stream is diagnostic rather than audit evidence. Closed tags,
+strict parsing, pre-storage redaction, a 50-datagram-per-second limit, coalesced status writes and
+bounded rotation constrain forgery and write amplification but cannot establish provenance.
+
+Reconsider this limitation when the reference deployment can use an OS-permission-protected local
+transport supported by both Docker's logging driver and the collector, or when a mutually
+authenticated external collector becomes part of the reference architecture.
+
 ## Private deployment hops use optional certificate verification
 
 The standard single-host deployment uses private Compose networks between the application,

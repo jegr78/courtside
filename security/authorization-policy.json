@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-09-19",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "b80924c0004ef913a54655d01054be5745f512a693a805153ed755cbe11c61b8",
-  "protectedFieldInventorySha256": "32c81217e78886abfde6276739eb2f33a87854fc8e6afdb7c39884c1ca6b8962",
-  "productionAuthorizationSha256": "369314dc651cb185a7f4d740ca10401f8193e0ff5b6676bbddb14543c3d7db19",
+  "openApiFieldInventorySha256": "dd7165fa6b320d868cd171e828a516289a5965fc90a2cf32e90a4576fe2464c3",
+  "protectedFieldInventorySha256": "eb5e0a8a85ee49e1f8a18371b949fc288dbfb27722d5e808434b2433a4dd0c25",
+  "productionAuthorizationSha256": "dd548c44be04e93d96caec0d15d93c1487f7d7eeaa0e7bd2fc632f8df96974f1",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1417,6 +1417,31 @@
     "searchAuditLog:response:Violation.code",
     "searchAuditLog:response:Violation.params",
     "searchAuditLog:response:Violation.params.*",
+    "searchOperationalLogs:request:OperationalLogSearchRequest.cursor",
+    "searchOperationalLogs:request:OperationalLogSearchRequest.from",
+    "searchOperationalLogs:request:OperationalLogSearchRequest.limit",
+    "searchOperationalLogs:request:OperationalLogSearchRequest.severity",
+    "searchOperationalLogs:request:OperationalLogSearchRequest.source",
+    "searchOperationalLogs:request:OperationalLogSearchRequest.to",
+    "searchOperationalLogs:response:$response.header.Accept",
+    "searchOperationalLogs:response:FieldError.code",
+    "searchOperationalLogs:response:FieldError.field",
+    "searchOperationalLogs:response:FieldError.params",
+    "searchOperationalLogs:response:FieldError.params.*",
+    "searchOperationalLogs:response:OperationalLogEntry.id",
+    "searchOperationalLogs:response:OperationalLogEntry.occurredAt",
+    "searchOperationalLogs:response:OperationalLogEntry.severity",
+    "searchOperationalLogs:response:OperationalLogEntry.source",
+    "searchOperationalLogs:response:OperationalLogPage.availability",
+    "searchOperationalLogs:response:OperationalLogPage.droppedRecords",
+    "searchOperationalLogs:response:OperationalLogPage.entries",
+    "searchOperationalLogs:response:OperationalLogPage.nextCursor",
+    "searchOperationalLogs:response:OperationalLogPage.oldestAvailableAt",
+    "searchOperationalLogs:response:OperationalLogPage.retentionTruncated",
+    "searchOperationalLogs:response:OperationalLogPage.searchIncomplete",
+    "searchOperationalLogs:response:Violation.code",
+    "searchOperationalLogs:response:Violation.params",
+    "searchOperationalLogs:response:Violation.params.*",
     "searchParticipantMembers:request:ParticipantMemberSearchRequest.query",
     "searchParticipantMembers:response:$response.header.Accept",
     "searchParticipantMembers:response:FieldError.code",
@@ -2229,6 +2254,7 @@
         "readMessageLog",
         "readAuditLog",
         "searchAuditLog",
+        "searchOperationalLogs",
         "exportRoster",
         "exportBookings",
         "exportPersonData"
@@ -2742,6 +2768,7 @@
         "src/main/java/org/courtside/audit/internal/AuditService.java#matchesBase",
         "src/main/java/org/courtside/audit/web/AuditAdminController.java#toResponse",
         "src/main/java/org/courtside/notification/web/MessageAdminController.java#toResponse",
+        "src/main/java/org/courtside/operations/web/OperationalLogAdminController.java#searchOperationalLogs",
         "src/main/java/org/courtside/dataexchange/web/SubjectAccessAdminController.java#toResponse",
         "src/main/java/org/courtside/dataexchange/web/ExternalReferenceAdminController.java#toResponse",
         "src/main/java/org/courtside/dataexchange/web/ImportPreviewAdminController.java#createImportPreview",
@@ -2751,10 +2778,12 @@
         "src/main/java/org/courtside/dataexchange/web/ExportAdminController.java#exportBookings"
       ],
       "positiveTests": [
-        "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenAPersonTheInstanceHoldsEverythingAbout_whenABoardAsks_thenEachOfThoseThingsIsAnswered"
+        "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenAPersonTheInstanceHoldsEverythingAbout_whenABoardAsks_thenEachOfThoseThingsIsAnswered",
+        "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAnAdministratorAndPrivateCriteria_whenSearching_thenTheMatchingPageIsReturned"
       ],
       "negativeTests": [
-        "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenABookingSomebodyElseMade_whenABoardAsksAboutTheNamedMember_thenNeitherMakerNorNoteIsNamed"
+        "src/test/java/org/courtside/dataexchange/web/SubjectAccessAdminControllerTest.java#givenABookingSomebodyElseMade_whenABoardAsksAboutTheNamedMember_thenNeitherMakerNorNoteIsNamed",
+        "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused"
       ]
     }
   ],
@@ -3383,6 +3412,49 @@
       ],
       "operationIds": [
         "readMessageLog"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator"
+      ],
+      "decisions": [
+        "administrator-gate",
+        "administrative-projection"
+      ]
+    },
+    {
+      "id": "operational-log-query-write",
+      "access": "write",
+      "description": "Potentially personal message fragments and trace identifiers are accepted only from administrators through the private operational-log request body.",
+      "fields": [
+        "OperationalLogSearchRequest.text",
+        "OperationalLogSearchRequest.traceId"
+      ],
+      "operationIds": [
+        "searchOperationalLogs"
+      ],
+      "actors": [
+        "ADMIN"
+      ],
+      "attributes": [
+        "administrator"
+      ],
+      "decisions": [
+        "administrator-gate"
+      ]
+    },
+    {
+      "id": "operational-log-record-read",
+      "access": "read",
+      "description": "Redacted operational messages and trace identifiers are available only to administrators through the bounded operational-log projection.",
+      "fields": [
+        "OperationalLogEntry.message",
+        "OperationalLogEntry.traceId"
+      ],
+      "operationIds": [
+        "searchOperationalLogs"
       ],
       "actors": [
         "ADMIN"
