@@ -29,6 +29,7 @@ class AuditedOperationCoverageTest {
             "AuditService#page",
             "AuditService#recordedAbout",
             "AuditService#recordedBy",
+            "AuditService#search",
             "BookingExportService#bookings",
             "CardService#activeCards",
             "CardService#activeParticipantCards",

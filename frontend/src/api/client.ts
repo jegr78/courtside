@@ -23,6 +23,15 @@ export type RosterSortField = components["schemas"]["RosterSortField"];
 export type RosterSortDirection = components["schemas"]["RosterSortDirection"];
 export type AuditEntry = components["schemas"]["AuditEntry"];
 export type AuditPage = components["schemas"]["AuditPage"];
+export type AuditSearch = {
+  query?: string;
+  eventType?: string;
+  subjectId?: string;
+  from?: string;
+  to?: string;
+  cursor?: string;
+  limit?: number;
+};
 export type MessageEntry = components["schemas"]["MessageEntry"];
 export type MessagePage = components["schemas"]["MessagePage"];
 export type MessageState = components["schemas"]["MessageState"];
@@ -450,6 +459,9 @@ export const api = {
       ...(subjectId ? { subjectId } : {})
     })}`
   ),
+  searchAudit: (criteria: AuditSearch) => request<AuditPage>("/api/admin/audit/search", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(criteria)
+  }),
   messages: (cursor?: string, limit = 50, options: { unsettled?: boolean; personId?: string } = {}) =>
     request<MessagePage>(
       `/api/admin/messages?${new URLSearchParams({

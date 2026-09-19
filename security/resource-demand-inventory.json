@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-13",
+  "reviewedAt": "2026-09-19",
   "sources": {
     "openapi": "src/main/resources/api/openapi.yaml",
     "scheduledFiles": [
@@ -213,21 +213,24 @@
         "listParticipantCards",
         "listParticipantCardsForAdmin",
         "listRuleSets",
+        "searchAuditLog",
         "searchParticipantMembers",
         "searchRoster"
       ],
-      "growthDrivers": "Collection queries grow with courts, cards, members, import history, rule sets or one day of occupied court slots in the club database.",
-      "inputOrDataBound": "Roster pages stop at 200 and participant search at 20; one occupancy response spans one day and at most 999 courts. Several configuration and import-history lists have no row ceiling beyond tenant data.",
+      "growthDrivers": "Collection queries grow with courts, cards, members, import history, rule sets, audit history or one day of occupied court slots in the club database.",
+      "inputOrDataBound": "Roster pages stop at 200, participant search at 20 and filtered audit search scans at most 2,500 candidate events per request; one occupancy response spans one day and at most 999 courts. Several configuration and import-history lists have no row ceiling beyond tenant data.",
       "concurrencyOrRateBound": "Read authorization and deployment resources apply, but these queries have no dedicated request-rate or concurrency gate.",
       "executionModel": "Each operation is a synchronous read-only request; paged operations use a stable cursor while deliberately small configuration lists return together.",
       "failureBehavior": "Invalid cursors, limits and dates return typed failures. Query failure produces no mutation and no successful partial collection response.",
       "consumerTimeoutBehavior": "The reference proxy sets no response deadline. These reads are repeatable after a caller disconnects and carry no server-side continuation contract.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
+        "src/main/java/org/courtside/audit/internal/AuditService.java",
         "src/main/java/org/courtside/dataexchange/ExecutionService.java",
         "src/main/java/org/courtside/member/RosterService.java"
       ],
       "evidence": [
+        "src/test/java/org/courtside/audit/internal/AuditSearchBudgetTest.java#givenNoTextMatch_whenTheScanBudgetIsReached_thenThePageSaysItIsIncomplete",
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnEmptyDay_whenLoadingThePublicGrid_thenItsQueryBudgetIsStable",
         "src/test/java/org/courtside/member/web/RosterAdminControllerTest.java#givenMorePeopleThanTheLimit_whenListingTheRoster_thenTheCursorNamesTheLastEntry"
       ]

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-18",
+  "reviewedAt": "2026-09-19",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "7eb05a6987080f4734fb06855525885848f4426c4268f661914669568bcff38e",
-  "protectedFieldInventorySha256": "81c927f1d1117fdbf8db29f645b163c1fad53c4a05cb3b4917ec423b71bb3795",
-  "productionAuthorizationSha256": "e166dad6ee57670d4af575cd976ca89fa6239addcac0af47668673ff667d65c5",
+  "openApiFieldInventorySha256": "b80924c0004ef913a54655d01054be5745f512a693a805153ed755cbe11c61b8",
+  "protectedFieldInventorySha256": "32c81217e78886abfde6276739eb2f33a87854fc8e6afdb7c39884c1ca6b8962",
+  "productionAuthorizationSha256": "369314dc651cb185a7f4d740ca10401f8193e0ff5b6676bbddb14543c3d7db19",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1229,6 +1229,7 @@
     "readAuditLog:response:AuditEntry.occurredAt",
     "readAuditLog:response:AuditPage.entries",
     "readAuditLog:response:AuditPage.nextCursor",
+    "readAuditLog:response:AuditPage.searchIncomplete",
     "readAuditLog:response:FieldError.code",
     "readAuditLog:response:FieldError.field",
     "readAuditLog:response:FieldError.params",
@@ -1395,6 +1396,27 @@
     "requestUsernameReminder:response:Violation.code",
     "requestUsernameReminder:response:Violation.params",
     "requestUsernameReminder:response:Violation.params.*",
+    "searchAuditLog:request:AuditSearchRequest.cursor",
+    "searchAuditLog:request:AuditSearchRequest.eventType",
+    "searchAuditLog:request:AuditSearchRequest.from",
+    "searchAuditLog:request:AuditSearchRequest.limit",
+    "searchAuditLog:request:AuditSearchRequest.query",
+    "searchAuditLog:request:AuditSearchRequest.subjectId",
+    "searchAuditLog:request:AuditSearchRequest.to",
+    "searchAuditLog:response:$response.header.Accept",
+    "searchAuditLog:response:AuditEntry.eventType",
+    "searchAuditLog:response:AuditEntry.id",
+    "searchAuditLog:response:AuditEntry.occurredAt",
+    "searchAuditLog:response:AuditPage.entries",
+    "searchAuditLog:response:AuditPage.nextCursor",
+    "searchAuditLog:response:AuditPage.searchIncomplete",
+    "searchAuditLog:response:FieldError.code",
+    "searchAuditLog:response:FieldError.field",
+    "searchAuditLog:response:FieldError.params",
+    "searchAuditLog:response:FieldError.params.*",
+    "searchAuditLog:response:Violation.code",
+    "searchAuditLog:response:Violation.params",
+    "searchAuditLog:response:Violation.params.*",
     "searchParticipantMembers:request:ParticipantMemberSearchRequest.query",
     "searchParticipantMembers:response:$response.header.Accept",
     "searchParticipantMembers:response:FieldError.code",
@@ -2206,6 +2228,7 @@
         "facilityUtilisation",
         "readMessageLog",
         "readAuditLog",
+        "searchAuditLog",
         "exportRoster",
         "exportBookings",
         "exportPersonData"
@@ -2716,6 +2739,7 @@
         "src/main/java/org/courtside/member/internal/RosterSecurityEventLog.java#record",
         "src/main/java/org/courtside/config/web/ConfigController.java#toAdminResponse",
         "src/main/java/org/courtside/audit/internal/DomainEventWriter.java#actor",
+        "src/main/java/org/courtside/audit/internal/AuditService.java#matchesBase",
         "src/main/java/org/courtside/audit/web/AuditAdminController.java#toResponse",
         "src/main/java/org/courtside/notification/web/MessageAdminController.java#toResponse",
         "src/main/java/org/courtside/dataexchange/web/SubjectAccessAdminController.java#toResponse",
@@ -3334,7 +3358,8 @@
         "AuditEntry.actorUsername"
       ],
       "operationIds": [
-        "readAuditLog"
+        "readAuditLog",
+        "searchAuditLog"
       ],
       "actors": [
         "ADMIN"

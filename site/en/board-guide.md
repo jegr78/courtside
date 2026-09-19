@@ -303,7 +303,9 @@ The **Records** area has four views.
 * **Utilisation** shows confirmed playing time by court. It includes courts without bookings.
 * **Data export** creates CSV files for bookings or members. The booking export omits the person who
   booked. The member export contains personal data and creates no change-log entry.
-* **Change log** lists administrative changes with time, subject and acting account.
+* **Change log** lists administrative changes with time, subject and acting account. Search by a
+  subject name or username and narrow the result by event type and time range when needed. *Load
+  more* keeps the active filters; *Clear filters* returns to the complete log.
 * **Message log** shows delivery state. *Handed over* only means that the mail server accepted the
   message. Final delivery is recorded by the mail server, not Courtside.
 

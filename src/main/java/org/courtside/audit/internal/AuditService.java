@@ -13,11 +13,13 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,6 +33,8 @@ import java.util.stream.Collectors;
 public class AuditService implements PersonAuditTrail {
 
     private static final int MAX_PAGE_SIZE = 100;
+    private static final int SEARCH_SCAN_SIZE = 250;
+    private static final int MAX_SEARCH_SCAN = 2_500;
 
     private final DomainEventRepository events;
     private final UserAccountRepository accounts;
@@ -82,6 +86,71 @@ public class AuditService implements PersonAuditTrail {
         return CursorPage.of(ids, limit, this::load, AuditEntry::id);
     }
 
+    public SearchResult search(String query, String eventType, UUID subjectId,
+                               Instant from, Instant to, UUID cursor, int limit) {
+        validateLimit(limit);
+        String normalizedEventType = blankToNull(eventType);
+        DomainEvent cursorEvent = cursorEvent(cursor);
+        if (cursorEvent != null && (!matchesBase(cursorEvent, normalizedEventType, subjectId, from, to)
+                || !matches(load(List.of(cursor)).getFirst(), query))) {
+            throw new AuditCursorUnknownException("audit.cursor.unknown", Map.of());
+        }
+        List<AuditEntry> matches = new ArrayList<>(limit + 1);
+        Instant scanOccurredAt = cursorEvent == null ? null : cursorEvent.getOccurredAt();
+        UUID scanId = cursorEvent == null ? null : cursorEvent.getId();
+        int scanned = 0;
+        boolean exhausted = false;
+        while (matches.size() <= limit && scanned < MAX_SEARCH_SCAN) {
+            int batchSize = Math.min(SEARCH_SCAN_SIZE, MAX_SEARCH_SCAN - scanned);
+            List<UUID> candidates = events.findSearchCandidates(subjectId, normalizedEventType, from, to,
+                    scanOccurredAt, scanId, Limit.of(batchSize));
+            scanned += candidates.size();
+            if (candidates.isEmpty()) {
+                exhausted = true;
+                break;
+            }
+            List<AuditEntry> loaded = load(candidates);
+            loaded.stream().filter(entry -> matches(entry, query)).forEach(matches::add);
+            AuditEntry last = loaded.getLast();
+            scanOccurredAt = last.occurredAt();
+            scanId = last.id();
+            if (candidates.size() < batchSize) {
+                exhausted = true;
+                break;
+            }
+        }
+        boolean hasProbe = matches.size() > limit;
+        List<AuditEntry> items = matches.stream().limit(limit).toList();
+        UUID nextCursor = hasProbe && !items.isEmpty() ? items.getLast().id() : null;
+        return new SearchResult(items, nextCursor, !hasProbe && !exhausted);
+    }
+
+    private static boolean matchesBase(DomainEvent event, String eventType, UUID subjectId,
+                                       Instant from, Instant to) {
+        return (subjectId == null || subjectId.equals(event.getSubjectId()))
+                && (eventType == null || eventType.equals(event.getEventType()))
+                && (from == null || !event.getOccurredAt().isBefore(from))
+                && (to == null || event.getOccurredAt().isBefore(to));
+    }
+
+    private static boolean matches(AuditEntry entry, String query) {
+        String term = blankToNull(query);
+        if (term == null) return true;
+        String normalized = term.toLowerCase(Locale.ROOT);
+        return contains(entry.subjectName(), normalized)
+                || contains(entry.actorUsername(), normalized)
+                || entry.subjectId().toString().equalsIgnoreCase(term)
+                || entry.actorAccountId() != null && entry.actorAccountId().toString().equalsIgnoreCase(term);
+    }
+
+    private static boolean contains(String value, String normalized) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(normalized);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     private DomainEvent cursorEvent(UUID cursor) {
         if (cursor == null) {
             return null;
@@ -101,7 +170,10 @@ public class AuditService implements PersonAuditTrail {
                 .collect(Collectors.toSet());
         Map<UUID, String> actorUsernames = accounts.findAllById(actorIds).stream()
                 .collect(Collectors.toMap(UserAccount::getId, UserAccount::getUsername));
-        return found.stream()
+        Map<UUID, DomainEvent> byId = found.stream().collect(Collectors.toMap(DomainEvent::getId, event -> event));
+        return ids.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
                 .map(event -> toEntry(event, subjectNamesById, actorUsernames))
                 .toList();
     }
@@ -135,5 +207,11 @@ public class AuditService implements PersonAuditTrail {
 
     public record AuditEntry(UUID id, Instant occurredAt, String eventType, Map<String, Object> parameters,
                              UUID subjectId, String subjectName, UUID actorAccountId, String actorUsername) {
+    }
+
+    public record SearchResult(List<AuditEntry> items, UUID nextCursor, boolean incomplete) {
+        public SearchResult {
+            items = List.copyOf(items);
+        }
     }
 }
