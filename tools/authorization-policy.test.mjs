@@ -51,7 +51,7 @@ test("given the shipped API and production authorization paths, when reading the
   const result = validate(policy);
 
   // then
-  assert.equal(result.operationCount, 111);
+  assert.equal(result.operationCount, 112);
   assert.equal(result.protectedFieldCount > 0, true);
   assert.equal(result.decisionCount > 0, true);
 });

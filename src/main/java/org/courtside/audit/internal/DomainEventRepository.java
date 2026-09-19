@@ -38,4 +38,21 @@ public interface DomainEventRepository extends Repository<DomainEvent, UUID> {
     List<UUID> findPage(@Param("subjectId") UUID subjectId, @Param("from") Instant from,
                         @Param("to") Instant to, @Param("cursorOccurredAt") Instant cursorOccurredAt,
                         @Param("cursorId") UUID cursorId, Limit limit);
+
+    @Query("""
+            SELECT e.id FROM DomainEvent e
+            WHERE (:subjectId IS NULL OR e.subjectId = :subjectId)
+              AND (:eventType IS NULL OR e.eventType = :eventType)
+              AND (CAST(:from AS timestamp) IS NULL OR e.occurredAt >= :from)
+              AND (CAST(:to AS timestamp) IS NULL OR e.occurredAt < :to)
+              AND (CAST(:cursorOccurredAt AS timestamp) IS NULL
+                   OR e.occurredAt < :cursorOccurredAt
+                   OR (e.occurredAt = :cursorOccurredAt AND e.id < :cursorId))
+            ORDER BY e.occurredAt DESC, e.id DESC
+            """)
+    List<UUID> findSearchCandidates(@Param("subjectId") UUID subjectId,
+                                    @Param("eventType") String eventType,
+                                    @Param("from") Instant from, @Param("to") Instant to,
+                                    @Param("cursorOccurredAt") Instant cursorOccurredAt,
+                                    @Param("cursorId") UUID cursorId, Limit limit);
 }

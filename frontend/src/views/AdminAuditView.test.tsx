@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -248,6 +248,105 @@ describe("AdminAuditView", () => {
     expect(await screen.findAllByTestId("audit-row")).toHaveLength(2);
     expect(within(row(second.id)).getByTestId("audit-message")).toBeInTheDocument();
     expect(screen.queryByTestId("audit-load-more")).not.toBeInTheDocument();
+  });
+
+  it("given search criteria, when applying them and loading more, then private terms stay in the request body and the filters stay active", async () => {
+    // given
+    const second: AuditEntry = { ...courtAdded, id: "44444444-4444-4444-4444-444444444444" };
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+    const searchAudit = vi.spyOn(api, "searchAudit")
+      .mockResolvedValueOnce({ entries: [courtAdded], nextCursor: courtAdded.id })
+      .mockResolvedValueOnce({ entries: [second], nextCursor: null });
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("audit-row");
+
+    // when
+    await user.type(screen.getByTestId("audit-filter-query"), "Jane Doe");
+    await user.type(screen.getByTestId("audit-filter-event-type"), "roster.account.rolesChanged");
+    fireEvent.change(screen.getByTestId("audit-filter-from"), { target: { value: "2026-09-19T10:00" } });
+    await user.click(screen.getByTestId("audit-filter-apply"));
+    await user.click(await screen.findByTestId("audit-load-more"));
+
+    // then
+    expect(searchAudit).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      query: "Jane Doe", eventType: "roster.account.rolesChanged",
+      from: "2026-09-19T10:00:00+02:00", limit: 50
+    }));
+    expect(searchAudit).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      query: "Jane Doe", eventType: "roster.account.rolesChanged", cursor: courtAdded.id, limit: 50
+    }));
+    expect(screen.getByTestId("audit-filter-query")).toHaveValue("Jane Doe");
+  });
+
+  it("given active filters, when clearing them, then the unfiltered first page is restored", async () => {
+    // given
+    vi.spyOn(api, "searchAudit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+    const audit = vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("audit-row");
+    await user.type(screen.getByTestId("audit-filter-query"), "Jane");
+    await user.click(screen.getByTestId("audit-filter-apply"));
+
+    // when
+    await user.click(screen.getByTestId("audit-filter-clear"));
+
+    // then
+    await waitFor(() => expect(audit).toHaveBeenLastCalledWith(undefined, 50, undefined));
+    expect(screen.getByTestId("audit-filter-query")).toHaveValue("");
+  });
+
+  it("given a broad search reaches the server scan limit, when its page is shown, then it is not presented as complete", async () => {
+    // given
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+    vi.spyOn(api, "searchAudit").mockResolvedValue({
+      entries: [], nextCursor: null, searchIncomplete: true
+    });
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("audit-row");
+
+    // when
+    await user.type(screen.getByTestId("audit-filter-query"), "rare value");
+    await user.click(screen.getByTestId("audit-filter-apply"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("Narrow the event type or time range");
+  });
+
+  it("given the filtered search is refused, when applying it, then the failure is shown and the existing page remains", async () => {
+    // given
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+    vi.spyOn(api, "searchAudit").mockRejectedValue(new Error("unavailable"));
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("audit-row");
+
+    // when
+    await user.type(screen.getByTestId("audit-filter-query"), "Jane");
+    await user.click(screen.getByTestId("audit-filter-apply"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
+    expect(screen.getByTestId("audit-row")).toBeInTheDocument();
+  });
+
+  it("given a local time skipped by daylight saving, when applying it, then the failure is shown without calling the search", async () => {
+    // given
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+    const searchAudit = vi.spyOn(api, "searchAudit");
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("audit-row");
+
+    // when
+    fireEvent.change(screen.getByTestId("audit-filter-from"), { target: { value: "2026-03-29T02:30" } });
+    await user.click(screen.getByTestId("audit-filter-apply"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("That did not work. Please try again.");
+    expect(searchAudit).not.toHaveBeenCalled();
   });
 
   it("given a page already loaded through 'load more', when the language changes, then the collected pages are not thrown away", async () => {

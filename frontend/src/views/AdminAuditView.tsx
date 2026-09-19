@@ -2,10 +2,10 @@ import type { TFunction } from "i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
-import { api, type AuditEntry, type DayOfWeek } from "../api/client";
+import { api, type AuditEntry, type AuditSearch, type DayOfWeek } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
-import { formatDateTime, shortTime } from "../time/clubZone";
+import { formatDateTime, shortTime, zonedDateTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 
@@ -91,6 +91,12 @@ export function AdminAuditView() {
   const [cursor, setCursor] = useState<string>();
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
+  const [query, setQuery] = useState("");
+  const [eventType, setEventType] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [criteria, setCriteria] = useState<AuditSearch>();
+  const [searchIncomplete, setSearchIncomplete] = useState(false);
 
   const reportError = useCallback((failure: unknown) => setError(problemMessage(failure, t)), [t]);
   const reportErrorRef = useRef(reportError);
@@ -103,6 +109,7 @@ export function AdminAuditView() {
       .then((page) => {
         setEntries(page.entries);
         setCursor(page.nextCursor ?? undefined);
+        setSearchIncomplete(page.searchIncomplete ?? false);
       })
       .catch((failure: unknown) => reportErrorRef.current(failure));
   }, [subjectId]);
@@ -111,15 +118,46 @@ export function AdminAuditView() {
     if (pending) return;
     setPending(true);
     try {
-      const page = await api.audit(cursor, 50, subjectId);
+      const page = criteria
+        ? await api.searchAudit({ ...criteria, cursor, limit: 50 })
+        : await api.audit(cursor, 50, subjectId);
       setEntries((current) => [...(current ?? []), ...page.entries]);
       setCursor(page.nextCursor ?? undefined);
+      setSearchIncomplete(page.searchIncomplete ?? false);
       setError(undefined);
     } catch (failure) {
       reportError(failure);
     } finally {
       setPending(false);
     }
+  }
+
+  async function applyFilters(next: AuditSearch | undefined) {
+    if (pending) return;
+    setPending(true);
+    try {
+      const page = next ? await api.searchAudit({ ...next, limit: 50 }) : await api.audit(undefined, 50, subjectId);
+      setCriteria(next);
+      setEntries(page.entries);
+      setCursor(page.nextCursor ?? undefined);
+      setSearchIncomplete(page.searchIncomplete ?? false);
+      setError(undefined);
+    } catch (failure) {
+      reportError(failure);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function submittedCriteria(): AuditSearch {
+    const instant = (value: string) => zonedDateTime(value.slice(0, 10), value.slice(11), club!.timeZone);
+    return {
+      ...(query.trim() ? { query: query.trim() } : {}),
+      ...(eventType.trim() ? { eventType: eventType.trim() } : {}),
+      ...(subjectId ? { subjectId } : {}),
+      ...(from ? { from: instant(from) } : {}),
+      ...(to ? { to: instant(to) } : {})
+    };
   }
 
   const problem = error ?? clubError;
@@ -129,6 +167,35 @@ export function AdminAuditView() {
       ? (problem ? <Alert>{problem}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
         {problem && <Alert>{problem}</Alert>}
+        {searchIncomplete && <Alert>{t("audit.filter.incomplete")}</Alert>}
+        <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" onSubmit={(event) => {
+          event.preventDefault();
+          try {
+            void applyFilters(submittedCriteria());
+          } catch (failure) {
+            reportError(failure);
+          }
+        }}>
+          <label className="grid gap-1 font-medium">{t("audit.filter.query")}
+            <input data-testid="audit-filter-query" className="form-control rounded-lg border px-3 py-2" value={query} maxLength={60} onChange={(event) => setQuery(event.target.value)} />
+          </label>
+          <label className="grid gap-1 font-medium">{t("audit.filter.eventType")}
+            <input data-testid="audit-filter-event-type" className="form-control rounded-lg border px-3 py-2" value={eventType} maxLength={100} onChange={(event) => setEventType(event.target.value)} />
+          </label>
+          <label className="grid gap-1 font-medium">{t("audit.filter.from")}
+            <input data-testid="audit-filter-from" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={from} onChange={(event) => setFrom(event.target.value)} />
+          </label>
+          <label className="grid gap-1 font-medium">{t("audit.filter.to")}
+            <input data-testid="audit-filter-to" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={to} onChange={(event) => setTo(event.target.value)} />
+          </label>
+          <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-4">
+            <Button data-testid="audit-filter-apply" variant="primary" type="submit" disabled={pending}>{t("audit.filter.apply")}</Button>
+            <Button data-testid="audit-filter-clear" variant="secondary" type="button" disabled={pending} onClick={() => {
+              setQuery(""); setEventType(""); setFrom(""); setTo("");
+              void applyFilters(undefined);
+            }}>{t("audit.filter.clear")}</Button>
+          </div>
+        </form>
         {entries.length === 0
           ? <p data-testid="audit-empty">{t("audit.empty")}</p>
           : <div>

@@ -33,8 +33,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -102,6 +104,50 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.entries[0].subjectName").value("Centre Court"))
                 .andExpect(jsonPath("$.entries[0].actorUsername").value("doe.jane"))
                 .andExpect(jsonPath("$.entries[0].parameters.number").value(7));
+    }
+
+    @Test
+    void givenSearchCriteria_whenTheLogIsSearched_thenSubjectActorEventAndTimeAreFilteredFromTheBody()
+            throws Exception {
+        // given
+        identity.signInAs("doe.jane");
+        facilityFixture.createCourt(7, "Centre Court");
+        facilityFixture.createCourt(8, "Back Court");
+        identity.signOut();
+
+        // when / then
+        mockMvc.perform(post("/api/admin/audit/search").with(user(administrator)).with(csrf())
+                        .contentType("application/json")
+                        .content("""
+                                {"query":"centre","eventType":"facility.court.added",
+                                 "from":"2026-01-01T00:00:00Z","to":"2027-01-01T00:00:00Z",
+                                 "limit":50}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(1)))
+                .andExpect(jsonPath("$.entries[0].subjectName").value("Centre Court"))
+                .andExpect(jsonPath("$.entries[0].actorUsername").value("doe.jane"));
+        mockMvc.perform(post("/api/admin/audit/search").with(user(administrator)).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"query\":\"DOE.JANE\",\"eventType\":\"facility.court.added\",\"limit\":50}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries", hasSize(2)));
+    }
+
+    @Test
+    void givenACursorOutsideTheFilteredResult_whenTheLogIsSearched_thenItIsRejected() throws Exception {
+        // given
+        UUID excluded = facilityFixture.createCourt(7, "Excluded Court");
+        String cursor = JsonPath.read(mockMvc.perform(get("/api/admin/audit")
+                        .param("subjectId", excluded.toString()).with(user(administrator)))
+                .andReturn().getResponse().getContentAsString(), "$.entries[0].id");
+
+        // when / then
+        mockMvc.perform(post("/api/admin/audit/search").with(user(administrator)).with(csrf())
+                        .contentType("application/json")
+                        .content("{\"query\":\"nothing matches\",\"cursor\":\"" + cursor + "\",\"limit\":50}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:audit-cursor-unknown"));
     }
 
     @Test
