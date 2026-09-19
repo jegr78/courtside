@@ -27,6 +27,9 @@ jobs:
       docs: ${{ steps.selection.outputs.docs }}
       backend: ${{ steps.selection.outputs.backend }}
       frontend: ${{ steps.selection.outputs.frontend }}
+      browser_visual: ${{ steps.selection.outputs.browser_visual }}
+      browser: ${{ steps.selection.outputs.browser }}
+      deployment: ${{ steps.selection.outputs.deployment }}
       tooling: ${{ steps.selection.outputs.tooling }}
       security: ${{ steps.selection.outputs.security }}
       profiles: ${{ steps.selection.outputs.profiles }}
@@ -79,7 +82,8 @@ jobs:
                 all(. == "docs" or . == "backend" or . == "frontend" or . == "tooling" or . == "full") and
                 (unique | length) == length) and
               (.ciJobs | type == "array" and length >= 1 and (unique | length) == length and
-                all(. == "docs" or . == "backend" or . == "frontend" or . == "tooling" or . == "security")) and
+                all(. == "docs" or . == "backend" or . == "frontend" or . == "browser_visual" or
+                  . == "browser" or . == "deployment" or . == "tooling" or . == "security")) and
               (.isFull | type == "boolean") and .isFull == (.profiles == ["full"]) and
               (.plannerOutcome == "passed" or .plannerOutcome == "failed") and
               (.reasons | type == "array" and length >= 1) and
@@ -90,7 +94,7 @@ jobs:
             JOBS=$(jq -cer '.ciJobs' build/test-profile/plan.json)
           else
             PROFILES='["full"]'
-            JOBS='["docs","backend","frontend","tooling","security"]'
+            JOBS='["docs","backend","frontend","browser_visual","browser","deployment","tooling","security"]'
             mkdir -p build/test-profile
             {
               echo '# Selected test profiles'
@@ -100,9 +104,12 @@ jobs:
               echo 'The classifier did not produce a trustworthy plan, so every quality job is required.'
             } > build/test-profile/summary.md
           fi
+          if [[ "$PROFILES" = '["full"]' ]]; then
+            JOBS='["docs","backend","frontend","browser_visual","browser","deployment","tooling","security"]'
+          fi
           cat build/test-profile/summary.md >> "$GITHUB_STEP_SUMMARY"
           echo "profiles=$PROFILES" >> "$GITHUB_OUTPUT"
-          for job in docs backend frontend tooling security; do
+          for job in docs backend frontend browser_visual browser deployment tooling security; do
             SELECTED=$(jq -nr --argjson jobs "$JOBS" --arg job "$job" '($jobs | index($job)) != null')
             echo "$job=$SELECTED" >> "$GITHUB_OUTPUT"
           done
@@ -385,7 +392,9 @@ jobs:
           distribution: 'temurin'
           cache: maven
       - name: Verify backend
-        run: ./mvnw -B clean verify -Pjava-only
+        run: >
+          ./mvnw -B --no-transfer-progress clean verify -Pjava-only
+          -Dmaven.test.redirectTestOutputToFile=true
       - name: Upload backend test evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -426,18 +435,105 @@ jobs:
           ./node/node ./node/node_modules/npm/bin/npm-cli.js run test:frontend
           ./node/node ./node/node_modules/npm/bin/npm-cli.js run build
       - name: Package the E2E application
-        run: ./mvnw -B package -DskipTests -Pjava-only
-      - name: Run browser journeys
-        working-directory: frontend
-        run: ./node/node ./node/node_modules/npm/bin/npm-cli.js run test:e2e
+        run: ./mvnw -B --no-transfer-progress package -DskipTests -Pjava-only
+      - name: Upload the browser and deployment candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: application-candidate-${{ github.run_id }}
+          path: |
+            target/courtside-*.jar
+            !target/*.jar.original
+            frontend/dist
+          if-no-files-found: error
+          retention-days: 1
       - name: Upload frontend test evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: frontend-test-evidence-${{ github.run_id }}
+          path: frontend/coverage
+          if-no-files-found: warn
+          retention-days: ${{ github.event_name == 'schedule' && 30 || 14 }}
+
+  browser_visual:
+    name: browser-visual
+    needs: [test-profile-plan, frontend]
+    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser_visual == 'true') && needs.frontend.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - uses: ./.github/actions/tool-dependencies
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: application-candidate-${{ github.run_id }}
+          path: .
+      - name: Verify visual baselines first
+        working-directory: frontend
+        env:
+          COURTSIDE_BROWSER_GROUP: visual
+        run: npm run test:e2e
+      - name: Upload visual browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: browser-visual-evidence-${{ github.run_id }}
           path: |
-            frontend/coverage
             frontend/test-results/visual-journeys
+            frontend/test-results/**/trace.zip
+            frontend/test-results/**/*.png
+            frontend/test-results/browser-diagnostics/*.json
+            frontend/test-results/browser-gate-outcome.json
+            site/screenshots
+          if-no-files-found: warn
+          retention-days: ${{ github.event_name == 'schedule' && 30 || 14 }}
+
+  browser:
+    name: browser-${{ matrix.group }}
+    needs: [test-profile-plan, frontend, browser_visual]
+    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.browser == 'true') && needs.frontend.result == 'success' && needs.browser_visual.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [functional-a, functional-b]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - uses: ./.github/actions/tool-dependencies
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: application-candidate-${{ github.run_id }}
+          path: .
+      - name: Run the functional browser shard
+        working-directory: frontend
+        env:
+          COURTSIDE_BROWSER_GROUP: ${{ matrix.group }}
+        run: npm run test:e2e
+      - name: Upload functional browser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: browser-${{ matrix.group }}-evidence-${{ github.run_id }}
+          path: |
             frontend/test-results/browser-security/browser-storage-evidence.json
             frontend/test-results/browser-security/browser-csp-evidence.json
             frontend/test-results/**/trace.zip
@@ -446,8 +542,41 @@ jobs:
             frontend/test-results/browser-diagnostics/*.json
             frontend/test-results/browser-gate-outcome.json
           if-no-files-found: warn
-          # A scheduled failure is diagnosed days later, so its diagnostics outlive a pull request's.
           retention-days: ${{ github.event_name == 'schedule' && 30 || 14 }}
+
+  deployment:
+    needs: [test-profile-plan, frontend]
+    if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.deployment == 'true') && needs.frontend.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '26'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: application-candidate-${{ github.run_id }}
+          path: .
+      - name: Exercise Compose wait with a fresh immutable image
+        run: node tools/compose-wait-smoke.mjs
+      - name: Upload Compose evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: compose-wait-smoke-${{ github.run_id }}
+          path: build/compose-wait-smoke/result.json
+          if-no-files-found: warn
+          retention-days: 14
 
   dependency-graph:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -589,7 +718,7 @@ jobs:
 
   build:
     if: always()
-    needs: [docs, backend, frontend, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan]
+    needs: [docs, backend, frontend, browser_visual, browser, deployment, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -600,6 +729,9 @@ jobs:
           DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
+          BROWSER_VISUAL_RESULT: ${{ needs.browser_visual.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+          DEPLOYMENT_RESULT: ${{ needs.deployment.result }}
           TOOLING_RESULT: ${{ needs.tooling.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
         run: |
@@ -611,11 +743,17 @@ jobs:
             --arg docs "$DOCS_RESULT" \
             --arg backend "$BACKEND_RESULT" \
             --arg frontend "$FRONTEND_RESULT" \
+            --arg browserVisual "$BROWSER_VISUAL_RESULT" \
+            --arg browser "$BROWSER_RESULT" \
+            --arg deployment "$DEPLOYMENT_RESULT" \
             --arg tooling "$TOOLING_RESULT" \
             --arg security "$SECURITY_RESULT" \
             '{schemaVersion: 1, commit: $commit, runId: $runId, attempt: $attempt,
-              firstAttempt: ($attempt == 1), jobs: {docs: $docs, backend: $backend, frontend: $frontend, tooling: $tooling, security: $security},
+              firstAttempt: ($attempt == 1), jobs: {docs: $docs, backend: $backend, frontend: $frontend,
+                browserVisual: $browserVisual, browser: $browser, deployment: $deployment,
+                tooling: $tooling, security: $security},
               releaseReadiness: (if $attempt == 1 and $docs == "success" and $backend == "success" and $frontend == "success"
+                and $browserVisual == "success" and $browser == "success" and $deployment == "success"
                 and $tooling == "success" and $security == "success" then "complete" else "incomplete" end)}' \
             > build/nightly/verification.json
           jq -r '"Nightly release readiness: **\(.releaseReadiness)** (`\(.commit)`, attempt \(.attempt))"' \
@@ -625,6 +763,9 @@ jobs:
           DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
+          BROWSER_VISUAL_RESULT: ${{ needs.browser_visual.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+          DEPLOYMENT_RESULT: ${{ needs.deployment.result }}
           TOOLING_RESULT: ${{ needs.tooling.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
           IDENTITY_RESULT: ${{ needs.assessment-runtime.result }}
@@ -634,6 +775,9 @@ jobs:
           DOCS_SELECTED: ${{ needs.test-profile-plan.outputs.docs }}
           BACKEND_SELECTED: ${{ needs.test-profile-plan.outputs.backend }}
           FRONTEND_SELECTED: ${{ needs.test-profile-plan.outputs.frontend }}
+          BROWSER_VISUAL_SELECTED: ${{ needs.test-profile-plan.outputs.browser_visual }}
+          BROWSER_SELECTED: ${{ needs.test-profile-plan.outputs.browser }}
+          DEPLOYMENT_SELECTED: ${{ needs.test-profile-plan.outputs.deployment }}
           TOOLING_SELECTED: ${{ needs.test-profile-plan.outputs.tooling }}
           SECURITY_SELECTED: ${{ needs.test-profile-plan.outputs.security }}
           EVENT_NAME: ${{ github.event_name }}
@@ -643,7 +787,7 @@ jobs:
           case "$EVENT_NAME" in
             pull_request)
               test "$PROFILE_PLAN_RESULT" = success
-              for job in docs backend frontend tooling security; do
+              for job in docs backend frontend browser_visual browser deployment tooling security; do
                 result_variable="${job^^}_RESULT"
                 selected_variable="${job^^}_SELECTED"
                 result="${!result_variable}"
@@ -660,6 +804,9 @@ jobs:
               test "$DOCS_RESULT" = success
               test "$BACKEND_RESULT" = success
               test "$FRONTEND_RESULT" = success
+              test "$BROWSER_VISUAL_RESULT" = success
+              test "$BROWSER_RESULT" = success
+              test "$DEPLOYMENT_RESULT" = success
               test "$TOOLING_RESULT" = success
               test "$SECURITY_RESULT" = success
               ;;
@@ -671,11 +818,17 @@ jobs:
           DOCS_RESULT: ${{ needs.docs.result }}
           BACKEND_RESULT: ${{ needs.backend.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
+          BROWSER_VISUAL_RESULT: ${{ needs.browser_visual.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+          DEPLOYMENT_RESULT: ${{ needs.deployment.result }}
           TOOLING_RESULT: ${{ needs.tooling.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
           DOCS_SELECTED: ${{ needs.test-profile-plan.outputs.docs }}
           BACKEND_SELECTED: ${{ needs.test-profile-plan.outputs.backend }}
           FRONTEND_SELECTED: ${{ needs.test-profile-plan.outputs.frontend }}
+          BROWSER_VISUAL_SELECTED: ${{ needs.test-profile-plan.outputs.browser_visual }}
+          BROWSER_SELECTED: ${{ needs.test-profile-plan.outputs.browser }}
+          DEPLOYMENT_SELECTED: ${{ needs.test-profile-plan.outputs.deployment }}
           TOOLING_SELECTED: ${{ needs.test-profile-plan.outputs.tooling }}
           SECURITY_SELECTED: ${{ needs.test-profile-plan.outputs.security }}
           PROFILES: ${{ needs.test-profile-plan.outputs.profiles }}
@@ -687,7 +840,7 @@ jobs:
             echo
             echo '| Job | Result | Reason |'
             echo '| --- | --- | --- |'
-            for job in docs backend frontend tooling security; do
+            for job in docs backend frontend browser_visual browser deployment tooling security; do
               result_variable="${job^^}_RESULT"
               selected_variable="${job^^}_SELECTED"
               result="${!result_variable}"
@@ -740,7 +893,7 @@ jobs:
             arguments+=(--java build/aggregate/backend/site/jacoco/jacoco.xml)
           fi
           if [[ "$FRONTEND_SELECTED" = true ]]; then
-            arguments+=(--frontend build/aggregate/frontend/coverage/lcov.info)
+            arguments+=(--frontend build/aggregate/frontend/lcov.info)
           fi
           node tools/coverage-diff.mjs "${arguments[@]}"
       - name: Upload combined test evidence

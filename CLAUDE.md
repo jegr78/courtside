@@ -128,10 +128,14 @@ fails on the missing `BuildProperties` bean.
 * **Targeted runs during red/green:** `./mvnw test -Dtest=ClassName`. Before the final push, commit
   the reviewed branch and run `node tools/courtside.mjs check`; it uses the protected test-profile
   contract against `origin/main` and verifies that exact commit in a detached worktree. A `full`
-  classification runs the documentation gate and then `./mvnw clean verify`, both read from the
-  runner rather than from the contract so a weakened contract cannot reduce them. Unknown,
-  structural or untrusted change evidence fails closed to `full`; `--full` may escalate but never
-  reduce the selected verification.
+  classification runs cheap workflow and documentation gates first, a clean Maven verification
+  without browser journeys, a fresh immutable-image Compose smoke, and then the browser and WebKit
+  reliability gates. Those tasks are read from the runner rather than from the contract so a
+  weakened contract cannot reduce them. An exact passing receipt may be reused only while the
+  commit, merge base, classified change evidence, runtime fingerprint, selected profiles and task
+  definitions still match; use `--rerun` when fresh execution is required. Unknown, structural or
+  untrusted change evidence fails closed to `full`; `--full` may escalate but never reduce the
+  selected verification.
 * **A change to the scanner normalizers is unverified until the assessment has run.**
   `tools/security-passive-deployment.mjs` reads what ZAP emits, and a unit test over it can only
   assert wordings somebody has already observed — so it is structurally unable to show that the

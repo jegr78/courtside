@@ -800,8 +800,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       });
       for (const stream of [application.stdout, application.stderr]) {
         stream?.on("data", (chunk: Buffer) => {
-          process.stdout.write(chunk);
           applicationLog.append(chunk);
+          if (process.env.COURTSIDE_VERBOSE_TEST_LOGS === "true") process.stdout.write(chunk);
         });
       }
       await waitForApplication(application, baseURL);
