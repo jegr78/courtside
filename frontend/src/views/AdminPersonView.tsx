@@ -27,6 +27,10 @@ const EMAIL_LENGTH = 120;
 const USERNAME_LENGTH = 60;
 const RECENT_AUTH = "urn:courtside:error:recent-authentication-required";
 
+function sameRoles(chosen: readonly Role[], saved: readonly Role[]): boolean {
+  return chosen.length === saved.length && chosen.every((role) => saved.includes(role));
+}
+
 function arrivedFromPersonCreation(state: unknown): boolean {
   return typeof state === "object" && state !== null && "personCreated" in state
     && state.personCreated === true;
@@ -325,7 +329,7 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
   const [chosenRoles, setChosenRoles] = useState(entry.roles);
   const unsavedUsername = username !== (entry.username ?? "");
   const unsavedLocale = locale !== (entry.locale ?? club.defaultLocale);
-  const unsavedRoles = differs({ roles: chosenRoles }, { roles: entry.roles });
+  const unsavedRoles = !sameRoles(chosenRoles, entry.roles);
   const [replacing, setReplacing] = useState(false);
   const [endingAll, setEndingAll] = useState(false);
 

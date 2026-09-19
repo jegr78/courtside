@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router-dom";
 import { api, ApiError, type ClubConfig, type MembershipType, type MessageEntry, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
 import { downloadJson } from "../downloads/downloadJson";
@@ -9,6 +9,7 @@ import { UnsavedCount } from "../test/UnsavedCount";
 import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
+import { UnsavedChangesGuard } from "../unsaved/UnsavedChangesGuard";
 import { AdminPersonView } from "./AdminPersonView";
 
 vi.mock("../downloads/downloadJson", () => ({ downloadJson: vi.fn() }));
@@ -532,6 +533,54 @@ describe("AdminPersonView", () => {
 
     // then
     expect(api.changeAccountRoles).toHaveBeenCalledWith("person-1", ["MEMBER", "TREASURER"]);
+  });
+
+  it("given saved roles return in another order, when the save succeeds, then no work remains unsaved", async () => {
+    // given
+    const existing: RosterEntry = { ...jane, roles: ["MEMBER", "TREASURER"] };
+    vi.spyOn(api, "changeAccountRoles").mockResolvedValue({
+      ...existing, roles: ["ADMIN", "MEMBER", "TREASURER"]
+    });
+    vi.spyOn(api, "person").mockResolvedValue(existing);
+    const router = createMemoryRouter([{
+      path: "*",
+      element: <WithClubConfiguration club={club}><UnsavedChangesProvider>
+        <UnsavedChangesGuard />
+        <UnsavedCount />
+        <Routes>
+          <Route path="/admin/roster/:personId" element={<AdminPersonView />} />
+          <Route path="/admin/roster" element={<p data-testid="opened-roster">roster</p>} />
+        </Routes>
+      </UnsavedChangesProvider></WithClubConfiguration>
+    }], { initialEntries: ["/admin/roster/person-1"] });
+    render(<RouterProvider router={router} />);
+    await screen.findByTestId("account-roles-ADMIN");
+
+    // when
+    await userEvent.click(screen.getByTestId("account-roles-ADMIN"));
+    await userEvent.click(screen.getByTestId("save-roles"));
+
+    // then
+    expect(await screen.findByTestId("admin-save-success")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByTestId("back-to-roster"));
+    expect(await screen.findByTestId("opened-roster")).toBeInTheDocument();
+    expect(screen.queryByTestId("unsaved-changes")).not.toBeInTheDocument();
+  });
+
+  it("given changed roles, when the save fails, then the work remains unsaved", async () => {
+    // given
+    vi.spyOn(api, "changeAccountRoles").mockRejectedValue(new Error("unavailable"));
+    showPerson();
+    await screen.findByTestId("account-roles-ADMIN");
+
+    // when
+    await userEvent.click(screen.getByTestId("account-roles-ADMIN"));
+    await userEvent.click(screen.getByTestId("save-roles"));
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1");
   });
 
   it("given a mistyped username, when correcting it, then the account keeps the corrected one", async () => {
