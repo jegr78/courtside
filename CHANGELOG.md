@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.1.0-rc.3](https://github.com/jegr78/courtside/compare/v0.1.0-rc.2...v0.1.0-rc.3) (2026-09-19)
+
+
+### Features
+
+* filter the administrative change log ([08d7c35](https://github.com/jegr78/courtside/commit/08d7c3577e08ede71ee143bd234a38219853bd42))
+* make the admin roster role-aware and pageable ([#1036](https://github.com/jegr78/courtside/issues/1036)) ([4fa3026](https://github.com/jegr78/courtside/commit/4fa30260b0c28aa81b6d63ff96953cc5fd841295))
+* make the administrative change log searchable ([#1059](https://github.com/jegr78/courtside/issues/1059)) ([08d7c35](https://github.com/jegr78/courtside/commit/08d7c3577e08ede71ee143bd234a38219853bd42))
+* show which booking rules no rule set can change ([#1038](https://github.com/jegr78/courtside/issues/1038)) ([3440de6](https://github.com/jegr78/courtside/commit/3440de673a567ce067c809ca9c17760fd1f8f66d))
+
+
+### Bug fixes
+
+* clear saved account role changes ([#1056](https://github.com/jegr78/courtside/issues/1056)) ([6b41ee4](https://github.com/jegr78/courtside/commit/6b41ee4c4f0713378eeb38104b87845325591801))
+* describe the PWA reload action ([#1054](https://github.com/jegr78/courtside/issues/1054)) ([976df37](https://github.com/jegr78/courtside/commit/976df37f2a3388afad2e04da4dec291cf5cf6e82))
+* fetch published release history without gh ([#1029](https://github.com/jegr78/courtside/issues/1029)) ([a4335e7](https://github.com/jegr78/courtside/commit/a4335e744fb581d22d6674405c54362521eb865e))
+* let a UAT reset answer for an environment that never existed ([#1035](https://github.com/jegr78/courtside/issues/1035)) ([e11deb3](https://github.com/jegr78/courtside/commit/e11deb322768d5bf0d872b058872ba4280eab876))
+
+
+### Documentation
+
+* make synthetic mail certificate path teardown-safe ([#1032](https://github.com/jegr78/courtside/issues/1032)) ([e3c47a5](https://github.com/jegr78/courtside/commit/e3c47a573ffd1d4aa15c0ecdd2f8486f06790b99))
+* publish a reproducible roster import example ([#1040](https://github.com/jegr78/courtside/issues/1040)) ([1bad4df](https://github.com/jegr78/courtside/commit/1bad4df6e777c2e1bd4c4e2b521bad55f3f4ae31))
+
+
+### Build and dependencies
+
+* **deps:** bump frontend, Maven, deploy and workflow dependencies ([#1058](https://github.com/jegr78/courtside/issues/1058)) ([9bceeda](https://github.com/jegr78/courtside/commit/9bceedab115946a4db33fe2b42cfdfd42a836dd6))
+
 ## 0.1.0 (2026-09-14)
 
 
@@ -455,4 +484,3 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
-
