@@ -11,7 +11,7 @@ vi.mock("virtual:pwa-register", () => ({ registerSW }));
 describe("PwaLifecycle", () => {
   beforeEach(() => registerSW.mockReset());
 
-  it("given a waiting service worker, when the user accepts the update, then the new version is activated", async () => {
+  it("given a waiting service worker, when the user reloads, then the prompt describes the browser action and the new version is activated", async () => {
     // given
     const update = vi.fn().mockResolvedValue(undefined);
     let needRefresh: (() => void) | undefined;
@@ -23,9 +23,18 @@ describe("PwaLifecycle", () => {
 
     // when
     needRefresh?.();
-    await userEvent.click(await screen.findByTestId("pwa-update"));
+    const prompt = await screen.findByTestId("pwa-update-prompt");
+    const reload = await screen.findByTestId("pwa-update");
 
     // then
+    expect(prompt).toHaveTextContent("Courtside wurde aktualisiert. Lade die Seite neu, um die neue Version zu verwenden.");
+    expect(reload).toHaveTextContent("Neu laden");
+
+    // when
+    await userEvent.click(reload);
+
+    // then
+    expect(update).toHaveBeenCalledOnce();
     expect(update).toHaveBeenCalledWith(true);
   });
 
