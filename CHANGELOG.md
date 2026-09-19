@@ -3,6 +3,7 @@
 ## 0.1.0 (2026-09-14)
 
 
+
 ### Notable changes
 
 * a club that points COURTSIDE_MAIL_RELAY_HOST at a relay whose certificate this instance cannot verify must now set COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE=true itself. Until it does, every handover over that hop fails: a message is attempted four times across about a minute and is then settled FAILED with its reason, and the event behind it is replayed only when the instance restarts — which writes a second row and issues a fresh credential, because the first exists only as a hash.
@@ -12,6 +13,11 @@
 * **api:** validation codes in fieldErrors entries change for missing, blank, non-positive and unknown-enum values, and field names now carry array indices. The problem type, the status and the fieldErrors shape are unchanged.
 
 ### Features
+
+* filter the administrative change log ([08d7c35](https://github.com/jegr78/courtside/commit/08d7c3577e08ede71ee143bd234a38219853bd42))
+* make the admin roster role-aware and pageable ([#1036](https://github.com/jegr78/courtside/issues/1036)) ([4fa3026](https://github.com/jegr78/courtside/commit/4fa30260b0c28aa81b6d63ff96953cc5fd841295))
+* make the administrative change log searchable ([#1059](https://github.com/jegr78/courtside/issues/1059)) ([08d7c35](https://github.com/jegr78/courtside/commit/08d7c3577e08ede71ee143bd234a38219853bd42))
+* show which booking rules no rule set can change ([#1038](https://github.com/jegr78/courtside/issues/1038)) ([3440de6](https://github.com/jegr78/courtside/commit/3440de673a567ce067c809ca9c17760fd1f8f66d))
 
 * add deployment lifecycle CLI ([#1024](https://github.com/jegr78/courtside/issues/1024)) ([9a43efe](https://github.com/jegr78/courtside/commit/9a43efed3b9f8312c555f3b13183188fcca17d61))
 * bind deployment images to explicit trust sources ([#1023](https://github.com/jegr78/courtside/issues/1023)) ([d4fb928](https://github.com/jegr78/courtside/commit/d4fb9285cb9a0eb1c45138e6fa6641ec98bc595a))
@@ -148,6 +154,11 @@
 * write to a member in the language they read ([#447](https://github.com/jegr78/courtside/issues/447)) ([596ce57](https://github.com/jegr78/courtside/commit/596ce576320ebf65ae3727d3e5059afdac42c5ef))
 
 ### Bug fixes
+
+* clear saved account role changes ([#1056](https://github.com/jegr78/courtside/issues/1056)) ([6b41ee4](https://github.com/jegr78/courtside/commit/6b41ee4c4f0713378eeb38104b87845325591801))
+* describe the PWA reload action ([#1054](https://github.com/jegr78/courtside/issues/1054)) ([976df37](https://github.com/jegr78/courtside/commit/976df37f2a3388afad2e04da4dec291cf5cf6e82))
+* fetch published release history without gh ([#1029](https://github.com/jegr78/courtside/issues/1029)) ([a4335e7](https://github.com/jegr78/courtside/commit/a4335e744fb581d22d6674405c54362521eb865e))
+* let a UAT reset answer for an environment that never existed ([#1035](https://github.com/jegr78/courtside/issues/1035)) ([e11deb3](https://github.com/jegr78/courtside/commit/e11deb322768d5bf0d872b058872ba4280eab876))
 
 * build the local image from the jar this build packaged ([#1001](https://github.com/jegr78/courtside/issues/1001)) ([bbdca60](https://github.com/jegr78/courtside/commit/bbdca60f1aef4288311508eb756918806d7cb582))
 * harden deployment acceptance paths ([3010f55](https://github.com/jegr78/courtside/commit/3010f552825bfea1825c1f641ae864bfaa10a610)), closes [#991](https://github.com/jegr78/courtside/issues/991)
@@ -343,6 +354,9 @@
 
 ### Documentation
 
+* make synthetic mail certificate path teardown-safe ([#1032](https://github.com/jegr78/courtside/issues/1032)) ([e3c47a5](https://github.com/jegr78/courtside/commit/e3c47a573ffd1d4aa15c0ecdd2f8486f06790b99))
+* publish a reproducible roster import example ([#1040](https://github.com/jegr78/courtside/issues/1040)) ([1bad4df](https://github.com/jegr78/courtside/commit/1bad4df6e777c2e1bd4c4e2b521bad55f3f4ae31))
+
 * capture each guide in a browser that speaks its language ([#979](https://github.com/jegr78/courtside/issues/979)) ([e1fe7d1](https://github.com/jegr78/courtside/commit/e1fe7d154a5e0a23f3778c1f68ddd5e1211184c3))
 * make design specification current ([fd6c036](https://github.com/jegr78/courtside/commit/fd6c036bf9c25cc773e0965cbeb63c4f9cf8761e))
 * make the design specification current ([#1014](https://github.com/jegr78/courtside/issues/1014)) ([fd6c036](https://github.com/jegr78/courtside/commit/fd6c036bf9c25cc773e0965cbeb63c4f9cf8761e))
@@ -391,6 +405,8 @@
 * stop the assessment from filing an issue for every unprovable control ([#910](https://github.com/jegr78/courtside/issues/910)) ([8740314](https://github.com/jegr78/courtside/commit/87403146786f632a5c7006fa0de871bb65978cf7))
 
 ### Build and dependencies
+
+* **deps:** bump frontend, Maven, deploy and workflow dependencies ([#1058](https://github.com/jegr78/courtside/issues/1058)) ([9bceeda](https://github.com/jegr78/courtside/commit/9bceedab115946a4db33fe2b42cfdfd42a836dd6))
 
 * adopt Node.js 26 toolchain ([#282](https://github.com/jegr78/courtside/issues/282)) ([b14599a](https://github.com/jegr78/courtside/commit/b14599a7e967c5e1a41e1ca2f707bc446dba2885))
 * **deps-dev:** Bump @axe-core/playwright from 4.10.2 to 4.13.0 in /frontend ([#273](https://github.com/jegr78/courtside/issues/273)) ([4cb418e](https://github.com/jegr78/courtside/commit/4cb418eb3d289519dfe0ea3339653fe693f3ca7e))
