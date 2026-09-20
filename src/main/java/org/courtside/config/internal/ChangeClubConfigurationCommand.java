@@ -14,6 +14,7 @@ public record ChangeClubConfigurationCommand(
         String logoUrl,
         String imprintUrl,
         String privacyUrl,
+        String documentationUrl,
         String defaultLocale,
         BookingSlotDuration slotDuration,
         String timeZone,
@@ -23,7 +24,7 @@ public record ChangeClubConfigurationCommand(
         ReminderLeadTime bookingReminder,
         UUID noMembershipTypeRuleSetId) {
 
-    // The two link fields, a logo and the rule set for people holding no membership type are what a
+    // The link fields, a logo and the rule set for people holding no membership type are what a
     // club may leave unset; an absent value anywhere else is a caller that skipped its validation.
     public ChangeClubConfigurationCommand {
         requirePresent(clubName, "clubName");

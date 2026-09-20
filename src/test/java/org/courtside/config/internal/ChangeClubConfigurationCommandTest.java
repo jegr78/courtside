@@ -27,7 +27,7 @@ class ChangeClubConfigurationCommandTest {
     void givenNoLogoAndNeitherLegalLink_whenBuildingTheChange_thenTheyMayStayUnset() {
         // when / then
         assertThatCode(() -> new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d",
-                "#c8a415", null, null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
+                "#c8a415", null, null, null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
                 new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null))
                 .doesNotThrowAnyException();
     }
@@ -36,7 +36,7 @@ class ChangeClubConfigurationCommandTest {
     void whenTheGridIsMissing_thenTheChangeIsRefusedNamingIt() {
         // when / then
         assertThatThrownBy(() -> new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d",
-                "#c8a415", null, null, null, "de", null, "Europe/Berlin",
+                "#c8a415", null, null, null, null, "de", null, "Europe/Berlin",
                 new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("slotDuration");
@@ -46,7 +46,7 @@ class ChangeClubConfigurationCommandTest {
     void whenACredentialLifetimeIsMissing_thenTheChangeIsRefusedNamingIt() {
         // when / then
         assertThatThrownBy(() -> new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d",
-                "#c8a415", null, null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
+                "#c8a415", null, null, null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
                 null, new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("newAccountCredential");
@@ -56,7 +56,7 @@ class ChangeClubConfigurationCommandTest {
     void whenTheClubHasNoName_thenTheChangeIsRefusedNamingIt() {
         // when / then
         assertThatThrownBy(() -> new ChangeClubConfigurationCommand(null, "#004f2d",
-                "#c8a415", null, null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
+                "#c8a415", null, null, null, null, "de", new BookingSlotDuration(30), "Europe/Berlin",
                 new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("clubName");
@@ -65,7 +65,8 @@ class ChangeClubConfigurationCommandTest {
     private static ChangeClubConfigurationCommand complete() {
         return new ChangeClubConfigurationCommand("Example Tennis Club", "#004f2d", "#c8a415",
                 "/branding/logo.svg", "https://example-tennis-club.example/imprint",
-                "https://example-tennis-club.example/privacy", "de",
+                "https://example-tennis-club.example/privacy",
+                "https://docs.example.org/courtside", "de",
                 new BookingSlotDuration(30), "Europe/Berlin",
                 new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null);
     }

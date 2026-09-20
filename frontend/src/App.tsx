@@ -38,6 +38,8 @@ import { AdminPersonView } from "./views/AdminPersonView";
 import { AdminRosterView } from "./views/AdminRosterView";
 import { AdminSetupView } from "./views/AdminSetupView";
 
+const DEFAULT_DOCUMENTATION_URL = "https://jegr78.github.io/courtside/";
+
 interface AppRoutesProps {
   session: SessionStatus;
   refreshSession: () => Promise<void>;
@@ -245,6 +247,8 @@ export function App() {
         {t("app.name")}
       </span>
       <BuildIdentity source={source} />
+      <a data-testid="footer-documentation" className="underline hover:no-underline"
+         href={club?.documentationUrl || DEFAULT_DOCUMENTATION_URL}>{t("footer.documentation")}</a>
       {club?.imprintUrl && <a data-testid="footer-imprint" className="underline hover:no-underline" href={club.imprintUrl}>{t("footer.imprint")}</a>}
       {club?.privacyUrl && <a data-testid="footer-privacy" className="underline hover:no-underline" href={club.privacyUrl}>{t("footer.privacy")}</a>}
     </footer>

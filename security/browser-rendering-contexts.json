@@ -103,6 +103,12 @@
       "sink": "anchor-href"
     },
     {
+      "id": "documentation-url",
+      "journey": "url-attributes",
+      "field": "documentationUrl",
+      "sink": "anchor-href"
+    },
+    {
       "id": "location-input",
       "journey": "location-input",
       "field": "location.search-and-hash",

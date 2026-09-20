@@ -42,7 +42,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
         // when
         ClubConfigurationSnapshot snapshot = config.update(new ChangeClubConfigurationCommand(
                 "Example Tennis Club", "#34584A", "#D7E24B",
-                "/logo.svg", "/imprint", "/privacy", "en",
+                "/logo.svg", "/imprint", "/privacy", "/docs", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
                 new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), null));
 
@@ -56,6 +56,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
         assertThat(snapshot.logoUploaded()).isFalse();
         assertThat(snapshot.imprintUrl()).isEqualTo("/imprint");
         assertThat(snapshot.privacyUrl()).isEqualTo("/privacy");
+        assertThat(snapshot.documentationUrl()).isEqualTo("/docs");
         assertThat(snapshot.defaultLocale()).isEqualTo("en");
         assertThat(snapshot.slotMinutes()).isEqualTo(15);
         assertThat(snapshot.timeZone()).isEqualTo("Pacific/Auckland");
@@ -75,7 +76,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
         // when
         ClubConfigurationSnapshot snapshot = config.update(new ChangeClubConfigurationCommand(
                 "Example Tennis Club", "#34584A", "#D7E24B",
-                "/logo.svg", "/imprint", "/privacy", "en",
+                "/logo.svg", "/imprint", "/privacy", "/docs", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
                 new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), YOUTH_RULE_SET));
 
@@ -103,7 +104,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
         // when
         ClubConfigurationSnapshot changed = config.update(new ChangeClubConfigurationCommand(
                 "Example Tennis Club", "#34584A", "#D7E24B",
-                "/new-logo.svg", "/imprint", "/privacy", "en",
+                "/new-logo.svg", "/imprint", "/privacy", "/docs", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
                 new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), null));
         ClubConfigurationSnapshot deleted = config.deleteLogo();
@@ -119,7 +120,7 @@ class ConfigServiceSnapshotTest extends AbstractIntegrationTest {
     private static ChangeClubConfigurationCommand commandWith(UUID noMembershipTypeRuleSetId) {
         return new ChangeClubConfigurationCommand(
                 "Example Tennis Club", "#34584A", "#D7E24B",
-                "/logo.svg", "/imprint", "/privacy", "en",
+                "/logo.svg", "/imprint", "/privacy", "/docs", "en",
                 new BookingSlotDuration(15), "Pacific/Auckland",
                 new CredentialLifetime(72), new CredentialLifetime(12), new ResetTokenLifetime(60), new ReminderLeadTime(24), noMembershipTypeRuleSetId);
     }

@@ -76,6 +76,7 @@ function editable(loaded: AdminClubConfig): ClubConfigRequest {
     logoUrl: loaded.logoFallbackUrl,
     imprintUrl: loaded.imprintUrl,
     privacyUrl: loaded.privacyUrl,
+    documentationUrl: loaded.documentationUrl,
     defaultLocale: loaded.defaultLocale,
     slotMinutes: loaded.slotMinutes,
     timeZone: loaded.timeZone,
@@ -384,6 +385,10 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             </fieldset>
             <TextField data-testid="imprint-url" label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
             <TextField data-testid="privacy-url" label={t("admin.config.privacyUrl")} value={config.privacyUrl ?? ""} onChange={(event) => changeConfig({ privacyUrl: event.target.value || null })} />
+            <div className="grid gap-1">
+              <TextField data-testid="documentation-url" label={t("admin.config.documentationUrl")} value={config.documentationUrl ?? ""} onChange={(event) => changeConfig({ documentationUrl: event.target.value || null })} />
+              <p className="text-muted text-sm">{t("admin.config.documentationUrlHelp")}</p>
+            </div>
           </div>
           <label className="grid gap-2 font-medium">
             {t("admin.config.defaultLocale")}

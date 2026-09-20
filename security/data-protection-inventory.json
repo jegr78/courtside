@@ -536,6 +536,10 @@
         "level": "operational",
         "lifecycle": "club-configuration"
       },
+      "documentation_url": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
       "id": {
         "level": "operational",
         "lifecycle": "club-configuration"

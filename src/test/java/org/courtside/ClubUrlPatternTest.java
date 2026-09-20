@@ -28,6 +28,9 @@ class ClubUrlPatternTest {
         assertThat(sqlCheckRegex("V40__club_config_privacy_url.sql", "privacy_url"))
                 .as("club_config_privacy_url_safe has drifted from club_config_imprint_url_safe")
                 .isEqualTo(canonical);
+        assertThat(sqlCheckRegex("V47__club_config_documentation_url.sql", "documentation_url"))
+                .as("club_config_documentation_url_safe has drifted from club_config_imprint_url_safe")
+                .isEqualTo(canonical);
         assertThat(sqlCheckRegex("V9__club_config.sql", "logo_url"))
                 .as("club_config_logo_url_safe differs from the link checks by more than the scheme")
                 .isEqualTo(logo);
@@ -37,6 +40,9 @@ class ClubUrlPatternTest {
                     .isEqualTo(canonical);
             assertThat(accessorPattern(model, "getPrivacyUrl"))
                     .as("%s.privacyUrl's pattern has drifted from club_config_imprint_url_safe", model)
+                    .isEqualTo(canonical);
+            assertThat(accessorPattern(model, "getDocumentationUrl"))
+                    .as("%s.documentationUrl's pattern has drifted from club_config_imprint_url_safe", model)
                     .isEqualTo(canonical);
             assertThat(accessorPattern(model, "getLogoUrl"))
                     .as("%s.logoUrl's pattern has drifted from club_config_logo_url_safe", model)

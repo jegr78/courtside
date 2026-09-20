@@ -286,7 +286,7 @@ test("given club-controlled rendering contexts, when checking the security journ
     "participant-card-label", "rule-set-name", "person-fields", "account-username",
     "membership-type-name", "import-source-name", "external-reference-id",
     "booking-note", "guest-name", "audit-projection", "logo-url", "imprint-url", "privacy-url",
-    "location-input"
+    "documentation-url", "location-input"
   ];
   assert.deepEqual(renderingContexts.contexts.map(({ id }) => id).toSorted(), expectedIds.toSorted());
   for (const context of renderingContexts.contexts) {

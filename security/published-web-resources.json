@@ -149,6 +149,10 @@
       "purpose": "The typeface projects the bundled licence texts attribute."
     },
     {
+      "host": "jegr78.github.io",
+      "purpose": "The frontend documentation link uses the Courtside GitHub Pages site when a club configures no override."
+    },
+    {
       "host": "scripts.sil.org",
       "purpose": "The Open Font License the bundled licence texts cite."
     },

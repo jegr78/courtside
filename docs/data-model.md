@@ -150,9 +150,9 @@ holding none, from `club_config.no_membership_type_rule_set_id`.
 
 `club_config` is a single row, pinned by `club_config_single_row` to one fixed id. It carries what a
 board can change without a deployment: the club name, the two brand colours, an uploaded logo, the
-imprint and privacy links, the default locale, the time zone, the booking slot length, how long
-issued credentials stay valid, how many minutes a mailed reset code stays redeemable, and how many
-hours before a booking the reminder goes out.
+imprint, privacy and documentation links, the default locale, the time zone, the booking slot length,
+how long issued credentials stay valid, how many minutes a mailed reset code stays redeemable, and
+how many hours before a booking the reminder goes out.
 
 The time zone is checked against `pg_timezone_names` by a trigger, so a typo is refused where it is
 written rather than at the next reminder. The logo is stored in the row itself, content, media type
