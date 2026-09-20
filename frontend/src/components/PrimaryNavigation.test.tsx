@@ -47,7 +47,8 @@ describe("PrimaryNavigation", () => {
     show(anonymous);
 
     // then — a bar holding the page you are already on is a strip of screen for nothing
-    expect(screen.getByTestId("court-plan-link")).toBeInTheDocument();
+    expect(screen.getByTestId("court-plan-link")).toHaveTextContent("nav.courts");
+    expect(screen.queryByTestId("court-plan-compact-label")).not.toBeInTheDocument();
     expect(screen.queryByTestId("primary-navigation-bar")).not.toBeInTheDocument();
   });
 
@@ -58,6 +59,25 @@ describe("PrimaryNavigation", () => {
     // then
     expect(screen.getByTestId("primary-navigation-bar").querySelectorAll("a").length)
       .toBeLessThanOrEqual(4);
+  });
+
+  it("given an administrator, when rendered, then compact phone labels keep the full accessible destination names", () => {
+    // when
+    show(administrator);
+
+    // then
+    const destinations = [
+      ["court-plan", "nav.courts", "nav.courtsCompact"],
+      ["my-bookings", "nav.myBookings", "nav.myBookingsCompact"],
+      ["my-messages", "nav.myMessages", "nav.myMessagesCompact"],
+      ["administration", "nav.administration", "nav.administrationCompact"]
+    ];
+    for (const [testId, fullLabel, compactLabel] of destinations) {
+      expect(screen.getByTestId(`${testId}-link`)).toHaveAccessibleName(fullLabel);
+      expect(screen.getByTestId(`${testId}-compact-label`)).toHaveTextContent(compactLabel);
+      expect(screen.getByTestId(`${testId}-full-label`)).toHaveTextContent(fullLabel);
+      expect(screen.getByTestId(`${testId}-icon`)).toHaveAttribute("aria-hidden", "true");
+    }
   });
 
   it("given a member, when rendered, then nothing offers administration", () => {
