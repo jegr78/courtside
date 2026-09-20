@@ -1,9 +1,10 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync
+  existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync,
+  writeFileSync
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { arch, platform, release, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { loadProfileContract, localTasksForProfiles } from "./test-profile-contract.mjs";
@@ -27,10 +28,23 @@ const protectedFullTasks = [
     arguments: ["tools/docs-check.mjs", "--check"]
   },
   {
-    label: "full",
+    label: "full-without-browser",
     workingDirectory: "repository",
     executable: "maven",
-    arguments: ["clean", "verify"]
+    arguments: ["clean", "verify", "-Dfrontend.e2e.skip=true",
+      "-Dmaven.test.redirectTestOutputToFile=true"]
+  },
+  {
+    label: "compose-wait-smoke",
+    workingDirectory: "repository",
+    executable: "node",
+    arguments: ["tools/compose-wait-smoke.mjs"]
+  },
+  {
+    label: "frontend-e2e",
+    workingDirectory: "frontend",
+    executable: "npm",
+    arguments: ["run", "test:e2e"]
   },
   // Last, because it walks the browsers against the jar the run above builds - and here at all
   // because the scheduled workflow that owns it is the one gate a branch cannot answer locally.
@@ -148,7 +162,8 @@ export function localVerificationPlans(tasks, platform = process.platform, root 
 export function localCheckPrerequisites(tasks) {
   const java = tasks.some((task) => task !== "docs-check");
   const docker = tasks.some((task) =>
-    ["backend", "frontend-e2e", "full", "webkit-reliability"].includes(task));
+    ["backend", "frontend-e2e", "full-without-browser", "compose-wait-smoke",
+      "webkit-reliability"].includes(task));
   return { java, docker };
 }
 
@@ -164,21 +179,33 @@ export async function executeLocalCheck(options, runtime = {}) {
   }
   const plan = planTasks(classified);
   const persist = runtime.writeResult ?? writeResult;
+  const runtimeFingerprint = options.planOnly
+    ? null
+    : (runtime.runtimeFingerprint ?? verificationRuntimeFingerprint(plan.tasks, runtime.executeVersion));
   const record = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     baseCommit: evidence.baseCommit,
     headCommit: evidence.headCommit,
     fallbackReason: evidence.fallbackReason,
     changeFingerprint: evidence.changeFingerprint,
+    runtimeFingerprint,
     profiles: plan.profiles,
     reasons: plan.reasons,
     tasks: plan.tasks.map((task) => task.label),
     outcome: options.planOnly ? "planned" : "running"
   };
-  persist(record);
   const output = runtime.output ?? process.stdout;
   output.write(`${renderLocalCheckPlan(record)}\n`);
-  if (options.planOnly) return record;
+  if (options.planOnly) {
+    persist(record);
+    return record;
+  }
+  const previous = (runtime.readResult ?? readResult)();
+  if (!options.rerun && reusableLocalCheckResult(previous, record)) {
+    output.write(`Reusing passed local check for ${record.headCommit}.\n`);
+    return previous;
+  }
+  persist(record);
   const execute = runtime.execute ?? runProcess;
   try {
     runtime.beforeRun?.(record);
@@ -218,6 +245,37 @@ export async function executeLocalCheck(options, runtime = {}) {
     persist(record);
     throw failure;
   }
+}
+
+export function reusableLocalCheckResult(previous, expected) {
+  if (previous === null || typeof previous !== "object" || Array.isArray(previous)
+      || previous.schemaVersion !== 2 || previous.outcome !== "passed") return false;
+  return ["baseCommit", "headCommit", "changeFingerprint", "runtimeFingerprint"]
+    .every((field) => previous[field] === expected[field])
+    && JSON.stringify(previous.profiles) === JSON.stringify(expected.profiles)
+    && JSON.stringify(previous.tasks) === JSON.stringify(expected.tasks);
+}
+
+export function verificationRuntimeFingerprint(tasks, execute = spawnSync) {
+  const prerequisites = localCheckPrerequisites(tasks.map((task) => task.label));
+  const evidence = [process.version, platform(), arch(), release()];
+  if (prerequisites.java) {
+    const java = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, "bin", "java") : "java";
+    evidence.push(versionEvidence(execute(java, ["-version"], { encoding: "utf8", shell: false })));
+  }
+  if (prerequisites.docker) {
+    evidence.push(versionEvidence(execute("docker", ["version", "--format", "{{.Server.Version}}"],
+      { encoding: "utf8", shell: false })));
+    evidence.push(versionEvidence(execute("docker", ["compose", "version", "--short"],
+      { encoding: "utf8", shell: false })));
+  }
+  return createHash("sha256").update(evidence.join("\0")).digest("hex");
+}
+
+function versionEvidence(result) {
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(String(result.stderr || result.stdout || "Version command failed"));
+  return `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
 }
 
 export function createVerificationWorktree(evidence, git = runGit,
@@ -425,4 +483,13 @@ function runProcess(plan) {
 function writeResult(record) {
   mkdirSync(dirname(resultFile), { recursive: true });
   writeFileSync(resultFile, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
+}
+
+function readResult() {
+  if (!existsSync(resultFile)) return null;
+  try {
+    return JSON.parse(readFileSync(resultFile, "utf8"));
+  } catch {
+    return null;
+  }
 }

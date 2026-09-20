@@ -7,7 +7,7 @@ import { test } from "node:test";
 import {
   classifyProtectedChanges, collectLocalChanges, createVerificationWorktree, executeLocalCheck,
   localCheckPrerequisites, localVerificationPlans, planTasks, recoverVerificationWorktrees,
-  registerVerificationSignalCleanup, renderLocalCheckPlan
+  registerVerificationSignalCleanup, renderLocalCheckPlan, reusableLocalCheckResult
 } from "./local-check.mjs";
 import { classifyChanges } from "./test-profile-classifier.mjs";
 import { loadProfileContract, localTasksForProfiles } from "./test-profile-contract.mjs";
@@ -46,7 +46,7 @@ test("given backend changes, when planning the local check, then Java verificati
     label: "backend",
     workingDirectory: "repository",
     executable: "maven",
-    arguments: ["clean", "verify", "-Pjava-only"]
+    arguments: ["clean", "verify", "-Pjava-only", "-Dmaven.test.redirectTestOutputToFile=true"]
   });
   assert.deepEqual(plan.tasks.map((task) => task.label),
     ["backend", "frontend-toolchain", "tooling-test"]);
@@ -146,7 +146,10 @@ test("given destructive or unknown changes, when planning the local check, then 
   // then
   assert.deepEqual(deleted.profiles, ["full"]);
   assert.deepEqual(unknown.profiles, ["full"]);
-  assert.deepEqual(deleted.tasks.map((task) => task.label), ["workflow-lint", "docs-check", "full", "webkit-reliability"]);
+  assert.deepEqual(deleted.tasks.map((task) => task.label), [
+    "workflow-lint", "docs-check", "full-without-browser", "compose-wait-smoke",
+    "frontend-e2e", "webkit-reliability"
+  ]);
 });
 
 // A documentation change selects the full profile through one path only — a file the classifier
@@ -158,10 +161,14 @@ test("given a full plan, when its tasks are planned, then the documentation gate
 
     // then
     assert.deepEqual(plan.profiles, ["full"]);
-    assert.deepEqual(plan.tasks.map((task) => task.label), ["workflow-lint", "docs-check", "full", "webkit-reliability"]);
-    assert.deepEqual(plan.tasks.at(-2), {
-      label: "full", workingDirectory: "repository", executable: "maven",
-      arguments: ["clean", "verify"]
+    assert.deepEqual(plan.tasks.map((task) => task.label), [
+      "workflow-lint", "docs-check", "full-without-browser", "compose-wait-smoke",
+      "frontend-e2e", "webkit-reliability"
+    ]);
+    assert.deepEqual(plan.tasks.at(-4), {
+      label: "full-without-browser", workingDirectory: "repository", executable: "maven",
+      arguments: ["clean", "verify", "-Dfrontend.e2e.skip=true",
+        "-Dmaven.test.redirectTestOutputToFile=true"]
     });
     assert.deepEqual(plan.tasks.at(-1), {
       label: "webkit-reliability", workingDirectory: "frontend", executable: "npm",
@@ -201,8 +208,17 @@ test("given no base commit, when the protected classification fails closed, then
         arguments: ["tools/docs-check.mjs", "--check"]
       },
       {
-        label: "full", workingDirectory: "repository", executable: "maven",
-        arguments: ["clean", "verify"]
+        label: "full-without-browser", workingDirectory: "repository", executable: "maven",
+        arguments: ["clean", "verify", "-Dfrontend.e2e.skip=true",
+          "-Dmaven.test.redirectTestOutputToFile=true"]
+      },
+      {
+        label: "compose-wait-smoke", workingDirectory: "repository", executable: "node",
+        arguments: ["tools/compose-wait-smoke.mjs"]
+      },
+      {
+        label: "frontend-e2e", workingDirectory: "frontend", executable: "npm",
+        arguments: ["run", "test:e2e"]
       },
       {
         label: "webkit-reliability", workingDirectory: "frontend", executable: "npm",
@@ -422,7 +438,8 @@ test("given selected tasks, when checking prerequisites, then docs avoid Java an
     { java: true, docker: false });
   assert.deepEqual(localCheckPrerequisites(["backend"]), { java: true, docker: true });
   assert.deepEqual(localCheckPrerequisites(["frontend-e2e"]), { java: true, docker: true });
-  assert.deepEqual(localCheckPrerequisites(["full"]), { java: true, docker: true });
+  assert.deepEqual(localCheckPrerequisites(["full-without-browser"]), { java: true, docker: true });
+  assert.deepEqual(localCheckPrerequisites(["compose-wait-smoke"]), { java: true, docker: true });
 });
 
 test("given a plan-only check, when executing it, then prerequisites and tasks do not run", async () => {
@@ -454,6 +471,8 @@ test("given a selected check, when every task passes, then the retained result i
   // when
   const record = await executeLocalCheck({ planOnly: false, forceFull: false }, {
     git,
+    runtimeFingerprint: "d".repeat(64),
+    readResult: () => null,
     classify: async () => backendPlan(),
     output: { write: () => {} },
     beforeRun: () => events.push("before"),
@@ -480,6 +499,8 @@ test("given a failing selected task, when executing it, then the retained result
   // when / then
   await assert.rejects(() => executeLocalCheck({ planOnly: false, forceFull: false }, {
     git,
+    runtimeFingerprint: "d".repeat(64),
+    readResult: () => null,
     classify: async () => backendPlan(),
     output: { write: () => {} },
     createWorktree: () => ({ path: "/pinned", release: () => records.push({ outcome: "released" }) }),
@@ -598,10 +619,17 @@ test("given protected classification fails, when planning locally, then candidat
 
   // then
   assert.deepEqual(record.profiles, ["full"]);
-  assert.deepEqual(record.tasks, ["workflow-lint", "docs-check", "full", "webkit-reliability"]);
+  assert.deepEqual(record.tasks, [
+    "workflow-lint", "docs-check", "full-without-browser", "compose-wait-smoke",
+    "frontend-e2e", "webkit-reliability"
+  ]);
   const execution = localVerificationPlans(planTasks({ profiles: ["full"] }).tasks, "linux", "/repo");
-  assert.deepEqual(execution.slice(0, 3).map((plan) => plan.arguments),
-    [["tools/workflow-lint.mjs", "--check"], ["tools/docs-check.mjs", "--check"], ["clean", "verify"]]);
+  assert.deepEqual(execution.slice(0, 3).map((plan) => plan.arguments), [
+    ["tools/workflow-lint.mjs", "--check"],
+    ["tools/docs-check.mjs", "--check"],
+    ["clean", "verify", "-Dfrontend.e2e.skip=true",
+      "-Dmaven.test.redirectTestOutputToFile=true"]
+  ]);
   // npm runs through the pinned node, so the CLI path leads the arguments the task itself declares.
   assert.deepEqual(execution.at(-1).arguments.slice(-5),
     ["run", "reliability:webkit", "--", "--order", "configured"]);
@@ -616,6 +644,8 @@ test("given the live tree changes after pinning, when finishing, then the verifi
   // when
   const record = await executeLocalCheck({ planOnly: false, forceFull: false }, {
     git,
+    runtimeFingerprint: "d".repeat(64),
+    readResult: () => null,
     classify: async () => localCheckPlan([
       { status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }
     ]),
@@ -629,6 +659,61 @@ test("given the live tree changes after pinning, when finishing, then the verifi
   assert.equal(record.outcome, "passed");
   assert.deepEqual(events, ["backend", "frontend-toolchain", "tooling-test", "release"]);
   assert.deepEqual(records.map((candidate) => candidate.outcome), ["running", "passed"]);
+});
+
+test("given an exact passing receipt, when verification is requested again, then expensive tasks are reused", async () => {
+  // given
+  const git = gitFor([{ status: "M", path: "src/main/java/org/courtside/CourtsideApplication.java" }]);
+  const evidence = collectLocalChanges(git);
+  const plan = backendPlan();
+  const receipt = {
+    schemaVersion: 2,
+    ...evidence,
+    runtimeFingerprint: "d".repeat(64),
+    profiles: plan.profiles,
+    reasons: plan.reasons,
+    tasks: plan.tasks.map((task) => task.label),
+    outcome: "passed"
+  };
+  const events = [];
+
+  // when
+  const result = await executeLocalCheck({ planOnly: false, forceFull: false, rerun: false }, {
+    git,
+    runtimeFingerprint: "d".repeat(64),
+    readResult: () => receipt,
+    classify: async () => plan,
+    output: { write: (value) => events.push(value) },
+    createWorktree: () => { throw new Error("a reused receipt must not create a worktree"); },
+    execute: () => { throw new Error("a reused receipt must not execute a task"); },
+    writeResult: () => { throw new Error("a reused receipt must not overwrite its evidence"); }
+  });
+
+  // then
+  assert.equal(result, receipt);
+  assert.match(events.join(""), /Reusing passed local check/);
+});
+
+test("given a changed commit runtime or task plan, when checking a receipt, then verification runs again", () => {
+  // given
+  const expected = {
+    schemaVersion: 2,
+    baseCommit: "a".repeat(40),
+    headCommit: "b".repeat(40),
+    changeFingerprint: "c".repeat(64),
+    runtimeFingerprint: "d".repeat(64),
+    profiles: ["full"],
+    tasks: ["full-without-browser"],
+    outcome: "running"
+  };
+
+  // when / then
+  for (const changed of [
+    { ...expected, outcome: "failed" },
+    { ...expected, outcome: "passed", headCommit: "e".repeat(40) },
+    { ...expected, outcome: "passed", runtimeFingerprint: "e".repeat(64) },
+    { ...expected, outcome: "passed", tasks: ["full-without-browser", "frontend-e2e"] }
+  ]) assert.equal(reusableLocalCheckResult(changed, expected), false);
 });
 
 function gitFor(changes, fingerprint = () => "c".repeat(64)) {

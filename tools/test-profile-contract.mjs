@@ -20,6 +20,9 @@ export function localTasksForProfiles(contract, profiles) {
 function coverageForProfiles(contract, profiles, field, transform) {
   validateProfiles(contract, profiles);
   const effective = profiles.includes("full") ? ["full"] : profiles;
+  if (effective.length === 1 && effective[0] === "full") {
+    return contract.profiles.full[field].map(transform);
+  }
   const selected = new Set(effective.flatMap((profile) => contract.profiles[profile][field]));
   const order = field === "ciJobs" ? contract.ciJobOrder : Object.keys(contract.localTaskDefinitions);
   return order.filter((value) => selected.has(value)).map(transform);
@@ -39,7 +42,9 @@ export function validateContract(contract) {
       || contract.schemaVersion !== 1
       || Object.keys(contract).some((field) => !rootFields.includes(field))
       || JSON.stringify(contract.profileOrder) !== JSON.stringify(["docs", "backend", "frontend", "tooling", "full"])
-      || JSON.stringify(contract.ciJobOrder) !== JSON.stringify(["docs", "backend", "frontend", "tooling", "security"])
+      || JSON.stringify(contract.ciJobOrder) !== JSON.stringify([
+        "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"
+      ])
       || Object.keys(contract.profiles ?? {}).length !== contract.profileOrder.length
       || Object.keys(contract.localTaskDefinitions ?? {}).length < 1
       || !Array.isArray(contract.coverageDifferences) || contract.coverageDifferences.length < 1) {
@@ -61,7 +66,8 @@ export function validateContract(contract) {
   }
   if (JSON.stringify(contract.profiles.full.ciJobs) !== JSON.stringify(contract.ciJobOrder)
       || JSON.stringify(contract.profiles.full.localTasks)
-        !== JSON.stringify(["workflow-lint", "docs-check", "full", "webkit-reliability"])) {
+        !== JSON.stringify(["workflow-lint", "docs-check", "full-without-browser",
+          "compose-wait-smoke", "frontend-e2e", "webkit-reliability"])) {
     throw new Error("Full test profile coverage is incomplete");
   }
   for (const [label, task] of Object.entries(contract.localTaskDefinitions)) {
@@ -73,9 +79,10 @@ export function validateContract(contract) {
       throw new Error(`Local task ${label} is invalid`);
     }
   }
-  const full = contract.localTaskDefinitions.full;
+  const full = contract.localTaskDefinitions["full-without-browser"];
   if (full.workingDirectory !== "repository" || full.executable !== "maven"
-      || JSON.stringify(full.arguments) !== JSON.stringify(["clean", "verify"])) {
+      || JSON.stringify(full.arguments) !== JSON.stringify(["clean", "verify",
+        "-Dfrontend.e2e.skip=true", "-Dmaven.test.redirectTestOutputToFile=true"])) {
     throw new Error("Full local verification task is invalid");
   }
   for (const difference of contract.coverageDifferences) {

@@ -25,7 +25,7 @@ test("given combined reduced profiles, when resolving coverage, then jobs and ta
   const tasks = localTasksForProfiles(contract, ["backend", "frontend"]);
 
   // then
-  assert.deepEqual(jobs, ["backend", "frontend", "tooling", "security"]);
+  assert.deepEqual(jobs, ["backend", "frontend", "browser_visual", "browser", "tooling", "security"]);
   assert.equal(tasks[0].label, "backend");
   assert.equal(tasks.at(-1).label, "tooling-test");
   assert.equal(new Set(tasks.map((task) => task.label)).size, tasks.length);
@@ -71,7 +71,7 @@ test("given incomplete full coverage, when validating the contract, then no plan
   const emptyTasks = structuredClone(loadProfileContract());
   emptyTasks.profiles.full.localTasks = [];
   const weakenedCommand = structuredClone(loadProfileContract());
-  weakenedCommand.localTaskDefinitions.full.arguments = ["verify"];
+  weakenedCommand.localTaskDefinitions["full-without-browser"].arguments = ["verify"];
   const openDifference = structuredClone(loadProfileContract());
   openDifference.coverageDifferences[0].unknown = "value";
 
@@ -105,7 +105,9 @@ test("given any full profile, when resolving coverage, then only full coverage r
   const tasks = localTasksForProfiles(contract, ["frontend", "full"]);
 
   // then
-  assert.deepEqual(jobs, ["docs", "backend", "frontend", "tooling", "security"]);
+  assert.deepEqual(jobs,
+    ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"]);
   assert.deepEqual(tasks.map((task) => task.label),
-    ["workflow-lint", "docs-check", "full", "webkit-reliability"]);
+    ["workflow-lint", "docs-check", "full-without-browser", "compose-wait-smoke",
+      "frontend-e2e", "webkit-reliability"]);
 });

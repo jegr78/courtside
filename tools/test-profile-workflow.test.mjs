@@ -23,15 +23,23 @@ test("given profile classification, when the pull request runs, then selected qu
     /git worktree add --detach "\$PROFILE_ROOT" "\$BASE_REF"[\s\S]+node "\$PROFILE_ROOT\/tools\/test-profile-classifier\.mjs"/);
   assert.match(workflow, /outputs:[\s\S]+backend: \$\{\{ steps\.selection\.outputs\.backend \}\}/);
   assert.match(workflow,
-    /needs: \[docs, backend, frontend, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
+    /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(workflow, /pull_request\)\s+test "\$PROFILE_PLAN_RESULT" = success/);
   assert.match(workflow, /push\|schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
-  assert.match(workflow, /backend:[\s\S]+name: Verify backend[\s\S]+\.\/mvnw -B clean verify -Pjava-only/);
+  assert.match(workflow,
+    /backend:[\s\S]+name: Verify backend[\s\S]+\.\/mvnw -B --no-transfer-progress clean verify -Pjava-only/);
   assert.match(workflow, /docs:[\s\S]+name: Verify documentation[\s\S]+node tools\/docs-check\.mjs --check/);
   assert.match(workflow,
     /docs:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name != 'pull_request' \|\| needs\.test-profile-plan\.outputs\.docs == 'true'\)/);
   assert.match(workflow,
     /frontend:[\s\S]+name: Verify frontend[\s\S]+npm-cli\.js run lint[\s\S]+npm-cli\.js run test:frontend[\s\S]+npm-cli\.js run build/);
+  assert.doesNotMatch(workflow, /frontend:[\s\S]+name: Run browser journeys/);
+  assert.match(workflow,
+    /browser_visual:[\s\S]+COURTSIDE_BROWSER_GROUP: visual[\s\S]+npm run test:e2e/);
+  assert.match(workflow,
+    /browser:[\s\S]+group: \[functional-a, functional-b\][\s\S]+COURTSIDE_BROWSER_GROUP: \$\{\{ matrix\.group \}\}/);
+  assert.match(workflow,
+    /deployment:[\s\S]+name: Exercise Compose wait with a fresh immutable image[\s\S]+node tools\/compose-wait-smoke\.mjs/);
   assert.doesNotMatch(workflow, /npm-cli\.js audit/);
   assert.match(workflow, /security:[\s\S]+github\/codeql-action\/init@[a-f0-9]{40}/);
   assert.match(workflow, /tooling:[\s\S]+name: Verify repository tooling[\s\S]+npm run test:tools/);
@@ -63,6 +71,8 @@ test("given reduced profiles, when jobs are scheduled, then only their conservat
     /\(\.ciJobs \| type == "array" and length >= 1 and \(unique \| length\) == length and/);
   assert.match(workflow,
     /SELECTED=\$\(jq -nr --argjson jobs "\$JOBS" --arg job "\$job" '\(\$jobs \| index\(\$job\)\) != null'\)/);
+  assert.match(workflow,
+    /if \[\[ "\$PROFILES" = '\["full"\]' \]\]; then\s+JOBS='\["docs","backend","frontend","browser_visual","browser","deployment","tooling","security"\]'/);
   assert.doesNotMatch(workflow, /\$job == "frontend" or \$job == "security"/);
 });
 
@@ -72,7 +82,7 @@ test("given the classifier fails, when the plan runs, then full selection still 
   assert.match(workflow,
     /if \.plannerOutcome == "failed" then \.isFull and \.profiles == \["full"\]\s+else \$classifierExit == 0 end/);
   assert.match(workflow,
-    /else\s+PROFILES='\["full"\]'\s+JOBS='\["docs","backend","frontend","tooling","security"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
+    /else\s+PROFILES='\["full"\]'\s+JOBS='\["docs","backend","frontend","browser_visual","browser","deployment","tooling","security"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
 });
 
 test("given an unrecognised repository variable, when selecting coverage, then anything but the classified default escalates", () => {
@@ -118,11 +128,12 @@ test("given remote npm audit is scheduled separately, when dependencies are inst
 test("given split coverage artifacts, when the aggregate downloads them, then it uses their archive roots", () => {
   // when / then
   assert.match(workflow, /--java build\/aggregate\/backend\/site\/jacoco\/jacoco\.xml/);
-  assert.match(workflow, /--frontend build\/aggregate\/frontend\/coverage\/lcov\.info/);
+  assert.match(workflow, /--frontend build\/aggregate\/frontend\/lcov\.info/);
   assert.doesNotMatch(workflow, /build\/aggregate\/backend\/target\/site/);
   assert.doesNotMatch(workflow, /build\/aggregate\/frontend\/frontend\/coverage/);
+  assert.doesNotMatch(workflow, /build\/aggregate\/frontend\/coverage\/lcov\.info/);
   assert.match(workflow, /arguments\+=\(--java build\/aggregate\/backend\/site\/jacoco\/jacoco\.xml\)/);
-  assert.match(workflow, /arguments\+=\(--frontend build\/aggregate\/frontend\/coverage\/lcov\.info\)/);
+  assert.match(workflow, /arguments\+=\(--frontend build\/aggregate\/frontend\/lcov\.info\)/);
 });
 
 test("given security finding tools need node modules, when the security job runs, then it installs locked dependencies", () => {

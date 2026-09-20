@@ -273,7 +273,7 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /security-cleanup "\$BASE_RUN_ID"[\s\S]+\) \|\| BASE_CLEANUP=\$\?/);
   assert.match(build, /security-cleanup "\$CANDIDATE_RUN_ID" \|\| CANDIDATE_CLEANUP=\$\?/);
   assert.match(build,
-    /needs: \[docs, backend, frontend, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
+    /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
@@ -366,7 +366,7 @@ test("given nothing the assessment runtime varies, when the required build runs,
     + "indistinguishable from one that ran.");
   assert.doesNotMatch(comparison, /steps\.runtime\.outputs\.changed/);
   assert.match(jobIn(build, "build"),
-    /needs: \[docs, backend, frontend, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/,
+    /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/,
     "a runtime identification that fails must not leave the comparison silently unstarted");
   assert.match(identity, /- uses: actions\/upload-artifact@[a-f0-9]{40}\n\s+if: always\(\)/,
     "the report naming what changed is the only account of why no comparison was needed, and a"
@@ -385,7 +385,8 @@ test("given the results the required build depends on, when it enforces them, th
     assert.match(gate, new RegExp(`\\[\\[ "\\$${result}" = success \\|\\| "\\$${result}" = skipped \\]\\]`),
       `${result} is assigned and never judged, which is a gate that reports whatever it is given`);
   }
-  for (const result of ["DOCS_RESULT", "BACKEND_RESULT", "FRONTEND_RESULT", "TOOLING_RESULT", "SECURITY_RESULT"]) {
+  for (const result of ["DOCS_RESULT", "BACKEND_RESULT", "FRONTEND_RESULT", "BROWSER_VISUAL_RESULT",
+    "BROWSER_RESULT", "DEPLOYMENT_RESULT", "TOOLING_RESULT", "SECURITY_RESULT"]) {
     assert.match(gate, new RegExp(`test "\\$${result}" = success`),
       `${result} has no state in which it may be absent, so it is required to have passed`);
   }

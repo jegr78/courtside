@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "profileOrder": ["docs", "backend", "frontend", "tooling", "full"],
-  "ciJobOrder": ["docs", "backend", "frontend", "tooling", "security"],
+  "ciJobOrder": ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"],
   "profiles": {
     "docs": {
       "ciJobs": ["docs", "tooling"],
@@ -12,7 +12,7 @@
       "localTasks": ["frontend-toolchain", "backend", "tooling-test"]
     },
     "frontend": {
-      "ciJobs": ["frontend", "tooling", "security"],
+      "ciJobs": ["frontend", "browser_visual", "browser", "tooling", "security"],
       "localTasks": [
         "frontend-toolchain",
         "frontend-lint",
@@ -28,8 +28,15 @@
       "localTasks": ["frontend-toolchain", "tooling-test"]
     },
     "full": {
-      "ciJobs": ["docs", "backend", "frontend", "tooling", "security"],
-      "localTasks": ["workflow-lint", "docs-check", "full", "webkit-reliability"]
+      "ciJobs": ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"],
+      "localTasks": [
+        "workflow-lint",
+        "docs-check",
+        "full-without-browser",
+        "compose-wait-smoke",
+        "frontend-e2e",
+        "webkit-reliability"
+      ]
     }
   },
   "localTaskDefinitions": {
@@ -46,7 +53,12 @@
     "backend": {
       "workingDirectory": "repository",
       "executable": "maven",
-      "arguments": ["clean", "verify", "-Pjava-only"]
+      "arguments": [
+        "clean",
+        "verify",
+        "-Pjava-only",
+        "-Dmaven.test.redirectTestOutputToFile=true"
+      ]
     },
     "frontend-toolchain": {
       "workingDirectory": "repository",
@@ -96,10 +108,20 @@
       "executable": "npm",
       "arguments": ["run", "test:tools"]
     },
-    "full": {
+    "full-without-browser": {
       "workingDirectory": "repository",
       "executable": "maven",
-      "arguments": ["clean", "verify"]
+      "arguments": [
+        "clean",
+        "verify",
+        "-Dfrontend.e2e.skip=true",
+        "-Dmaven.test.redirectTestOutputToFile=true"
+      ]
+    },
+    "compose-wait-smoke": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/compose-wait-smoke.mjs"]
     },
     "webkit-reliability": {
       "workingDirectory": "frontend",

@@ -261,12 +261,14 @@ test("given a local check, when parsing its options, then planning and escalatio
   const normal = parseArguments(["check"]);
   const planned = parseArguments(["check", "--plan"]);
   const full = parseArguments(["check", "--full"]);
+  const rerun = parseArguments(["check", "--rerun"]);
 
   // then
   assert.equal(normal.planOnly, false);
   assert.equal(normal.forceFull, false);
   assert.equal(planned.planOnly, true);
   assert.equal(full.forceFull, true);
+  assert.equal(rerun.rerun, true);
   assert.throws(() => parseArguments(["check", "--skip-verify"]), /Unknown option/);
 });
 

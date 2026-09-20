@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import type { JourneyOptions } from "./e2e/fixtures";
+import { browserProjectGroup } from "./e2e/browser-project-groups";
 
 delete process.env.NO_COLOR;
 process.env.FORCE_COLOR = "0";
@@ -44,13 +45,13 @@ const journeyProjects = journeyRun ? [
 ];
 
 const configuredProjects = [
-  { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts|guide-screenshots\.spec\.ts|journeys\//, use: { browserName: "chromium" as const } },
-  { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "chromium" as const } },
   { name: "visual", testMatch: /visual-regression\.spec\.ts/, use: { browserName: "chromium" as const } },
   // The guides' captures are snapshots too, so a surface that moves fails them and the pages that
   // show it are named by site/screenshots/captures.json. They are written where the site reads them.
   { name: "guides-de", testMatch: /guide-screenshots\.spec\.ts/, snapshotPathTemplate: "{testDir}/../../site/screenshots/de/{arg}{ext}", use: { browserName: "chromium" as const, locale: "de-DE" } },
   { name: "guides-en", testMatch: /guide-screenshots\.spec\.ts/, snapshotPathTemplate: "{testDir}/../../site/screenshots/en/{arg}{ext}", use: { browserName: "chromium" as const, locale: "en-GB" } },
+  { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts|guide-screenshots\.spec\.ts|journeys\//, use: { browserName: "chromium" as const } },
+  { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "chromium" as const } },
   { name: "webkit-core", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts/, use: { browserName: "webkit" as const } },
   { name: "webkit-pwa", testMatch: /pwa-browser-compatibility\.spec\.ts/, use: { browserName: "webkit" as const } },
   // Both engines, because a phone layout breaks per engine: the booking dialog was swallowed by a
@@ -62,9 +63,10 @@ const configuredProjects = [
   ...journeyProjects
 ];
 
-const projects = projectOrder === "reversed"
+const orderedProjects = projectOrder === "reversed"
   ? [...configuredProjects].reverse()
   : configuredProjects;
+const projects = browserProjectGroup(orderedProjects, process.env.COURTSIDE_BROWSER_GROUP);
 
 export default defineConfig<JourneyOptions>({
   testDir: "./e2e",

@@ -41,7 +41,7 @@ Tests are placed at the lowest level that can prove the risk. Database guarantee
 | Local unit and contract feedback | under 2 minutes | Focused tests for the changed decision and its negative boundary. |
 | Required pull-request checks | under 15 minutes | Green required checks plus the pull-request risk and evidence declaration. |
 | Local single-area pull-request verification | under 15 minutes | `node tools/courtside.mjs check` selects and runs one protected reduced profile against a pinned commit. |
-| Local combined or full pull-request verification | under 25 minutes | Mixed profiles run additively; `full` validates every GitHub Actions workflow and runs a clean Maven verification against the same pinned commit. |
+| Local combined or full pull-request verification | under 25 minutes | Mixed profiles run additively; `full` validates workflows and documentation, runs clean non-browser verification, exercises a fresh Compose deployment and then runs browser and WebKit reliability gates against the same pinned commit. |
 | Nightly qualification | under 90 minutes | Periodic browser, order, concurrency, security and bounded performance evidence assigned by risk. |
 | Release qualification | under 45 minutes | Candidate-image, upgrade, restore and release-risk evidence; long soak runs are recorded separately. |
 
@@ -75,7 +75,11 @@ base commit and the local runner from its merge base with `origin/main`, so a br
 itself with rules it brings, and every file that decides a selection is itself classified `full`.
 Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, `tooling`, or an additive
 combination. Backend changes run backend, tooling and security verification; frontend changes run frontend,
-tooling and security verification, including the complete Chromium and WebKit browser matrix.
+tooling and security verification. Frontend compilation, lint, unit tests and coverage finish before
+the browser jobs consume the same packaged candidate. Blocking visual and guide snapshots run first;
+only then do two stable functional shards cover Chromium, WebKit, accessibility, phone layouts and
+the journey catalogue. A full selection also starts a fresh Compose project from an image built for
+that commit and proves its application, database and log-collector wait contract.
 Documentation changes run the bounded documentation job and the tooling job. The tooling job travels
 with all three because the policies under `tools/` read `src/`, `frontend/` and `docs/`, and a rule
 this repository enforces with a test has to run for the change that could break it. The
@@ -124,13 +128,16 @@ executes, derived from what those jobs run rather than from which profile happen
 file. Unknown files, missing validators, a validator no selected job runs, and stale or
 duplicate manifest entries fail closed.
 
-The full local profile runs the pinned `actionlint` release before the longer Maven build. CI
-downloads the matching official release archive and verifies its GitHub attestation before running
-the same check. ShellCheck remains a separate repository concern, so this invocation checks GitHub
-workflow structure, expressions, job dependencies and permissions without making a platform's
-optional ShellCheck installation part of the result. The one ignored diagnostic names a permission
-that GitHub documents but the pinned actionlint release does not yet know; `ci/actionlint.json`
-keeps that exception next to the version that requires it.
+The full local profile runs the pinned `actionlint` release and documentation checks before the
+longer build. It then runs clean Maven verification with browser journeys disabled, exercises the
+Compose wait contract with a uniquely named project and immutable image ID, and finally runs the
+browser and WebKit reliability gates. CI downloads the matching official actionlint archive and
+verifies its GitHub attestation before running the same workflow check. ShellCheck remains a
+separate repository concern, so this invocation checks GitHub workflow structure, expressions, job
+dependencies and permissions without making a platform's optional ShellCheck installation part of
+the result. The one ignored diagnostic names a permission that GitHub documents but the pinned
+actionlint release does not yet know; `ci/actionlint.json` keeps that exception next to the version
+that requires it.
 
 The selection has no separate admission step. What keeps it honest is that both inventories are
 closed and everything unrecognised fails closed: an unclassified path, a structural change such as a
@@ -138,7 +145,10 @@ rename or a deletion, a manifest entry whose file no longer exists and a classif
 select `full`. The repository variable `COURTSIDE_TEST_PROFILES` forces the complete job set for every
 pull request unless it is empty or reads `admitted`, so a typo escalates rather than silently
 reducing, and the run summary says when it did. That is the immediate rollback. Locally,
-`check --full` is the same escalation.
+`check --full` is the same escalation. A passing local result is reusable only for the exact commit,
+merge base, classified changes, runtime fingerprint, profiles and task definitions it records. Any
+difference reruns the selected gates; `check --rerun` deliberately bypasses an otherwise compatible
+receipt.
 
 A release demands a nightly that verified it, rather than the absence of a complaint about one. The
 tag is refused unless a scheduled `build` run succeeded on its first attempt over a commit the
@@ -293,7 +303,9 @@ baseline would go unnoticed. The pull request must expose the changed PNG baseli
 Unreviewed dimension-only screenshots remain diagnostic artifacts and never replace these
 assertions.
 
-The pull-request browser gate makes two separate product claims. Chromium runs the blocking
+The pull-request browser gate makes two separate product claims. The blocking visual and guide
+snapshots run as the first browser job, so a known pixel regression stops the more expensive
+functional shards. Chromium runs the blocking
 automated WCAG 2.2 AA rule scan, while WebKit runs blocking core compatibility journeys. WebKit
 plus axe remains a qualification signal until retained first-attempt evidence supports admitting
 that combination. Browser process loss, an internal engine error, a lost target or a test-level
@@ -305,8 +317,9 @@ A failed test retains what an analysis needs after the run is over: which test f
 text rather than as the colour codes Playwright writes them in, the last lines the application
 logged, and the state of the browser, proxy and database containers, one JSON file per failure
 under `frontend/test-results/browser-diagnostics`, uploaded with the run. The application log is
-kept in memory while the run proceeds and passes the same redaction a container log does before it
-is written: URLs lose their path and query, a value behind a password, token, cookie or
+kept in memory rather than streamed during a successful run; `COURTSIDE_VERBOSE_TEST_LOGS=true`
+enables live output for an explicit diagnosis. Retained logs pass the same redaction a container
+log does before they are written: URLs lose their path and query, a value behind a password, token, cookie or
 authorization key is replaced, and any opaque run of 24 characters or more goes. That covers what
 the application itself prints, not every shape a browser harness can quote, the suite signs in with
 fixtures this repository publishes, so what it types is not a secret to begin with. A run that goes
