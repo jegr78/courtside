@@ -26,6 +26,68 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.getByTestId("login-submit").click();
 }
 
+async function expectPrimaryNavigationFits(
+  page: import("@playwright/test").Page,
+  accessibleNames: string[]
+) {
+  const bar = page.getByTestId("primary-navigation-bar");
+  await expect(bar).toBeVisible();
+  const layout = await bar.evaluate((element) => {
+    const barBounds = element.getBoundingClientRect();
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      links: [...element.querySelectorAll("a")].map((link) => {
+        const bounds = link.getBoundingClientRect();
+        return { left: bounds.left, right: bounds.right, visible: bounds.width > 0 && bounds.height > 0 };
+      }),
+      left: barBounds.left,
+      right: barBounds.right
+    };
+  });
+  expect(layout.links).toHaveLength(accessibleNames.length);
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth);
+  for (const link of layout.links) {
+    expect(link.visible).toBe(true);
+    expect(link.left).toBeGreaterThanOrEqual(layout.left);
+    expect(link.right).toBeLessThanOrEqual(layout.right);
+  }
+  for (const name of accessibleNames) await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+}
+
+test("administrator and member destinations fit the narrow phone bar", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.goto("/login");
+  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+  await signIn(page, "configuration-admin");
+
+  // then
+  await expectPrimaryNavigationFits(page, ["Platzplan", "Meine Buchungen", "Benachrichtigungen", "Verwaltung"]);
+
+  // when
+  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "en-GB"));
+  await page.reload();
+
+  // then
+  await expectPrimaryNavigationFits(page, ["Court plan", "My bookings", "Notifications", "Administration"]);
+
+  // when
+  await page.context().clearCookies();
+  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+  await signIn(page, "doe.jane");
+
+  // then
+  await expectPrimaryNavigationFits(page, ["Platzplan", "Meine Buchungen", "Benachrichtigungen"]);
+
+  // when
+  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "en-GB"));
+  await page.reload();
+
+  // then
+  await expectPrimaryNavigationFits(page, ["Court plan", "My bookings", "Notifications"]);
+});
+
 test("a member reaches every destination from the bottom of a touch viewport", async ({ page }) => {
   // given
   await signIn(page, "doe.jane");
