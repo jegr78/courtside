@@ -187,6 +187,9 @@ jobs:
       - name: Verify repository tooling
         working-directory: frontend
         run: npm run test:tools
+      - name: Verify repository tooling under a shifted clock
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: node tools/tool-tests.mjs --clock-offset-days=400
 
   assessment-runtime:
     if: github.event_name == 'pull_request'

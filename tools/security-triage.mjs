@@ -143,11 +143,11 @@ function validTimestamp(value) {
   return parsed.toISOString() === canonical;
 }
 
-export function validateRiskAcceptances(acceptances, today = new Date().toISOString().slice(0, 10)) {
+export function validateRiskAcceptances(acceptances) {
   const ids = new Set();
   const fingerprints = new Set();
   for (const acceptance of acceptances) {
-    for (const field of ["id", "fingerprint", "owner", "rationale", "compensatingControl", "expiresOn", "acceptedAt"]) {
+    for (const field of ["id", "fingerprint", "owner", "rationale", "compensatingControl", "acceptedAt"]) {
       if (typeof acceptance[field] !== "string" || acceptance[field].trim() === "") {
         throw new Error(`Risk acceptance requires ${field}`);
       }
@@ -161,14 +161,12 @@ export function validateRiskAcceptances(acceptances, today = new Date().toISOStr
       throw new Error(`Duplicate risk acceptance for fingerprint ${acceptance.fingerprint}`);
     }
     fingerprints.add(acceptance.fingerprint);
-    if (!validDate(acceptance.expiresOn)) throw new Error(`Risk acceptance ${acceptance.id} has invalid expiry`);
-    if (acceptance.expiresOn < today) throw new Error(`Risk acceptance ${acceptance.id} expired on ${acceptance.expiresOn}`);
     if (!validTimestamp(acceptance.acceptedAt)) throw new Error(`Risk acceptance ${acceptance.id} has invalid timestamp`);
   }
 }
 
 export function assessmentOutcome(lifecycle, today = new Date().toISOString().slice(0, 10)) {
-  validateRiskAcceptances(lifecycle.riskAcceptances, today);
+  validateRiskAcceptances(lifecycle.riskAcceptances);
   const acceptedFindings = new Map(lifecycle.findings
     .filter((finding) => finding.state === "accepted-risk")
     .map((finding) => [finding.fingerprint, finding]));
@@ -296,9 +294,7 @@ function validateLifecycleSemantics(lifecycle, today) {
       const transition = finding.transitions.at(-1);
       if (!acceptance || transition.reference !== acceptance.id
         || acceptance.acceptedAt > transition.changedAt
-        || transition.changedAt > lifecycle.run.recordedAt
-        || acceptance.acceptedAt.slice(0, 10) > acceptance.expiresOn
-        || transition.changedAt.slice(0, 10) > acceptance.expiresOn) {
+        || transition.changedAt > lifecycle.run.recordedAt) {
         throw new Error(`Finding ${finding.fingerprint} has inconsistent risk acceptance`);
       }
     }

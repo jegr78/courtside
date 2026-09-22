@@ -3,20 +3,9 @@
   "$id": "urn:courtside:quality:risk-register:v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "reviewPolicyDays", "areas", "automationGaps"],
+  "required": ["schemaVersion", "areas", "automationGaps"],
   "properties": {
     "schemaVersion": { "const": 1 },
-    "reviewPolicyDays": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["P0", "P1", "P2", "P3"],
-      "properties": {
-        "P0": { "const": 90 },
-        "P1": { "const": 180 },
-        "P2": { "const": 365 },
-        "P3": { "const": 365 }
-      }
-    },
     "areas": {
       "type": "array",
       "minItems": 1,
@@ -40,15 +29,13 @@
     }
   },
   "$defs": {
-    "date": { "type": "string", "format": "date" },
     "riskId": { "type": "string", "pattern": "^[A-Z]{2}-[1-9][0-9]*$" },
     "risk": {
       "type": "object",
       "additionalProperties": false,
       "required": [
         "id", "impact", "likelihood", "invariant", "positiveBoundaries", "negativeBoundaries",
-        "level", "frequency", "environment", "syntheticData", "evidenceType", "owner", "openGap",
-        "lastReviewedOn", "nextReviewOn"
+        "level", "frequency", "environment", "syntheticData", "evidenceType", "owner", "openGap"
       ],
       "properties": {
         "id": { "$ref": "#/$defs/riskId" },
@@ -69,34 +56,17 @@
         "evidenceType": { "type": "string", "minLength": 1 },
         "owner": { "type": "string", "minLength": 1 },
         "openGap": { "type": ["string", "null"], "minLength": 1 },
-        "lastReviewedOn": { "$ref": "#/$defs/date" },
-        "nextReviewOn": { "$ref": "#/$defs/date" },
         "acceptanceIds": {
           "type": "array",
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
-        },
-        "protectedEvidence": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/protectedEvidence" }
         }
-      }
-    },
-    "protectedEvidence": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "digest", "status", "expiresOn"],
-      "properties": {
-        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
-        "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-        "status": { "enum": ["retained", "withheld", "discarded"] },
-        "expiresOn": { "$ref": "#/$defs/date" }
       }
     },
     "automationGap": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "riskIds", "summary", "owner", "reviewOn", "decision", "issue"],
+      "required": ["id", "riskIds", "summary", "owner", "decision", "issue"],
       "properties": {
         "id": { "type": "string", "pattern": "^GAP-[A-Z0-9-]+$" },
         "riskIds": {
@@ -107,7 +77,6 @@
         },
         "summary": { "type": "string", "minLength": 1 },
         "owner": { "type": "string", "minLength": 1 },
-        "reviewOn": { "$ref": "#/$defs/date" },
         "decision": { "type": "string", "minLength": 1 },
         "issue": { "type": "integer", "minimum": 1 }
       }

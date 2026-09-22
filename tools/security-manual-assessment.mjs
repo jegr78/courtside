@@ -47,7 +47,7 @@ function requireRealTimestamp(value, field) {
   }
 }
 
-export function validateManualAssessmentEvidence(evidence, assessmentDate = new Date()) {
+export function validateManualAssessmentEvidence(evidence, assessmentDate) {
   if (!validateShape(evidence)) fail(JSON.stringify(validateShape.errors));
   if (!(assessmentDate instanceof Date) || !Number.isFinite(assessmentDate.getTime())) {
     fail("assessment date is not a real timestamp");
@@ -147,7 +147,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       }
       if (evidence !== undefined) {
         try {
-          validateManualAssessmentEvidence(evidence);
+          validateManualAssessmentEvidence(evidence, new Date());
           process.stdout.write("Manual assessment evidence is valid\n");
         } catch {
           process.stderr.write("Manual assessment evidence is invalid\n");

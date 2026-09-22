@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { declaredToolTests, runToolTests, toolInventory } from "./tool-tests.mjs";
+import { declaredToolTests, runToolTests, shiftedClockEnvironment, toolInventory } from "./tool-tests.mjs";
 
 test("when inventorying tools, then tracked and untracked files come from Git independently of the manifest", () => {
   // given
@@ -85,4 +85,26 @@ test("given a manifest omits a tool test, when planning execution, then the inde
     () => declaredToolTests(manifest, ["tools/direct.test.mjs", "tools/validator.test.mjs"]),
     /inventory is stale/i
   );
+});
+
+test("given a clock offset, when the tool tests are spawned, then the child runs under a shifted clock", () => {
+  // given
+  const calls = [];
+  const spawn = (executable, arguments_, options) => {
+    calls.push({ executable, arguments_, options });
+    return { status: 0 };
+  };
+
+  // when
+  runToolTests(["tools/direct.test.mjs"], spawn, 400);
+  runToolTests(["tools/direct.test.mjs"], spawn);
+
+  // then
+  assert.equal(calls[0].options.env.COURTSIDE_CLOCK_OFFSET_DAYS, "400");
+  assert.match(calls[0].options.env.NODE_OPTIONS, /--import=file:.*tools\/shift-clock\.mjs$/);
+  assert.equal(Object.hasOwn(calls[1].options, "env"), false);
+  assert.equal(shiftedClockEnvironment(400, { NODE_OPTIONS: "--enable-source-maps" }).NODE_OPTIONS
+    .startsWith("--enable-source-maps "), true);
+  assert.throws(() => shiftedClockEnvironment(0), /Clock offset in days is invalid/);
+  assert.throws(() => shiftedClockEnvironment(1.5), /Clock offset in days is invalid/);
 });

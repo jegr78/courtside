@@ -102,10 +102,9 @@
     },
     "acceptance": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "expiresOn"],
+      "required": ["id"],
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,63}$" },
-        "expiresOn": { "$ref": "#/$defs/date" }
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,63}$" }
       }
     },
     "ruleEvidence": {

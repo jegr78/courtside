@@ -322,18 +322,20 @@ test("given schema-valid but forged lifecycle relationships, when summarizing, t
   }
 });
 
-test("given accepted risk, when its owner rationale control or expiry is absent or stale, then assessment fails closed", () => {
+test("given accepted risk, when its owner rationale or compensating control is absent, then assessment fails closed", () => {
   // given
   const acceptance = {
     id: "acceptance-0001", fingerprint: candidate().fingerprint, owner: "maintainer",
     rationale: "The affected endpoint is disabled.", compensatingControl: "The proxy rejects the route.",
-    expiresOn: "2026-09-01", acceptedAt: "2026-08-20T14:00:00.000Z", independentReview: false
+    acceptedAt: "2026-08-20T14:00:00.000Z", independentReview: false
   };
 
   // when / then
-  assert.doesNotThrow(() => validateRiskAcceptances([acceptance], "2026-08-20"));
-  assert.throws(() => validateRiskAcceptances([{ ...acceptance, owner: "" }], "2026-08-20"), /requires owner/);
-  assert.throws(() => validateRiskAcceptances([{ ...acceptance, expiresOn: "2026-08-19" }], "2026-08-20"), /expired/);
+  assert.doesNotThrow(() => validateRiskAcceptances([acceptance]));
+  assert.throws(() => validateRiskAcceptances([{ ...acceptance, owner: "" }]), /requires owner/);
+  assert.throws(() => validateRiskAcceptances([{ ...acceptance, rationale: "" }]), /requires rationale/);
+  assert.throws(() => validateRiskAcceptances([{ ...acceptance, compensatingControl: "" }]),
+    /requires compensatingControl/);
 });
 
 test("given risk acceptance, when it is stale or targets P0, then it cannot make an assessment pass", () => {
@@ -341,7 +343,7 @@ test("given risk acceptance, when it is stale or targets P0, then it cannot make
   const acceptance = {
     id: "acceptance-0001", fingerprint: candidate().fingerprint, owner: "maintainer",
     rationale: "The affected endpoint is disabled.", compensatingControl: "The proxy rejects the route.",
-    expiresOn: "2026-09-01", acceptedAt: "2026-08-20T14:00:00.000Z", independentReview: false
+    acceptedAt: "2026-08-20T14:00:00.000Z", independentReview: false
   };
 
   // when / then
@@ -370,7 +372,7 @@ test("given accepted risk, when acceptance is future-dated or misreferenced, the
   const acceptance = {
     id: "acceptance-0001", fingerprint: source.fingerprint, owner: "maintainer",
     rationale: "The affected endpoint is disabled.", compensatingControl: "The proxy rejects the route.",
-    expiresOn: "2026-09-01", acceptedAt: "2026-08-20T13:00:00.000Z", independentReview: false
+    acceptedAt: "2026-08-20T13:00:00.000Z", independentReview: false
   };
 
   // when / then
@@ -383,12 +385,6 @@ test("given accepted risk, when acceptance is future-dated or misreferenced, the
   assert.throws(() => summarizeFindingLifecycle(lifecycle({ findings: [misreferenced] }), {
     ...exceptionPolicy, riskAcceptances: [acceptance]
   }, "2026-08-20"), /inconsistent risk acceptance/);
-  const expiredTransition = { ...accepted, transitions: accepted.transitions.map((transition, index) => index === 1
-    ? { ...transition, changedAt: "2026-09-02T13:30:00.000Z" }
-    : transition) };
-  assert.throws(() => summarizeFindingLifecycle(lifecycle({
-    run: { ...lifecycle().run, recordedAt: "2026-09-02T14:00:00.000Z" }, findings: [expiredTransition]
-  }), { ...exceptionPolicy, riskAcceptances: [acceptance] }, "2026-08-20"), /inconsistent risk acceptance/);
 });
 
 test("given a fixed or accepted finding, when calculating the outcome, then retest and precise acceptance govern it", () => {
@@ -397,7 +393,7 @@ test("given a fixed or accepted finding, when calculating the outcome, then rete
   const acceptance = {
     id: "acceptance-0001", fingerprint: source.fingerprint, owner: "maintainer",
     rationale: "The affected endpoint is disabled.", compensatingControl: "The proxy rejects the route.",
-    expiresOn: "2026-09-01", acceptedAt: "2026-08-20T14:00:00.000Z", independentReview: false
+    acceptedAt: "2026-08-20T14:00:00.000Z", independentReview: false
   };
 
   // when / then

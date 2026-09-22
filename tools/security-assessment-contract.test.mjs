@@ -299,11 +299,16 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
   const validate = new Ajv({ strict: true, strictRequired: false, allErrors: true })
     .compile(manualEvidenceSchema);
   const digest = `sha256:${"a".repeat(64)}`;
+  // the CLI below validates against its own clock, so a pinned date would expire this fixture
+  const validityDays = 30;
+  const recordedAt = `${new Date(Date.now() - 60_000).toISOString().slice(0, 19)}Z`;
+  const validUntil = new Date(Date.parse(recordedAt) + validityDays * 86_400_000);
+  const assessedAt = new Date(recordedAt);
   const evidenceReference = {
     id: "evidence-001",
     digest,
     classification: "restricted-security-evidence",
-    expiresOn: "2026-09-21"
+    expiresOn: validUntil.toISOString().slice(0, 10)
   };
   const control = {
     controlId: "v5.0.0-8.3.1",
@@ -318,7 +323,7 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
     prerequisites: ["Qualified target"],
     controls: [control],
     tester: "Maintainer",
-    recordedAt: "2026-08-21T20:00:00Z",
+    recordedAt,
     targetImageDigest: digest
   };
   const evidence = {
@@ -326,7 +331,7 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
     catalogVersion: catalog.catalogVersion,
     runId: "manual-baseline-1",
     tester: "Maintainer",
-    recordedAt: "2026-08-21T20:00:00Z",
+    recordedAt,
     sourceCommit: "a".repeat(40),
     targetImageDigest: digest,
     targetFingerprint: digest,
@@ -340,7 +345,7 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
       targetImageDigest: digest,
       profile: "active",
       procedureIds: ["MAN-AUTHZ-001"],
-      expiresAt: "2026-09-21T20:00:00Z"
+      expiresAt: `${validUntil.toISOString().slice(0, 19)}Z`
     },
     selectedControlIds: ["v5.0.0-8.3.1"],
     independentReview: { performed: false },
@@ -349,7 +354,7 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
 
   // when / then
   assert.equal(validate(evidence), true, JSON.stringify(validate.errors));
-  assert.equal(validateManualAssessmentEvidence(evidence, new Date("2026-08-21T20:00:00Z")), evidence);
+  assert.equal(validateManualAssessmentEvidence(evidence, assessedAt), evidence);
   const directory = mkdtempSync(join(tmpdir(), "courtside-manual-assessment-"));
   context.after(() => rmSync(directory, { recursive: true, force: true }));
   const evidencePath = join(directory, "evidence.json");
@@ -416,12 +421,11 @@ test("given manual evidence, when its outcome needs action, then schema and CLI 
     selectedControlIds: [control.controlId, blockedControl.controlId],
     procedures: [{ ...procedure, controls: [control, blockedControl] }]
   };
-  assert.equal(validateManualAssessmentEvidence(expandedEvidence,
-    new Date("2026-08-21T20:00:00Z")), expandedEvidence);
+  assert.equal(validateManualAssessmentEvidence(expandedEvidence, assessedAt), expandedEvidence);
   assert.throws(() => validateManualAssessmentEvidence({
     ...expandedEvidence,
     procedures: [{ ...procedure, controls: [control, control] }]
-  }, new Date("2026-08-21T20:00:00Z")), /duplicate outcome/);
+  }, assessedAt), /duplicate outcome/);
   assert.equal(validate({ ...evidence, procedures: [{ ...procedure,
     controls: [{ ...control, outcome: "blocked" }] }] }), false);
   assert.equal(validate({ ...evidence, procedures: [{ ...procedure,
@@ -522,6 +526,8 @@ test("given schema-valid manual evidence, when catalog and authorization relatio
     assert.throws(() => validateManualAssessmentEvidence(invalidRecord,
       new Date("2026-08-21T20:00:00Z")), refusal);
   }
+  assert.throws(() => validateManualAssessmentEvidence(evidence, new Date("2026-09-22T00:00:00Z")),
+    /authorization has expired/);
   assert.throws(() => validateManualAssessmentEvidence({
     ...evidence,
     authorization: { ...evidence.authorization, expiresAt: "2026-10-21T20:00:00Z" }

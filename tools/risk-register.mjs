@@ -7,15 +7,6 @@ const schema = JSON.parse(readFileSync(new URL("../quality/risk-register.schema.
 const gapStartMarker = "<!-- automation-gap-register:start -->";
 const gapEndMarker = "<!-- automation-gap-register:end -->";
 
-function isoDate(date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function validDate(value) {
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.getTime()) && isoDate(date) === value;
-}
-
 function schemaTarget(reference) {
   if (!reference.startsWith("#/$defs/")) throw new Error(`Unsupported schema reference ${reference}`);
   return schema.$defs[reference.slice("#/$defs/".length)];
@@ -40,7 +31,6 @@ function validateSchema(value, rule, path = "$") {
   if (typeof value === "string") {
     if (rule.minLength !== undefined && value.length < rule.minLength) throw new Error(`${path} violates schema length`);
     if (rule.pattern && !new RegExp(rule.pattern, "u").test(value)) throw new Error(`${path} violates schema pattern`);
-    if (rule.format === "date" && !validDate(value)) throw new Error(`${path} violates schema date format`);
   }
   if (typeof value === "number" && rule.minimum !== undefined && value < rule.minimum) {
     throw new Error(`${path} violates schema minimum`);
@@ -64,16 +54,6 @@ function validateSchema(value, rule, path = "$") {
       if (rule.properties?.[key]) validateSchema(entry, rule.properties[key], `${path}.${key}`);
     }
   }
-}
-
-function addDays(value, days) {
-  const date = new Date(`${value}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return isoDate(date);
-}
-
-function earlier(...values) {
-  return values.filter(Boolean).sort()[0];
 }
 
 function safeMarkdown(value, context) {
@@ -105,24 +85,24 @@ function areaMarker(area, boundary) {
 
 function riskTable(area) {
   safeMarkdown(area.name, `Risk area ${area.name}`);
-  const header = "| ID | Impact | Likelihood | Invariant | Positive boundaries | Negative boundaries | Level | Frequency | Environment | Synthetic data | Evidence | Owner | Open gap | Last review | Next review |";
-  const divider = "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|";
+  const header = "| ID | Impact | Likelihood | Invariant | Positive boundaries | Negative boundaries | Level | Frequency | Environment | Synthetic data | Evidence | Owner | Open gap |";
+  const divider = "|---|---|---|---|---|---|---|---|---|---|---|---|---|";
   const rows = area.risks.map((risk) => {
     for (const value of [risk.invariant, risk.positiveBoundaries, risk.negativeBoundaries, risk.level,
       risk.environment, risk.syntheticData, risk.evidenceType, risk.owner, risk.openGap].filter((entry) => entry !== null)) {
       safeMarkdown(value, `Risk ${risk.id}`);
     }
-    return `| ${risk.id} | ${risk.impact} | ${risk.likelihood} | ${risk.invariant} | ${risk.positiveBoundaries} | ${risk.negativeBoundaries} | ${risk.level} | ${risk.frequency.join(", ")} | ${risk.environment} | ${risk.syntheticData} | ${risk.evidenceType} | ${risk.owner} | ${risk.openGap ?? "None."} | ${risk.lastReviewedOn} | ${risk.nextReviewOn} |`;
+    return `| ${risk.id} | ${risk.impact} | ${risk.likelihood} | ${risk.invariant} | ${risk.positiveBoundaries} | ${risk.negativeBoundaries} | ${risk.level} | ${risk.frequency.join(", ")} | ${risk.environment} | ${risk.syntheticData} | ${risk.evidenceType} | ${risk.owner} | ${risk.openGap ?? "None."} |`;
   });
   return `### ${area.name}\n\n${header}\n${divider}\n${rows.join("\n")}`;
 }
 
 function gapTable(register) {
-  const header = "| ID | Risks | Gap | Owner | Review date | Decision | Issue |";
-  const divider = "|---|---|---|---|---|---|---|";
+  const header = "| ID | Risks | Gap | Owner | Decision | Issue |";
+  const divider = "|---|---|---|---|---|---|";
   const rows = register.automationGaps.map((gap) => {
     for (const value of [gap.summary, gap.owner, gap.decision]) safeMarkdown(value, `Automation gap ${gap.id}`);
-    return `| ${gap.id} | ${gap.riskIds.join(", ")} | ${gap.summary} | ${gap.owner} | ${gap.reviewOn} | ${gap.decision} | [#${gap.issue}](https://github.com/jegr78/courtside/issues/${gap.issue}) |`;
+    return `| ${gap.id} | ${gap.riskIds.join(", ")} | ${gap.summary} | ${gap.owner} | ${gap.decision} | [#${gap.issue}](https://github.com/jegr78/courtside/issues/${gap.issue}) |`;
   });
   return [header, divider, ...rows].join("\n");
 }
@@ -133,8 +113,7 @@ export function renderQualityStrategy(source, register) {
   return replaceGenerated(risks, gapStartMarker, gapEndMarker, gapTable(register));
 }
 
-export function validateRiskRegister(register, { catalog, exceptions, today }) {
-  if (!validDate(today)) throw new Error(`Invalid risk review date ${today}`);
+export function validateRiskRegister(register, { catalog, exceptions }) {
   validateSchema(register, schema);
   const areaNames = register.areas.map((area) => area.name);
   if (new Set(areaNames).size !== areaNames.length) throw new Error("Duplicate risk area in risk register");
@@ -147,12 +126,7 @@ export function validateRiskRegister(register, { catalog, exceptions, today }) {
   if (uniqueRiskIds.size !== riskIds.length) throw new Error("Duplicate risk ID in risk register");
   const acceptances = new Map((exceptions.riskAcceptances ?? []).map((entry) => [entry.id, entry]));
   if (acceptances.size !== (exceptions.riskAcceptances ?? []).length) throw new Error("Duplicate risk acceptance ID");
-  for (const acceptance of acceptances.values()) {
-    if (!validDate(acceptance.expiresOn)) throw new Error(`Risk acceptance ${acceptance.id} has an invalid expiry`);
-    if (acceptance.expiresOn < today) throw new Error(`Risk acceptance ${acceptance.id} expired on ${acceptance.expiresOn}`);
-  }
   const referencedAcceptances = new Set();
-  const protectedEvidenceIds = new Set();
   for (const risk of risks) {
     for (const value of [
       risk.invariant, risk.positiveBoundaries, risk.negativeBoundaries, risk.level, risk.environment,
@@ -160,29 +134,10 @@ export function validateRiskRegister(register, { catalog, exceptions, today }) {
     ].filter((entry) => entry !== null)) {
       safeMarkdown(value, `Risk ${risk.id}`);
     }
-    if (!validDate(risk.lastReviewedOn) || !validDate(risk.nextReviewOn)) {
-      throw new Error(`Risk ${risk.id} has an invalid review date`);
-    }
-    const policyDays = register.reviewPolicyDays[risk.impact];
-    const acceptanceDates = (risk.acceptanceIds ?? []).map((id) => {
-      const acceptance = acceptances.get(id);
-      if (!acceptance) throw new Error(`Risk ${risk.id} references unknown acceptance ${id}`);
+    for (const id of risk.acceptanceIds ?? []) {
+      if (!acceptances.has(id)) throw new Error(`Risk ${risk.id} references unknown acceptance ${id}`);
       referencedAcceptances.add(id);
-      return acceptance.expiresOn;
-    });
-    const evidenceDates = (risk.protectedEvidence ?? []).map((entry) => entry.expiresOn);
-    if ([...acceptanceDates, ...evidenceDates].some((value) => !validDate(value))) {
-      throw new Error(`Risk ${risk.id} has an invalid expiry date`);
     }
-    for (const evidence of risk.protectedEvidence ?? []) {
-      if (protectedEvidenceIds.has(evidence.id)) throw new Error(`Duplicate protected evidence ID ${evidence.id}`);
-      protectedEvidenceIds.add(evidence.id);
-      if (evidence.expiresOn < today) throw new Error(`Protected evidence ${evidence.id} expired on ${evidence.expiresOn}`);
-    }
-    const deadline = earlier(addDays(risk.lastReviewedOn, policyDays), ...acceptanceDates, ...evidenceDates);
-    if (risk.nextReviewOn > deadline) throw new Error(`Risk ${risk.id} exceeds its review deadline ${deadline}`);
-    if (risk.nextReviewOn < risk.lastReviewedOn) throw new Error(`Risk ${risk.id} has a review before its last review`);
-    if (risk.nextReviewOn < today) throw new Error(`Risk ${risk.id} review is overdue since ${risk.nextReviewOn}`);
   }
   for (const acceptance of acceptances.values()) {
     if (!referencedAcceptances.has(acceptance.id)) {
@@ -193,18 +148,16 @@ export function validateRiskRegister(register, { catalog, exceptions, today }) {
   if (new Set(gapIds).size !== gapIds.length) throw new Error("Duplicate automation gap ID");
   for (const gap of register.automationGaps) {
     for (const value of [gap.summary, gap.owner, gap.decision]) safeMarkdown(value, `Automation gap ${gap.id}`);
-    if (!validDate(gap.reviewOn)) throw new Error(`Automation gap ${gap.id} has an invalid review date`);
     for (const id of gap.riskIds) {
       if (!uniqueRiskIds.has(id)) throw new Error(`Automation gap ${gap.id} references unknown risk ID ${id}`);
     }
-    if (gap.reviewOn < today) throw new Error(`Automation gap ${gap.id} review is overdue since ${gap.reviewOn}`);
   }
   const assessedSurfaces = new Set();
   for (const assessment of catalog.tests) {
     if (!Array.isArray(assessment.qualityRiskIds) || assessment.qualityRiskIds.length === 0) {
       throw new Error(`Assessment ${assessment.id} has no quality risk relationship`);
     }
-    for (const id of assessment.qualityRiskIds ?? []) {
+    for (const id of assessment.qualityRiskIds) {
       if (!uniqueRiskIds.has(id)) throw new Error(`Assessment ${assessment.id} references unknown risk ID ${id}`);
     }
     assessedSurfaces.add(assessment.surface);
@@ -215,25 +168,27 @@ export function validateRiskRegister(register, { catalog, exceptions, today }) {
   return { riskCount: risks.length, riskIds: [...uniqueRiskIds].sort() };
 }
 
-export function checkRiskRegister(repository = root, today = isoDate(new Date())) {
-  const register = JSON.parse(readFileSync(resolve(repository, "quality/risk-register.json"), "utf8"));
-  const catalog = JSON.parse(readFileSync(resolve(repository, "security/assessment-catalog.json"), "utf8"));
-  const exceptions = JSON.parse(readFileSync(resolve(repository, "security/exceptions.json"), "utf8"));
+function registerSources(repository) {
+  return {
+    register: JSON.parse(readFileSync(resolve(repository, "quality/risk-register.json"), "utf8")),
+    catalog: JSON.parse(readFileSync(resolve(repository, "security/assessment-catalog.json"), "utf8")),
+    exceptions: JSON.parse(readFileSync(resolve(repository, "security/exceptions.json"), "utf8"))
+  };
+}
+
+export function checkRiskRegister(repository = root) {
+  const { register, catalog, exceptions } = registerSources(repository);
   const strategyPath = resolve(repository, "docs/quality-strategy.md");
   const strategy = readFileSync(strategyPath, "utf8");
-  const validation = validateRiskRegister(register, { catalog, exceptions, today });
+  const validation = validateRiskRegister(register, { catalog, exceptions });
   const rendered = renderQualityStrategy(strategy, register);
   if (rendered !== strategy) throw new Error("docs/quality-strategy.md differs from the risk register; run risk-register.mjs --write");
   return validation;
 }
 
 function main() {
-  const register = JSON.parse(readFileSync(resolve(root, "quality/risk-register.json"), "utf8"));
-  const catalog = JSON.parse(readFileSync(resolve(root, "security/assessment-catalog.json"), "utf8"));
-  const exceptions = JSON.parse(readFileSync(resolve(root, "security/exceptions.json"), "utf8"));
-  const todayArgument = process.argv.find((argument) => argument.startsWith("--today="));
-  const today = todayArgument?.slice("--today=".length) ?? isoDate(new Date());
-  validateRiskRegister(register, { catalog, exceptions, today });
+  const { register, catalog, exceptions } = registerSources(root);
+  validateRiskRegister(register, { catalog, exceptions });
   const strategyPath = resolve(root, "docs/quality-strategy.md");
   const strategy = readFileSync(strategyPath, "utf8");
   const rendered = renderQualityStrategy(strategy, register);

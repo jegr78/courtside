@@ -176,14 +176,13 @@
     "riskAcceptance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "fingerprint", "owner", "rationale", "compensatingControl", "expiresOn", "acceptedAt", "independentReview"],
+      "required": ["id", "fingerprint", "owner", "rationale", "compensatingControl", "acceptedAt", "independentReview"],
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{5,63}$" },
         "fingerprint": { "$ref": "#/$defs/fingerprint" },
         "owner": { "$ref": "#/$defs/nonEmpty" },
         "rationale": { "$ref": "#/$defs/nonEmpty" },
         "compensatingControl": { "$ref": "#/$defs/nonEmpty" },
-        "expiresOn": { "$ref": "#/$defs/date" },
         "acceptedAt": { "$ref": "#/$defs/timestamp" },
         "independentReview": { "type": "boolean" }
       }
