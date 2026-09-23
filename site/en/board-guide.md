@@ -57,6 +57,10 @@ file replaces the logo URL until you remove it.
 ### Links, language and time
 
 * Enter the club's own pages under **Imprint** and **Privacy policy**.
+* Under **Documentation** you can link a guide of your own. Left empty, the footer link opens the
+  Courtside documentation. The link is always visible, and the address you enter is readable
+  without signing in, like the imprint and privacy links. Do not enter anything there that should
+  stay private.
 * The **Default language** applies to people who have not selected one.
 * Enter a valid IANA time zone such as `Europe/Berlin`. You can only change it while there are no
   future bookings.

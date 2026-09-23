@@ -213,6 +213,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         addIfChanged(fields, "logoUrl", configuration.getLogoUrl(), command.logoUrl());
         addIfChanged(fields, "imprintUrl", configuration.getImprintUrl(), command.imprintUrl());
         addIfChanged(fields, "privacyUrl", configuration.getPrivacyUrl(), command.privacyUrl());
+        addIfChanged(fields, "documentationUrl", configuration.getDocumentationUrl(), command.documentationUrl());
         addIfChanged(fields, "newAccountCredentialHours",
                 configuration.getNewAccountCredentialHours(), command.newAccountCredential().hours());
         addIfChanged(fields, "passwordResetCredentialHours",
@@ -236,9 +237,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     }
 
     private static void apply(ClubConfiguration configuration, ChangeClubConfigurationCommand command) {
-        configuration.changeTo(command.clubName(), command.primaryColor(), command.accentColor(),
-                command.logoUrl(), command.imprintUrl(), command.privacyUrl(), command.defaultLocale(),
-                command.slotDuration().minutes(), command.timeZone());
+        configuration.changeTo(command);
         configuration.changeCredentialValidity(command.newAccountCredential().hours(),
                 command.passwordResetCredential().hours());
         configuration.expireResetCodesAfter(command.passwordResetToken().minutes());

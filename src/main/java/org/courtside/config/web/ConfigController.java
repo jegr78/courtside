@@ -59,6 +59,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
         return ResponseEntity.ok(toAdminResponse(config.update(new ChangeClubConfigurationCommand(
                 request.getClubName(), request.getPrimaryColor(), request.getAccentColor(),
                 request.getLogoUrl(), request.getImprintUrl(), request.getPrivacyUrl(),
+                request.getDocumentationUrl(),
                 request.getDefaultLocale(),
                 new BookingSlotDuration(request.getSlotMinutes()), request.getTimeZone(),
                 new CredentialLifetime(request.getNewAccountCredentialHours()),
@@ -118,7 +119,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.slotMinutes(), configuration.timeZone())
                 .logoUrl(configuration.logoUrl())
                 .imprintUrl(configuration.imprintUrl())
-                .privacyUrl(configuration.privacyUrl());
+                .privacyUrl(configuration.privacyUrl())
+                .documentationUrl(configuration.documentationUrl());
     }
 
     private ApiAdminClubConfig toAdminResponse(ClubConfigurationSnapshot configuration) {
@@ -136,6 +138,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 .logoFallbackUrl(configuration.logoFallbackUrl())
                 .imprintUrl(configuration.imprintUrl())
                 .privacyUrl(configuration.privacyUrl())
+                .documentationUrl(configuration.documentationUrl())
                 .noMembershipTypeRuleSetId(configuration.noMembershipTypeRuleSetId());
     }
 }

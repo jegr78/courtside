@@ -124,6 +124,27 @@ describe("AdminConfigurationView", () => {
       expect.objectContaining({ privacyUrl: "/privacy" })));
   });
 
+  it("given a documentation target, when saving, then the override is written", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, logoUploaded: false,
+      documentationUrl: "https://docs.example.org/courtside"
+    });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("documentation-url");
+
+    // when
+    await userEvent.type(screen.getByTestId("documentation-url"), "https://docs.example.org/courtside");
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(
+      expect.objectContaining({ documentationUrl: "https://docs.example.org/courtside" })));
+  });
+
   it("given stored brand colours, when choosing a new primary colour, then the field and live contrast preview agree", async () => {
     // given
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
@@ -284,6 +305,33 @@ describe("AdminConfigurationView", () => {
     // then
     await waitFor(() => expect(changing).toHaveBeenCalledWith(
       expect.objectContaining({ privacyUrl: null })));
+  });
+
+  it("given a stored documentation override, when it is cleared, then the default can take over", async () => {
+    // given
+    vi.spyOn(api, "adminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, logoUploaded: false,
+      documentationUrl: "https://docs.example.org/courtside"
+    });
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, logoUploaded: false
+    });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("documentation-url");
+
+    // when
+    await userEvent.clear(screen.getByTestId("documentation-url"));
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(
+      expect.objectContaining({ documentationUrl: null })));
   });
 
   it("given an assigned rule set that has since been deactivated, when the configuration is loaded, then it is still the selected one", async () => {

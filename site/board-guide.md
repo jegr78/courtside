@@ -61,6 +61,10 @@ Logos müssen als PNG oder JPEG vorliegen. Die Datei darf höchstens 1 MiB groß
 ### Links, Sprache und Zeit
 
 * Hinterlege unter **Impressum** und **Datenschutz** die Seiten des Vereins.
+* Unter **Dokumentation** kannst du eine eigene Anleitung verlinken. Bleibt das Feld leer,
+  führt der Link in der Fußzeile zur Courtside-Dokumentation. Der Link ist immer sichtbar, und
+  die eingetragene Adresse ist wie Impressum und Datenschutz ohne Anmeldung abrufbar. Trage dort
+  also nichts ein, das nicht jeder sehen soll.
 * Die **Standardsprache** gilt für Personen ohne eigene Sprachauswahl.
 * Gib eine gültige IANA-Zeitzone ein, zum Beispiel `Europe/Berlin`. Du kannst die Zeitzone
   nur ändern, solange keine zukünftige Buchung vorhanden ist.

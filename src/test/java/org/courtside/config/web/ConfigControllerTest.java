@@ -769,6 +769,78 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenADocumentationUrl_whenChangingTheConfig_thenThePublicConfigurationCarriesIt()
+            throws Exception {
+        // given
+        String configuration = configJson("Example Tennis Club").replace(
+                "\"defaultLocale\": \"de\"",
+                "\"documentationUrl\": \"https://docs.example.org/courtside\", \"defaultLocale\": \"de\"");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configuration)
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentationUrl")
+                        .value("https://docs.example.org/courtside"));
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentationUrl")
+                        .value("https://docs.example.org/courtside"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAStoredDocumentationUrl_whenItIsCleared_thenThePublicConfigurationCarriesNoOverride()
+            throws Exception {
+        // given
+        String configuration = configJson("Example Tennis Club").replace(
+                "\"defaultLocale\": \"de\"",
+                "\"documentationUrl\": \"https://docs.example.org/courtside\", \"defaultLocale\": \"de\"");
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configuration)
+                        .with(csrf()))
+                .andExpect(status().isOk());
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configuration.replace(
+                                "\"documentationUrl\": \"https://docs.example.org/courtside\"",
+                                "\"documentationUrl\": null"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentationUrl").doesNotExist());
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentationUrl").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenADocumentationUrlWithAnActiveScheme_whenChangingTheConfig_thenTheRejectionNamesTheField()
+            throws Exception {
+        // given
+        String configuration = configJson("Example Tennis Club").replace(
+                "\"defaultLocale\": \"de\"",
+                "\"documentationUrl\": \"javascript:alert(1)\", \"defaultLocale\": \"de\"");
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configuration)
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("documentationUrl"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAStoredPrivacyUrl_whenItIsClearedAgain_thenTheFooterHasNothingLeftToRender()
             throws Exception {
         // given

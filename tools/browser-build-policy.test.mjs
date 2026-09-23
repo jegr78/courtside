@@ -138,7 +138,7 @@ test("given the published-web-resource inventory, when it is read, then its own 
     ["source-map-reference", "unfinished-work-marker", "build-host-path"]);
   assert.deepEqual(inventory.reviewedOrigins.map(({ host }) => host),
     ["www.w3.org", "react.dev", "reactrouter.com", "react.i18next.com", "bit.ly", "github.com",
-      "scripts.sil.org", "localhost"],
+      "jegr78.github.io", "scripts.sil.org", "localhost"],
     "a new reviewed origin is a decision, so it is named where the review can see it");
 });
 

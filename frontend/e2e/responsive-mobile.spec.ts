@@ -188,6 +188,7 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   // then
   await expect(page.getByTestId("footer-imprint")).toBeVisible();
   await expect(page.getByTestId("footer-privacy")).toBeVisible();
+  await expect(page.getByTestId("footer-documentation")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   // when

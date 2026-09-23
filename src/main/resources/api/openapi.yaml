@@ -510,6 +510,14 @@ components:
             Where this club publishes its privacy policy, beside the imprint. Both are navigation
             targets rather than subresources, so unlike the logo they also accept plain HTTP: a club
             that serves Courtside without TLS still has to be able to link them.
+        documentationUrl:
+          type: [string, "null"]
+          maxLength: 500
+          pattern: "^(https?://\\S+|/[^/\\\\\\s]\\S*|/)$"
+          description: |
+            A club-specific documentation target. The frontend uses the published Courtside
+            documentation when this override is absent. This projection answers without
+            authentication, so whatever a club enters here is readable by anybody.
         defaultLocale: { type: string }
         supportedLocales:
           type: array
@@ -588,6 +596,13 @@ components:
             accepted — a club that serves Courtside without TLS still has to be able to link it.
             Tab, newline and carriage return are refused throughout: a browser strips them before
             parsing, so `/<TAB>/host` would otherwise reach the same off-origin target as `//host`.
+        documentationUrl:
+          type: [string, "null"]
+          maxLength: 500
+          pattern: "^(https?://\\S+|/[^/\\\\\\s]\\S*|/)$"
+          description: |
+            A same-origin path or absolute URL that replaces the published Courtside documentation
+            target. `null` restores the frontend default.
         defaultLocale: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         timeZone:

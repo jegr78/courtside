@@ -680,6 +680,54 @@ describe("App build identity", () => {
     expect(screen.queryByTestId("footer-privacy")).not.toBeInTheDocument();
   });
 
+  it("given no documentation override, when the shell loads, then the footer links to the published documentation", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      defaultLocale: "en",
+      supportedLocales: ["de", "en"],
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<RoutedShell><App /></RoutedShell>);
+
+    // then — the club has to have arrived, or this would assert the pre-load fallback instead
+    await waitFor(() => expect(screen.getByTestId("club-brand-name"))
+      .toHaveTextContent("Example Tennis Club"));
+    expect(screen.getByTestId("footer-documentation"))
+      .toHaveAttribute("href", "https://jegr78.github.io/courtside/");
+    expect(screen.getByTestId("footer-documentation")).toHaveTextContent("Documentation");
+  });
+
+  it("given a club documentation override, when the shell loads, then the footer uses it", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({
+      clubName: "Example Tennis Club",
+      primaryColor: "#b85c38",
+      accentColor: "#d7e24b",
+      documentationUrl: "https://docs.example.org/courtside",
+      defaultLocale: "en",
+      supportedLocales: ["de", "en"],
+      slotMinutes: 30,
+      timeZone: "Europe/Berlin"
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<RoutedShell><App /></RoutedShell>);
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("footer-documentation"))
+      .toHaveAttribute("href", "https://docs.example.org/courtside"));
+  });
+
   // Nothing else holds this wire: cutting the callback in App leaves every other test green, and
   // only the browser journey would notice.
   it("given a saved club name, when the configuration page reports it, then the shell carries it without a reload", async () => {
