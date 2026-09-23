@@ -76,19 +76,17 @@ public class ClubConfiguration {
     @Column(name = "no_membership_type_rule_set_id")
     private UUID noMembershipTypeRuleSetId;
 
-    public void changeTo(String clubName, String primaryColor, String accentColor,
-                         String logoUrl, String imprintUrl, String privacyUrl, String documentationUrl,
-                         String defaultLocale, int slotMinutes, String timeZone) {
-        this.clubName = clubName;
-        this.primaryColor = primaryColor;
-        this.accentColor = accentColor;
-        this.logoUrl = logoUrl;
-        this.imprintUrl = imprintUrl;
-        this.privacyUrl = privacyUrl;
-        this.documentationUrl = documentationUrl;
-        this.defaultLocale = defaultLocale;
-        this.slotMinutes = slotMinutes;
-        this.timeZone = timeZone;
+    public void changeTo(ChangeClubConfigurationCommand command) {
+        this.clubName = command.clubName();
+        this.primaryColor = command.primaryColor();
+        this.accentColor = command.accentColor();
+        this.logoUrl = command.logoUrl();
+        this.imprintUrl = command.imprintUrl();
+        this.privacyUrl = command.privacyUrl();
+        this.documentationUrl = command.documentationUrl();
+        this.defaultLocale = command.defaultLocale();
+        this.slotMinutes = command.slotDuration().minutes();
+        this.timeZone = command.timeZone();
     }
 
     public void changeCredentialValidity(int newAccountHours, int passwordResetHours) {

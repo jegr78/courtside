@@ -516,7 +516,8 @@ components:
           pattern: "^(https?://\\S+|/[^/\\\\\\s]\\S*|/)$"
           description: |
             A club-specific documentation target. The frontend uses the published Courtside
-            documentation when this override is absent.
+            documentation when this override is absent. This projection answers without
+            authentication, so whatever a club enters here is readable by anybody.
         defaultLocale: { type: string }
         supportedLocales:
           type: array

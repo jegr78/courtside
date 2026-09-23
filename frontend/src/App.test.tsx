@@ -697,8 +697,10 @@ describe("App build identity", () => {
     // when
     render(<RoutedShell><App /></RoutedShell>);
 
-    // then
-    expect(await screen.findByTestId("footer-documentation"))
+    // then — the club has to have arrived, or this would assert the pre-load fallback instead
+    await waitFor(() => expect(screen.getByTestId("club-brand-name"))
+      .toHaveTextContent("Example Tennis Club"));
+    expect(screen.getByTestId("footer-documentation"))
       .toHaveAttribute("href", "https://jegr78.github.io/courtside/");
     expect(screen.getByTestId("footer-documentation")).toHaveTextContent("Documentation");
   });
@@ -722,8 +724,8 @@ describe("App build identity", () => {
     render(<RoutedShell><App /></RoutedShell>);
 
     // then
-    expect(await screen.findByTestId("footer-documentation"))
-      .toHaveAttribute("href", "https://docs.example.org/courtside");
+    await waitFor(() => expect(screen.getByTestId("footer-documentation"))
+      .toHaveAttribute("href", "https://docs.example.org/courtside"));
   });
 
   // Nothing else holds this wire: cutting the callback in App leaves every other test green, and

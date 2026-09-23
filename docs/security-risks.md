@@ -161,6 +161,24 @@ The failure tracker opens a public issue naming the workflow, job, failed step, 
 run. It does not copy findings, credentials, requests or protected evidence. The repository and
 Actions history are already public, while the issue shortens the time a red gate can go unnoticed.
 
+## The documentation link a club configures is world-readable
+
+`GET /api/public/config` answers without authentication, and `documentationUrl` is part of that
+projection because the footer renders before anybody signs in. The value pattern permits userinfo
+and a query, so `https://user:pass@wiki.example.org/` and `?token=…` are both accepted, and a board
+that points the link at an internal page hands that address to every visitor. The imprint and
+privacy links carry the same exposure, but those name pages a club publishes on purpose, and a
+documentation target need not be one. The board guide says the link is public; narrowing the
+pattern would change all three link fields and is reconsidered when a club reports a need.
+
+## The shipped documentation link names a personal GitHub namespace
+
+A club that configures no target gets `https://jegr78.github.io/courtside/`, so every instance
+carries that host in a link that is always visible. GitHub releases a user name once it is freed,
+and whoever registers it then serves that address. This is the reason the problem types in this
+product are URNs rather than `https://` URLs. Reconsider when the documentation moves to a domain
+or an organization the project controls.
+
 ## Reduced pull-request profiles depend on correct classification
 
 Pull requests run checks selected from closed path inventories. Unknown files, deletions, renames,

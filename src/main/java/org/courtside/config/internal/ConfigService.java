@@ -237,10 +237,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     }
 
     private static void apply(ClubConfiguration configuration, ChangeClubConfigurationCommand command) {
-        configuration.changeTo(command.clubName(), command.primaryColor(), command.accentColor(),
-                command.logoUrl(), command.imprintUrl(), command.privacyUrl(), command.documentationUrl(),
-                command.defaultLocale(),
-                command.slotDuration().minutes(), command.timeZone());
+        configuration.changeTo(command);
         configuration.changeCredentialValidity(command.newAccountCredential().hours(),
                 command.passwordResetCredential().hours());
         configuration.expireResetCodesAfter(command.passwordResetToken().minutes());

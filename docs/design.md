@@ -286,7 +286,9 @@ dependencies belong to deployment configuration.
 
 The public configuration contains club identity, legal and documentation links, time zone, language
 and grid duration. The frontend always links to documentation: a club may override the target, and
-an absent override uses the published Courtside documentation on GitHub Pages.
+an absent override uses the published Courtside documentation on GitHub Pages. The link is the one
+configurable target a club can redirect but not remove, because a member who cannot reach any
+documentation has no way to learn what the product does.
 The PWA manifest and the browser tab icon use the same identity: the club logo, or the Courtside
 mark while none is set. Logo URLs are root-relative or HTTPS. Remote logos disclose the visitor's
 address and Courtside origin to their host, so club-hosted images are preferred.
