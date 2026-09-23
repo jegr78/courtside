@@ -68,7 +68,7 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
     setTheme(value);
   }
 
-  return <div className="grid justify-items-end gap-2">
+  return <div className="grid w-full justify-items-start gap-2 sm:w-auto sm:justify-items-end">
     {failure && <Alert testId="preferences-failure">{failure}</Alert>}
     <details className="relative" open={open}>
       <summary data-testid="preferences-menu"
@@ -79,7 +79,7 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
         className="form-control cursor-pointer list-none rounded-lg border px-3 py-2 text-sm font-semibold [&::-webkit-details-marker]:hidden">
         {t(authenticated ? "preferences.accountMenu" : "preferences.menu")}
       </summary>
-      <div className="surface-panel absolute right-0 z-30 mt-2 grid w-64 max-w-[calc(100vw-2rem)] gap-4 rounded-xl border p-4 shadow-[0_20px_50px_var(--cs-shadow)]">
+      <div className="surface-panel absolute left-0 z-30 mt-2 grid w-64 max-w-[calc(100vw-2rem)] gap-4 rounded-xl border p-4 shadow-[0_20px_50px_var(--cs-shadow)] sm:left-auto sm:right-0">
         <label className="grid gap-2 text-sm font-semibold" htmlFor="locale-preference">
           {t("preferences.language")}
           <LocaleSelect id="locale-preference" className={controlClass} value={locale} supported={supported} changed={(value) => void changeLocale(value)} />

@@ -47,6 +47,10 @@ it("given preferences chosen once, when the header is shown, then they stay insi
   // then
   expect(document.getElementById("locale-preference")).toBeVisible();
   expect(document.getElementById("theme-preference")).toBeVisible();
+  expect(menu.closest("details")!.querySelector(":scope > div"))
+    .toHaveClass("left-0", "sm:left-auto", "sm:right-0");
+  expect(menu.closest("details")!.parentElement)
+    .toHaveClass("w-full", "justify-items-start", "sm:w-auto", "sm:justify-items-end");
 });
 
 it("given React owns the menu state, when its summary is activated, then the native toggle cannot race it", () => {

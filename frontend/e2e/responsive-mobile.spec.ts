@@ -88,6 +88,59 @@ test("administrator and member destinations fit the narrow phone bar", async ({ 
   await expectPrimaryNavigationFits(page, ["Court plan", "My bookings", "Notifications"]);
 });
 
+test("the account menu stays inside the narrowest supported viewport", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 320, height: 720 });
+  await signIn(page, "configuration-admin");
+  await expect(page.getByTestId("administration-link")).toBeVisible();
+  await page.goto("/admin/configuration");
+  await page.getByTestId("club-name").fill("C");
+  const saved = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/config") && response.request().method() === "PUT"
+  );
+  await page.getByTestId("save-club-config").tap();
+  const response = await saved;
+  expect(response.status()).toBe(200);
+  expect((await response.json() as { clubName: string }).clubName).toBe("C");
+  await expect(page.getByTestId("admin-save-success")).toBeVisible();
+  await expect(page.getByTestId("club-brand-name")).toHaveText("C");
+  await page.goto("/");
+  await expect(page.getByTestId("club-brand-name")).toHaveText("C");
+  await expect(page.getByTestId("week-date")).toBeEnabled();
+
+  // when
+  await page.getByTestId("preferences-menu").tap();
+
+  // then
+  const panel = page.locator("details:has([data-testid='preferences-menu']) > div");
+  const viewport = page.viewportSize();
+  const bounds = await panel.boundingBox();
+  expect(viewport).not.toBeNull();
+  expect(bounds).not.toBeNull();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport!.width);
+
+  const controls = [
+    ...await panel.locator("label").all(),
+    page.getByTestId("account-security-link"),
+    page.getByTestId("logout")
+  ];
+  for (const control of controls) {
+    await expect(control).toBeVisible();
+    const controlBounds = await control.boundingBox();
+    expect(controlBounds).not.toBeNull();
+    expect(controlBounds!.x).toBeGreaterThanOrEqual(0);
+    expect(controlBounds!.x + controlBounds!.width).toBeLessThanOrEqual(viewport!.width);
+  }
+
+  // and the account actions remain reachable rather than merely painted inside the viewport
+  await page.getByTestId("account-security-link").tap();
+  await expect(page).toHaveURL(/\/account\/security$/);
+  await page.getByTestId("preferences-menu").tap();
+  await page.getByTestId("logout").tap();
+  await expect(page).toHaveURL(/\/login$/);
+});
+
 test("a member reaches every destination from the bottom of a touch viewport", async ({ page }) => {
   // given
   await signIn(page, "doe.jane");
