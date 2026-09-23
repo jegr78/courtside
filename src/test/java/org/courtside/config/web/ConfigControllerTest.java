@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -171,9 +172,27 @@ class ConfigControllerTest extends AbstractIntegrationTest {
         // when / then
         mockMvc.perform(get("/api/public/config"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.newAccountCredentialHours").doesNotExist())
-                .andExpect(jsonPath("$.passwordResetCredentialHours").doesNotExist())
-                .andExpect(jsonPath("$.noMembershipTypeRuleSetId").doesNotExist());
+                .andExpect(jsonPath("$.newAccountCredentialHours").doesNotHaveJsonPath())
+                .andExpect(jsonPath("$.passwordResetCredentialHours").doesNotHaveJsonPath())
+                .andExpect(jsonPath("$.passwordResetTokenMinutes").doesNotHaveJsonPath())
+                .andExpect(jsonPath("$.bookingReminderHours").doesNotHaveJsonPath())
+                .andExpect(jsonPath("$.logoUploaded").doesNotHaveJsonPath())
+                .andExpect(jsonPath("$.logoFallbackUrl").doesNotHaveJsonPath())
+                .andExpect(jsonPath("$.noMembershipTypeRuleSetId").doesNotHaveJsonPath());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void whenReadingTheAdministrativeConfig_thenEveryUnsetFieldIsAnExplicitNull() throws Exception {
+        // when / then
+        ResultActions answer = mockMvc.perform(get("/api/admin/config")).andExpect(status().isOk());
+        // the setup overview compares this answer against factory values, so an unset field has to
+        // arrive as a null rather than as a missing key
+        for (String field : new String[]{"logoUrl", "imprintUrl", "privacyUrl", "documentationUrl",
+                "logoFallbackUrl", "noMembershipTypeRuleSetId"}) {
+            answer.andExpect(jsonPath("$." + field).hasJsonPath())
+                    .andExpect(jsonPath("$." + field).doesNotExist());
+        }
     }
 
     @Test
@@ -792,7 +811,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    void givenAStoredDocumentationUrl_whenItIsCleared_thenThePublicConfigurationCarriesNoOverride()
+    void givenAStoredDocumentationUrl_whenItIsCleared_thenEveryProjectionSendsAnExplicitNull()
             throws Exception {
         // given
         String configuration = configJson("Example Tennis Club").replace(
@@ -812,9 +831,15 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                                 "\"documentationUrl\": null"))
                         .with(csrf()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentationUrl").hasJsonPath())
+                .andExpect(jsonPath("$.documentationUrl").doesNotExist());
+        mockMvc.perform(get("/api/admin/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentationUrl").hasJsonPath())
                 .andExpect(jsonPath("$.documentationUrl").doesNotExist());
         mockMvc.perform(get("/api/public/config"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentationUrl").hasJsonPath())
                 .andExpect(jsonPath("$.documentationUrl").doesNotExist());
     }
 
