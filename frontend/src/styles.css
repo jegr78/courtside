@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --cs-clay: #af5030;
@@ -73,6 +74,10 @@ input[type="time"] {
 
 .text-muted {
   color: var(--cs-muted);
+}
+
+.text-destructive {
+  color: var(--cs-destructive);
 }
 
 .border-structural {
