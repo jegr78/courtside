@@ -27,6 +27,7 @@ const factoryConfiguration = {
   logoUrl: null,
   imprintUrl: null,
   privacyUrl: null,
+  documentationUrl: null,
   defaultLocale: "de",
   slotMinutes: 30,
   timeZone: "Europe/Berlin",

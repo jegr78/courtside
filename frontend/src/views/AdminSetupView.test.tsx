@@ -12,6 +12,7 @@ const configuration: AdminClubConfig = {
   logoUrl: null,
   imprintUrl: null,
   privacyUrl: null,
+  documentationUrl: null,
   defaultLocale: "en",
   supportedLocales: ["de", "en"],
   slotMinutes: 30,
@@ -22,6 +23,14 @@ const configuration: AdminClubConfig = {
   logoUploaded: false,
   logoFallbackUrl: null,
   noMembershipTypeRuleSetId: null
+};
+
+const factoryResponse: AdminClubConfig = {
+  ...configuration,
+  clubName: "Courtside",
+  primaryColor: "#AF5030",
+  accentColor: "#D7E24B",
+  defaultLocale: "de"
 };
 
 const currentMember: RosterEntry = {
@@ -78,13 +87,7 @@ describe("AdminSetupView", () => {
 
   it("given factory configuration, inactive resources and an ended membership, when setup is opened, then they remain unfinished", async () => {
     // given
-    vi.spyOn(api, "adminConfig").mockResolvedValue({
-      ...configuration,
-      clubName: "Courtside",
-      primaryColor: "#AF5030",
-      accentColor: "#D7E24B",
-      defaultLocale: "de"
-    });
+    vi.mocked(api.adminConfig).mockResolvedValue(factoryResponse);
     vi.spyOn(api, "adminCourts").mockResolvedValue([
       { id: "court-1", number: 1, name: "Centre Court", active: false }
     ]);
@@ -114,6 +117,21 @@ describe("AdminSetupView", () => {
     expect(screen.getByTestId("setup-step-membership-types")).toHaveAttribute("data-state", "next");
     expect(screen.getByTestId("setup-step-roster")).toHaveAttribute("data-state", "next");
     expect(screen.getByTestId("setup-step-import")).toHaveAttribute("data-state", "available");
+  });
+
+  it("given a documentation target is the only change to factory configuration, when setup is opened, then the club counts as configured", async () => {
+    // given
+    vi.mocked(api.adminConfig).mockResolvedValue({
+      ...factoryResponse,
+      documentationUrl: "https://docs.example.org/courtside"
+    });
+
+    // when
+    render(<MemoryRouter><AdminSetupView /></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("setup-progress")).toHaveTextContent("4 of 4 required steps complete");
+    expect(screen.getByTestId("setup-step-configuration")).toHaveAttribute("data-state", "complete");
   });
 
   it.each(["court", "hours"])("given missing %s readiness, when setup is opened, then the facility remains unfinished", async (missing) => {
