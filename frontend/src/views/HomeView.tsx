@@ -12,6 +12,7 @@ export function HomeView({ session, clubName }: { session: SessionStatus; clubNa
   const { t } = useTranslation();
 
   return <section data-testid="court-plan-view" className="surface-panel w-full max-w-7xl self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
+    {session.authenticated && <h1 className="mb-6 text-3xl font-bold">{t("nav.courts")}</h1>}
     {!session.authenticated && clubName && <div className="mb-6 grid gap-2">
       <h1 data-testid="public-club-name" className="text-3xl font-bold">
         {t("home.publicTitle", { clubName })}
