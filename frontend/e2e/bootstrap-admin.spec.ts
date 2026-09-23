@@ -6,6 +6,37 @@ function freeSlot(page: import("@playwright/test").Page, court: number, slot: st
   return page.locator(`[data-testid="free-slot"][data-court-number="${court}"][data-slot="${slot}"][data-state="free"]`);
 }
 
+async function renderedColours(locator: import("@playwright/test").Locator) {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, border: style.borderColor, text: style.color };
+  });
+}
+
+async function contrastAgainstPanel(locator: import("@playwright/test").Locator): Promise<number> {
+  return locator.evaluate((element) => {
+    const channels = (color: string) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const context = canvas.getContext("2d", { willReadFrequently: true })!;
+      context.fillStyle = color;
+      context.fillRect(0, 0, 1, 1);
+      return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3);
+    };
+    const luminance = (color: string) => {
+      const linear = channels(color).map((channel) => {
+        const value = channel / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+    };
+    const foreground = luminance(getComputedStyle(element).color);
+    const panel = luminance(getComputedStyle(element.closest('[data-testid="booking-dialog"]')!).backgroundColor);
+    return (Math.max(foreground, panel) + 0.05) / (Math.min(foreground, panel) + 0.05);
+  });
+}
+
 test("language and theme preferences persist across reloads", async ({ page }) => {
   // given
   await page.goto("/");
@@ -26,6 +57,57 @@ test("language and theme preferences persist across reloads", async ({ page }) =
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(page.locator("#locale-preference")).toHaveValue("en");
   await expect(page.locator("#theme-preference")).toHaveValue("light");
+});
+
+test("the chosen appearance controls alert colours independently of the operating system", async ({ page }) => {
+  // given
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/login");
+  await page.getByTestId("username").fill("nobody");
+  await page.getByTestId("password").fill("incorrect-password");
+  await page.getByTestId("login-submit").click();
+  const alert = page.getByRole("alert");
+  await expect(alert).toBeVisible();
+
+  // then
+  const darkUnderLightOs = await renderedColours(alert);
+  await page.emulateMedia({ colorScheme: "dark" });
+  expect(await renderedColours(alert)).toEqual(darkUnderLightOs);
+
+  // when
+  await selectPreference(page, "#theme-preference", "light");
+  const lightUnderDarkOs = await renderedColours(alert);
+  expect(lightUnderDarkOs).not.toEqual(darkUnderLightOs);
+  await page.emulateMedia({ colorScheme: "light" });
+
+  // then
+  expect(await renderedColours(alert)).toEqual(lightUnderDarkOs);
+});
+
+test("booking field violations remain readable in both appearances", async ({ page, journeyService }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await selectJourneyDate(page, journeyService.visualDate);
+  await freeSlot(page, 1, "12:00").click();
+  await page.getByTestId("booking-submit").click();
+  const violation = page.getByTestId("booking-dialog").locator("[data-code]").first();
+  await expect(violation).toBeVisible();
+
+  // then
+  expect(await contrastAgainstPanel(violation)).toBeGreaterThanOrEqual(4.5);
+
+  // when
+  await page.getByTestId("booking-close").click();
+  await selectPreference(page, "#theme-preference", "light");
+  await freeSlot(page, 1, "12:00").click();
+  await page.getByTestId("booking-submit").click();
+  await expect(violation).toBeVisible();
+
+  // then
+  expect(await contrastAgainstPanel(violation)).toBeGreaterThanOrEqual(4.5);
 });
 
 test("the application shell identifies the exact running build", async ({ page }) => {

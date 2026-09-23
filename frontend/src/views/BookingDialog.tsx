@@ -253,7 +253,7 @@ function dayOfWeek(date: string): string {
 function FieldViolations({ id, violations }: { id: string; violations: Array<{ field: string; code: string; message: string }> }) {
   if (violations.length === 0) return null;
   return <div id={id} className="mt-2 grid gap-1">
-    {violations.map((violation, index) => <p key={`${violation.field}-${index}`} data-field={violation.field} data-code={violation.code} className="text-sm text-red-800">{violation.message}</p>)}
+    {violations.map((violation, index) => <p key={`${violation.field}-${index}`} data-field={violation.field} data-code={violation.code} className="text-destructive text-sm">{violation.message}</p>)}
   </div>;
 }
 
