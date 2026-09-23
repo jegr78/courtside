@@ -5,15 +5,15 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variantClasses: Record<ButtonProps["variant"], string> = {
-  primary: "button-primary focus-visible:outline-(--club-primary)",
-  secondary: "button-secondary focus-visible:outline-(--cs-text)",
-  destructive: "button-destructive focus-visible:outline-(--cs-destructive)",
+  primary: "button-primary",
+  secondary: "button-secondary",
+  destructive: "button-destructive",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ className = "", variant, ...props }, ref) {
   return <button
     ref={ref}
-    className={`rounded-lg px-4 py-3 font-semibold shadow-sm transition hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:border disabled:border-(--cs-border) disabled:bg-(--cs-raised) disabled:text-(--cs-muted) ${variantClasses[variant]} ${className}`}
+    className={`focus-ring rounded-lg px-4 py-3 font-semibold shadow-sm transition hover:brightness-90 disabled:cursor-not-allowed disabled:border disabled:border-(--cs-border) disabled:bg-(--cs-raised) disabled:text-(--cs-muted) ${variantClasses[variant]} ${className}`}
     {...props}
   />;
 });

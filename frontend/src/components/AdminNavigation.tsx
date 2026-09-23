@@ -92,7 +92,7 @@ export function AdminNavigation() {
       {current ? t(current) : t("nav.administration")}
     </summary>
     <nav aria-label={t("nav.administration")} className="grid gap-5 pt-3 lg:pt-0">
-      <Link data-testid="court-plan-link" to="/" className="font-semibold underline-offset-4">
+      <Link data-testid="court-plan-link" to="/" className="focus-ring rounded-lg font-semibold underline-offset-4">
         {t("nav.courts")}
       </Link>
       {groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2">
@@ -103,7 +103,7 @@ export function AdminNavigation() {
           data-testid={destination.testId}
           aria-current={isCurrent(destination, pathname) ? "page" : undefined}
           onClick={() => { if (!laidOpen) setUnfolded(false); }}
-          className="rounded-lg px-3 py-2 font-semibold aria-[current]:bg-(--cs-raised)"
+          className="focus-ring rounded-lg px-3 py-2 font-semibold aria-[current]:bg-(--cs-raised)"
         >{t(destination.label)}</Link>)}
       </div>)}
     </nav>
