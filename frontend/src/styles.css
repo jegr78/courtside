@@ -153,6 +153,20 @@ input[type="time"] {
   user-select: none;
 }
 
+.day-plan-slot-row {
+  height: var(--slot-height);
+}
+
+.day-plan-free-cell {
+  position: relative;
+}
+
+.day-plan-free-slot {
+  position: absolute;
+  inset: 0.125rem;
+  width: auto;
+}
+
 .day-plan-slot[data-state="free"] {
   color: var(--cs-muted);
   outline: 1px dashed var(--cs-border);
@@ -279,6 +293,16 @@ input[type="time"] {
     padding: 0.125rem;
   }
 
+  .day-plan-slot-row {
+    height: max(44px, var(--slot-height));
+  }
+
+  .day-plan-free-slot {
+    inset-block: 0;
+    inset-inline: 0;
+    min-height: 44px;
+  }
+
   .day-plan [data-state] {
     padding-inline: 0;
     overflow: hidden;
@@ -288,11 +312,6 @@ input[type="time"] {
 
   .day-plan [data-state] span {
     display: none;
-  }
-
-  .day-plan [data-state="free"]::after {
-    font-size: 0.75rem;
-    content: "✓";
   }
 
   .day-plan [data-state="past"]::after {

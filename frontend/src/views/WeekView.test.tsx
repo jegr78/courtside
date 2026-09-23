@@ -97,7 +97,7 @@ it("given the current week, when it loads, then every day and active court is av
   expect(booking).toHaveStyle({ backgroundColor: "rgb(23, 107, 85)" });
   expect(booking).toHaveAttribute("data-state", "occupied");
   expect(booking.closest("td")).toHaveAttribute("rowspan", "2");
-  expect(screen.getByTestId("slot-heading-12:00").closest("tr")).toHaveStyle({ height: "40px" });
+  expect(screen.getByTestId("slot-heading-12:00").closest("tr")).toHaveStyle({ "--slot-height": "40px" });
   expect(screen.getByTestId("court-plan-legend")).toHaveRole("list");
   expect(screen.getAllByTestId("allocation")).toHaveLength(1);
   expect(booking).toHaveTextContent("Booked · 2 participants");
@@ -116,7 +116,7 @@ it("given short booking slots, when rendering the plan, then rows retain their u
 
   // then
   expect((await screen.findByTestId("slot-heading-12:00")).closest("tr"))
-    .toHaveStyle({ height: "32px" });
+    .toHaveStyle({ "--slot-height": "32px" });
 });
 
 it("given another supported participant count, when showing the booking, then no sport term is inferred", async () => {
