@@ -451,7 +451,7 @@ function renderCell(
       data-slot={slot}
       disabled={isPast}
       data-state={isPast ? "past" : drag.selected ? "selected" : "free"}
-      className="day-plan-slot day-plan-free-slot w-full rounded-md px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-(--club-accent)"
+      className="day-plan-slot day-plan-free-slot w-full rounded-md px-2 text-sm"
       aria-label={isPast ? t("week.pastLabel", { court: courtName, time: slot }) : t("booking.open", { court: courtName, time: slot })}
       onClick={book}
       onPointerDown={(event) => drag.start(event.pointerType)}

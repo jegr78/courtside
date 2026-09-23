@@ -92,7 +92,7 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
           </select>
         </label>
         {authenticated && <Link to="/account/security" data-testid="account-security-link"
-          onClick={() => setOpen(false)} className="rounded-lg border px-4 py-3 text-center font-semibold hover:brightness-90">
+          onClick={() => setOpen(false)} className="focus-ring rounded-lg border px-4 py-3 text-center font-semibold hover:brightness-90">
           {t("accountSecurity.menu")}
         </Link>}
         {authenticated && <Button variant="secondary" type="button" data-testid="logout" onClick={() => void logout()}>{t("auth.logout")}</Button>}

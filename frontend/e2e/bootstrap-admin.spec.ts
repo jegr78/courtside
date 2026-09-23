@@ -13,8 +13,31 @@ async function renderedColours(locator: import("@playwright/test").Locator) {
   });
 }
 
-async function contrastAgainstPanel(locator: import("@playwright/test").Locator): Promise<number> {
-  return locator.evaluate((element) => {
+async function renderedContrast(
+  page: import("@playwright/test").Page,
+  foreground: import("@playwright/test").Locator,
+  foregroundProperty: string,
+  backdrop?: import("@playwright/test").Locator
+): Promise<number> {
+  const foregroundColor = await foreground.evaluate((element, property) =>
+    getComputedStyle(element).getPropertyValue(property), foregroundProperty);
+  const backgroundColor = backdrop
+    ? await backdrop.evaluate((element) => getComputedStyle(element).backgroundColor)
+    : await foreground.evaluate((element) => {
+      for (let candidate = element.parentElement; candidate; candidate = candidate.parentElement) {
+        const color = getComputedStyle(candidate).backgroundColor;
+        const canvas = document.createElement("canvas");
+        canvas.width = 1;
+        canvas.height = 1;
+        const context = canvas.getContext("2d", { willReadFrequently: true })!;
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        if (context.getImageData(0, 0, 1, 1).data[3] === 255) return color;
+      }
+      throw new Error("The element has no opaque rendered backdrop");
+    });
+  return page.evaluate(({ foregroundColor, backgroundColor }) => {
     const channels = (color: string) => {
       const canvas = document.createElement("canvas");
       canvas.width = 1;
@@ -31,10 +54,11 @@ async function contrastAgainstPanel(locator: import("@playwright/test").Locator)
       });
       return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
     };
-    const foreground = luminance(getComputedStyle(element).color);
-    const panel = luminance(getComputedStyle(element.closest('[data-testid="booking-dialog"]')!).backgroundColor);
-    return (Math.max(foreground, panel) + 0.05) / (Math.min(foreground, panel) + 0.05);
-  });
+    const foregroundLuminance = luminance(foregroundColor);
+    const backgroundLuminance = luminance(backgroundColor);
+    return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05)
+      / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+  }, { foregroundColor, backgroundColor });
 }
 
 test("language and theme preferences persist across reloads", async ({ page }) => {
@@ -97,7 +121,7 @@ test("booking field violations remain readable in both appearances", async ({ pa
   await expect(violation).toBeVisible();
 
   // then
-  expect(await contrastAgainstPanel(violation)).toBeGreaterThanOrEqual(4.5);
+  expect(await renderedContrast(page, violation, "color", page.getByTestId("booking-dialog"))).toBeGreaterThanOrEqual(4.5);
 
   // when
   await page.getByTestId("booking-close").click();
@@ -107,7 +131,55 @@ test("booking field violations remain readable in both appearances", async ({ pa
   await expect(violation).toBeVisible();
 
   // then
-  expect(await contrastAgainstPanel(violation)).toBeGreaterThanOrEqual(4.5);
+  expect(await renderedContrast(page, violation, "color", page.getByTestId("booking-dialog"))).toBeGreaterThanOrEqual(4.5);
+});
+
+test("control boundaries and focus indicators remain visible in both appearances", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  const control = page.getByTestId("week-date");
+  const free = page.locator('[data-testid="free-slot"][data-state="free"]').first();
+  const currentTime = page.getByTestId("current-time-line");
+  const tableHeading = page.locator(".day-plan thead th").nth(1);
+  const navigation = page.getByTestId("my-bookings-link");
+
+  for (const appearance of ["dark", "light"] as const) {
+    if (appearance === "light") await selectPreference(page, "#theme-preference", appearance);
+
+    // then
+    expect(await renderedContrast(page, control, "border-top-color", control)).toBeGreaterThanOrEqual(3);
+    expect(await renderedContrast(page, free, "outline-color")).toBeGreaterThanOrEqual(3);
+    expect(await renderedContrast(page, currentTime, "background-color", tableHeading)).toBeGreaterThanOrEqual(3);
+
+    await control.focus();
+    const controlFocus = await control.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { style: style.outlineStyle, width: Number.parseFloat(style.outlineWidth) };
+    });
+    expect(controlFocus).toEqual({ style: "solid", width: 2 });
+    expect(await renderedContrast(page, control, "outline-color")).toBeGreaterThanOrEqual(3);
+
+    await page.keyboard.press("Tab");
+    await free.focus();
+    const freeFocus = await free.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { style: style.outlineStyle, width: Number.parseFloat(style.outlineWidth) };
+    });
+    expect(freeFocus).toEqual({ style: "solid", width: 2 });
+    expect(await renderedContrast(page, free, "outline-color")).toBeGreaterThanOrEqual(3);
+
+    await page.keyboard.press("Tab");
+    await navigation.focus();
+    const navigationFocus = await navigation.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { style: style.outlineStyle, width: Number.parseFloat(style.outlineWidth) };
+    });
+    expect(navigationFocus).toEqual({ style: "solid", width: 2 });
+    expect(await renderedContrast(page, navigation, "outline-color")).toBeGreaterThanOrEqual(3);
+  }
 });
 
 test("the application shell identifies the exact running build", async ({ page }) => {

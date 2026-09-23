@@ -12,13 +12,17 @@
   --cs-raised: #202c26;
   --cs-text: #fcfbf9;
   --cs-muted: #a8b0aa;
-  --cs-border: #344139;
+  --cs-border: #697970;
   --cs-input: #111b16;
   --cs-overlay: rgb(16 23 19 / 75%);
   --cs-shadow: rgb(0 0 0 / 28%);
   --club-primary: #af5030;
   --club-primary-text: #fcfbf9;
   --club-accent: #d7e24b;
+  /* Club colours are configurable, so the opaque focus colour keeps their hue while moving
+     toward the contrast pole of the chosen appearance. */
+  --cs-focus: color-mix(in srgb, var(--club-accent) 50%, #ffffff);
+  --cs-current-time: var(--cs-ball);
   --cs-destructive: #ff8a80;
   --cs-destructive-text: #30110f;
   font-family: "Archivo Variable", Archivo, ui-sans-serif, system-ui, sans-serif;
@@ -33,10 +37,12 @@
   --cs-raised: #f3eee9;
   --cs-text: #17211d;
   --cs-muted: #626b65;
-  --cs-border: #cfc8c0;
+  --cs-border: #8b837a;
   --cs-input: #ffffff;
   --cs-overlay: rgb(23 33 29 / 55%);
   --cs-shadow: rgb(23 33 29 / 16%);
+  --cs-focus: color-mix(in srgb, var(--club-accent) 45%, #000000);
+  --cs-current-time: var(--cs-clay);
   --cs-destructive: #a82820;
   --cs-destructive-text: #ffffff;
 }
@@ -91,8 +97,15 @@ input[type="time"] {
 }
 
 .form-control:focus {
-  border-color: var(--club-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--club-primary) 28%, transparent);
+  border-color: var(--cs-focus);
+  outline: 2px solid var(--cs-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--cs-focus);
+  outline-offset: 2px;
 }
 
 .button-primary {
@@ -183,6 +196,11 @@ input[type="time"] {
   background: color-mix(in srgb, var(--club-accent) 18%, transparent);
 }
 
+.day-plan-slot[data-state="free"]:focus-visible {
+  outline: 2px solid var(--cs-focus);
+  outline-offset: -2px;
+}
+
 .day-plan-slot[data-state="selected"] {
   color: var(--cs-text);
   background: color-mix(in srgb, var(--club-accent) 34%, transparent);
@@ -202,7 +220,7 @@ input[type="time"] {
   left: 5rem;
   height: 2px;
   pointer-events: none;
-  background: var(--cs-ball);
+  background: var(--cs-current-time);
 }
 
 .current-time-line::before {
@@ -213,7 +231,7 @@ input[type="time"] {
   height: 10px;
   content: "";
   border-radius: 999px;
-  background: var(--cs-ball);
+  background: var(--cs-current-time);
 }
 
 .day-plan-legend {

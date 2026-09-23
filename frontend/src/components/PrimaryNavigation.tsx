@@ -56,8 +56,8 @@ export function PrimaryNavigation({ session }: { session: SessionStatus }) {
 
   const reachable = open.length > 1;
   const linkClass = reachable
-    ? "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-center text-xs font-semibold underline-offset-4 sm:block sm:min-h-0 sm:flex-none sm:px-0 sm:text-base"
-    : "flex min-h-11 items-center px-3 font-semibold underline-offset-4 sm:block sm:min-h-0 sm:px-0";
+    ? "focus-ring flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-center text-xs font-semibold underline-offset-4 sm:block sm:min-h-0 sm:flex-none sm:px-0 sm:text-base"
+    : "focus-ring flex min-h-11 items-center rounded-lg px-3 font-semibold underline-offset-4 sm:block sm:min-h-0 sm:px-0";
 
   return <div data-testid="primary-navigation" className="grid w-full max-w-7xl gap-3">
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -82,7 +82,7 @@ export function PrimaryNavigation({ session }: { session: SessionStatus }) {
             </> : t(destination.label)}
           </Link>)}
       </nav>
-      {!session.authenticated && pathname !== "/login" && <Link to="/login" data-testid="sign-in-link" className="button-primary rounded-lg px-4 py-3 font-semibold">{t("auth.submit")}</Link>}
+      {!session.authenticated && pathname !== "/login" && <Link to="/login" data-testid="sign-in-link" className="button-primary focus-ring rounded-lg px-4 py-3 font-semibold">{t("auth.submit")}</Link>}
     </div>
   </div>;
 }
