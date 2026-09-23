@@ -311,6 +311,37 @@ test("the initial-password form remains usable on a touch viewport", async ({ pa
   await expect(page.getByTestId("password-submit")).toBeVisible();
 });
 
+test("a free slot fills its cell and remains large enough to tap", async ({ page, journeyService }) => {
+  // given
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, "doe.jane");
+  await page.getByTestId("selected-date").fill(journeyService.visualDate);
+  const slot = page.locator('[data-testid="free-slot"][data-state="free"]').first();
+  await expect(slot).toBeVisible();
+
+  // then
+  const phoneBounds = await slot.boundingBox();
+  expect(phoneBounds).not.toBeNull();
+  expect(phoneBounds!.width).toBeGreaterThanOrEqual(44);
+  expect(phoneBounds!.height).toBeGreaterThanOrEqual(44);
+  expect(await slot.evaluate((element) => getComputedStyle(element, "::after").content)).not.toContain("✓");
+
+  // when
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  // then
+  const desktopGeometry = await slot.evaluate((element) => {
+    const slotBounds = element.getBoundingClientRect();
+    const cellBounds = element.parentElement!.getBoundingClientRect();
+    return {
+      slot: { width: slotBounds.width, height: slotBounds.height },
+      cell: { width: cellBounds.width, height: cellBounds.height }
+    };
+  });
+  expect(desktopGeometry.slot.width).toBeGreaterThanOrEqual(desktopGeometry.cell.width - 8);
+  expect(desktopGeometry.slot.height).toBeGreaterThanOrEqual(desktopGeometry.cell.height - 8);
+});
+
 test("the phone plan shows every court's availability at once", async ({ page, journeyService }) => {
   // given
   await page.route("**/api/public/courts", async (route) => route.fulfill({

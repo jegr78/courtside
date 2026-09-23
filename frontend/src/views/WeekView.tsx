@@ -303,7 +303,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
           </tr>
         </thead>
         <tbody>
-          {slots.map((slot) => <tr key={slot} data-slot={slot} style={{ height: `${slotHeight}px` }}>
+          {slots.map((slot) => <tr key={slot} data-slot={slot} className="day-plan-slot-row"
+            style={{ "--slot-height": `${slotHeight}px` } as CSSProperties}>
             <th scope="row" data-testid={`slot-heading-${slot}`} className="font-value surface-panel border-structural whitespace-nowrap border-b px-3 text-left font-medium">
               {slot}
             </th>
@@ -450,17 +451,17 @@ function renderCell(
       data-slot={slot}
       disabled={isPast}
       data-state={isPast ? "past" : drag.selected ? "selected" : "free"}
-      className="day-plan-slot h-full w-full rounded-md px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-(--club-accent)"
+      className="day-plan-slot day-plan-free-slot w-full rounded-md px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-(--club-accent)"
       aria-label={isPast ? t("week.pastLabel", { court: courtName, time: slot }) : t("booking.open", { court: courtName, time: slot })}
       onClick={book}
       onPointerDown={(event) => drag.start(event.pointerType)}
       onPointerEnter={drag.extend}
     >
       {isPast ? t("week.past") : t("week.available")}
-    </button> : <div data-testid="free-slot" data-date={date} data-court-number={court.number} data-slot={slot} data-state={isPast ? "past" : "free"} className="day-plan-slot flex h-full w-full items-center justify-center rounded-md px-2 text-sm">
+    </button> : <div data-testid="free-slot" data-date={date} data-court-number={court.number} data-slot={slot} data-state={isPast ? "past" : "free"} className="day-plan-slot day-plan-free-slot flex w-full items-center justify-center rounded-md px-2 text-sm">
       {isPast ? t("week.past") : t("week.available")}
     </div>;
-  return <td key={court.id} className={`${cellClass} p-1`}>
+  return <td key={court.id} className={`${cellClass} day-plan-free-cell p-1`}>
     {content}
   </td>;
 }
