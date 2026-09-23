@@ -187,8 +187,21 @@ jobs:
       - name: Verify repository tooling
         working-directory: frontend
         run: npm run test:tools
+
+  clock-shift:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          # The release configuration is checked against the history it claims to cover.
+          fetch-depth: 0
+      - uses: ./.github/actions/tool-dependencies
       - name: Verify repository tooling under a shifted clock
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: node tools/tool-tests.mjs --clock-offset-days=400
 
   assessment-runtime:
