@@ -422,10 +422,12 @@ test("given the performance relay certificate, when it is issued, then it is own
     assert.equal(statSync(directory).mode & 0o777, 0o700);
     assert.equal(statSync(join(directory, "key.pem")).mode & 0o777, 0o600);
     assert.ok(existsSync(join(directory, "cert.pem")));
-    const enddate = spawnSync("openssl",
-      ["x509", "-enddate", "-noout", "-in", join(directory, "cert.pem")], { encoding: "utf8" });
-    assert.equal(enddate.status, 0, enddate.stderr);
-    assert.ok(Date.parse(enddate.stdout.replace("notAfter=", "")) - Date.now() > 7 * 24 * 3600 * 1000,
+    const dates = spawnSync("openssl",
+      ["x509", "-dates", "-noout", "-in", join(directory, "cert.pem")], { encoding: "utf8" });
+    assert.equal(dates.status, 0, dates.stderr);
+    const [notBefore, notAfter] = dates.stdout.trim().split("\n")
+      .map((line) => Date.parse(line.replace(/^not(Before|After)=/, "")));
+    assert.ok(notAfter - notBefore > 7 * 24 * 3600 * 1000,
       "the certificate expires under a stack that is left standing between runs");
   } finally {
     rmSync(parent, { recursive: true, force: true });

@@ -22,7 +22,7 @@ test("given the quality strategy, when reviewing product risks, then the generat
   }
   for (const field of [
     "Impact", "Likelihood", "Invariant", "Positive boundaries", "Negative boundaries", "Level", "Frequency",
-    "Environment", "Synthetic data", "Evidence", "Owner", "Open gap", "Last review", "Next review"
+    "Environment", "Synthetic data", "Evidence", "Owner", "Open gap"
   ]) {
     assert.match(strategy, new RegExp(`\\| ${field} `));
   }

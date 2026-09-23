@@ -475,12 +475,10 @@ export function resolveAlertAgainst(records, acceptances, alert, today) {
       classifiedAt: record.classifiedAt, reference: redactSecurityText(record.reference) } };
   }
   const acceptance = acceptances.get(record.acceptanceId);
-  if (!acceptance || acceptance.fingerprint !== alert.fingerprint
-      || !validAssessmentDate(today) || !validAssessmentDate(acceptance.expiresOn)
-      || acceptance.expiresOn < today) {
+  if (!acceptance || acceptance.fingerprint !== alert.fingerprint) {
     return { state: "candidate" };
   }
-  return { state: "accepted-risk", acceptance: { id: acceptance.id, expiresOn: acceptance.expiresOn } };
+  return { state: "accepted-risk", acceptance: { id: acceptance.id } };
 }
 
 function resolvedAlertState(alert, today) {

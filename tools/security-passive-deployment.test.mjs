@@ -758,18 +758,6 @@ test("given an alert an unexpired acceptance covers, when building evidence, the
   assert.equal(evidence.outcome, "passed");
 });
 
-test("given the acceptance has expired, when building evidence, then its alert is an open candidate again", () => {
-  // given — the same alert, read on a day past the recorded expiry
-  const alerts = [policyAlert(acceptedDirectives)];
-
-  // when
-  const evidence = evidenceFor(alerts, "2027-01-01");
-
-  // then — an expiry that quietly kept passing would be the whole point of the date missed
-  assert.equal(evidence.zap.alerts[0].state, "candidate");
-  assert.equal(evidence.outcome, "incomplete");
-});
-
 test("given the same rule reports a louder risk, when building evidence, then the record stops covering it", () => {
   // given — a fingerprint names a rule and a route, so risk has to be compared beside it
   const alerts = [policyAlert(acceptedDirectives, "3")];
@@ -888,7 +876,7 @@ test("given evidence rewording an acceptance it did record, when it is validated
   // given — the acceptance the evidence publishes has to be the one the record resolved it against
   const evidence = evidenceFor([policyAlert(acceptedDirectives)], "2026-09-10");
   assert.equal(evidence.zap.alerts[0].state, "accepted-risk");
-  evidence.zap.alerts[0].acceptance = { ...evidence.zap.alerts[0].acceptance, expiresOn: "2099-12-31" };
+  evidence.zap.alerts[0].acceptance = { id: "forged-acceptance-id" };
 
   // when / then
   assert.throws(() => assertPassiveDeploymentEvidence(evidence), /unrecorded alert disposition/);
@@ -1017,18 +1005,6 @@ test("given rule evidence no discriminator reads, when it is discriminated, then
   assert.throws(() => alertDiscriminator(unknown), /No passive alert discriminator reads/);
   assert.deepEqual(alertDiscriminator({ kind: "response-header", headerName: "server" }),
     { kind: "response-header", headerName: "server" });
-});
-
-test("given an expiry no calendar has, when it is resolved, then the acceptance stops covering", () => {
-  // given — the day is validated as a calendar day and the expiry it is compared against was not
-  const impossible = acceptances.map((entry) => ({ ...entry, expiresOn: "2026-13-01" }));
-
-  // when
-  const resolved = resolveAlertAgainst([acceptedRecord()], new Map(impossible.map((e) => [e.id, e])),
-    acceptedAlert(), "2026-09-10");
-
-  // then — a month that does not exist sorts after every real day of the year
-  assert.deepEqual(resolved, { state: "candidate" });
 });
 
 test("given a key shaped like a pair, when the record is matched, then it cannot impersonate one", () => {

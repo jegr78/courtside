@@ -154,6 +154,7 @@
     { "path": "tools/security-update-report.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/security-update-report.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-workflow.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/shift-clock.mjs", "profiles": ["tooling"], "test": false },
     { "path": "tools/site-documentation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/spa-route-policy.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/surfaceless-endpoints.json", "profiles": ["full"], "test": false },
