@@ -32,13 +32,27 @@ export function shiftedClockEnvironment(offsetDays, environment = process.env) {
   };
 }
 
+export function assertShiftedClock(environment, offsetDays, spawn = spawnSync) {
+  const probe = spawn(process.execPath, ["-e", "process.stdout.write(String(Date.now()))"],
+    { encoding: "utf8", env: environment });
+  const observed = Number(probe.stdout);
+  // performance keeps the real epoch when this process itself runs under a shifted Date
+  const expected = performance.timeOrigin + performance.now() + offsetDays * 86_400_000;
+  if (!Number.isFinite(observed) || Math.abs(observed - expected) > 600_000) {
+    throw new Error("The shifted clock did not reach the child process");
+  }
+}
+
 export function runToolTests(paths, spawn = spawnSync, offsetDays = 0) {
   if (!Array.isArray(paths) || paths.length < 1 || paths.some((path) => typeof path !== "string")) {
     throw new Error("Tool test paths are invalid");
   }
   const arguments_ = ["--test", ...paths.map((path) => `../${path}`)];
   const options = { cwd: frontend, stdio: "inherit" };
-  if (offsetDays !== 0) options.env = shiftedClockEnvironment(offsetDays);
+  if (offsetDays !== 0) {
+    options.env = shiftedClockEnvironment(offsetDays);
+    assertShiftedClock(options.env, offsetDays);
+  }
   const result = spawn(process.execPath, arguments_, options);
   if (result.error) throw result.error;
   if (result.status !== 0) process.exitCode = result.status ?? 1;

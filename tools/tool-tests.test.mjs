@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { declaredToolTests, runToolTests, shiftedClockEnvironment, toolInventory } from "./tool-tests.mjs";
+import { assertShiftedClock, declaredToolTests, runToolTests, shiftedClockEnvironment, toolInventory }
+  from "./tool-tests.mjs";
 
 test("when inventorying tools, then tracked and untracked files come from Git independently of the manifest", () => {
   // given
@@ -107,4 +108,14 @@ test("given a clock offset, when the tool tests are spawned, then the child runs
     .startsWith("--enable-source-maps "), true);
   assert.throws(() => shiftedClockEnvironment(0), /Clock offset in days is invalid/);
   assert.throws(() => shiftedClockEnvironment(1.5), /Clock offset in days is invalid/);
+});
+
+test("given the preload does not reach the child, when the shifted run starts, then it refuses to report a pass", () => {
+  // given — an environment carrying the offset but no preload is what a broken wiring produces
+  const unwired = { ...process.env, COURTSIDE_CLOCK_OFFSET_DAYS: "400" };
+  delete unwired.NODE_OPTIONS;
+
+  // when / then
+  assert.doesNotThrow(() => assertShiftedClock(shiftedClockEnvironment(400), 400));
+  assert.throws(() => assertShiftedClock(unwired, 400), /did not reach the child process/);
 });
