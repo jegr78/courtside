@@ -5,6 +5,8 @@ import {
 } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
+import { LoadFailure } from "../components/LoadFailure";
+import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { BookingDialog, type BookingSelection } from "./BookingDialog";
@@ -51,6 +53,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const [selectedDate, setSelectedDate] = useState<string>();
   const [data, setData] = useState<WeekData>();
   const { message: error, report, clear } = useReportedFailure();
+  const { message: loadError, report: reportLoad, clear: clearLoad } = useReportedFailure();
+  const [loadAttempt, retryLoad] = useRetry();
   const [success, setSuccess] = useState<string>();
   const [eligibility, setEligibility] = useState<BookingEligibility>();
   const { message: eligibilityError, report: reportEligibility, clear: clearEligibility } = useReportedFailure();
@@ -66,6 +70,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     let active = true;
     setData(undefined);
     clear();
+    clearLoad();
     if (offline) return () => { active = false; };
     void Promise.all([api.bookingGrid(), api.courts(), api.bookingCardLegend()])
       .then(async ([grid, courts, currentBookingCards]) => {
@@ -84,11 +89,11 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         }
       }).catch((failure: unknown) => {
       if (active) {
-        report(failure);
+        reportLoad(failure);
       }
     });
     return () => { active = false; };
-  }, [clear, offline, referenceInstant, report, weekOffset]);
+  }, [clear, clearLoad, loadAttempt, offline, referenceInstant, reportLoad, weekOffset]);
 
   useEffect(() => {
     if (!canBook || offline) {
@@ -289,6 +294,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     </nav>}
 
     {offline && <Alert tone="warning" testId="court-plan-offline">{t("week.offline")}</Alert>}
+    {!offline && loadError && <LoadFailure message={loadError} retry={retryLoad} />}
     {!offline && error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {eligibilityError && <Alert testId="booking-eligibility-error">{eligibilityError}</Alert>}

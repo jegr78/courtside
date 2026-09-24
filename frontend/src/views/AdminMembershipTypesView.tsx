@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { api, type MembershipType, type MembershipTypeRequest, type RuleSet } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
+import { LoadFailure } from "../components/LoadFailure";
+import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
@@ -30,6 +32,7 @@ export function AdminMembershipTypesView() {
   const [holders, setHolders] = useState<Record<string, Holders>>({});
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
+  const [loadAttempt, retryLoad] = useRetry();
 
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
@@ -52,7 +55,7 @@ export function AdminMembershipTypesView() {
         await countHolders(membershipTypes);
       })
       .catch(reportError);
-  }, [countHolders, reportError]);
+  }, [countHolders, loadAttempt, reportError]);
 
   async function mutate(change: () => Promise<MembershipType>): Promise<boolean> {
     if (pending) return false;
@@ -99,7 +102,7 @@ export function AdminMembershipTypesView() {
   return <section data-testid="admin-membership-types-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:max-w-5xl sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.membershipTypes.title")}</h1>
     {!types
-      ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
+      ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert>{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}

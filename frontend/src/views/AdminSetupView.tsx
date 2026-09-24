@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, type AdminClubConfig } from "../api/client";
-import { Alert } from "../components/Alert";
+import { LoadFailure } from "../components/LoadFailure";
+import { useRetry } from "../failures/useRetry";
 import { useReportedFailure } from "../failures/useReportedFailure";
 
 interface SetupState {
@@ -56,8 +57,9 @@ async function hasCurrentMember(isActive: () => boolean): Promise<boolean> {
 
 export function AdminSetupView() {
   const { t } = useTranslation();
-  const { message: error, report } = useReportedFailure();
+  const { message: error, report, clear } = useReportedFailure();
   const [state, setState] = useState<SetupState>();
+  const [loadAttempt, retryLoad] = useRetry();
 
   useEffect(() => {
     let active = true;
@@ -84,7 +86,7 @@ export function AdminSetupView() {
     return () => {
       active = false;
     };
-  }, [report]);
+  }, [loadAttempt, report]);
 
   const steps: SetupStep[] = state ? [
     { id: "configuration", to: "/admin/configuration", complete: state.configuration },
@@ -101,7 +103,7 @@ export function AdminSetupView() {
       <p className="text-muted">{t("admin.setup.description")}</p>
     </div>
     {!state
-      ? error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>
+      ? error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>
       : <>
         <div className="grid gap-2">
           <p data-testid="setup-progress" className="font-semibold" aria-live="polite">

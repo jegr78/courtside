@@ -7,6 +7,8 @@ import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { formatDateTime, shortTime, zonedDateTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
+import { LoadFailure } from "../components/LoadFailure";
+import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
 
 const enabledFlagByEventType: Record<string, string> = {
@@ -95,7 +97,7 @@ export function AdminAuditView() {
   const language = i18n.resolvedLanguage ?? i18n.language;
   const [search] = useSearchParams();
   const subjectId = search.get("subjectId") ?? undefined;
-  const { club, error: clubError } = useClubConfiguration();
+  const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const [entries, setEntries] = useState<AuditEntry[]>();
   const [cursor, setCursor] = useState<string>();
   const [error, setError] = useState<string>();
@@ -106,6 +108,7 @@ export function AdminAuditView() {
   const [to, setTo] = useState("");
   const [criteria, setCriteria] = useState<AuditSearch>();
   const [searchIncomplete, setSearchIncomplete] = useState(false);
+  const [loadAttempt, retryLoad] = useRetry();
 
   const reportError = useCallback((failure: unknown) => setError(problemMessage(failure, t)), [t]);
   const reportErrorRef = useRef(reportError);
@@ -121,7 +124,7 @@ export function AdminAuditView() {
         setSearchIncomplete(page.searchIncomplete ?? false);
       })
       .catch((failure: unknown) => reportErrorRef.current(failure));
-  }, [subjectId]);
+  }, [loadAttempt, subjectId]);
 
   async function readNextPage() {
     if (pending) return;
@@ -173,7 +176,7 @@ export function AdminAuditView() {
   return <section data-testid="admin-audit-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-3xl font-bold">{t("audit.title")}</h1>
     {!entries || !club
-      ? (problem ? <Alert>{problem}</Alert> : <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
       : <>
         {problem && <Alert>{problem}</Alert>}
         {searchIncomplete && <Alert tone="warning" testId="audit-search-incomplete">{t("audit.filter.incomplete")}</Alert>}

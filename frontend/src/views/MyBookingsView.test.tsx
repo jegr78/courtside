@@ -290,6 +290,26 @@ it("given another page exists, when loading more, then its bookings are appended
   expect(api.personalBookings).toHaveBeenLastCalledWith(upcomingId);
 });
 
+it("given the next page cannot be read, when the member asks for it, then the failure offers no reload of the whole page", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockResolvedValueOnce({
+    items: [{
+      id: upcomingId, seriesId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED"
+    }],
+    nextCursor: upcomingId
+  }).mockRejectedValueOnce(new Error("offline for a moment"));
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("load-more-bookings"));
+
+  // then
+  expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("error.generic"));
+  expect(screen.queryByTestId("retry-load"), "the load-more control already repeats this request").not.toBeInTheDocument();
+});
+
 it("given more bookings exist, when previewing a series cancellation, then the incomplete preview is disclosed", async () => {
   // given
   vi.mocked(api.personalBookings).mockResolvedValueOnce({
@@ -449,6 +469,20 @@ it("given a listed participation, when the member withdraws, then it is sent and
   await waitFor(() => expect(withdraw).toHaveBeenCalledWith(participationId));
   await waitFor(() => expect(api.participations).toHaveBeenCalledTimes(2));
   expect(screen.getByRole("status")).toHaveTextContent("Participation withdrawn.");
+});
+
+it("given the bookings cannot be read, when the member tries again, then they appear without a reload", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockRejectedValueOnce(new Error("offline for a moment"));
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  expect(await screen.findByTestId("load-failure")).toHaveTextContent(i18n.t("error.generic"));
+
+  // when
+  await userEvent.click(screen.getByTestId("retry-load"));
+
+  // then
+  expect(await screen.findByTestId("upcoming-bookings")).toBeInTheDocument();
+  expect(screen.queryByTestId("load-failure"), "the failure leaves once the read succeeds").not.toBeInTheDocument();
 });
 
 it("given the withdrawal fails, when the member tries, then the reason is shown rather than swallowed", async () => {

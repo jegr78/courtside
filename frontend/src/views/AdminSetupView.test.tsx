@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { api, type AdminClubConfig, type RosterEntry } from "../api/client";
 import i18n from "../i18n";
@@ -63,6 +64,21 @@ describe("AdminSetupView", () => {
     ]);
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [currentMember], nextCursor: null });
     vi.spyOn(api, "importSources").mockResolvedValue([]);
+  });
+
+  it("given the first read fails, when the board tries again, then the checklist appears without a reload", async () => {
+    // given
+    vi.mocked(api.adminConfig).mockRejectedValueOnce(new Error("offline for a moment"));
+    render(<MemoryRouter><AdminSetupView /></MemoryRouter>);
+    expect(await screen.findByTestId("load-failure")).toHaveTextContent(i18n.t("error.generic"));
+
+    // when
+    await userEvent.click(screen.getByTestId("retry-load"));
+
+    // then
+    expect(await screen.findByTestId("setup-progress")).toHaveTextContent("4 of 4 required steps complete");
+    expect(screen.queryByTestId("load-failure"), "the failure leaves once the read succeeds").not.toBeInTheDocument();
+    expect(api.adminConfig).toHaveBeenCalledTimes(2);
   });
 
   it("given a configured instance, when setup is opened, then every required step is complete in order", async () => {

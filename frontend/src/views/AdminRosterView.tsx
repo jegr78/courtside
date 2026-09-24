@@ -5,6 +5,8 @@ import { api, type MembershipType, type Role, type RosterEntry, type RosterSortF
   type RosterSortDirection } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
+import { LoadFailure } from "../components/LoadFailure";
+import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
@@ -64,6 +66,7 @@ export function AdminRosterView() {
   const [sortDirection, setSortDirection] = useState<RosterSortDirection>("ASC");
   const { message: error, report: reportError, clear } = useReportedFailure();
   const [pending, setPending] = useState(false);
+  const [loadAttempt, retryLoad] = useRetry();
 
   useEffect(() => {
     let active = true;
@@ -84,7 +87,7 @@ export function AdminRosterView() {
     return () => {
       active = false;
     };
-  }, [reportError, requestedMembershipTypeId]);
+  }, [loadAttempt, reportError, requestedMembershipTypeId]);
 
   async function read(term: string | undefined, typeId: string | undefined, selectedRole: Role | undefined,
     field: RosterSortField, direction: RosterSortDirection, requestedCursor?: string,
@@ -161,7 +164,7 @@ export function AdminRosterView() {
   return <section data-testid="admin-roster-view" className="surface-panel grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.roster.title")}</h1>
     {!entries
-      ? (error ? <Alert>{error}</Alert> : <p role="status">{t("status.loading")}</p>)
+      ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert>{error}</Alert>}
         <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
