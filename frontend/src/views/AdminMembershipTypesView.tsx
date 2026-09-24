@@ -110,7 +110,14 @@ export function AdminMembershipTypesView() {
           </div>
           {types.length === 0
             ? <p data-testid="membership-types-empty">{t("admin.membershipTypes.empty")}</p>
-            : <table className="block w-full text-left md:table">
+            : <table className="block w-full text-left md:table md:table-fixed">
+              <colgroup>
+                <col className="md:w-[30%]" />
+                <col className="md:w-[22%]" />
+                <col className="md:w-[12%]" />
+                <col className="md:w-[10%]" />
+                <col className="md:w-[26%]" />
+              </colgroup>
               <thead className="sr-only md:not-sr-only">
                 <tr>
                   <th scope="col" className="p-2">{t("admin.membershipTypes.name")}</th>
@@ -155,6 +162,10 @@ export function AdminMembershipTypesView() {
   </section>;
 }
 
+function holderCount(holders: Holders): string {
+  return holders.more ? `${holders.count}+` : String(holders.count);
+}
+
 function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: {
   type: MembershipType;
   ruleSets: RuleSet[];
@@ -179,7 +190,7 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
       <span aria-hidden="true" data-testid="membership-type-label-name" className={label}>{t("admin.membershipTypes.name")}</span>
       <span className="flex min-w-0 items-center gap-2">
         <input data-testid={`membership-type-name-${type.id}`} aria-label={t("admin.membershipTypes.name")} disabled={disabled}
-               maxLength={NAME_LENGTH} className="form-control min-w-0 flex-1 rounded-lg border px-3 py-2 font-semibold"
+               maxLength={NAME_LENGTH} className="form-control w-0 min-w-24 flex-1 rounded-lg border px-3 py-1.5 font-semibold"
                value={name} onChange={(event) => setName(event.target.value)} />
         <span data-testid={`membership-type-state-${type.id}`} className={`shrink-0 text-sm ${type.active ? "text-muted" : "font-semibold"}`}>
           {t(type.active ? "admin.membershipTypes.offered" : "admin.membershipTypes.retired")}
@@ -188,13 +199,13 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
     </th>
     <td className={cell}>
       <span aria-hidden="true" data-testid="membership-type-label-rule-set" className={label}>{t("admin.membershipTypes.ruleSet")}</span>
-      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
         <select data-testid={`membership-type-rule-set-${type.id}`} aria-label={t("admin.membershipTypes.ruleSet")} disabled={disabled}
-                className="form-control min-w-0 flex-1 basis-32 rounded-lg border px-3 py-2" value={ruleSetId} onChange={(event) => setRuleSetId(event.target.value)}>
+                className="form-control w-0 min-w-28 flex-1 rounded-lg border px-3 py-1.5" value={ruleSetId} onChange={(event) => setRuleSetId(event.target.value)}>
           <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
           {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
         </select>
-        {type.ruleSetId && <Link data-testid={`membership-type-rules-link-${type.id}`} className="shrink-0 text-sm underline"
+        {type.ruleSetId && <Link data-testid={`membership-type-rules-link-${type.id}`} className="shrink-0 text-xs leading-tight underline"
                                  to={`/admin/configuration?ruleSetId=${encodeURIComponent(type.ruleSetId)}#rule-set`}>
           {t("admin.membershipTypes.ruleSetLink")}
         </Link>}
@@ -207,18 +218,21 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
     </td>
     <td className={cell}>
       <span aria-hidden="true" data-testid="membership-type-label-members" className={label}>{t("admin.membershipTypes.members")}</span>
-      <Link data-testid={`membership-type-holders-${type.id}`} className="font-semibold whitespace-nowrap underline" to={`/admin/roster?membershipTypeId=${type.id}`}>
-        {holders
-          ? t("admin.membershipTypes.holders", { holders: holders.more ? `${holders.count}+` : String(holders.count) })
-          : t("status.loading")}
-      </Link>
+      {holders
+        ? <Link data-testid={`membership-type-holders-${type.id}`} className="font-semibold whitespace-nowrap underline" to={`/admin/roster?membershipTypeId=${type.id}`}
+                aria-label={t("admin.membershipTypes.holders", { holders: holderCount(holders) })}>
+          {holderCount(holders)}
+        </Link>
+        : <span data-testid={`membership-type-holders-${type.id}`} className="text-muted">
+          <span aria-hidden="true">…</span><span className="sr-only">{t("status.loading")}</span>
+        </span>}
     </td>
     <td className="min-w-0 md:border-t md:p-2 md:align-middle">
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary" data-testid={`save-membership-type-${type.id}`} aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button"
-                className="px-3 py-2" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>
+                className="px-3 py-1.5 text-sm" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>
         <Button variant={type.active ? "destructive" : "primary"} data-testid={`toggle-membership-type-${type.id}`} disabled={disabled} type="button"
-                className="px-3 py-2" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
+                className="px-3 py-1.5 text-sm" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
         <UnsavedMark id={mark} unsaved={unsaved} />
       </div>
     </td>
