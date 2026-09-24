@@ -752,6 +752,7 @@ test("a disabled button and a focused field read differently from their resting 
 
     // then
     await expect(confirm).toBeDisabled();
+    await expect(confirm, `${appearance}: a button takes the weight Button declares`).toHaveCSS("font-weight", "600");
     await expect(confirm, `${appearance}: a disabled button takes the raised surface`)
       .toHaveCSS("background-color", unavailable.background);
     await expect(confirm, `${appearance}: a disabled button takes the muted text`)
