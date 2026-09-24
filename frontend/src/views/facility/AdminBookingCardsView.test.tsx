@@ -61,6 +61,35 @@ describe("AdminBookingCardsView", () => {
     expect(create.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("given a new colour is chosen, when a label is typed and cleared again, then the colour is still work to lose", async () => {
+    // given
+    show(true);
+    const label = await screen.findByTestId("new-card-label");
+    fireEvent.input(screen.getByTestId("new-card-color"), { target: { value: "#17211d" } });
+
+    // when
+    await userEvent.type(label, "Training");
+    await userEvent.clear(label);
+
+    // then
+    expect(screen.getByTestId("unsaved-count"), "a chosen colour keeps the form unsaved").toHaveTextContent("1");
+  });
+
+  it("given a new colour is chosen, when the card is created, then that colour is sent", async () => {
+    // given
+    const createCard = vi.spyOn(api, "createAdminBookingCard").mockResolvedValue({ ...memberCard, id: "card-2", color: "#17211d" });
+    show();
+    await screen.findByTestId("new-card-label");
+
+    // when
+    fireEvent.input(screen.getByTestId("new-card-color"), { target: { value: "#17211d" } });
+    await userEvent.type(screen.getByTestId("new-card-label"), "Training");
+    await userEvent.click(screen.getByTestId("create-card"));
+
+    // then
+    expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ color: "#17211d" }));
+  });
+
   it("given a create form is filled in, when the entry is cleared again, then nothing is left to lose", async () => {
     // given
     show(true);

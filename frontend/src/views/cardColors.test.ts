@@ -11,9 +11,9 @@ describe("cardContrast", () => {
     expect(contrast?.ratio, "even the better tone stays below 4.5:1").toBeCloseTo(4.48, 2);
   });
 
-  it("given a card colour, when the plan picks its label colour, then it is the tone the contrast reading names", () => {
+  it("given a light and a dark card colour, when the plan picks their label colours, then each takes the opposite tone", () => {
     // when / then
-    expect(contrastColor("#d7e24b")).toBe(cardContrast("#d7e24b")?.textColor);
-    expect(contrastColor("#17211d")).toBe(cardContrast("#17211d")?.textColor);
+    expect(contrastColor("#d7e24b"), "a light card carries dark text").toBe("#0f172a");
+    expect(contrastColor("#17211d"), "a dark card carries light text").toBe("#ffffff");
   });
 });

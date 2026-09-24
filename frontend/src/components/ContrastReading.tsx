@@ -5,13 +5,16 @@ import { noticeColours } from "./noticeTones";
 const READABLE = 4.5;
 
 export function ContrastReading({ contrast, testId }: { contrast: BrandContrast; testId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const readable = contrast.ratio >= READABLE;
+  // Rounded down, so a ratio that fails never prints as the threshold it misses.
+  const ratio = new Intl.NumberFormat(i18n.resolvedLanguage ?? i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .format(Math.floor(contrast.ratio * 100) / 100);
   return <output data-testid={testId} className={`rounded-lg border p-3 text-sm ${noticeColours(readable ? "info" : "warning")}`}>
-    {t("admin.config.colorContrast", {
-      ratio: contrast.ratio.toFixed(2),
-      tone: t(contrast.tone === "dark" ? "admin.config.colorDarkText" : "admin.config.colorLightText"),
-      result: t(readable ? "admin.config.colorContrastPass" : "admin.config.colorContrastWarning")
+    {t("colorContrast.reading", {
+      ratio,
+      tone: t(contrast.tone === "dark" ? "colorContrast.darkText" : "colorContrast.lightText"),
+      result: t(readable ? "colorContrast.pass" : "colorContrast.warning")
     })}
   </output>;
 }

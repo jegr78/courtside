@@ -114,7 +114,7 @@ Punktspiel oder Sperrung. Lege für jede benötigte Art eine Karte an.
 
 | Einstellung | Wirkung |
 |---|---|
-| **Bezeichnung und Farbe** | Darstellung im Platzplan |
+| **Bezeichnung und Farbe** | Darstellung im Platzplan. Courtside zeigt den Kontrast der Beschriftung zur Farbe und warnt unter 4,5 zu 1 |
 | **Berechtigte Rollen** | Rollen, die mit der Karte buchen dürfen. Ohne Auswahl dürfen alle angemeldeten Personen buchen |
 | **Verantwortliche Rollen** | Rollen, die jede Buchung dieser Karte öffnen, einsehen und stornieren dürfen |
 | **Erlaubte Spielerzahlen** | Zulässige Zahl von Teilnehmenden. Ohne Wert erfasst die Karte keine Teilnehmenden |

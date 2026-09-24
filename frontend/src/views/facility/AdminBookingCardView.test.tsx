@@ -102,7 +102,7 @@ describe("AdminBookingCardView", () => {
     expect(reading.className, "a failing card colour takes the warning tone the club colours use").toContain("bg-(--cs-notice-warning-surface)");
   });
 
-  it("given a card, when its colour changes, then the preview shows the new colour before any save", async () => {
+  it("given a card, when its label changes, then the preview shows the new label before any save", async () => {
     // given
     show();
     await screen.findByTestId("card-label");
