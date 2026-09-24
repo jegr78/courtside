@@ -1,14 +1,20 @@
 import type { ReactNode } from "react";
 
+export type AlertTone = "error" | "warning" | "info" | "success";
+
 export function Alert({ children, tone = "error", testId }: {
   children: ReactNode;
-  tone?: "error" | "success";
+  tone?: AlertTone;
   testId?: string;
 }) {
-  const colors = tone === "success"
-    ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100"
-    : "border-red-300 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-950 dark:text-red-100";
-  return <div data-testid={testId} role={tone === "error" ? "alert" : "status"} className={`rounded-lg border p-3 ${colors}`}>
+  return <div data-testid={testId} role={tone === "error" ? "alert" : "status"} className={`rounded-lg border p-3 ${noticeColours[tone]}`}>
     {children}
   </div>;
 }
+
+const noticeColours: Record<AlertTone, string> = {
+  error: "border-(--cs-notice-error-border) bg-(--cs-notice-error-surface) text-(--cs-notice-error-text)",
+  warning: "border-(--cs-notice-warning-border) bg-(--cs-notice-warning-surface) text-(--cs-notice-warning-text)",
+  info: "border-(--cs-notice-info-border) bg-(--cs-notice-info-surface) text-(--cs-notice-info-text)",
+  success: "border-(--cs-notice-success-border) bg-(--cs-notice-success-surface) text-(--cs-notice-success-text)"
+};

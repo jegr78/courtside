@@ -259,7 +259,7 @@ export function App() {
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-start justify-center px-4 py-8">
       <div className="flex w-full flex-col items-center gap-4">
-      {offline && <div data-testid="offline-status" className="w-full max-w-7xl"><Alert>{t("status.offline")}</Alert></div>}
+      {offline && <div data-testid="offline-status" className="w-full max-w-7xl"><Alert tone="warning">{t("status.offline")}</Alert></div>}
       {session
         ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged}
           initialPasswordChanged={initialPasswordChanged} signedOut={signOut}

@@ -158,6 +158,8 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("primary-color-preview")).toHaveStyle({ backgroundColor: "#777777" });
     expect(screen.getByTestId("primary-color-contrast")).toHaveTextContent("4.33:1");
     expect(screen.getByTestId("primary-color-contrast")).toHaveTextContent("does not reach 4.5:1");
+    expect(screen.getByTestId("primary-color-contrast").className, "a failing ratio is shown in the warning tone")
+      .toContain("bg-(--cs-notice-warning-surface)");
   });
 
   it("given a high contrast accent colour, when it is shown, then the preview names the automatic text tone", async () => {
@@ -168,6 +170,8 @@ describe("AdminConfigurationView", () => {
     expect(await screen.findByTestId("accent-color-picker")).toHaveValue("#d7e24b");
     expect(screen.getByTestId("accent-color-contrast")).toHaveTextContent("Dark text");
     expect(screen.getByTestId("accent-color-contrast")).toHaveTextContent("reaches 4.5:1");
+    expect(screen.getByTestId("accent-color-contrast").className, "a passing ratio carries no warning")
+      .not.toContain("--cs-notice-warning");
   });
 
   it("given a board logo file, when uploading it, then the effective preview and shell configuration change", async () => {
