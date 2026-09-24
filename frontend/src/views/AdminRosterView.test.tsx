@@ -11,6 +11,7 @@ import { AdminRosterView } from "./AdminRosterView";
 const withAccount: RosterEntry = {
   personId: "person-1", firstName: "Jane", lastName: "Doe", email: "jane.doe@example.org",
   accountId: "account-1", username: "doe.jane", enabled: true, roles: ["MEMBER"],
+  credentialState: "PASSWORD_CHOSEN",
   membershipTypeId: "type-1", membershipStartedOn: "2026-01-01", membershipEndedOn: null
 };
 
@@ -27,10 +28,22 @@ const departed: RosterEntry = {
 
 const trainer: RosterEntry = {
   personId: "person-4", firstName: "Tara", lastName: "Trainer", email: "tara@example.org",
-  accountId: "account-4", username: "trainer.tara", enabled: true, roles: ["MEMBER", "TRAINER"]
+  accountId: "account-4", username: "trainer.tara", enabled: true, roles: ["MEMBER", "TRAINER"],
+  credentialState: "AWAITING_CREDENTIAL"
+};
+
+const blocked: RosterEntry = {
+  personId: "person-5", firstName: "Richard", lastName: "Miles", email: "richard.miles@example.org",
+  accountId: "account-5", username: "miles.richard", enabled: false, roles: ["MEMBER"],
+  credentialState: "CREDENTIAL_EXPIRED"
 };
 
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false };
+
+function resizeTo(width: number) {
+  window.innerWidth = width;
+  window.dispatchEvent(new Event("resize"));
+}
 
 function row(personId: string): HTMLElement {
   return screen.getByTestId(`roster-row-${personId}`);
@@ -48,7 +61,8 @@ describe("AdminRosterView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
-    vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount, withoutAccount], nextCursor: null });
+    resizeTo(1024);
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount, withoutAccount], nextCursor: null, matching: 2 });
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);
   });
 
@@ -62,7 +76,7 @@ describe("AdminRosterView", () => {
   });
 
   it("given account roles, when the roster loads, then translated roles are visible in their column", async () => {
-    vi.spyOn(api, "roster").mockResolvedValue({ entries: [trainer, withoutAccount], nextCursor: null });
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [trainer, withoutAccount], nextCursor: null, matching: 2 });
 
     render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
 
@@ -97,9 +111,9 @@ describe("AdminRosterView", () => {
 
   it("given two pages, when navigating forward and back, then one page is shown at a time", async () => {
     vi.spyOn(api, "roster")
-      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" })
-      .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null })
-      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" });
+      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1", matching: 2 })
+      .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null, matching: 2 })
+      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1", matching: 2 });
     render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
 
@@ -127,6 +141,7 @@ describe("AdminRosterView", () => {
       ["roster-label-name", "Name"],
       ["roster-label-username", "Username"],
       ["roster-label-account", "Account"],
+      ["roster-label-credential", "Access"],
       ["roster-label-membership", "Membership type"],
       ["roster-label-roles", "Roles"]
     ]) {
@@ -174,7 +189,7 @@ describe("AdminRosterView", () => {
 
   it("given an ended membership, when the list is read, then it is not shown as a current one", async () => {
     // given
-    vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount, departed], nextCursor: null });
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount, departed], nextCursor: null, matching: 2 });
 
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
@@ -201,14 +216,14 @@ describe("AdminRosterView", () => {
 
   it("given the URL filter changes while its roster is loading, when the old answer arrives last, then it is discarded", async () => {
     // given
-    let resolveFiltered!: (page: { entries: RosterEntry[]; nextCursor: null }) => void;
-    const filtered = new Promise<{ entries: RosterEntry[]; nextCursor: null }>((resolve) => {
+    let resolveFiltered!: (page: { entries: RosterEntry[]; nextCursor: null; matching: number }) => void;
+    const filtered = new Promise<{ entries: RosterEntry[]; nextCursor: null; matching: number }>((resolve) => {
       resolveFiltered = resolve;
     });
     vi.spyOn(api, "roster").mockImplementation((criteria) =>
       criteria?.membershipTypeId === "type-1"
         ? filtered
-        : Promise.resolve({ entries: [withoutAccount], nextCursor: null }));
+        : Promise.resolve({ entries: [withoutAccount], nextCursor: null, matching: 2 }));
     const router = createMemoryRouter([{
       path: "/admin/roster",
       element: <UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider>
@@ -220,7 +235,7 @@ describe("AdminRosterView", () => {
     await act(() => router.navigate("/admin/roster"));
     expect(await screen.findByTestId("roster-row-person-2")).toBeInTheDocument();
     await act(async () => {
-      resolveFiltered({ entries: [withAccount], nextCursor: null });
+      resolveFiltered({ entries: [withAccount], nextCursor: null, matching: 2 });
       await filtered;
     });
 
@@ -248,8 +263,8 @@ describe("AdminRosterView", () => {
   it("given a further page, when reading it, then it replaces the current page", async () => {
     // given
     vi.spyOn(api, "roster")
-      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" })
-      .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null });
+      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1", matching: 2 })
+      .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null, matching: 2 });
     render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
 
@@ -264,9 +279,9 @@ describe("AdminRosterView", () => {
   it("given a search and a filter with a further page, when reading it, then both are asked for again", async () => {
     // given
     vi.spyOn(api, "roster")
-      .mockResolvedValueOnce({ entries: [withAccount, withoutAccount], nextCursor: null })
-      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1" })
-      .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null });
+      .mockResolvedValueOnce({ entries: [withAccount, withoutAccount], nextCursor: null, matching: 2 })
+      .mockResolvedValueOnce({ entries: [withAccount], nextCursor: "person-1", matching: 2 })
+      .mockResolvedValueOnce({ entries: [withoutAccount], nextCursor: null, matching: 2 });
     render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
     await userEvent.type(screen.getByTestId("roster-search"), "Doe");
@@ -387,14 +402,14 @@ describe("AdminRosterView", () => {
 
   it("given nobody matches the search, when the roster is read, then the empty list says so", async () => {
     // given
-    vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null });
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null, matching: 2 });
 
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
 
     // then
     expect(await screen.findByTestId("roster-empty")).toHaveTextContent(
-      "People matching the current filters appear here. Change the search or add a person below."
+      "People matching the current filters appear here. Change the search or add a person above."
     );
   });
   it("given a failure on screen, when the language changes, then it is read out in the new language", async () => {
@@ -413,12 +428,12 @@ describe("AdminRosterView", () => {
   it("given a filtered and paged roster, when the language changes, then the page is not fetched again", async () => {
     // given
     const reading = vi.spyOn(api, "roster")
-      .mockResolvedValue({ entries: [withAccount], nextCursor: "cursor-2" });
+      .mockResolvedValue({ entries: [withAccount], nextCursor: "cursor-2", matching: 2 });
     render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("roster-row-person-1");
     await userEvent.selectOptions(screen.getByTestId("roster-filter"), "type-1");
     await waitFor(() => expect(screen.getByTestId("roster-filter")).toHaveValue("type-1"));
-    reading.mockResolvedValueOnce({ entries: [departed], nextCursor: null });
+    reading.mockResolvedValueOnce({ entries: [departed], nextCursor: null, matching: 2 });
     await userEvent.click(screen.getByTestId("roster-next-page"));
     await waitFor(() => expect(reading).toHaveBeenCalledTimes(3));
 
@@ -432,5 +447,142 @@ describe("AdminRosterView", () => {
     expect(reading).toHaveBeenLastCalledWith({
       cursor: "cursor-2", limit: 20, membershipTypeId: "type-1", sortBy: "NAME", sortDirection: "ASC"
     });
+  });
+
+  it("given accounts at every step of getting in, when the roster loads, then each row carries its access state", async () => {
+    // given
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount, trainer, blocked, withoutAccount],
+      nextCursor: null, matching: 4 });
+
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("roster-credential-person-1")).toHaveAttribute("data-state", "PASSWORD_CHOSEN");
+    expect(screen.getByTestId("roster-credential-person-1")).toHaveTextContent("Password chosen");
+    expect(screen.getByTestId("roster-credential-person-4")).toHaveAttribute("data-state", "AWAITING_CREDENTIAL");
+    expect(screen.getByTestId("roster-credential-person-5")).toHaveAttribute("data-state", "CREDENTIAL_EXPIRED");
+    expect(screen.getByTestId("roster-credential-person-2")).toHaveAttribute("data-state", "NONE");
+    expect(screen.getAllByRole("columnheader")).toHaveLength(6);
+  });
+
+  it("given a blocked and an active account, when the roster loads, then the account state carries a mark besides its word", async () => {
+    // given
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount, blocked, withoutAccount],
+      nextCursor: null, matching: 3 });
+
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    const disabled = await screen.findByTestId("roster-account-person-5");
+    expect(disabled).toHaveAttribute("data-state", "disabled");
+    expect(disabled).toHaveTextContent("Disabled");
+    expect(within(disabled).getByTestId("roster-account-mark")).toHaveAttribute("aria-hidden", "true");
+    expect(disabled.className).not.toBe(screen.getByTestId("roster-account-person-1").className);
+    expect(screen.getByTestId("roster-account-person-1")).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("roster-account-person-2")).toHaveAttribute("data-state", "none");
+  });
+
+  it("given a board looking for who has not got in yet, when choosing that access filter, then the three states before a chosen password are asked for", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // when
+    await userEvent.selectOptions(await screen.findByTestId("roster-credential-filter"), "NOT_CHOSEN");
+
+    // then
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith({
+      limit: 20, credentialStates: ["AWAITING_CREDENTIAL", "CREDENTIAL_ISSUED", "CREDENTIAL_EXPIRED"],
+      sortBy: "NAME", sortDirection: "ASC"
+    }));
+    expect(screen.getByTestId("roster-credential-filter")).toHaveValue("NOT_CHOSEN");
+  });
+
+  it("given one access state is chosen, when paging on, then the state is asked for again", async () => {
+    // given
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [trainer], nextCursor: "person-4", matching: 30 });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+    await userEvent.selectOptions(await screen.findByTestId("roster-credential-filter"), "AWAITING_CREDENTIAL");
+    await waitFor(() => expect(screen.getByTestId("roster-credential-filter")).toHaveValue("AWAITING_CREDENTIAL"));
+
+    // when
+    await userEvent.click(screen.getByTestId("roster-next-page"));
+
+    // then
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith({
+      limit: 20, cursor: "person-4", credentialStates: ["AWAITING_CREDENTIAL"], sortBy: "NAME", sortDirection: "ASC"
+    }));
+  });
+
+  it("given the server counts the matches, when the roster loads, then the count is shown rather than the page size", async () => {
+    // given
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount, withoutAccount], nextCursor: "person-2", matching: 212 });
+
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("roster-matching")).toHaveTextContent("212 people");
+  });
+
+  it("given one person matches, when the roster loads, then the count speaks of one person", async () => {
+    // given
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [withAccount], nextCursor: null, matching: 1 });
+
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("roster-matching")).toHaveTextContent("1 person");
+  });
+
+  it("given the roster, when it is laid out, then the form for a new person comes before the list", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    const table = await screen.findByRole("table");
+    const create = screen.getByTestId("create-person");
+    expect(create.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("given a phone, when the roster loads, then the hidden column sort buttons leave the tab order", async () => {
+    // given
+    resizeTo(375);
+
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    await screen.findByTestId("roster-row-person-1");
+    for (const heading of screen.getAllByRole("columnheader")) {
+      const button = within(heading).queryByRole("button");
+      if (button) expect(button).toHaveAttribute("tabindex", "-1");
+    }
+    act(() => resizeTo(1024));
+    for (const heading of screen.getAllByRole("columnheader")) {
+      const button = within(heading).queryByRole("button");
+      if (button) expect(button).not.toHaveAttribute("tabindex");
+    }
+  });
+
+  it("given a phone, when choosing a sort field and direction, then the roster is read in that order", async () => {
+    // given
+    resizeTo(375);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("roster-row-person-1");
+
+    // when
+    await userEvent.selectOptions(screen.getByTestId("roster-sort-field"), "USERNAME");
+    await waitFor(() => expect(screen.getByTestId("roster-sort-field")).toHaveValue("USERNAME"));
+    await userEvent.selectOptions(screen.getByTestId("roster-sort-direction"), "DESC");
+
+    // then
+    await waitFor(() => expect(api.roster).toHaveBeenLastCalledWith({
+      limit: 20, sortBy: "USERNAME", sortDirection: "DESC"
+    }));
+    expect(screen.getAllByRole("columnheader")[1]).toHaveAttribute("aria-sort", "descending");
   });
 });

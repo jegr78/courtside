@@ -302,7 +302,7 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "adminCourts").mockResolvedValue([]);
     vi.spyOn(api, "adminOpeningHours").mockResolvedValue([]);
     vi.spyOn(api, "membershipTypes").mockResolvedValue([]);
-    vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null });
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null, matching: 0 });
     vi.spyOn(api, "importSources").mockResolvedValue([]);
 
     // when

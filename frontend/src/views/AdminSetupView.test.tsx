@@ -62,7 +62,7 @@ describe("AdminSetupView", () => {
     vi.spyOn(api, "membershipTypes").mockResolvedValue([
       { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false }
     ]);
-    vi.spyOn(api, "roster").mockResolvedValue({ entries: [currentMember], nextCursor: null });
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [currentMember], nextCursor: null, matching: 0 });
     vi.spyOn(api, "importSources").mockResolvedValue([]);
   });
 
@@ -115,7 +115,7 @@ describe("AdminSetupView", () => {
     ]);
     vi.spyOn(api, "roster").mockResolvedValue({
       entries: [{ ...currentMember, membershipEndedOn: "2026-08-31" }],
-      nextCursor: null
+      nextCursor: null, matching: 0
     });
     vi.spyOn(api, "importSources").mockResolvedValue([{
       id: "source-1", sourceKey: "roster-system", displayName: "Membership system",
@@ -166,7 +166,7 @@ describe("AdminSetupView", () => {
   it("given a later roster page fails, when setup is opened, then incomplete membership evidence is not presented", async () => {
     // given
     vi.mocked(api.roster)
-      .mockResolvedValueOnce({ entries: [], nextCursor: "page-2" })
+      .mockResolvedValueOnce({ entries: [], nextCursor: "page-2", matching: 0 })
       .mockRejectedValueOnce(new Error("unavailable"));
 
     // when
@@ -180,8 +180,8 @@ describe("AdminSetupView", () => {
   it("given a current member on a later page, when setup is opened, then the roster step is complete", async () => {
     // given
     vi.mocked(api.roster)
-      .mockResolvedValueOnce({ entries: [{ ...currentMember, membershipEndedOn: "2026-08-31" }], nextCursor: "page-2" })
-      .mockResolvedValueOnce({ entries: [currentMember], nextCursor: "page-3" });
+      .mockResolvedValueOnce({ entries: [{ ...currentMember, membershipEndedOn: "2026-08-31" }], nextCursor: "page-2", matching: 0 })
+      .mockResolvedValueOnce({ entries: [currentMember], nextCursor: "page-3", matching: 0 });
 
     // when
     render(<MemoryRouter><AdminSetupView /></MemoryRouter>);

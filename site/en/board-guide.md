@@ -172,8 +172,13 @@ assigned to new memberships.
 
 ## People → People and accounts
 
-The overview shows name, username, account state and membership type. Use search and filters to
-find an entry. You can correct first name, last name and email address later.
+Add a new person at the top. Below it, the overview shows name, username, account state, access,
+membership type and roles, together with the number of people the search and filters match. A
+disabled account carries a colour and a mark of its own. The access column says whether credentials
+have not been issued yet, are issued or have expired, or whether the member has chosen a password of
+their own. The **Access** filter set to **No password of their own yet** lists everybody who has not
+chosen one yet. On a phone, sort with **Sort by** and **Order**. You can correct first name, last
+name and email address later.
 
 ![The people list with search, filters and the main account details.](../screenshots/en/admin-roster.png)
 
