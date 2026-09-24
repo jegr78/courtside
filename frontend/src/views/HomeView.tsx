@@ -8,7 +8,9 @@ function holdsAnOfficeBeyondMembership(session: SessionStatus): boolean {
   return session.roles.some((role) => role !== "MEMBER");
 }
 
-export function HomeView({ session, clubName }: { session: SessionStatus; clubName?: string }) {
+export function HomeView({ session, clubName, offline = false }: {
+  session: SessionStatus; clubName?: string; offline?: boolean;
+}) {
   const { t } = useTranslation();
 
   return <section data-testid="court-plan-view" className="surface-panel w-full max-w-7xl self-start rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
@@ -19,6 +21,7 @@ export function HomeView({ session, clubName }: { session: SessionStatus; clubNa
       </h1>
       <p data-testid="guest-guidance" className="text-muted">{t("home.guestGuidance")}</p>
     </div>}
-    <WeekView canBook={session.authenticated} canChooseSeveralCourts={holdsAnOfficeBeyondMembership(session)} />
+    <WeekView canBook={session.authenticated} canChooseSeveralCourts={holdsAnOfficeBeyondMembership(session)}
+      offline={offline} />
   </section>;
 }

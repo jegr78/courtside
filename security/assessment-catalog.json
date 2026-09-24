@@ -1725,7 +1725,7 @@
           "manualProcedureId": "MAN-DATA-001",
           "controlEvidence": {
             "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
-            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#personal API responses remain fresh and uncacheable across the application and proxy boundary"
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#administrative personal API responses remain fresh and uncacheable across the application and proxy boundary"
           }
         },
         {
@@ -1753,7 +1753,7 @@
           "manualProcedureId": "MAN-DATA-001",
           "controlEvidence": {
             "productionPath": "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
-            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#personal API responses remain fresh and uncacheable across the application and proxy boundary"
+            "falsifyingTest": "frontend/e2e/browser-security.spec.ts#administrative personal API responses remain fresh and uncacheable across the application and proxy boundary"
           }
         },
         {
@@ -2081,7 +2081,7 @@
           "manualProcedureId": "MAN-IDENTITY-001",
           "controlEvidence": {
             "productionPath": "frontend/src/App.tsx",
-            "falsifyingTest": "frontend/e2e/pwa-lifecycle.spec.ts#logout and browser history cannot reveal a cached personal view"
+            "falsifyingTest": "frontend/e2e/pwa-lifecycle.spec.ts#logout, another tab and browser history cannot reveal a cached personal view"
           }
         },
         {

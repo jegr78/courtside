@@ -9,10 +9,15 @@ input and browser-engine behaviour; it is not evidence for operating-system inte
 physical device.
 
 The application shell is available offline after installation. Booking, account and administration
-operations require the network. Workbox uses `NetworkOnly` for every `/api/` request, and the PWA
+operations require the network. Workbox uses `NetworkOnly` for every API request except the
+member-owned `GET /api/my/bookings`, which uses a seven-day `StaleWhileRevalidate` cache. Its page
+also carries the club time zone and court labels, so the cached response is self-contained. The PWA
 journey inspects Cache Storage after authenticated activity and offline reloads. A German and an
-English offline launch must show the connection state, reconnect without mixed assets and retain no
-personal API response. Logout plus Back and Forward must not reveal an authenticated view.
+English offline launch must keep that member's bookings readable with the response's `refreshedAt`
+instant as the visible refresh time, state that the court plan cannot be refreshed, and reconnect without mixed
+assets. Successful login, logout and a server-observed expired session (`401`) clear the personal
+cache; logout plus Back
+and Forward must not reveal an authenticated view.
 
 The Chromium security journey stores a harmless inert markup payload in every current text shape
 that reaches the rendered PWA: club and court names, booking and participant-card labels, rule-set
@@ -118,7 +123,8 @@ smoke on one current iOS/Safari device and one current Android/Chrome device:
    loop.
 6. Install the preceding UI, start the candidate backend and verify the compatible core journey.
 7. Publish a changed candidate UI, accept its update prompt and verify one coherent build identity.
-8. Inspect browser storage and confirm that Cache Storage contains no `/api/` response.
+8. Open personal bookings, inspect browser storage and confirm that the only cached API path is
+   `/api/my/bookings`; sign out and confirm that no `/api/` response remains.
 
 Attach the completed record to the release and link it from the release checklist. Use placeholder
 identities only. Screenshots must not contain cookies, credentials, personal bookings or real club

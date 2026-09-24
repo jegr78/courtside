@@ -70,6 +70,39 @@ it("given the bookings on screen, when the language changes, then they are not f
     .map((read) => vi.mocked(read).mock.calls.length)).toEqual(reads);
 });
 
+it("given a cached personal page, when offline, then bookings remain readable with their refresh time", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockResolvedValue({
+    items: [
+      {
+        id: upcomingId,
+        seriesId,
+        courtIds: ["33333333-3333-3333-3333-333333333333"],
+        startsAt: "2026-08-12T16:00:00Z",
+        endsAt: "2026-08-12T17:00:00Z",
+        cardLabel: "Member booking",
+        cardColor: "#176b55",
+        status: "CONFIRMED"
+      }
+    ],
+    refreshedAt: "2026-08-11T10:30:00Z",
+    timeZone: "Europe/Berlin",
+    courts: [{ id: "33333333-3333-3333-3333-333333333333", number: 1, name: "Centre Court" }]
+  });
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} offline />);
+
+  // then
+  expect(await screen.findByTestId(`booking-${upcomingId}`)).toHaveTextContent("Member booking");
+  expect(screen.getByTestId(`booking-${upcomingId}`)).toHaveTextContent("Centre Court");
+  expect(screen.getByTestId("bookings-offline-as-of")).toHaveTextContent("Available offline · As of");
+  expect(api.participations).not.toHaveBeenCalled();
+  expect(api.courts).not.toHaveBeenCalled();
+  expect(api.bookingGrid).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("personal-cancel")).not.toBeInTheDocument();
+});
+
 it("given past and upcoming occurrences, when loaded, then the series is grouped in both sections", async () => {
   // when
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);

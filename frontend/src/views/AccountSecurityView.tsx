@@ -101,7 +101,7 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
           <Button variant={session.current ? "secondary" : "destructive"} disabled={pending} type="button"
             aria-describedby={`account-session-${session.handle}`}
             data-testid={session.current ? "end-current-session" : "end-other-session"}
-            onClick={() => void run(() => api.endAccountSession(session.handle),
+            onClick={() => void run(() => api.endAccountSession(session.handle, session.current),
               session.current ? signedOut : undefined)}>
             {t("accountSecurity.sessions.end")}
           </Button>

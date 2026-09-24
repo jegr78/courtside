@@ -1716,6 +1716,17 @@ components:
           type: [string, "null"]
           format: uuid
           description: Pass this booking id as `cursor` to continue after the current page.
+        refreshedAt:
+          type: string
+          format: date-time
+          description: Instant at which this page was read from the booking ledger.
+        timeZone:
+          type: string
+          description: Club time zone used to render the cached booking instants.
+        courts:
+          type: array
+          description: Court labels needed to render this page without another request.
+          items: { $ref: "#/components/schemas/PublicCourt" }
 
     Participation:
       type: object

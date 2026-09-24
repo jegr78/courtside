@@ -411,6 +411,11 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.items[0].cardLabel").value(labelOf(MEMBER_BOOKING_CARD)))
                 .andExpect(jsonPath("$.items[0].status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.items[0].seriesId").doesNotExist())
+                .andExpect(jsonPath("$.refreshedAt").value("2026-05-12T10:00:00Z"))
+                .andExpect(jsonPath("$.timeZone").value("Europe/Berlin"))
+                .andExpect(jsonPath("$.courts.length()").value(2))
+                .andExpect(jsonPath("$.courts[*].id", Matchers.hasItem(courtId.toString())))
+                .andExpect(jsonPath("$.courts[*].name", Matchers.containsInAnyOrder("Court 1", "Court 2")))
                 .andExpect(jsonPath("$.nextCursor").doesNotExist());
     }
 

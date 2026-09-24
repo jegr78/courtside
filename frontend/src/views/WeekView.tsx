@@ -21,6 +21,7 @@ interface WeekViewProps {
   clock?: () => Date;
   canBook?: boolean;
   canChooseSeveralCourts?: boolean;
+  offline?: boolean;
 }
 
 interface WeekData {
@@ -41,7 +42,7 @@ const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDA
 const systemClock = () => new Date();
 
 export function WeekView({ today, clock = systemClock, canBook = true,
-  canChooseSeveralCourts = false }: WeekViewProps) {
+  canChooseSeveralCourts = false, offline = false }: WeekViewProps) {
   const { t, i18n } = useTranslation();
   const [referenceInstant] = useState(() => today ?? clock());
   const [currentInstant, setCurrentInstant] = useState(referenceInstant);
@@ -64,6 +65,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     let active = true;
     setData(undefined);
     clear();
+    if (offline) return () => { active = false; };
     void Promise.all([api.bookingGrid(), api.courts(), api.bookingCardLegend()])
       .then(async ([grid, courts, currentBookingCards]) => {
         const clubToday = dateInTimeZone(referenceInstant, grid.timeZone);
@@ -85,10 +87,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       }
     });
     return () => { active = false; };
-  }, [clear, referenceInstant, report, weekOffset]);
+  }, [clear, offline, referenceInstant, report, weekOffset]);
 
   useEffect(() => {
-    if (!canBook) {
+    if (!canBook || offline) {
       setEligibility(undefined);
       clearEligibility();
       return;
@@ -118,7 +120,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       window.clearInterval(interval);
       window.removeEventListener("focus", refresh);
     };
-  }, [canBook, clearEligibility, reportEligibility]);
+  }, [canBook, clearEligibility, offline, reportEligibility]);
 
   useEffect(() => {
     if (eligibilityError || eligibility?.violations.length) setBookingSelection(undefined);
@@ -285,7 +287,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         aria-label={t("week.next")}>›</Button>
     </nav>}
 
-    {error && <Alert>{error}</Alert>}
+    {offline && <Alert testId="court-plan-offline">{t("week.offline")}</Alert>}
+    {!offline && error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {eligibilityError && <Alert testId="booking-eligibility-error">{eligibilityError}</Alert>}
     {eligibility && eligibility.violations.length > 0 && <Alert testId="booking-eligibility">
@@ -295,7 +298,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         </li>)}
       </ul>
     </Alert>}
-    {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
+    {!offline && !data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
     {data && !hasCourts && <p data-testid="court-plan-empty" className="text-muted mt-6">{t("week.noCourtOpen")}</p>}
     {data && hasCourts && <div className="desktop-current-time mt-4 flex justify-end">
       <Button variant="secondary" type="button" data-testid="current-time" onClick={() => isToday

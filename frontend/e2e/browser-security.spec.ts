@@ -155,7 +155,7 @@ async function browserInventory(page: import("@playwright/test").Page) {
   return { ...storage, cookies };
 }
 
-test("personal API responses remain fresh and uncacheable across the application and proxy boundary",
+test("administrative personal API responses remain fresh and uncacheable across the application and proxy boundary",
   async ({ page, journeyService }) => {
   // given
   await login(page, "configuration-admin");

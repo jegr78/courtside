@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
@@ -15,6 +15,9 @@ import { UnsavedChangesGuard } from "./unsaved/UnsavedChangesGuard";
 import { useClubConfiguration } from "./club/registry";
 import { brandContrast } from "./brandColor";
 import { applyAccountLocale, supportedLocale } from "./i18n";
+import {
+  clearPersonalBookingsOfflineData, listenForOtherClientSessionChanges, offlineMemberSession
+} from "./offlineBookings";
 import { HomeView } from "./views/HomeView";
 import { InitialPasswordView } from "./views/InitialPasswordView";
 import { LoginView } from "./views/LoginView";
@@ -48,10 +51,11 @@ interface AppRoutesProps {
   signedOut?: () => void;
   configurationChanged?: (config: ClubConfig) => void;
   clubName?: string;
+  offline?: boolean;
 }
 
 export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut,
-  configurationChanged, clubName }: AppRoutesProps) {
+  configurationChanged, clubName, offline = false }: AppRoutesProps) {
   const { pathname } = useLocation();
   const administrative = pathname === "/admin" || pathname.startsWith("/admin/");
 
@@ -66,8 +70,8 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
     <UnsavedChangesGuard />
     {!administrative && <PrimaryNavigation session={session} />}
     <Routes>
-    <Route path="/" element={<HomeView session={session} clubName={clubName} />} />
-    <Route path="/courts" element={<HomeView session={session} clubName={clubName} />} />
+    <Route path="/" element={<HomeView session={session} clubName={clubName} offline={offline} />} />
+    <Route path="/courts" element={<HomeView session={session} clubName={clubName} offline={offline} />} />
     <Route path="/account-recovery" element={session.authenticated
       ? <Navigate to="/" replace />
       : <AccountRecoveryView />} />
@@ -75,7 +79,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       ? <Navigate to={passwordChanged && session.roles.includes("ADMIN") ? "/admin/setup" : "/"} replace />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
     <Route path="/my-bookings" element={session.authenticated
-      ? <MyBookingsPage session={session} />
+      ? <MyBookingsPage session={session} offline={offline} />
       : <Navigate to="/login" replace />} />
     <Route path="/my-messages" element={session.authenticated
       ? <MyMessagesView />
@@ -157,24 +161,41 @@ export function App() {
   const [session, setSession] = useState<SessionStatus>();
   const [source, setSource] = useState<SourceOffer>();
   const [identityStatus, setIdentityStatus] = useState<"loading" | "available" | "unavailable">("loading");
-  const [offline, setOffline] = useState(false);
+  const [offline, setOffline] = useState(() => !navigator.onLine);
   const [passwordChanged, setPasswordChanged] = useState(false);
+  const sessionInvalidations = useRef(0);
 
   // The account's language is applied before the session is published, so the signed-in navigation
   // is painted once instead of moving its links out from under whoever is already reaching for one.
   const refreshSession = useCallback(async () => {
+    const requestedBefore = sessionInvalidations.current;
     const current = await api.session();
+    if (requestedBefore !== sessionInvalidations.current) return;
     const accountLocale = supportedLocale(current.locale);
     if (accountLocale) {
       await applyAccountLocale(accountLocale).catch(() => undefined);
     }
+    if (requestedBefore !== sessionInvalidations.current) return;
+    if (!current.authenticated) await clearPersonalBookingsOfflineData();
+    if (requestedBefore !== sessionInvalidations.current) return;
     setSession(current);
     setOffline(false);
   }, []);
 
   useEffect(() => {
+    const unauthenticated = () => {
+      sessionInvalidations.current += 1;
+      setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
+      void navigate("/login");
+    };
+    const startupInvalidations = sessionInvalidations.current;
     void Promise.all([
-      refreshSession().catch(() => setOffline(true)),
+      refreshSession().catch(async () => {
+        setOffline(true);
+        const restored = await offlineMemberSession()
+          ?? { authenticated: false, roles: [], passwordChangeRequired: false };
+        if (startupInvalidations === sessionInvalidations.current) setSession(restored);
+      }),
       api.source()
         .then((value) => {
           setSource(value);
@@ -182,12 +203,12 @@ export function App() {
         })
         .catch(() => setIdentityStatus("unavailable"))
     ]);
-    const unauthenticated = () => {
-      setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
-      void navigate("/login");
-    };
+    const stopListeningForSessionChanges = listenForOtherClientSessionChanges(unauthenticated);
     window.addEventListener("courtside:unauthenticated", unauthenticated);
-    return () => window.removeEventListener("courtside:unauthenticated", unauthenticated);
+    return () => {
+      stopListeningForSessionChanges();
+      window.removeEventListener("courtside:unauthenticated", unauthenticated);
+    };
   }, [navigate, refreshSession]);
 
   // Before the paint, not after it: the club's colours would otherwise show one frame of the
@@ -208,6 +229,7 @@ export function App() {
   }, [refreshSession]);
 
   function initialPasswordChanged() {
+    sessionInvalidations.current += 1;
     flushSync(() => {
       setPasswordChanged(true);
       setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
@@ -218,6 +240,7 @@ export function App() {
   // The session has to be gone before the route is chosen: signing out from a role-guarded page
   // would otherwise be sent home by that page's own redirect before this one is applied.
   function signOut() {
+    sessionInvalidations.current += 1;
     flushSync(() => setSession({ authenticated: false, roles: [], passwordChangeRequired: false }));
     void navigate("/login");
   }
@@ -235,11 +258,14 @@ export function App() {
     </header>
     <EnvironmentMarker source={source} identityStatus={identityStatus} />
     <main className="flex flex-1 items-start justify-center px-4 py-8">
-      {offline ? <div data-testid="offline-status"><Alert>{t("status.offline")}</Alert></div> : session
+      <div className="flex w-full flex-col items-center gap-4">
+      {offline && <div data-testid="offline-status" className="w-full max-w-7xl"><Alert>{t("status.offline")}</Alert></div>}
+      {session
         ? <AppRoutes session={session} refreshSession={refreshSession} passwordChanged={passwordChanged}
           initialPasswordChanged={initialPasswordChanged} signedOut={signOut}
-          configurationChanged={configurationChanged} clubName={club?.clubName} />
+          configurationChanged={configurationChanged} clubName={club?.clubName} offline={offline} />
         : <p role="status">{t("status.loading")}</p>}
+      </div>
     </main>
     <footer className="text-muted flex flex-wrap justify-center gap-x-5 gap-y-2 px-5 pt-4 pb-[max(6rem,calc(4rem+env(safe-area-inset-bottom)))] text-sm sm:pb-4">
       <span data-testid="footer-product-identity" className="flex items-center gap-2 font-semibold">

@@ -88,6 +88,17 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it("given the device is offline, when the court plan opens, then it explains why no stale plan is shown", () => {
+  // when
+  render(<WeekView today={clubInstant("12:00")} offline />);
+
+  // then
+  expect(screen.getByTestId("court-plan-offline")).toHaveTextContent("cannot be refreshed offline");
+  expect(screen.queryByTestId("week-grid")).not.toBeInTheDocument();
+  expect(api.bookingGrid).not.toHaveBeenCalled();
+  expect(api.allocations).not.toHaveBeenCalled();
+});
+
 it("given the current week, when it loads, then every day and active court is available", async () => {
   // when
   render(<WeekView today={clubInstant("12:00")} />);

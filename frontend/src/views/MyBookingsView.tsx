@@ -6,19 +6,28 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { SuccessFeedback } from "../components/SuccessFeedback";
-import { formatBookingPeriod } from "../time/clubZone";
+import { formatBookingPeriod, formatDateTime } from "../time/clubZone";
 import { SeriesForm } from "./SeriesForm";
 
 type Appointment = PersonalBooking | ManagedAppointment;
 
-export function MyBookingsView({ now, showManaged = false }: { now?: Date; showManaged?: boolean }) {
+function offlineBookingGrid(): BookingGrid {
+  return {
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", slotMinutes: 30, openingHours: []
+  };
+}
+
+export function MyBookingsView({ now, showManaged = false, offline = false }: {
+  now?: Date; showManaged?: boolean; offline?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const [reference] = useState(() => now ?? new Date());
   const [bookings, setBookings] = useState<PersonalBooking[]>([]);
   const [managed, setManaged] = useState<ManagedAppointment[]>([]);
   const [participations, setParticipations] = useState<Participation[]>([]);
   const [courts, setCourts] = useState<PublicCourt[]>([]);
-  const [grid, setGrid] = useState<BookingGrid>();
+  const [grid, setGrid] = useState<BookingGrid | undefined>(() => offline ? offlineBookingGrid() : undefined);
+  const [refreshedAt, setRefreshedAt] = useState<string>();
   const [maxBookingMinutes, setMaxBookingMinutes] = useState<number>();
   const [nextCursor, setNextCursor] = useState<string>();
   const [managedNextCursor, setManagedNextCursor] = useState<string>();
@@ -32,15 +41,24 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [page, managedPage, participationPage, availableCourts, bookingGrid] = await Promise.all([
-        api.personalBookings(), showManaged ? api.managedAppointments() : Promise.resolve<ManagedAppointmentPage>({ items: [] }),
+      const page = await api.personalBookings();
+      setBookings(page.items);
+      setRefreshedAt(page.refreshedAt);
+      setNextCursor(page.nextCursor ?? undefined);
+      if (page.courts) setCourts(page.courts);
+      const cachedTimeZone = page.timeZone;
+      if (cachedTimeZone) setGrid((current) => ({ ...(current ?? offlineBookingGrid()), timeZone: cachedTimeZone }));
+      if (offline) {
+        clear();
+        return;
+      }
+      const [managedPage, participationPage, availableCourts, bookingGrid] = await Promise.all([
+        showManaged ? api.managedAppointments() : Promise.resolve<ManagedAppointmentPage>({ items: [] }),
         api.participations(), api.courts(), api.bookingGrid()
       ]);
-      setBookings(page.items);
       setManaged(managedPage.items);
       setParticipations(participationPage.items);
       setParticipationsNextCursor(participationPage.nextCursor ?? undefined);
-      setNextCursor(page.nextCursor ?? undefined);
       setManagedNextCursor(managedPage.nextCursor ?? undefined);
       setCourts(availableCourts);
       setGrid(bookingGrid);
@@ -50,17 +68,18 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
     } finally {
       setLoading(false);
     }
-  }, [clear, report, showManaged]);
+  }, [clear, offline, report, showManaged]);
 
   useEffect(() => { void load(); }, [load]);
 
   // The bound only fills in a field's maximum, and the server holds the rule either way, so a
   // reading that fails leaves the maximum unset rather than taking the bookings down with it.
   useEffect(() => {
+    if (offline) return;
     void api.bookingEligibility()
       .then((eligibility) => setMaxBookingMinutes(eligibility.maxBookingMinutes ?? undefined))
       .catch(() => setMaxBookingMinutes(undefined));
-  }, []);
+  }, [offline]);
 
   async function loadMore() {
     if (!nextCursor) return;
@@ -123,21 +142,25 @@ export function MyBookingsView({ now, showManaged = false }: { now?: Date; showM
   };
   return <section className="mt-8" aria-labelledby="my-bookings-title">
     <h2 id="my-bookings-title" data-testid="my-bookings-title" className="text-2xl font-bold">{t("myBookings.title")}</h2>
+    {offline && refreshedAt && grid && <p data-testid="bookings-offline-as-of" role="status"
+      className="surface-raised border-structural mt-4 rounded-xl border px-4 py-3">
+      {t("myBookings.offlineAsOf", { time: formatDateTime(refreshedAt, i18n.language, grid.timeZone) })}
+    </p>}
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-8 lg:grid-cols-2">
-      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable action={chooseAction} t={t} />
+      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} t={t} />
       <BookingSection testId="past-bookings" title={t("myBookings.past")} empty={t("myBookings.noPast")} bookings={sections.past} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} action={chooseAction} t={t} />
     </div>}
-    {nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
-    {showManaged && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
+    {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
+    {!offline && showManaged && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
       <h2 id="managed-appointments-title" data-testid="managed-appointments-title" className="text-2xl font-bold">{t("managedAppointments.title")}</h2>
       <p className="text-muted mt-2">{t("managedAppointments.description")}</p>
       <div className="mt-4"><BookingSection testId="managed-bookings" title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={chooseAction} t={t} /></div>
       {managedNextCursor && <Button variant="secondary" className="mt-6" disabled={loadingMore} onClick={() => void loadMoreManaged()}>{t("managedAppointments.loadMore")}</Button>}
       <SeriesForm timeZone={grid.timeZone} courts={courts} created={async () => { await load(); setSuccess(t("series.createdSuccess")); }} reportError={(failure) => { setSuccess(undefined); report(failure); }} />
     </section>}
-    {!loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
+    {!offline && !loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={(action.managed ? managed : bookings).filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={(action.managed ? managedNextCursor : nextCursor) !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} maxBookingMinutes={maxBookingMinutes} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.moved")); }} />}
     {grid && action?.kind === "detail" && <ManagedAppointmentDialog bookingId={action.booking.id} locale={i18n.language} timeZone={grid.timeZone} closed={() => setAction(undefined)} />}

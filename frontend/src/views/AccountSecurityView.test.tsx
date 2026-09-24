@@ -83,7 +83,7 @@ describe("AccountSecurityView", () => {
 
     // then
     await waitFor(() => expect(end).toHaveBeenCalledTimes(2));
-    expect(end).toHaveBeenNthCalledWith(2, other.handle);
+    expect(end).toHaveBeenNthCalledWith(2, other.handle, false);
     expect(prove).toHaveBeenCalledWith("correct-password");
   });
 

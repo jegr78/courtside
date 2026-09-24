@@ -1,4 +1,5 @@
 import type { components } from "./schema";
+import { clearPersonalBookingsOfflineData, notifyOtherClientsOfSessionChange } from "../offlineBookings";
 
 export type SessionStatus = components["schemas"]["SessionStatus"];
 export type ClubConfig = components["schemas"]["ClubConfig"];
@@ -130,7 +131,8 @@ export class ApiError extends Error {
 
 const ACCESS_DENIED = "urn:courtside:error:access-denied";
 
-async function send(path: string, init: RequestInit, notifyUnauthorized: boolean): Promise<Response> {
+async function send(path: string, init: RequestInit, notifyUnauthorized: boolean,
+                    announceSessionChange: boolean): Promise<Response> {
   const write = Boolean(init.method) && init.method !== "GET" && init.method !== "HEAD";
   const sent = write ? await usableCsrfToken() : undefined;
   let response = await fetch(path, carrying(init, sent));
@@ -143,15 +145,22 @@ async function send(path: string, init: RequestInit, notifyUnauthorized: boolean
   }
   if (!response.ok) {
     if (response.status === 401 && notifyUnauthorized) {
+      await clearPersonalBookingsOfflineData();
+      notifyOtherClientsOfSessionChange();
       window.dispatchEvent(new Event("courtside:unauthenticated"));
     }
     throw new ApiError(response.status, problem);
   }
+  if (write) {
+    await clearPersonalBookingsOfflineData();
+    if (announceSessionChange) notifyOtherClientsOfSessionChange();
+  }
   return response;
 }
 
-async function request<T>(path: string, init: RequestInit = {}, notifyUnauthorized = true): Promise<T> {
-  const response = await send(path, init, notifyUnauthorized);
+async function request<T>(path: string, init: RequestInit = {}, notifyUnauthorized = true,
+                          announceSessionChange = false): Promise<T> {
+  const response = await send(path, init, notifyUnauthorized, announceSessionChange);
   if (response.status === 204 || response.headers.get("Content-Length") === "0") {
     return undefined as T;
   }
@@ -165,7 +174,7 @@ export interface OfferedFile {
 }
 
 async function requestFile(path: string, init: RequestInit): Promise<OfferedFile> {
-  const response = await send(path, init, true);
+  const response = await send(path, init, true, false);
   return { fileName: fileNameIn(response.headers.get("Content-Disposition")), content: await response.blob() };
 }
 
@@ -221,10 +230,10 @@ export const api = {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale })
   }),
   accountSessions: () => request<AccountSession[]>("/api/account/sessions"),
-  endAccountSession: (handle: string) => request<void>(
-    `/api/account/sessions/${encodeURIComponent(handle)}`, { method: "DELETE" }
+  endAccountSession: (handle: string, current = false) => request<void>(
+    `/api/account/sessions/${encodeURIComponent(handle)}`, { method: "DELETE" }, true, current
   ),
-  endOwnSessions: () => request<void>("/api/account/sessions", { method: "DELETE" }),
+  endOwnSessions: () => request<void>("/api/account/sessions", { method: "DELETE" }, true, true),
   requestPasswordReset: (username: string) => request<void>("/api/account-recovery/password", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username })
   }),
@@ -243,7 +252,7 @@ export const api = {
     "/api/account/password", {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentPassword, newPassword })
-    }
+    }, true, true
   ),
   ownMessageChoices: () => request<MessageChoice[]>("/api/account/messages"),
   chooseOwnMessages: (declined: MessageKind[]) => request<void>("/api/account/messages", {
@@ -541,11 +550,11 @@ export const api = {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ username, password })
-  }, false),
+  }, false, true),
   changeInitialPassword: (password: string) => request<void>("/api/account/initial-password", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password })
-  }),
-  logout: () => request<void>("/api/session/logout", { method: "POST" }, false)
+  }, true, true),
+  logout: () => request<void>("/api/session/logout", { method: "POST" }, false, true)
 };

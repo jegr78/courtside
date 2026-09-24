@@ -26,8 +26,8 @@
         },
         {
           "id": "ID-3", "impact": "P0", "likelihood": "Low",
-          "invariant": "Secrets and personal data do not enter public responses, logs, caches or retained artifacts.",
-          "positiveBoundaries": "Approved public and role-scoped data remains available to its intended caller.",
+          "invariant": "Secrets and personal data do not enter public responses, logs, unrelated caches or retained artifacts.",
+          "positiveBoundaries": "Approved public and role-scoped data, including the bounded offline cache of a member's own bookings, remains available to its intended caller.",
           "negativeBoundaries": "Success, error and diagnostic paths expose no credentials, unrelated personal data or retained secrets.",
           "level": "Unit, contract, static analysis, E2E, deployment and image smoke", "frequency": ["PR", "release"],
           "environment": "Packaged app and proxy", "syntheticData": "Approved placeholder identities only",
@@ -147,9 +147,9 @@
         },
         {
           "id": "UI-2", "impact": "P0", "likelihood": "Low",
-          "invariant": "PWA caching and browser history never serve personal API data after logout, expiry or offline transition.",
-          "positiveBoundaries": "Install, update, offline shell and reconnect preserve public application availability.",
-          "negativeBoundaries": "Logout, expiry, Back or Forward, old assets and multiple tabs cannot reveal cached personal API data.",
+          "invariant": "PWA caching and browser history serve only the current member's bounded booking cache offline and never retain it after logout, a server-observed expiry or account change.",
+          "positiveBoundaries": "Install, update, offline launch and reconnect keep personal bookings readable with an honest refresh time while the live court plan stays unavailable.",
+          "negativeBoundaries": "Logout, a server-observed expiry, account change, Back or Forward, old assets and multiple tabs cannot reveal a previous member's cached data.",
           "level": "React, E2E, deployment smoke", "frequency": ["PR", "nightly", "release"],
           "environment": "Chromium, WebKit and periodic Firefox", "syntheticData": "Synthetic member sessions",
           "evidenceType": "Browser traces, cache inspection and linked device record", "owner": "Frontend and identity",

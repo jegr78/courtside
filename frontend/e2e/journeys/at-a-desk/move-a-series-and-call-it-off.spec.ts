@@ -10,6 +10,7 @@ test("given a trainer whose hall time moved, when they shift one appointment of 
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
     await activate(page.getByTestId("my-bookings-link"));
     await expect(page.getByTestId("managed-bookings")).toBeVisible();
+    await expect.poll(() => bookingsHeld(page, "managed-cancel")).not.toEqual([]);
     const standing = await bookingsHeld(page, "managed-cancel");
 
     // when — a term of three is arranged
