@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { api, type ClubConfig, type MessageEntry } from "../api/client";
 import i18n from "../i18n";
+import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { AdminMessagesView } from "./AdminMessagesView";
 
@@ -160,6 +161,37 @@ async (language) => {
     // then
     await waitFor(() => expect(screen.getAllByTestId("message-row")).toHaveLength(2));
     expect(messages).toHaveBeenLastCalledWith("a-cursor", 50, { unsettled: false });
+  });
+
+  it("given the log cannot be read, when the board tries again, then it appears without a reload", async () => {
+    // given
+    vi.spyOn(api, "messages").mockRejectedValueOnce(new Error("offline for a moment"))
+      .mockResolvedValue({ entries: [handedOver], nextCursor: null });
+    show();
+    expect(await screen.findByTestId("load-failure")).toHaveTextContent(i18n.t("error.generic"));
+
+    // when
+    await userEvent.click(screen.getByTestId("retry-load"));
+
+    // then
+    expect(await screen.findByTestId("message-row")).toHaveAttribute("data-entry-id", handedOver.id);
+    expect(screen.queryByTestId("load-failure"), "the failure leaves once the read succeeds").not.toBeInTheDocument();
+  });
+
+  it("given the club cannot be read, when the board tries again, then the club is asked for again", async () => {
+    // given
+    const config = vi.spyOn(api, "config").mockRejectedValueOnce(new Error("offline for a moment"))
+      .mockResolvedValue(clubConfig);
+    vi.spyOn(api, "messages").mockResolvedValue({ entries: [handedOver], nextCursor: null });
+    render(<MemoryRouter><ClubConfigurationProvider><AdminMessagesView /></ClubConfigurationProvider></MemoryRouter>);
+    expect(await screen.findByTestId("load-failure")).toHaveTextContent(i18n.t("error.generic"));
+
+    // when
+    await userEvent.click(screen.getByTestId("retry-load"));
+
+    // then
+    expect(await screen.findByTestId("message-row")).toHaveAttribute("data-entry-id", handedOver.id);
+    expect(config, "the retry reaches the club, not only the log").toHaveBeenCalledTimes(2);
   });
 
   it("given nothing has been sent, when the log is shown, then it says so instead of rendering an empty table", async () => {

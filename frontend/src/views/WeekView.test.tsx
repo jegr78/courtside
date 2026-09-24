@@ -133,6 +133,20 @@ it("given the current week, when it loads, then every day and active court is av
   expect(booking).toHaveTextContent("Booked · 2 participants");
 });
 
+it("given the plan cannot be read, when the member tries again, then the week appears without a reload", async () => {
+  // given
+  vi.mocked(api.bookingGrid).mockRejectedValueOnce(new Error("offline for a moment"));
+  render(<WeekView today={clubInstant("12:00")} />);
+  expect(await screen.findByTestId("load-failure")).toHaveTextContent(i18n.t("error.generic"));
+
+  // when
+  await userEvent.click(screen.getByTestId("retry-load"));
+
+  // then
+  expect(await screen.findByTestId("occupancy-heading")).toBeInTheDocument();
+  expect(screen.queryByTestId("load-failure"), "the failure leaves once the read succeeds").not.toBeInTheDocument();
+});
+
 it("given short booking slots, when rendering the plan, then rows retain their usable height", async () => {
   // given
   vi.mocked(api.bookingGrid).mockResolvedValue({

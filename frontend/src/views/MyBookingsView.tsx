@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api, type BookingGrid, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail, type ManagedAppointmentPage, type MovePreview, type MoveRequest, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
+import { LoadFailure } from "../components/LoadFailure";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { SuccessFeedback } from "../components/SuccessFeedback";
@@ -36,6 +37,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
   const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const { message: error, report, clear } = useReportedFailure();
+  const { message: loadError, report: reportLoad, clear: clearLoad } = useReportedFailure();
   const [success, setSuccess] = useState<string>();
   const [action, setAction] = useState<{ kind: "cancel" | "move" | "detail"; booking: Appointment; managed: boolean }>();
 
@@ -50,7 +52,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
       const cachedTimeZone = page.timeZone;
       if (cachedTimeZone) setGrid((current) => ({ ...(current ?? offlineBookingGrid()), timeZone: cachedTimeZone }));
       if (offline) {
-        clear();
+        clearLoad();
         return;
       }
       const [managedPage, participationPage, availableCourts, bookingGrid] = await Promise.all([
@@ -63,13 +65,13 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
       setManagedNextCursor(managedPage.nextCursor ?? undefined);
       setCourts(availableCourts);
       setGrid(bookingGrid);
-      clear();
+      clearLoad();
     } catch (failure) {
-      report(failure);
+      reportLoad(failure);
     } finally {
       setLoading(false);
     }
-  }, [clear, offline, report, showManaged]);
+  }, [clearLoad, offline, reportLoad, showManaged]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -147,6 +149,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
       className="surface-raised border-structural mt-4 rounded-xl border px-4 py-3">
       {t("myBookings.offlineAsOf", { time: formatDateTime(refreshedAt, i18n.language, grid.timeZone) })}
     </p>}
+    {loadError && <LoadFailure message={loadError} retry={() => void load()} />}
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-8 lg:grid-cols-2">

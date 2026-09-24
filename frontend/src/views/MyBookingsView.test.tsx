@@ -451,6 +451,20 @@ it("given a listed participation, when the member withdraws, then it is sent and
   expect(screen.getByRole("status")).toHaveTextContent("Participation withdrawn.");
 });
 
+it("given the bookings cannot be read, when the member tries again, then they appear without a reload", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockRejectedValueOnce(new Error("offline for a moment"));
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  expect(await screen.findByTestId("load-failure")).toHaveTextContent(i18n.t("error.generic"));
+
+  // when
+  await userEvent.click(screen.getByTestId("retry-load"));
+
+  // then
+  expect(await screen.findByTestId("upcoming-bookings")).toBeInTheDocument();
+  expect(screen.queryByTestId("load-failure"), "the failure leaves once the read succeeds").not.toBeInTheDocument();
+});
+
 it("given the withdrawal fails, when the member tries, then the reason is shown rather than swallowed", async () => {
   recordedAsCoPlayer();
   vi.spyOn(api, "withdrawParticipation").mockRejectedValue(
@@ -460,6 +474,7 @@ it("given the withdrawal fails, when the member tries, then the reason is shown 
   await userEvent.click(await screen.findByTestId("withdraw-participation"));
 
   expect(await screen.findByRole("alert")).toBeInTheDocument();
+  expect(screen.queryByTestId("retry-load"), "a refused action is not a failed load to repeat").not.toBeInTheDocument();
 });
 
 it("given more participations than one page, when the member asks for more, then the next page is appended", async () => {
