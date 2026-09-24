@@ -443,7 +443,7 @@ test("a guest-restricted booking card rejects a guest through the browser", asyn
   const createdCard = await cardCreated;
   expect(createdCard.status()).toBe(201);
   const restrictedEventCardId = ((await createdCard.json()) as { id: string }).id;
-  await expect(page.getByRole("status")).toBeVisible();
+  await expect(page.getByTestId("admin-save-success")).toBeVisible();
   await page.goto("/");
   await page.getByTestId("preferences-menu").click();
   await page.getByTestId("logout").click();

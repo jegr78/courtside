@@ -87,7 +87,22 @@ describe("AdminBookingCardView", () => {
       expect(screen.getByTestId("card-counts-add")).toBeDisabled();
     });
 
-  it("given a card, when its colour changes, then the preview shows the new colour before any save", async () => {
+  it("given a card, when a colour is chosen that leaves its label hard to read, then the board is told before saving", async () => {
+    // given
+    show();
+    const color = await screen.findByTestId("card-color");
+    expect(screen.getByTestId("card-color-contrast")).toHaveTextContent("reaches 4.5:1");
+
+    // when
+    fireEvent.change(color, { target: { value: "#777777" } });
+
+    // then
+    const reading = screen.getByTestId("card-color-contrast");
+    expect(reading).toHaveTextContent("does not reach 4.5:1");
+    expect(reading.className, "a failing card colour takes the warning tone the club colours use").toContain("bg-(--cs-notice-warning-surface)");
+  });
+
+  it("given a card, when its label changes, then the preview shows the new label before any save", async () => {
     // given
     show();
     await screen.findByTestId("card-label");
@@ -213,7 +228,7 @@ describe("AdminBookingCardView", () => {
       await screen.findAllByTestId("card-label");
 
       // then
-      expect(screen.queryByRole("status")).toBeNull();
+      expect(screen.queryByTestId("admin-save-success")).toBeNull();
     }
   });
 
@@ -223,14 +238,14 @@ describe("AdminBookingCardView", () => {
     vi.spyOn(api, "changeAdminBookingCard").mockRejectedValue(new Error("nope"));
     show("card-1", false, { cardCreated: true });
     await screen.findByTestId("card-label");
-    expect(screen.getByRole("status")).toHaveTextContent("The booking card was created.");
+    expect(screen.getByTestId("admin-save-success")).toHaveTextContent("The booking card was created.");
 
     // when
     await userEvent.click(screen.getByTestId("save-card"));
 
     // then
     expect(await screen.findByRole("alert")).toBeVisible();
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByTestId("admin-save-success")).toBeNull();
   });
 
   // Deactivating is not a save, so it must not answer for the fields somebody is still editing.

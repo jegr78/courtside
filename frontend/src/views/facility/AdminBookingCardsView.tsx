@@ -6,7 +6,7 @@ import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { formString } from "../../forms/formString";
 import { useUnsavedForm } from "../../unsaved/useUnsavedForm";
-import { AllowedRoleCheckboxes, BookingRules, Checkbox, ColorField, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
+import { AllowedRoleCheckboxes, BookingRules, CardColorField, Checkbox, DEFAULT_CARD_COLOR, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
 import { FacilityPage } from "./FacilityPage";
 import { useSaving } from "./useSaving";
 
@@ -16,7 +16,8 @@ export function AdminBookingCardsView() {
   const [cards, setCards] = useState<BookingCard[]>();
   const [counts, setCounts] = useState<number[]>([]);
   const { error, pending, reportError, save } = useSaving();
-  const newCard = useUnsavedForm("card:new", counts.length > 0);
+  const [color, setColor] = useState(DEFAULT_CARD_COLOR);
+  const newCard = useUnsavedForm("card:new", counts.length > 0 || color !== DEFAULT_CARD_COLOR);
   const disabled = pending.has("card:new");
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export function AdminBookingCardsView() {
         showGenericOccupancy: form.get("showGenericOccupancy") === "on"
       });
       setCounts([]);
+      setColor(DEFAULT_CARD_COLOR);
       newCard.saved();
       await navigate(`/admin/facility/booking-cards/${created.id}`, { state: { cardCreated: true } });
     });
@@ -45,7 +47,7 @@ export function AdminBookingCardsView() {
 
   return <FacilityPage testId="admin-booking-cards-view" title={t("admin.facility.cards")} error={error}>
     {cards !== undefined && <>
-      <CardCreateForm disabled={disabled} form={newCard.form} counts={counts} setCounts={setCounts} create={create} />
+      <CardCreateForm disabled={disabled} form={newCard.form} counts={counts} setCounts={setCounts} color={color} setColor={setColor} create={create} />
       <section className="grid gap-3">
         <h2 className="text-2xl font-bold">{t("admin.facility.allCards")}</h2>
         <div className="overflow-x-auto">
@@ -74,14 +76,14 @@ export function AdminBookingCardsView() {
   </FacilityPage>;
 }
 
-function CardCreateForm({ disabled, form, counts, setCounts, create }: { disabled: boolean; form: ReturnType<typeof useUnsavedForm>["form"]; counts: number[]; setCounts: (counts: number[]) => void; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+function CardCreateForm({ disabled, form, counts, setCounts, color, setColor, create }: { disabled: boolean; form: ReturnType<typeof useUnsavedForm>["form"]; counts: number[]; setCounts: (counts: number[]) => void; color: string; setColor: (color: string) => void; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const { t } = useTranslation();
   return <form noValidate {...form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-4 rounded-xl border p-4">
     <h2 className="font-bold">{t("admin.facility.newCard")}</h2>
     <div className="grid items-start gap-4 md:grid-cols-3">
       <TextField disabled={disabled} data-testid="new-card-label" name="label" label={t("admin.facility.label")} />
       <div className="grid content-start gap-4">
-        <ColorField disabled={disabled} name="color" />
+        <CardColorField testId="new-card-color" disabled={disabled} name="color" value={color} changed={setColor} />
         <Checkbox disabled={disabled} name="showGenericOccupancy" label={t("admin.facility.showGenericOccupancy")} />
       </div>
       <PlayerCounts idPrefix="new-card-counts" disabled={disabled} counts={counts} changed={setCounts} />

@@ -107,7 +107,7 @@ or closure. Add one card for every type the club needs.
 
 | Setting | Effect |
 |---|---|
-| **Label and colour** | Appearance in the court plan |
+| **Label and colour** | Appearance in the court plan. Courtside shows the contrast of the label against the colour and warns below 4.5 to 1 |
 | **Allowed roles** | Roles that may book with the card. With no selection, every signed-in person may book |
 | **Managing roles** | Roles that may open, inspect and cancel every booking made with this card |
 | **Allowed player counts** | Permitted participant counts. With no value, the card records no participants |
