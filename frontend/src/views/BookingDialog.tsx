@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, type Allocation, type BookingGrid, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { idempotencyKey } from "../api/idempotency";
-import { problemReference } from "../api/problem-message";
+import { problemReference, violationMessage } from "../api/problem-message";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
@@ -262,12 +262,12 @@ function translatedViolations(problem: Problem, t: ReturnType<typeof useTranslat
     ...(problem.violations ?? []).map((violation) => ({
       field: violationField(violation.code),
       code: violation.code,
-      message: t(violation.code, { ...violation.params, defaultValue: t("error.generic") })
+      message: violationMessage(violation.code, violation.params, t)
     })),
     ...(problem.fieldErrors ?? []).map((violation) => ({
       field: normalizedField(violation.field),
       code: violation.code,
-      message: t(violation.code, { ...violation.params, defaultValue: t("error.generic") })
+      message: violationMessage(violation.code, violation.params, t)
     }))
   ];
 }

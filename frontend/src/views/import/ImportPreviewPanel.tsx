@@ -5,6 +5,7 @@ import { api, type ImportPersonChange, type ImportPreview, type SnapshotMode } f
 import { NotUtf8Error, readCsvHeader } from "../../import/read-csv";
 import { Button } from "../../components/Button";
 import { isExpired } from "./previewState";
+import { violationMessage } from "../../api/problem-message";
 
 const MODES: SnapshotMode[] = ["UPDATE_ONLY", "FULL_SNAPSHOT"];
 
@@ -131,9 +132,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
       <Section testId="row-errors" heading={t("admin.import.rowErrors", { shown: preview.rowErrors.length })}>
         <ul className="grid gap-1">
           {preview.rowErrors.map((error) => <li key={error.rowNumber} data-testid={`row-error-${error.rowNumber}`}>
-            {t("admin.import.row", { row: error.rowNumber })} — {t(error.code, {
-              ...error.params, defaultValue: t("error.generic")
-            })}
+            {t("admin.import.row", { row: error.rowNumber })} — {violationMessage(error.code, error.params, t)}
           </li>)}
         </ul>
       </Section>

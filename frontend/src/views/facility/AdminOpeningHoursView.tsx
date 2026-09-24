@@ -12,6 +12,7 @@ import { describedByMark } from "../../unsaved/markId";
 import { UnsavedMark } from "../../unsaved/UnsavedMark";
 import { FacilityPage } from "./FacilityPage";
 import { useSaving } from "./useSaving";
+import { violationMessage } from "../../api/problem-message";
 
 type WeekDay = { dayOfWeek: DayOfWeek; opensAt: string; closesAt: string; closed: boolean };
 
@@ -190,7 +191,7 @@ function rejectedDays(failure: unknown, t: TFunction): Record<string, string> {
   for (const violation of failure.problem?.violations ?? []) {
     const day = violation.params?.day;
     if (typeof day === "string") {
-      marked[day] = t(violation.code, { ...violation.params, defaultValue: t("error.generic") });
+      marked[day] = violationMessage(violation.code, violation.params, t);
     }
   }
   return marked;

@@ -140,7 +140,7 @@ describe("ImportPreviewPanel", () => {
     expect(screen.getByTestId("duplicates-heading")).toHaveTextContent("1");
   });
 
-  it("given an unknown row error, when the preview is read, then a generic failure replaces its translation key", async () => {
+  it("given an unknown row error, when the preview is read, then it says this page does not know the reason yet", async () => {
     // given
     show({ ...preview, rowErrors: [{ rowNumber: 4, code: "import.snapshot.row.unknown", params: {} }] });
 
@@ -149,8 +149,8 @@ describe("ImportPreviewPanel", () => {
 
     // then
     const error = screen.getByTestId("row-error-4");
-    expect(error).toHaveTextContent("That did not work. Please try again.");
-    expect(error).not.toHaveTextContent("import.snapshot.row.unknown");
+    expect(error).toHaveTextContent("This version of the page does not know the reason for the refusal yet.");
+    expect(error, "an untranslated code is not presented as a generic failure").not.toHaveTextContent("That did not work.");
   });
 
   it("given a change touching somebody the club holds, when it is read, then it names them", async () => {

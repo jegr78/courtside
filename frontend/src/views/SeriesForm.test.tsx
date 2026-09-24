@@ -146,7 +146,7 @@ describe("SeriesForm", () => {
     expect(screen.getByTestId("series-occurrence-1")).toHaveTextContent("14");
   });
 
-  it("given an unknown rule violation, when the preview is read, then a generic failure replaces its translation key", async () => {
+  it("given an unknown rule violation, when the preview is read, then it says this page does not know the reason yet", async () => {
     // given
     vi.spyOn(api, "previewSeries").mockResolvedValue({
       creatableCount: 0, truncatedByHorizon: false, horizonLimit: null,
@@ -163,8 +163,8 @@ describe("SeriesForm", () => {
 
     // then
     const occurrence = await screen.findByTestId("series-occurrence-0");
-    expect(occurrence).toHaveTextContent("That did not work. Please try again.");
-    expect(occurrence).not.toHaveTextContent("booking.rule.unknown");
+    expect(occurrence).toHaveTextContent("This version of the page does not know the reason for the refusal yet.");
+    expect(occurrence, "an untranslated code is not presented as a generic failure").not.toHaveTextContent("That did not work.");
   });
 
   it("given a date the court is already taken on, when the preview is read, then it says so rather than staying blank", async () => {
