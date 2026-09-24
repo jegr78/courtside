@@ -781,7 +781,7 @@ test("a caution reads as a warning rather than a failure in both appearances", a
   await page.getByTestId("primary-color-value").fill("#777777");
 
   // then
-  await expect(caution).toHaveAttribute("role", "status");
+  await expect(caution, "a caution is announced politely, not as an alert").toHaveRole("status");
   for (const appearance of ["dark", "light"] as const) {
     if (appearance === "light") await selectPreference(page, "#theme-preference", appearance);
     const tone = (name: string) => page.evaluate((token) => {

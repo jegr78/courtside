@@ -31,6 +31,8 @@ describe("BuildIdentity", () => {
 
     // then
     expect(screen.getByTestId("environment-marker")).toHaveTextContent("UAT");
+    expect(screen.getByTestId("environment-marker").className, "the marker keeps its strong environment fill")
+      .toContain("bg-(--cs-environment-warning-surface)");
   });
 
   it("given a performance build, when rendered, then the disposable environment is identified", () => {
@@ -47,6 +49,8 @@ describe("BuildIdentity", () => {
 
     // then
     expect(screen.getByTestId("environment-warning")).toHaveAttribute("role", "alert");
+    expect(screen.getByTestId("environment-warning").className, "the missing identity keeps its strong environment fill")
+      .toContain("bg-(--cs-environment-error-surface)");
   });
 
   it("given build metadata, when opening details, then complete diagnostics can be copied", async () => {

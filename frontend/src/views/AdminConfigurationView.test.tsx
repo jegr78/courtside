@@ -162,6 +162,23 @@ describe("AdminConfigurationView", () => {
       .toContain("bg-(--cs-notice-warning-surface)");
   });
 
+  it("given a primary colour that passes, when a new one fails, then the same live region reports the change", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const picker = await screen.findByTestId("primary-color-picker");
+    fireEvent.change(picker, { target: { value: "#17211d" } });
+    const passing = screen.getByTestId("primary-color-contrast");
+    expect(passing).toHaveTextContent("reaches 4.5:1");
+
+    // when
+    fireEvent.change(picker, { target: { value: "#777777" } });
+
+    // then
+    expect(screen.getByTestId("primary-color-contrast"), "a region inserted with its content is not announced").toBe(passing);
+    expect(passing).toHaveTextContent("does not reach 4.5:1");
+    expect(passing.tagName, "a computed result stays an output").toBe("OUTPUT");
+  });
+
   it("given a high contrast accent colour, when it is shown, then the preview names the automatic text tone", async () => {
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);

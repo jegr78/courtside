@@ -15,6 +15,7 @@ import {
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { LocaleSelect } from "../components/LocaleSelect";
 import { Alert } from "../components/Alert";
+import { noticeColours } from "../components/noticeTones";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { SuccessFeedback } from "../components/SuccessFeedback";
@@ -61,9 +62,10 @@ function BrandColorField({ kind, label, value, changed }: {
               style={{ backgroundColor: value, color: contrast.textColor }}>
         {t("admin.config.colorPreview")}
       </button>
-      {contrast.ratio >= 4.5
-        ? <output data-testid={`${id}-contrast`} className="text-sm">{contrastSummary}</output>
-        : <Alert tone="warning" testId={`${id}-contrast`}>{contrastSummary}</Alert>}
+      <output data-testid={`${id}-contrast`}
+              className={`rounded-lg border p-3 text-sm ${noticeColours(contrast.ratio >= 4.5 ? "info" : "warning")}`}>
+        {contrastSummary}
+      </output>
     </>}
   </fieldset>;
 }

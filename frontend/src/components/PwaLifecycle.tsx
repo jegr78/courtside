@@ -21,7 +21,7 @@ export function PwaLifecycle() {
 
   if (registrationFailed) {
     return <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl shadow-xl" data-testid="pwa-registration-warning">
-      <Alert>{t("pwa.registrationFailed")}</Alert>
+      <Alert tone="warning">{t("pwa.registrationFailed")}</Alert>
     </div>;
   }
   if (!needsRefresh) {

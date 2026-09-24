@@ -16,8 +16,8 @@ describe("Alert", () => {
     const notice = screen.getByTestId("notice");
     expect(notice, `${tone} announces itself as ${role}`).toHaveAttribute("role", role);
     expect(notice.className, `${tone} draws its colours from ${token}`).toContain(`bg-(${token}-surface)`);
-    expect(notice.className).toContain(`border-(${token}-border)`);
-    expect(notice.className).toContain(`text-(${token}-text)`);
+    expect(notice.className, `${tone} draws its border from ${token}`).toContain(`border-(${token}-border)`);
+    expect(notice.className, `${tone} draws its text from ${token}`).toContain(`text-(${token}-text)`);
   });
 
   it("given no tone, when it is shown, then it is announced as an error", () => {

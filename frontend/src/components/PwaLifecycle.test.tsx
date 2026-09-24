@@ -63,7 +63,8 @@ describe("PwaLifecycle", () => {
 
     // then
     const warning = await screen.findByTestId("pwa-registration-warning");
-    expect(warning.querySelector("[role='alert']")).not.toBeNull();
+    expect(warning.querySelector("[role='status']"), "a degraded capability is a caution, the app still works").not.toBeNull();
+    expect(warning.querySelector("[role='alert']")).toBeNull();
     expect(warning).toHaveTextContent("Offline-Nutzung und automatische Update-Hinweise");
     expect(warning).toHaveTextContent("vertrauenswürdiges HTTPS-Zertifikat");
   });

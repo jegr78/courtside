@@ -34,6 +34,10 @@
   --cs-notice-success-surface: oklch(26.2% 0.051 172.552);
   --cs-notice-success-border: oklch(50.8% 0.118 165.612);
   --cs-notice-success-text: oklch(95% 0.052 163.051);
+  --cs-environment-warning-surface: oklch(92.4% 0.12 95.746);
+  --cs-environment-warning-text: oklch(27.9% 0.077 45.635);
+  --cs-environment-error-surface: oklch(88.5% 0.062 18.334);
+  --cs-environment-error-text: oklch(25.8% 0.092 26.042);
   --cs-notice-info-surface: var(--cs-raised);
   --cs-notice-info-border: var(--cs-border);
   --cs-notice-info-text: var(--cs-text);

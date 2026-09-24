@@ -96,11 +96,14 @@ test("given a class list, when it names a fixed palette colour, then the colour 
   assert.equal(paletteColours("className={`bg-red-200 hover:border-emerald-300/50`}").length, 2);
   assert.deepEqual(paletteColours('className="bg-(--cs-notice-warning-surface) text-(--cs-text) border-t-2 grid-cols-2"'), []);
   assert.deepEqual(paletteColours('const shade = "red-700";'), []);
+  assert.equal(paletteColours('className="ring-offset-sky-200 drop-shadow-rose-500 border-s-lime-400 bg-white"').length, 4);
+  assert.equal(paletteColours('className="bg-[#b45309]"; color: var(--color-amber-700);').length, 2);
+  assert.deepEqual(paletteColours('className="bg-(--cs-raised) text-[length:1rem] w-[2px]"'), []);
 });
 
-test("given the frontend sources, when a surface picks a colour, then it comes from the tokens", () => {
+test("given the frontend sources, when a surface picks a colour, then it names no fixed palette colour", () => {
   // given
-  const sources = sourceFiles(join(root, "frontend/src")).filter((path) => /\.(?:ts|tsx)$/.test(path) && !/\.test\.tsx?$/.test(path));
+  const sources = sourceFiles(join(root, "frontend/src")).filter((path) => /\.(?:ts|tsx|css)$/.test(path) && !/\.test\.tsx?$/.test(path));
 
   // when
   const violations = sources.flatMap((path) => {
@@ -114,10 +117,13 @@ test("given the frontend sources, when a surface picks a colour, then it comes f
 });
 
 function paletteColours(source) {
-  const palette = "red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone";
-  const utility = "bg|text|border(?:-[trblxy])?|outline|ring|fill|stroke|from|via|to|decoration|accent|caret|divide|shadow";
-  return [...source.matchAll(new RegExp(`(?<![\\w-])(?:[\\w-]+:)*(?:${utility})-(?:${palette})-\\d{2,3}(?:/\\d+)?(?![\\w-])`, "g"))]
-    .map((match) => match.index);
+  const palette = "red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone|mauve|olive|mist|taupe";
+  const utility = "bg|text|border(?:-[trblxyse])?|outline|ring(?:-offset)?|inset-ring|inset-shadow|text-shadow|drop-shadow|fill|stroke|from|via|to|decoration|accent|caret|divide|shadow";
+  const variants = "(?<![\\w-])(?:[^\\s\"'`]+:)*";
+  const named = `${variants}(?:${utility})-(?:(?:${palette})-\\d{2,3}|white|black)(?:/\\d+)?(?![\\w-])`;
+  const hex = `${variants}(?:${utility})-\\[#[0-9a-fA-F]{3,8}\\]`;
+  const themeColour = `--color-(?:${palette})-\\d{2,3}\\b`;
+  return [...source.matchAll(new RegExp(`${named}|${hex}|${themeColour}`, "g"))].map((match) => match.index);
 }
 
 function outlineRemovals(source) {
