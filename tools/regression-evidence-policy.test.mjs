@@ -12,7 +12,7 @@ const snapshots = new URL("../frontend/e2e/visual-regression.spec.ts-snapshots/"
 test("given stable product views, when qualifying the UI, then reviewed pixel baselines cover every principal surface", () => {
   const principalSurfaces = [
     "court-plan", "booking-dialog", "booking-validation", "personal-bookings",
-    "my-messages", "series-preview", "primary-navigation", "admin-navigation",
+    "my-messages", "series-preview", "primary-navigation", "admin-navigation", "admin-menu-folded",
     "admin-setup", "admin-configuration", "admin-courts", "admin-opening-hours", "admin-booking-cards",
     "admin-booking-card",
     "admin-slot-fillers", "admin-roster", "admin-membership-types",

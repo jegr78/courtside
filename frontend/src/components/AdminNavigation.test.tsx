@@ -166,4 +166,80 @@ describe("AdminNavigation", () => {
     expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
     expect(screen.getByTestId("admin-menu")).toHaveTextContent("Configuration");
   });
+
+  it("given a phone, when the folded navigation is read, then it reads as a menu rather than a field", () => {
+    // given
+    resizeTo(375);
+
+    // when
+    show("/admin/membership-types");
+
+    // then
+    const menu = screen.getByTestId("admin-menu");
+    expect(menu, "a menu trigger does not wear the text field's styling").not.toHaveClass("form-control");
+    expect(within(menu).getByTestId("admin-menu-indicator"), "the trigger shows that it opens").toBeInTheDocument();
+    expect(menu, "the trigger names the navigation and where the board is in it").toHaveAccessibleName("Administration Membership types");
+  });
+
+  it.each([
+    ["Escape", async () => { await userEvent.keyboard("{Escape}"); }],
+    ["a tap outside", async () => { await userEvent.click(document.body); }]
+  ])("given an open phone navigation, when %s dismisses it, then it folds away", async (_, dismiss) => {
+    // given
+    resizeTo(375);
+    show("/admin/setup");
+    await userEvent.click(screen.getByTestId("admin-menu"));
+    expect(screen.getByTestId("admin-navigation")).toHaveAttribute("open");
+
+    // when
+    await dismiss();
+
+    // then
+    expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
+  });
+
+  it("given an open phone navigation, when Escape folds it from inside, then the keyboard lands on the menu again", async () => {
+    // given
+    resizeTo(375);
+    show("/admin/setup");
+    await userEvent.click(screen.getByTestId("admin-menu"));
+    screen.getByTestId("admin-courts-link").focus();
+
+    // when
+    await userEvent.keyboard("{Escape}");
+
+    // then
+    expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
+    expect(screen.getByTestId("admin-menu"), "the focus does not fall back to the page").toHaveFocus();
+  });
+
+  it("given an open phone navigation, when the keyboard leaves it, then it folds away", async () => {
+    // given
+    resizeTo(375);
+    render(<MemoryRouter initialEntries={["/admin/setup"]}><AdminNavigation /><button type="button" data-testid="beyond">beyond</button></MemoryRouter>);
+    await userEvent.click(screen.getByTestId("admin-menu"));
+    screen.getByTestId("admin-operational-logs-link").focus();
+
+    // when
+    await userEvent.tab();
+
+    // then
+    expect(screen.getByTestId("beyond")).toHaveFocus();
+    expect(screen.getByTestId("admin-navigation"), "an overlay must not cover where the focus went").not.toHaveAttribute("open");
+  });
+
+  it("given an open phone navigation, when the window passes the breakpoint and returns, then it comes back folded", () => {
+    // given
+    resizeTo(375);
+    show("/admin/setup");
+    act(() => screen.getByTestId("admin-menu").click());
+    expect(screen.getByTestId("admin-navigation")).toHaveAttribute("open");
+
+    // when
+    act(() => resizeTo(1280));
+    act(() => resizeTo(375));
+
+    // then
+    expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
+  });
 });
