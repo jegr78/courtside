@@ -311,7 +311,10 @@ roles again.
 
 The **Records** area has five views.
 
-* **Utilisation** shows confirmed playing time by court. It includes courts without bookings.
+* **Utilisation** opens on the last full month. For each court it shows the confirmed playing time
+  and its share of the opening hours in the period. It includes courts without bookings. The share
+  uses the opening hours as they are configured today. Time booked outside the opening hours does
+  not count towards it, and closures count as occupied.
 * **Data export** creates CSV files for bookings or members. The booking export omits the person who
   booked. The member export contains personal data and creates no change-log entry.
 * **Change log** lists administrative changes with time, subject and acting account. Search by a
@@ -325,7 +328,7 @@ The **Records** area has five views.
   durable log archive and cannot inspect arbitrary server containers. The source is not
   authenticated: a local process on the server can imitate one of the fixed source names.
 
-![Utilisation by court with booking count, occupied time and share.](../screenshots/en/utilisation.png)
+![Utilisation by court with booking count, occupied time and share of the opening hours.](../screenshots/en/utilisation.png)
 
 ## Two rules that hold everywhere
 

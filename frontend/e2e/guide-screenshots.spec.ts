@@ -169,9 +169,12 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   },
   "utilisation": async (page, visualDate) => {
     await page.getByTestId("admin-utilisation-link").click();
+    await expect(page.getByTestId("utilisation-row-1")).toBeVisible();
+    const lastMonth = await page.getByTestId("utilisation-period").textContent() ?? "";
     await page.getByTestId("utilisation-from").fill(visualDate);
     await page.getByTestId("utilisation-to").fill(visualDate);
     await page.getByTestId("utilisation-read").click();
+    await expect(page.getByTestId("utilisation-period")).not.toHaveText(lastMonth);
     await expect(page.getByTestId("utilisation-row-1")).toBeVisible();
   }
 };

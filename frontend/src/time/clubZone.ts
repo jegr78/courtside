@@ -119,6 +119,10 @@ export function formatDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export function formatDateRange(from: string, to: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).formatRange(parseDate(from), parseDate(to));
+}
+
 export function parseDate(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);

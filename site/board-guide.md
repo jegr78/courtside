@@ -323,7 +323,10 @@ aktivieren und Mitgliedsrollen neu vergeben.
 
 Unter **Nachweise** findest du fünf Ansichten.
 
-* **Auslastung** zeigt bestätigte Spielzeit je Platz. Plätze ohne Buchung sind enthalten.
+* **Auslastung** zeigt beim Öffnen den letzten vollen Monat. Für jeden Platz stehen dort die
+  bestätigte Spielzeit und ihr Anteil an den Öffnungszeiten des Zeitraums. Plätze ohne Buchung sind
+  enthalten. Der Anteil rechnet mit den Öffnungszeiten, wie sie heute eingestellt sind. Spielzeit
+  außerhalb der Öffnungszeiten zählt nicht dazu, Sperrungen zählen als belegt.
 * **Datenexport** erstellt CSV-Dateien für Buchungen oder Mitglieder. Der Buchungsexport enthält
   keine buchende Person. Der Mitgliederexport enthält personenbezogene Daten und erzeugt keinen
   Eintrag im Änderungsprotokoll.
@@ -339,7 +342,7 @@ Unter **Nachweise** findest du fünf Ansichten.
   kein dauerhaftes Logarchiv und zeigt keine beliebigen Container des Servers. Die Quelle ist nicht
   authentifiziert: Ein lokaler Prozess auf dem Server kann einen der festen Quellnamen nachahmen.
 
-![Die Auslastung je Platz mit Buchungszahl, belegter Zeit und Anteil.](screenshots/de/utilisation.png)
+![Die Auslastung je Platz mit Buchungszahl, belegter Zeit und Anteil an den Öffnungszeiten.](screenshots/de/utilisation.png)
 
 ## Zwei Regeln, die überall gelten
 
