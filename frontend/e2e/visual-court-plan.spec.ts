@@ -35,11 +35,7 @@ for (const locale of locales) {
       await page.getByTestId("password").fill("temporary-password");
       await page.getByTestId("login-submit").click();
       await expect(page.getByTestId("court-plan-view")).toBeVisible();
-      if (viewport.width < 1024) {
-        await page.getByTestId("selected-date").fill(journeyDate);
-      } else {
-        await selectJourneyDate(page, journeyDate);
-      }
+      await selectJourneyDate(page, journeyDate);
 
       // then
       await expect(page.locator('[data-testid^="court-column-"]')).toHaveCount(4);

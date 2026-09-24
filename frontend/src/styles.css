@@ -259,28 +259,52 @@ input[type="time"] {
   background: repeating-linear-gradient(135deg, transparent 0 4px, var(--cs-muted) 4px 6px);
 }
 
-.mobile-day-navigation,
+.mobile-week-control,
 .court-heading-compact {
   display: none;
 }
 
+.week-day-navigation {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
 @media (width < 1024px) {
-  .desktop-day-navigation,
+  .desktop-week-controls,
+  .desktop-current-time,
   .desktop-week-date {
     display: none;
   }
 
-  .mobile-day-navigation {
+  .week-day-navigation {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-block: 0.5rem;
+    background: var(--cs-panel);
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
   }
 
-  .mobile-day-navigation {
-    display: grid;
+  .mobile-week-control {
+    display: inline-flex;
+    min-height: 44px;
+    scroll-snap-align: start;
+  }
+
+  .week-day-option {
+    flex: 0 0 7rem;
+    scroll-snap-align: start;
   }
 
   .day-plan {
     max-height: none;
     overflow: visible;
+    scroll-margin-top: 7rem;
   }
 
   .day-plan-table.day-plan-many-courts {

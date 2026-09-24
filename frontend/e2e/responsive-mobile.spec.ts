@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, selectJourneyDate, test } from "./fixtures";
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => {
@@ -202,7 +202,7 @@ test("member and administration surfaces remain usable on a touch viewport", asy
 
   // when
   await page.getByTestId("court-plan-link").tap();
-  await page.getByTestId("selected-date").fill(journeyService.visualDate);
+  await selectJourneyDate(page, journeyService.visualDate);
   await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]:visible').tap();
 
   // then
@@ -315,7 +315,7 @@ test("a free slot fills its cell and remains large enough to tap", async ({ page
   // given
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, "doe.jane");
-  await page.getByTestId("selected-date").fill(journeyService.visualDate);
+  await selectJourneyDate(page, journeyService.visualDate);
   const slot = page.locator('[data-testid="free-slot"][data-state="free"]').first();
   await expect(slot).toBeVisible();
 
@@ -342,6 +342,60 @@ test("a free slot fills its cell and remains large enough to tap", async ({ page
   expect(desktopGeometry.slot.height).toBeGreaterThanOrEqual(desktopGeometry.cell.height - 8);
 });
 
+test("the phone reaches the whole week before the first bookable row", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, "doe.jane");
+  const navigation = page.getByTestId("mobile-week-navigation");
+  await expect(navigation).toBeVisible();
+
+  // then — one compact strip owns week changes, day choices, and the return to now
+  await expect(navigation.locator('[data-testid^="day-selector-"]')).toHaveCount(7);
+  await expect(navigation.getByTestId("mobile-week-previous")).toBeVisible();
+  await expect(navigation.getByTestId("mobile-current-time")).toBeVisible();
+  await expect(navigation.getByTestId("mobile-week-next")).toBeVisible();
+  expect(await navigation.evaluate((element) => element.scrollWidth)).toBeGreaterThan(
+    await navigation.evaluate((element) => element.clientWidth)
+  );
+  const currentDay = navigation.locator('[data-testid^="day-selector-"][aria-pressed="true"]');
+  const currentDayId = await currentDay.getAttribute("data-testid");
+  expect(currentDayId).not.toBeNull();
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const firstBookable = page.locator('[data-testid="free-slot"][data-state="free"]').first();
+  const bounds = await firstBookable.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds!.y).toBeGreaterThanOrEqual(0);
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(844);
+
+  // when — any day in the shown week is a direct choice rather than a sequence of next-day steps
+  const lastDay = navigation.locator('[data-testid^="day-selector-"]').last();
+  await lastDay.click();
+
+  // then
+  await expect(lastDay).toHaveAttribute("aria-pressed", "true");
+
+  // when
+  await navigation.getByTestId("mobile-current-time").click();
+
+  // then
+  const restoredDay = navigation.getByTestId(currentDayId!);
+  await expect(restoredDay).toHaveAttribute("aria-pressed", "true");
+  await expect(restoredDay).toBeInViewport();
+
+  // when — returning from another week replaces the strip before today's card exists again
+  await navigation.getByTestId("mobile-week-next").click();
+  await expect(navigation.getByTestId(currentDayId!)).toHaveCount(0);
+  const otherWeekLastDay = navigation.locator('[data-testid^="day-selector-"]').last();
+  await otherWeekLastDay.click();
+  await navigation.getByTestId("mobile-current-time").click();
+
+  // then — the freshly loaded card is selected and scrolled back into the horizontal viewport
+  const restoredFromOtherWeek = navigation.getByTestId(currentDayId!);
+  await expect(restoredFromOtherWeek).toHaveAttribute("aria-pressed", "true");
+  await expect(restoredFromOtherWeek).toBeInViewport();
+});
+
 test("the phone plan shows every court's availability at once", async ({ page, journeyService }) => {
   // given
   await page.route("**/api/public/courts", async (route) => route.fulfill({
@@ -354,7 +408,7 @@ test("the phone plan shows every court's availability at once", async ({ page, j
     }))
   }));
   await signIn(page, "doe.jane");
-  await page.getByTestId("selected-date").fill(journeyService.visualDate);
+  await selectJourneyDate(page, journeyService.visualDate);
   const plan = page.getByTestId("week-grid");
   const headings = page.locator('[data-testid^="court-heading-"]');
   await expect(plan).toBeVisible();
@@ -381,14 +435,14 @@ test("a vertical gesture over the phone plan scrolls the page rather than a nest
 
   // when
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const selectedDate = page.getByTestId("selected-date");
-  const nextDate = await selectedDate.evaluate((element: HTMLInputElement) => {
-    const date = new Date(`${element.value}T12:00:00Z`);
-    date.setUTCDate(date.getUTCDate() + 1);
-    return date.toISOString().slice(0, 10);
-  });
-  await selectedDate.fill(nextDate);
+  const selectedDay = page.locator('[data-testid^="day-selector-"][aria-pressed="true"]');
+  const nextDay = selectedDay.locator("xpath=following-sibling::*[starts-with(@data-testid, 'day-selector-')][1]");
+  await nextDay.click();
 
   // then
-  await expect.poll(async () => Math.abs((await plan.boundingBox())?.y ?? Number.POSITIVE_INFINITY)).toBeLessThan(1);
+  await expect.poll(async () => {
+    const navigationBounds = await page.getByTestId("mobile-week-navigation").boundingBox();
+    const planBounds = await plan.boundingBox();
+    return navigationBounds && planBounds ? planBounds.y - (navigationBounds.y + navigationBounds.height) : -1;
+  }).toBeGreaterThanOrEqual(-1);
 });
