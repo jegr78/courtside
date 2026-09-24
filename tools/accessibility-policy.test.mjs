@@ -90,6 +90,36 @@ test("given the frontend sources, when a control styles its focus, then no class
   assert.deepEqual(violations, [], "a component class sits below the utilities, so outline-none defeats its focus outline");
 });
 
+test("given a class list, when it names a fixed palette colour, then the colour is found under every variant", () => {
+  // when / then
+  assert.equal(paletteColours('className="text-amber-700 dark:text-amber-300"').length, 2);
+  assert.equal(paletteColours("className={`bg-red-200 hover:border-emerald-300/50`}").length, 2);
+  assert.deepEqual(paletteColours('className="bg-(--cs-notice-warning-surface) text-(--cs-text) border-t-2 grid-cols-2"'), []);
+  assert.deepEqual(paletteColours('const shade = "red-700";'), []);
+});
+
+test("given the frontend sources, when a surface picks a colour, then it comes from the tokens", () => {
+  // given
+  const sources = sourceFiles(join(root, "frontend/src")).filter((path) => /\.(?:ts|tsx)$/.test(path) && !/\.test\.tsx?$/.test(path));
+
+  // when
+  const violations = sources.flatMap((path) => {
+    const source = readFileSync(path, "utf8");
+    return paletteColours(source).map((offset) =>
+      `${path.slice(root.length + 1)}:${source.slice(0, offset).split("\n").length}`);
+  });
+
+  // then
+  assert.deepEqual(violations, [], "a fixed palette colour ignores the chosen appearance and the club's tokens");
+});
+
+function paletteColours(source) {
+  const palette = "red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone";
+  const utility = "bg|text|border(?:-[trblxy])?|outline|ring|fill|stroke|from|via|to|decoration|accent|caret|divide|shadow";
+  return [...source.matchAll(new RegExp(`(?<![\\w-])(?:[\\w-]+:)*(?:${utility})-(?:${palette})-\\d{2,3}(?:/\\d+)?(?![\\w-])`, "g"))]
+    .map((match) => match.index);
+}
+
 function outlineRemovals(source) {
   return [...source.matchAll(/(?<![\w-])(?:[\w-]+:)*outline-(?:none|hidden)(?![\w-])/g)].map((match) => match.index);
 }
