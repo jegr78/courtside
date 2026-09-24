@@ -13,4 +13,6 @@ public interface CourtUtilisationRow {
     long getBookingCount();
 
     long getOccupiedMinutes();
+
+    long getOccupiedOpenMinutes();
 }

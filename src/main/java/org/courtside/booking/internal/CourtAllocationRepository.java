@@ -54,18 +54,25 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
                    CAST(COALESCE(SUM(EXTRACT(EPOCH FROM
                        (LEAST(a.ends_at, :to) - GREATEST(a.starts_at, :from))))
                        FILTER (WHERE a.id IS NOT NULL), 0) / 60
-                       AS bigint) AS "occupiedMinutes"
+                       AS bigint) AS "occupiedMinutes",
+                   CAST(COALESCE(SUM(open_time.seconds), 0) / 60 AS bigint) AS "occupiedOpenMinutes"
             FROM court c
             LEFT JOIN court_allocation a
               ON a.court_id = c.id
              AND a.status = 'CONFIRMED'
              AND a.starts_at < :to
              AND a.ends_at > :from
+            LEFT JOIN LATERAL (
+                SELECT SUM(EXTRACT(EPOCH FROM upper(r) - lower(r))) AS seconds
+                FROM unnest(tstzmultirange(tstzrange(a.starts_at, a.ends_at))
+                            * CAST(:openTime AS tstzmultirange)) AS r
+            ) open_time ON a.id IS NOT NULL
             GROUP BY c.id, c.number, c.name
             ORDER BY c.number
             """, nativeQuery = true)
     List<CourtUtilisationRow> facilityUtilisation(@Param("from") Instant from,
-                                                   @Param("to") Instant to);
+                                                   @Param("to") Instant to,
+                                                   @Param("openTime") String openTime);
 
     @Query("""
             SELECT DISTINCT a.courtId FROM CourtAllocation a

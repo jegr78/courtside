@@ -2095,25 +2095,53 @@ components:
     CourtUtilisation:
       type: object
       description: Confirmed court time intersecting the requested local-date period.
-      required: [courtId, courtNumber, courtName, bookingCount, occupiedMinutes]
+      required: [courtId, courtNumber, courtName, bookingCount, occupiedMinutes, occupiedOpenMinutes, occupancy]
       properties:
         courtId: { type: string, format: uuid }
         courtNumber: { type: integer, format: int32, minimum: 1, maximum: 999 }
         courtName: { type: [string, "null"] }
         bookingCount: { type: integer, format: int64, minimum: 0 }
-        occupiedMinutes: { type: integer, format: int64, minimum: 0 }
+        occupiedMinutes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Confirmed minutes inside the period, whether or not the facility was open.
+        occupiedOpenMinutes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: The part of `occupiedMinutes` that falls inside the facility's opening hours.
+        occupancy:
+          type: [number, "null"]
+          format: double
+          minimum: 0
+          maximum: 1
+          description: |
+            `occupiedOpenMinutes` divided by the report's `openMinutes`: 0.25 means the court was
+            held for a quarter of the time the facility was open. Null when the facility had no open
+            minutes in the period.
 
     FacilityUtilisation:
       type: object
       description: |
         Booked occupancy for every court, including inactive courts and courts with no confirmed
-        allocation in the period. Cancelled allocations do not contribute. The dates are interpreted
-        in `timeZone`; allocations crossing either boundary contribute only their intersecting minutes.
-      required: [from, to, timeZone, courts]
+        allocation in the period. Cancelled allocations do not contribute; closures are bookings and
+        do. The dates are interpreted in `timeZone`; allocations crossing either boundary contribute
+        only their intersecting minutes.
+      required: [from, to, timeZone, openMinutes, courts]
       properties:
         from: { type: string, format: date }
         to: { type: string, format: date }
         timeZone: { type: string }
+        openMinutes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: |
+            Minutes the facility was open in the period, from the weekly opening hours as they are
+            configured now. Each day's window is read as wall-clock time in `timeZone`, so a day
+            that changes to or from daylight saving time counts the minutes that actually elapsed.
+            The same for every court: the product keeps no dated court availability.
         courts:
           type: array
           items: { $ref: "#/components/schemas/CourtUtilisation" }
@@ -6065,19 +6093,20 @@ paths:
     get:
       tags: [admin-reports]
       operationId: facilityUtilisation
-      summary: How much confirmed booking time each court held in a local-date period.
+      summary: How much of the facility's open time each court was booked in a local-date period.
       description: |
-        `from` and `to` are inclusive dates in the club time zone. The period may span at most 366
-        days. Courts remain in number order even when inactive or unused, so exported comparisons
-        keep a stable shape.
+        `from` and `to` are inclusive dates in the club time zone. Both are given or both are
+        omitted; without them the report covers the last full calendar month in the club time zone.
+        The period may span at most 366 days. Courts remain in number order even when inactive or
+        unused, so exported comparisons keep a stable shape.
       parameters:
         - name: from
           in: query
-          required: true
+          required: false
           schema: { type: string, format: date }
         - name: to
           in: query
-          required: true
+          required: false
           schema: { type: string, format: date }
       responses:
         "200":

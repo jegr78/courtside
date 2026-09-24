@@ -1,14 +1,25 @@
 package org.courtside.booking.internal;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
-final class ReportingPeriod {
+record ReportingPeriod(LocalDate from, LocalDate to) {
 
     private static final long MAX_DAYS = 366;
 
-    private ReportingPeriod() {
+    static ReportingPeriod resolve(LocalDate from, LocalDate to, LocalDate today) {
+        if (from == null && to == null) {
+            YearMonth lastMonth = YearMonth.from(today).minusMonths(1);
+            return new ReportingPeriod(lastMonth.atDay(1), lastMonth.atEndOfMonth());
+        }
+        if (from == null || to == null) {
+            throw new FacilityUtilisationPeriodInvalidException(
+                    "booking.facilityUtilisation.periodIncomplete", Map.of());
+        }
+        validate(from, to);
+        return new ReportingPeriod(from, to);
     }
 
     static void validate(LocalDate from, LocalDate to) {
