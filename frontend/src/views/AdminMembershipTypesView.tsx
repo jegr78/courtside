@@ -112,17 +112,17 @@ export function AdminMembershipTypesView() {
             ? <p data-testid="membership-types-empty">{t("admin.membershipTypes.empty")}</p>
             : <table className="block w-full text-left md:table md:table-fixed">
               <colgroup>
-                <col className="md:w-[30%]" />
-                <col className="md:w-[22%]" />
-                <col className="md:w-[12%]" />
-                <col className="md:w-[10%]" />
                 <col className="md:w-[26%]" />
+                <col className="md:w-[27%]" />
+                <col className="md:w-[10%]" />
+                <col className="md:w-[9%]" />
+                <col className="md:w-[28%]" />
               </colgroup>
               <thead className="sr-only md:not-sr-only">
                 <tr>
                   <th scope="col" className="p-2">{t("admin.membershipTypes.name")}</th>
                   <th scope="col" className="p-2">{t("admin.membershipTypes.ruleSet")}</th>
-                  <th scope="col" className="p-2">{t("admin.membershipTypes.grantsAccount")}</th>
+                  <th scope="col" className="p-2">{t("admin.membershipTypes.grantsAccountColumn")}</th>
                   <th scope="col" className="p-2">{t("admin.membershipTypes.members")}</th>
                   <th scope="col" className="p-2"><span className="sr-only">{t("admin.membershipTypes.actions")}</span></th>
                 </tr>
@@ -199,13 +199,13 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
     </th>
     <td className={cell}>
       <span aria-hidden="true" data-testid="membership-type-label-rule-set" className={label}>{t("admin.membershipTypes.ruleSet")}</span>
-      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         <select data-testid={`membership-type-rule-set-${type.id}`} aria-label={t("admin.membershipTypes.ruleSet")} disabled={disabled}
                 className="form-control w-0 min-w-28 flex-1 rounded-lg border px-3 py-1.5" value={ruleSetId} onChange={(event) => setRuleSetId(event.target.value)}>
           <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
           {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
         </select>
-        {type.ruleSetId && <Link data-testid={`membership-type-rules-link-${type.id}`} className="shrink-0 text-xs leading-tight underline"
+        {type.ruleSetId && <Link data-testid={`membership-type-rules-link-${type.id}`} className="inline-flex min-h-6 shrink-0 items-center text-xs whitespace-nowrap underline"
                                  to={`/admin/configuration?ruleSetId=${encodeURIComponent(type.ruleSetId)}#rule-set`}>
           {t("admin.membershipTypes.ruleSetLink")}
         </Link>}
