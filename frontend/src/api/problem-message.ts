@@ -5,6 +5,10 @@ const TYPE_PREFIX = "urn:courtside:error:";
 // A default no bundle carries, so a missing key is told apart from a translation.
 const MISSING = "\u0000missing";
 
+export function isUnauthenticated(failure: unknown): boolean {
+  return failure instanceof ApiError && failure.problem?.type === `${TYPE_PREFIX}unauthenticated`;
+}
+
 export function problemMessage(failure: unknown, t: TFunction): string {
   if (!(failure instanceof ApiError) || !failure.problem) {
     return t("error.generic");
@@ -38,7 +42,7 @@ export function violationMessage(code: string, params: Record<string, unknown>, 
 function translatedProblem(problem: Problem, t: TFunction): string {
   const coded = firstCodedFailure(problem);
   if (coded) return violationMessage(coded.code, coded.params, t);
-  const slug = problem.type.startsWith(TYPE_PREFIX) ? problem.type.slice(TYPE_PREFIX.length) : undefined;
+  const slug = problem.type?.startsWith(TYPE_PREFIX) ? problem.type.slice(TYPE_PREFIX.length) : undefined;
   const message = slug ? t(`error.type.${slug}`, { defaultValue: MISSING }) : MISSING;
   return message === MISSING ? t("error.generic") : message;
 }

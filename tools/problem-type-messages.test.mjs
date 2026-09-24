@@ -16,6 +16,10 @@ export function declaredProblemTypes(sources) {
   return [...slugs].sort();
 }
 
+function unreadDeclarations(sources) {
+  return sources.flatMap((source) => [...source.matchAll(/new ProblemType\((?!\s*")\s*([^,)]*)/g)].map((match) => match[1].trim()));
+}
+
 function javaSources(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => entry.isDirectory()
     ? javaSources(join(directory, entry.name))
@@ -47,6 +51,8 @@ test("given every problem type the instance declares, when each locale is read, 
 
   // then
   assert.ok(declared.length > 50, `only ${declared.length} problem types were found, so the scan is not reading the declarations`);
+  assert.deepEqual(unreadDeclarations(javaSources(join(root, "src/main/java"))), [],
+    "a problem type whose slug is not a literal cannot be matched to its message");
   assert.deepEqual(inDe, declared, "de must carry one \"error.type.<slug>\" message per declared problem type and no other");
   assert.deepEqual(inEn, declared, "en must carry one \"error.type.<slug>\" message per declared problem type and no other");
 });

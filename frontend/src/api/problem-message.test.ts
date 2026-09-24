@@ -1,10 +1,14 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import i18n from "../i18n";
 import { ApiError } from "./client";
 import { problemMessage, violationMessage } from "./problem-message";
 
 beforeEach(async () => {
   await i18n.changeLanguage("en");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 it("given a coded violation, when resolving the problem, then its i18n key is translated", () => {
@@ -42,7 +46,6 @@ it("given a production build, when a violation code is untranslated, then the pa
 
   // then
   expect(message).toBe(i18n.t("error.unknownViolation"));
-  vi.unstubAllEnvs();
 });
 
 it("given a problem type a board can act on, when it carries no violation, then its own message is shown", () => {
@@ -62,6 +65,22 @@ it("given a concurrent booking loss, when resolving it, then the stable type is 
 
   // when / then
   expect(problemMessage(error, i18n.t)).toBe("Someone else just booked this court. Choose another time.");
+});
+
+it("given a problem without a type, when resolving it, then the generic message is shown", () => {
+  // given
+  const error = new ApiError(400, { title: "Untyped", status: 400 } as unknown as ConstructorParameters<typeof ApiError>[1]);
+
+  // when / then
+  expect(problemMessage(error, i18n.t)).toBe(i18n.t("error.generic"));
+});
+
+it("given an ended session, when a request is refused as unauthenticated, then the member reads that they are signed out", () => {
+  // given
+  const error = new ApiError(401, { type: "urn:courtside:error:unauthenticated", title: "Not authenticated", status: 401 });
+
+  // when / then
+  expect(problemMessage(error, i18n.t), "a refused request is not a wrong password").toBe("You are no longer signed in. Sign in again.");
 });
 
 it("given a problem type this client does not know, when resolving it, then the generic message is shown", () => {

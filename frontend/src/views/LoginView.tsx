@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { problemMessage } from "../api/problem-message";
+import { isUnauthenticated, problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
@@ -26,7 +26,7 @@ export function LoginView({ refreshSession, passwordChanged = false }: { refresh
       await api.login(username, password);
       await refreshSession();
     } catch (failure) {
-      setError(problemMessage(failure, t));
+      setError(isUnauthenticated(failure) ? t("auth.failed") : problemMessage(failure, t));
     } finally {
       setPending(false);
     }
