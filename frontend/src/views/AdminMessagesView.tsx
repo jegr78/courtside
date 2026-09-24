@@ -6,6 +6,8 @@ import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { formatDateTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
+import { LoadFailure } from "../components/LoadFailure";
+import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
 
 function outcomeOf(entry: MessageEntry): string | undefined {
@@ -16,12 +18,13 @@ function outcomeOf(entry: MessageEntry): string | undefined {
 export function AdminMessagesView() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage ?? i18n.language;
-  const { club, error: clubError } = useClubConfiguration();
+  const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const [entries, setEntries] = useState<MessageEntry[]>();
   const [cursor, setCursor] = useState<string>();
   const [unsettled, setUnsettled] = useState(false);
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
+  const [loadAttempt, retryLoad] = useRetry();
 
   const reportError = useCallback((failure: unknown) => setError(problemMessage(failure, t)), [t]);
   const reportErrorRef = useRef(reportError);
@@ -38,7 +41,7 @@ export function AdminMessagesView() {
         setError(undefined);
       })
       .catch((failure: unknown) => reportErrorRef.current(failure));
-  }, [unsettled]);
+  }, [loadAttempt, unsettled]);
 
   async function readNextPage() {
     if (pending) return;
@@ -69,7 +72,7 @@ export function AdminMessagesView() {
       {t("messages.onlyUnsettled")}
     </label>
     {!entries || !club
-      ? (problem ? <Alert>{problem}</Alert> : <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
       : <>
         {problem && <Alert>{problem}</Alert>}
         {entries.some((entry) => entry.state === "REFUSED")

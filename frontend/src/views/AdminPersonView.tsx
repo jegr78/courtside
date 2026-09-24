@@ -6,6 +6,8 @@ import { problemMessage } from "../api/problem-message";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
+import { LoadFailure } from "../components/LoadFailure";
+import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
 import { LocaleSelect } from "../components/LocaleSelect";
 import { Modal } from "../components/Modal";
@@ -41,7 +43,7 @@ export function AdminPersonView() {
   const { message: error, report, clear } = useReportedFailure();
   const location = useLocation();
   const { personId = "" } = useParams();
-  const { club, error: clubError } = useClubConfiguration();
+  const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const [entry, setEntry] = useState<RosterEntry>();
   const [types, setTypes] = useState<MembershipType[]>([]);
   const [success, setSuccess] = useState<string | undefined>(() => arrivedFromPersonCreation(location.state as unknown)
@@ -50,6 +52,7 @@ export function AdminPersonView() {
   const [pending, setPending] = useState(false);
   const [retry, setRetry] = useState<{ run: () => Promise<void> }>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
+  const [loadAttempt, retryLoad] = useRetry();
 
   const reportError = useCallback((failure: unknown) => {
     setSuccess(undefined);
@@ -75,7 +78,7 @@ export function AdminPersonView() {
         setTypes(membershipTypes);
       })
       .catch(reportError);
-  }, [personId, reportError]);
+  }, [loadAttempt, personId, reportError]);
 
   async function mutate(change: () => Promise<RosterEntry>,
                        message = "admin.roster.saved"): Promise<RosterEntry | undefined> {
@@ -165,7 +168,7 @@ export function AdminPersonView() {
       <Link data-testid="back-to-roster" to="/admin/roster" className="font-semibold underline">{t("admin.person.backToRoster")}</Link>
     </div>
     {!entry || !club
-      ? (problem ? <Alert>{problem}</Alert> : <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { clear(); loadClub(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
       : <>
         {problem && <Alert>{problem}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}

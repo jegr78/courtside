@@ -6,6 +6,8 @@ import {
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
+import { LoadFailure } from "../components/LoadFailure";
+import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
 import { formatDateTime, zonedDateTime } from "../time/clubZone";
 
@@ -41,13 +43,14 @@ function requestFor(filters: Filters, timeZone: string, cursor?: string): Operat
 export function AdminOperationalLogsView() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage ?? i18n.language;
-  const { club, error: clubError } = useClubConfiguration();
+  const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const [draft, setDraft] = useState<Filters>(emptyFilters);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [page, setPage] = useState<OperationalLogPage>();
   const [entries, setEntries] = useState<OperationalLogEntry[]>([]);
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
+  const [loadAttempt, retryLoad] = useRetry();
 
   const reportError = useCallback((failure: unknown) => setError(problemMessage(failure, t)), [t]);
   const reportErrorRef = useRef(reportError);
@@ -55,8 +58,6 @@ export function AdminOperationalLogsView() {
 
   useEffect(() => {
     if (!club) return;
-    setPage(undefined);
-    setEntries([]);
     let criteria: OperationalLogSearchRequest;
     try {
       criteria = requestFor(filters, club.timeZone);
@@ -67,6 +68,8 @@ export function AdminOperationalLogsView() {
       }
       throw failure;
     }
+    setPage(undefined);
+    setEntries([]);
     let active = true;
     void api.operationalLogs(criteria)
       .then((result) => {
@@ -77,7 +80,7 @@ export function AdminOperationalLogsView() {
       })
       .catch((failure: unknown) => { if (active) reportErrorRef.current(failure); });
     return () => { active = false; };
-  }, [club, filters, t]);
+  }, [club, filters, loadAttempt, t]);
 
   function change(name: keyof Filters, value: string) {
     setDraft((current) => ({ ...current, [name]: value }));
@@ -136,7 +139,7 @@ export function AdminOperationalLogsView() {
       </div>
     </form>
     {!page || !club
-      ? (problem ? <Alert testId="operational-logs-problem">{problem}</Alert> : <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
       : <>
         {problem && <Alert testId="operational-logs-problem">{problem}</Alert>}
         {page.availability === "UNAVAILABLE"

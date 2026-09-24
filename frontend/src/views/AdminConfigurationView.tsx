@@ -15,6 +15,8 @@ import {
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { LocaleSelect } from "../components/LocaleSelect";
 import { Alert } from "../components/Alert";
+import { LoadFailure } from "../components/LoadFailure";
+import { useRetry } from "../failures/useRetry";
 import { ContrastReading } from "../components/ContrastReading";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
@@ -110,6 +112,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   const [ruleSetName, setRuleSetName] = useState("");
   const [pending, setPending] = useState(false);
   const [success, setSuccess] = useState<string>();
+  const [loadAttempt, retryLoad] = useRetry();
   useFragmentTarget("slot-minutes", config !== undefined);
   const [search] = useSearchParams();
   const requestedRuleSetId = useRef(search.get("ruleSetId"));
@@ -139,7 +142,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     return () => {
       active = false;
     };
-  }, [report]);
+  }, [loadAttempt, report]);
 
   useEffect(() => {
     setRules([]);
@@ -347,7 +350,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   return <section data-testid="admin-configuration-view" className="surface-panel min-w-0 grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl sm:p-8">
     <h1 className="text-3xl font-bold">{t("admin.config.title")}</h1>
     {!config
-      ? (error ? <Alert testId="admin-error">{error}</Alert> : <p role="status">{t("status.loading")}</p>)
+      ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
