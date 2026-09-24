@@ -104,16 +104,34 @@ export function AdminMembershipTypesView() {
         {error && <Alert>{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
         <section className="grid gap-4">
-          {types.length === 0 && <p data-testid="membership-types-empty">{t("admin.membershipTypes.empty")}</p>}
-          {types.map((type) => <MembershipTypeCard
-            key={type.id}
-            type={type}
-            ruleSets={ruleSets}
-            holders={holders[type.id]}
-            disabled={pending}
-            save={(request) => saveType(type.id, request)}
-            toggle={() => toggleType(type)}
-          />)}
+          <div className="text-muted grid gap-1 text-sm">
+            <p data-testid="membership-types-grants-account-note">{t("admin.membershipTypes.grantsAccountNote")}</p>
+            <p data-testid="membership-types-retire-note">{t("admin.membershipTypes.retireNote")}</p>
+          </div>
+          {types.length === 0
+            ? <p data-testid="membership-types-empty">{t("admin.membershipTypes.empty")}</p>
+            : <table className="block w-full text-left md:table">
+              <thead className="sr-only md:not-sr-only">
+                <tr>
+                  <th scope="col" className="p-2">{t("admin.membershipTypes.name")}</th>
+                  <th scope="col" className="p-2">{t("admin.membershipTypes.ruleSet")}</th>
+                  <th scope="col" className="p-2">{t("admin.membershipTypes.grantsAccount")}</th>
+                  <th scope="col" className="p-2">{t("admin.membershipTypes.members")}</th>
+                  <th scope="col" className="p-2"><span className="sr-only">{t("admin.membershipTypes.actions")}</span></th>
+                </tr>
+              </thead>
+              <tbody className="grid gap-3 md:table-row-group">
+                {types.map((type) => <MembershipTypeRow
+                  key={type.id}
+                  type={type}
+                  ruleSets={ruleSets}
+                  holders={holders[type.id]}
+                  disabled={pending}
+                  save={(request) => saveType(type.id, request)}
+                  toggle={() => toggleType(type)}
+                />)}
+              </tbody>
+            </table>}
         </section>
         <form noValidate {...newType.form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
           <h2 className="text-2xl font-bold">{t("admin.membershipTypes.newType")}</h2>
@@ -131,14 +149,13 @@ export function AdminMembershipTypesView() {
             <input data-testid="new-membership-type-grants-account" disabled={pending} name="grantsAccount" type="checkbox" className="size-5" />
             {t("admin.membershipTypes.grantsAccount")}
           </label>
-          <p className="text-muted text-sm">{t("admin.membershipTypes.grantsAccountNote")}</p>
           <Button variant="primary" data-testid="create-membership-type" disabled={pending} className="justify-self-start" type="submit">{t("admin.create")}</Button>
         </form>
       </>}
   </section>;
 }
 
-function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }: {
+function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: {
   type: MembershipType;
   ruleSets: RuleSet[];
   holders: Holders | undefined;
@@ -154,39 +171,50 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
   const unsaved = differs(
     { name, ruleSetId: ruleSetId || null, grantsAccount },
     { name: type.name, ruleSetId: type.ruleSetId ?? null, grantsAccount: type.grantsAccount });
+  const cell = "grid min-w-0 gap-2 md:table-cell md:border-t md:p-2 md:align-top";
 
-  return <article data-testid={`membership-type-${type.id}`} className="surface-subtle grid gap-3 rounded-xl border p-4">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <span data-testid={`membership-type-state-${type.id}`} className="font-medium">
+  return <tr data-testid={`membership-type-${type.id}`} className="surface-subtle grid gap-3 rounded-xl border p-4 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">
+    <th scope="row" className={`${cell} font-normal`}>
+      <input data-testid={`membership-type-name-${type.id}`} aria-label={t("admin.membershipTypes.name")} disabled={disabled}
+             maxLength={NAME_LENGTH} className="form-control w-full min-w-0 rounded-lg border px-3 py-2 font-semibold"
+             value={name} onChange={(event) => setName(event.target.value)} />
+      <span data-testid={`membership-type-state-${type.id}`} className={`text-sm ${type.active ? "text-muted" : "font-semibold"}`}>
         {t(type.active ? "admin.membershipTypes.offered" : "admin.membershipTypes.retired")}
       </span>
+    </th>
+    <td className={cell}>
+      <select data-testid={`membership-type-rule-set-${type.id}`} aria-label={t("admin.membershipTypes.ruleSet")} disabled={disabled}
+              className="form-control w-full min-w-0 rounded-lg border px-3 py-2" value={ruleSetId} onChange={(event) => setRuleSetId(event.target.value)}>
+        <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
+        {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
+      </select>
+      {type.ruleSetId && <Link data-testid={`membership-type-rules-link-${type.id}`} className="text-sm underline"
+                               to={`/admin/configuration?ruleSetId=${encodeURIComponent(type.ruleSetId)}#rule-set`}>
+        {t("admin.membershipTypes.ruleSetLink")}
+      </Link>}
+    </td>
+    <td className={cell}>
+      <label className="flex items-center gap-2 font-medium">
+        <input data-testid={`membership-type-grants-account-${type.id}`} disabled={disabled} type="checkbox" className="size-5"
+               checked={grantsAccount} onChange={(event) => setGrantsAccount(event.target.checked)} />
+        <span className="md:sr-only">{t("admin.membershipTypes.grantsAccount")}</span>
+      </label>
+    </td>
+    <td className={cell}>
       <Link data-testid={`membership-type-holders-${type.id}`} className="font-semibold underline" to={`/admin/roster?membershipTypeId=${type.id}`}>
         {holders
           ? t("admin.membershipTypes.holders", { holders: holders.more ? `${holders.count}+` : String(holders.count) })
           : t("status.loading")}
       </Link>
-    </div>
-    <div className="grid gap-3 md:grid-cols-2">
-      <TextField data-testid={`membership-type-name-${type.id}`} disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.membershipTypes.name")} value={name} onChange={(event) => setName(event.target.value)} />
-      <label className="grid gap-2 font-medium">
-        {t("admin.membershipTypes.ruleSet")}
-        <select data-testid={`membership-type-rule-set-${type.id}`} disabled={disabled} className="form-control rounded-lg border px-3 py-3" value={ruleSetId} onChange={(event) => setRuleSetId(event.target.value)}>
-          <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
-          {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
-        </select>
-      </label>
-    </div>
-    <label className="flex items-center gap-2 font-medium">
-      <input data-testid={`membership-type-grants-account-${type.id}`} disabled={disabled} type="checkbox" className="size-5" checked={grantsAccount} onChange={(event) => setGrantsAccount(event.target.checked)} />
-      {t("admin.membershipTypes.grantsAccount")}
-    </label>
-    <p className="text-muted text-sm">{t("admin.membershipTypes.grantsAccountNote")}</p>
-    <Link data-testid={`membership-type-rules-link-${type.id}`} className="underline" to="/admin/configuration">{t("admin.membershipTypes.ruleSetLink")}</Link>
-    <div className="grid gap-2 md:grid-cols-[auto_1fr] md:items-center">
-      <Button variant="primary" data-testid={`save-membership-type-${type.id}`} aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>
-      <span><UnsavedMark id={mark} unsaved={unsaved} /></span>
-      <Button variant={type.active ? "destructive" : "primary"} data-testid={`toggle-membership-type-${type.id}`} disabled={disabled} type="button" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
-      {type.active && <p data-testid={`membership-type-retire-note-${type.id}`} className="text-muted text-sm">{t("admin.membershipTypes.retireNote")}</p>}
-    </div>
-  </article>;
+    </td>
+    <td className={cell}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="primary" data-testid={`save-membership-type-${type.id}`} aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button"
+                className="px-3 py-2" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>
+        <Button variant={type.active ? "destructive" : "primary"} data-testid={`toggle-membership-type-${type.id}`} disabled={disabled} type="button"
+                className="px-3 py-2" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
+        <UnsavedMark id={mark} unsaved={unsaved} />
+      </div>
+    </td>
+  </tr>;
 }

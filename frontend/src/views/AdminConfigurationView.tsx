@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   api,
   type AdminClubConfig,
@@ -119,6 +119,9 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
   const [pending, setPending] = useState(false);
   const [success, setSuccess] = useState<string>();
   useFragmentTarget("slot-minutes", config !== undefined);
+  const [search] = useSearchParams();
+  const requestedRuleSetId = useRef(search.get("ruleSetId"));
+  useFragmentTarget("rule-set", selectedRuleSetId !== "");
 
   useEffect(() => {
     let active = true;
@@ -133,8 +136,9 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         setRuleTypes(loadedRuleTypes);
         setMembershipTypes(loadedMembershipTypes);
         if (selectedRuleSetIdRef.current === "") {
-          selectRuleSet(loadedRuleSets[0]?.id ?? "");
-          setRuleSetName(loadedRuleSets[0]?.name ?? "");
+          const initial = loadedRuleSets.find((ruleSet) => ruleSet.id === requestedRuleSetId.current) ?? loadedRuleSets[0];
+          selectRuleSet(initial?.id ?? "");
+          setRuleSetName(initial?.name ?? "");
         }
       })
       .catch((failure) => {
@@ -442,7 +446,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
           <h2 className="text-2xl font-bold">{t("admin.rules.title")}</h2>
           <label className="grid gap-2 font-medium">
             {t("admin.rules.ruleSet")}
-            <select data-testid="rule-set" className="form-control rounded-lg border px-3 py-3" value={selectedRuleSetId} onChange={(event) => askBeforeChoosing(event.target.value)}>
+            <select id="rule-set" data-testid="rule-set" className="form-control rounded-lg border px-3 py-3" value={selectedRuleSetId} onChange={(event) => askBeforeChoosing(event.target.value)}>
               {ruleSets.map((ruleSet) => <option key={ruleSet.id} value={ruleSet.id}>{ruleSet.name}</option>)}
             </select>
           </label>

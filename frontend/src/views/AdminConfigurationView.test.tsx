@@ -379,6 +379,36 @@ describe("AdminConfigurationView", () => {
       .toContain("retired");
   });
 
+  it("given a rule set named in the address, when the configuration opens, then that rule set is chosen and in focus", async () => {
+    // given
+    vi.spyOn(api, "ruleSets").mockResolvedValue([
+      { id: "rule-set", name: "Standard", active: true },
+      { id: "summer", name: "Summer rules", active: true }
+    ]);
+    const rules = vi.spyOn(api, "rules").mockResolvedValue([]);
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/configuration?ruleSetId=summer#rule-set"]}><UnsavedChangesProvider>
+      <AdminConfigurationView configurationChanged={() => undefined} />
+    </UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    const chosen = await screen.findByTestId("rule-set");
+    await waitFor(() => expect(chosen).toHaveValue("summer"));
+    expect(rules, "only the named rule set's rules are read").not.toHaveBeenCalledWith("rule-set");
+    await waitFor(() => expect(chosen).toHaveFocus());
+  });
+
+  it("given a rule set the address names but the club does not have, when the configuration opens, then the first one is chosen", async () => {
+    // when
+    render(<MemoryRouter initialEntries={["/admin/configuration?ruleSetId=missing"]}><UnsavedChangesProvider>
+      <AdminConfigurationView configurationChanged={() => undefined} />
+    </UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("rule-set")).toHaveValue("rule-set"));
+  });
+
   it("given a mistyped rule set name, when it is corrected, then the correction is written", async () => {
     // given
     const changing = vi.spyOn(api, "changeRuleSet")

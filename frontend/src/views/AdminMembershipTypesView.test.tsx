@@ -145,7 +145,49 @@ describe("AdminMembershipTypesView", () => {
 
   it("given an active type, when the board is about to retire it, then the surface says what stays in force", async () => {
     render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
-    expect(await screen.findByTestId("membership-type-retire-note-type-1")).toBeInTheDocument();
+    expect(await screen.findByTestId("membership-types-retire-note")).toBeInTheDocument();
+  });
+
+  it("given ten membership types, when the page is read, then each explanation appears once", async () => {
+    // given
+    const many = Array.from({ length: 10 }, (_, index): MembershipType =>
+      ({ id: `type-${index}`, name: `Type ${index}`, ruleSetId: "rules-1", active: true, grantsAccount: false }));
+    vi.spyOn(api, "membershipTypes").mockResolvedValue(many);
+
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-9");
+
+    // then
+    const text = screen.getByTestId("admin-membership-types-view").textContent ?? "";
+    const occurrences = (key: string) => text.split(i18n.t(key)).length - 1;
+    expect(occurrences("admin.membershipTypes.grantsAccountNote"), "the account note is stated once").toBe(1);
+    expect(occurrences("admin.membershipTypes.retireNote"), "the retirement note is stated once").toBe(1);
+  });
+
+  it("given a membership type, when its row is read, then its name heads the row and its availability sits beside it", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-2");
+
+    // then
+    const header = within(card("type-2")).getByRole("rowheader");
+    expect(within(header).getByTestId("membership-type-name-type-2")).toHaveValue("Juniors");
+    expect(within(header).getByTestId("membership-type-state-type-2")).toHaveTextContent("Retired");
+    expect(within(within(card("type-1")).getByRole("rowheader")).getByTestId("membership-type-state-type-1")).toHaveTextContent("Offered");
+  });
+
+  it("given types on rule sets, when the list is read, then each rule set and its rules link sit in the type's row", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-1");
+
+    // then
+    expect(within(card("type-1")).getByTestId("membership-type-rule-set-type-1")).toHaveValue("rules-1");
+    expect(within(card("type-1")).getByTestId("membership-type-rules-link-type-1"), "the link opens the rule set the type uses")
+      .toHaveAttribute("href", "/admin/configuration?ruleSetId=rules-1#rule-set");
+    expect(within(card("type-2")).queryByTestId("membership-type-rules-link-type-2"), "a type without a rule set has no rules to open")
+      .not.toBeInTheDocument();
   });
 
   it("given a mistyped name, when correcting it, then the correction is sent with the rule set", async () => {
