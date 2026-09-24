@@ -67,3 +67,7 @@ Colour is never the sole carrier of state. Interactive controls retain visible k
 and reduced-motion preferences suppress non-essential transitions. Times use tabular numerals.
 Modal surfaces, inputs and controls consume the same semantic tokens as the page instead of
 maintaining theme-specific component variants.
+Checkboxes and radios stay native elements and draw their box from the control tokens and their
+checked fill from the club's action colour; under forced colours the system draws them. A file
+input's trigger reads as a secondary button, and every colour field offers hex entry beside the
+picker.

@@ -87,6 +87,8 @@ describe("AdminSetupView", () => {
 
     // then
     expect(await screen.findByTestId("setup-progress")).toHaveTextContent("4 of 4 required steps complete");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "4");
+    expect(screen.getByTestId("setup-progress-fill")).toHaveStyle({ width: "100%" });
     const steps = screen.getAllByTestId(/^setup-step-/);
     expect(steps.map((step) => step.dataset.testid)).toEqual([
       "setup-step-configuration",
@@ -128,6 +130,8 @@ describe("AdminSetupView", () => {
 
     // then
     expect(await screen.findByTestId("setup-progress")).toHaveTextContent("0 of 4 required steps complete");
+    expect(screen.getByRole("progressbar"), "the bar reads out what the sentence says").toHaveAttribute("aria-valuenow", "0");
+    expect(screen.getByTestId("setup-progress-fill")).toHaveStyle({ width: "0%" });
     expect(screen.getByTestId("setup-step-configuration")).toHaveAttribute("data-state", "next");
     expect(screen.getByTestId("setup-step-facility")).toHaveAttribute("data-state", "next");
     expect(screen.getByTestId("setup-step-membership-types")).toHaveAttribute("data-state", "next");

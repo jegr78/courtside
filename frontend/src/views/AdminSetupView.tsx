@@ -109,7 +109,12 @@ export function AdminSetupView() {
           <p data-testid="setup-progress" className="font-semibold" aria-live="polite">
             {t("admin.setup.progress", { completed, total: 4 })}
           </p>
-          <progress className="h-2 w-full" value={completed} max={4} aria-label={t("admin.setup.progressLabel")} />
+          <div role="progressbar" data-testid="setup-progress-bar" aria-label={t("admin.setup.progressLabel")}
+               aria-valuemin={0} aria-valuemax={4} aria-valuenow={completed}
+               className="h-2 w-full overflow-hidden rounded-full border border-(--cs-border) bg-(--cs-raised)">
+            <div data-testid="setup-progress-fill" className="h-full bg-(--club-primary) forced-colors:bg-[CanvasText]"
+                 style={{ width: `${(completed / 4) * 100}%` }} />
+          </div>
         </div>
         <ol className="grid gap-4">
           {steps.map((step) => <SetupStepCard key={step.id} step={step} />)}

@@ -90,6 +90,23 @@ describe("AdminBookingCardsView", () => {
     expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ color: "#17211d" }));
   });
 
+  it("given a colour typed as hex, when the card is created, then that colour is sent", async () => {
+    // given
+    const createCard = vi.spyOn(api, "createAdminBookingCard").mockResolvedValue({ ...memberCard, id: "card-2", color: "#3a4a5c" });
+    show();
+    await screen.findByTestId("new-card-label");
+
+    // when
+    await userEvent.clear(screen.getByTestId("new-card-color-value"));
+    await userEvent.type(screen.getByTestId("new-card-color-value"), "#3a4a5c");
+    expect(screen.getByTestId("new-card-color"), "the picker follows the typed colour").toHaveValue("#3a4a5c");
+    await userEvent.type(screen.getByTestId("new-card-label"), "Training");
+    await userEvent.click(screen.getByTestId("create-card"));
+
+    // then
+    expect(createCard).toHaveBeenCalledWith(expect.objectContaining({ color: "#3a4a5c" }));
+  });
+
   it("given a create form is filled in, when the entry is cleared again, then nothing is left to lose", async () => {
     // given
     show(true);
