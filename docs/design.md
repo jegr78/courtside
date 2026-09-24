@@ -251,7 +251,9 @@ repeating it returns the same result.
 
 The API uses RFC 9457 problem details. Every type is a stable `urn:courtside:error:<slug>`.
 Translatable domain failures contain `violations` with i18n codes and named parameters. Bean
-Validation uses `fieldErrors`, adding the rejected field to the same shape.
+Validation uses `fieldErrors`, adding the rejected field to the same shape. The web client
+carries a message for every declared type, and a violation code it does not know yet reads as a
+refusal it cannot name rather than as a general failure.
 
 The API refuses unknown JSON fields, duplicate keys, repeated scalar parameters and incompatible
 JSON types. Framework, filter, connector and unmapped-path failures use the same problem format even
