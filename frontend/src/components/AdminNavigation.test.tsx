@@ -166,4 +166,34 @@ describe("AdminNavigation", () => {
     expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
     expect(screen.getByTestId("admin-menu")).toHaveTextContent("Configuration");
   });
+  it("given a phone, when the folded navigation is read, then it reads as a menu rather than a field", () => {
+    // given
+    resizeTo(375);
+
+    // when
+    show("/admin/membership-types");
+
+    // then
+    const menu = screen.getByTestId("admin-menu");
+    expect(menu, "a menu trigger does not wear the text field's styling").not.toHaveClass("form-control");
+    expect(within(menu).getByTestId("admin-menu-indicator"), "the trigger shows that it opens").toBeInTheDocument();
+    expect(menu, "the trigger names the navigation and where the board is in it").toHaveTextContent(/Administration.*Membership types/);
+  });
+
+  it.each([
+    ["Escape", async () => { await userEvent.keyboard("{Escape}"); }],
+    ["a tap outside", async () => { await userEvent.click(document.body); }]
+  ])("given an open phone navigation, when %s dismisses it, then it folds away", async (_, dismiss) => {
+    // given
+    resizeTo(375);
+    show("/admin/setup");
+    await userEvent.click(screen.getByTestId("admin-menu"));
+    expect(screen.getByTestId("admin-navigation")).toHaveAttribute("open");
+
+    // when
+    await dismiss();
+
+    // then
+    expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
+  });
 });
