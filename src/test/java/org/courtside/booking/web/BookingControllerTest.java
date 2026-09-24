@@ -929,6 +929,8 @@ class BookingControllerTest extends AbstractIntegrationTest {
                         .with(user("major.mary").roles("MEMBER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].ownBooking").value(false))
+                .andExpect(jsonPath("$[0].cardLabel").value("?"))
+                .andExpect(jsonPath("$[0].cardColor").value("#999999"))
                 .andExpect(jsonPath("$[0].participantLastNames").doesNotExist())
                 .andExpect(jsonPath("$[0].bookedByName").doesNotExist());
     }
@@ -969,6 +971,8 @@ class BookingControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/bookings").param("date", "2026-05-12"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].ownBooking").value(false))
+                .andExpect(jsonPath("$[0].cardLabel").value("?"))
+                .andExpect(jsonPath("$[0].cardColor").value("#999999"))
                 .andExpect(jsonPath("$[0].participantLastNames").doesNotExist())
                 .andExpect(jsonPath("$[0].bookedByName").doesNotExist())
                 .andExpect(content().string(Matchers.not(Matchers.containsString("Partner"))));

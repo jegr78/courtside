@@ -694,6 +694,21 @@ components:
           items: { type: integer }
         guestAllowed: { type: boolean }
 
+    BookingCardLegendEntry:
+      type: object
+      additionalProperties: false
+      required: [id, label, color, showGenericOccupancy]
+      properties:
+        id:
+          type: [string, "null"]
+          format: uuid
+          description: Present for a named card; null on the combined generic-occupancy entry.
+        label: { type: string }
+        color: { type: string }
+        showGenericOccupancy:
+          type: boolean
+          description: Whether the card is deliberately represented as neutral occupancy to other viewers.
+
     PublicParticipantCard:
       type: object
       required: [id, label]
@@ -1791,8 +1806,12 @@ components:
         courtId: { type: string, format: uuid }
         startsAt: { type: string, format: date-time }
         endsAt: { type: string, format: date-time }
-        cardLabel: { type: string }
-        cardColor: { type: string }
+        cardLabel:
+          type: string
+          description: A neutral placeholder when generic occupancy hides the card from this viewer.
+        cardColor:
+          type: string
+          description: A neutral colour when generic occupancy hides the card from this viewer.
         ownBooking:
           type: boolean
           description: True only when the authenticated viewer created this booking; always false anonymously.
@@ -3169,6 +3188,22 @@ paths:
                 items: { $ref: "#/components/schemas/PublicBookingCard" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+
+  /api/public/booking-card-legend:
+    get:
+      tags: [cards]
+      operationId: listBookingCardLegend
+      summary: The active booking cards shown in the court-plan legend.
+      description: A public label-and-colour projection without booking permissions or rule details.
+      security: []
+      responses:
+        "200":
+          description: The cards represented by the court plan.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BookingCardLegendEntry" }
 
   /api/public/participant-cards:
     get:

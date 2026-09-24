@@ -53,6 +53,17 @@ beforeEach(async () => {
     allowedPlayerCounts: [2, 4],
     guestAllowed: true
   }]);
+  vi.spyOn(api, "bookingCardLegend").mockResolvedValue([{
+    id: null,
+    label: "?",
+    color: "#999999",
+    showGenericOccupancy: true
+  }, {
+    id: "99999999-9999-9999-9999-999999999999",
+    label: "Training",
+    color: "#34584a",
+    showGenericOccupancy: false
+  }]);
   vi.spyOn(api, "participantCards").mockResolvedValue([{
     id: "66666666-6666-6666-6666-666666666666", label: "Ball machine", capacity: 1
   }]);
@@ -98,7 +109,15 @@ it("given the current week, when it loads, then every day and active court is av
   expect(booking).toHaveAttribute("data-state", "occupied");
   expect(booking.closest("td")).toHaveAttribute("rowspan", "2");
   expect(screen.getByTestId("slot-heading-12:00").closest("tr")).toHaveStyle({ "--slot-height": "40px" });
-  expect(screen.getByTestId("court-plan-legend")).toHaveRole("list");
+  const legend = screen.getByTestId("court-plan-legend");
+  expect(legend).toHaveRole("list");
+  expect(legend).not.toHaveTextContent("Member booking");
+  expect(screen.getByTestId("legend-occupied").closest("li")).toHaveTextContent("Occupied");
+  expect(screen.getByTestId("legend-card-99999999-9999-9999-9999-999999999999"))
+    .toHaveStyle({ backgroundColor: "rgb(52, 88, 74)" });
+  expect(screen.getByTestId("day-selector-2026-08-10")).toHaveTextContent("38 free slots");
+  expect(screen.getByTestId("day-selector-2026-08-10"))
+    .toHaveAccessibleName(/38 free slots/);
   expect(screen.getAllByTestId("allocation")).toHaveLength(1);
   expect(booking).toHaveTextContent("Booked · 2 participants");
 });
@@ -218,6 +237,32 @@ it("given an anonymous visitor, when showing a free slot, then it is visible but
   expect(freeSlot(1, "12:30").tagName).toBe("DIV");
   expect(screen.getAllByTestId("free-slot").filter((slot) => slot.dataset.state === "free").length).toBeGreaterThan(0);
   expect(api.bookingEligibility).not.toHaveBeenCalled();
+  expect(api.bookingCards).not.toHaveBeenCalled();
+  expect(api.bookingCardLegend).toHaveBeenCalledOnce();
+});
+
+it("given an inactive card still has an allocation, when showing the week, then the legend still names it", async () => {
+  // given
+  vi.mocked(api.bookingCardLegend).mockResolvedValue([]);
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "33333333-3333-3333-3333-333333333333",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Retired tournament",
+    cardColor: "#3a4a5c",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: null
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  await screen.findByTestId("court-plan-legend");
+  expect(screen.getByTestId("legend-allocation-card").closest("li"))
+    .toHaveTextContent("Retired tournament");
 });
 
 it("given a barred member, when showing the plan, then the coded refusal appears before any dialog can open", async () => {
@@ -256,14 +301,14 @@ it("given a plan on screen, when the language changes, then the week is not fetc
   // given
   render(<WeekView today={clubInstant("12:00")} />);
   await findFreeSlot(1, "12:30");
-  const reads = [api.bookingGrid, api.courts, api.bookingEligibility]
+  const reads = [api.bookingGrid, api.courts, api.bookingCardLegend, api.bookingEligibility]
     .map((read) => vi.mocked(read).mock.calls.length);
 
   // when
   await act(() => i18n.changeLanguage("de"));
 
   // then
-  expect([api.bookingGrid, api.courts, api.bookingEligibility]
+  expect([api.bookingGrid, api.courts, api.bookingCardLegend, api.bookingEligibility]
     .map((read) => vi.mocked(read).mock.calls.length)).toEqual(reads);
 });
 
@@ -278,12 +323,13 @@ it("given a chosen booking card, when the language changes, then the choice is s
   await waitFor(() => expect(slot).toHaveRole("button"));
   await userEvent.click(slot);
   await userEvent.selectOptions(await screen.findByTestId("booking-card"), "88888888-8888-8888-8888-888888888888");
+  const bookingCardReads = vi.mocked(api.bookingCards).mock.calls.length;
 
   // when
   await act(() => i18n.changeLanguage("de"));
 
   // then
-  expect(api.bookingCards).toHaveBeenCalledTimes(1);
+  expect(api.bookingCards).toHaveBeenCalledTimes(bookingCardReads);
   expect(screen.getByTestId("booking-card")).toHaveValue("88888888-8888-8888-8888-888888888888");
 });
 
@@ -394,16 +440,17 @@ it("given a week before daylight saving starts, when choosing the next week, the
   expect(screen.getByTestId("day-selector-2026-03-30")).toHaveAttribute("aria-pressed", "true");
 });
 
-it("given past slots, when showing today, then the plan starts with the first remaining slot", async () => {
+it("given past slots, when showing today, then the whole day remains visible with elapsed rows dimmed", async () => {
   // when
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  expect(await screen.findByTestId("slot-heading-12:00")).toBeInTheDocument();
-  expect(screen.queryByTestId("slot-heading-11:30")).not.toBeInTheDocument();
+  expect(await screen.findByTestId("slot-heading-08:00")).toBeInTheDocument();
+  expect(screen.getByTestId("slot-heading-11:30").closest("tr")).toHaveAttribute("data-state", "past");
+  expect(screen.getByTestId("slot-heading-12:00").closest("tr")).toHaveAttribute("data-state", "remaining");
 });
 
-it("given an own booking in the past, when showing today, then its collapsed row is absent", async () => {
+it("given an own booking in the past, when showing today, then it remains visible but cannot be cancelled", async () => {
   // given
   vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
     bookingId: "44444444-4444-4444-4444-444444444444",
@@ -423,7 +470,7 @@ it("given an own booking in the past, when showing today, then its collapsed row
 
   // then
   await screen.findByTestId("week-grid");
-  expect(screen.queryByTestId("own-allocation")).not.toBeInTheDocument();
+  expect(screen.getByTestId("own-allocation").tagName).toBe("DIV");
 });
 
 it("given an allocation started before the first remaining slot, when showing today, then its occupancy remains visible", async () => {
@@ -447,8 +494,8 @@ it("given an allocation started before the first remaining slot, when showing to
   // then
   const allocation = await screen.findByTestId("own-allocation");
   expect(allocation.tagName).toBe("DIV");
-  expect(allocation.closest("td")).toHaveAttribute("rowspan", "2");
-  expect(screen.queryByTestId("slot-heading-11:30")).not.toBeInTheDocument();
+  expect(allocation.closest("td")).toHaveAttribute("rowspan", "3");
+  expect(screen.getByTestId("slot-heading-11:30")).toBeInTheDocument();
 });
 
 it("given today, when showing the plan, then current time and a return action are available", async () => {

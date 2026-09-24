@@ -51,6 +51,9 @@ import java.util.stream.Collectors;
 @RestController
 class BookingController implements BookingsApi {
 
+    private static final String GENERIC_CARD_LABEL = "?";
+    private static final String GENERIC_CARD_COLOR = "#999999";
+
     private final BookingService bookings;
     private final CardService cards;
     private final CurrentUser currentUser;
@@ -278,6 +281,7 @@ class BookingController implements BookingsApi {
         AllocationVisibility allocationVisibility = visibility.get(allocation.getBooking().getId());
         long slotCount = slotCounts.getOrDefault(allocation.getBooking().getId(), 0L);
         boolean showGenericOccupancy = card != null && card.isShowGenericOccupancy();
+        boolean hideCard = showGenericOccupancy && !allocationVisibility.ownBooking();
         Integer participantCount = showGenericOccupancy && slotCount > 0
                 ? Math.toIntExact(slotCount)
                 : null;
@@ -287,8 +291,8 @@ class BookingController implements BookingsApi {
                 allocation.getCourtId(),
                 WireTypes.toOffsetDateTime(allocation.getStartsAt()),
                 WireTypes.toOffsetDateTime(allocation.getEndsAt()),
-                card == null ? "?" : card.getLabel(),
-                card == null ? "#999999" : card.getColor(),
+                card == null || hideCard ? GENERIC_CARD_LABEL : card.getLabel(),
+                card == null || hideCard ? GENERIC_CARD_COLOR : card.getColor(),
                 allocationVisibility.ownBooking(), showGenericOccupancy)
                 .participantLastNames(slotCount > 0 && allocationVisibility.ownBooking()
                         ? allocationVisibility.participantLastNames()

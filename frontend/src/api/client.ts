@@ -69,6 +69,7 @@ export type PublicCourt = components["schemas"]["PublicCourt"];
 export type Allocation = components["schemas"]["Allocation"];
 export type BookingGrid = components["schemas"]["BookingGrid"];
 export type PublicBookingCard = components["schemas"]["PublicBookingCard"];
+export type BookingCardLegendEntry = components["schemas"]["BookingCardLegendEntry"];
 export type SeriesRuleRequest = components["schemas"]["SeriesRuleRequest"];
 export type CreateSeriesRequest = components["schemas"]["CreateSeriesRequest"];
 export type SeriesPreview = components["schemas"]["SeriesPreview"];
@@ -486,6 +487,7 @@ export const api = {
     `/api/bookings?${new URLSearchParams({ date })}`
   ),
   bookingCards: () => request<PublicBookingCard[]>("/api/public/booking-cards"),
+  bookingCardLegend: () => request<BookingCardLegendEntry[]>("/api/public/booking-card-legend"),
   participantCards: () => request<PublicParticipantCard[]>("/api/public/participant-cards"),
   participantMembers: (query: string) => request<PublicParticipantMember[]>(
     "/api/public/participant-members", {

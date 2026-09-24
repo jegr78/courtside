@@ -361,7 +361,7 @@ test("the phone reaches the whole week before the first bookable row", async ({ 
   const currentDayId = await currentDay.getAttribute("data-testid");
   expect(currentDayId).not.toBeNull();
 
-  await page.evaluate(() => window.scrollTo(0, 0));
+  // The plan keeps elapsed rows for context and brings the current one into view on its own.
   const firstBookable = page.locator('[data-testid="free-slot"][data-state="free"]').first();
   const bounds = await firstBookable.boundingBox();
   expect(bounds).not.toBeNull();
@@ -394,6 +394,29 @@ test("the phone reaches the whole week before the first bookable row", async ({ 
   const restoredFromOtherWeek = navigation.getByTestId(currentDayId!);
   await expect(restoredFromOtherWeek).toHaveAttribute("aria-pressed", "true");
   await expect(restoredFromOtherWeek).toBeInViewport();
+});
+
+test("the court plan describes its served cards, remaining room, and elapsed rows", async ({ page }) => {
+  // given — a club-defined card must reach the plan without a frontend release
+  await page.route("**/api/public/booking-card-legend", async (route) => route.fulfill({ json: [{
+    id: "90000000-0000-0000-0000-000000000099",
+    label: "Club championship",
+    color: "#176b55",
+    showGenericOccupancy: false
+  }] }));
+  await signIn(page, "doe.jane");
+
+  // then
+  const legend = page.getByTestId("court-plan-legend");
+  await expect(legend).toContainText("Club championship");
+  await expect(page.getByTestId("legend-card-90000000-0000-0000-0000-000000000099"))
+    .toHaveCSS("background-color", "rgb(23, 107, 85)");
+  const selectedDate = await page.locator('[data-testid^="day-selector-"][aria-pressed="true"]')
+    .getAttribute("data-testid");
+  const freeCount = page.getByTestId(`day-free-count-${selectedDate!.replace("day-selector-", "")}`);
+  expect(Number(await freeCount.getAttribute("data-free-count"))).toBeGreaterThan(0);
+  await expect(page.getByTestId("slot-row-08:00")).toHaveAttribute("data-state", "past");
+  await expect(page.getByTestId("slot-row-12:00")).toHaveAttribute("data-state", "remaining");
 });
 
 test("the phone plan shows every court's availability at once", async ({ page, journeyService }) => {
