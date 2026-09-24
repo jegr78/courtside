@@ -284,7 +284,7 @@ function MembershipSection({ entry, types, disabled, save }: {
     <div className="grid gap-3 md:grid-cols-3">
       <label className="grid gap-2 font-medium">
         {t("admin.person.membershipType")}
-        <select data-testid="membership-type" disabled={disabled} className="form-control rounded-lg border px-3 py-3 outline-none" value={typeId} onChange={(event) => setTypeId(event.target.value)}>
+        <select data-testid="membership-type" disabled={disabled} className="form-control rounded-lg border px-3 py-3" value={typeId} onChange={(event) => setTypeId(event.target.value)}>
           <option value="">{t("admin.person.noMembershipType")}</option>
           {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
         </select>

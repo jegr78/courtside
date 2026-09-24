@@ -220,7 +220,7 @@ function CellEditorControls({ editor, mark, unsaved, disabled, entered, confirm,
     <input
       autoFocus
       data-testid="court-editor"
-      className={`form-control min-h-11 rounded-lg border px-3 py-2 outline-none ${cellWidth[editor.field]}`}
+      className={`form-control min-h-11 rounded-lg border px-3 py-2 ${cellWidth[editor.field]}`}
       aria-label={t(number ? "admin.facility.number" : "admin.facility.name")}
       type={number ? "number" : "text"}
       min={number ? MIN_NUMBER : undefined}

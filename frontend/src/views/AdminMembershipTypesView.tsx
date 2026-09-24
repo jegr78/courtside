@@ -121,7 +121,7 @@ export function AdminMembershipTypesView() {
             <TextField data-testid="new-membership-type-name" disabled={pending} name="name" maxLength={NAME_LENGTH} label={t("admin.membershipTypes.name")} />
             <label className="grid gap-2 font-medium">
               {t("admin.membershipTypes.ruleSet")}
-              <select data-testid="new-membership-type-rule-set" disabled={pending} name="ruleSetId" className="form-control rounded-lg border px-3 py-3 outline-none" defaultValue="">
+              <select data-testid="new-membership-type-rule-set" disabled={pending} name="ruleSetId" className="form-control rounded-lg border px-3 py-3" defaultValue="">
                 <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
                 {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
               </select>
@@ -170,7 +170,7 @@ function MembershipTypeCard({ type, ruleSets, holders, disabled, save, toggle }:
       <TextField data-testid={`membership-type-name-${type.id}`} disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.membershipTypes.name")} value={name} onChange={(event) => setName(event.target.value)} />
       <label className="grid gap-2 font-medium">
         {t("admin.membershipTypes.ruleSet")}
-        <select data-testid={`membership-type-rule-set-${type.id}`} disabled={disabled} className="form-control rounded-lg border px-3 py-3 outline-none" value={ruleSetId} onChange={(event) => setRuleSetId(event.target.value)}>
+        <select data-testid={`membership-type-rule-set-${type.id}`} disabled={disabled} className="form-control rounded-lg border px-3 py-3" value={ruleSetId} onChange={(event) => setRuleSetId(event.target.value)}>
           <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
           {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
         </select>

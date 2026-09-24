@@ -67,7 +67,7 @@ export function RosterExport({ query, membershipTypeId, disabled, onFailure }: P
         {t("admin.roster.exportSeparator")}
         <select
           data-testid="roster-export-separator"
-          className="form-control rounded-lg border px-3 py-3 outline-none"
+          className="form-control rounded-lg border px-3 py-3"
           value={separator}
           onChange={(event) => setSeparator(event.target.value)}
         >
@@ -79,7 +79,7 @@ export function RosterExport({ query, membershipTypeId, disabled, onFailure }: P
         {t("admin.roster.exportEncoding")}
         <select
           data-testid="roster-export-encoding"
-          className="form-control rounded-lg border px-3 py-3 outline-none"
+          className="form-control rounded-lg border px-3 py-3"
           value={encoding}
           onChange={(event) => setEncoding(event.target.value)}
         >
@@ -90,7 +90,7 @@ export function RosterExport({ query, membershipTypeId, disabled, onFailure }: P
         {t("admin.roster.exportSource")}
         <select
           data-testid="roster-export-source"
-          className="form-control rounded-lg border px-3 py-3 outline-none"
+          className="form-control rounded-lg border px-3 py-3"
           value={sourceId}
           onChange={(event) => setSourceId(event.target.value)}
         >

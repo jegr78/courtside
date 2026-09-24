@@ -150,7 +150,7 @@ function ParticipantCardCellEditor({ editor, mark, unsaved, disabled, entered, c
     if (event.key === "Escape") dismiss();
   }
   return <span className="flex flex-wrap items-center gap-2">
-    <input autoFocus data-testid="participant-card-editor" className="form-control min-h-11 w-48 rounded-lg border px-3 py-2 outline-none"
+    <input autoFocus data-testid="participant-card-editor" className="form-control min-h-11 w-48 rounded-lg border px-3 py-2"
       aria-label={t(capacity ? "admin.facility.owned" : "admin.facility.label")}
       type={capacity ? "number" : "text"} min={capacity ? 1 : undefined} max={capacity ? 99 : undefined}
       maxLength={capacity ? undefined : MAX_LABEL} value={editor.entry} disabled={disabled}

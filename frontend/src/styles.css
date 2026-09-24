@@ -54,10 +54,6 @@ body {
   background: var(--cs-page);
 }
 
-button, input, select, textarea {
-  font: inherit;
-}
-
 .font-value,
 time,
 input[type="date"],
@@ -66,62 +62,64 @@ input[type="time"] {
   font-variant-numeric: tabular-nums;
 }
 
-.surface-panel {
-  color: var(--cs-text);
-  background: var(--cs-panel);
-  border-color: var(--cs-border);
-}
+@layer components {
+  .surface-panel {
+    color: var(--cs-text);
+    background: var(--cs-panel);
+    border-color: var(--cs-border);
+  }
 
-.surface-raised {
-  color: var(--cs-text);
-  background: var(--cs-raised);
-  border-color: var(--cs-border);
-}
+  .surface-raised {
+    color: var(--cs-text);
+    background: var(--cs-raised);
+    border-color: var(--cs-border);
+  }
 
-.text-muted {
-  color: var(--cs-muted);
-}
+  .text-muted {
+    color: var(--cs-muted);
+  }
 
-.text-destructive {
-  color: var(--cs-destructive);
-}
+  .text-destructive {
+    color: var(--cs-destructive);
+  }
 
-.border-structural {
-  border-color: var(--cs-border);
-}
+  .border-structural {
+    border-color: var(--cs-border);
+  }
 
-.form-control {
-  color: var(--cs-text);
-  background: var(--cs-input);
-  border-color: var(--cs-border);
-}
+  .form-control {
+    color: var(--cs-text);
+    background: var(--cs-input);
+    border-color: var(--cs-border);
+  }
 
-.form-control:focus {
-  border-color: var(--cs-focus);
-  outline: 2px solid var(--cs-focus);
-  outline-offset: 2px;
-  box-shadow: none;
-}
+  .form-control:focus {
+    border-color: var(--cs-focus);
+    outline: 2px solid var(--cs-focus);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
 
-.focus-ring:focus-visible {
-  outline: 2px solid var(--cs-focus);
-  outline-offset: 2px;
-}
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--cs-focus);
+    outline-offset: 2px;
+  }
 
-.button-primary {
-  color: var(--club-primary-text);
-  background: var(--club-primary);
-}
+  .button-primary {
+    color: var(--club-primary-text);
+    background: var(--club-primary);
+  }
 
-.button-secondary {
-  color: var(--cs-text);
-  background: var(--cs-raised);
-  border: 1px solid var(--cs-border);
-}
+  .button-secondary {
+    color: var(--cs-text);
+    background: var(--cs-raised);
+    border: 1px solid var(--cs-border);
+  }
 
-.button-destructive {
-  color: var(--cs-destructive-text);
-  background: var(--cs-destructive);
+  .button-destructive {
+    color: var(--cs-destructive-text);
+    background: var(--cs-destructive);
+  }
 }
 
 .day-plan-table {
