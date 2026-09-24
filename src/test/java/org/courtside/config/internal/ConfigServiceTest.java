@@ -83,7 +83,7 @@ class ConfigServiceTest {
 
         // when
         service.update(new ChangeClubConfigurationCommand(
-                "Example Tennis Club", "#004f2d", "#c8a415", null, null, null, null, "en",
+                "Example Tennis Club", "#004f2d", "#c8a415", null, null, null, null, null, "en",
                 new BookingSlotDuration(45), "Pacific/Auckland",
                 new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null));
 
@@ -104,7 +104,7 @@ class ConfigServiceTest {
 
         // when / then — the guard sits before the row is locked, so no caller can leave it half done
         assertThatThrownBy(() -> service.update(new ChangeClubConfigurationCommand(
-                "Example Tennis Club", "#004f2d", "#c8a415", null, null, null, null, "fr",
+                "Example Tennis Club", "#004f2d", "#c8a415", null, null, null, null, null, "fr",
                 new BookingSlotDuration(30), "Europe/Berlin",
                 new CredentialLifetime(168), new CredentialLifetime(24), new ResetTokenLifetime(60), new ReminderLeadTime(24), null)))
                 .isInstanceOf(UnsupportedLanguageException.class)

@@ -63,6 +63,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/public/booking-card-legend",
             "/api/public/booking-grid",
             "/api/public/config",
+            "/api/public/config/icon",
             "/api/public/config/logo",
             "/api/public/courts",
             "/api/public/opening-hours",
@@ -374,6 +375,9 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
                     .with(csrf());
             if (endpoint.method() == HttpMethod.GET && endpoint.pattern().equals("/api/bookings")) {
                 request.param("date", "2026-05-12");
+            }
+            if (endpoint.pattern().equals("/api/public/config/icon")) {
+                request.param("size", "192");
             }
             if (endpoint.pattern().equals("/api/account-recovery/password/redemption")) {
                 // The only anonymous operation that needs a secret to succeed: the refusal it names

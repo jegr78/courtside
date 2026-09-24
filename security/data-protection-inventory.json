@@ -540,6 +540,10 @@
         "level": "operational",
         "lifecycle": "club-configuration"
       },
+      "short_name": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
       "id": {
         "level": "operational",
         "lifecycle": "club-configuration"

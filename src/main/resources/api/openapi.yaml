@@ -556,6 +556,13 @@ components:
             passwordResetCredentialHours: { type: integer, minimum: 1, maximum: 168 }
             passwordResetTokenMinutes: { type: integer, minimum: 15, maximum: 1440 }
             bookingReminderHours: { type: integer, minimum: 0, maximum: 168 }
+            shortName:
+              type: [string, "null"]
+              maxLength: 12
+              pattern: ".*\\S.*"
+              description: |
+                The name the club chose for the installed app's icon. `null` means the manifest
+                derives one from the club name.
             noMembershipTypeRuleSetId:
               type: [string, "null"]
               format: uuid
@@ -603,6 +610,14 @@ components:
           description: |
             A same-origin path or absolute URL that replaces the published Courtside documentation
             target. `null` restores the frontend default.
+        shortName:
+          type: [string, "null"]
+          maxLength: 12
+          pattern: ".*\\S.*"
+          description: |
+            The name shown under the installed app's icon, where about twelve characters fit.
+            `null` lets the manifest derive it from the club name: the whole name when it fits,
+            otherwise its leading words.
         defaultLocale: { type: string, pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         timeZone:
@@ -661,26 +676,46 @@ components:
     WebManifest:
       type: object
       additionalProperties: false
-      required: [name, short_name, start_url, display, background_color, theme_color, icons]
+      required: [id, name, short_name, description, lang, start_url, display, background_color,
+                 theme_color, icons, shortcuts]
       properties:
+        id: { type: string }
         name: { type: string }
-        short_name: { type: string }
+        short_name: { type: string, maxLength: 12 }
+        description: { type: string }
+        lang:
+          type: string
+          description: The club's default language, which the description and shortcuts are written in.
         start_url: { type: string }
         display: { type: string, enum: [standalone] }
-        background_color: { type: string }
+        background_color:
+          type: string
+          description: The page colour the application paints, so the splash screen does not flash.
         theme_color: { type: string }
         icons:
           type: array
           items: { $ref: "#/components/schemas/WebManifestIcon" }
+        shortcuts:
+          type: array
+          items: { $ref: "#/components/schemas/WebManifestShortcut" }
 
     WebManifestIcon:
       type: object
       additionalProperties: false
-      required: [src, sizes]
+      required: [src, sizes, purpose]
       properties:
         src: { type: string }
         sizes: { type: string }
         type: { type: string }
+        purpose: { type: string, enum: [any, maskable] }
+
+    WebManifestShortcut:
+      type: object
+      additionalProperties: false
+      required: [name, url]
+      properties:
+        name: { type: string }
+        url: { type: string }
 
     PublicBookingCard:
       type: object
@@ -3219,6 +3254,41 @@ paths:
           $ref: "#/components/responses/Invalid"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /api/public/config/icon:
+    get:
+      tags: [manifest]
+      operationId: getAppIcon
+      summary: The installed app's icon as a PNG.
+      description: |
+        Rasterised from the uploaded club logo, or from the Courtside mark while none is uploaded.
+        A logo given only as a URL is not fetched, so such a club gets the Courtside mark here. A
+        maskable icon is opaque and keeps its content inside the central 80 % a launcher may crop
+        to. A matching version is immutable; any other version is answered with the current icon
+        and no caching, so an icon an installed app still names never breaks.
+      security: []
+      parameters:
+        - name: size
+          in: query
+          required: true
+          schema: { type: integer, enum: [180, 192, 512] }
+        - name: purpose
+          in: query
+          schema: { type: string, enum: [any, maskable], default: any }
+        - name: v
+          in: query
+          schema: { type: string, pattern: "^[0-9a-f]{64}$" }
+          description: The icon version the manifest names.
+      responses:
+        "200":
+          description: The icon.
+          headers:
+            ETag: { schema: { type: string } }
+            Cache-Control: { schema: { type: string } }
+          content:
+            image/png: { schema: { type: string, format: binary } }
+        "400":
+          $ref: "#/components/responses/Invalid"
 
   /manifest.webmanifest:
     get:

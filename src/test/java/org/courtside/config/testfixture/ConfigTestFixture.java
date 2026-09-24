@@ -51,7 +51,7 @@ public class ConfigTestFixture {
         return new ChangeClubConfigurationCommand(
                 current.clubName(), current.primaryColor(), current.accentColor(),
                 current.logoFallbackUrl(), current.imprintUrl(), current.privacyUrl(),
-                current.documentationUrl(), languageTag,
+                current.documentationUrl(), current.shortName(), languageTag,
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),

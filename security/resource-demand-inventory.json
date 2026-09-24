@@ -67,6 +67,7 @@
         "endOwnSession",
         "endOwnSessions",
         "getApiDocument",
+        "getAppIcon",
         "getBookingCard",
         "getBookingEligibility",
         "getBookingGrid",

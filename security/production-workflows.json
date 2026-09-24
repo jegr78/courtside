@@ -132,6 +132,7 @@
         "getBookingGrid",
         "getClubConfig",
         "getClubLogo",
+        "getAppIcon",
         "getWebManifest",
         "listBookingCardLegend",
         "listBookableCards",

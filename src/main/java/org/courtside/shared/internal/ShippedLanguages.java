@@ -23,7 +23,7 @@ class ShippedLanguages implements SupportedLanguages {
     // one no file name names.
     private static final String BASE_LANGUAGE = "en";
 
-    private static final List<String> FAMILIES = List.of("messages", "mail", "seed");
+    private static final List<String> FAMILIES = List.of("messages", "mail", "seed", "manifest");
     private static final Pattern TRANSLATED =
             Pattern.compile("^[a-z]+_([a-zA-Z]{2,3}(?:_[a-zA-Z0-9]{2,8})*)\\.properties$");
 

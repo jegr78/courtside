@@ -15,6 +15,7 @@ public record ChangeClubConfigurationCommand(
         String imprintUrl,
         String privacyUrl,
         String documentationUrl,
+        String shortName,
         String defaultLocale,
         BookingSlotDuration slotDuration,
         String timeZone,
@@ -24,8 +25,8 @@ public record ChangeClubConfigurationCommand(
         ReminderLeadTime bookingReminder,
         UUID noMembershipTypeRuleSetId) {
 
-    // The link fields, a logo and the rule set for people holding no membership type are what a
-    // club may leave unset; an absent value anywhere else is a caller that skipped its validation.
+    // The link fields, a logo, a short name and the rule set for people holding no membership type are
+    // what a club may leave unset; an absent value anywhere else is a caller that skipped its validation.
     public ChangeClubConfigurationCommand {
         requirePresent(clubName, "clubName");
         requirePresent(primaryColor, "primaryColor");
@@ -37,6 +38,9 @@ public record ChangeClubConfigurationCommand(
         requirePresent(passwordResetCredential, "passwordResetCredential");
         requirePresent(passwordResetToken, "passwordResetToken");
         requirePresent(bookingReminder, "bookingReminder");
+        if (shortName != null && !AppShortName.fits(shortName)) {
+            throw new IllegalArgumentException("A short name has to fit under an app icon");
+        }
     }
 
     private static void requirePresent(Object value, String field) {
