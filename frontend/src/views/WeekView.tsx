@@ -15,6 +15,7 @@ import {
   formatDate, formatTime, isPastSlot, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes,
   weekDays, zonedDateTime
 } from "../time/clubZone";
+import { violationMessage } from "../api/problem-message";
 
 interface WeekViewProps {
   today?: Date;
@@ -294,7 +295,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     {eligibility && eligibility.violations.length > 0 && <Alert testId="booking-eligibility">
       <ul>
         {eligibility.violations.map((violation) => <li key={violation.code} data-code={violation.code}>
-          {t(violation.code, { ...violation.params, defaultValue: t("error.generic") })}
+          {violationMessage(violation.code, violation.params, t)}
         </li>)}
       </ul>
     </Alert>}

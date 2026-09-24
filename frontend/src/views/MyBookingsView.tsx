@@ -8,6 +8,7 @@ import { Modal } from "../components/Modal";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { formatBookingPeriod, formatDateTime } from "../time/clubZone";
 import { SeriesForm } from "./SeriesForm";
+import { violationMessage } from "../api/problem-message";
 
 type Appointment = PersonalBooking | ManagedAppointment;
 
@@ -356,7 +357,7 @@ function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }: { boo
 function MoveReasons({ move, courtNames, t }: { move: MovePreview["moves"][number]; courtNames: Map<string, string>; t: Translate }) {
   const names = (ids: string[]) => ids.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ");
   return <ul className="list-disc pl-5">
-    {move.violations.map((violation) => <li data-code={violation.code} key={`${move.bookingId}-${violation.code}`}>{t(violation.code, { ...violation.params, defaultValue: t("error.generic") })}</li>)}
+    {move.violations.map((violation) => <li data-code={violation.code} key={`${move.bookingId}-${violation.code}`}>{violationMessage(violation.code, violation.params, t)}</li>)}
     {move.blockedCourtIds.length > 0 && <li data-testid="occupied-courts">{t("myBookings.occupiedCourts", { courts: names(move.blockedCourtIds) })}</li>}
     {move.unbookableCourtIds.length > 0 && <li data-testid="unavailable-courts">{t("myBookings.unavailableCourts", { courts: names(move.unbookableCourtIds) })}</li>}
   </ul>;

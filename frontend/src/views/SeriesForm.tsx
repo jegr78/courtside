@@ -8,6 +8,7 @@ import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { formatBookingPeriod } from "../time/clubZone";
+import { violationMessage } from "../api/problem-message";
 
 const WEEKDAYS: DayOfWeek[] = [
   "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"
@@ -237,9 +238,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
 
 function blockedBy(occurrence: Occurrence, t: (key: string, params?: Record<string, unknown>) => string): string {
   if (occurrence.violations.length > 0) {
-    return occurrence.violations.map((violation) => t(violation.code, {
-      ...violation.params, defaultValue: t("error.generic")
-    })).join(", ");
+    return occurrence.violations.map((violation) => violationMessage(violation.code, violation.params, t)).join(", ");
   }
   return t("series.courtTaken");
 }

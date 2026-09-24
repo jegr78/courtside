@@ -1,13 +1,13 @@
 import type { TFunction } from "i18next";
 import { ApiError, type Problem } from "./client";
 
-const typeMessageKeys: Record<string, string> = {
-  "urn:courtside:error:unauthenticated": "auth.failed",
-  "urn:courtside:error:court-unavailable": "booking.courtUnavailable",
-  "urn:courtside:error:username-taken": "roster.usernameTaken",
-  "urn:courtside:error:person-account-exists": "roster.accountExists",
-  "urn:courtside:error:court-number-taken": "admin.facility.numberTaken"
-};
+const TYPE_PREFIX = "urn:courtside:error:";
+// A default no bundle carries, so a missing key is told apart from a translation.
+const MISSING = "\u0000missing";
+
+export function isUnauthenticated(failure: unknown): boolean {
+  return failure instanceof ApiError && failure.problem?.type === `${TYPE_PREFIX}unauthenticated`;
+}
 
 export function problemMessage(failure: unknown, t: TFunction): string {
   if (!(failure instanceof ApiError) || !failure.problem) {
@@ -32,13 +32,19 @@ function traceReference(problem: Problem): string | undefined {
   return problem.spanId ? `${problem.traceId}/${problem.spanId}` : problem.traceId;
 }
 
+export function violationMessage(code: string, params: Record<string, unknown>, t: (key: string, options?: Record<string, unknown>) => string): string {
+  const message = t(code, { ...params, defaultValue: MISSING });
+  if (message !== MISSING) return message;
+  const unknown = t("error.unknownViolation");
+  return import.meta.env.DEV ? `${unknown} [${code}]` : unknown;
+}
+
 function translatedProblem(problem: Problem, t: TFunction): string {
   const coded = firstCodedFailure(problem);
-  if (coded) {
-    return t(coded.code, { ...coded.params, defaultValue: t("error.generic") });
-  }
-  const typeMessageKey = typeMessageKeys[problem.type];
-  return t(typeMessageKey ?? "error.generic");
+  if (coded) return violationMessage(coded.code, coded.params, t);
+  const slug = problem.type?.startsWith(TYPE_PREFIX) ? problem.type.slice(TYPE_PREFIX.length) : undefined;
+  const message = slug ? t(`error.type.${slug}`, { defaultValue: MISSING }) : MISSING;
+  return message === MISSING ? t("error.generic") : message;
 }
 
 function firstCodedFailure(problem: Problem): { code: string; params: Record<string, unknown> } | undefined {
