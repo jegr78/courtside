@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -282,7 +282,7 @@ describe("AdminAuditView", () => {
   it.each([
     ["en", "Court added", "All changes"],
     ["de", "Platz angelegt", "Alle Änderungen"]
-  ])("given the %s change log, when its kinds of change are offered, then each reads as a label in alphabetical order", async (language, courtAdded, unfiltered) => {
+  ])("given the %s change log, when its kinds of change are offered, then each reads as a label in alphabetical order", async (language, courtAddedLabel, unfiltered) => {
     // given
     await i18n.changeLanguage(language);
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [], nextCursor: null });
@@ -295,11 +295,27 @@ describe("AdminAuditView", () => {
     expect(options[0].value, "the first choice leaves the log unfiltered").toBe("");
     expect(options[0]).toHaveTextContent(unfiltered);
     const kinds = options.slice(1);
-    expect(kinds.length, "every audited kind of change is offered").toBeGreaterThan(40);
-    expect(kinds.find((option) => option.value === "facility.court.added")).toHaveTextContent(courtAdded);
+    expect(kinds, "every audited kind of change is offered").toHaveLength(48);
+    expect(kinds.find((option) => option.value === "facility.court.added")).toHaveTextContent(courtAddedLabel);
     expect(kinds.filter((option) => /\w\.\w/.test(option.text)).map((option) => option.text), "no choice shows an identifier").toEqual([]);
     const labels = kinds.map((option) => option.text);
     expect(labels, "the kinds are sorted by their label").toEqual([...labels].sort((left, right) => left.localeCompare(right, language)));
+  });
+
+  it("given a chosen kind of change, when the language changes, then the choice stays and reads in the new language", async () => {
+    // given
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [], nextCursor: null });
+    show();
+    const user = userEvent.setup();
+    const filter = await screen.findByTestId("audit-filter-event-type");
+    await user.selectOptions(filter, "facility.court.added");
+
+    // when
+    await act(() => i18n.changeLanguage("de"));
+
+    // then
+    expect(filter).toHaveValue("facility.court.added");
+    expect(within(filter).getAllByRole<HTMLOptionElement>("option").find((option) => option.selected)).toHaveTextContent("Platz angelegt");
   });
 
   it("given active filters, when clearing them, then the unfiltered first page is restored", async () => {

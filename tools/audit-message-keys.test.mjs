@@ -33,7 +33,11 @@ test("given every audited event type, when the change log offers its kinds, then
   const offered = (locale) => [...locale].filter((key) => key.startsWith("audit.eventType."))
     .map((key) => key.slice("audit.eventType.".length)).sort();
 
-  // when / then
-  assert.deepEqual(offered(de), types, "de must carry one \"audit.eventType.<type>\" label per audited event type and no other");
-  assert.deepEqual(offered(en), types, "en must carry one \"audit.eventType.<type>\" label per audited event type and no other");
+  // when
+  const offeredDe = offered(de);
+  const offeredEn = offered(en);
+
+  // then
+  assert.deepEqual(offeredDe, types, "de must carry one \"audit.eventType.<type>\" label per audited event type and no other");
+  assert.deepEqual(offeredEn, types, "en must carry one \"audit.eventType.<type>\" label per audited event type and no other");
 });
