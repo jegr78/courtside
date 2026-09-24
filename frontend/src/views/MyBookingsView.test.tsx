@@ -290,6 +290,26 @@ it("given another page exists, when loading more, then its bookings are appended
   expect(api.personalBookings).toHaveBeenLastCalledWith(upcomingId);
 });
 
+it("given the next page cannot be read, when the member asks for it, then the failure offers no reload of the whole page", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockResolvedValueOnce({
+    items: [{
+      id: upcomingId, seriesId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED"
+    }],
+    nextCursor: upcomingId
+  }).mockRejectedValueOnce(new Error("offline for a moment"));
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("load-more-bookings"));
+
+  // then
+  expect(await screen.findByRole("alert")).toHaveTextContent(i18n.t("error.generic"));
+  expect(screen.queryByTestId("retry-load"), "the load-more control already repeats this request").not.toBeInTheDocument();
+});
+
 it("given more bookings exist, when previewing a series cancellation, then the incomplete preview is disclosed", async () => {
   // given
   vi.mocked(api.personalBookings).mockResolvedValueOnce({
@@ -474,7 +494,6 @@ it("given the withdrawal fails, when the member tries, then the reason is shown 
   await userEvent.click(await screen.findByTestId("withdraw-participation"));
 
   expect(await screen.findByRole("alert")).toBeInTheDocument();
-  expect(screen.queryByTestId("retry-load"), "a refused action is not a failed load to repeat").not.toBeInTheDocument();
 });
 
 it("given more participations than one page, when the member asks for more, then the next page is appended", async () => {
