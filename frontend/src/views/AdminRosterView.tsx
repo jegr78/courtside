@@ -39,11 +39,16 @@ interface Criteria {
 }
 type AccountState = "active" | "disabled" | "none";
 
-const tableHeadFrom = window.matchMedia("(width >= 640px)");
+const TABLE_HEAD_FROM = "(width >= 640px)";
 
 function subscribeToTableHead(changed: () => void) {
-  tableHeadFrom.addEventListener("change", changed);
-  return () => tableHeadFrom.removeEventListener("change", changed);
+  const query = window.matchMedia(TABLE_HEAD_FROM);
+  query.addEventListener("change", changed);
+  return () => query.removeEventListener("change", changed);
+}
+
+function isTableHeadShown(): boolean {
+  return window.matchMedia(TABLE_HEAD_FROM).matches;
 }
 
 type Translate = (key: string, values?: Record<string, unknown>) => string;
@@ -108,7 +113,7 @@ export function AdminRosterView() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedMembershipTypeId = searchParams.get("membershipTypeId") || undefined;
-  const headVisible = useSyncExternalStore(subscribeToTableHead, () => tableHeadFrom.matches, () => true);
+  const headVisible = useSyncExternalStore(subscribeToTableHead, isTableHeadShown, () => true);
   const [entries, setEntries] = useState<RosterEntry[]>();
   const [matching, setMatching] = useState(0);
   const [types, setTypes] = useState<MembershipType[]>([]);
