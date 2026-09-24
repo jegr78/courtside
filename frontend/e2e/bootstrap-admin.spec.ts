@@ -182,6 +182,43 @@ test("control boundaries and focus indicators remain visible in both appearances
   }
 });
 
+test("the current member destination is visible in both appearances and layouts", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByTestId("my-bookings-link")).toBeVisible();
+
+  for (const appearance of ["dark", "light"] as const) {
+    if (appearance === "light") await selectPreference(page, "#theme-preference", appearance);
+
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/");
+      const courtPlan = page.getByTestId("court-plan-link");
+      const bookings = page.getByTestId("my-bookings-link");
+
+      // then
+      await expect(courtPlan).toHaveAttribute("aria-current", "page");
+      expect((await renderedColours(courtPlan)).background)
+        .not.toBe((await renderedColours(bookings)).background);
+      await expect(courtPlan).toHaveCSS("text-decoration-line", "underline");
+      await expect(bookings).toHaveCSS("text-decoration-line", "none");
+
+      // when
+      await bookings.click();
+
+      // then
+      await expect(bookings).toHaveAttribute("aria-current", "page");
+      expect((await renderedColours(bookings)).background)
+        .not.toBe((await renderedColours(courtPlan)).background);
+      await expect(bookings).toHaveCSS("text-decoration-line", "underline");
+      await expect(courtPlan).toHaveCSS("text-decoration-line", "none");
+    }
+  }
+});
+
 test("the application shell identifies the exact running build", async ({ page }) => {
   // given
   await page.goto("/");

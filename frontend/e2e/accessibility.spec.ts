@@ -9,6 +9,13 @@ async function expectNoWcagViolations(page: import("@playwright/test").Page) {
   expect(results.violations).toEqual([]);
 }
 
+async function expectPageHasHeadingOne(page: import("@playwright/test").Page) {
+  const results = await new AxeBuilder({ page })
+    .withRules(["page-has-heading-one"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+}
+
 async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.goto("/login");
   await page.getByTestId("username").fill(username);
@@ -85,6 +92,10 @@ for (const locale of ["de", "en"]) {
     await signIn(page, "doe.jane");
 
     // when / then
+    const pageHeading = page.getByRole("heading", { level: 1 });
+    await expect(pageHeading).toBeVisible();
+    await expect(pageHeading).toHaveText(locale === "de" ? "Platzplan" : "Court plan");
+    await expectPageHasHeadingOne(page);
     await expectNoWcagViolations(page);
     await selectJourneyDate(page, journeyService.visualDate);
     await page.locator('[data-testid="free-slot"][data-state="free"]').first().click();
