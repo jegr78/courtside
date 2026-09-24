@@ -235,15 +235,15 @@ test("a waiting service-worker update activates once and reloads one coherent ap
   // then
   await expect(page.getByTestId("build-identity")).toHaveText(buildIdentity ?? "");
   await expect(page.getByTestId("pwa-update-prompt")).not.toBeVisible();
-  const workerVersion = await page.evaluate(() => new Promise<number>((resolveVersion, rejectVersion) => {
-    const timeout = window.setTimeout(() => rejectVersion(new Error("Updated service worker did not identify itself")), 2_000);
-    navigator.serviceWorker.addEventListener("message", (event) => {
+  const workerVersion = await page.evaluate(() => new Promise<number>((resolveVersion) => {
+    const receiveVersion = (event: MessageEvent<unknown>) => {
       const data: unknown = event.data;
       if (typeof data === "object" && data !== null && "courtsideVersion" in data && data.courtsideVersion === 2) {
-        window.clearTimeout(timeout);
+        navigator.serviceWorker.removeEventListener("message", receiveVersion);
         resolveVersion(data.courtsideVersion);
       }
-    }, { once: true });
+    };
+    navigator.serviceWorker.addEventListener("message", receiveVersion);
     navigator.serviceWorker.controller?.postMessage("COURTSIDE_TEST_VERSION");
   }));
   expect(workerVersion).toBe(2);

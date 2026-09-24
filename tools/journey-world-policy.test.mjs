@@ -6,6 +6,8 @@ const setup = readFileSync(new URL("../frontend/e2e/global-setup.ts", import.met
 const frontendPackage = JSON.parse(readFileSync(new URL("../frontend/package.json", import.meta.url), "utf8"));
 const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta.url), "utf8");
 const playwright = readFileSync(new URL("../frontend/playwright.config.ts", import.meta.url), "utf8");
+const pwaLifecycle = readFileSync(new URL("../frontend/e2e/pwa-lifecycle.spec.ts", import.meta.url), "utf8");
+const processCommand = readFileSync(new URL("../frontend/e2e/process-command.ts", import.meta.url), "utf8");
 const bookingReminders = readFileSync(new URL(
   "../src/main/java/org/courtside/booking/internal/BookingReminders.java", import.meta.url), "utf8");
 const bookingReminderSchedule = readFileSync(new URL(
@@ -37,6 +39,16 @@ test("given several browser projects, when Playwright runs them, then one global
   assert.match(playwright, /workers: 1/);
   assert.match(playwright, /timeout: 60_000/);
   assert.match(playwright, /Unsupported browser project order/);
+});
+
+test("given release-critical journey commands, when the runner is slow, then only the outer gate owns their deadline", () => {
+  const serviceWorkerHandshake = pwaLifecycle.slice(
+    pwaLifecycle.indexOf("const workerVersion"), pwaLifecycle.indexOf("expect(workerVersion)"));
+
+  // when / then
+  assert.doesNotMatch(setup, /executeFile/);
+  assert.doesNotMatch(processCommand, /\btimeout\b/);
+  assert.doesNotMatch(serviceWorkerHandshake, /setTimeout/);
 });
 
 test("given Playwright starts browsers in a container, when its package changes, then the image uses the same release", () => {

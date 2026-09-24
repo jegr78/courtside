@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { auditTimeoutMilliseconds, classifyAuditAttempt, executeNpmAudit, runAudit } from "./npm-audit.mjs";
+import { classifyAuditAttempt, executeNpmAudit, runAudit } from "./npm-audit.mjs";
 
 const cleanReport = JSON.stringify({ auditReportVersion: 2, vulnerabilities: {} });
 
@@ -69,14 +69,7 @@ test("given the audit request times out, when npm returns no report, then eviden
   assert.equal(result.report.reason, "network-unavailable");
 });
 
-test("given the npm process exceeds its budget without network evidence, when execution ends, then it fails closed", () => {
-  // when / then
-  assert.throws(() => classifyAuditAttempt({
-    status: null, stdout: "", stderr: "", error: { code: "ETIMEDOUT" }
-  }), /process budget/);
-});
-
-test("given npm is executed, when planning the child process, then it has a bounded six-minute budget", () => {
+test("given npm is executed inside a bounded job, when planning the child process, then no shorter clock is added", () => {
   // given
   let invocation;
   const execute = (...args) => {
@@ -88,10 +81,8 @@ test("given npm is executed, when planning the child process, then it has a boun
   executeNpmAudit(execute, { npm_execpath: "/opt/npm-cli.js" }, "/repo/frontend");
 
   // then
-  assert.equal(auditTimeoutMilliseconds, 360_000);
-  assert.equal(invocation[2].timeout, auditTimeoutMilliseconds);
+  assert.equal(invocation[2].timeout, undefined);
   assert.equal(invocation[2].maxBuffer, 10 * 1024 * 1024);
-  assert.equal(invocation[2].killSignal, "SIGKILL");
 });
 
 test("given malformed or unknown output, when classification runs, then it fails closed", () => {

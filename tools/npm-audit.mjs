@@ -4,14 +4,12 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { validateNpmReport } from "./security-findings.mjs";
 
-export const auditTimeoutMilliseconds = 360_000;
-
 const servicePatterns = [/\b502\b.*bad gateway/i, /\b503\b.*service unavailable/i,
   /\b504\b.*gateway timeout/i];
 const networkPatterns = [/\bEAI_AGAIN\b/i, /\bECONNRESET\b/i, /\bENETUNREACH\b/i, /\bETIMEDOUT\b/i,
   /network timeout/i];
 
-export function classifyAuditAttempt({ status, stdout, stderr, error }) {
+export function classifyAuditAttempt({ status, stdout, stderr }) {
   const output = stdout.trim();
   if (output !== "") {
     let parsed;
@@ -40,7 +38,6 @@ export function classifyAuditAttempt({ status, stdout, stderr, error }) {
     throw new Error("npm audit did not produce a valid audit report");
   }
   if (status === 0) throw new Error("npm audit produced no report");
-  if (error?.code === "ETIMEDOUT") throw new Error("npm audit exceeded its process budget without network evidence");
   if (servicePatterns.some((pattern) => pattern.test(stderr))) return skipped("service-unavailable");
   if (networkPatterns.some((pattern) => pattern.test(stderr))) return skipped("network-unavailable");
   throw new Error("npm audit failed with an unclassified error");
@@ -64,8 +61,7 @@ export function executeNpmAudit(execute = spawnSync, env = process.env, workingD
   const npmCli = env.npm_execpath;
   if (!npmCli || !isAbsolute(npmCli)) throw new Error("Run npm audit through the audit:security package script");
   return execute(process.execPath, [npmCli, "audit", "--json", "--audit-level=high"], {
-    cwd: workingDirectory, encoding: "utf8", env, timeout: auditTimeoutMilliseconds,
-    killSignal: "SIGKILL", maxBuffer: 10 * 1024 * 1024
+    cwd: workingDirectory, encoding: "utf8", env, maxBuffer: 10 * 1024 * 1024
   });
 }
 
