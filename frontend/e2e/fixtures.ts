@@ -166,7 +166,9 @@ export const test = base.extend<TestFixtures & JourneyOptions, WorkerFixtures>({
 export async function selectJourneyDate(page: Page, visualDate: string): Promise<void> {
   await expect(page.getByTestId("week-grid")).toBeVisible();
   const day = page.getByTestId(`day-selector-${visualDate}`);
-  if (await day.count() === 0) await page.getByTestId("week-next").click();
+  if (await day.count() === 0) {
+    await page.locator('[data-testid="week-next"]:visible, [data-testid="mobile-week-next"]:visible').click();
+  }
   await day.click();
 }
 

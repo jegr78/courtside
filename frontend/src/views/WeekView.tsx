@@ -47,6 +47,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const [drag, setDrag] = useState<{ courtId: string; anchor: string; head: string }>();
   const [cancellation, setCancellation] = useState<Allocation>();
   const planRef = useRef<HTMLDivElement>(null);
+  const dayNavigationRef = useRef<HTMLElement>(null);
   const eligibilityRequest = useRef(0);
   const shownDate = useRef<string>(undefined);
 
@@ -114,6 +115,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
 
   const hasCourts = (data?.courts.length ?? 0) > 0;
   const days = data?.days ?? [];
+  const renderedWeekStart = days[0] ? formatDate(days[0]) : undefined;
   const selectedDay = days.find((day) => formatDate(day) === selectedDate);
   const selectedAllocations = selectedDate ? data?.allocations.get(selectedDate) ?? [] : [];
   const daySlots = selectedDay && data ? slotsFor(selectedDay, data.grid) : [];
@@ -215,13 +217,22 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     scrollToStart(planRef.current);
   }, [selectedDate, isToday]);
 
+  useEffect(() => {
+    const activeDay = selectedDate
+      ? dayNavigationRef.current?.querySelector(`[data-testid="day-selector-${selectedDate}"]`)
+      : undefined;
+    if (activeDay instanceof HTMLElement && typeof activeDay.scrollIntoView === "function") {
+      activeDay.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [renderedWeekStart, selectedDate]);
+
   return <section aria-labelledby="occupancy-heading" className="mt-8">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 id="occupancy-heading" data-testid="occupancy-heading" className="text-2xl font-bold">{t("week.title")}</h2>
         {days.length > 0 && hasCourts && <p className="text-muted text-sm">{formatWeekRange(days, language)}</p>}
       </div>
-      {(!data || hasCourts) && <div className="flex gap-2">
+      {(!data || hasCourts) && <div className="desktop-week-controls flex gap-2">
         <input data-testid="week-date" type="date" value={selectedDate ?? ""} disabled={!data} onChange={(event) => selectDate(event.target.value)} aria-label={t("week.chooseDate")} className="desktop-week-date form-control rounded-lg border px-2" />
         <Button variant="secondary" type="button" data-testid="week-previous" onClick={() => setWeekOffset((offset) => offset - 1)} aria-label={t("week.previous")}>
           {t("week.previousShort")}
@@ -232,7 +243,11 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       </div>}
     </div>
 
-    {data && hasCourts && <div className="desktop-day-navigation mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+    {data && hasCourts && <nav ref={dayNavigationRef} data-testid="mobile-week-navigation" className="week-day-navigation mt-5"
+      aria-label={t("week.chooseDate")}>
+      <Button variant="secondary" type="button" data-testid="mobile-week-previous"
+        className="mobile-week-control shrink-0 px-3" onClick={() => setWeekOffset((offset) => offset - 1)}
+        aria-label={t("week.previous")}>‹</Button>
       {days.map((day) => {
         const date = formatDate(day);
         const count = data.allocations.get(date)?.length ?? 0;
@@ -242,7 +257,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
           data-testid={`day-selector-${date}`}
           aria-label={formatDayLong(day, language)}
           aria-pressed={selectedDate === date}
-          className="border-structural rounded-xl border px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/15"
+          className="week-day-option border-structural rounded-xl border px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/15"
           onClick={() => setSelectedDate(date)}
         >
           <span className="block text-sm font-semibold">{formatWeekday(day, language)}</span>
@@ -250,14 +265,14 @@ export function WeekView({ today, clock = systemClock, canBook = true,
           <span className="text-muted mt-1 block text-xs">{t("week.bookingCount", { count })}</span>
         </button>;
       })}
-    </div>}
-
-    {data && hasCourts && <div className="mobile-day-navigation sticky top-0 z-10 mt-5 grid grid-cols-[auto_1fr_auto_auto] gap-2 surface-panel py-2">
-      <Button variant="secondary" type="button" data-testid="day-previous" className="px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), -1)))} aria-label={t("week.previousDay")}>‹</Button>
-      <input data-testid="selected-date" type="date" value={selectedDate ?? ""} onChange={(event) => selectDate(event.target.value)} aria-label={t("week.chooseDate")} className="form-control min-w-0 rounded-lg border px-2" />
-      <Button variant="secondary" type="button" data-testid="day-today" className="px-3" onClick={() => selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.today")}</Button>
-      <Button variant="secondary" type="button" data-testid="day-next" className="px-3" onClick={() => selectedDate && selectDate(formatDate(addDays(parseDate(selectedDate), 1)))} aria-label={t("week.nextDay")}>›</Button>
-    </div>}
+      <Button variant="secondary" type="button" data-testid="mobile-current-time" className="mobile-week-control shrink-0"
+        onClick={() => isToday
+          ? scrollToSlot(planRef.current, currentSlot)
+          : selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.now")}</Button>
+      <Button variant="secondary" type="button" data-testid="mobile-week-next"
+        className="mobile-week-control shrink-0 px-3" onClick={() => setWeekOffset((offset) => offset + 1)}
+        aria-label={t("week.next")}>›</Button>
+    </nav>}
 
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
@@ -271,7 +286,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     </Alert>}
     {!data && !error && <p className="mt-6" aria-live="polite">{t("status.loading")}</p>}
     {data && !hasCourts && <p data-testid="court-plan-empty" className="text-muted mt-6">{t("week.noCourtOpen")}</p>}
-    {data && hasCourts && <div className="mt-4 flex justify-end">
+    {data && hasCourts && <div className="desktop-current-time mt-4 flex justify-end">
       <Button variant="secondary" type="button" data-testid="current-time" onClick={() => isToday
         ? scrollToSlot(planRef.current, currentSlot)
         : selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.now")}</Button>

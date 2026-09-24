@@ -369,16 +369,15 @@ it("given multiple courts, when the plan loads, then every court remains in the 
   expect(screen.getByTestId("court-heading-2")).toHaveAccessibleName("Court 2");
 });
 
-it("given the day plan, when using compact date navigation, then the adjacent day becomes selected", async () => {
+it("given the day plan, when using compact date navigation, then another day becomes selected", async () => {
   // given
   render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByTestId("week-grid");
 
   // when
-  await userEvent.click(screen.getByTestId("day-next"));
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-11"));
 
   // then
-  expect(screen.getByTestId("selected-date")).toHaveValue("2026-08-11");
   expect(screen.getByTestId("day-selector-2026-08-11")).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -388,11 +387,11 @@ it("given a week before daylight saving starts, when choosing the next week, the
   await screen.findByTestId("week-grid");
 
   // when
-  fireEvent.change(screen.getByTestId("selected-date"), { target: { value: "2026-03-30" } });
+  await userEvent.click(screen.getByTestId("week-next"));
 
   // then
   await waitFor(() => expect(api.allocations).toHaveBeenCalledWith("2026-03-30"));
-  expect(screen.getByTestId("selected-date")).toHaveValue("2026-03-30");
+  expect(screen.getByTestId("day-selector-2026-03-30")).toHaveAttribute("aria-pressed", "true");
 });
 
 it("given past slots, when showing today, then the plan starts with the first remaining slot", async () => {
@@ -482,6 +481,11 @@ it("given the plan is open, when the refresh interval elapses and focus returns,
   render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByTestId("week-grid");
   vi.mocked(api.allocations).mockClear();
+  const activeDay = screen.getByTestId("day-selector-2026-08-10");
+  const scrollIntoView = vi.fn();
+  activeDay.scrollIntoView = scrollIntoView;
+  await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+  scrollIntoView.mockClear();
 
   // when
   await vi.advanceTimersByTimeAsync(60_000);
@@ -491,6 +495,7 @@ it("given the plan is open, when the refresh interval elapses and focus returns,
   await waitFor(() => expect(api.allocations).toHaveBeenCalledTimes(2));
   expect(api.allocations).toHaveBeenNthCalledWith(1, "2026-08-10");
   expect(api.allocations).toHaveBeenNthCalledWith(2, "2026-08-10");
+  expect(scrollIntoView).not.toHaveBeenCalled();
 });
 
 it("given a booking conflict, when submission fails, then the affected day is refreshed", async () => {
@@ -1302,12 +1307,12 @@ it("given a day in another week, when returning to the current time, then today 
   render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByTestId("week-grid");
   await userEvent.click(screen.getByTestId("week-next"));
-  await waitFor(() => expect(screen.getByTestId("selected-date")).toHaveValue("2026-08-17"));
+  await waitFor(() => expect(screen.getByTestId("day-selector-2026-08-17")).toHaveAttribute("aria-pressed", "true"));
 
   // when
   await userEvent.click(screen.getByTestId("current-time"));
 
   // then
-  await waitFor(() => expect(screen.getByTestId("selected-date")).toHaveValue("2026-08-10"));
+  await waitFor(() => expect(screen.getByTestId("day-selector-2026-08-10")).toHaveAttribute("aria-pressed", "true"));
   expect(await screen.findByTestId("current-time-line")).toBeInTheDocument();
 });
