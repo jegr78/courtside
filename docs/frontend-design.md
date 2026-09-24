@@ -20,6 +20,12 @@ CSS uses semantic surface, text, border and form tokens derived from this palett
 default theme. Light changes those semantic tokens but does not introduce a second palette. Large
 gradients are not part of the product surface.
 
+Notices and the environment banner are the exception: their `--cs-notice-*` and
+`--cs-environment-*` tokens take red, amber and emerald from Tailwind's palette, because an error,
+a warning and a success need colours the court palette does not carry. A notice has four tones.
+Error announces itself as an alert; warning, info and success announce themselves as a status,
+because nothing failed.
+
 Club configuration controls the logo, name, primary action colour and focus accent. Club colours
 must not replace free, own, occupied or closed court states. Action text is selected for contrast
 against the configured primary colour.

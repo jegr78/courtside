@@ -353,7 +353,10 @@ describe("AdminAuditView", () => {
     await user.click(screen.getByTestId("audit-filter-apply"));
 
     // then
-    expect(await screen.findByRole("alert")).toHaveTextContent("Narrow the kind of change or time range");
+    const notice = await screen.findByTestId("audit-search-incomplete");
+    expect(notice).toHaveTextContent("Narrow the kind of change or time range");
+    expect(notice, "a bounded search is a caution, not a failure").toHaveAttribute("role", "status");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("given the filtered search is refused, when applying it, then the failure is shown and the existing page remains", async () => {

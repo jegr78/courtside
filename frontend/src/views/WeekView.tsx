@@ -287,7 +287,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         aria-label={t("week.next")}>›</Button>
     </nav>}
 
-    {offline && <Alert testId="court-plan-offline">{t("week.offline")}</Alert>}
+    {offline && <Alert tone="warning" testId="court-plan-offline">{t("week.offline")}</Alert>}
     {!offline && error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {eligibilityError && <Alert testId="booking-eligibility-error">{eligibilityError}</Alert>}

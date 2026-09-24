@@ -158,6 +158,25 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("primary-color-preview")).toHaveStyle({ backgroundColor: "#777777" });
     expect(screen.getByTestId("primary-color-contrast")).toHaveTextContent("4.33:1");
     expect(screen.getByTestId("primary-color-contrast")).toHaveTextContent("does not reach 4.5:1");
+    expect(screen.getByTestId("primary-color-contrast").className, "a failing ratio is shown in the warning tone")
+      .toContain("bg-(--cs-notice-warning-surface)");
+  });
+
+  it("given a primary colour that passes, when a new one fails, then the same live region reports the change", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const picker = await screen.findByTestId("primary-color-picker");
+    fireEvent.change(picker, { target: { value: "#17211d" } });
+    const passing = screen.getByTestId("primary-color-contrast");
+    expect(passing).toHaveTextContent("reaches 4.5:1");
+
+    // when
+    fireEvent.change(picker, { target: { value: "#777777" } });
+
+    // then
+    expect(screen.getByTestId("primary-color-contrast"), "a region inserted with its content is not announced").toBe(passing);
+    expect(passing).toHaveTextContent("does not reach 4.5:1");
+    expect(passing.tagName, "a computed result stays an output").toBe("OUTPUT");
   });
 
   it("given a high contrast accent colour, when it is shown, then the preview names the automatic text tone", async () => {
@@ -168,6 +187,8 @@ describe("AdminConfigurationView", () => {
     expect(await screen.findByTestId("accent-color-picker")).toHaveValue("#d7e24b");
     expect(screen.getByTestId("accent-color-contrast")).toHaveTextContent("Dark text");
     expect(screen.getByTestId("accent-color-contrast")).toHaveTextContent("reaches 4.5:1");
+    expect(screen.getByTestId("accent-color-contrast").className, "a passing ratio carries no warning")
+      .not.toContain("--cs-notice-warning");
   });
 
   it("given a board logo file, when uploading it, then the effective preview and shell configuration change", async () => {

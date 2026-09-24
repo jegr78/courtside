@@ -15,6 +15,7 @@ import {
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { LocaleSelect } from "../components/LocaleSelect";
 import { Alert } from "../components/Alert";
+import { noticeColours } from "../components/noticeTones";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { SuccessFeedback } from "../components/SuccessFeedback";
@@ -39,6 +40,11 @@ function BrandColorField({ kind, label, value, changed }: {
   const { t } = useTranslation();
   const contrast = brandContrast(value);
   const id = `${kind}-color`;
+  const contrastSummary = contrast && t("admin.config.colorContrast", {
+    ratio: contrast.ratio.toFixed(2),
+    tone: t(contrast.tone === "dark" ? "admin.config.colorDarkText" : "admin.config.colorLightText"),
+    result: t(contrast.ratio >= 4.5 ? "admin.config.colorContrastPass" : "admin.config.colorContrastWarning")
+  });
   return <fieldset className="min-w-0 grid gap-3 rounded-xl border p-4">
     <legend className="px-1 font-semibold">{label}</legend>
     <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-end gap-3">
@@ -56,12 +62,9 @@ function BrandColorField({ kind, label, value, changed }: {
               style={{ backgroundColor: value, color: contrast.textColor }}>
         {t("admin.config.colorPreview")}
       </button>
-      <output data-testid={`${id}-contrast`} className={contrast.ratio >= 4.5 ? "text-sm" : "text-sm font-semibold text-amber-700 dark:text-amber-300"}>
-        {t("admin.config.colorContrast", {
-          ratio: contrast.ratio.toFixed(2),
-          tone: t(contrast.tone === "dark" ? "admin.config.colorDarkText" : "admin.config.colorLightText"),
-          result: t(contrast.ratio >= 4.5 ? "admin.config.colorContrastPass" : "admin.config.colorContrastWarning")
-        })}
+      <output data-testid={`${id}-contrast`}
+              className={`rounded-lg border p-3 text-sm ${noticeColours(contrast.ratio >= 4.5 ? "info" : "warning")}`}>
+        {contrastSummary}
       </output>
     </>}
   </fieldset>;

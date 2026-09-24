@@ -176,7 +176,7 @@ export function AdminAuditView() {
       ? (problem ? <Alert>{problem}</Alert> : <p role="status">{t("status.loading")}</p>)
       : <>
         {problem && <Alert>{problem}</Alert>}
-        {searchIncomplete && <Alert>{t("audit.filter.incomplete")}</Alert>}
+        {searchIncomplete && <Alert tone="warning" testId="audit-search-incomplete">{t("audit.filter.incomplete")}</Alert>}
         <form className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" onSubmit={(event) => {
           event.preventDefault();
           try {

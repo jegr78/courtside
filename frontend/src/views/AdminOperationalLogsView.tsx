@@ -142,10 +142,10 @@ export function AdminOperationalLogsView() {
         {page.availability === "UNAVAILABLE"
           ? <Alert testId="operational-logs-unavailable">{t("operationalLogs.unavailable")}</Alert>
           : <>
-            <Alert testId="operational-logs-provenance-warning">{t("operationalLogs.provenanceWarning")}</Alert>
-            {page.retentionTruncated && <Alert testId="operational-logs-retention-warning">{t("operationalLogs.retentionWarning")}</Alert>}
-            {page.searchIncomplete && <Alert testId="operational-logs-incomplete-warning">{t("operationalLogs.incompleteWarning")}</Alert>}
-            {page.droppedRecords > 0 && <Alert testId="operational-logs-dropped-warning">{t("operationalLogs.droppedWarning", { count: page.droppedRecords })}</Alert>}
+            <Alert tone="info" testId="operational-logs-provenance-warning">{t("operationalLogs.provenanceWarning")}</Alert>
+            {page.retentionTruncated && <Alert tone="info" testId="operational-logs-retention-warning">{t("operationalLogs.retentionWarning")}</Alert>}
+            {page.searchIncomplete && <Alert tone="warning" testId="operational-logs-incomplete-warning">{t("operationalLogs.incompleteWarning")}</Alert>}
+            {page.droppedRecords > 0 && <Alert tone="warning" testId="operational-logs-dropped-warning">{t("operationalLogs.droppedWarning", { count: page.droppedRecords })}</Alert>}
             {entries.length === 0
               ? <p data-testid="operational-logs-empty">{t("operationalLogs.empty")}</p>
               : <div className="overflow-x-auto"><table className="w-full text-left">

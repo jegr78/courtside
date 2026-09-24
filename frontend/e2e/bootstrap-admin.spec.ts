@@ -766,6 +766,45 @@ test("a disabled button and a focused field read differently from their resting 
   }
 });
 
+test("a caution reads as a warning rather than a failure in both appearances", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
+  await page.getByTestId("admin-configuration-link").click();
+  await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
+  const caution = page.getByTestId("primary-color-contrast");
+
+  // when
+  await page.getByTestId("primary-color-value").fill("#777777");
+
+  // then
+  await expect(caution, "a caution is announced politely, not as an alert").toHaveRole("status");
+  for (const appearance of ["dark", "light"] as const) {
+    if (appearance === "light") await selectPreference(page, "#theme-preference", appearance);
+    const tone = (name: string) => page.evaluate((token) => {
+      const probe = document.createElement("span");
+      probe.style.background = `var(${token}-surface)`;
+      probe.style.color = `var(${token}-text)`;
+      document.body.append(probe);
+      const style = getComputedStyle(probe);
+      const colours = { background: style.backgroundColor, text: style.color };
+      probe.remove();
+      return colours;
+    }, name);
+    const warning = await tone("--cs-notice-warning");
+    const error = await tone("--cs-notice-error");
+
+    await expect(caution, `${appearance}: a caution takes the warning surface`).toHaveCSS("background-color", warning.background);
+    await expect(caution, `${appearance}: a caution takes the warning text`).toHaveCSS("color", warning.text);
+    expect(warning.background, `${appearance}: the warning surface must differ from the error surface`).not.toBe(error.background);
+    expect(await renderedContrast(page, caution, "color", caution), `${appearance}: the caution stays readable`)
+      .toBeGreaterThanOrEqual(4.5);
+  }
+});
+
 test("an admin adds a person, gives them an account, and that person signs in and books", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");

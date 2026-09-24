@@ -85,7 +85,7 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
         <dt>{t("build.environment")}</dt><dd>{source.environment}</dd>
       </dl>
       <a className="mt-4 inline-block underline hover:no-underline" href={source.sourceUrl}>{t("footer.source")}</a>
-      {copyFailed && <p role="alert" className="mt-4 text-sm text-red-800 dark:text-red-200">{t("build.copyFailed")}</p>}
+      {copyFailed && <p role="alert" className="text-destructive mt-4 text-sm">{t("build.copyFailed")}</p>}
       <div className="mt-6 flex justify-end gap-3">
         <Button variant="primary" type="button" autoFocus data-testid="copy-build-identity" className="px-4 py-2" disabled={isCopying} onClick={() => void copyDiagnostics()}>
           {isCopied ? t("build.copied") : t("build.copy")}
@@ -99,12 +99,12 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
 export function EnvironmentMarker({ source, identityStatus = "available" }: EnvironmentMarkerProps) {
   const { t } = useTranslation();
   if (identityStatus !== "available") {
-    return <div data-testid="environment-warning" role="alert" className="bg-red-200 px-5 py-2 text-center font-semibold text-red-950">
+    return <div data-testid="environment-warning" role="alert" className="bg-(--cs-environment-error-surface) px-5 py-2 text-center font-semibold text-(--cs-environment-error-text)">
       {t(identityStatus === "loading" ? "environment.loading" : "environment.unavailable")}
     </div>;
   }
   return source?.environment === "UAT" || source?.environment === "PERFORMANCE"
-    ? <div data-testid="environment-marker" role="status" className="bg-amber-200 px-5 py-2 text-center font-semibold text-amber-950">
+    ? <div data-testid="environment-marker" role="status" className="bg-(--cs-environment-warning-surface) px-5 py-2 text-center font-semibold text-(--cs-environment-warning-text)">
       {t(source.environment === "UAT" ? "environment.uat" : "environment.performance")}
     </div>
     : null;
