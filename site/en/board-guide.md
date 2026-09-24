@@ -157,7 +157,9 @@ should receive different rules.
 
 ## People → Membership types
 
-A membership type has a label, a rule set and an import setting.
+A membership type has a label, a rule set and an import setting. The overview shows each type in
+one row, or one card on a phone, so the rule sets of all types can be compared one below the
+other. *Edit rules* opens exactly the rule set the type uses.
 
 Enable **Open an account on import** if imported members of this type should receive an account.
 Courtside sends the one-time password to the recorded email address. Existing accounts remain
