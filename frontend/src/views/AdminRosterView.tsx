@@ -173,7 +173,7 @@ export function AdminRosterView() {
             {t("admin.roster.filter")}
             <select
               data-testid="roster-filter"
-              className="form-control rounded-lg border px-3 py-3 outline-none"
+              className="form-control rounded-lg border px-3 py-3"
               disabled={pending}
               value={membershipTypeId ?? ""}
               onChange={(event) => void read(query, event.target.value || undefined, role, sortBy, sortDirection)}
@@ -186,7 +186,7 @@ export function AdminRosterView() {
             {t("admin.roster.roleFilter")}
             <select
               data-testid="roster-role-filter"
-              className="form-control rounded-lg border px-3 py-3 outline-none"
+              className="form-control rounded-lg border px-3 py-3"
               disabled={pending}
               value={role ?? ""}
               onChange={(event) => void read(query, membershipTypeId,

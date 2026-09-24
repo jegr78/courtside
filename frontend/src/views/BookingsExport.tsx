@@ -65,7 +65,7 @@ export function BookingsExport({ onFailure }: Props) {
           {t("admin.export.separator")}
           <select
             data-testid="bookings-export-separator"
-            className="form-control rounded-lg border px-3 py-3 outline-none"
+            className="form-control rounded-lg border px-3 py-3"
             value={separator}
             onChange={(event) => setSeparator(event.target.value)}
           >
@@ -77,7 +77,7 @@ export function BookingsExport({ onFailure }: Props) {
           {t("admin.export.encoding")}
           <select
             data-testid="bookings-export-encoding"
-            className="form-control rounded-lg border px-3 py-3 outline-none"
+            className="form-control rounded-lg border px-3 py-3"
             value={encoding}
             onChange={(event) => setEncoding(event.target.value)}
           >

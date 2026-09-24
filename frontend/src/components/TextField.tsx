@@ -9,7 +9,7 @@ export function TextField({ label, id, className = "", ...props }: TextFieldProp
     {label}
     <input
       id={id}
-      className={`form-control rounded-lg border px-3 py-3 outline-none ${className}`}
+      className={`form-control rounded-lg border px-3 py-3 ${className}`}
       {...props}
     />
   </label>;

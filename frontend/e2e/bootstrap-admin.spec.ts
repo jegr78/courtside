@@ -712,6 +712,56 @@ test.describe("renaming a court", () => {
   });
 });
 
+test("a disabled button and a focused field read differently from their resting state in both appearances", async ({ page }) => {
+  // given
+  const court = "dddddddd-0000-0000-0000-000000000002";
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
+  await page.getByTestId("admin-courts-link").click();
+  await expect(page.getByTestId("admin-courts-view")).toBeVisible();
+  const editor = page.getByTestId("court-editor");
+  const confirm = page.getByTestId("confirm-court-edit");
+
+  for (const appearance of ["dark", "light"] as const) {
+    if (appearance === "light") await selectPreference(page, "#theme-preference", appearance);
+    const unavailable = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      probe.style.background = "var(--cs-raised)";
+      probe.style.color = "var(--cs-muted)";
+      document.body.append(probe);
+      const style = getComputedStyle(probe);
+      const colours = { background: style.backgroundColor, text: style.color };
+      probe.remove();
+      return colours;
+    });
+    await page.getByTestId(`edit-court-number-${court}`).click();
+    await editor.fill("7");
+    await expect(confirm).toBeEnabled();
+    const enabled = await renderedColours(confirm);
+
+    // when
+    await editor.fill("1000");
+
+    // then
+    await expect(confirm).toBeDisabled();
+    await expect(confirm, `${appearance}: a disabled button takes the raised surface`)
+      .toHaveCSS("background-color", unavailable.background);
+    await expect(confirm, `${appearance}: a disabled button takes the muted text`)
+      .toHaveCSS("color", unavailable.text);
+    expect(enabled.background, `${appearance}: the enabled fill must differ from the disabled one`)
+      .not.toBe(unavailable.background);
+    expect(enabled.text, `${appearance}: the enabled text must differ from the disabled one`)
+      .not.toBe(unavailable.text);
+    await expect(editor).toBeFocused();
+    await expect(editor, `${appearance}: a focused field keeps its focus outline`).toHaveCSS("outline-style", "solid");
+    await page.getByTestId("dismiss-court-edit").click();
+    await expect(editor).toHaveCount(0);
+  }
+});
+
 test("an admin adds a person, gives them an account, and that person signs in and books", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");
