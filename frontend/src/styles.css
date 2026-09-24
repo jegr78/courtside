@@ -54,10 +54,6 @@ body {
   background: var(--cs-page);
 }
 
-button, input, select, textarea {
-  font: inherit;
-}
-
 .font-value,
 time,
 input[type="date"],

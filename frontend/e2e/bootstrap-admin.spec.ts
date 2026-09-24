@@ -726,7 +726,12 @@ test("a disabled button and a focused field read differently from their resting 
   const confirm = page.getByTestId("confirm-court-edit");
 
   for (const appearance of ["dark", "light"] as const) {
-    if (appearance === "light") await selectPreference(page, "#theme-preference", appearance);
+    // given
+    if (appearance === "light") {
+      await page.getByTestId("dismiss-court-edit").click();
+      await expect(editor).toHaveCount(0);
+      await selectPreference(page, "#theme-preference", appearance);
+    }
     const unavailable = await page.evaluate(() => {
       const probe = document.createElement("span");
       probe.style.background = "var(--cs-raised)";
@@ -757,8 +762,6 @@ test("a disabled button and a focused field read differently from their resting 
       .not.toBe(unavailable.text);
     await expect(editor).toBeFocused();
     await expect(editor, `${appearance}: a focused field keeps its focus outline`).toHaveCSS("outline-style", "solid");
-    await page.getByTestId("dismiss-court-edit").click();
-    await expect(editor).toHaveCount(0);
   }
 });
 

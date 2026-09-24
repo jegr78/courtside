@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -65,3 +65,37 @@ test("given the reflow check, when it narrows the viewport, then it proves the l
   assert.doesNotMatch(accessibility, /toPass\(\{/);
   assert.doesNotMatch(accessibility, /expect\.poll/);
 });
+
+test("given a class list, when it removes the outline, then the removal is found under every variant", () => {
+  // when / then
+  assert.equal(outlineRemovals('className="form-control rounded-lg outline-none"').length, 1);
+  assert.equal(outlineRemovals("className={`form-control ${width} focus:outline-hidden`}").length, 1);
+  assert.equal(outlineRemovals('className="sm:focus-visible:outline-none"').length, 1);
+  assert.deepEqual(outlineRemovals('className="focus-visible:outline-2 outline-offset-2 outline-(--cs-focus)"'), []);
+  assert.deepEqual(outlineRemovals('const noneLeft = "outline-none-ish";'), []);
+});
+
+test("given the frontend sources, when a control styles its focus, then no class removes the outline", () => {
+  // given
+  const sources = sourceFiles(join(root, "frontend/src")).filter((path) => /\.(?:ts|tsx|css)$/.test(path));
+
+  // when
+  const violations = sources.flatMap((path) => {
+    const source = readFileSync(path, "utf8");
+    return outlineRemovals(source).map((offset) =>
+      `${path.slice(root.length + 1)}:${source.slice(0, offset).split("\n").length}`);
+  });
+
+  // then
+  assert.deepEqual(violations, [], "a component class sits below the utilities, so outline-none defeats its focus outline");
+});
+
+function outlineRemovals(source) {
+  return [...source.matchAll(/(?<![\w-])(?:[\w-]+:)*outline-(?:none|hidden)(?![\w-])/g)].map((match) => match.index);
+}
+
+function sourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => entry.isDirectory()
+    ? sourceFiles(join(directory, entry.name))
+    : [join(directory, entry.name)]);
+}
