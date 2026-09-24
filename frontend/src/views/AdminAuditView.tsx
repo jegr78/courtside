@@ -72,6 +72,15 @@ function auditMessage(entry: AuditEntry, t: TFunction): string {
   });
 }
 
+const EVENT_TYPE_LABEL = "audit.eventType.";
+
+function eventTypeChoices(bundle: Record<string, unknown> | undefined, language: string, t: TFunction): { eventType: string; label: string }[] {
+  return Object.keys(bundle ?? {})
+    .filter((key) => key.startsWith(EVENT_TYPE_LABEL))
+    .map((key) => ({ eventType: key.slice(EVENT_TYPE_LABEL.length), label: t(key) }))
+    .sort((left, right) => left.label.localeCompare(right.label, language));
+}
+
 function actorLabel(entry: AuditEntry, t: TFunction): string {
   if (!entry.actorAccountId) return t("audit.actor.system");
   return entry.actorUsername ?? entry.actorAccountId;
@@ -153,7 +162,7 @@ export function AdminAuditView() {
     const instant = (value: string) => zonedDateTime(value.slice(0, 10), value.slice(11), club!.timeZone);
     return {
       ...(query.trim() ? { query: query.trim() } : {}),
-      ...(eventType.trim() ? { eventType: eventType.trim() } : {}),
+      ...(eventType ? { eventType } : {}),
       ...(subjectId ? { subjectId } : {}),
       ...(from ? { from: instant(from) } : {}),
       ...(to ? { to: instant(to) } : {})
@@ -179,8 +188,11 @@ export function AdminAuditView() {
           <label className="grid gap-1 font-medium">{t("audit.filter.query")}
             <input data-testid="audit-filter-query" className="form-control rounded-lg border px-3 py-2" value={query} maxLength={60} onChange={(event) => setQuery(event.target.value)} />
           </label>
-          <label className="grid gap-1 font-medium">{t("audit.filter.eventType")}
-            <input data-testid="audit-filter-event-type" className="form-control rounded-lg border px-3 py-2" value={eventType} maxLength={100} onChange={(event) => setEventType(event.target.value)} />
+          <label className="grid min-w-0 gap-1 font-medium">{t("audit.filter.eventType")}
+            <select data-testid="audit-filter-event-type" className="form-control w-full min-w-0 rounded-lg border px-3 py-2" value={eventType} onChange={(event) => setEventType(event.target.value)}>
+              <option value="">{t("audit.filter.anyEventType")}</option>
+              {eventTypeChoices(i18n.getResourceBundle(language, "translation") as Record<string, unknown> | undefined, language, t).map((choice) => <option key={choice.eventType} value={choice.eventType}>{choice.label}</option>)}
+            </select>
           </label>
           <label className="grid gap-1 font-medium">{t("audit.filter.from")}
             <input data-testid="audit-filter-from" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={from} onChange={(event) => setFrom(event.target.value)} />

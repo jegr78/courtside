@@ -322,8 +322,8 @@ Unter **Nachweise** findest du fünf Ansichten.
   Eintrag im Änderungsprotokoll.
 * **Änderungsprotokoll** zeigt administrative Änderungen mit Zeitpunkt, Gegenstand und
   ausführendem Konto. Suche nach dem Namen eines Gegenstands oder einem Benutzernamen und grenze
-  die Treffer bei Bedarf nach Ereignistyp und Zeitraum ein. *Weitere laden* behält die aktiven
-  Filter bei; *Filter zurücksetzen* zeigt wieder das vollständige Protokoll.
+  die Treffer bei Bedarf nach der Art der Änderung und dem Zeitraum ein. *Weitere laden* behält
+  die aktiven Filter bei; *Filter zurücksetzen* zeigt wieder das vollständige Protokoll.
 * **Nachrichtenprotokoll** zeigt den Versandstatus. *Übergeben* bedeutet nur, dass der Mailserver
   die Nachricht angenommen hat. Die endgültige Zustellung steht allein in dessen Protokoll.
 * **Betriebsprotokoll** zeigt jüngste, vor der Speicherung bereinigte Meldungen aus Anwendung,
