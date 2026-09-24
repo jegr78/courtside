@@ -6,7 +6,7 @@ import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { formString } from "../../forms/formString";
 import { useUnsavedForm } from "../../unsaved/useUnsavedForm";
-import { AllowedRoleCheckboxes, BookingRules, Checkbox, ColorField, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
+import { AllowedRoleCheckboxes, BookingRules, CardColorField, Checkbox, DEFAULT_CARD_COLOR, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
 import { FacilityPage } from "./FacilityPage";
 import { useSaving } from "./useSaving";
 
@@ -76,12 +76,13 @@ export function AdminBookingCardsView() {
 
 function CardCreateForm({ disabled, form, counts, setCounts, create }: { disabled: boolean; form: ReturnType<typeof useUnsavedForm>["form"]; counts: number[]; setCounts: (counts: number[]) => void; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const { t } = useTranslation();
+  const [color, setColor] = useState(DEFAULT_CARD_COLOR);
   return <form noValidate {...form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-4 rounded-xl border p-4">
     <h2 className="font-bold">{t("admin.facility.newCard")}</h2>
     <div className="grid items-start gap-4 md:grid-cols-3">
       <TextField disabled={disabled} data-testid="new-card-label" name="label" label={t("admin.facility.label")} />
       <div className="grid content-start gap-4">
-        <ColorField disabled={disabled} name="color" />
+        <CardColorField testId="new-card-color" disabled={disabled} name="color" value={color} changed={setColor} />
         <Checkbox disabled={disabled} name="showGenericOccupancy" label={t("admin.facility.showGenericOccupancy")} />
       </div>
       <PlayerCounts idPrefix="new-card-counts" disabled={disabled} counts={counts} changed={setCounts} />

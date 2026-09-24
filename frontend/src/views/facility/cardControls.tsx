@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { Role } from "../../api/client";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
+import { ContrastReading } from "../../components/ContrastReading";
+import { cardContrast } from "../cardColors";
 
 const MIN_PLAYER_COUNT = 1;
 const MAX_PLAYER_COUNT = 20;
@@ -70,7 +72,17 @@ export function PlayerCounts({ counts, disabled, changed, idPrefix }: { counts: 
   </fieldset>;
 }
 
-export function ColorField({ value, disabled, changed, name, testId }: { value?: string; disabled?: boolean; changed?: (color: string) => void; name?: string; testId?: string }) {
+export const DEFAULT_CARD_COLOR = "#b85c38";
+
+export function CardColorField({ value, disabled, changed, name, testId }: { value: string; disabled?: boolean; changed: (color: string) => void; name?: string; testId: string }) {
+  const contrast = cardContrast(value);
+  return <div className="grid content-start gap-2">
+    <ColorField testId={testId} name={name} disabled={disabled} value={value} changed={changed} />
+    {contrast && <ContrastReading contrast={contrast} testId={`${testId}-contrast`} />}
+  </div>;
+}
+
+function ColorField({ value, disabled, changed, name, testId }: { value: string; disabled?: boolean; changed: (color: string) => void; name?: string; testId: string }) {
   const { t } = useTranslation();
   return <TextField
     className="cursor-pointer"
@@ -82,9 +94,8 @@ export function ColorField({ value, disabled, changed, name, testId }: { value?:
     type="color"
     disabled={disabled}
     label={t("admin.facility.color")}
-    defaultValue={changed ? undefined : "#b85c38"}
-    value={changed ? value : undefined}
-    onChange={changed ? (event) => changed(event.target.value) : undefined}
+    value={value}
+    onChange={(event) => changed(event.target.value)}
   />;
 }
 

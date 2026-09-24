@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
@@ -76,6 +76,18 @@ describe("AdminBookingCardsView", () => {
     expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
   });
 
+  it("given a new card, when its colour would leave its label hard to read, then the board is told before creating it", async () => {
+    // given
+    show();
+    const color = await screen.findByTestId("new-card-color");
+
+    // when
+    fireEvent.change(color, { target: { value: "#777777" } });
+
+    // then
+    expect(screen.getByTestId("new-card-color-contrast")).toHaveTextContent("does not reach 4.5:1");
+  });
+
   it("given a new card, when it is created, then the page that edits it opens", async () => {
     // given
     const createCard = vi.spyOn(api, "createAdminBookingCard").mockResolvedValue({
@@ -95,7 +107,7 @@ describe("AdminBookingCardsView", () => {
 
     // then
     expect(createCard).toHaveBeenCalledWith(expect.objectContaining({
-      label: "Training", allowedRoles: ["TRAINER"], managingRoles: ["TRAINER"],
+      label: "Training", color: "#b85c38", allowedRoles: ["TRAINER"], managingRoles: ["TRAINER"],
       allowedPlayerCounts: [2]
     }));
     expect(await screen.findByTestId("arrived-at-card-2")).toBeVisible();

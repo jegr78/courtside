@@ -8,12 +8,16 @@ export interface BrandContrast {
 }
 
 export function brandContrast(background: string): BrandContrast | undefined {
+  return contrastBetween(background, DARK_TEXT, LIGHT_TEXT);
+}
+
+export function contrastBetween(background: string, darkText: string, lightText: string): BrandContrast | undefined {
   if (!/^#[0-9a-f]{6}$/i.test(background)) return undefined;
-  const darkRatio = contrastRatio(background, DARK_TEXT);
-  const lightRatio = contrastRatio(background, LIGHT_TEXT);
+  const darkRatio = contrastRatio(background, darkText);
+  const lightRatio = contrastRatio(background, lightText);
   return darkRatio >= lightRatio
-    ? { textColor: DARK_TEXT, tone: "dark", ratio: darkRatio }
-    : { textColor: LIGHT_TEXT, tone: "light", ratio: lightRatio };
+    ? { textColor: darkText, tone: "dark", ratio: darkRatio }
+    : { textColor: lightText, tone: "light", ratio: lightRatio };
 }
 
 function contrastRatio(first: string, second: string): number {

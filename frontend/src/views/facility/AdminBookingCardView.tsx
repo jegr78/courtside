@@ -10,7 +10,7 @@ import { differs } from "../../unsaved/differs";
 import { describedByMark } from "../../unsaved/markId";
 import { UnsavedMark } from "../../unsaved/UnsavedMark";
 import { CardPreview } from "./CardPreview";
-import { AllowedRoleCheckboxes, BookingRules, Checkbox, ColorField, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
+import { AllowedRoleCheckboxes, BookingRules, Checkbox, CardColorField, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
 import { FacilityPage } from "./FacilityPage";
 import { useSaving } from "./useSaving";
 
@@ -87,7 +87,7 @@ export function AdminBookingCardView() {
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="grid content-start gap-4">
           <TextField data-testid="card-label" disabled={disabled} label={t("admin.facility.label")} value={card.label} onChange={(event) => setCard({ ...card, label: event.target.value })} />
-          <ColorField testId="card-color" disabled={disabled} value={card.color} changed={(color) => setCard({ ...card, color })} />
+          <CardColorField testId="card-color" disabled={disabled} value={card.color} changed={(color) => setCard({ ...card, color })} />
           <CardPreview label={card.label} color={card.color} showGenericOccupancy={card.showGenericOccupancy} />
           <Checkbox disabled={disabled} data-testid="card-generic-occupancy" label={t("admin.facility.showGenericOccupancy")} checked={card.showGenericOccupancy} changed={(showGenericOccupancy) => setCard({ ...card, showGenericOccupancy })} />
           <PlayerCounts idPrefix="card-counts" disabled={disabled} counts={card.allowedPlayerCounts} changed={(allowedPlayerCounts) => setCard({ ...card, allowedPlayerCounts })} />
