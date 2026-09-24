@@ -1,14 +1,18 @@
 package org.courtside.member.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.identity.CredentialState;
 import org.courtside.identity.Role;
 import org.courtside.member.RosterService;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -18,13 +22,13 @@ public class RosterListQuery {
     private final JdbcClient jdbc;
 
     public List<UUID> findIds(String nameFragment, UUID membershipTypeId, Role role,
+                              Set<CredentialState> credentialStates, Instant now,
                               RosterService.SortField field,
                               RosterService.SortDirection direction,
                               UUID cursor, int limit) {
         Map<String, Object> parameters = new HashMap<>();
-        parameters.put("nameFragment", nameFragment);
-        String criteria = criteria(membershipTypeId, role, parameters);
-        String roster = roster(criteria);
+        String roster = roster(criteria(nameFragment, membershipTypeId, role, credentialStates, now,
+                parameters));
         if (cursor != null) {
             parameters.put("cursor", cursor);
             Integer matches = jdbc.sql(roster + " SELECT count(*) FROM roster WHERE id = :cursor")
@@ -44,8 +48,20 @@ public class RosterListQuery {
                 .params(parameters).query(UUID.class).list();
     }
 
-    private static String criteria(UUID membershipTypeId, Role role,
+    public long count(String nameFragment, UUID membershipTypeId, Role role,
+                      Set<CredentialState> credentialStates, Instant now) {
+        Map<String, Object> parameters = new HashMap<>();
+        String roster = roster(criteria(nameFragment, membershipTypeId, role, credentialStates, now,
+                parameters));
+        return jdbc.sql(roster + " SELECT count(*) FROM roster")
+                .params(parameters).query(Long.class).single();
+    }
+
+    private static String criteria(String nameFragment, UUID membershipTypeId, Role role,
+                                   Set<CredentialState> credentialStates, Instant now,
                                    Map<String, Object> parameters) {
+        parameters.put("nameFragment", nameFragment);
+        parameters.put("now", now.atOffset(ZoneOffset.UTC));
         StringBuilder criteria = new StringBuilder("""
                 WHERE lower(concat(p.first_name, ' ', p.last_name))
                       LIKE concat('%', :nameFragment, '%') ESCAPE '!'
@@ -67,6 +83,10 @@ public class RosterListQuery {
                     """);
             parameters.put("role", role.name());
         }
+        if (credentialStates != null && !credentialStates.isEmpty()) {
+            criteria.append("AND credential.state IN (:credentialStates)\n");
+            parameters.put("credentialStates", credentialStates.stream().map(Enum::name).toList());
+        }
         return criteria.toString();
     }
 
@@ -83,12 +103,21 @@ public class RosterListQuery {
                            roles.names AS role_names
                     FROM person p
                     LEFT JOIN LATERAL (
-                        SELECT candidate.id, candidate.username, candidate.enabled
+                        SELECT candidate.id, candidate.username, candidate.enabled,
+                               candidate.password_hash, candidate.password_change_required,
+                               candidate.credentials_expire_at
                         FROM user_account candidate
                         WHERE candidate.person_id = p.id
                         ORDER BY candidate.enabled DESC, candidate.created_at, candidate.id
                         LIMIT 1
                     ) account ON TRUE
+                    CROSS JOIN LATERAL (
+                        SELECT CASE WHEN account.id IS NULL THEN NULL
+                                    WHEN account.password_hash IS NULL THEN 'AWAITING_CREDENTIAL'
+                                    WHEN NOT account.password_change_required THEN 'PASSWORD_CHOSEN'
+                                    WHEN account.credentials_expire_at <= :now THEN 'CREDENTIAL_EXPIRED'
+                                    ELSE 'CREDENTIAL_ISSUED' END AS state
+                    ) credential
                     LEFT JOIN LATERAL (
                         SELECT type.name
                         FROM member held

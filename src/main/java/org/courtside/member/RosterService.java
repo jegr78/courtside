@@ -88,19 +88,22 @@ public class RosterService {
         return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
     }
 
-    public CursorPage.Result<RosterEntry> search(String query, UUID membershipTypeId, Role role,
-                                                  SortField sortField, SortDirection sortDirection,
-                                                  UUID cursor, int limit) {
+    public RosterPage search(String query, UUID membershipTypeId, Role role,
+                             Set<CredentialState> credentialStates,
+                             SortField sortField, SortDirection sortDirection,
+                             UUID cursor, int limit) {
         SortField field = sortField == null ? SortField.NAME : sortField;
         SortDirection direction = sortDirection == null ? SortDirection.ASC : sortDirection;
-        if (role == null && field == SortField.NAME && direction == SortDirection.ASC) {
-            return list(query, membershipTypeId, cursor, limit);
-        }
         validateLimit(limit);
         requireKnownCursor(cursor);
-        List<UUID> ids = rosterQuery.findIds(normalize(query), membershipTypeId, role,
+        String fragment = normalize(query);
+        Instant now = clock.instant();
+        List<UUID> ids = rosterQuery.findIds(fragment, membershipTypeId, role, credentialStates, now,
                 field, direction, cursor, limit + 1);
-        return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
+        CursorPage.Result<RosterEntry> page = CursorPage.of(ids, limit,
+                personIds -> load(personIds, now), RosterEntry::personId);
+        return new RosterPage(page.items(), page.nextCursor(),
+                rosterQuery.count(fragment, membershipTypeId, role, credentialStates, now));
     }
 
     public Set<UUID> personIdsHoldingAnAccount(List<UUID> personIds) {
@@ -469,12 +472,15 @@ public class RosterService {
     }
 
     private List<RosterEntry> load(List<UUID> personIds) {
+        return load(personIds, clock.instant());
+    }
+
+    private List<RosterEntry> load(List<UUID> personIds, Instant now) {
         Map<UUID, UserAccount> accountsByPerson = accounts.findByPersonIdIn(personIds).stream()
                 .collect(Collectors.toMap(account -> account.getPerson().getId(), account -> account,
                         RosterService::preferredAccount));
         Map<UUID, Member> membershipsByPerson = members.findByPersonIdIn(personIds).stream()
                 .collect(Collectors.toMap(Member::getPersonId, member -> member));
-        Instant now = clock.instant();
         List<Person> people = persons.findAllById(personIds);
         Map<String, Integer> sharing = addressSharing(people);
         return people.stream()
@@ -568,6 +574,13 @@ public class RosterService {
 
         public RosterEntry {
             roles = Set.copyOf(roles);
+        }
+    }
+
+    public record RosterPage(List<RosterEntry> items, UUID nextCursor, long matching) {
+
+        public RosterPage {
+            items = List.copyOf(items);
         }
     }
 

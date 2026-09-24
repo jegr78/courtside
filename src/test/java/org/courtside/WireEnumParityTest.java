@@ -1,6 +1,7 @@
 package org.courtside;
 
 import org.courtside.api.ApiCancelScope;
+import org.courtside.api.ApiCredentialState;
 import org.courtside.api.ApiDayOfWeek;
 import org.courtside.api.ApiImportAccountOutcome;
 import org.courtside.api.ApiMessageKind;
@@ -9,6 +10,7 @@ import org.courtside.api.ApiRole;
 import org.courtside.api.ApiRuleType;
 import org.courtside.booking.series.CancelScope;
 import org.courtside.dataexchange.ResolvedChangeSet;
+import org.courtside.identity.CredentialState;
 import org.courtside.identity.Role;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.MessageState;
@@ -40,6 +42,8 @@ class WireEnumParityTest {
                 MessageKind.values());
         assertParity("ImportAccountOutcome", ApiImportAccountOutcome.values(),
                 ApiImportAccountOutcome::getValue, ResolvedChangeSet.AccountOutcome.values());
+        assertParity("CredentialState", ApiCredentialState.values(), ApiCredentialState::getValue,
+                CredentialState.values());
     }
 
     private static <T> void assertParity(
