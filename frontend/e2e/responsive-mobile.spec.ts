@@ -231,6 +231,7 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   // then
   await expect(page.getByTestId("admin-configuration-link")).toBeVisible();
   expect(await pageTop(), "the open menu lies over the page instead of pushing it down").toBe(before);
+  await expectNoHorizontalOverflow(page);
 
   // when
   await page.getByTestId("admin-configuration-link").tap();

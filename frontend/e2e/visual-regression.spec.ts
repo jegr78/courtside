@@ -173,6 +173,15 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   // then
   await stableScreenshot(page.getByTestId("admin-audit-view"), "admin-audit.png");
 
+  // when
+  const desk = page.viewportSize()!;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByTestId("admin-menu")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-menu"), "admin-menu-folded.png");
+  await page.setViewportSize(desk);
+
   // when — the same reset makes the empty message log the one state it reaches deterministically
   await page.goto("/admin/messages");
   await expect(page.getByTestId("messages-empty")).toBeVisible();

@@ -83,9 +83,19 @@ export function AdminNavigation() {
   const disclosure = useRef<HTMLDetailsElement>(null);
   const folding = unfolded && !laidOpen;
 
+  const [wasLaidOpen, setWasLaidOpen] = useState(laidOpen);
+  if (wasLaidOpen !== laidOpen) {
+    setWasLaidOpen(laidOpen);
+    if (laidOpen) setUnfolded(false);
+  }
+
   useEffect(() => {
     if (!folding) return;
-    const escaped = (event: KeyboardEvent) => { if (event.key === "Escape") setUnfolded(false); };
+    const escaped = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setUnfolded(false);
+      disclosure.current?.querySelector("summary")?.focus();
+    };
     const pressedOutside = (event: PointerEvent) => {
       if (!disclosure.current?.contains(event.target as Node)) setUnfolded(false);
     };
@@ -105,18 +115,19 @@ export function AdminNavigation() {
     className="group relative"
     open={laidOpen || unfolded}
     onToggle={(event) => { if (!laidOpen) setUnfolded(event.currentTarget.open); }}
+    onBlur={(event) => { if (folding && !event.currentTarget.contains(event.relatedTarget)) setUnfolded(false); }}
   >
     <summary data-testid="admin-menu" className="admin-navigation-menu surface-raised focus-ring flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border px-4 py-3 [&::-webkit-details-marker]:hidden">
       <span className="min-w-0 truncate">
         <span className={current ? "text-muted font-medium" : "font-semibold"}>{t("nav.administration")}</span>
         {current && <>
-          <span aria-hidden="true" className="text-muted px-2">›</span>
+          {" "}<span aria-hidden="true" className="text-muted px-1">›</span>{" "}
           <span className="font-semibold">{t(current)}</span>
         </>}
       </span>
       <span data-testid="admin-menu-indicator" aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-180">▾</span>
     </summary>
-    <nav aria-label={t("nav.administration")} className="surface-panel absolute inset-x-0 top-full z-30 mt-2 grid max-h-[70vh] gap-5 overflow-y-auto rounded-xl border p-4 shadow-xl lg:static lg:mt-0 lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+    <nav aria-label={t("nav.administration")} className="surface-panel absolute inset-x-0 top-full z-20 mt-2 grid max-h-[70vh] gap-5 overflow-y-auto rounded-xl border p-4 shadow-xl lg:static lg:mt-0 lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
       <Link data-testid="court-plan-link" to="/" className="focus-ring rounded-lg font-semibold underline-offset-4">
         {t("nav.courts")}
       </Link>
