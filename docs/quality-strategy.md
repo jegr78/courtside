@@ -355,6 +355,8 @@ The runner verifies Docker before Playwright starts. It owns the test process tr
 an orderly stop at its execution deadline and then ends the tree after a short cleanup grace period.
 The hosted job reserves separate budgets for packaging, execution, validation and artifact upload,
 so its outer limit cannot normally erase the bounded runner's result.
+Docker observations, host telemetry and container cleanup end with their subprocess. They carry no
+shorter process deadline that can turn a loaded runner into a false browser failure.
 
 Every browser container carries a random journey identity and a separate startup-attempt identity.
 Creation becomes visible before port publication, so a failed start retains its bounded failure

@@ -1,4 +1,4 @@
-import { execFile, spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
 import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -7,7 +7,6 @@ import { createServer as createNetServer, type AddressInfo } from "node:net";
 import { createServer as createHttpServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { promisify } from "node:util";
 import { GenericContainer, Network, Wait,
   type StartedNetwork, type StartedTestContainer } from "testcontainers";
 import type { FullConfig } from "@playwright/test";
@@ -24,6 +23,7 @@ import {
 import { startJourneyControl } from "./journey-control";
 import { browserExitState, BrowserLifecycleRecorder, browserResourceUsage } from "./browser-lifecycle";
 import { completeCleanup } from "./resource-cleanup";
+import { runJourneyProcess } from "./process-command";
 import {
   applicationResourceCommand,
   applicationResourceUsage,
@@ -42,8 +42,6 @@ import {
   startOwnedBrowserContainer,
   type BrowserStartupFailureClass
 } from "./browser-container-lifecycle";
-
-const executeFile = promisify(execFile);
 
 export type JourneyStart = "seeded" | "empty";
 
@@ -605,8 +603,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     writeFileSync(browserLifecyclePath, `${JSON.stringify(browserLifecycle.evidence(), null, 2)}\n`, { mode: 0o600 });
   };
   const dockerText = async (args: string[]): Promise<string> => {
-    const result = await executeFile("docker", args, { maxBuffer: 1024 * 1024, timeout: 5_000 });
-    return result.stdout;
+    return runJourneyProcess("docker", args);
   };
   const dockerJson = async (args: string[]): Promise<unknown> => JSON.parse(await dockerText(args));
   const resourceEnvironment: {
@@ -639,8 +636,8 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     const observations: Array<Promise<ResourceObservation>> = [];
     if (application?.pid) {
       const telemetry = applicationResourceCommand(process.platform, application.pid);
-      observations.push(executeFile(telemetry.command, telemetry.args, { timeout: 5_000 })
-        .then(({ stdout }) => ({ target: "application",
+      observations.push(runJourneyProcess(telemetry.command, telemetry.args)
+        .then((stdout) => ({ target: "application",
           ...applicationResourceUsage(stdout, application!.pid!, telemetry.memoryUnit) })));
     }
     if (clubProxy) observations.push(containerObservation("proxy", clubProxy));
@@ -694,7 +691,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
             browserExitState(await dockerJson(["inspect", "--format", "{{json .State}}", id])), new Date().toISOString());
           retainBrowserLifecycle();
         },
-        () => executeFile("docker", ["rm", "-f", id], { timeout: 5_000 })
+        () => runJourneyProcess("docker", ["rm", "-f", id])
       ]);
     } finally {
       browserServers.delete(browserName);
@@ -992,7 +989,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
           .start(),
         () => ownedBrowserContainerIds(journeyId, undefined, dockerText, startupId),
         startupDiagnostics,
-        (containerId) => executeFile("docker", ["rm", "-f", containerId], { timeout: 5_000 })
+        (containerId) => runJourneyProcess("docker", ["rm", "-f", containerId])
       );
       const endpoint = `ws://${container.getHost()}:${container.getMappedPort(3000)}${wsPath}`;
       browserServers.set(browserName, { container, endpoint, locale });
