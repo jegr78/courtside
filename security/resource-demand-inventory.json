@@ -224,6 +224,7 @@
       "entryPoints": [
         "listAllocations",
         "listBookableCards",
+        "listBookingCardLegend",
         "listBookingCards",
         "listCourts",
         "listCourtsForAdmin",

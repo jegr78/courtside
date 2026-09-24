@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-09-23",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "f6a7adda80bfb1edf17d0ad16f30ef48e6bda87b314753b4111a796c04c1b153",
-  "protectedFieldInventorySha256": "eb5e0a8a85ee49e1f8a18371b949fc288dbfb27722d5e808434b2433a4dd0c25",
-  "productionAuthorizationSha256": "e6a2245483fb4773af26bbce3463e73f084fbc7d7fff8af7a4b71934da0ce9d1",
+  "openApiFieldInventorySha256": "8bfb47705162b3d79611053447627b020274ec66a7a2b90a4354bc1d312f65cf",
+  "protectedFieldInventorySha256": "4f16eed4229be447f36a68cbd5c82d5b9f5afb3c6dbad61dcad6c242025d9bad",
+  "productionAuthorizationSha256": "a9636d8ac5bc72440b9f33c4f919928345847460173dbaea8f2327dd812594b0",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -856,8 +856,6 @@
     "linkExternalReference:response:Violation.params.*",
     "listAllocations:parameter:$parameter.query.date",
     "listAllocations:response:Allocation.bookingId",
-    "listAllocations:response:Allocation.cardColor",
-    "listAllocations:response:Allocation.cardLabel",
     "listAllocations:response:Allocation.courtId",
     "listAllocations:response:Allocation.endsAt",
     "listAllocations:response:Allocation.participantCount",
@@ -870,6 +868,10 @@
     "listAllocations:response:Violation.code",
     "listAllocations:response:Violation.params",
     "listAllocations:response:Violation.params.*",
+    "listBookingCardLegend:response:BookingCardLegendEntry.color",
+    "listBookingCardLegend:response:BookingCardLegendEntry.id",
+    "listBookingCardLegend:response:BookingCardLegendEntry.label",
+    "listBookingCardLegend:response:BookingCardLegendEntry.showGenericOccupancy",
     "listBookableCards:response:FieldError.code",
     "listBookableCards:response:FieldError.field",
     "listBookableCards:response:FieldError.params",
@@ -1694,6 +1696,10 @@
       "description": "Whether the selected booking card remains active."
     },
     {
+      "id": "booking-card-generic-occupancy",
+      "description": "Whether the booking card must hide its identity from viewers other than the booking owner."
+    },
+    {
       "id": "participant-card-active",
       "description": "Whether a participant card remains active and may be offered for a new booking."
     },
@@ -1948,6 +1954,7 @@
         "getClubConfig",
         "getClubLogo",
         "getWebManifest",
+        "listBookingCardLegend",
         "listAllocations"
       ],
       "actors": [
@@ -2718,22 +2725,27 @@
       "attributes": [
         "viewer-account",
         "booking-owner",
+        "booking-card-generic-occupancy",
         "public-schema"
       ],
       "productionPaths": [
         "src/main/java/org/courtside/config/web/ConfigController.java#toResponse",
+        "src/main/java/org/courtside/card/web/CardController.java#listBookingCardLegend",
         "src/main/java/org/courtside/booking/internal/AllocationVisibilityService.java#resolve",
         "src/main/java/org/courtside/booking/internal/AllocationVisibilityService.java#participantPersonIds",
         "src/main/java/org/courtside/booking/web/BookingController.java#listAllocations",
         "src/main/java/org/courtside/booking/web/BookingController.java#toResponse"
       ],
       "positiveTests": [
+        "src/test/java/org/courtside/card/web/CardControllerTest.java#givenRoleRestrictedAndInactiveCards_whenListingTheLegend_thenEveryActiveCardIsPublic",
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenABookingOnADay_whenRequestingThatDaysGrid_thenTheBookingIsListed",
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenOwnBookingWithAnotherMember_whenLoadingTheGrid_thenOnlyOwnershipAndSurnameAreVisible"
       ],
       "negativeTests": [
+        "src/test/java/org/courtside/card/web/CardControllerTest.java#whenListingTheLegend_thenBookingRulesAreNotExposed",
         "src/test/java/org/courtside/config/web/ConfigControllerTest.java#whenReadingThePublicConfig_thenItPublishesNothingOnlyABoardShouldSee",
-        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnotherMembersBooking_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden"
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnotherMembersBooking_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden",
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnonymousCaller_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden"
       ]
     },
     {
@@ -2994,11 +3006,13 @@
     {
       "id": "public-allocation-read",
       "access": "read",
-      "description": "The public allocation projection withholds booker identity; participant surnames appear only on the authenticated viewer's own booking.",
+      "description": "The public allocation projection withholds booker identity; participant surnames and generic card identity appear only on the authenticated viewer's own booking.",
       "fields": [
         "Allocation.ownBooking",
         "Allocation.participantLastNames",
-        "Allocation.bookedByName"
+        "Allocation.bookedByName",
+        "Allocation.cardLabel",
+        "Allocation.cardColor"
       ],
       "operationIds": [
         "listAllocations"
@@ -3016,7 +3030,8 @@
       ],
       "attributes": [
         "viewer-account",
-        "booking-owner"
+        "booking-owner",
+        "booking-card-generic-occupancy"
       ],
       "decisions": [
         "public-projection",

@@ -32,6 +32,7 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `authenticated-session` | Whether a valid server-side session resolves to an account. |
 | `booking-card` | The booking card attached to the requested booking or series. |
 | `booking-card-active` | Whether the selected booking card remains active. |
+| `booking-card-generic-occupancy` | Whether the booking card must hide its identity from viewers other than the booking owner. |
 | `participant-card-active` | Whether a participant card remains active and may be offered for a new booking. |
 | `booking-owner` | Whether the current account created the selected booking. |
 | `current-account` | The account derived from the authenticated session rather than request input. |
@@ -75,7 +76,7 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `public-password-recovery-boundary` | `requestPasswordReset` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary`, `credential-write-only` |
 | `public-password-redemption-boundary` | `redeemPasswordReset` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary`, `credential-write-only` |
 | `public-username-reminder-boundary` | `requestUsernameReminder` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary` |
-| `public-club-and-calendar` | `listCourts`, `listOpeningHours`, `getBookingGrid`, `getClubConfig`, `getClubLogo`, `getWebManifest`, `listAllocations` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary`, `public-projection` |
+| `public-club-and-calendar` | `listCourts`, `listOpeningHours`, `getBookingGrid`, `getClubConfig`, `getClubLogo`, `getWebManifest`, `listBookingCardLegend`, `listAllocations` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary`, `public-projection` |
 | `initial-password-replacement` | `changeInitialPassword` | `INITIAL_PASSWORD` | `initial-password-gate`, `credential-write-only` |
 | `own-account-preferences-and-session-list` | `listOwnSessions`, `changeOwnLocale`, `listOwnMessageChoices`, `chooseOwnMessages` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `own-account-scope` |
 | `own-credential-proof-and-replacement` | `reauthenticate`, `changeOwnPassword` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `own-account-scope`, `credential-write-only` |
@@ -280,13 +281,13 @@ Negative tests: `src/test/java/org/courtside/dataexchange/PreviewRetentionTest.j
 
 Public configuration and calendar responses use dedicated DTO projections and never widen to administrative configuration, roster or another person's booking details.
 
-Attributes: `viewer-account`, `booking-owner`, `public-schema`.
+Attributes: `viewer-account`, `booking-owner`, `booking-card-generic-occupancy`, `public-schema`.
 
-Production: `src/main/java/org/courtside/config/web/ConfigController.java#toResponse`, `src/main/java/org/courtside/booking/internal/AllocationVisibilityService.java#resolve`, `src/main/java/org/courtside/booking/internal/AllocationVisibilityService.java#participantPersonIds`, `src/main/java/org/courtside/booking/web/BookingController.java#listAllocations`, `src/main/java/org/courtside/booking/web/BookingController.java#toResponse`.
+Production: `src/main/java/org/courtside/config/web/ConfigController.java#toResponse`, `src/main/java/org/courtside/card/web/CardController.java#listBookingCardLegend`, `src/main/java/org/courtside/booking/internal/AllocationVisibilityService.java#resolve`, `src/main/java/org/courtside/booking/internal/AllocationVisibilityService.java#participantPersonIds`, `src/main/java/org/courtside/booking/web/BookingController.java#listAllocations`, `src/main/java/org/courtside/booking/web/BookingController.java#toResponse`.
 
-Positive tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenABookingOnADay_whenRequestingThatDaysGrid_thenTheBookingIsListed`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenOwnBookingWithAnotherMember_whenLoadingTheGrid_thenOnlyOwnershipAndSurnameAreVisible`.
+Positive tests: `src/test/java/org/courtside/card/web/CardControllerTest.java#givenRoleRestrictedAndInactiveCards_whenListingTheLegend_thenEveryActiveCardIsPublic`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenABookingOnADay_whenRequestingThatDaysGrid_thenTheBookingIsListed`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenOwnBookingWithAnotherMember_whenLoadingTheGrid_thenOnlyOwnershipAndSurnameAreVisible`.
 
-Negative tests: `src/test/java/org/courtside/config/web/ConfigControllerTest.java#whenReadingThePublicConfig_thenItPublishesNothingOnlyABoardShouldSee`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnotherMembersBooking_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden`.
+Negative tests: `src/test/java/org/courtside/card/web/CardControllerTest.java#whenListingTheLegend_thenBookingRulesAreNotExposed`, `src/test/java/org/courtside/config/web/ConfigControllerTest.java#whenReadingThePublicConfig_thenItPublishesNothingOnlyABoardShouldSee`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnotherMembersBooking_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnonymousCaller_whenLoadingTheGrid_thenOwnershipAndParticipantsAreHidden`.
 
 ### Participant directory projection
 
@@ -323,7 +324,7 @@ Negative tests: `src/test/java/org/courtside/dataexchange/web/SubjectAccessAdmin
 | `permanent-password-change-write-only` | never-read | `PasswordChangeRequest.currentPassword`, `PasswordChangeRequest.newPassword` | `changeOwnPassword` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `dedicated-workflow`, `current-account` |
 | `reauthentication-password-write-only` | never-read | `ReauthenticationRequest.password` | `reauthenticate` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `dedicated-workflow`, `current-account` |
 | `participant-member-read` | read | `PublicParticipantMember.personId`, `PublicParticipantMember.displayName` | `searchParticipantMembers` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `current-membership` |
-| `public-allocation-read` | read | `Allocation.ownBooking`, `Allocation.participantLastNames`, `Allocation.bookedByName` | `listAllocations` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `viewer-account`, `booking-owner` |
+| `public-allocation-read` | read | `Allocation.ownBooking`, `Allocation.participantLastNames`, `Allocation.bookedByName`, `Allocation.cardLabel`, `Allocation.cardColor` | `listAllocations` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD`; `viewer-account`, `booking-owner`, `booking-card-generic-occupancy` |
 | `personal-booking-read` | read | `PersonalBooking.id`, `PersonalBooking.seriesId`, `PersonalBooking.note` | `listPersonalBookings` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `booking-owner`, `current-account` |
 | `managed-booking-detail-read` | read | `ManagedAppointmentDetail.note`, `ManagedAppointmentDetail.participants`, `ManagedParticipant.displayName` | `getManagedAppointment` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`; `booking-card`, `managing-role`, `administrator-override` |
 | `roster-person-create` | write | `PersonRequest.firstName`, `PersonRequest.lastName`, `PersonRequest.email` | `createPerson` | `ADMIN`; `administrator` |

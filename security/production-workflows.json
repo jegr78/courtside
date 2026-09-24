@@ -133,6 +133,7 @@
         "getClubConfig",
         "getClubLogo",
         "getWebManifest",
+        "listBookingCardLegend",
         "listBookableCards",
         "listParticipantCards",
         "searchParticipantMembers"
@@ -152,9 +153,11 @@
       "productionPaths": [
         "src/main/java/org/courtside/config/web/ConfigController.java",
         "src/main/java/org/courtside/facility/web/CourtController.java",
-        "src/main/java/org/courtside/booking/web/BookingController.java"
+        "src/main/java/org/courtside/booking/web/BookingController.java",
+        "src/main/java/org/courtside/card/web/CardController.java"
       ],
       "evidence": [
+        "src/test/java/org/courtside/card/web/CardControllerTest.java#givenRoleRestrictedAndInactiveCards_whenListingTheLegend_thenEveryActiveCardIsPublic",
         "src/test/java/org/courtside/config/web/ConfigControllerTest.java#whenReadingThePublicConfig_thenItPublishesNothingOnlyABoardShouldSee",
         "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenNoUploadedLogo_whenReadingIt_thenTheTypedNotFoundProblemIsServed"
       ]

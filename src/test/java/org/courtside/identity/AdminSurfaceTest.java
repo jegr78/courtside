@@ -60,6 +60,7 @@ class AdminSurfaceTest extends AbstractIntegrationTest {
             "/api/account-recovery/password/redemption",
             "/api/account-recovery/usernames",
             "/api/openapi.yaml",
+            "/api/public/booking-card-legend",
             "/api/public/booking-grid",
             "/api/public/config",
             "/api/public/config/logo",

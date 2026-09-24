@@ -1,5 +1,6 @@
 package org.courtside.card.web;
 
+import org.courtside.api.ApiBookingCardLegendEntry;
 import org.courtside.api.ApiPublicBookingCard;
 import org.courtside.api.ApiPublicParticipantCard;
 import org.courtside.api.CardsApi;
@@ -29,6 +30,19 @@ class CardController implements CardsApi {
         return ResponseEntity.ok(cards.bookableCards(callerRoles()).stream()
                 .map(CardController::toResponse)
                 .toList());
+    }
+
+    @Override
+    public ResponseEntity<List<ApiBookingCardLegendEntry>> listBookingCardLegend() {
+        List<BookingCard> activeCards = cards.activeCards();
+        List<ApiBookingCardLegendEntry> legend = new ArrayList<>(activeCards.stream()
+                .filter(card -> !card.isShowGenericOccupancy())
+                .map(card -> new ApiBookingCardLegendEntry(card.getId(), card.getLabel(), card.getColor(), false))
+                .toList());
+        if (activeCards.stream().anyMatch(BookingCard::isShowGenericOccupancy)) {
+            legend.add(new ApiBookingCardLegendEntry(null, "?", "#999999", true));
+        }
+        return ResponseEntity.ok(legend);
     }
 
     @Override

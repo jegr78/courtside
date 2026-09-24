@@ -175,6 +175,18 @@ input[type="time"] {
   height: var(--slot-height);
 }
 
+.day-plan-slot-row[data-state="past"] > th,
+.day-plan-slot-row[data-state="past"] > td {
+  background-image: repeating-linear-gradient(135deg, transparent 0 8px,
+    color-mix(in srgb, var(--cs-muted) 7%, transparent) 8px 10px);
+}
+
+.day-plan-slot-row[data-state="past"] .day-plan-slot,
+.day-plan-slot-row[data-state="past"] [data-testid="allocation"],
+.day-plan-slot-row[data-state="past"] [data-testid="own-allocation"] {
+  filter: saturate(35%);
+}
+
 .day-plan-free-cell {
   position: relative;
 }

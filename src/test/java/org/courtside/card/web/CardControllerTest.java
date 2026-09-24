@@ -18,6 +18,7 @@ import java.util.Set;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,6 +44,66 @@ class CardControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/public/booking-cards").with(anonymous()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:unauthenticated"));
+    }
+
+    @Test
+    void givenRoleRestrictedAndInactiveCards_whenListingTheLegend_thenEveryActiveCardIsPublic() throws Exception {
+        // given
+        BookingCard restricted = cards.createCard("Trainer session", "#3a4a5c", Set.of(Role.TRAINER), Set.of(),
+                new short[0], false, false, false);
+        BookingCard retired = cards.createCard("Retired card", "#c8a415", Set.of(), Set.of(),
+                new short[0], false, false, false);
+        cards.setCardActive(retired.getId(), false);
+
+        // when / then
+        mockMvc.perform(get("/api/public/booking-card-legend").with(anonymous()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='" + restricted.getId() + "')].label")
+                        .value("Trainer session"))
+                .andExpect(jsonPath("$[?(@.id=='" + restricted.getId() + "')].color")
+                        .value("#3a4a5c"))
+                .andExpect(jsonPath("$[?(@.id=='" + restricted.getId() + "')].showGenericOccupancy")
+                        .value(false))
+                .andExpect(jsonPath("$[?(@.id=='" + retired.getId() + "')]").isEmpty());
+    }
+
+    @Test
+    void whenListingTheLegend_thenBookingRulesAreNotExposed() throws Exception {
+        // given
+        BookingCard card = cards.createCard("Match play", "#3a4a5c", Set.of(Role.TRAINER), Set.of(),
+                new short[] {2, 4}, true, true, true);
+        String at = "$[?(@.id=='" + card.getId() + "')]";
+
+        // when / then
+        mockMvc.perform(get("/api/public/booking-card-legend").with(anonymous()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(at + ".allowedPlayerCounts").doesNotExist())
+                .andExpect(jsonPath(at + ".guestAllowed").doesNotExist())
+                .andExpect(jsonPath(at + ".allowedRoles").doesNotExist())
+                .andExpect(jsonPath(at + ".managingRoles").doesNotExist());
+    }
+
+    @Test
+    void givenGenericCards_whenListingTheLegend_thenTheyBecomeOneNeutralEntry() throws Exception {
+        // given
+        cards.createCard("Private rehabilitation", "#123456", Set.of(Role.TRAINER), Set.of(),
+                new short[0], false, false, true);
+        cards.createCard("Confidential coaching", "#654321", Set.of(Role.TRAINER), Set.of(),
+                new short[0], false, false, true);
+
+        // when / then
+        mockMvc.perform(get("/api/public/booking-card-legend").with(anonymous()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.showGenericOccupancy==true)]")
+                        .value(org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$[?(@.showGenericOccupancy==true)].id")
+                        .value(org.hamcrest.Matchers.contains((Object) null)))
+                .andExpect(jsonPath("$[?(@.showGenericOccupancy==true)].label").value("?"))
+                .andExpect(jsonPath("$[?(@.showGenericOccupancy==true)].color").value("#999999"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Private rehabilitation"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Confidential coaching"))));
     }
 
     @Test
