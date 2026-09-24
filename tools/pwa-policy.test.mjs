@@ -228,11 +228,16 @@ test("given periodic browser qualification, when the stability workflow runs, th
   assert.match(stability, /test-results\/browser-compatibility\.json/);
 });
 
-test("given the installed PWA, when its lifecycle is qualified, then shell availability and API cache privacy are asserted", () => {
+test("given the installed PWA, when its lifecycle is qualified, then bounded booking availability and API cache privacy are asserted", () => {
   assert.match(pwa, /serviceWorker\.ready/);
   assert.match(pwa, /context\.setOffline\(true\)/);
   assert.match(pwa, /caches\.keys/);
-  assert.match(pwa, /\/api\//);
+  assert.match(pwa, /bookings-offline-as-of/);
+  assert.match(pwa, /court-plan-offline/);
+  assert.match(pwa, /expectNoApiResponseInCache/);
+  assert.match(viteConfiguration, /pathname === "\/api\/my\/bookings"/);
+  assert.match(viteConfiguration, /handler: "StaleWhileRevalidate"/);
+  assert.match(viteConfiguration, /handler: "NetworkOnly"/);
 });
 
 test("given the installed PWA, when checking supported engines, then Chromium and WebKit run its signed-in journey", () => {
@@ -277,6 +282,23 @@ test("given retained browser security evidence, when validating it, then only cl
   assert.equal(validate({
     kind: "browser-csp", executed: false,
     events: [{ directive: "script-src-elem", blockedReason: "inline", cookie: "secret" }]
+  }), false);
+  const inventory = {
+    localStorageKeys: ["courtside.locale"],
+    sessionStorageKeys: [],
+    indexedDbNames: [],
+    cacheRequests: ["/.courtside/personal-bookings-generation", "/index.html"],
+    storageContainsSensitiveData: false,
+    cookies: []
+  };
+  assert.equal(validate({
+    kind: "browser-storage", authenticated: inventory, postLogout: inventory, consoleEventTypes: []
+  }), true);
+  assert.equal(validate({
+    kind: "browser-storage",
+    authenticated: { ...inventory, cacheRequests: ["/api/my/bookings"] },
+    postLogout: inventory,
+    consoleEventTypes: []
   }), false);
 });
 

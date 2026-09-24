@@ -820,6 +820,33 @@
       ]
     },
     {
+      "id": "browser-cache-generation",
+      "purpose": "Separate one signed-in account's offline booking cache from every account or session state that follows it",
+      "algorithm": "UUIDv4",
+      "implementation": "web-crypto",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 122,
+        "basis": "The 122 random bits a version-4 UUID draws. The value is a uniqueness marker rather than a secret: no authorisation depends on guessing it, and a mismatch always rejects the cached response."
+      },
+      "class": "identifier",
+      "owner": "club-operator",
+      "storageBoundary": "The member's browser stores the current value in a dedicated Cache Storage control entry and copies it into the personal-booking cache response. It names no person and leaves neither browser nor device.",
+      "permittedUse": "Correlating a cached personal-booking response with the account generation that created it. It authenticates nobody and grants no server access.",
+      "rotation": "Every successful login, logout, session refusal and personal-cache invalidation replaces the marker before the old response is deleted.",
+      "revocation": "Writing the next marker immediately makes every response carrying the prior value unusable, even if deleting that response is delayed.",
+      "recovery": "None is needed: a missing or unreadable marker rejects offline authority, and the next online personal-booking read creates another one.",
+      "retirement": "A successor invalidation scheme clears both browser caches before it accepts personal data under its own marker.",
+      "evidence": "frontend/src/offlineBookings.test.ts, frontend/e2e/pwa-lifecycle.spec.ts",
+      "detects": [
+        "randomUUID"
+      ],
+      "locations": [
+        "frontend/src/offlineBookings.ts",
+        "frontend/src/offlineBookings.test.ts"
+      ]
+    },
+    {
       "id": "application-transport",
       "purpose": "Carry what the reverse proxy forwards to the application, which includes the session cookie and a password on its way in",
       "algorithm": "TLS, when an operator turns it on; plain HTTP on the compose network otherwise",

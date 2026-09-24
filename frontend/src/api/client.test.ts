@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
+import { listenForOtherClientSessionChanges } from "../offlineBookings";
 import { api } from "./client";
 
 const server = setupServer();
@@ -220,6 +221,33 @@ it("given valid credentials, when the empty login response arrives, then login s
   await expect(api.login("doe.jane", "secret")).resolves.toBeUndefined();
 });
 
+it("given a successful login, when the account boundary changes, then other tabs are notified", async () => {
+  const postMessage = vi.fn();
+  const close = vi.fn();
+  const addEventListener = vi.fn();
+  const removeEventListener = vi.fn();
+  class TestBroadcastChannel {
+    postMessage = postMessage;
+    close = close;
+    addEventListener = addEventListener;
+    removeEventListener = removeEventListener;
+  }
+  vi.stubGlobal("BroadcastChannel", TestBroadcastChannel);
+  const localListener = vi.fn();
+  const stopListening = listenForOtherClientSessionChanges(localListener);
+  server.use(
+    http.get("/api/session", () => HttpResponse.json({ authenticated: false, roles: [] })),
+    http.post("/api/session", () => new HttpResponse(null, { status: 200 }))
+  );
+
+  await api.login("doe.jane", "secret");
+
+  expect(postMessage).toHaveBeenCalledWith("changed");
+  expect(localListener).not.toHaveBeenCalled();
+  stopListening();
+  expect(close).toHaveBeenCalledOnce();
+});
+
 it("when loading courts, then the active public courts are returned", async () => {
   // given
   server.use(http.get("/api/public/courts", () => HttpResponse.json([
@@ -316,11 +344,21 @@ it("given a booking attempt, when creating it, then the idempotency key and body
 
 it("given an existing booking, when cancelling it, then the booking URL is deleted", async () => {
   // given
+  const remove = vi.fn().mockResolvedValue(true);
+  vi.stubGlobal("caches", {
+    open: vi.fn().mockResolvedValue({
+      delete: vi.fn().mockResolvedValue(true), put: vi.fn().mockResolvedValue(undefined)
+    }),
+    delete: remove
+  });
   server.use(http.delete("/api/bookings/33333333-3333-3333-3333-333333333333", () =>
     new HttpResponse(null, { status: 204 })));
 
-  // when / then
+  // when
   await expect(api.cancelBooking("33333333-3333-3333-3333-333333333333")).resolves.toBeUndefined();
+
+  // then
+  expect(remove).toHaveBeenCalledWith("courtside-personal-bookings");
 });
 
 it("given a series occurrence, when cancelling following occurrences, then ids and scope are encoded", async () => {

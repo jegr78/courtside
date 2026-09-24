@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -387,7 +387,149 @@ describe("App build identity", () => {
 
   beforeEach(async () => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     await i18n.changeLanguage("en");
+  });
+
+  it("given a cached member view, when the session endpoint reports anonymous, then a later offline launch stays anonymous", async () => {
+    // given
+    let cached = true;
+    const request = new Request("http://localhost/api/my/bookings?limit=50");
+    const remove = vi.fn().mockImplementation(() => {
+      cached = false;
+      return Promise.resolve(true);
+    });
+    const generation = "generation-1";
+    vi.stubGlobal("caches", {
+      delete: remove,
+      open: vi.fn().mockImplementation((name: string) => Promise.resolve(name === "courtside-personal-bookings" ? {
+        keys: () => Promise.resolve(cached ? [request] : []), match: () => Promise.resolve({
+          headers: new Headers({ "x-courtside-cache-generation": generation }),
+          clone: () => ({ json: () => Promise.resolve({ refreshedAt: new Date().toISOString() }) })
+        })
+      } : {
+        match: () => Promise.resolve(new Response(generation)),
+        delete: () => Promise.resolve(true),
+        put: () => Promise.resolve()
+      }))
+    });
+    vi.spyOn(api, "session").mockResolvedValueOnce(anonymous).mockRejectedValueOnce(new Error("offline"));
+    vi.spyOn(api, "config").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    const first = render(<RoutedShell><App /></RoutedShell>);
+    await waitFor(() => expect(remove).toHaveBeenCalledWith("courtside-personal-bookings"));
+    first.unmount();
+
+    // when
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("login-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("my-bookings-page")).not.toBeInTheDocument();
+  });
+
+  it("given offline restoration is pending, when the session is invalidated, then cached authority cannot return", async () => {
+    // given
+    const generation = "generation-1";
+    const request = new Request("http://localhost/api/my/bookings?limit=50");
+    let resolveCached!: (response: Response) => void;
+    const cached = new Promise<Response>((resolve) => {
+      resolveCached = resolve;
+    });
+    const matchBooking = vi.fn().mockReturnValue(cached);
+    const matchControl = vi.fn().mockResolvedValue(new Response(generation));
+    vi.stubGlobal("caches", {
+      delete: vi.fn().mockResolvedValue(true),
+      open: vi.fn().mockImplementation((name: string) => Promise.resolve(name === "courtside-personal-bookings" ? {
+        keys: () => Promise.resolve([request]), match: matchBooking
+      } : {
+        match: matchControl,
+        delete: () => Promise.resolve(true),
+        put: () => Promise.resolve()
+      }))
+    });
+    vi.spyOn(api, "session").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+    await waitFor(() => expect(matchBooking).toHaveBeenCalledOnce());
+
+    // when
+    window.dispatchEvent(new Event("courtside:unauthenticated"));
+    resolveCached(new Response(JSON.stringify({ refreshedAt: new Date().toISOString() }), {
+      headers: {
+        "content-type": "application/json",
+        "x-courtside-cache-generation": generation
+      }
+    }));
+
+    // then
+    await waitFor(() => expect(matchControl).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("login-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("logout")).not.toBeInTheDocument();
+  });
+
+  it("given session refresh is pending, when the session is invalidated, then its old authority cannot return", async () => {
+    // given
+    let resolveSession!: (session: SessionStatus) => void;
+    const pendingSession = new Promise<SessionStatus>((resolve) => {
+      resolveSession = resolve;
+    });
+    const session = vi.spyOn(api, "session").mockReturnValue(pendingSession);
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+    await waitFor(() => expect(session).toHaveBeenCalledOnce());
+
+    // when
+    window.dispatchEvent(new Event("courtside:unauthenticated"));
+    await act(async () => {
+      resolveSession({
+        authenticated: true,
+        roles: ["MEMBER"],
+        passwordChangeRequired: false,
+        displayName: "Jane Doe"
+      });
+      await Promise.resolve();
+    });
+
+    // then
+    expect(await screen.findByTestId("login-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("logout")).not.toBeInTheDocument();
+  });
+
+  it("given an authenticated shell, when sign out succeeds, then build identity stays public and the session ends", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue({
+      authenticated: true,
+      roles: ["MEMBER"],
+      passwordChangeRequired: false,
+      displayName: "Jane Doe"
+    });
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    const source = vi.spyOn(api, "source").mockResolvedValue({
+      version: "0.1.0-rc.2",
+      commit: "f8b8268d97ab42be77e3cbe553869af085c6f687",
+      environment: "PRODUCTION",
+      sourceUrl: "https://github.com/jegr78/courtside"
+    });
+    vi.spyOn(api, "bookingGrid").mockResolvedValue({
+      timeZone: "Europe/Berlin", slotMinutes: 30, openingHours: []
+    });
+    vi.spyOn(api, "courts").mockResolvedValue([]);
+    vi.spyOn(api, "logout").mockResolvedValue();
+    render(<RoutedShell><App /></RoutedShell>);
+    expect(await screen.findByTestId("build-identity")).toHaveTextContent("f8b8268");
+    await userEvent.click(screen.getByTestId("preferences-menu"));
+
+    // when
+    await userEvent.click(screen.getByTestId("logout"));
+
+    // then
+    expect(await screen.findByTestId("login-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("logout")).not.toBeInTheDocument();
+    expect(screen.getByTestId("build-identity")).toHaveTextContent("f8b8268");
+    expect(source).toHaveBeenCalledOnce();
   });
 
   it("given a failure raised while signed in, when the session ends and the shell returns to sign-in, then the message does not outlive it", async () => {

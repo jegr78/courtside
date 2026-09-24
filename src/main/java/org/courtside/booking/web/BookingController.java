@@ -10,6 +10,7 @@ import org.courtside.api.ApiPersonalBooking;
 import org.courtside.api.ApiParticipation;
 import org.courtside.api.ApiParticipationPage;
 import org.courtside.api.ApiPersonalBookingPage;
+import org.courtside.api.ApiPublicCourt;
 import org.courtside.api.ApiManagedAppointment;
 import org.courtside.api.ApiManagedAppointmentDetail;
 import org.courtside.api.ApiManagedAppointmentPage;
@@ -31,6 +32,7 @@ import org.courtside.booking.internal.AllocationVisibilityService.AllocationVisi
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.config.ClubTimeZone;
+import org.courtside.facility.FacilityService;
 import org.courtside.identity.CurrentUser;
 import org.courtside.identity.UserAccount;
 import org.courtside.shared.TimeSlot;
@@ -41,6 +43,7 @@ import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -63,6 +66,8 @@ class BookingController implements BookingsApi {
     private final ClubTimeZone timeZone;
     private final ParticipationService participations;
     private final BookingRuleGate ruleGate;
+    private final FacilityService facility;
+    private final Clock clock;
 
     BookingController(BookingService bookings,
                       CardService cards,
@@ -72,7 +77,9 @@ class BookingController implements BookingsApi {
                       ManagedAppointmentQuery managedAppointments,
                       ClubTimeZone timeZone,
                       ParticipationService participations,
-                      BookingRuleGate ruleGate) {
+                      BookingRuleGate ruleGate,
+                      FacilityService facility,
+                      Clock clock) {
         this.bookings = bookings;
         this.cards = cards;
         this.currentUser = currentUser;
@@ -82,6 +89,8 @@ class BookingController implements BookingsApi {
         this.timeZone = timeZone;
         this.participations = participations;
         this.ruleGate = ruleGate;
+        this.facility = facility;
+        this.clock = clock;
     }
 
     @Override
@@ -158,7 +167,14 @@ class BookingController implements BookingsApi {
                             .note(booking.getNote());
                 })
                 .toList();
-        return ResponseEntity.ok(new ApiPersonalBookingPage(items).nextCursor(page.nextCursor()));
+        List<ApiPublicCourt> courtLabels = facility.allCourts().stream()
+                .map(court -> new ApiPublicCourt(court.getId(), court.getNumber(), court.getName()))
+                .toList();
+        return ResponseEntity.ok(new ApiPersonalBookingPage(items)
+                .nextCursor(page.nextCursor())
+                .refreshedAt(WireTypes.toOffsetDateTime(clock.instant()))
+                .timeZone(timeZone.id())
+                .courts(courtLabels));
     }
 
     @Override

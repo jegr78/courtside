@@ -6,13 +6,40 @@ async function install(page: import("@playwright/test").Page) {
   await page.reload();
 }
 
-async function expectNoApiResponseInCache(page: import("@playwright/test").Page) {
+async function cachedApiPaths(page: import("@playwright/test").Page) {
   const cachedRequests = await page.evaluate(async () => {
     const names = await caches.keys();
     const requests = await Promise.all(names.map(async (name) => (await caches.open(name)).keys()));
     return requests.flat().map((request) => request.url);
   });
-  expect(cachedRequests.filter((url) => new URL(url).pathname.startsWith("/api/"))).toEqual([]);
+  return cachedRequests.filter((url) => new URL(url).pathname.startsWith("/api/"))
+    .map((url) => new URL(url).pathname);
+}
+
+async function cachedPersonalBookingContract(page: import("@playwright/test").Page) {
+  return page.evaluate(async () => {
+    const cache = await caches.open("courtside-personal-bookings");
+    const control = await caches.open("courtside-personal-bookings-control");
+    const requests = await cache.keys();
+    const response = requests[0] ? await cache.match(requests[0]) : undefined;
+    const marker = await control.match("/.courtside/personal-bookings-generation");
+    const body: unknown = await response?.json();
+    if (requests.length !== 1 || typeof body !== "object" || body === null
+      || !("items" in body) || !Array.isArray(body.items)) return undefined;
+    return {
+      requestPath: `${new URL(requests[0].url).pathname}${new URL(requests[0].url).search}`,
+      pageKeys: Object.keys(body).sort(),
+      cachedAt: Number(response?.headers.get("x-courtside-cached-at")),
+      cachedGeneration: response?.headers.get("x-courtside-cache-generation"),
+      currentGeneration: await marker?.text(),
+      itemKeys: body.items.map((booking: unknown) =>
+        typeof booking === "object" && booking !== null ? Object.keys(booking).sort() : [])
+    };
+  });
+}
+
+async function expectNoApiResponseInCache(page: import("@playwright/test").Page) {
+  expect(await cachedApiPaths(page)).toEqual([]);
 }
 
 async function expectAnonymousSurface(page: import("@playwright/test").Page) {
@@ -25,7 +52,7 @@ async function expectAnonymousSurface(page: import("@playwright/test").Page) {
 }
 
 for (const locale of ["de", "en"] as const) {
-  test(`the installed ${locale} shell survives an offline launch without caching API data`, async ({ context, page }) => {
+  test(`the installed ${locale} shell keeps personal bookings readable during an offline launch`, async ({ context, page }) => {
     // given
     await install(page);
     await selectPreference(page, "#locale-preference", locale);
@@ -34,16 +61,36 @@ for (const locale of ["de", "en"] as const) {
     await page.getByTestId("password").fill("temporary-password");
     await page.getByTestId("login-submit").click();
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
-    await expectNoApiResponseInCache(page);
+    await page.getByTestId("my-bookings-link").click();
+    await expect(page.getByTestId("my-bookings-page")).toBeVisible();
+    await expect(page.locator('[data-testid^="booking-"]').first()).toBeVisible();
+    await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings"]);
+    const cachedContract = await cachedPersonalBookingContract(page);
+    expect(cachedContract?.requestPath).toBe("/api/my/bookings?limit=50");
+    expect(cachedContract?.cachedGeneration).toBe(cachedContract?.currentGeneration);
 
     // when
     await context.setOffline(true);
     await page.reload({ waitUntil: "domcontentloaded" });
 
     // then
+    const offlineContract = await cachedPersonalBookingContract(page);
+    expect(offlineContract?.requestPath).toBe("/api/my/bookings?limit=50");
+    expect(offlineContract?.cachedAt).toBeGreaterThan(0);
+    expect(offlineContract?.cachedGeneration).toBe(offlineContract?.currentGeneration);
     await expect(page.getByTestId("offline-status")).toBeVisible();
+    await expect(page.getByTestId("my-bookings-page")).toBeVisible();
+    await expect(page.locator('[data-testid^="booking-"]').first()).toBeVisible();
+    await expect(page.getByTestId("bookings-offline-as-of")).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", locale);
-    await expectNoApiResponseInCache(page);
+    expect(await cachedApiPaths(page)).toEqual(["/api/my/bookings"]);
+
+    // when
+    await page.getByTestId("court-plan-link").click();
+
+    // then
+    await expect(page.getByTestId("court-plan-offline")).toBeVisible();
+    await expect(page.getByTestId("week-grid")).toHaveCount(0);
 
     // when
     await context.setOffline(false);
@@ -54,7 +101,7 @@ for (const locale of ["de", "en"] as const) {
   });
 }
 
-test("logout and browser history cannot reveal a cached personal view", async ({ page }) => {
+test("logout, another tab and browser history cannot reveal a cached personal view", async ({ context, page }) => {
   // given
   await install(page);
   await page.goto("/login");
@@ -63,6 +110,11 @@ test("logout and browser history cannot reveal a cached personal view", async ({
   await page.getByTestId("login-submit").click();
   await page.getByTestId("my-bookings-link").click();
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
+  const otherPage = await context.newPage();
+  await otherPage.goto("/");
+  await expect(otherPage.getByTestId("court-plan-view")).toBeVisible();
+  await otherPage.getByTestId("my-bookings-link").click();
+  await expect(otherPage.getByTestId("my-bookings-page")).toBeVisible();
 
   // when
   const logoutResponse = page.waitForResponse((response) =>
@@ -74,7 +126,87 @@ test("logout and browser history cannot reveal a cached personal view", async ({
 
   // then
   await expectAnonymousSurface(page);
+  await expectAnonymousSurface(otherPage);
   await page.goForward();
+  await expectAnonymousSurface(page);
+  await expectNoApiResponseInCache(page);
+});
+
+test("ending the current session removes a personal view from every open tab", async ({ context, page }) => {
+  // given
+  await install(page);
+  await page.goto("/login");
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  const otherPage = await context.newPage();
+  await otherPage.goto("/");
+  await expect(otherPage.getByTestId("court-plan-view")).toBeVisible();
+  await otherPage.getByTestId("my-bookings-link").click();
+  await expect(otherPage.getByTestId("my-bookings-page")).toBeVisible();
+  await page.getByTestId("preferences-menu").click();
+  await page.getByTestId("account-security-link").click();
+  await expect(page.getByTestId("end-current-session")).toHaveCount(1);
+
+  // when
+  await page.getByTestId("end-current-session").click();
+
+  // then
+  await expectAnonymousSurface(page);
+  await expectAnonymousSurface(otherPage);
+  await expectNoApiResponseInCache(page);
+});
+
+test("logout outranks a delayed personal-booking revalidation and the cache contains only display data", async ({ context, page }) => {
+  // given
+  await install(page);
+  await page.goto("/login");
+  await page.getByTestId("username").fill("doe.jane");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("my-bookings-link").click();
+  await expect(page.getByTestId("my-bookings-page")).toBeVisible();
+  await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings"]);
+  const cachedContract = await cachedPersonalBookingContract(page);
+  expect(cachedContract?.pageKeys).toEqual(["courts", "items", "refreshedAt", "timeZone"]);
+  const allowedItemKeys = new Set([
+    "cardColor", "cardLabel", "courtIds", "endsAt", "id", "seriesId", "startsAt", "status"
+  ]);
+  expect(cachedContract?.itemKeys.length).toBeGreaterThan(0);
+  expect(cachedContract?.itemKeys.every((keys) => keys.every((key) => allowedItemKeys.has(key)))).toBe(true);
+  let releaseRevalidation: () => void = () => undefined;
+  const revalidationReleased = new Promise<void>((resolve) => { releaseRevalidation = resolve; });
+  let observeRevalidation: () => void = () => undefined;
+  const revalidationObserved = new Promise<void>((resolve) => { observeRevalidation = resolve; });
+  let delayNextPage = true;
+  await context.route("**/api/my/bookings?limit=50", async (route) => {
+    if (!delayNextPage) {
+      await route.continue();
+      return;
+    }
+    delayNextPage = false;
+    observeRevalidation();
+    await revalidationReleased;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: [{ note: "private revalidation note" }], refreshedAt: new Date().toISOString() })
+    });
+  });
+  await page.evaluate(() => fetch("/api/my/bookings?limit=50").then((response) => response.json()));
+  await revalidationObserved;
+
+  // when
+  const logoutResponse = page.waitForResponse((response) =>
+    response.url().endsWith("/api/session/logout") && response.request().method() === "POST");
+  await page.getByTestId("preferences-menu").click();
+  const logout = page.getByTestId("logout").click();
+  expect((await logoutResponse).status()).toBe(204);
+  releaseRevalidation();
+  await logout;
+
+  // then
   await expectAnonymousSurface(page);
   await expectNoApiResponseInCache(page);
 });
