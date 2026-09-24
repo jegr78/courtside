@@ -856,6 +856,68 @@ test.describe("comparing membership types", () => {
   });
 });
 
+test("a deactivate button rests quietly yet stays distinguishable from a secondary one in both appearances", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
+  await page.getByTestId("admin-courts-link").click();
+  const deactivate = page.getByTestId("toggle-court-dddddddd-0000-0000-0000-000000000001");
+  await expect(deactivate).toBeVisible();
+  await page.getByTestId("edit-court-name-dddddddd-0000-0000-0000-000000000001").click();
+  const secondary = page.getByTestId("dismiss-court-edit");
+
+  for (const appearance of ["dark", "light"] as const) {
+    // when
+    if (appearance === "light") await selectPreference(page, "#theme-preference", appearance);
+    const tokens = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      document.body.append(probe);
+      const read = (value: string) => {
+        probe.style.color = value;
+        return getComputedStyle(probe).color;
+      };
+      const colours = { destructive: read("var(--cs-destructive)"), text: read("var(--cs-text)"), raised: read("var(--cs-raised)") };
+      probe.remove();
+      return colours;
+    });
+
+    // then
+    await expect(deactivate, `${appearance}: the resting state is the secondary surface`).toHaveCSS("background-color", tokens.raised);
+    await expect(deactivate, `${appearance}: the destructive colour is carried by the text`).toHaveCSS("color", tokens.destructive);
+    await expect(deactivate, `${appearance}: and by the border`).toHaveCSS("border-top-color", tokens.destructive);
+    const quiet = await renderedColours(deactivate);
+    const plain = await renderedColours(secondary);
+    expect(quiet.text, `${appearance}: a destructive label reads differently from a secondary one`).not.toBe(plain.text);
+    expect(quiet.border, `${appearance}: a destructive border reads differently from a secondary one`).not.toBe(plain.border);
+    expect(await renderedContrast(page, deactivate, "color", deactivate), `${appearance}: the quiet label stays readable`)
+      .toBeGreaterThanOrEqual(4.5);
+  }
+
+  // when
+  await page.getByTestId("court-editor").fill("Practice Wall");
+  await page.getByTestId("admin-setup-link").click();
+  const discard = page.getByTestId("unsaved-changes-discard");
+  await expect(discard).toBeVisible();
+
+  // then
+  const confirmation = await page.evaluate(() => {
+    const probe = document.createElement("span");
+    document.body.append(probe);
+    probe.style.background = "var(--cs-destructive)";
+    probe.style.color = "var(--cs-destructive-text)";
+    const style = getComputedStyle(probe);
+    const colours = { background: style.backgroundColor, text: style.color };
+    probe.remove();
+    return colours;
+  });
+  await expect(discard, "a confirmation carries the full destructive fill").toHaveCSS("background-color", confirmation.background);
+  await expect(discard).toHaveCSS("color", confirmation.text);
+  await page.getByTestId("unsaved-changes-stay").click();
+});
+
 test("an admin adds a person, gives them an account, and that person signs in and books", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");

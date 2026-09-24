@@ -66,7 +66,7 @@ export function ImportPreviewPanel({ sourceId, sourceEncoding, preview, disabled
 
   const busy = disabled || pending;
 
-  return <section className="surface-subtle grid gap-4 rounded-xl border p-4">
+  return <section className="grid gap-4 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.import.snapshot")}</h2>
 
     <div className="grid gap-2">

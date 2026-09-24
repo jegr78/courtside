@@ -16,6 +16,9 @@ The structural palette has five named values:
 | Line | `#FCFBF9` | Court lines, light surfaces and dark-theme text |
 | Dust | `#E8DDD4` | Closed courts and quiet light-theme surfaces |
 
+The default primary action colour and the `--cs-clay` token use the darker `#AF5030`; Clay's
+`#B85C38` is the member booking card's colour in the court plan.
+
 CSS uses semantic surface, text, border and form tokens derived from this palette. Dark is the
 default theme. Light changes those semantic tokens but does not introduce a second palette. Large
 gradients are not part of the product surface.

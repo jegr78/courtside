@@ -7,7 +7,8 @@ describe("Button", () => {
     ["primary", "button-primary"],
     ["secondary", "button-secondary"],
     ["destructive", "button-destructive"],
-  ] as const)("givenThe%sVariant_whenRendered_thenItUsesTheMatchingActionLevel", (variant, className) => {
+    ["destructive-confirm", "button-destructive-confirm"],
+  ] as const)("given the %s variant, when rendered, then it uses the matching action level", (variant, className) => {
     // given / when
     render(<Button variant={variant}>Action</Button>);
 

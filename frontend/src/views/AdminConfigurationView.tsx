@@ -442,7 +442,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
               {ruleSets.map((ruleSet) => <option key={ruleSet.id} value={ruleSet.id}>{ruleSet.name}</option>)}
             </select>
           </label>
-          {selectedRuleSet && <div className="surface-subtle grid gap-3 rounded-xl border p-4">
+          {selectedRuleSet && <div className="grid gap-3 rounded-xl border p-4">
             <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
               <TextField data-testid="rule-set-name" disabled={pending} maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.ruleSetName")} value={ruleSetName} onChange={(event) => setRuleSetName(event.target.value)} />
               <Button variant="primary" data-testid="save-rule-set" aria-describedby={describedByMark(`rule-set:${selectedRuleSet.id}`, unsavedRuleSetName)} disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.changeRuleSet(selectedRuleSet.id, { name: ruleSetName }))}>{t("admin.save")}</Button>
@@ -460,7 +460,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             stay={() => setPendingRuleSetId(undefined)}
             discard={() => { chooseRuleSet(pendingRuleSetId); setPendingRuleSetId(undefined); }}
           />}
-          <form noValidate {...newRuleSet.form} onSubmit={(event) => { event.preventDefault(); void addRuleSet(event.currentTarget); }} className="surface-subtle grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_auto] md:items-end">
+          <form noValidate {...newRuleSet.form} onSubmit={(event) => { event.preventDefault(); void addRuleSet(event.currentTarget); }} className="grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_auto] md:items-end">
             <TextField data-testid="new-rule-set-name" disabled={pending} name="name" maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.newRuleSet")} />
             <Button variant="primary" data-testid="create-rule-set" disabled={pending} type="submit">{t("admin.create")}</Button>
           </form>
@@ -494,7 +494,7 @@ function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTy
   const params = edited ?? saved;
   const mark = `rule:${type.ruleType}`;
   const unsaved = differs(params, saved);
-  return <article className="surface-subtle grid gap-4 rounded-xl border p-4">
+  return <article className="grid gap-4 rounded-xl border p-4">
     <div><h4 data-testid={`rule-${type.ruleType}-title`} className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>{!type.configurable && <GlobalRuleLink ruleType={type.ruleType} />}</div>
     {type.configurable && <>
       {type.parameters.length === 0 && <p data-testid={`rule-${type.ruleType}-description`} className="text-muted text-sm">{t(`admin.rules.description.${type.ruleType}`, { defaultValue: "" })}</p>}

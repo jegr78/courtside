@@ -102,7 +102,7 @@ export function AdminCourtsView() {
 
   return <FacilityPage testId="admin-courts-view" title={t("admin.facility.courts")} error={error ?? clubError} success={success}>
     {courts !== undefined && club !== undefined && <>
-      <form noValidate {...newCourt.form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-4 rounded-xl border p-4">
+      <form noValidate {...newCourt.form} onSubmit={(event) => void create(event)} className="grid gap-4 rounded-xl border p-4">
         <h2 className="font-bold">{t("admin.facility.newCourt")}</h2>
         <div className="grid gap-3 sm:grid-cols-[8rem_1fr] sm:items-end">
           <TextField data-testid="new-court-number" disabled={pending.has("court:new")} name="number" type="number" label={t("admin.facility.number")} />

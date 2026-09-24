@@ -142,6 +142,12 @@ input[type="time"] {
   }
 
   .button-destructive {
+    color: var(--cs-destructive);
+    background: var(--cs-raised);
+    border: 1px solid var(--cs-destructive);
+  }
+
+  .button-destructive-confirm {
     color: var(--cs-destructive-text);
     background: var(--cs-destructive);
   }

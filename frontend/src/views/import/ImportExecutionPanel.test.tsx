@@ -141,7 +141,7 @@ describe("ImportExecutionPanel", () => {
 
     // then
     expect(await screen.findByTestId("confirm-removals-note")).toBeInTheDocument();
-    expect(screen.getByTestId("confirm-execute")).toHaveClass("button-destructive");
+    expect(screen.getByTestId("confirm-execute"), "the confirmation carries the full destructive weight").toHaveClass("button-destructive-confirm");
     await userEvent.click(screen.getByTestId("confirm-execute"));
     expect(executing).toHaveBeenCalledWith("preview-1", true);
   });

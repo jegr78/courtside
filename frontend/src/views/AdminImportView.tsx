@@ -208,7 +208,7 @@ export function AdminImportView() {
         <h2 id="remove-source-title" className="text-2xl font-bold">{t("admin.import.removeSource")}</h2>
         <p>{t("admin.import.removeSourceExplain")}</p>
         <div className="flex flex-wrap gap-3">
-          <Button variant="destructive" data-testid="confirm-remove-source" disabled={pending} type="button" onClick={() => void remove(chosen)}>
+          <Button variant="destructive-confirm" data-testid="confirm-remove-source" disabled={pending} type="button" onClick={() => void remove(chosen)}>
             {t("admin.import.removeSource")}
           </Button>
           <Button variant="secondary" data-testid="cancel-remove-source" type="button" onClick={() => setRemoving(false)}>

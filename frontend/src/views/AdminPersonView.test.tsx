@@ -648,7 +648,7 @@ describe("AdminPersonView", () => {
     // then
     expect(sent).not.toHaveBeenCalled();
     const confirm = screen.getByTestId("confirm-send-credentials");
-    expect(confirm).toHaveClass("button-destructive");
+    expect(confirm, "the confirmation carries the full destructive weight").toHaveClass("button-destructive-confirm");
     await userEvent.click(confirm);
     expect(sent).toHaveBeenCalledWith("person-1");
   });

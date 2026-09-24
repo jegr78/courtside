@@ -15,7 +15,7 @@ export function UnsavedChangesQuestion({ count, stay, discard }: {
       <div className="mt-6 flex justify-end gap-3">
         <Button variant="secondary" type="button" data-testid="unsaved-changes-stay"
                 onClick={stay}>{t("unsaved.stay")}</Button>
-        <Button variant="destructive" type="button" data-testid="unsaved-changes-discard"
+        <Button variant="destructive-confirm" type="button" data-testid="unsaved-changes-discard"
                 onClick={discard}>{t("unsaved.discard")}</Button>
       </div>
     </div>

@@ -78,7 +78,7 @@ export function AdminBookingCardsView() {
 
 function CardCreateForm({ disabled, form, counts, setCounts, color, setColor, create }: { disabled: boolean; form: ReturnType<typeof useUnsavedForm>["form"]; counts: number[]; setCounts: (counts: number[]) => void; color: string; setColor: (color: string) => void; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const { t } = useTranslation();
-  return <form noValidate {...form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-4 rounded-xl border p-4">
+  return <form noValidate {...form} onSubmit={(event) => void create(event)} className="grid gap-4 rounded-xl border p-4">
     <h2 className="font-bold">{t("admin.facility.newCard")}</h2>
     <div className="grid items-start gap-4 md:grid-cols-3">
       <TextField disabled={disabled} data-testid="new-card-label" name="label" label={t("admin.facility.label")} />

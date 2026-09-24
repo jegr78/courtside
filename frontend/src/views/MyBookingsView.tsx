@@ -285,7 +285,7 @@ function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, clos
     <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatBookingPeriod(candidate.startsAt, candidate.endsAt, i18n.language, timeZone)}</li>)}</ul>
     {hasMoreBookings && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}
     {error && <Alert>{error}</Alert>}
-    <div className="flex gap-2"><Button variant="destructive" data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    <div className="flex gap-2"><Button variant="destructive-confirm" data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 

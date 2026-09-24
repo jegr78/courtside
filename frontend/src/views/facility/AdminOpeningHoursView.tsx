@@ -112,7 +112,7 @@ function ApplyToDays({ disabled, apply }: { disabled: boolean; apply: (days: Set
     });
   }
 
-  return <article className="surface-subtle grid gap-3 rounded-xl border p-4">
+  return <article className="grid gap-3 rounded-xl border p-4">
     <h2 className="font-bold">{t("admin.facility.applyToDays")}</h2>
     <p data-testid="apply-to-days-hint" className="text-sm text-[var(--cs-muted)]">{t("admin.facility.applyToDaysHint")}</p>
     <div className="grid gap-3 sm:grid-cols-2">
@@ -135,7 +135,7 @@ function ApplyToDays({ disabled, apply }: { disabled: boolean; apply: (days: Set
 function DayEditor({ day, timeZone, disabled, rejected, changed, reportError }: { day: WeekDay; timeZone: string; disabled: boolean; rejected?: string; changed: (day: WeekDay) => void; reportError: (failure: unknown) => void }) {
   const { t } = useTranslation();
   const errorId = `hours-error-${day.dayOfWeek}`;
-  return <article className="surface-subtle grid gap-3 rounded-xl border p-4">
+  return <article className="grid gap-3 rounded-xl border p-4">
     <h2 className="font-bold">{t(`weekday.${day.dayOfWeek}`)}</h2>
     <div className="grid grid-cols-2 gap-3">
       <TextField disabled={disabled || day.closed} data-testid={`hours-open-${day.dayOfWeek}`} type="time" aria-describedby={rejected ? errorId : undefined} label={t("admin.facility.opensAt")} value={day.opensAt} onChange={(event) => changed({ ...day, opensAt: event.target.value })} />

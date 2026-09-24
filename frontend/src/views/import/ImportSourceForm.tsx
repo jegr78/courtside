@@ -179,7 +179,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
   const unsaved = differs(requested(), { ...confirmed, membershipTypes: assigned(confirmed.membershipTypes) });
 
   // The column choices come from the club's own file, which is why it is read here and never sent.
-  return <section className="surface-subtle grid gap-4 rounded-xl border p-4">
+  return <section className="grid gap-4 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.import.source")}</h2>
 
     <div className="grid gap-3 md:grid-cols-2">
