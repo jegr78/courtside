@@ -687,10 +687,11 @@ test("given verified recovery units and unrelated entries, when status and diagn
     const oldDirectoryTime = new Date(Date.now() - 60_000);
     utimesSync(recovery, oldDirectoryTime, oldDirectoryTime);
     const systemDate = executable("date");
+    const createdEpoch = Math.floor(Date.now() / 1000) - 5;
     writeFileSync(join(context.root, "bin", "date"), `#!/bin/sh
 if [ "$1 $2" = '-u -d' ]; then
   case "$3" in
-    ????-??-??T??:??:??Z) exec '${systemDate}' +%s ;;
+    ????-??-??T??:??:??Z) echo ${createdEpoch}; exit 0 ;;
     *) exit 1 ;;
   esac
 fi
