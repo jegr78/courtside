@@ -182,6 +182,9 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(searchRoster("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.matching").value(4));
+        mockMvc.perform(searchRoster("{\"credentialStates\":[]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matching").value(4));
     }
 
     @Test
