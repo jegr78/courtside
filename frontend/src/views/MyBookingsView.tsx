@@ -149,7 +149,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
       className="surface-raised border-structural mt-4 rounded-xl border px-4 py-3">
       {t("myBookings.offlineAsOf", { time: formatDateTime(refreshedAt, i18n.language, grid.timeZone) })}
     </p>}
-    {loadError && <LoadFailure message={loadError} retry={() => void load()} />}
+    {loadError && <LoadFailure message={loadError} retry={() => { clearLoad(); void load(); }} />}
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-8 lg:grid-cols-2">

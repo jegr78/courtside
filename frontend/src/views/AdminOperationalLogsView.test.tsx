@@ -100,10 +100,12 @@ describe("AdminOperationalLogsView", () => {
     });
     await userEvent.click(screen.getByTestId("operational-log-apply"));
 
-    expect(await screen.findByTestId("operational-logs-problem")).toHaveTextContent(
+    expect(await screen.findByTestId("operational-logs-filter-refused")).toHaveTextContent(
       /does not exist in the club time zone/i
     );
     expect(search).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("operational-log-row"), "the refused filter leaves the last results readable").toBeInTheDocument();
+    expect(screen.queryByTestId("retry-load"), "a refused filter is not a failed read").not.toBeInTheDocument();
   });
 
   it("distinguishes an unavailable collector from an available empty result", async () => {

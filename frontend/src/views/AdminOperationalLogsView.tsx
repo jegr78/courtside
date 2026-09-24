@@ -49,6 +49,7 @@ export function AdminOperationalLogsView() {
   const [page, setPage] = useState<OperationalLogPage>();
   const [entries, setEntries] = useState<OperationalLogEntry[]>([]);
   const [error, setError] = useState<string>();
+  const [refusedFilter, setRefusedFilter] = useState<string>();
   const [pending, setPending] = useState(false);
   const [loadAttempt, retryLoad] = useRetry();
 
@@ -63,11 +64,12 @@ export function AdminOperationalLogsView() {
       criteria = requestFor(filters, club.timeZone);
     } catch (failure) {
       if (failure instanceof RangeError) {
-        setError(t("operationalLogs.time.invalid"));
+        setRefusedFilter(t("operationalLogs.time.invalid"));
         return;
       }
       throw failure;
     }
+    setRefusedFilter(undefined);
     setPage(undefined);
     setEntries([]);
     let active = true;
@@ -138,8 +140,9 @@ export function AdminOperationalLogsView() {
         <Button variant="secondary" type="button" onClick={() => { setDraft(emptyFilters); setFilters(emptyFilters); }}>{t("operationalLogs.filter.clear")}</Button>
       </div>
     </form>
+    {refusedFilter && <Alert testId="operational-logs-filter-refused">{refusedFilter}</Alert>}
     {!page || !club
-      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
+      ? (problem ? <LoadFailure message={problem} retry={() => { setError(undefined); loadClub(); retryLoad(); }} /> : !refusedFilter && <p role="status">{t("status.loading")}</p>)
       : <>
         {problem && <Alert testId="operational-logs-problem">{problem}</Alert>}
         {page.availability === "UNAVAILABLE"
