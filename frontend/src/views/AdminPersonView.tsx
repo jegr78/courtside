@@ -206,7 +206,7 @@ export function AdminPersonView() {
             disabled={pending}
             create={(request) => mutate(() => api.createAccount(personId, request))}
           />}
-        <section className="surface-subtle grid gap-3 rounded-xl border p-4">
+        <section className="grid gap-3 rounded-xl border p-4">
           <h2 className="text-2xl font-bold">{t("admin.person.subjectAccess")}</h2>
           <p className="text-muted text-sm">{t("admin.person.subjectAccessExplain")}</p>
           <Button variant="secondary" data-testid="export-person-data" disabled={pending} className="justify-self-start" type="button" onClick={() => void exportData()}>
@@ -229,7 +229,7 @@ function PersonSection({ entry, disabled, save }: { entry: RosterEntry; disabled
   });
   const mark = `person:${entry.personId}`;
   const unsaved = differs(person, { firstName: entry.firstName, lastName: entry.lastName, email: entry.email });
-  return <section className="surface-subtle grid gap-3 rounded-xl border p-4">
+  return <section className="grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.person.person")}</h2>
     <div className="grid gap-3 md:grid-cols-3">
       <TextField data-testid="person-first-name" disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.roster.firstName")} value={person.firstName} onChange={(event) => setPerson({ ...person, firstName: event.target.value })} />
@@ -279,7 +279,7 @@ function MembershipSection({ entry, types, disabled, save }: {
     }
   }
 
-  return <section data-testid="person-membership" className="surface-subtle grid gap-3 rounded-xl border p-4">
+  return <section data-testid="person-membership" className="grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.person.membership")}</h2>
     <div className="grid gap-3 md:grid-cols-3">
       <label className="grid gap-2 font-medium">
@@ -347,7 +347,7 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
     setReplacing(false);
   }
 
-  return <section className="surface-subtle grid gap-3 rounded-xl border p-4">
+  return <section className="grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.person.account")}</h2>
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
       <TextField data-testid="account-username" disabled={disabled} autoComplete="off" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} value={username} onChange={(event) => setUsername(event.target.value)} />
@@ -456,7 +456,7 @@ function AccountCreateSection({ entry, disabled, create }: {
   const { t } = useTranslation();
   const newAccount = useUnsavedForm("account:new");
   if (!entry.email) {
-    return <section className="surface-subtle grid gap-3 rounded-xl border p-4">
+    return <section className="grid gap-3 rounded-xl border p-4">
       <h2 className="text-2xl font-bold">{t("admin.roster.newAccount")}</h2>
       <p data-testid="account-needs-address">{t("admin.person.accountNeedsAddress")}</p>
     </section>;
@@ -469,7 +469,7 @@ function AccountCreateSection({ entry, disabled, create }: {
       roles: form.getAll("roles") as Role[]
     });
   }
-  return <form noValidate {...newAccount.form} onSubmit={submit} className="surface-subtle grid gap-3 rounded-xl border p-4">
+  return <form noValidate {...newAccount.form} onSubmit={submit} className="grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.roster.newAccount")}</h2>
     <TextField data-testid="new-account-username" disabled={disabled} autoComplete="off" name="username" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} />
     <CredentialDestination entry={entry} />

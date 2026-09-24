@@ -120,7 +120,7 @@ function SetupStepCard({ step }: { step: SetupStep }) {
   const { t } = useTranslation();
   const state = step.optional ? step.complete ? "available" : "optional" : step.complete ? "complete" : "next";
   return <li data-testid={`setup-step-${step.id === "membershipTypes" ? "membership-types" : step.id}`} data-state={state}
-    className="surface-subtle grid gap-3 rounded-xl border p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+    className="grid gap-3 rounded-xl border p-4 sm:grid-cols-[1fr_auto] sm:items-center">
     <div className="grid gap-1">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-xl font-bold">{t(`admin.setup.${step.id}.title`)}</h2>

@@ -164,7 +164,7 @@ function ParticipantCardCellEditor({ editor, mark, unsaved, disabled, entered, c
 function ParticipantCardCreateForm({ disabled, create }: { disabled: boolean; create: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
   const { t } = useTranslation();
   const { form } = useUnsavedForm("participant-card:new");
-  return <form noValidate {...form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-4 rounded-xl border p-4">
+  return <form noValidate {...form} onSubmit={(event) => void create(event)} className="grid gap-4 rounded-xl border p-4">
     <h2 className="font-bold">{t("admin.facility.newParticipantCard")}</h2>
     <div className="grid gap-3 md:grid-cols-2">
       <TextField disabled={disabled} data-testid="new-participant-card-label" name="label" label={t("admin.facility.label")} />

@@ -140,7 +140,7 @@ export function AdminMembershipTypesView() {
               </tbody>
             </table>}
         </section>
-        <form noValidate {...newType.form} onSubmit={(event) => void create(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
+        <form noValidate {...newType.form} onSubmit={(event) => void create(event)} className="grid gap-3 rounded-xl border p-4">
           <h2 className="text-2xl font-bold">{t("admin.membershipTypes.newType")}</h2>
           <div className="grid gap-3 md:grid-cols-2">
             <TextField data-testid="new-membership-type-name" disabled={pending} name="name" maxLength={NAME_LENGTH} label={t("admin.membershipTypes.name")} />
@@ -185,7 +185,7 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
   const cell = "grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] items-center gap-3 md:table-cell md:border-t md:p-2 md:align-middle";
   const label = "font-medium md:hidden";
 
-  return <tr data-testid={`membership-type-${type.id}`} className="surface-subtle grid gap-2 rounded-xl border p-4 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">
+  return <tr data-testid={`membership-type-${type.id}`} className="grid gap-2 rounded-xl border p-4 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">
     <th scope="row" className={`${cell} font-normal`}>
       <span aria-hidden="true" data-testid="membership-type-label-name" className={label}>{t("admin.membershipTypes.name")}</span>
       <span className="flex min-w-0 items-center gap-2">

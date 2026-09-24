@@ -99,7 +99,7 @@ export function ExternalReferencePanel({ sourceId, disabled, reportError }: {
 
   const busy = disabled || pending;
 
-  return <section className="surface-subtle grid gap-4 rounded-xl border p-4">
+  return <section className="grid gap-4 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.import.references")}</h2>
     <p className="text-sm">{t("admin.import.referencesExplain")}</p>
     {success && <SuccessFeedback>{success}</SuccessFeedback>}

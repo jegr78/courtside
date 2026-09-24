@@ -246,7 +246,7 @@ export function AdminRosterView() {
             <Button variant="secondary" data-testid="roster-next-page" disabled={pending || !nextCursor} type="button" onClick={() => void readNextPage()}>{t("admin.roster.nextPage")}</Button>
           </nav>
         </section>
-        <form noValidate {...newPerson.form} onSubmit={(event) => void createPerson(event)} className="surface-subtle grid gap-3 rounded-xl border p-4">
+        <form noValidate {...newPerson.form} onSubmit={(event) => void createPerson(event)} className="grid gap-3 rounded-xl border p-4">
           <h2 className="text-2xl font-bold">{t("admin.roster.newPerson")}</h2>
           <div className="grid gap-3 md:grid-cols-3">
             <TextField data-testid="new-person-first-name" disabled={pending} name="firstName" maxLength={NAME_LENGTH} label={t("admin.roster.firstName")} />

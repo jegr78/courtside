@@ -54,7 +54,7 @@ export function BookingsExport({ onFailure }: Props) {
     }
   }
 
-  return <section data-testid="bookings-export" className="surface-subtle grid gap-3 rounded-xl border p-4">
+  return <section data-testid="bookings-export" className="grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.export.bookings")}</h2>
     <p className="text-muted text-sm">{t("admin.export.bookingsExplain")}</p>
     <form noValidate onSubmit={(event) => void download(event)} className="grid gap-3">
