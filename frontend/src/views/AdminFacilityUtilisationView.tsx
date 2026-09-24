@@ -17,7 +17,7 @@ function OccupancyCell({ court }: { court: CourtUtilisation }) {
   if (court.occupancy === null) {
     return <td data-testid={`utilisation-occupancy-${court.courtNumber}`} className="py-2 tabular-nums">–</td>;
   }
-  const percent = Math.min(100, Math.round(court.occupancy * 100));
+  const percent = Math.round(court.occupancy * 100);
   return <td className="py-2">
     <div className="flex items-center gap-3">
       <div aria-hidden="true" className="occupancy-bar h-2 w-24 shrink-0 overflow-hidden rounded-full border">
