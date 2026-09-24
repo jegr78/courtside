@@ -1230,6 +1230,10 @@ it("given a rule set bounds the booking duration, when the dialog opens, then it
   const duration = await screen.findByTestId("booking-duration");
   expect(duration).toContainHTML('value="60"');
   expect(duration).not.toContainHTML('value="90"');
+  const bound = screen.getByTestId("booking-duration-bound");
+  expect(bound, "the member reads the bound before submitting").toHaveTextContent(
+    i18n.t("booking.durationBound", { duration: i18n.t("booking.durationMinutes", { count: 60 }) }));
+  expect(duration.getAttribute("aria-describedby")?.split(" "), "the bound describes the list it shortens").toContain(bound.id);
 });
 
 it("given a bound that is not a multiple of the slot, when the dialog opens, then it stops below the bound", async () => {
@@ -1256,6 +1260,21 @@ it("given no bound is reported, when the dialog opens, then the closing time is 
   // then
   const duration = await screen.findByTestId("booking-duration");
   expect(duration).toContainHTML('value="120"');
+  expect(screen.queryByTestId("booking-duration-bound"), "no rule bounds the length, so none is claimed").not.toBeInTheDocument();
+  expect(screen.getByTestId("booking-duration-hint")).toHaveTextContent(i18n.t("booking.durationHint"));
+});
+
+it("given the member field, when the dialog opens, then one heading names it", async () => {
+  // given
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  const search = await screen.findByTestId("member-search");
+  expect(search).toHaveAccessibleName(i18n.t("booking.members"));
+  expect(search.closest("label"), "the field carries no second heading of its own").toBeNull();
 });
 
 it("given a rule set bounds the booking duration, when dragging past it, then the period stops at the bound", async () => {

@@ -125,6 +125,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   // second is the conflict the server reports on submit, and saying so is its job and not ours.
   const boundLeavesNoPeriod = maxBookingMinutes !== undefined && maxBookingMinutes !== null
     && maxBookingMinutes < grid.slotMinutes;
+  const showsBound = maxBookingMinutes !== undefined && maxBookingMinutes !== null && !boundLeavesNoPeriod;
+  const durationDescription = showsBound ? "booking-duration-bound booking-duration-hint" : "booking-duration-hint";
   const selectedDuration = durations.includes(durationMinutes) ? durationMinutes : durations[0] ?? grid.slotMinutes;
   const period = bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration);
   // The booker takes a slot too, which is what BookingWriter counts, so an empty dialog stands at one.
@@ -140,10 +142,14 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       <p data-testid="booking-period" aria-live="polite" className="mt-2 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
       <label className="mt-5 grid gap-2 font-medium">{t("booking.duration")}
-        <select data-testid="booking-duration" value={selectedDuration} onChange={(event) => setDurationMinutes(Number(event.target.value))} className="form-control rounded-lg border px-3 py-3">
+        <select data-testid="booking-duration" aria-describedby={durationDescription} value={selectedDuration} onChange={(event) => setDurationMinutes(Number(event.target.value))} className="form-control rounded-lg border px-3 py-3">
           {durations.map((minutes) => <option key={minutes} value={minutes}>{t("booking.durationMinutes", { count: minutes })}</option>)}
         </select>
       </label>
+      {showsBound && <p id="booking-duration-bound" data-testid="booking-duration-bound" className="text-muted mt-2 text-sm">
+        {t("booking.durationBound", { duration: t("booking.durationMinutes", { count: maxBookingMinutes }) })}
+      </p>}
+      <p id="booking-duration-hint" data-testid="booking-duration-hint" className="text-muted mt-1 text-sm">{t("booking.durationHint")}</p>
       {boundLeavesNoPeriod && <Alert tone="warning" testId="booking-no-duration">{t("booking.boundBelowSlotGrid")}</Alert>}
       {canChooseSeveralCourts
         ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
@@ -167,10 +173,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         {t("booking.players", { players: chosenPlayers, required: requiredPlayers })}
       </p>}
       <fieldset className="mt-4 grid gap-3" aria-invalid={fieldViolations("participants").length > 0} aria-describedby={describedBy("participants")}>
-        <legend className="font-semibold">{t("booking.members")}</legend>
-        <label className="grid gap-2 font-medium">{t("booking.memberSearch")}
-          <input data-testid="member-search" value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="form-control rounded-lg border px-3 py-3" />
-        </label>
+        <legend id="booking-members-legend" className="font-semibold">{t("booking.members")}</legend>
+        <input data-testid="member-search" type="search" aria-labelledby="booking-members-legend" value={memberQuery} onChange={(event) => setMemberQuery(event.target.value)} className="form-control rounded-lg border px-3 py-3" />
         {memberMatches.length > 0 && <ul className="grid gap-2">
           {memberMatches.map((member) => <li key={member.personId}>
             <Button variant="secondary" type="button" data-testid="member-match" data-person-id={member.personId} className="w-full text-left" onClick={() => {
