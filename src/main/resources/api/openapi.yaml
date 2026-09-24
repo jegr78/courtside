@@ -1434,13 +1434,27 @@ components:
             first and the order does not move when the enumeration grows.
           items: { $ref: "#/components/schemas/Role" }
 
+    CredentialState:
+      type: string
+      description: |
+        Where an account stands between being created and being used. `credentialState` on a
+        roster entry says what each value means.
+      enum: [AWAITING_CREDENTIAL, CREDENTIAL_ISSUED, CREDENTIAL_EXPIRED, PASSWORD_CHOSEN]
+
     RosterPage:
       type: object
-      required: [entries]
+      required: [entries, matching]
       properties:
         entries:
           type: array
           items: { $ref: "#/components/schemas/RosterEntry" }
+        matching:
+          type: integer
+          minimum: 0
+          description: |
+            How many people the criteria match across every page, not only this one. It is counted
+            in its own statement, so a roster that changes between the two can make it differ from
+            what paging through the list finds.
         nextCursor:
           type: [string, "null"]
           format: uuid
@@ -1468,6 +1482,17 @@ components:
         role:
           $ref: "#/components/schemas/Role"
           description: Only people whose displayed account holds this role.
+        credentialStates:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items: { $ref: "#/components/schemas/CredentialState" }
+          description: |
+            Only people whose displayed account is in one of these states at the moment of the
+            request, the same state `credentialState` on their entry reports. A person without an
+            account has no state and never matches. Absent or empty narrows nothing. Everybody who
+            has not yet chosen a password of their own is the three values other than
+            `PASSWORD_CHOSEN`.
         sortBy:
           $ref: "#/components/schemas/RosterSortField"
           default: NAME
@@ -1500,8 +1525,8 @@ components:
     RosterExportRequest:
       type: object
       description: |
-        The same narrowing the roster list takes, plus what the receiving spreadsheet needs. It is
-        a body for the reason above and not because the operation is a `POST`.
+        The roster list's name and membership-type narrowing, plus what the receiving spreadsheet
+        needs. It is a body for the reason above and not because the operation is a `POST`.
       properties:
         query:
           type: string

@@ -181,8 +181,13 @@ kann danach nicht mehr neu vergeben werden.
 
 ## Mitglieder → Personen und Konten
 
-Die Übersicht zeigt Name, Benutzername, Kontostatus und Mitgliedsart. Nutze Suche und Filter,
-um einen Eintrag zu finden. Vorname, Nachname und E-Mail-Adresse kannst du später korrigieren.
+Oben legst du eine neue Person an. Darunter zeigt die Übersicht Name, Benutzername, Kontostatus,
+Zugang, Mitgliedsart und Rollen, dazu die Zahl der Personen, auf die Suche und Filter passen. Ein
+gesperrtes Konto ist farbig und mit eigenem Zeichen markiert. Die Spalte Zugang sagt, ob Zugangsdaten
+noch nicht ausgestellt, ausgestellt oder abgelaufen sind oder ob das Mitglied ein eigenes Passwort
+gewählt hat. Der Filter **Zugang** mit **Noch kein eigenes Passwort** listet alle, die noch kein
+eigenes Passwort gewählt haben. Auf dem Smartphone sortierst du über **Sortieren nach** und **Reihenfolge**.
+Vorname, Nachname und E-Mail-Adresse kannst du später korrigieren.
 
 ![Die Personenliste mit Suche, Filter und den wichtigsten Kontodaten.](screenshots/de/admin-roster.png)
 

@@ -22,6 +22,7 @@ export type RosterEntry = components["schemas"]["RosterEntry"];
 export type RosterPage = components["schemas"]["RosterPage"];
 export type RosterSortField = components["schemas"]["RosterSortField"];
 export type RosterSortDirection = components["schemas"]["RosterSortDirection"];
+export type CredentialState = components["schemas"]["CredentialState"];
 export type AuditEntry = components["schemas"]["AuditEntry"];
 export type AuditPage = components["schemas"]["AuditPage"];
 export type AuditSearch = {
@@ -116,6 +117,7 @@ export interface RosterCriteria {
   limit?: number;
   membershipTypeId?: string;
   role?: Role;
+  credentialStates?: CredentialState[];
   sortBy?: RosterSortField;
   sortDirection?: RosterSortDirection;
 }
@@ -336,12 +338,13 @@ export const api = {
   setParticipantCardActive: (id: string, active: boolean) => request<ParticipantCard>(`/api/admin/participant-cards/${id}/active`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
-  roster: ({ query, cursor, limit = 50, membershipTypeId, role,
+  roster: ({ query, cursor, limit = 50, membershipTypeId, role, credentialStates,
     sortBy = "NAME", sortDirection = "ASC" }: RosterCriteria = {}) => request<RosterPage>(
     "/api/admin/roster-search", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ limit, ...(query ? { query } : {}), ...(cursor ? { cursor } : {}),
-        ...(membershipTypeId ? { membershipTypeId } : {}), ...(role ? { role } : {}), sortBy, sortDirection })
+        ...(membershipTypeId ? { membershipTypeId } : {}), ...(role ? { role } : {}),
+        ...(credentialStates?.length ? { credentialStates } : {}), sortBy, sortDirection })
     }
   ),
   person: (personId: string) => request<RosterEntry>(`/api/admin/roster/${personId}`),

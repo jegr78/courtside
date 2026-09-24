@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-23",
+  "reviewedAt": "2026-09-24",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "6ce56ae1a5ea65f8ebf6010a878b70e6c09b65cd764d3ae3a408cb1515e77445",
+  "openApiFieldInventorySha256": "bf8fd7d2ba2bb845e98b4e2cfb2198a26357111dd21d1677f8f02c135b9a8952",
   "protectedFieldInventorySha256": "4f16eed4229be447f36a68cbd5c82d5b9f5afb3c6dbad61dcad6c242025d9bad",
-  "productionAuthorizationSha256": "30b2aff9f9abab29eadd4d21bd1629c0076cb743f9cbef6e1e905fb96f2d89f4",
+  "productionAuthorizationSha256": "d67af745cb52136d8bb9c709fd91b9438fde0952013dbfe38a17cc37f577cf3a",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1464,6 +1464,7 @@
     "searchParticipantMembers:response:Violation.code",
     "searchParticipantMembers:response:Violation.params",
     "searchParticipantMembers:response:Violation.params.*",
+    "searchRoster:request:RosterSearchRequest.credentialStates",
     "searchRoster:request:RosterSearchRequest.cursor",
     "searchRoster:request:RosterSearchRequest.limit",
     "searchRoster:request:RosterSearchRequest.membershipTypeId",
@@ -1477,6 +1478,7 @@
     "searchRoster:response:FieldError.params",
     "searchRoster:response:FieldError.params.*",
     "searchRoster:response:RosterPage.entries",
+    "searchRoster:response:RosterPage.matching",
     "searchRoster:response:RosterPage.nextCursor",
     "searchRoster:response:Violation.code",
     "searchRoster:response:Violation.params",
@@ -2784,6 +2786,7 @@
       ],
       "productionPaths": [
         "src/main/java/org/courtside/member/RosterService.java#load/1",
+        "src/main/java/org/courtside/member/RosterService.java#load/2",
         "src/main/java/org/courtside/member/RosterService.java#requiredLanguage/1",
         "src/main/java/org/courtside/member/web/RosterAdminController.java#toResponse",
         "src/main/java/org/courtside/member/internal/RosterSecurityEventLog.java#record",

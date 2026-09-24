@@ -49,6 +49,24 @@ test("given a board that has taken on a new member, when they record the person,
     await expect(page.getByTestId("end-membership")).toBeVisible();
     await messageTo(journeyService.mailboxURL, "mary.major@example.org");
 
+    // when — the board looks for everybody who has not chosen a password yet
+    const personId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
+    await reachAdministration(page, "admin-roster-link");
+    await page.getByTestId("roster-credential-filter").selectOption("NOT_CHOSEN");
+    await expect(page.getByTestId("roster-credential-filter")).toHaveValue("NOT_CHOSEN");
+    await writeInto(page.getByTestId("roster-search"), "Mary Major");
+    await activate(page.getByTestId("roster-search-submit"));
+
+    // then
+    await expect(page.locator('[data-testid^="roster-row-"]')).toHaveCount(1);
+    await expect(page.getByTestId(`roster-credential-${personId}`)).toHaveAttribute("data-state", "CREDENTIAL_ISSUED");
+
+    // when
+    await activate(page.getByTestId(`person-link-${personId}`));
+
+    // then
+    await expect(page.getByTestId("admin-person-view")).toBeVisible();
+
     // when — and the membership ends, with the sessions that account holds. A club records a
     // departure that has happened, so a day the club has not reached yet is refused.
     await activate(page.getByTestId("end-membership"));

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.api.AdminRosterApi;
 import org.courtside.api.ApiAccountRequest;
 import org.courtside.api.ApiActiveRequest;
+import org.courtside.api.ApiCredentialState;
 import org.courtside.api.ApiMembershipRequest;
 import org.courtside.api.ApiPersonRequest;
 import org.courtside.api.ApiRole;
@@ -13,6 +14,7 @@ import org.courtside.api.ApiRosterEntry;
 import org.courtside.api.ApiRosterPage;
 import org.courtside.api.ApiRosterSearchRequest;
 import org.courtside.api.ApiUsernameRequest;
+import org.courtside.identity.CredentialState;
 import org.courtside.identity.Role;
 import org.courtside.identity.GlobalSessionAdministration;
 import org.courtside.identity.CurrentUser;
@@ -21,7 +23,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.courtside.member.MembershipPeriod;
 import org.courtside.member.RosterService;
-import org.courtside.shared.CursorPage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -47,15 +48,16 @@ class RosterAdminController implements AdminRosterApi {
 
     @Override
     public ResponseEntity<ApiRosterPage> searchRoster(ApiRosterSearchRequest request) {
-        CursorPage.Result<RosterService.RosterEntry> page = roster.search(request.getQuery(),
+        RosterService.RosterPage page = roster.search(request.getQuery(),
                 request.getMembershipTypeId(),
                 request.getRole() == null ? null : Role.valueOf(request.getRole().name()),
+                credentialStates(request.getCredentialStates()),
                 RosterService.SortField.valueOf(request.getSortBy().name()),
                 RosterService.SortDirection.valueOf(request.getSortDirection().name()),
                 request.getCursor(), request.getLimit());
         return ResponseEntity.ok(new ApiRosterPage(page.items().stream()
                 .map(RosterAdminController::toResponse)
-                .toList())
+                .toList(), Math.toIntExact(page.matching()))
                 .nextCursor(page.nextCursor()));
     }
 
@@ -165,6 +167,14 @@ class RosterAdminController implements AdminRosterApi {
         for (ApiRole role : requested) {
             result.add(Role.named(role.getValue()).orElseThrow(() -> new IllegalStateException(
                     "Unvalidated role name reached the roster boundary: " + role.getValue())));
+        }
+        return result;
+    }
+
+    private static Set<CredentialState> credentialStates(Collection<ApiCredentialState> requested) {
+        Set<CredentialState> result = EnumSet.noneOf(CredentialState.class);
+        if (requested != null) {
+            requested.forEach(state -> result.add(CredentialState.valueOf(state.getValue())));
         }
         return result;
     }

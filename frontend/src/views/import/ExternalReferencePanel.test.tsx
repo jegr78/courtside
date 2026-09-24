@@ -67,7 +67,7 @@ describe("ExternalReferencePanel", () => {
     // given
     vi.useFakeTimers();
     vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
-    const searching = vi.spyOn(api, "roster").mockResolvedValue({ entries: [jane], nextCursor: null });
+    const searching = vi.spyOn(api, "roster").mockResolvedValue({ entries: [jane], nextCursor: null, matching: 0 });
     show();
 
     // when
@@ -90,7 +90,7 @@ describe("ExternalReferencePanel", () => {
   it("given fewer than two characters, when the board pauses, then no broad roster search starts", async () => {
     // given
     vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
-    const searching = vi.spyOn(api, "roster").mockResolvedValue({ entries: [jane], nextCursor: null });
+    const searching = vi.spyOn(api, "roster").mockResolvedValue({ entries: [jane], nextCursor: null, matching: 0 });
     show();
     await screen.findByTestId("no-references");
 
@@ -107,7 +107,7 @@ describe("ExternalReferencePanel", () => {
     // given
     vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
     vi.spyOn(api, "roster")
-      .mockResolvedValueOnce({ entries: [jane], nextCursor: null })
+      .mockResolvedValueOnce({ entries: [jane], nextCursor: null, matching: 0 })
       .mockReturnValueOnce(new Promise(() => undefined));
     show();
     await screen.findByTestId("no-references");
@@ -126,7 +126,7 @@ describe("ExternalReferencePanel", () => {
   it("given a person the file already knows, when they are linked by hand, then the link is written", async () => {
     // given
     vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
-    vi.spyOn(api, "roster").mockResolvedValue({ entries: [jane], nextCursor: null });
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [jane], nextCursor: null, matching: 0 });
     const linking = vi.spyOn(api, "linkExternalReference").mockResolvedValue(linked);
     show();
     await screen.findByTestId("no-references");
@@ -146,8 +146,8 @@ describe("ExternalReferencePanel", () => {
   it("given a search still in flight, when the field is emptied, then its answer cannot fill the list back in", async () => {
     // given
     vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
-    let answer!: (page: { entries: RosterEntry[]; nextCursor: null }) => void;
-    const asked = new Promise<{ entries: RosterEntry[]; nextCursor: null }>((resolve) => {
+    let answer!: (page: { entries: RosterEntry[]; nextCursor: null; matching: number }) => void;
+    const asked = new Promise<{ entries: RosterEntry[]; nextCursor: null; matching: number }>((resolve) => {
       answer = resolve;
     });
     vi.spyOn(api, "roster").mockReturnValue(asked);
@@ -160,7 +160,7 @@ describe("ExternalReferencePanel", () => {
     await userEvent.clear(screen.getByTestId("reference-person-search"));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     await act(async () => {
-      answer({ entries: [jane], nextCursor: null });
+      answer({ entries: [jane], nextCursor: null, matching: 0 });
       await asked;
     });
 
@@ -172,10 +172,10 @@ describe("ExternalReferencePanel", () => {
   it("given a query the board has replaced, when the earlier answer arrives last, then the newer one stands", async () => {
     // given
     vi.spyOn(api, "externalReferences").mockResolvedValue({ references: [], nextCursor: null });
-    const answers: ((page: { entries: RosterEntry[]; nextCursor: null }) => void)[] = [];
-    const asked: Promise<{ entries: RosterEntry[]; nextCursor: null }>[] = [];
+    const answers: ((page: { entries: RosterEntry[]; nextCursor: null; matching: number }) => void)[] = [];
+    const asked: Promise<{ entries: RosterEntry[]; nextCursor: null; matching: number }>[] = [];
     vi.spyOn(api, "roster").mockImplementation(() => {
-      const answer = new Promise<{ entries: RosterEntry[]; nextCursor: null }>((resolve) => {
+      const answer = new Promise<{ entries: RosterEntry[]; nextCursor: null; matching: number }>((resolve) => {
         answers.push(resolve);
       });
       asked.push(answer);
@@ -191,12 +191,12 @@ describe("ExternalReferencePanel", () => {
 
     // when — the replaced query answers after the one that replaced it
     await act(async () => {
-      answers[answers.length - 1]({ entries: [mary], nextCursor: null });
+      answers[answers.length - 1]({ entries: [mary], nextCursor: null, matching: 0 });
       await asked[asked.length - 1];
     });
     expect(await screen.findByTestId("reference-person-person-2")).toBeInTheDocument();
     await act(async () => {
-      answers[0]({ entries: [jane], nextCursor: null });
+      answers[0]({ entries: [jane], nextCursor: null, matching: 0 });
       await asked[0];
     });
 

@@ -36,7 +36,7 @@ describe("AdminMembershipTypesView", () => {
     await i18n.changeLanguage("en");
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults, juniors]);
     vi.spyOn(api, "ruleSets").mockResolvedValue([summer]);
-    vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null });
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null, matching: 0 });
   });
 
   it("given the create form is filled in, when it is read, then it holds work", async () => {
@@ -107,7 +107,7 @@ describe("AdminMembershipTypesView", () => {
     vi.spyOn(api, "roster").mockImplementation((criteria) =>
       Promise.resolve({
         entries: criteria?.membershipTypeId === "type-1" ? [holder("p1"), holder("p2")] : [],
-        nextCursor: null
+        nextCursor: null, matching: 0
       }));
 
     // given
@@ -134,7 +134,7 @@ describe("AdminMembershipTypesView", () => {
     // given
     const many = Array.from({ length: 200 }, (_, index) => holder(`p${index}`));
     vi.spyOn(api, "roster").mockImplementation((criteria) =>
-      Promise.resolve({ entries: criteria?.membershipTypeId === "type-1" ? many : [], nextCursor: "p199" }));
+      Promise.resolve({ entries: criteria?.membershipTypeId === "type-1" ? many : [], nextCursor: "p199", matching: 0 }));
 
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);

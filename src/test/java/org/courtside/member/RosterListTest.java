@@ -1,6 +1,7 @@
 package org.courtside.member;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.identity.CredentialState;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
@@ -14,7 +15,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.EnumSet;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -53,14 +57,17 @@ class RosterListTest extends AbstractIntegrationTest {
     @Autowired
     private RosterService roster;
 
+    @Autowired
+    private Clock clock;
+
     @Test
     void givenAPersonWithoutAnAccount_whenListingTheRoster_thenTheEntryCarriesNoUsername() {
         // given
         UUID child = identity.createPerson("Mary", "Major", "mary.major@example.org");
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.search(
-                null, null, null, null, null, null, 50);
+        RosterService.RosterPage page = roster.search(
+                null, null, null, Set.of(), null, null, null, 50);
 
         // then
         assertThat(page.items())
@@ -125,15 +132,15 @@ class RosterListTest extends AbstractIntegrationTest {
         identity.createEnabledAccount(member, "member.mia", Set.of(Role.MEMBER));
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> page = roster.search(
-                null, null, Role.TRAINER, RosterService.SortField.NAME,
+        RosterService.RosterPage page = roster.search(
+                null, null, Role.TRAINER, Set.of(), RosterService.SortField.NAME,
                 RosterService.SortDirection.ASC, null, 50);
 
         // then
         assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
                 .containsExactly(trainer);
         assertThatThrownBy(() -> roster.search(
-                null, null, Role.TRAINER, RosterService.SortField.NAME,
+                null, null, Role.TRAINER, Set.of(), RosterService.SortField.NAME,
                 RosterService.SortDirection.ASC, member, 50))
                 .isInstanceOf(RosterCursorUnknownException.class);
     }
@@ -149,11 +156,11 @@ class RosterListTest extends AbstractIntegrationTest {
         identity.createEnabledAccount(gamma, "gamma", Set.of(Role.MEMBER));
 
         // when
-        CursorPage.Result<RosterService.RosterEntry> first = roster.search(
-                null, null, null, RosterService.SortField.USERNAME,
+        RosterService.RosterPage first = roster.search(
+                null, null, null, Set.of(), RosterService.SortField.USERNAME,
                 RosterService.SortDirection.DESC, null, 2);
-        CursorPage.Result<RosterService.RosterEntry> second = roster.search(
-                null, null, null, RosterService.SortField.USERNAME,
+        RosterService.RosterPage second = roster.search(
+                null, null, null, Set.of(), RosterService.SortField.USERNAME,
                 RosterService.SortDirection.DESC, first.nextCursor(), 2);
 
         // then
@@ -162,11 +169,11 @@ class RosterListTest extends AbstractIntegrationTest {
         assertThat(second.items()).extracting(RosterService.RosterEntry::username)
                 .containsExactly("alpha");
 
-        CursorPage.Result<RosterService.RosterEntry> firstByName = roster.search(
-                null, null, null, RosterService.SortField.NAME,
+        RosterService.RosterPage firstByName = roster.search(
+                null, null, null, Set.of(), RosterService.SortField.NAME,
                 RosterService.SortDirection.DESC, null, 2);
-        CursorPage.Result<RosterService.RosterEntry> secondByName = roster.search(
-                null, null, null, RosterService.SortField.NAME,
+        RosterService.RosterPage secondByName = roster.search(
+                null, null, null, Set.of(), RosterService.SortField.NAME,
                 RosterService.SortDirection.DESC, firstByName.nextCursor(), 2);
         assertThat(firstByName.items()).extracting(RosterService.RosterEntry::personId)
                 .containsExactly(gamma, beta);
@@ -196,16 +203,16 @@ class RosterListTest extends AbstractIntegrationTest {
                 .containsExactly(active, disabled, noAccount);
         assertThat(sortedIds(RosterService.SortField.ROLES))
                 .containsExactly(disabled, active, noAccount);
-        assertThat(roster.search(null, adults.getId(), null, RosterService.SortField.USERNAME,
+        assertThat(roster.search(null, adults.getId(), null, Set.of(), RosterService.SortField.USERNAME,
                 RosterService.SortDirection.ASC, null, 50).items())
                 .extracting(RosterService.RosterEntry::personId)
                 .containsExactly(active);
 
-        CursorPage.Result<RosterService.RosterEntry> first = roster.search(
-                null, null, null, RosterService.SortField.USERNAME,
+        RosterService.RosterPage first = roster.search(
+                null, null, null, Set.of(), RosterService.SortField.USERNAME,
                 RosterService.SortDirection.ASC, null, 2);
-        CursorPage.Result<RosterService.RosterEntry> second = roster.search(
-                null, null, null, RosterService.SortField.USERNAME,
+        RosterService.RosterPage second = roster.search(
+                null, null, null, Set.of(), RosterService.SortField.USERNAME,
                 RosterService.SortDirection.ASC, first.nextCursor(), 2);
         assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
                 .containsExactly(active, disabled);
@@ -214,10 +221,10 @@ class RosterListTest extends AbstractIntegrationTest {
     }
 
     private List<UUID> sortedIds(RosterService.SortField field) {
-        CursorPage.Result<RosterService.RosterEntry> first = roster.search(
-                null, null, null, field, RosterService.SortDirection.ASC, null, 2);
-        CursorPage.Result<RosterService.RosterEntry> second = roster.search(
-                null, null, null, field, RosterService.SortDirection.ASC, first.nextCursor(), 2);
+        RosterService.RosterPage first = roster.search(
+                null, null, null, Set.of(), field, RosterService.SortDirection.ASC, null, 2);
+        RosterService.RosterPage second = roster.search(
+                null, null, null, Set.of(), field, RosterService.SortDirection.ASC, first.nextCursor(), 2);
         return Stream.concat(first.items().stream(), second.items().stream())
                 .map(RosterService.RosterEntry::personId).toList();
     }
@@ -443,4 +450,124 @@ class RosterListTest extends AbstractIntegrationTest {
                         .isEqualTo(older.getId()));
     }
 
+    @Test
+    void givenAnAccountInEveryCredentialState_whenFilteringOnEachState_thenTheFilterAgreesWithTheDisplayedState() {
+        // given
+        Instant now = clock.instant();
+        UUID awaiting = identity.createPerson("Alpha", "Awaiting", "alpha@example.org");
+        identity.createAccountAwaitingCredentials(awaiting, "alpha", Set.of(Role.MEMBER));
+        UUID issued = identity.createPerson("Bravo", "Issued", "bravo@example.org");
+        identity.issueCredential(identity.createAccountAwaitingCredentials(
+                issued, "bravo", Set.of(Role.MEMBER)), "bravo-credential", now.plusSeconds(1));
+        UUID unbounded = identity.createPerson("Charlie", "Unbounded", "charlie@example.org");
+        identity.createAccountWithEnvironmentCredential(
+                unbounded, "charlie", "synthetic-test-password-hash", Set.of(Role.ADMIN));
+        UUID expired = identity.createPerson("Delta", "Expired", "delta@example.org");
+        identity.issueCredential(identity.createAccountAwaitingCredentials(
+                expired, "delta", Set.of(Role.MEMBER)), "delta-credential", now.minusSeconds(1));
+        UUID expiringNow = identity.createPerson("Echo", "Expiring", "echo@example.org");
+        identity.issueCredential(identity.createAccountAwaitingCredentials(
+                expiringNow, "echo", Set.of(Role.MEMBER)), "echo-credential", now);
+        UUID chosen = identity.createPerson("Foxtrot", "Chosen", "foxtrot@example.org");
+        identity.createEnabledAccount(chosen, "foxtrot", Set.of(Role.MEMBER));
+        identity.createPerson("Golf", "Unaccounted", "golf@example.org");
+
+        // when
+        List<RosterService.RosterEntry> everybody = roster.search(
+                null, null, null, Set.of(), null, null, null, 50).items();
+
+        // then
+        assertThat(idsIn(CredentialState.AWAITING_CREDENTIAL)).containsExactlyInAnyOrder(awaiting);
+        assertThat(idsIn(CredentialState.CREDENTIAL_ISSUED)).containsExactlyInAnyOrder(issued, unbounded);
+        assertThat(idsIn(CredentialState.CREDENTIAL_EXPIRED)).containsExactlyInAnyOrder(expired, expiringNow);
+        assertThat(idsIn(CredentialState.PASSWORD_CHOSEN)).containsExactlyInAnyOrder(chosen);
+        for (CredentialState state : CredentialState.values()) {
+            assertThat(idsIn(state))
+                    .as("the %s filter must select exactly the people whose entry displays it", state)
+                    .containsExactlyInAnyOrderElementsOf(everybody.stream()
+                            .filter(entry -> entry.credentialState() == state)
+                            .map(RosterService.RosterEntry::personId).toList());
+        }
+    }
+
+    @Test
+    void givenEverybodyWithoutAChosenPassword_whenFilteringInTheDefaultOrder_thenEveryPageCountsAllOfThem() {
+        // given
+        UUID awaiting = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccountAwaitingCredentials(awaiting, "jane.doe", Set.of(Role.MEMBER));
+        UUID issued = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        identity.issueCredential(identity.createAccountAwaitingCredentials(
+                issued, "mary.major", Set.of(Role.MEMBER)), "mary-credential", clock.instant().plusSeconds(60));
+        UUID expired = identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+        identity.issueCredential(identity.createAccountAwaitingCredentials(
+                expired, "richard.miles", Set.of(Role.MEMBER)), "richard-credential", clock.instant());
+        UUID chosen = identity.createPerson("John", "Roe", "john.roe@example.org");
+        identity.createEnabledAccount(chosen, "john.roe", Set.of(Role.MEMBER));
+        identity.createPerson("Mia", "Member", "mia@example.org");
+        Set<CredentialState> notYetChosen = EnumSet.complementOf(EnumSet.of(CredentialState.PASSWORD_CHOSEN));
+
+        // when
+        RosterService.RosterPage first = roster.search(
+                null, null, null, notYetChosen, null, null, null, 2);
+        RosterService.RosterPage second = roster.search(
+                null, null, null, notYetChosen, null, null, first.nextCursor(), 2);
+
+        // then
+        assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(awaiting, issued);
+        assertThat(second.items()).extracting(RosterService.RosterEntry::personId)
+                .containsExactly(expired);
+        assertThat(first.matching()).as("the count covers every page, not the one returned").isEqualTo(3);
+        assertThat(second.matching()).isEqualTo(3);
+    }
+
+    @Test
+    void givenNameAndMembershipCriteria_whenSearchingInTheDefaultOrder_thenTheCountFollowsThem() {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID janet = identity.createPerson("Janet", "Doe", "janet.doe@example.org");
+        identity.createPerson("John", "Roe", "john.roe@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        members.save(memberSince(janet, OTHER_MEMBERSHIP_TYPE_ID));
+
+        // when
+        RosterService.RosterPage everybody = roster.search(null, null, null, Set.of(), null, null, null, 1);
+        RosterService.RosterPage named = roster.search("doe", null, null, Set.of(), null, null, null, 1);
+        RosterService.RosterPage holders = roster.search(
+                "doe", MEMBERSHIP_TYPE_ID, null, Set.of(), null, null, null, 1);
+
+        // then
+        assertThat(everybody.matching()).isEqualTo(3);
+        assertThat(named.matching()).isEqualTo(2);
+        assertThat(holders.matching()).isEqualTo(1);
+    }
+
+    @Test
+    void givenAPersonWhoseOtherAccountChoseAPassword_whenFilteringOnCredentialState_thenOnlyTheDisplayedAccountCounts() {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID dormant = identity.createAccount(jane, "jane.doe.dormant", Set.of(Role.MEMBER));
+        UUID displayed = identity.createAccountAwaitingCredentials(jane, "jane.doe", Set.of(Role.MEMBER));
+
+        // when
+        RosterService.RosterPage awaiting = roster.search(null, null, null,
+                Set.of(CredentialState.AWAITING_CREDENTIAL), null, null, null, 50);
+        RosterService.RosterPage chosen = roster.search(null, null, null,
+                Set.of(CredentialState.PASSWORD_CHOSEN), null, null, null, 50);
+
+        // then
+        assertThat(awaiting.items()).singleElement().satisfies(entry -> {
+            assertThat(entry.accountId()).isEqualTo(displayed);
+            assertThat(entry.credentialState()).isEqualTo(CredentialState.AWAITING_CREDENTIAL);
+        });
+        assertThat(chosen.items())
+                .as("the disabled account %s chose a password, but the roster shows the enabled one", dormant)
+                .isEmpty();
+        assertThat(chosen.matching()).isZero();
+    }
+
+    private List<UUID> idsIn(CredentialState state) {
+        return roster.search(null, null, null, Set.of(state), null, null, null, 50).items().stream()
+                .map(RosterService.RosterEntry::personId).toList();
+    }
 }

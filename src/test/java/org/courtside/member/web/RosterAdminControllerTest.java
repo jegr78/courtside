@@ -157,6 +157,50 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenACredentialStateCriterion_whenListingTheRoster_thenThePageAndTheCountFollowIt()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID mary = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        identity.createAccountAwaitingCredentials(jane, "jane.doe", Set.of(Role.MEMBER));
+        identity.createAccountAwaitingCredentials(mary, "mary.major", Set.of(Role.MEMBER));
+        identity.createEnabledAccount(john, "john.roe", Set.of(Role.MEMBER));
+        identity.createPerson("Richard", "Miles", "richard.miles@example.org");
+
+        // when / then
+        mockMvc.perform(searchRoster("""
+                        {"credentialStates":["AWAITING_CREDENTIAL"],"limit":1}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matching").value(2))
+                .andExpect(jsonPath("$.entries.length()").value(1))
+                .andExpect(jsonPath("$.entries[0].personId").value(jane.toString()))
+                .andExpect(jsonPath("$.entries[0].credentialState").value("AWAITING_CREDENTIAL"))
+                .andExpect(jsonPath("$.nextCursor").value(jane.toString()));
+        mockMvc.perform(searchRoster("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matching").value(4));
+        mockMvc.perform(searchRoster("{\"credentialStates\":[]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matching").value(4));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnUnknownCredentialState_whenListingTheRoster_thenTheBodyIsRefused() throws Exception {
+        // when / then
+        mockMvc.perform(searchRoster("""
+                        {"credentialStates":["LOCKED_OUT"]}
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("credentialStates[0]"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.TypeMismatch"));
+    }
+
+    @Test
     void givenNoSession_whenListingTheRoster_thenItIsUnauthenticated() throws Exception {
         // when / then
         mockMvc.perform(searchRoster("{}"))

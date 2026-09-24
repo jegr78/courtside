@@ -78,6 +78,11 @@ const BOUNDARIES = {
     classification: "passed to the instance, which answers the refusal the view reports",
     test: "src/views/AdminPersonView.test.tsx#given an address naming no person the instance knows, when the page opens, then the refusal is shown instead of an empty page"
   },
+  "src/views/AdminRosterView.tsx matchMedia": {
+    value: "the width the browser reports",
+    classification: "decides whether the hidden column headings take focus, and never which order is offered",
+    test: "src/views/AdminRosterView.test.tsx#given a phone, when the roster loads, then the hidden column sort buttons leave the tab order"
+  },
   "src/views/AdminRosterView.tsx useSearchParams": {
     value: "the membership type the roster is filtered by",
     classification: "passed to the instance, which answers the refusal the view reports",
