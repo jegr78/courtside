@@ -155,6 +155,22 @@ class FacilityUtilisationControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAWindowTheSpringChangeSwallows_whenReportingThatDay_thenTheFacilityWasNotOpen()
+            throws Exception {
+        // given
+        openEveryDay(LocalTime.of(2, 30), LocalTime.of(3, 0));
+        facility.createCourt(1, "Centre");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/reports/facility-utilisation")
+                        .param("from", "2026-03-29")
+                        .param("to", "2026-03-29"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.openMinutes").value(0))
+                .andExpect(jsonPath("$.courts[0].occupancy").value(nullValue()));
+    }
+
+    @Test
     void givenNoOpeningHours_whenReportingABookedPeriod_thenOccupancyIsNullRatherThanADivisionByZero()
             throws Exception {
         // given

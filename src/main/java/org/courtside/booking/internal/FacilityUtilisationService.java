@@ -52,10 +52,14 @@ public class FacilityUtilisationService {
         List<OpenInterval> intervals = new ArrayList<>();
         for (LocalDate date = period.from(); !date.isAfter(period.to()); date = date.plusDays(1)) {
             OpeningHours hours = week.get(date.getDayOfWeek());
-            if (hours != null) {
-                intervals.add(new OpenInterval(
-                        date.atTime(hours.getOpensAt()).atZone(zone).toInstant(),
-                        date.atTime(hours.getClosesAt()).atZone(zone).toInstant()));
+            if (hours == null) {
+                continue;
+            }
+            Instant opensAt = date.atTime(hours.getOpensAt()).atZone(zone).toInstant();
+            Instant closesAt = date.atTime(hours.getClosesAt()).atZone(zone).toInstant();
+            // A window inside a daylight-saving gap resolves to an empty or inverted interval.
+            if (closesAt.isAfter(opensAt)) {
+                intervals.add(new OpenInterval(opensAt, closesAt));
             }
         }
         return intervals;
