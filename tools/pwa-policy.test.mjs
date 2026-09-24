@@ -304,7 +304,7 @@ test("given retained browser security evidence, when validating it, then only cl
 
 test("given club-controlled rendering contexts, when checking the security journey, then every inventoried sink is bound to a test", () => {
   const expectedIds = [
-    "club-name-text", "club-name-title", "court-name-text", "booking-card-label",
+    "club-name-text", "club-name-title", "club-name-app-title", "court-name-text", "booking-card-label",
     "participant-card-label", "rule-set-name", "person-fields", "account-username",
     "membership-type-name", "import-source-name", "external-reference-id",
     "booking-note", "guest-name", "audit-projection", "logo-url", "imprint-url", "privacy-url",

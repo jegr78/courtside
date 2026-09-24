@@ -52,6 +52,12 @@ against light and dark text. Normal text requires a ratio of at least 4.5 to 1.
 Logos must be PNG or JPEG files. The file may be at most 1 MiB and 2048 by 2048 pixels. An uploaded
 file replaces the logo URL until you remove it.
 
+A member who adds Courtside to a phone's home screen gets an app icon made from the uploaded logo.
+A logo entered only as a URL is not enough for that, and the icon then shows the Courtside mark.
+About twelve characters fit under the icon. Enter a **Short name** for it, or Courtside shortens
+the club name to its leading words. The installed app's status bar takes the primary colour the next
+time it opens.
+
 ![Primary and accent colours with contrast values, a preview and the club logo.](../screenshots/en/club-appearance.png)
 
 ### Links, language and time

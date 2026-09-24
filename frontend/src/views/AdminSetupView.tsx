@@ -23,6 +23,7 @@ interface SetupStep {
 
 const factoryConfiguration = {
   clubName: "Courtside",
+  shortName: null,
   primaryColor: "#AF5030",
   accentColor: "#D7E24B",
   logoUrl: null,

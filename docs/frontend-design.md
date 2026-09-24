@@ -47,7 +47,8 @@ and served by the application. Their SIL Open Font License 1.1 notices are distr
 
 The configured club logo and club name lead the application. If no logo exists, the monochrome
 Courtside court mark is the neutral fallback. Courtside's own identity remains subordinate in an
-installed single-club instance.
+installed single-club instance. Where the mark stands on its own, as `icon.svg` and the installed
+app icon, it is drawn in the palette: Line court lines on a Shade tile, with the alley in Clay.
 
 A root-relative logo keeps the request within the club instance and is preferred. An HTTPS logo on
 another origin remains supported for clubs without a local asset route, but its host receives the

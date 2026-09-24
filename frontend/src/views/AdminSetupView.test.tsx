@@ -14,6 +14,7 @@ const configuration: AdminClubConfig = {
   imprintUrl: null,
   privacyUrl: null,
   documentationUrl: null,
+  shortName: null,
   defaultLocale: "en",
   supportedLocales: ["de", "en"],
   slotMinutes: 30,

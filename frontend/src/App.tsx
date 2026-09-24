@@ -124,6 +124,18 @@ function applyBranding(config: ClubConfig) {
   document.documentElement.style.setProperty("--club-primary-text", contrastColor(config.primaryColor));
   document.documentElement.style.setProperty("--club-accent", config.accentColor);
   applyTabIcon(config.logoUrl ?? "/icon.svg");
+  applyMeta("theme-color", config.primaryColor);
+  applyMeta("apple-mobile-web-app-title", config.clubName);
+}
+
+function applyMeta(name: string, content: string) {
+  let meta = document.head.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = name;
+    document.head.appendChild(meta);
+  }
+  meta.content = content;
 }
 
 function applyTabIcon(href: string) {

@@ -56,6 +56,12 @@ Kontrast zu hellem und dunklem Text. Für normalen Text gilt ein Verhältnis von
 Logos müssen als PNG oder JPEG vorliegen. Die Datei darf höchstens 1 MiB groß sein und 2048 mal
 2048 Pixel messen. Eine hochgeladene Datei ersetzt die Logo-URL, bis du die Datei entfernst.
 
+Wer Courtside auf dem Smartphone zum Startbildschirm hinzufügt, bekommt ein App-Symbol aus dem
+hochgeladenen Logo. Ein Logo, das nur als URL eingetragen ist, reicht dafür nicht: Dann zeigt das
+Symbol die Courtside-Marke. Unter dem Symbol stehen etwa zwölf Zeichen. Trage dafür einen
+**Kurznamen** ein, sonst kürzt Courtside den Vereinsnamen auf seine ersten Wörter. Die
+Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Öffnen.
+
 ![Primär- und Akzentfarbe mit Kontrastwert, Vorschau und Vereinslogo.](screenshots/de/club-appearance.png)
 
 ### Links, Sprache und Zeit

@@ -60,6 +60,7 @@ function BrandColorField({ kind, label, value, changed }: {
 function editable(loaded: AdminClubConfig): ClubConfigRequest {
   return {
     clubName: loaded.clubName,
+    shortName: loaded.shortName ?? null,
     primaryColor: loaded.primaryColor,
     accentColor: loaded.accentColor,
     logoUrl: loaded.logoFallbackUrl,
@@ -349,6 +350,10 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         <form noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5">
           <h2 className="text-2xl font-bold">{t("admin.config.club")}</h2>
           <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />
+          <div className="grid gap-1">
+            <TextField data-testid="short-name" maxLength={12} label={t("admin.config.shortName")} value={config.shortName ?? ""} onChange={(event) => changeConfig({ shortName: event.target.value || null })} />
+            <p className="text-muted text-sm">{t("admin.config.shortNameHelp")}</p>
+          </div>
           <div data-testid="club-appearance" className="grid gap-5 [&>*]:min-w-0 sm:grid-cols-2">
             <BrandColorField kind="primary" label={t("admin.config.primaryColor")} value={config.primaryColor} changed={(primaryColor) => changeConfig({ primaryColor })} />
             <BrandColorField kind="accent" label={t("admin.config.accentColor")} value={config.accentColor} changed={(accentColor) => changeConfig({ accentColor })} />
