@@ -303,7 +303,7 @@ function MembershipSection({ entry, types, disabled, save }: {
         <p>{t("admin.person.endMembershipExplain")}</p>
         <TextField data-testid="end-membership-date" type="date" label={t("admin.person.endedOn")} value={chosenEnd} onChange={(event) => setChosenEnd(event.target.value)} />
         <div className="flex flex-wrap gap-3">
-          <Button variant="destructive" data-testid="confirm-end-membership" disabled={disabled || !chosenEnd} type="button" onClick={() => void endMembership()}>{t("admin.person.endMembership")}</Button>
+          <Button variant="destructive-confirm" data-testid="confirm-end-membership" disabled={disabled || !chosenEnd} type="button" onClick={() => void endMembership()}>{t("admin.person.endMembership")}</Button>
           <Button variant="secondary" data-testid="cancel-end-membership" type="button" onClick={() => setEnding(false)}>{t("admin.cancel")}</Button>
         </div>
       </div>
@@ -391,7 +391,7 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
         <h2 id="end-all-sessions-title" className="text-2xl font-bold">{t("admin.person.endAllSessions")}</h2>
         <p>{t("admin.person.endAllSessionsExplain")}</p>
         <div className="flex flex-wrap gap-3">
-          <Button variant="destructive" data-testid="confirm-end-all-sessions" disabled={disabled} type="button" onClick={() => void endAllSessions()}>{t("admin.person.endAllSessionsConfirm")}</Button>
+          <Button variant="destructive-confirm" data-testid="confirm-end-all-sessions" disabled={disabled} type="button" onClick={() => void endAllSessions()}>{t("admin.person.endAllSessionsConfirm")}</Button>
           <Button variant="secondary" type="button" onClick={() => setEndingAll(false)}>{t("admin.cancel")}</Button>
         </div>
       </div>
@@ -401,7 +401,7 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
         <h2 id="replace-chosen-title" className="text-2xl font-bold">{t("admin.person.replaceChosenTitle")}</h2>
         <p>{t("admin.person.replaceChosenExplain")}</p>
         <div className="flex flex-wrap gap-3">
-          <Button variant="destructive" data-testid="confirm-send-credentials" disabled={disabled} type="button" onClick={() => void replace()}>{t("admin.person.replaceChosenConfirm")}</Button>
+          <Button variant="destructive-confirm" data-testid="confirm-send-credentials" disabled={disabled} type="button" onClick={() => void replace()}>{t("admin.person.replaceChosenConfirm")}</Button>
           <Button variant="secondary" data-testid="cancel-send-credentials" type="button" onClick={() => setReplacing(false)}>{t("admin.cancel")}</Button>
         </div>
       </div>

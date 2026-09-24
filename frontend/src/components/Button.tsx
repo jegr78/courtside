@@ -1,13 +1,14 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant: "primary" | "secondary" | "destructive";
+  variant: "primary" | "secondary" | "destructive" | "destructive-confirm";
 };
 
 const variantClasses: Record<ButtonProps["variant"], string> = {
   primary: "button-primary",
   secondary: "button-secondary",
   destructive: "button-destructive",
+  "destructive-confirm": "button-destructive-confirm",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ className = "", variant, ...props }, ref) {

@@ -121,7 +121,7 @@ export function ImportExecutionPanel({ sourceId, preview, disabled, timeZone, ex
           })}
         </p>}
         <div className="flex flex-wrap gap-3">
-          <Button variant={preview.needsConfirmation ? "destructive" : "primary"} data-testid="confirm-execute" disabled={busy} type="button" onClick={() => void execute(preview)}>
+          <Button variant={preview.needsConfirmation ? "destructive-confirm" : "primary"} data-testid="confirm-execute" disabled={busy} type="button" onClick={() => void execute(preview)}>
             {t("admin.import.execute")}
           </Button>
           <Button variant="secondary" data-testid="cancel-execute" type="button" onClick={() => setConfirming(false)}>

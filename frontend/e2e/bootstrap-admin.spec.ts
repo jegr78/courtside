@@ -856,6 +856,42 @@ test.describe("comparing membership types", () => {
   });
 });
 
+test("a deactivate button rests quietly yet stays distinguishable from a secondary one in both appearances", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
+  await page.getByTestId("admin-courts-link").click();
+  const deactivate = page.getByTestId("toggle-court-dddddddd-0000-0000-0000-000000000001");
+  await expect(deactivate).toBeVisible();
+
+  for (const appearance of ["dark", "light"] as const) {
+    // when
+    if (appearance === "light") await selectPreference(page, "#theme-preference", appearance);
+    const tokens = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      document.body.append(probe);
+      const read = (value: string) => {
+        probe.style.color = value;
+        return getComputedStyle(probe).color;
+      };
+      const colours = { destructive: read("var(--cs-destructive)"), text: read("var(--cs-text)"), raised: read("var(--cs-raised)") };
+      probe.remove();
+      return colours;
+    });
+
+    // then
+    await expect(deactivate, `${appearance}: the resting state is the secondary surface`).toHaveCSS("background-color", tokens.raised);
+    await expect(deactivate, `${appearance}: the destructive colour is carried by the text`).toHaveCSS("color", tokens.destructive);
+    await expect(deactivate, `${appearance}: and by the border`).toHaveCSS("border-top-color", tokens.destructive);
+    expect(tokens.destructive, `${appearance}: a destructive action reads differently from a secondary one`).not.toBe(tokens.text);
+    expect(await renderedContrast(page, deactivate, "color", deactivate), `${appearance}: the quiet label stays readable`)
+      .toBeGreaterThanOrEqual(4.5);
+  }
+});
+
 test("an admin adds a person, gives them an account, and that person signs in and books", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");
