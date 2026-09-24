@@ -805,6 +805,47 @@ test("a caution reads as a warning rather than a failure in both appearances", a
   }
 });
 
+test.describe("comparing membership types", () => {
+  const added = Array.from({ length: 8 }, (_, index) => `cccccccc-0000-0000-0000-0000000001${String(index).padStart(2, "0")}`);
+
+  test.afterEach(async ({ journeyService }) => {
+    await journeyService.executeSql(`DELETE FROM membership_type WHERE id IN (${added.map((id) => `'${id}'`).join(", ")});`);
+  });
+
+  test("a board compares ten membership types on one screen beside the administration menu", async ({ page, journeyService }) => {
+    // given
+    await journeyService.executeSql(`INSERT INTO membership_type (id, name, rule_set_id) VALUES ${added
+      .map((id, index) => `('${id}', 'Seasonal member group ${index + 1}', 'aaaaaaaa-0000-0000-0000-000000000001')`).join(", ")};`);
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await page.goto("/login");
+    await page.getByTestId("username").fill("configuration-admin");
+    await page.getByTestId("password").fill("temporary-password");
+    await page.getByTestId("login-submit").click();
+
+    // when
+    await page.goto("/admin/membership-types");
+    const rows = page.locator('[data-testid^="membership-type-cccccccc"]');
+    await expect(rows).toHaveCount(10);
+
+    // then
+    const layout = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll<HTMLElement>('[data-testid^="membership-type-cccccccc"]')];
+      const first = rows[0].getBoundingClientRect();
+      const last = rows[rows.length - 1].getBoundingClientRect();
+      const name = rows[0].querySelector<HTMLElement>('[data-testid^="membership-type-name-"]')!.getBoundingClientRect();
+      const state = rows[0].querySelector<HTMLElement>('[data-testid^="membership-type-state-"]')!.getBoundingClientRect();
+      return {
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        rowsHeight: last.bottom - first.top,
+        stateBesideName: state.left >= name.right && state.top < name.bottom && state.bottom > name.top
+      };
+    });
+    expect(layout.overflow, "the table fits beside the administration menu").toBeLessThanOrEqual(0);
+    expect(layout.stateBesideName, "a type's availability sits beside its name").toBe(true);
+    expect(layout.rowsHeight, "ten types fit within one screen height").toBeLessThanOrEqual(900 - 200);
+  });
+});
+
 test("an admin adds a person, gives them an account, and that person signs in and books", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");

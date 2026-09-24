@@ -143,9 +143,12 @@ describe("AdminMembershipTypesView", () => {
     expect(await screen.findByTestId("membership-type-holders-type-1")).toHaveTextContent("200+");
   });
 
-  it("given an active type, when the board is about to retire it, then the surface says what stays in force", async () => {
+  it("when the page is read, then it says what retiring a type leaves in force", async () => {
+    // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
-    expect(await screen.findByTestId("membership-types-retire-note")).toBeInTheDocument();
+
+    // then
+    expect(await screen.findByTestId("membership-types-retire-note")).toHaveTextContent("Retiring only stops new assignments");
   });
 
   it("given ten membership types, when the page is read, then each explanation appears once", async () => {
@@ -236,7 +239,10 @@ describe("AdminMembershipTypesView", () => {
   });
 
   it("given a retired type, when the view is read, then it is still listed and says so", async () => {
+    // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
     expect(await screen.findByTestId("membership-type-type-2")).toBeInTheDocument();
     expect(within(card("type-2")).getByTestId("membership-type-state-type-2")).toHaveTextContent("Retired");
   });

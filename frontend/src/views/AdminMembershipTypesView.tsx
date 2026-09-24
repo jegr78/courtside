@@ -171,43 +171,49 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
   const unsaved = differs(
     { name, ruleSetId: ruleSetId || null, grantsAccount },
     { name: type.name, ruleSetId: type.ruleSetId ?? null, grantsAccount: type.grantsAccount });
-  const cell = "grid min-w-0 gap-2 md:table-cell md:border-t md:p-2 md:align-top";
+  const cell = "grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] items-center gap-3 md:table-cell md:border-t md:p-2 md:align-middle";
+  const label = "font-medium md:hidden";
 
-  return <tr data-testid={`membership-type-${type.id}`} className="surface-subtle grid gap-3 rounded-xl border p-4 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">
+  return <tr data-testid={`membership-type-${type.id}`} className="surface-subtle grid gap-2 rounded-xl border p-4 md:table-row md:rounded-none md:border-0 md:bg-transparent md:p-0">
     <th scope="row" className={`${cell} font-normal`}>
-      <input data-testid={`membership-type-name-${type.id}`} aria-label={t("admin.membershipTypes.name")} disabled={disabled}
-             maxLength={NAME_LENGTH} className="form-control w-full min-w-0 rounded-lg border px-3 py-2 font-semibold"
-             value={name} onChange={(event) => setName(event.target.value)} />
-      <span data-testid={`membership-type-state-${type.id}`} className={`text-sm ${type.active ? "text-muted" : "font-semibold"}`}>
-        {t(type.active ? "admin.membershipTypes.offered" : "admin.membershipTypes.retired")}
+      <span aria-hidden="true" data-testid="membership-type-label-name" className={label}>{t("admin.membershipTypes.name")}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <input data-testid={`membership-type-name-${type.id}`} aria-label={t("admin.membershipTypes.name")} disabled={disabled}
+               maxLength={NAME_LENGTH} className="form-control min-w-0 flex-1 rounded-lg border px-3 py-2 font-semibold"
+               value={name} onChange={(event) => setName(event.target.value)} />
+        <span data-testid={`membership-type-state-${type.id}`} className={`shrink-0 text-sm ${type.active ? "text-muted" : "font-semibold"}`}>
+          {t(type.active ? "admin.membershipTypes.offered" : "admin.membershipTypes.retired")}
+        </span>
       </span>
     </th>
     <td className={cell}>
-      <select data-testid={`membership-type-rule-set-${type.id}`} aria-label={t("admin.membershipTypes.ruleSet")} disabled={disabled}
-              className="form-control w-full min-w-0 rounded-lg border px-3 py-2" value={ruleSetId} onChange={(event) => setRuleSetId(event.target.value)}>
-        <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
-        {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
-      </select>
-      {type.ruleSetId && <Link data-testid={`membership-type-rules-link-${type.id}`} className="text-sm underline"
-                               to={`/admin/configuration?ruleSetId=${encodeURIComponent(type.ruleSetId)}#rule-set`}>
-        {t("admin.membershipTypes.ruleSetLink")}
-      </Link>}
+      <span aria-hidden="true" data-testid="membership-type-label-rule-set" className={label}>{t("admin.membershipTypes.ruleSet")}</span>
+      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <select data-testid={`membership-type-rule-set-${type.id}`} aria-label={t("admin.membershipTypes.ruleSet")} disabled={disabled}
+                className="form-control min-w-0 flex-1 basis-32 rounded-lg border px-3 py-2" value={ruleSetId} onChange={(event) => setRuleSetId(event.target.value)}>
+          <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
+          {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
+        </select>
+        {type.ruleSetId && <Link data-testid={`membership-type-rules-link-${type.id}`} className="shrink-0 text-sm underline"
+                                 to={`/admin/configuration?ruleSetId=${encodeURIComponent(type.ruleSetId)}#rule-set`}>
+          {t("admin.membershipTypes.ruleSetLink")}
+        </Link>}
+      </span>
     </td>
     <td className={cell}>
-      <label className="flex items-center gap-2 font-medium">
-        <input data-testid={`membership-type-grants-account-${type.id}`} disabled={disabled} type="checkbox" className="size-5"
-               checked={grantsAccount} onChange={(event) => setGrantsAccount(event.target.checked)} />
-        <span className="md:sr-only">{t("admin.membershipTypes.grantsAccount")}</span>
-      </label>
+      <span aria-hidden="true" data-testid="membership-type-label-grants-account" className={label}>{t("admin.membershipTypes.grantsAccount")}</span>
+      <input data-testid={`membership-type-grants-account-${type.id}`} aria-label={t("admin.membershipTypes.grantsAccount")} disabled={disabled}
+             type="checkbox" className="size-5" checked={grantsAccount} onChange={(event) => setGrantsAccount(event.target.checked)} />
     </td>
     <td className={cell}>
-      <Link data-testid={`membership-type-holders-${type.id}`} className="font-semibold underline" to={`/admin/roster?membershipTypeId=${type.id}`}>
+      <span aria-hidden="true" data-testid="membership-type-label-members" className={label}>{t("admin.membershipTypes.members")}</span>
+      <Link data-testid={`membership-type-holders-${type.id}`} className="font-semibold whitespace-nowrap underline" to={`/admin/roster?membershipTypeId=${type.id}`}>
         {holders
           ? t("admin.membershipTypes.holders", { holders: holders.more ? `${holders.count}+` : String(holders.count) })
           : t("status.loading")}
       </Link>
     </td>
-    <td className={cell}>
+    <td className="min-w-0 md:border-t md:p-2 md:align-middle">
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary" data-testid={`save-membership-type-${type.id}`} aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button"
                 className="px-3 py-2" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>

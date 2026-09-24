@@ -167,8 +167,8 @@ Regelwerk zu, wenn sich ihre Regeln ändern sollen.
 ## Mitglieder → Mitgliedsarten
 
 Eine Mitgliedsart hat eine Bezeichnung, ein Regelwerk und eine Einstellung für den Import. Die
-Übersicht zeigt jede Art in einer Zeile, sodass du die Regelwerke aller Arten nebeneinander
-vergleichst. *Regeln in der Konfiguration bearbeiten* öffnet genau das Regelwerk der Art.
+Übersicht zeigt jede Art in einer Zeile, am Handy als eigene Karte, sodass du die Regelwerke
+aller Arten untereinander vergleichst. *Regeln bearbeiten* öffnet genau das Regelwerk der Art.
 
 Aktiviere **Zugang beim Import anlegen**, wenn importierte Mitglieder dieser Art automatisch
 ein Konto erhalten sollen. Courtside sendet das Einmalpasswort an die hinterlegte E-Mail-Adresse.

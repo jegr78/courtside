@@ -271,6 +271,11 @@ test("member and administration surfaces remain usable on a touch viewport", asy
 
   // then
   await expect(page.getByTestId("create-membership-type")).toBeVisible();
+  const typeRow = page.getByTestId("membership-type-cccccccc-0000-0000-0000-000000000001");
+  expect(await typeRow.evaluate((element) => getComputedStyle(element).display)).toBe("grid");
+  await expect(typeRow.getByTestId("membership-type-label-name")).toBeVisible();
+  await expect(typeRow.getByTestId("membership-type-label-rule-set")).toBeVisible();
+  expect(await typeRow.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await expectNoHorizontalOverflow(page);
 
   // when
