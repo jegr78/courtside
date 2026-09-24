@@ -346,6 +346,15 @@ class InstalledAppTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenNoSize_whenReadingTheIcon_thenTheTypedRefusalNamesTheMissingParameter() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/public/config/icon"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:missing-parameter"))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("size"));
+    }
+
+    @Test
     void givenAnUnknownPurpose_whenReadingTheIcon_thenTheTypedRefusalNamesThePurpose() throws Exception {
         // when / then
         mockMvc.perform(get("/api/public/config/icon?size=192&purpose=monochrome"))
