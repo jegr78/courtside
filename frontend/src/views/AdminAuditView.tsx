@@ -188,8 +188,8 @@ export function AdminAuditView() {
           <label className="grid gap-1 font-medium">{t("audit.filter.query")}
             <input data-testid="audit-filter-query" className="form-control rounded-lg border px-3 py-2" value={query} maxLength={60} onChange={(event) => setQuery(event.target.value)} />
           </label>
-          <label className="grid gap-1 font-medium">{t("audit.filter.eventType")}
-            <select data-testid="audit-filter-event-type" className="form-control rounded-lg border px-3 py-2" value={eventType} onChange={(event) => setEventType(event.target.value)}>
+          <label className="grid min-w-0 gap-1 font-medium">{t("audit.filter.eventType")}
+            <select data-testid="audit-filter-event-type" className="form-control w-full min-w-0 rounded-lg border px-3 py-2" value={eventType} onChange={(event) => setEventType(event.target.value)}>
               <option value="">{t("audit.filter.anyEventType")}</option>
               {eventTypeChoices(i18n.getResourceBundle(language, "translation") as Record<string, unknown> | undefined, language, t).map((choice) => <option key={choice.eventType} value={choice.eventType}>{choice.label}</option>)}
             </select>
