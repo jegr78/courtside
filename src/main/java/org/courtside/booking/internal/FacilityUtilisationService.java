@@ -26,6 +26,10 @@ import java.util.stream.Collectors;
 public class FacilityUtilisationService {
 
     private final CourtAllocationRepository allocations;
+    // PostgreSQL reads a timestamp literal only within these years, and the period's edges may leave them in UTC.
+    private static final Instant EARLIEST_LITERAL = Instant.parse("0001-01-01T00:00:00Z");
+    private static final Instant LATEST_LITERAL = Instant.parse("9999-12-31T23:59:59.999999Z");
+
     private final FacilityService facility;
     private final ClubTimeZone clubTimeZone;
     private final Clock clock;
@@ -67,8 +71,19 @@ public class FacilityUtilisationService {
 
     private static String multirange(List<OpenInterval> intervals) {
         return intervals.stream()
+                .map(interval -> new OpenInterval(latest(interval.opensAt(), EARLIEST_LITERAL),
+                        earliest(interval.closesAt(), LATEST_LITERAL)))
+                .filter(interval -> interval.closesAt().isAfter(interval.opensAt()))
                 .map(interval -> "[" + interval.opensAt() + "," + interval.closesAt() + ")")
                 .collect(Collectors.joining(",", "{", "}"));
+    }
+
+    private static Instant latest(Instant first, Instant second) {
+        return first.isAfter(second) ? first : second;
+    }
+
+    private static Instant earliest(Instant first, Instant second) {
+        return first.isBefore(second) ? first : second;
     }
 
     private static CourtUtilisation toCourtUtilisation(CourtUtilisationRow row, long openMinutes) {

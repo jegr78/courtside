@@ -171,6 +171,24 @@ class FacilityUtilisationControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAWindowOnTheFirstAcceptedDayThatStartsBeforeYearOneInUtc_whenReportingIt_thenItIsCounted()
+            throws Exception {
+        // given
+        openEveryDay(LocalTime.MIDNIGHT, LocalTime.of(0, 30));
+        UUID court = facility.createCourt(1, "Centre");
+        insertAllocation(court, "0001-01-05T10:00:00Z", "0001-01-05T11:00:00Z", "CONFIRMED");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/reports/facility-utilisation")
+                        .param("from", "0001-01-01")
+                        .param("to", "0001-01-10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.openMinutes").value(300))
+                .andExpect(jsonPath("$.courts[0].occupiedMinutes").value(60))
+                .andExpect(jsonPath("$.courts[0].occupiedOpenMinutes").value(0));
+    }
+
+    @Test
     void givenNoOpeningHours_whenReportingABookedPeriod_thenOccupancyIsNullRatherThanADivisionByZero()
             throws Exception {
         // given
