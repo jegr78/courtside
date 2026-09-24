@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { Role } from "../../api/client";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
+import { ColorInput } from "../../components/ColorInput";
 import { ContrastReading } from "../../components/ContrastReading";
 import { cardContrast } from "../cardColors";
 
@@ -75,28 +76,13 @@ export function PlayerCounts({ counts, disabled, changed, idPrefix }: { counts: 
 export const DEFAULT_CARD_COLOR = "#b85c38";
 
 export function CardColorField({ value, disabled, changed, name, testId }: { value: string; disabled?: boolean; changed: (color: string) => void; name?: string; testId: string }) {
-  const contrast = cardContrast(value);
-  return <div className="grid content-start gap-2">
-    <ColorField testId={testId} name={name} disabled={disabled} value={value} changed={changed} />
-    {contrast && <ContrastReading contrast={contrast} testId={`${testId}-contrast`} />}
-  </div>;
-}
-
-function ColorField({ value, disabled, changed, name, testId }: { value: string; disabled?: boolean; changed: (color: string) => void; name?: string; testId: string }) {
   const { t } = useTranslation();
-  return <TextField
-    className="cursor-pointer"
-    // A padding class would compete with the field's own, and Tailwind decides that by
-    // the order it emitted the utilities in rather than the order they are written in.
-    style={{ height: "3rem", width: "6rem", padding: "0.25rem" }}
-    data-testid={testId}
-    name={name}
-    type="color"
-    disabled={disabled}
-    label={t("admin.facility.color")}
-    value={value}
-    onChange={(event) => changed(event.target.value)}
-  />;
+  const contrast = cardContrast(value);
+  return <fieldset className="grid content-start gap-2">
+    <legend className="font-medium">{t("admin.facility.color")}</legend>
+    <ColorInput id={testId} valueTestId={`${testId}-value`} pickerTestId={testId} name={name} disabled={disabled} value={value} changed={changed} />
+    {contrast && <ContrastReading contrast={contrast} testId={`${testId}-contrast`} />}
+  </fieldset>;
 }
 
 export function BookingRules({ children }: { children: ReactNode }) {

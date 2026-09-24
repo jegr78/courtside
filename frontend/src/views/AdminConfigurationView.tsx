@@ -29,6 +29,7 @@ import { describedByMark } from "../unsaved/markId";
 import { UnsavedMark } from "../unsaved/UnsavedMark";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
 import { brandContrast } from "../brandColor";
+import { ColorInput } from "../components/ColorInput";
 
 const RULE_SET_NAME_LENGTH = 60;
 const MAX_LOGO_BYTES = 1024 * 1024;
@@ -44,16 +45,7 @@ function BrandColorField({ kind, label, value, changed }: {
   const id = `${kind}-color`;
   return <fieldset className="min-w-0 grid gap-3 rounded-xl border p-4">
     <legend className="px-1 font-semibold">{label}</legend>
-    <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-end gap-3">
-      <TextField id={`${id}-value`} data-testid={`${id}-value`} label={t("admin.config.colorHex")} value={value}
-                 onChange={(event) => changed(event.target.value)} />
-      <label className="grid gap-2 text-sm font-medium" htmlFor={`${id}-picker`}>
-        {t("admin.config.colorPicker")}
-        <input id={`${id}-picker`} data-testid={`${id}-picker`} type="color" value={contrast ? value : "#000000"}
-               className="form-control h-12 w-full cursor-pointer rounded-lg border p-1"
-               onChange={(event) => changed(event.target.value)} />
-      </label>
-    </div>
+    <ColorInput id={id} valueTestId={`${id}-value`} pickerTestId={`${id}-picker`} value={value} changed={changed} />
     {contrast && <>
       <button type="button" disabled data-testid={`${id}-preview`} className="rounded-lg px-4 py-3 font-semibold opacity-100"
               style={{ backgroundColor: value, color: contrast.textColor }}>

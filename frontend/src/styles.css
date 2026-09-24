@@ -88,6 +88,84 @@ input[type="time"] {
 }
 
 @layer components {
+  input[type="checkbox"],
+  input[type="radio"] {
+    appearance: none;
+    display: inline-grid;
+    flex: none;
+    place-content: center;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0;
+    border: 2px solid var(--cs-border);
+    background: var(--cs-input);
+    cursor: pointer;
+  }
+
+  input[type="checkbox"] {
+    border-radius: 0.25rem;
+  }
+
+  input[type="radio"] {
+    border-radius: 9999px;
+  }
+
+  input[type="checkbox"]::before,
+  input[type="radio"]::before {
+    content: "";
+    width: 0.625rem;
+    height: 0.625rem;
+    background: var(--club-primary-text);
+    transform: scale(0);
+  }
+
+  input[type="checkbox"]::before {
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+  }
+
+  input[type="radio"]::before {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+  }
+
+  input:is([type="checkbox"], [type="radio"]):checked {
+    border-color: var(--club-primary);
+    background: var(--club-primary);
+  }
+
+  input:is([type="checkbox"], [type="radio"]):checked::before {
+    transform: scale(1);
+  }
+
+  input:is([type="checkbox"], [type="radio"]):focus-visible {
+    outline: 2px solid var(--cs-focus);
+    outline-offset: 2px;
+  }
+
+  input:is([type="checkbox"], [type="radio"]):disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  input[type="file"]::file-selector-button {
+    margin-inline-end: 0.75rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--cs-border);
+    border-radius: 0.5rem;
+    color: var(--cs-text);
+    background: var(--cs-raised);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  @media (forced-colors: active) {
+    input:is([type="checkbox"], [type="radio"]) {
+      appearance: auto;
+    }
+  }
+
   .surface-panel {
     color: var(--cs-text);
     background: var(--cs-panel);

@@ -918,6 +918,70 @@ test("a deactivate button rests quietly yet stays distinguishable from a seconda
   await page.getByTestId("unsaved-changes-stay").click();
 });
 
+test("a checkbox, the setup progress and the file picker take their colours from the palette in both appearances", async ({ page }) => {
+  // given
+  await page.goto("/login");
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+  await page.getByTestId("administration-link").click();
+
+  for (const appearance of ["dark", "light"] as const) {
+    if (appearance === "light") await selectPreference(page, "#theme-preference", appearance);
+    const tokens = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      document.body.append(probe);
+      const read = (value: string) => {
+        probe.style.color = value;
+        return getComputedStyle(probe).color;
+      };
+      const colours = {
+        primary: read("var(--club-primary)"), primaryText: read("var(--club-primary-text)"), border: read("var(--cs-border)"),
+        input: read("var(--cs-input)"), raised: read("var(--cs-raised)"), text: read("var(--cs-text)")
+      };
+      probe.remove();
+      return colours;
+    });
+
+    // when
+    await page.getByTestId("admin-setup-link").click();
+
+    // then
+    await expect(page.getByTestId("setup-progress-bar"), `${appearance}: the track is a raised surface`).toHaveCSS("background-color", tokens.raised);
+    await expect(page.getByTestId("setup-progress-fill"), `${appearance}: the progress is the club's action colour`).toHaveCSS("background-color", tokens.primary);
+
+    // when
+    await page.getByTestId("admin-messages-link").click();
+    const filter = page.getByRole("checkbox").and(page.getByTestId("messages-unsettled-filter"));
+    await expect(filter).not.toBeChecked();
+
+    // then
+    await expect(filter, `${appearance}: an empty box is drawn with the control border`).toHaveCSS("border-top-color", tokens.border);
+    await expect(filter, `${appearance}: on the input surface`).toHaveCSS("background-color", tokens.input);
+    await filter.focus();
+    await page.keyboard.press("Space");
+    await expect(filter, "the keyboard still toggles the native control").toBeChecked();
+    await expect(filter, `${appearance}: a checked box is filled with the club's action colour`).toHaveCSS("background-color", tokens.primary);
+    expect(await filter.evaluate((element) => getComputedStyle(element, "::before").backgroundColor),
+      `${appearance}: the check mark takes the action text colour`).toBe(tokens.primaryText);
+    await page.keyboard.press("Space");
+    await expect(filter).not.toBeChecked();
+
+    // when
+    await page.getByTestId("admin-configuration-link").click();
+    const logo = page.getByTestId("logo-file");
+    await expect(logo).toBeVisible();
+
+    // then
+    const trigger = await logo.evaluate((element) => {
+      const style = getComputedStyle(element, "::file-selector-button");
+      return { background: style.backgroundColor, color: style.color, border: style.borderTopColor };
+    });
+    expect(trigger, `${appearance}: the file trigger reads as a secondary button`)
+      .toEqual({ background: tokens.raised, color: tokens.text, border: tokens.border });
+  }
+});
+
 test("an admin adds a person, gives them an account, and that person signs in and books", async ({ page, journeyService }) => {
   // given
   await page.goto("/login");
