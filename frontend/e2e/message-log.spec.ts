@@ -40,6 +40,30 @@ async function lastMessageOnThePerson(page: import("@playwright/test").Page, exp
   }, { timeout: 20_000 }).toBe(expected);
 }
 
+test("a board whose log could not be read tries again and reads it without reloading", async ({ page }) => {
+  // given
+  await signInAsAdministrator(page);
+  let reads = 0;
+  await page.route("**/api/admin/messages?**", async (route) => {
+    reads += 1;
+    if (reads > 1) return route.continue();
+    await route.fulfill({
+      status: 503, contentType: "application/problem+json",
+      body: JSON.stringify({ type: "urn:courtside:error:internal-error", title: "Internal error", status: 503 })
+    });
+  });
+  await page.getByTestId("admin-messages-link").click();
+  await expect(page.getByTestId("load-failure")).toBeVisible();
+
+  // when
+  await page.getByTestId("retry-load").click();
+
+  // then
+  await expect(page.getByTestId("messages-empty").or(page.getByTestId("message-row").first())).toBeVisible();
+  await expect(page.getByTestId("load-failure")).toHaveCount(0);
+  expect(reads, "the retry asked the server again").toBe(2);
+});
+
 test("a board mistypes an address, the log shows the refusal, and the correction is sent", async ({ page, journeyService }) => {
   // given
   await signInAsAdministrator(page);

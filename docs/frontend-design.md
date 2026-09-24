@@ -29,6 +29,9 @@ a warning and a success need colours the court palette does not carry. A notice 
 Error announces itself as an alert; warning, info and success announce themselves as a status,
 because nothing failed.
 
+A page whose first read failed shows the error notice with a secondary control that repeats that
+read. A refused action gets no such control, because its own button already repeats it.
+
 Club configuration controls the logo, name, primary action colour and focus accent. Club colours
 must not replace free, own, occupied or closed court states. Action text is selected for contrast
 against the configured primary colour.
