@@ -209,16 +209,39 @@ test("given an incomplete harness or missing execution, when building its record
   assert.equal(environment.outcome.status, "incomplete");
 });
 
-test("given Docker is unavailable, when checking the environment, then the attempt is classified before playwright starts", async () => {
+test("given Docker completes after the former inner boundary, when checking the environment, then it may finish", async (context) => {
   // given
-  const unavailable = () => ({ status: 1, error: undefined });
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const completesAfterFormerBoundary = (...invocation) => {
+    assert.equal(invocation.length, 3);
+    return new Promise((resolveExecution) => setTimeout(() => resolveExecution({ exitCode: 0 }), 10_001));
+  };
 
   // when
-  const result = await environmentPrerequisites(unavailable, true);
+  const pending = environmentPrerequisites(completesAfterFormerBoundary, true);
+  context.mock.timers.tick(10_001);
+  const result = await pending;
 
   // then
-  assert.equal(result.isReady, false);
-  assert.equal(result.classification, "environment");
+  assert.deepEqual(result, { isReady: true });
+});
+
+test("given Docker cannot complete its prerequisite, when checking the environment, then the failure is explicit", async () => {
+  // given
+  const failures = [
+    { exitCode: 1, timedOut: false, launchError: false },
+    { exitCode: null, timedOut: false, launchError: true },
+    { exitCode: null, timedOut: true, launchError: false }
+  ];
+
+  // when
+  const results = await Promise.all(failures.map((failure) => environmentPrerequisites(() => failure, true)));
+  const missingPlaywright = await environmentPrerequisites(() => failures[0], false);
+
+  // then
+  for (const result of [...results, missingPlaywright]) {
+    assert.deepEqual(result, { isReady: false, classification: "environment" });
+  }
 });
 
 test("given a child ignores the graceful signal, when its deadline expires, then the owned process is killed", async () => {

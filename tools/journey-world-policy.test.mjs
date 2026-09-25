@@ -8,6 +8,8 @@ const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta
 const playwright = readFileSync(new URL("../frontend/playwright.config.ts", import.meta.url), "utf8");
 const pwaLifecycle = readFileSync(new URL("../frontend/e2e/pwa-lifecycle.spec.ts", import.meta.url), "utf8");
 const processCommand = readFileSync(new URL("../frontend/e2e/process-command.ts", import.meta.url), "utf8");
+const webkitReliability = readFileSync(new URL("./webkit-reliability.mjs", import.meta.url), "utf8");
+const resourceObservation = readFileSync(new URL("./browser-resource-observation.mjs", import.meta.url), "utf8");
 const bookingReminders = readFileSync(new URL(
   "../src/main/java/org/courtside/booking/internal/BookingReminders.java", import.meta.url), "utf8");
 const bookingReminderSchedule = readFileSync(new URL(
@@ -44,11 +46,22 @@ test("given several browser projects, when Playwright runs them, then one global
 test("given release-critical journey commands, when the runner is slow, then only the outer gate owns their deadline", () => {
   const serviceWorkerHandshake = pwaLifecycle.slice(
     pwaLifecycle.indexOf("const workerVersion"), pwaLifecycle.indexOf("expect(workerVersion)"));
+  const dockerPrerequisite = webkitReliability.slice(
+    webkitReliability.indexOf("export async function environmentPrerequisites"),
+    webkitReliability.indexOf("async function runAttempt"));
 
   // when / then
   assert.doesNotMatch(setup, /executeFile/);
   assert.doesNotMatch(processCommand, /\btimeout\b/);
   assert.doesNotMatch(serviceWorkerHandshake, /setTimeout/);
+  assert.match(dockerPrerequisite, /execute = runProcessToCompletion/);
+  assert.doesNotMatch(dockerPrerequisite, /deadlineMs|terminationGraceMs/);
+  assert.doesNotMatch(resourceObservation, /intervalMs\s*\*\s*\d/);
+});
+
+test("given a reliability browser starts, when its tests run, then resource evidence begins at its lifecycle boundary", () => {
+  assert.match(setup, /browserLifecycle\.start\([^;]+;[\s\S]{0,300}await captureResourceBoundary\(\)/);
+  assert.match(setup, /await captureResourceBoundary\(\);[\s\S]{0,500}browserLifecycle\.finish\(/);
 });
 
 test("given Playwright starts browsers in a container, when its package changes, then the image uses the same release", () => {

@@ -147,7 +147,7 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
   });
 
-  test(`${locale} facility and audit administration meet automated WCAG 2.2 AA checks`, async ({ page }) => {
+  test(`${locale} court and opening-hours administration meet automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");
     await selectPreference(page, "#locale-preference", locale);
@@ -175,18 +175,19 @@ for (const locale of ["de", "en"]) {
       await expect(page.getByTestId("court-editor")).toHaveCount(0);
     }
 
-    // when — the audit entry the last stage reads is written here, on the page that owns the court
-    const courtToggled = page.waitForResponse((response) =>
-      response.url().endsWith("/api/admin/courts/dddddddd-0000-0000-0000-000000000002/active")
-        && response.request().method() === "PUT"
-    );
-    await page.getByTestId("toggle-court-dddddddd-0000-0000-0000-000000000002").click();
-    await courtToggled;
+    // when
     await page.goto("/admin/facility/opening-hours");
     await expect(page.getByTestId("save-opening-hours")).toBeVisible();
 
     // then
     await expectNoWcagViolations(page);
+  });
+
+  test(`${locale} card administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await selectPreference(page, "#locale-preference", locale);
+    await signIn(page, "configuration-admin");
 
     // when
     await page.goto("/admin/facility/booking-cards");
@@ -208,6 +209,21 @@ for (const locale of ["de", "en"]) {
 
     // then
     await expectNoWcagViolations(page);
+  });
+
+  test(`${locale} audit administration meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await selectPreference(page, "#locale-preference", locale);
+    await signIn(page, "configuration-admin");
+    await page.goto("/admin/facility/courts");
+    await expect(page.getByTestId("admin-courts-view")).toBeVisible();
+    const courtToggled = page.waitForResponse((response) =>
+      response.url().endsWith("/api/admin/courts/dddddddd-0000-0000-0000-000000000002/active")
+        && response.request().method() === "PUT"
+    );
+    await page.getByTestId("toggle-court-dddddddd-0000-0000-0000-000000000002").click();
+    await courtToggled;
 
     // when
     await page.goto("/admin/audit");
@@ -217,7 +233,7 @@ for (const locale of ["de", "en"]) {
     // then
     await expectNoWcagViolations(page);
 
-    // when — an unavailable collector is a first-class operational state, not a broken page
+    // when
     await page.goto("/admin/operational-logs");
     await expect(page.getByTestId("admin-operational-logs-view")).toBeVisible();
     await expect(page.getByTestId("operational-logs-unavailable")).toBeVisible();

@@ -482,10 +482,15 @@ export async function runBoundedProcess(command, args, options, limits = {}) {
   return { ...await completion, timedOut: true };
 }
 
-export async function environmentPrerequisites(execute = runBoundedProcess, cliAvailable = true) {
+async function runProcessToCompletion(command, args, options) {
+  const child = spawn(command, args, { ...options, shell: false });
+  return await completionOf(child);
+}
+
+export async function environmentPrerequisites(execute = runProcessToCompletion, cliAvailable = true) {
   if (!cliAvailable) return { isReady: false, classification: "environment" };
   const docker = await execute("docker", ["info", "--format", "{{.ServerVersion}}"],
-    { cwd: root, env: process.env, stdio: "ignore" }, { deadlineMs: 10_000, terminationGraceMs: 1_000 });
+    { cwd: root, env: process.env, stdio: "ignore" });
   return docker.exitCode === 0 && docker.timedOut !== true && docker.launchError !== true
     ? { isReady: true }
     : { isReady: false, classification: "environment" };
