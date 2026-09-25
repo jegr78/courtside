@@ -224,6 +224,20 @@ class InstalledAppTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAShortNameOfUnicodeSpaces_whenChangingTheConfig_thenTheFieldIsRefusedLikeABlankOne() throws Exception {
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("\"\u2003\u3000\""))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:validation-failed"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("shortName"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Pattern"));
+    }
+
+    @Test
     void givenNoUploadedLogo_whenReadingTheIcon_thenItIsTheCourtsideMarkAtTheRequestedSize()
             throws Exception {
         // when
