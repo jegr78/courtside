@@ -429,6 +429,9 @@ test("stored text projections remain inert on administrative and managed views",
   await page.goto("/admin/rule-sets");
   await expect(page.getByTestId("rule-set-choose-aaaaaaaa-0000-0000-0000-000000000001")).toHaveText(payload);
   await expect(page.getByTestId("no-membership-type-rule-set").locator('option[value="aaaaaaaa-0000-0000-0000-000000000001"]')).toHaveText(payload);
+  await expect(page.getByTestId("rule-set-applies-aaaaaaaa-0000-0000-0000-000000000001")).toHaveText(payload);
+  await page.getByTestId("rule-set-choose-aaaaaaaa-0000-0000-0000-000000000001").click();
+  await expect(page.getByTestId("rule-set-retire-note")).toContainText(payload);
   await page.goto("/admin/facility/booking-cards");
   await expect(page.getByTestId("card-link-33333333-3333-3333-3333-333333333333")).toHaveText(payload);
   await page.getByTestId("card-link-33333333-3333-3333-3333-333333333333").click();
