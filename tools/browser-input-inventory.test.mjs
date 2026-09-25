@@ -48,6 +48,11 @@ const BOUNDARIES = {
     classification: "resolved against the shipped locales, and dropped when it names none",
     test: "src/i18n.test.ts#given a stored language this build does not ship, when the language is read, then the default is used"
   },
+  "src/navigation/lazySurface.tsx location": {
+    value: "no external value",
+    classification: "reloads the document when a chunk failed to arrive, and reads nothing off the location",
+    test: "src/navigation/lazySurface.test.tsx#given a surface whose chunk a newer deployment replaced, when it is rendered, then a reload is offered"
+  },
   "src/navigation/useFragmentTarget.ts useLocation": {
     value: "the fragment the address carries",
     classification: "compared with one known target id, and moves the focus nowhere else",

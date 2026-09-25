@@ -1,13 +1,25 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../i18n";
 import { lazySurface } from "./lazySurface";
 
+const reload = vi.fn();
+const realLocation = window.location;
+
 describe("lazySurface", () => {
   beforeEach(async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: Object.assign(new URL(realLocation.href), { reload })
+    });
+    reload.mockReset();
     await i18n.changeLanguage("de");
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "location", { configurable: true, value: realLocation });
   });
 
   it("given a surface that arrives, when it is rendered, then it replaces the waiting state", async () => {
@@ -26,9 +38,8 @@ describe("lazySurface", () => {
 
   it("given a surface whose chunk a newer deployment replaced, when it is rendered, then a reload is offered", async () => {
     // given
-    const reload = vi.fn();
     const Surface = lazySurface<object>(
-      () => Promise.reject(new TypeError("Failed to fetch dynamically imported module")), reload);
+      () => Promise.reject(new TypeError("Failed to fetch dynamically imported module")));
     render(<Suspense fallback={<p role="status" />}><Surface /></Suspense>);
 
     // when

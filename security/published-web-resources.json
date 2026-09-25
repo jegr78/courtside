@@ -11,7 +11,7 @@
       "id": "application-script",
       "pattern": "^assets/[A-Za-z0-9._-]+\\.js$",
       "class": "script",
-      "purpose": "The bundled application and the helper that registers the service worker."
+      "purpose": "The bundled member surface, the chunks it loads on demand for administration and further languages, and the helper that registers the service worker."
     },
     {
       "id": "application-stylesheet",
