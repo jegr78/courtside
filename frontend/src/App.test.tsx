@@ -919,6 +919,23 @@ describe("App build identity", () => {
       .toHaveAttribute("content", "Example Tennis Club");
   });
 
+  it("given a name for the installed app, when the club arrives, then the home-screen title takes it over the full club name", async () => {
+    // given
+    document.head.querySelectorAll('meta[name="apple-mobile-web-app-title"]').forEach((meta) => meta.remove());
+    document.head.insertAdjacentHTML("beforeend", '<meta name="apple-mobile-web-app-title" content="Courtside" />');
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({ ...club, installedAppName: "Example TC" });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<RoutedShell><App /></RoutedShell>);
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club"));
+    expect(document.head.querySelector('meta[name="apple-mobile-web-app-title"]'))
+      .toHaveAttribute("content", "Example TC");
+  });
+
   it("given a board saving a new primary colour, when the configuration page reports it, then the status bar follows without a release", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue({

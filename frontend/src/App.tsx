@@ -125,7 +125,7 @@ function applyBranding(config: ClubConfig) {
   document.documentElement.style.setProperty("--club-accent", config.accentColor);
   applyTabIcon(config.logoUrl ?? "/icon.svg");
   applyMeta("theme-color", config.primaryColor);
-  applyMeta("apple-mobile-web-app-title", config.clubName);
+  applyMeta("apple-mobile-web-app-title", config.installedAppName ?? config.clubName);
 }
 
 function applyMeta(name: string, content: string) {

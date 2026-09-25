@@ -128,6 +128,9 @@ class InstalledAppTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Example Tennis Club"))
                 .andExpect(jsonPath("$.short_name").value("Example"));
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.installedAppName").value("Example"));
     }
 
     @Test
@@ -161,6 +164,10 @@ class InstalledAppTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/admin/config"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.shortName").value("ETC Example"));
+        mockMvc.perform(get("/api/public/config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.installedAppName").value("ETC Example"))
+                .andExpect(jsonPath("$.shortName").doesNotExist());
     }
 
     @Test

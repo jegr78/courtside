@@ -139,7 +139,8 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 .logoUrl(configuration.logoUrl())
                 .imprintUrl(configuration.imprintUrl())
                 .privacyUrl(configuration.privacyUrl())
-                .documentationUrl(configuration.documentationUrl());
+                .documentationUrl(configuration.documentationUrl())
+                .installedAppName(configuration.effectiveShortName());
     }
 
     private ApiAdminClubConfig toAdminResponse(ClubConfigurationSnapshot configuration) {
@@ -155,6 +156,7 @@ class ConfigController implements ClubConfigApi, AdminConfigApi, ManifestApi {
                 configuration.bookingReminderHours())
                 .logoUrl(configuration.logoUrl())
                 .logoFallbackUrl(configuration.logoFallbackUrl())
+                .installedAppName(configuration.effectiveShortName())
                 .imprintUrl(configuration.imprintUrl())
                 .privacyUrl(configuration.privacyUrl())
                 .documentationUrl(configuration.documentationUrl())

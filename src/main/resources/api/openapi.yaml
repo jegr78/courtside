@@ -489,6 +489,13 @@ components:
                  timeZone]
       properties:
         clubName: { type: string }
+        installedAppName:
+          type: string
+          minLength: 1
+          maxLength: 12
+          description: |
+            The name an installed Courtside shows under its icon, the same as the manifest's
+            `short_name`: the club's own short name, or one derived from the club name when it set none.
         primaryColor: { type: string }
         accentColor: { type: string }
         logoUrl:
