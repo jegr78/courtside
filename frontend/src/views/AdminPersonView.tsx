@@ -297,11 +297,14 @@ export function AdminPersonView() {
           membership={draft.membership ?? storedMembership(entry)}
           changed={(membership) => edit({ membership })}
           end={async (endedOn) => {
-            const current = draft.membership ?? storedMembership(entry);
+            const stored = storedMembership(entry);
             const ended = await mutate(() => api.assignMembership(personId, {
-              membershipTypeId: current.membershipTypeId, startedOn: current.startedOn || null, endedOn
+              membershipTypeId: stored.membershipTypeId, startedOn: stored.startedOn || null, endedOn
             }));
-            if (ended) settle("membership");
+            // Ending writes the end alone, so an unsaved type or start stays in the bar with the new end.
+            if (ended) setDraft((current) => current.membership
+              ? { ...current, membership: { ...current.membership, endedOn: ended.membershipEndedOn ?? "" } }
+              : current);
             return ended;
           }}
         />
@@ -314,6 +317,7 @@ export function AdminPersonView() {
             locale={draft.locale ?? storedLocale}
             chosenRoles={draft.roles ?? entry.roles}
             changed={edit}
+            addressUnsaved={draft.person !== undefined && (draft.person.email ?? null) !== (entry.email ?? null)}
             sendCredentials={() => mutate(() => api.requestAccountCredentials(personId), "admin.person.credentialsSent")}
             toggleAccount={() => mutate(() => api.setAccountActive(personId, !entry.enabled))}
             endSessions={() => runSecurityAction(() => api.endAccountSessions(personId), "admin.person.sessionsEnded")}
@@ -399,8 +403,9 @@ function MembershipSection({ entry, types, disabled, membership, changed, end }:
   </section>;
 }
 
-function AccountSection({ entry, disabled, supportedLocales, username, locale, chosenRoles, changed, sendCredentials, toggleAccount, endSessions, endAllSessions }: {
+function AccountSection({ entry, disabled, supportedLocales, username, locale, chosenRoles, changed, addressUnsaved, sendCredentials, toggleAccount, endSessions, endAllSessions }: {
   entry: RosterEntry;
+  addressUnsaved: boolean;
   disabled: boolean;
   supportedLocales: ClubConfig["supportedLocales"];
   username: string;
@@ -448,7 +453,10 @@ function AccountSection({ entry, disabled, supportedLocales, username, locale, c
       </p>
       <CredentialDestination entry={entry} />
       <LastMessage entry={entry} />
-      <Button variant="secondary" data-testid="send-credentials" disabled={disabled || !entry.enabled} className="justify-self-start" type="button" onClick={send}>{t("admin.person.sendCredentials")}</Button>
+      {addressUnsaved && <p id="send-credentials-waits" data-testid="send-credentials-waits" className="text-muted text-sm">{t("admin.person.credentialsWaitForAddress")}</p>}
+      <Button variant="secondary" data-testid="send-credentials" disabled={disabled || !entry.enabled || addressUnsaved}
+              aria-describedby={addressUnsaved ? "send-credentials-waits" : undefined}
+              className="justify-self-start" type="button" onClick={send}>{t("admin.person.sendCredentials")}</Button>
     </div>
     <Button variant={entry.enabled ? "destructive" : "primary"} data-testid="toggle-account" disabled={disabled} className="justify-self-start" type="button" onClick={() => void toggleAccount()}>{t(entry.enabled ? "admin.deactivate" : "admin.activate")}</Button>
     <div className="flex flex-wrap gap-3">

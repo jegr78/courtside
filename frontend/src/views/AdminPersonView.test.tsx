@@ -572,6 +572,43 @@ describe("AdminPersonView", () => {
     });
   });
 
+  it("given an unsaved membership type, when the membership is ended, then only the end is written and the type stays in the bar", async () => {
+    // given
+    const assigning = vi.spyOn(api, "assignMembership").mockResolvedValue({ ...jane, membershipEndedOn: "2026-03-31" });
+    showPerson();
+    await screen.findByTestId("end-membership");
+    await userEvent.selectOptions(screen.getByTestId("membership-type"), "type-2");
+
+    // when
+    await userEvent.click(screen.getByTestId("end-membership"));
+    await userEvent.clear(screen.getByTestId("end-membership-date"));
+    await userEvent.type(screen.getByTestId("end-membership-date"), "2026-03-31");
+    await userEvent.click(screen.getByTestId("confirm-end-membership"));
+
+    // then
+    await waitFor(() => expect(assigning).toHaveBeenCalledWith("person-1", {
+      membershipTypeId: "type-1", startedOn: "2026-01-01", endedOn: "2026-03-31"
+    }));
+    expect(screen.getByTestId("membership-type"), "the unsaved type is still what the form shows").toHaveValue("type-2");
+    expect(screen.getByTestId("membership-ended-on"), "the end just written is not offered back as a change").toHaveValue("2026-03-31");
+    expect(screen.getByTestId("save-person"), "the type edit still waits for the page save").toBeInTheDocument();
+  });
+
+  it("given an unsaved address, when credentials could be sent, then sending waits for the address to be saved", async () => {
+    // given
+    showPerson();
+    await screen.findByTestId("send-credentials");
+    expect(screen.getByTestId("send-credentials")).toBeEnabled();
+
+    // when
+    await userEvent.clear(screen.getByTestId("person-email"));
+    await userEvent.type(screen.getByTestId("person-email"), "mary.major@example.org");
+
+    // then
+    expect(screen.getByTestId("send-credentials"), "credentials go to the stored address only").toBeDisabled();
+    expect(screen.getByTestId("send-credentials")).toHaveAccessibleDescription("Save the changed email address before sending credentials.");
+  });
+
   it("given an ended membership, when correcting its end date, then it is written and not re-ended", async () => {
     // given
     const ended = { ...jane, membershipEndedOn: "2026-03-31" };

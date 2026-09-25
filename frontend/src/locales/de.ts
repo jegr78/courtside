@@ -227,6 +227,7 @@ const de = {
   "admin.person.title": "Person",
   "admin.person.person": "Person",
   "admin.person.membership": "Mitgliedschaft",
+  "admin.person.credentialsWaitForAddress": "Speichere die geänderte E-Mail-Adresse, bevor du Zugangsdaten sendest.",
   "admin.person.membershipNeedsType": "Wähle eine Mitgliedsart, bevor du die Mitgliedschaft speicherst.",
   "admin.person.accountLocale": "Sprache der Benachrichtigungen",
   "admin.person.account": "Konto",
