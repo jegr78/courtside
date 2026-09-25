@@ -397,11 +397,11 @@ describe("AdminConfigurationView", () => {
     await screen.findByTestId("logo-file");
 
     // then
-    expect(screen.getByTestId("club-logo").className, "a browser's file control truncates its text in a shared column")
+    expect(screen.getByTestId("logo-fieldset").className, "a browser's file control truncates its text in a shared column")
       .not.toMatch(/grid-cols/);
-    expect(screen.getByTestId("club-logo-actions")).toContainElement(screen.getByTestId("logo-url"));
-    expect(screen.getByTestId("club-logo-actions")).toContainElement(screen.getByTestId("upload-logo"));
-    expect(screen.getByTestId("club-logo-actions")).not.toContainElement(screen.getByTestId("logo-file"));
+    expect(screen.getByTestId("logo-actions")).toContainElement(screen.getByTestId("logo-url"));
+    expect(screen.getByTestId("logo-actions")).toContainElement(screen.getByTestId("upload-logo"));
+    expect(screen.getByTestId("logo-actions")).not.toContainElement(screen.getByTestId("logo-file"));
   });
 
   it("given the time-grid fragment, when configuration loads, then the owned setting receives focus", async () => {

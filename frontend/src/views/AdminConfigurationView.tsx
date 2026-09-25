@@ -195,7 +195,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
             <div data-testid="club-appearance" className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 lg:col-span-2">
               <BrandColorField kind="primary" label={t("admin.config.primaryColor")} value={config.primaryColor} changed={(primaryColor) => changeConfig({ primaryColor })} />
               <BrandColorField kind="accent" label={t("admin.config.accentColor")} value={config.accentColor} changed={(accentColor) => changeConfig({ accentColor })} />
-              <fieldset data-testid="club-logo" className="min-w-0 grid gap-2 rounded-xl border p-4 sm:col-span-2">
+              <fieldset data-testid="logo-fieldset" className="min-w-0 grid gap-2 rounded-xl border p-4 sm:col-span-2">
                 <legend className="px-1 font-semibold">{t("admin.config.logo")}</legend>
                 {logo?.url && <img data-testid="logo-preview" src={logo.url} alt={t("admin.config.logoPreview")}
                                   className="max-h-16 max-w-48 object-contain" />}
@@ -206,7 +206,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
                          className="form-control min-w-0 w-full rounded-lg border px-3 py-2" />
                 </label>
                 <p className="text-muted text-sm">{t("admin.config.logoHelp")}</p>
-                <div data-testid="club-logo-actions" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <div data-testid="logo-actions" className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                   <TextField data-testid="logo-url" label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""}
                              onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
                   <div className="flex flex-wrap gap-3">
