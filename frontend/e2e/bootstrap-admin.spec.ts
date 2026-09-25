@@ -525,32 +525,33 @@ test("an admin changes club configuration and a booking rule through the browser
   const offered = await withoutMembershipType.locator("option").nth(1).getAttribute("value");
   expect(offered).toBeTruthy();
   await withoutMembershipType.selectOption(offered);
+  // The editor opens on whichever rule set sorts first, so the one this member is measured by is
+  // chosen rather than assumed: its own seeded window is what says the switch has landed.
+  await page.getByTestId(`rule-set-choose-${STANDARD_RULE_SET}`).click();
+  await expect(page.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue("7");
+  await expect(withoutMembershipType, "the fallback belongs to no set, so switching keeps it").toHaveValue(offered);
+  await page.getByTestId("rule-ADVANCE_WINDOW-maxDays").fill("1");
   const fallbackSaved = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/config") && response.request().method() === "PUT"
   );
-  await page.getByTestId("save-no-membership-type-rule-set").click();
+  const ruleSaved = page.waitForResponse((response) =>
+    response.url().includes("/api/admin/rule-sets/")
+      && response.url().endsWith("/rules/ADVANCE_WINDOW")
+      && response.request().method() === "PUT"
+  );
+  await page.getByTestId("save-booking-rules").click();
+  expect((await ruleSaved).status()).toBe(200);
   const fallback = await (await fallbackSaved).json() as {
     clubName: string; newAccountCredentialHours: number; noMembershipTypeRuleSetId: string;
   };
   expect(fallback.noMembershipTypeRuleSetId).toBe(offered);
   expect(fallback.clubName).toBe("Example Racquet Club");
   expect(fallback.newAccountCredentialHours).toBe(72);
-  await expect(page.getByTestId(`rule-set-applies-${offered}`)).toBeVisible();
-  // The editor opens on whichever rule set sorts first, so the one this member is measured by is
-  // chosen rather than assumed: its own seeded window is what says the switch has landed.
-  await page.getByTestId(`rule-set-choose-${STANDARD_RULE_SET}`).click();
-  await expect(page.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue("7");
-  await page.getByTestId("rule-ADVANCE_WINDOW-maxDays").fill("1");
-  const ruleSaved = page.waitForResponse((response) =>
-    response.url().includes("/api/admin/rule-sets/")
-      && response.url().endsWith("/rules/ADVANCE_WINDOW")
-      && response.request().method() === "PUT"
-  );
-  await page.getByTestId("save-rule-ADVANCE_WINDOW").click();
-  expect((await ruleSaved).status()).toBe(200);
 
   // then
   await expect(page.getByTestId("admin-save-success")).toBeVisible();
+  await expect(page.getByTestId(`rule-set-applies-${offered}`)).toBeVisible();
+  await expect(page.getByTestId("save-bar"), "one save committed the rule and the fallback").toHaveCount(0);
 
   // when
   await page.goto("/");
@@ -705,13 +706,13 @@ test.describe("renaming a court", () => {
 
     // when
     const renamed = written();
-    await page.getByTestId(`edit-court-name-${court}`).click();
-    await page.getByTestId("court-editor").fill("Practice Wall");
-    await page.getByTestId("confirm-court-edit").click();
+    await page.getByTestId(`edit-court-name-${court}`).fill("Practice Wall");
+    await page.getByTestId("save-courts").click();
     expect((await renamed).status()).toBe(200);
 
     // then
-    await expect(page.getByTestId(`edit-court-name-${court}`)).toContainText("Practice Wall");
+    await expect(page.getByTestId("save-bar")).toHaveCount(0);
+    await expect(page.getByTestId(`edit-court-name-${court}`)).toHaveValue("Practice Wall");
     await page.getByTestId("admin-audit-link").click();
     await expect(page.getByTestId("admin-audit-view")).toBeVisible();
     await expect(page.locator(
@@ -721,14 +722,14 @@ test.describe("renaming a court", () => {
     // when — clearing the name is the other half of the same control
     await page.getByTestId("admin-courts-link").click();
     const cleared = written();
-    await page.getByTestId(`edit-court-name-${court}`).click();
-    await page.getByTestId("court-editor").fill("");
-    await page.getByTestId("confirm-court-edit").click();
+    await expect(page.getByTestId(`edit-court-name-${court}`)).toHaveValue("Practice Wall");
+    await page.getByTestId(`edit-court-name-${court}`).fill("");
+    await page.getByTestId("save-courts").click();
     expect((await cleared).status()).toBe(200);
 
     // then
-    await expect(page.getByTestId("court-editor")).toHaveCount(0);
-    await expect(page.getByTestId(`edit-court-name-${court}`)).not.toContainText("Practice Wall");
+    await expect(page.getByTestId("save-bar")).toHaveCount(0);
+    await expect(page.getByTestId(`edit-court-name-${court}`)).toHaveValue("");
   });
 });
 
@@ -742,16 +743,19 @@ test("a disabled button and a focused field read differently from their resting 
   await page.getByTestId("administration-link").click();
   await page.getByTestId("admin-courts-link").click();
   await expect(page.getByTestId("admin-courts-view")).toBeVisible();
-  const editor = page.getByTestId("court-editor");
-  const confirm = page.getByTestId("confirm-court-edit");
+  const editor = page.getByTestId(`edit-court-number-${court}`);
+  const confirm = page.getByTestId("save-courts");
+  // The save is held in flight so its button stays in the one disabled state a saving page has.
+  let release: () => void = () => undefined;
+  await page.route(`**/api/admin/courts/${court}`, async (route) => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    await new Promise<void>((resolve) => { release = resolve; });
+    await route.continue();
+  });
 
-  for (const appearance of ["dark", "light"] as const) {
+  for (const [appearance, number] of [["dark", "7"], ["light", "8"]] as const) {
     // given
-    if (appearance === "light") {
-      await page.getByTestId("dismiss-court-edit").click();
-      await expect(editor).toHaveCount(0);
-      await selectPreference(page, "#theme-preference", appearance);
-    }
+    if (appearance === "light") await selectPreference(page, "#theme-preference", appearance);
     const unavailable = await page.evaluate(() => {
       const probe = document.createElement("span");
       probe.style.background = "var(--cs-raised)";
@@ -762,13 +766,16 @@ test("a disabled button and a focused field read differently from their resting 
       probe.remove();
       return colours;
     });
-    await page.getByTestId(`edit-court-number-${court}`).click();
-    await editor.fill("7");
+    await editor.fill(number);
+    await expect(editor).toBeFocused();
+    await expect(editor, `${appearance}: a focused field keeps its focus outline`).toHaveCSS("outline-style", "solid");
     await expect(confirm).toBeEnabled();
     const enabled = await renderedColours(confirm);
+    const saved = page.waitForResponse((response) =>
+      response.url().endsWith(`/api/admin/courts/${court}`) && response.request().method() === "PUT");
 
     // when
-    await editor.fill("1000");
+    await confirm.click();
 
     // then
     await expect(confirm).toBeDisabled();
@@ -781,8 +788,9 @@ test("a disabled button and a focused field read differently from their resting 
       .not.toBe(unavailable.background);
     expect(enabled.text, `${appearance}: the enabled text must differ from the disabled one`)
       .not.toBe(unavailable.text);
-    await expect(editor).toBeFocused();
-    await expect(editor, `${appearance}: a focused field keeps its focus outline`).toHaveCSS("outline-style", "solid");
+    release();
+    expect((await saved).status()).toBe(200);
+    await expect(page.getByTestId("save-bar")).toHaveCount(0);
   }
 });
 
@@ -886,8 +894,8 @@ test("a deactivate button rests quietly yet stays distinguishable from a seconda
   await page.getByTestId("admin-courts-link").click();
   const deactivate = page.getByTestId("toggle-court-dddddddd-0000-0000-0000-000000000001");
   await expect(deactivate).toBeVisible();
-  await page.getByTestId("edit-court-name-dddddddd-0000-0000-0000-000000000001").click();
-  const secondary = page.getByTestId("dismiss-court-edit");
+  await page.getByTestId("edit-court-name-dddddddd-0000-0000-0000-000000000001").fill("Practice Wall");
+  const secondary = page.getByTestId("discard-courts");
 
   for (const appearance of ["dark", "light"] as const) {
     // when
@@ -917,7 +925,6 @@ test("a deactivate button rests quietly yet stays distinguishable from a seconda
   }
 
   // when
-  await page.getByTestId("court-editor").fill("Practice Wall");
   await page.getByTestId("admin-setup-link").click();
   const discard = page.getByTestId("unsaved-changes-discard");
   await expect(discard).toBeVisible();

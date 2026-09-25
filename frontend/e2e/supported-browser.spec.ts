@@ -153,7 +153,7 @@ test("an administrator can open both core administration views", async ({ page }
 
   // then
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
-  await expect(page.getByTestId("save-club-config")).toBeVisible();
+  await expect(page.getByTestId("logo-url")).toBeEnabled();
 
   // when
   await page.goto("/admin/facility");

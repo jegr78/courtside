@@ -142,14 +142,23 @@ for (const locale of ["de", "en"]) {
     // when
     await page.getByTestId("admin-configuration-link").click();
     await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
-    await expect(page.getByTestId("save-club-config")).toBeVisible();
+    await expect(page.getByTestId("logo-url")).toBeEnabled();
+
+    // then
+    await expectNoWcagViolations(page);
+
+    // when — the save bar is only on screen once something is unsaved
+    await page.getByTestId("club-name").fill("Example Racquet Club");
+    await expect(page.getByTestId("save-bar")).toBeVisible();
 
     // then
     await expectNoWcagViolations(page);
 
     // when
+    await page.getByTestId("discard-club-configuration").click();
+    await expect(page.getByTestId("save-bar")).toHaveCount(0);
     await page.getByTestId("admin-deadlines-link").click();
-    await expect(page.getByTestId("save-deadlines")).toBeVisible();
+    await expect(page.getByTestId("booking-reminder-hours")).toBeEnabled();
 
     // then
     await expectNoWcagViolations(page);
@@ -177,23 +186,18 @@ for (const locale of ["de", "en"]) {
     // then
     await expectNoWcagViolations(page);
 
-    // when — an open cell editor is a surface of its own, and it is only on screen once chosen;
-    // the number cell carries a different control from the name cell, so both are scanned
-    for (const field of ["name", "number"]) {
-      await page.getByTestId(`edit-court-${field}-dddddddd-0000-0000-0000-000000000002`).click();
-      await expect(page.getByTestId("court-editor")).toBeFocused();
+    // when — an edited court brings the save bar, which is only on screen once something is unsaved
+    await page.getByTestId("edit-court-name-dddddddd-0000-0000-0000-000000000002").fill("Practice Wall");
+    await expect(page.getByTestId("save-bar")).toBeVisible();
 
-      // then
-      await expectNoWcagViolations(page);
-
-      // when
-      await page.getByTestId("dismiss-court-edit").click();
-      await expect(page.getByTestId("court-editor")).toHaveCount(0);
-    }
+    // then
+    await expectNoWcagViolations(page);
 
     // when
+    await page.getByTestId("discard-courts").click();
+    await expect(page.getByTestId("save-bar")).toHaveCount(0);
     await page.goto("/admin/facility/opening-hours");
-    await expect(page.getByTestId("save-opening-hours")).toBeVisible();
+    await expect(page.getByTestId("hours-open-MONDAY")).toBeEnabled();
 
     // then
     await expectNoWcagViolations(page);
@@ -504,6 +508,8 @@ test("core administration is operable using only the keyboard", async ({ page, b
   // when
   const tabKey = browserName === "webkit" ? "Alt+Tab" : "Tab";
   await tabToTestId(page, "club-name", tabKey);
+  await page.keyboard.press("End");
+  await page.keyboard.type(" Club");
   await tabToTestId(page, "save-club-config", tabKey);
   const refused = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/config")

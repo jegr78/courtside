@@ -114,11 +114,11 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   },
   "club-appearance": async (page) => {
     await page.getByTestId("admin-configuration-link").click();
-    await expect(page.getByTestId("save-club-config")).toBeVisible();
+    await expect(page.getByTestId("logo-url")).toBeEnabled();
   },
   "deadlines": async (page) => {
     await page.getByTestId("admin-deadlines-link").click();
-    await expect(page.getByTestId("save-deadlines")).toBeVisible();
+    await expect(page.getByTestId("booking-reminder-hours")).toBeEnabled();
   },
   "booking-rules": async (page) => {
     await page.getByTestId("admin-rule-sets-link").click();
@@ -130,7 +130,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   },
   "opening-hours": async (page) => {
     await page.getByTestId("admin-opening-hours-link").click();
-    await expect(page.getByTestId("save-opening-hours")).toBeVisible();
+    await expect(page.getByTestId("hours-open-MONDAY")).toBeEnabled();
   },
   "booking-card": async (page) => {
     await page.getByTestId("admin-booking-cards-link").click();

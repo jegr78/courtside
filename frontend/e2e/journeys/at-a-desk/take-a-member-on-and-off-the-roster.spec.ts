@@ -43,7 +43,7 @@ test("given a board that has taken on a new member, when they record the person,
     // instance answers first and writes the account again when it hands the credential over.
     await page.getByTestId("membership-type").selectOption({ index: 1 });
     await writeDate(page.getByTestId("membership-started-on"), "2026-01-01");
-    await activate(page.getByTestId("save-membership"));
+    await activate(page.getByTestId("save-person"));
 
     // then
     await expect(page.getByTestId("end-membership")).toBeVisible();

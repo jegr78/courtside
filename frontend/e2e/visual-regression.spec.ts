@@ -92,14 +92,14 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 
   // when
   await page.getByTestId("admin-configuration-link").click();
-  await expect(page.getByTestId("save-club-config")).toBeVisible();
+  await expect(page.getByTestId("logo-url")).toBeEnabled();
 
   // then
   await stableScreenshot(page.getByTestId("admin-configuration-view"), "admin-configuration.png");
 
   // when
   await page.getByTestId("admin-deadlines-link").click();
-  await expect(page.getByTestId("save-deadlines")).toBeVisible();
+  await expect(page.getByTestId("booking-reminder-hours")).toBeEnabled();
 
   // then
   await stableScreenshot(page.getByTestId("admin-deadlines-view"), "admin-deadlines.png");
@@ -121,7 +121,7 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 
   // when
   await page.goto("/admin/facility/opening-hours");
-  await expect(page.getByTestId("save-opening-hours")).toBeVisible();
+  await expect(page.getByTestId("hours-open-MONDAY")).toBeEnabled();
 
   // then
   await stableScreenshot(page.getByTestId("admin-opening-hours-view"), "admin-opening-hours.png");
