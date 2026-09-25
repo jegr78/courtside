@@ -27,7 +27,9 @@ const groups: Group[] = [
     heading: "nav.adminClub",
     destinations: [
       { to: "/admin/setup", testId: "admin-setup-link", label: "nav.adminSetup" },
-      { to: "/admin/configuration", testId: "admin-configuration-link", label: "nav.adminConfiguration" }
+      { to: "/admin/configuration", testId: "admin-configuration-link", label: "nav.adminConfiguration" },
+      { to: "/admin/deadlines", testId: "admin-deadlines-link", label: "nav.adminDeadlines" },
+      { to: "/admin/rule-sets", testId: "admin-rule-sets-link", label: "nav.adminRuleSets" }
     ]
   },
   {

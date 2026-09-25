@@ -212,7 +212,11 @@ describe("AppRoutes", () => {
     expect(await screen.findByTestId("sign-in-link")).toHaveAttribute("href", "/login");
   });
 
-  it("given an admin session, when opening configuration, then the protected admin view is available", async () => {
+  it.each([
+    ["/admin/configuration", "admin-configuration-view"],
+    ["/admin/deadlines", "admin-deadlines-view"],
+    ["/admin/rule-sets", "admin-rule-sets-view"]
+  ])("given an admin session, when opening %s, then the protected admin view is available", async (address, view) => {
     // given
     vi.spyOn(api, "adminConfig").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "ruleSets").mockReturnValue(new Promise<never>(() => undefined));
@@ -220,7 +224,7 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "membershipTypes").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
-    render(<RoutedShell initialEntries={["/admin/configuration"]}><AppRoutes session={{
+    render(<RoutedShell initialEntries={[address]}><AppRoutes session={{
       authenticated: true,
       username: "admin",
       displayName: "Example Administrator",
@@ -229,7 +233,7 @@ describe("AppRoutes", () => {
     }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
 
     // then
-    expect(await screen.findByTestId("admin-configuration-view")).toBeInTheDocument();
+    expect(await screen.findByTestId(view)).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 

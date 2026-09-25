@@ -12,6 +12,8 @@ import { AdminOperationalLogsView } from "./AdminOperationalLogsView";
 import { AdminPersonView } from "./AdminPersonView";
 import { AdminRosterView } from "./AdminRosterView";
 import { AdminSetupView } from "./AdminSetupView";
+import { AdminDeadlinesView } from "./configuration/AdminDeadlinesView";
+import { AdminRuleSetsView } from "./configuration/AdminRuleSetsView";
 import { AdminBookingCardView } from "./facility/AdminBookingCardView";
 import { AdminBookingCardsView } from "./facility/AdminBookingCardsView";
 import { AdminCourtsView } from "./facility/AdminCourtsView";
@@ -26,6 +28,8 @@ export default function AdminRoutes({ configurationChanged }: {
       <Route index element={<Navigate to="/admin/setup" replace />} />
       <Route path="setup" element={<AdminSetupView />} />
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={configurationChanged} />} />
+      <Route path="deadlines" element={<AdminDeadlinesView configurationChanged={configurationChanged} />} />
+      <Route path="rule-sets" element={<AdminRuleSetsView configurationChanged={configurationChanged} />} />
       <Route path="facility">
         <Route index element={<Navigate to="/admin/facility/courts" replace />} />
         <Route path="courts" element={<AdminCourtsView />} />

@@ -188,7 +188,7 @@ describe("AdminMembershipTypesView", () => {
     // then
     expect(within(card("type-1")).getByTestId("membership-type-rule-set-type-1")).toHaveValue("rules-1");
     expect(within(card("type-1")).getByTestId("membership-type-rules-link-type-1"), "the link opens the rule set the type uses")
-      .toHaveAttribute("href", "/admin/configuration?ruleSetId=rules-1#rule-set");
+      .toHaveAttribute("href", "/admin/rule-sets?ruleSetId=rules-1#rule-set");
     expect(within(card("type-2")).queryByTestId("membership-type-rules-link-type-2"), "a type without a rule set has no rules to open")
       .not.toBeInTheDocument();
   });

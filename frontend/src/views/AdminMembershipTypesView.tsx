@@ -209,7 +209,7 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
           {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
         </select>
         {type.ruleSetId && <Link data-testid={`membership-type-rules-link-${type.id}`} className="inline-flex min-h-6 shrink-0 items-center text-xs whitespace-nowrap underline"
-                                 to={`/admin/configuration?ruleSetId=${encodeURIComponent(type.ruleSetId)}#rule-set`}>
+                                 to={`/admin/rule-sets?ruleSetId=${encodeURIComponent(type.ruleSetId)}#rule-set`}>
           {t("admin.membershipTypes.ruleSetLink")}
         </Link>}
       </span>
