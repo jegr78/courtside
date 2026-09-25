@@ -36,7 +36,7 @@ export function AdminSlotFillersView() {
   const [fillers, setFillers] = useState<ParticipantCard[]>();
   const [entries, setEntries] = useState<Record<string, FillerEntry>>({});
   const [refused, setRefused] = useState<ReadonlySet<string>>(new Set());
-  const { error, success, pending, reportError, refuse, save } = useSaving();
+  const { error, success, pending, reportError, refuse, clear, save } = useSaving();
 
   useEffect(() => {
     void api.adminParticipantCards()
@@ -67,6 +67,7 @@ export function AdminSlotFillersView() {
   function discard() {
     setEntries({});
     setRefused(new Set());
+    clear();
   }
 
   function saveFillers(event: FormEvent<HTMLFormElement>) {

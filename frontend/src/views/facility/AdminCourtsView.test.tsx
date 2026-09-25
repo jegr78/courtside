@@ -189,6 +189,21 @@ describe("AdminCourtsView", () => {
     expect(screen.queryByTestId("save-bar")).not.toBeInTheDocument();
   });
 
+  it("given a refused number, when the edits are discarded, then the refusal goes with them", async () => {
+    // given
+    show();
+    fireEvent.change(await screen.findByTestId("edit-court-number-court-1"), { target: { value: "0" } });
+    await userEvent.click(screen.getByTestId("save-courts"));
+    await screen.findByRole("alert");
+
+    // when
+    await userEvent.click(screen.getByTestId("discard-courts"));
+
+    // then
+    expect(screen.queryByRole("alert"), "nothing is left to correct").not.toBeInTheDocument();
+    expect(screen.getByTestId("edit-court-number-court-1")).not.toHaveAttribute("aria-invalid");
+  });
+
   it("given edited courts, when the edits are discarded, then every row shows what is stored", async () => {
     // given
     show(true);

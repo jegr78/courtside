@@ -37,7 +37,7 @@ export function AdminCourtsView() {
   const [courts, setCourts] = useState<AdminCourt[]>();
   const [entries, setEntries] = useState<Record<string, CourtEntry>>({});
   const [refused, setRefused] = useState<ReadonlySet<string>>(new Set());
-  const { error, success, pending, reportError, refuse, save } = useSaving();
+  const { error, success, pending, reportError, refuse, clear, save } = useSaving();
   const newCourt = useUnsavedForm("court:new");
 
   useEffect(() => {
@@ -63,6 +63,7 @@ export function AdminCourtsView() {
   function discard() {
     setEntries({});
     setRefused(new Set());
+    clear();
   }
 
   function saveCourts(event: FormEvent<HTMLFormElement>) {

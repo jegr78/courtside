@@ -785,7 +785,6 @@ const de = {
   "unsaved.title": "Ungespeicherte Änderungen",
   "unsaved.question_one": "Eine Änderung ist noch nicht gespeichert. Wenn du die Seite verlässt, geht sie verloren.",
   "unsaved.question_other": "{{count}} Änderungen sind noch nicht gespeichert. Wenn du die Seite verlässt, gehen sie verloren.",
-  "unsaved.mark": "Noch nicht gespeichert",
   "unsaved.bar": "Noch nicht gespeichert: {{subject}}",
   "unsaved.discardChanges": "Änderungen verwerfen",
   "unsaved.stepFailed": "{{subject}} wurde nicht gespeichert. {{reason}}",
