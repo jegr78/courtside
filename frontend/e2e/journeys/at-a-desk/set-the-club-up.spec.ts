@@ -20,8 +20,8 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     await signIn(page, "bootstrap-admin", "the-one-the-club-chose");
 
     // then — the club is shown what is still missing
-    await expect(page.getByTestId("admin-setup-view")).toBeVisible();
-    await expect(page.getByTestId("setup-progress")).toBeVisible();
+    await expect(page.getByTestId("admin-overview-view")).toBeVisible();
+    await expect(page.getByTestId("overview-setup").getByTestId("setup-progress")).toBeVisible();
 
     // when — the club says who it is and where it is
     await reachAdministration(page, "admin-configuration-link");

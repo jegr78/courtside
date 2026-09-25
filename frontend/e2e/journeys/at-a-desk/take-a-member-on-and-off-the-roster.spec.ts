@@ -9,7 +9,7 @@ test("given a board that has taken on a new member, when they record the person,
     await openTheApplication(page, language);
     await signIn(page, "configuration-admin");
     await activate(page.getByTestId("administration-link"));
-    await expect(page.getByTestId("admin-setup-view")).toBeVisible();
+    await expect(page.getByTestId("admin-overview-view")).toBeVisible();
 
     // when — the person is recorded, with a first name that goes in wrong
     await reachAdministration(page, "admin-roster-link");
