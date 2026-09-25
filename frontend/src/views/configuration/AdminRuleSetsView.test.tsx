@@ -140,7 +140,7 @@ describe("AdminRuleSetsView", () => {
     await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
 
     // then
-    expect(screen.getByTestId("rule-set-rules-list")).toHaveClass("md:grid-cols-2");
+    expect(screen.getByTestId("rule-set-rules-list")).toHaveClass("md:grid-cols-2", "lg:grid-cols-3");
     expect(screen.getByTestId("club-wide-rules-list")).toHaveClass("md:grid-cols-2");
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveClass("max-w-40");
   });

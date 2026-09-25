@@ -311,7 +311,7 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
             />}
             <div data-testid="rule-set-rules" className="grid gap-4">
               <h3 data-testid="rule-set-rules-heading" className="text-xl font-bold">{t("admin.rules.ofRuleSet")}</h3>
-              <div data-testid="rule-set-rules-list" className="grid gap-4 [&>*]:min-w-0 md:grid-cols-2">
+              <div data-testid="rule-set-rules-list" className="grid gap-4 [&>*]:min-w-0 md:grid-cols-2 lg:grid-cols-3">
                 {ruleTypes.filter((type) => type.configurable).map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} remove={removeRule} />)}
               </div>
             </div>
@@ -320,7 +320,7 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
                 <h3 data-testid="club-wide-rules-heading" className="text-xl font-bold">{t("admin.rules.clubWide")}</h3>
                 <p data-testid="club-wide-rules-note" className="text-muted text-sm">{t("admin.rules.clubWideHelp")}</p>
               </div>
-              <div data-testid="club-wide-rules-list" className="grid gap-4 [&>*]:min-w-0 md:grid-cols-2">
+              <div data-testid="club-wide-rules-list" className="grid gap-4 [&>*]:min-w-0 md:grid-cols-2 lg:grid-cols-3">
                 {ruleTypes.filter((type) => !type.configurable).map((type) => <RuleEditor key={type.ruleType} type={type} definition={undefined} disabled save={saveRule} remove={removeRule} />)}
               </div>
             </div>
