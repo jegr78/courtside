@@ -8,8 +8,7 @@ import { ImpactPanel } from "../../components/ImpactPanel";
 import { TextField } from "../../components/TextField";
 import { shortTime } from "../../time/clubZone";
 import { differs } from "../../unsaved/differs";
-import { describedByMark } from "../../unsaved/markId";
-import { UnsavedMark } from "../../unsaved/UnsavedMark";
+import { SaveBar } from "../../unsaved/SaveBar";
 import { FacilityPage } from "./FacilityPage";
 import { useSaving } from "./useSaving";
 import { violationMessage } from "../../api/problem-message";
@@ -17,6 +16,7 @@ import { violationMessage } from "../../api/problem-message";
 type WeekDay = { dayOfWeek: DayOfWeek; opensAt: string; closesAt: string; closed: boolean };
 
 const MARK = "opening-hours";
+const FORM = "opening-hours-form";
 
 export function AdminOpeningHoursView() {
   const { t } = useTranslation();
@@ -75,10 +75,15 @@ export function AdminOpeningHoursView() {
     });
   }
 
+  function discard() {
+    setWeek(confirmed);
+    setRejected({});
+  }
+
   const unsaved = differs({ week }, { week: confirmed });
   const saving = pending.has(MARK);
   return <FacilityPage testId="admin-opening-hours-view" title={t("admin.facility.openingHours")} error={error ?? clubError} success={success}>
-    {week !== undefined && club !== undefined && <form noValidate onSubmit={(event) => void saveWeek(event)} className="grid gap-4">
+    {week !== undefined && club !== undefined && <form id={FORM} noValidate onSubmit={(event) => void saveWeek(event)} className="grid gap-4">
       <ApplyToDays disabled={saving} apply={applyTo} />
       <div className="grid gap-3 lg:grid-cols-2">
         {week.map((day) => <DayEditor
@@ -91,10 +96,8 @@ export function AdminOpeningHoursView() {
           reportError={reportError}
         />)}
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" data-testid="save-opening-hours" aria-describedby={describedByMark(MARK, unsaved)} disabled={saving} type="submit">{t("admin.save")}</Button>
-        <UnsavedMark id={MARK} unsaved={unsaved} />
-      </div>
+      <SaveBar id={MARK} subject={t("admin.facility.openingHours")} saveTestId="save-opening-hours" form={FORM}
+               unsaved={unsaved} pending={saving} discard={discard} />
     </form>}
   </FacilityPage>;
 }
