@@ -966,7 +966,8 @@ test("a checkbox, the setup progress and the file picker take their colours from
       const colours = {
         primary: read("var(--club-primary)"), primaryText: read("var(--club-primary-text)"), border: read("var(--cs-border)"),
         input: read("var(--cs-input)"), raised: read("var(--cs-raised)"), text: read("var(--cs-text)"),
-        successBorder: read("var(--cs-notice-success-border)"), successText: read("var(--cs-notice-success-text)")
+        successBorder: read("var(--cs-notice-success-border)"), successText: read("var(--cs-notice-success-text)"),
+        warningText: read("var(--cs-notice-warning-text)")
       };
       probe.remove();
       return colours;
@@ -978,10 +979,15 @@ test("a checkbox, the setup progress and the file picker take their colours from
     // then
     await expect(page.getByTestId("setup-progress-bar"), `${appearance}: the track is a raised surface`).toHaveCSS("background-color", tokens.raised);
     await expect(page.getByTestId("setup-progress-fill"), `${appearance}: the progress is the club's action colour`).toHaveCSS("background-color", tokens.primary);
-    const complete = page.getByTestId("setup-step-configuration").getByTestId("setup-state-badge");
+    const complete = page.getByTestId("setup-step-facility").getByTestId("setup-state-badge");
+    const open = page.getByTestId("setup-step-configuration").getByTestId("setup-state-badge");
     await expect(complete).toHaveAttribute("data-state", "complete");
+    await expect(open).toHaveAttribute("data-state", "next");
     await expect(complete, `${appearance}: a complete step is outlined in the success tone`).toHaveCSS("border-top-color", tokens.successBorder);
     await expect(complete, `${appearance}: a complete step is labelled in the success tone`).toHaveCSS("color", tokens.successText);
+    await expect(open, `${appearance}: an open step is labelled in the warning tone`).toHaveCSS("color", tokens.warningText);
+    await expect(complete).toHaveCSS("border-top-width", "1px");
+    await expect(open, `${appearance}: an open step is outlined heavier than a complete one`).toHaveCSS("border-top-width", "2px");
 
     // when
     await page.getByTestId("admin-messages-link").click();
