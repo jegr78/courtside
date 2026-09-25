@@ -9,8 +9,8 @@ it("given several steps, when all succeed, then each runs once and in order", as
 
   // when
   await saveInTurn([
-    { subject: "Adults", run: async () => { order.push("Adults"); } },
-    { subject: "Juniors", run: async () => { order.push("Juniors"); } }
+    { subject: "Adults", run: () => { order.push("Adults"); return Promise.resolve(); } },
+    { subject: "Juniors", run: () => { order.push("Juniors"); return Promise.resolve(); } }
   ]);
 
   // then
@@ -26,7 +26,7 @@ it("given a step that fails, when saving in turn, then the steps after it do not
   const seniors = { subject: "Seniors", run: later };
 
   // when
-  const failure = await saveInTurn([{ subject: "Adults", run: async () => undefined }, juniors, seniors])
+  const failure = await saveInTurn([{ subject: "Adults", run: () => Promise.resolve() }, juniors, seniors])
     .catch((thrown: unknown) => thrown);
 
   // then
