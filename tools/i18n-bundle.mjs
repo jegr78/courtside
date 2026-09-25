@@ -5,13 +5,19 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const keysOf = (block) => new Set([...block.matchAll(/^\s*"([^"]+)":/gm)].map((match) => match[1]));
+export const localeFiles = { de: "frontend/src/locales/de.ts", en: "frontend/src/locales/en.ts" };
+
+export function localeSources() {
+  return Object.fromEntries(Object.entries(localeFiles).map(([locale, path]) => {
+    const source = readFileSync(join(root, path), "utf8");
+    assert.match(source, /^ {2}"app\.name":/m, `could not locate the translation entries in ${path}`);
+    return [locale, source];
+  }));
+}
+
+const keysOf = (source) => new Set([...source.matchAll(/^\s*"([^"]+)":/gm)].map((match) => match[1]));
 
 export function localeKeys() {
-  const source = readFileSync(join(root, "frontend/src/i18n.ts"), "utf8");
-  const blocks = source.match(
-    /^ {2}de: \{ translation: \{\n([\s\S]*?)\n {2}\} \},\n {2}en: \{ translation: \{\n([\s\S]*?)\n {2}\} \}\n\};/m
-  );
-  assert.ok(blocks, "could not locate the de and en translation blocks in i18n.ts");
-  return { de: keysOf(blocks[1]), en: keysOf(blocks[2]) };
+  const { de, en } = localeSources();
+  return { de: keysOf(de), en: keysOf(en) };
 }

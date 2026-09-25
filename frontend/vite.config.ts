@@ -15,6 +15,7 @@ export default defineConfig({
       manifest: false,
       registerType: "prompt",
       workbox: {
+        globIgnores: ["**/node_modules/**/*", "assets/AdminRoutes-*.js"],
         navigateFallback: "/index.html",
         runtimeCaching: [
           {

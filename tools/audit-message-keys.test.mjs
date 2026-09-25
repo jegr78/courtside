@@ -22,8 +22,8 @@ test("given every audited event type, when checking each locale of the web clien
   const missingEn = types.filter((type) => !en.has(`audit.event.${type}`));
 
   // then
-  assert.deepEqual(missingDe, [], `de is missing a message for these event types, add "audit.event.<type>" to the de block of frontend/src/i18n.ts: ${missingDe.join(", ")}`);
-  assert.deepEqual(missingEn, [], `en is missing a message for these event types, add "audit.event.<type>" to the en block of frontend/src/i18n.ts: ${missingEn.join(", ")}`);
+  assert.deepEqual(missingDe, [], `de is missing a message for these event types, add "audit.event.<type>" to frontend/src/locales/de.ts: ${missingDe.join(", ")}`);
+  assert.deepEqual(missingEn, [], `en is missing a message for these event types, add "audit.event.<type>" to frontend/src/locales/en.ts: ${missingEn.join(", ")}`);
 });
 
 test("given every audited event type, when the change log offers its kinds, then each locale names exactly those types", () => {

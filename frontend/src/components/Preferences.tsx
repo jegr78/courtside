@@ -37,9 +37,15 @@ export function Preferences({ authenticated = false, supported, signedOut }: {
   // Stored on the account rather than in the browser, so the next message the instance sends
   // arrives in the language the member reads.
   async function changeLocale(value: SupportedLocale) {
-    await setLocale(value);
-    if (!authenticated) return;
     const raisedDuring = session.current;
+    let applied: boolean;
+    try {
+      applied = await setLocale(value);
+    } catch {
+      report(raisedDuring, t("preferences.languageUnavailable"));
+      return;
+    }
+    if (!applied || !authenticated) return;
     try {
       await api.changeOwnLocale(value);
       report(raisedDuring);
