@@ -217,10 +217,11 @@ name and email address later.
 
 After opening a person, you can edit three areas:
 
-* **Person** contains personal details and the language used for notifications.
+* **Person** contains first name, last name and email address.
 * **Membership** contains type, start and end. End a membership instead of deleting it. You can
   correct the end date later.
-* **Account** contains username, roles, state and credentials. An account requires an email address.
+* **Account** contains username, the language used for notifications, roles, state and credentials.
+  An account requires an email address.
 
 ### Send credentials
 

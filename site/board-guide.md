@@ -227,11 +227,11 @@ Vorname, Nachname und E-Mail-Adresse kannst du später korrigieren.
 
 Nach dem Öffnen einer Person stehen drei Bereiche bereit:
 
-* Unter **Person** bearbeitest du Stammdaten und die Sprache der Benachrichtigungen.
+* Unter **Person** bearbeitest du Vorname, Nachname und E-Mail-Adresse.
 * Unter **Mitgliedschaft** bearbeitest du Mitgliedsart, Beginn und Ende. Beende eine
   Mitgliedschaft, statt sie zu löschen. Das Enddatum bleibt korrigierbar.
-* Unter **Konto** verwaltest du Benutzername, Rollen, Status und Zugangsdaten. Für ein Konto ist
-  eine E-Mail-Adresse erforderlich.
+* Unter **Konto** verwaltest du Benutzername, Sprache der Benachrichtigungen, Rollen, Status und
+  Zugangsdaten. Für ein Konto ist eine E-Mail-Adresse erforderlich.
 
 ### Zugangsdaten senden
 
