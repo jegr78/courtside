@@ -318,7 +318,8 @@ test("stored values remain data across roles without entering browser storage or
   // then
   await expect(page.getByTestId("club-brand-name")).toHaveText(payload);
   await expect(page).toHaveTitle(payload);
-  const { installedAppName } = await (await page.request.get("/api/public/config")).json() as { installedAppName: string };
+  const installedAppName = await page.evaluate(async () =>
+    ((await (await fetch("/api/public/config")).json()) as { installedAppName: string }).installedAppName);
   expect(payload.startsWith(installedAppName), "the home-screen title is derived from the stored club name").toBe(true);
   await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute("content", installedAppName);
   await expect(page.getByTestId("court-plan-view")).toContainText(payload);
