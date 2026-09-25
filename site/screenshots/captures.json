@@ -73,6 +73,11 @@
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {
+      "name": "save-bar",
+      "surface": "save-bar",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
       "name": "admin-setup",
       "surface": "admin-setup-view",
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }

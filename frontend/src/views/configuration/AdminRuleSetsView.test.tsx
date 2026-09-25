@@ -107,7 +107,7 @@ describe("AdminRuleSetsView", () => {
 
     // when
     await userEvent.selectOptions(screen.getByTestId("no-membership-type-rule-set"), "rule-set");
-    await userEvent.click(screen.getByTestId("save-no-membership-type-rule-set"));
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
 
     // then
     await waitFor(() => expect(configurationChanged).toHaveBeenCalled());
@@ -133,7 +133,7 @@ describe("AdminRuleSetsView", () => {
 
     // when
     await userEvent.selectOptions(screen.getByTestId("no-membership-type-rule-set"), "rule-set");
-    await userEvent.click(screen.getByTestId("save-no-membership-type-rule-set"));
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
 
     // then
     await waitFor(() => expect(changing).toHaveBeenCalledTimes(1));
@@ -150,9 +150,10 @@ describe("AdminRuleSetsView", () => {
     const changing = vi.spyOn(api, "changeAdminConfig");
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("no-membership-type-rule-set");
+    await userEvent.selectOptions(screen.getByTestId("no-membership-type-rule-set"), "rule-set");
 
     // when
-    await userEvent.click(screen.getByTestId("save-no-membership-type-rule-set"));
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
 
     // then
     expect(await screen.findByRole("alert")).toBeInTheDocument();
@@ -188,7 +189,7 @@ describe("AdminRuleSetsView", () => {
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), "a number of days needs no full-width input").toHaveClass("w-24");
   });
 
-  it("given a changed rule, when saving it, then the selected set is written once its rules have arrived", async () => {
+  it("given a changed rule, when the page is saved, then the selected set is written once its rules have arrived", async () => {
     // given
     const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
       ruleType: "ADVANCE_WINDOW", params: { maxDays: 14 }
@@ -196,18 +197,19 @@ describe("AdminRuleSetsView", () => {
     const loadedRules = deferred<Awaited<ReturnType<typeof api.rules>>>();
     vi.mocked(api.rules).mockReturnValueOnce(loadedRules.promise);
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
-    const saveRuleButton = await screen.findByTestId("save-rule-ADVANCE_WINDOW");
-    expect(saveRuleButton).toBeDisabled();
+    const parameter = await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
+    expect(parameter, "a rule is not edited before its set's rules arrive").toBeDisabled();
     loadedRules.resolve([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]);
-    await waitFor(() => expect(saveRuleButton).toBeEnabled());
+    await waitFor(() => expect(parameter).toBeEnabled());
 
     // when
-    fireEvent.change(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), { target: { value: "14" } });
-    fireEvent.click(saveRuleButton);
+    fireEvent.change(parameter, { target: { value: "14" } });
+    fireEvent.click(screen.getByTestId("save-booking-rules"));
 
     // then
     await waitFor(() => expect(setRule).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW", { maxDays: 14 }));
-    expect(await screen.findByTestId("admin-save-success")).toHaveTextContent("The rule was saved.");
+    expect(await screen.findByTestId("admin-save-success")).toHaveTextContent("The booking rules were saved.");
+    expect(screen.queryByTestId("save-booking-rules")).not.toBeInTheDocument();
   });
 
   // A rule editor that reads its values from a prop through an effect claims unsaved work for the
@@ -254,7 +256,7 @@ describe("AdminRuleSetsView", () => {
 
     // when
     fireEvent.change(screen.getByTestId("no-membership-type-rule-set"), { target: { value: "rule-set" } });
-    await userEvent.click(screen.getByTestId("save-no-membership-type-rule-set"));
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
 
     // then
     await waitFor(() => expect(changing).toHaveBeenCalledWith(
@@ -333,7 +335,7 @@ describe("AdminRuleSetsView", () => {
 
     // when
     fireEvent.change(screen.getByTestId("rule-set-name"), { target: { value: "Standard rules" } });
-    await userEvent.click(screen.getByTestId("save-rule-set"));
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
 
     // then
     expect(changing).toHaveBeenCalledWith("rule-set", { name: "Standard rules" });
@@ -371,7 +373,7 @@ describe("AdminRuleSetsView", () => {
     // then
     await waitFor(() => expect(screen.getByTestId("toggle-rule-set")).toHaveTextContent("Activate"));
     expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard plus");
-    expect(screen.getByTestId("unsaved-mark-rule-set:rule-set")).toBeInTheDocument();
+    expect(screen.getByTestId("unsaved-mark-booking-rules")).toBeInTheDocument();
 
     // when — the way back is the same change
     await userEvent.click(screen.getByTestId("toggle-rule-set"));
@@ -379,7 +381,7 @@ describe("AdminRuleSetsView", () => {
     // then
     await waitFor(() => expect(screen.getByTestId("toggle-rule-set")).toHaveTextContent("Deactivate"));
     expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard plus");
-    expect(screen.getByTestId("unsaved-mark-rule-set:rule-set")).toBeInTheDocument();
+    expect(screen.getByTestId("unsaved-mark-booking-rules")).toBeInTheDocument();
   });
 
   it("given a refused rule set creation, when the answer arrives, then the form still holds what was typed", async () => {
@@ -433,31 +435,58 @@ describe("AdminRuleSetsView", () => {
     expect(toggling).toHaveBeenCalledWith("rule-set", false);
   });
 
-  it("given a rule the club no longer wants, when it is removed, then the set stops carrying it", async () => {
+  it("given a rule the club no longer wants, when it is unticked and the page saved, then the set stops carrying it", async () => {
     // given
     const removing = vi.spyOn(api, "removeRule").mockResolvedValue(undefined);
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
-    await screen.findByTestId("remove-rule-ADVANCE_WINDOW");
+    const applies = await screen.findByTestId("rule-ADVANCE_WINDOW-applies");
+    await waitFor(() => expect(applies).toBeChecked());
 
     // when
-    await userEvent.click(screen.getByTestId("remove-rule-ADVANCE_WINDOW"));
+    await userEvent.click(applies);
+
+    // then
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(null);
+    expect(removing, "unticking only stages the removal").not.toHaveBeenCalled();
+
+    // when
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
 
     // then
     expect(removing).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW");
-    await vi.waitFor(() =>
-      expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(null));
+    await waitFor(() => expect(screen.queryByTestId("save-booking-rules")).not.toBeInTheDocument());
+    expect(applies).not.toBeChecked();
   });
 
-  it("given a rule type the set does not carry, when it is read, then there is nothing to remove", async () => {
+  it("given a rule unticked by mistake, when it is ticked again, then its stored setting returns and nothing is left to save", async () => {
     // given
-    vi.spyOn(api, "rules").mockResolvedValue([]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const applies = await screen.findByTestId("rule-ADVANCE_WINDOW-applies");
+    await waitFor(() => expect(applies).toBeChecked());
+    await userEvent.click(applies);
 
     // when
-    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
-    await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
+    await userEvent.click(applies);
 
     // then
-    expect(screen.queryByTestId("remove-rule-ADVANCE_WINDOW")).not.toBeInTheDocument();
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7);
+    expect(screen.queryByTestId("save-booking-rules")).not.toBeInTheDocument();
+  });
+
+  it("given a rule type the set does not carry, when it is read, then its box is unticked and a value ticks it", async () => {
+    // given
+    vi.spyOn(api, "rules").mockResolvedValue([]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const parameter = await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
+    await waitFor(() => expect(parameter).toBeEnabled());
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-applies")).not.toBeChecked();
+
+    // when
+    fireEvent.change(parameter, { target: { value: "10" } });
+
+    // then
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-applies")).toBeChecked();
+    expect(screen.getByTestId("save-booking-rules")).toBeInTheDocument();
   });
 
   it("given rules no rule set can change, when the rule sets load, then they stand apart from the ones it can", async () => {
@@ -504,7 +533,7 @@ describe("AdminRuleSetsView", () => {
     await act(() => i18n.changeLanguage("de"));
 
     // then — the text is translated and no load runs again
-    expect(screen.getByTestId("save-rule-set")).toHaveTextContent("Speichern");
+    expect(screen.getByTestId("save-booking-rules")).toHaveTextContent("Speichern");
     expect([api.adminConfig, api.ruleSets, api.ruleTypes, api.membershipTypes, api.rules]
       .map((read) => vi.mocked(read).mock.calls.length)).toEqual(reads);
 
@@ -523,12 +552,15 @@ describe("AdminRuleSetsView", () => {
     }));
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("no-membership-type-rule-set");
+    await userEvent.selectOptions(screen.getByTestId("no-membership-type-rule-set"), "rule-set");
 
     // when
-    await userEvent.click(screen.getByTestId("save-no-membership-type-rule-set"));
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
 
     // then
-    expect(await screen.findByRole("alert")).toHaveTextContent("The chosen rule set is not active.");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Rule set for people without a membership type was not saved.");
+    expect(alert).toHaveTextContent("The chosen rule set is not active.");
   });
 
   it("given a rule with no parameters, when it is offered, then it says what switching it on does", async () => {
@@ -538,9 +570,10 @@ describe("AdminRuleSetsView", () => {
     // when
     const description = await screen.findByTestId("rule-NO_COURT_BOOKING-description");
 
-    // then — a Save button beside no field says nothing on its own
+    // then
     expect(description).toHaveTextContent("nobody measured by that set may book a court or move a booking");
-    expect(screen.getByTestId("save-rule-NO_COURT_BOOKING")).toBeInTheDocument();
+    expect(screen.getByTestId("rule-NO_COURT_BOOKING-applies"), "the box is the rule's only setting").toBeInTheDocument();
+    expect(screen.queryByTestId("save-rule-NO_COURT_BOOKING"), "a rule without a setting has no save of its own").not.toBeInTheDocument();
   });
 
   it("given a cancellation deadline is offered, when editing rules, then its unit and range are clear", async () => {
@@ -557,15 +590,17 @@ describe("AdminRuleSetsView", () => {
       .toHaveTextContent("Allowed: 0 to 525600");
   });
 
-  it("given a rule with no parameters, when it is saved, then it is written without any parameter", async () => {
+  it("given a rule with no parameters, when it is ticked and the page saved, then it is written without any parameter", async () => {
     // given
     const saving = vi.spyOn(api, "setRule")
       .mockResolvedValue({ ruleType: "NO_COURT_BOOKING", params: {} });
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
-    await screen.findByTestId("save-rule-NO_COURT_BOOKING");
+    const applies = await screen.findByTestId("rule-NO_COURT_BOOKING-applies");
+    await waitFor(() => expect(applies).toBeEnabled());
 
     // when
-    await userEvent.click(screen.getByTestId("save-rule-NO_COURT_BOOKING"));
+    await userEvent.click(applies);
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
 
     // then
     expect(saving).toHaveBeenCalledWith("rule-set", "NO_COURT_BOOKING", {});
@@ -599,8 +634,9 @@ describe("AdminRuleSetsView", () => {
 
     // then
     expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).not.toHaveValue(7);
-    await userEvent.click(screen.getByTestId("save-rule-ADVANCE_WINDOW"));
-    expect(setRule).toHaveBeenCalledWith("second", "ADVANCE_WINDOW", { maxDays: 14 });
+    fireEvent.change(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), { target: { value: "21" } });
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
+    expect(setRule).toHaveBeenCalledWith("second", "ADVANCE_WINDOW", { maxDays: 21 });
   });
 
   it("given the rule set name is edited, when another rule set is chosen, then the edit is not dropped silently", async () => {
@@ -662,7 +698,7 @@ describe("AdminRuleSetsView", () => {
     await userEvent.type(parameter, "5");
 
     // then
-    expect(await screen.findByTestId("unsaved-mark-rule:ADVANCE_WINDOW")).toBeInTheDocument();
+    expect(await screen.findByTestId("unsaved-mark-booking-rules")).toHaveTextContent("Booking rules");
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
   });
 
@@ -679,6 +715,161 @@ describe("AdminRuleSetsView", () => {
 
     // then
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+  });
+  it("given untouched booking rules, when the page loads, then no save is offered", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7));
+
+    // then
+    expect(screen.queryByTestId("save-booking-rules")).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId(/^save-rule-/), "no rule carries a save of its own").toHaveLength(0);
+    expect(screen.queryAllByTestId(/^remove-rule-/)).toHaveLength(0);
+  });
+
+  it("given a new name, a changed rule and a fallback, when the page is saved once, then each is written in turn", async () => {
+    // given
+    const written: string[] = [];
+    vi.spyOn(api, "changeRuleSet").mockImplementation((id, request) => {
+      written.push("name");
+      return Promise.resolve({ id, name: request.name, active: true });
+    });
+    vi.spyOn(api, "setRule").mockImplementation((_id, ruleType, params) => {
+      written.push(ruleType);
+      return Promise.resolve({ ruleType, params });
+    });
+    const stored = await api.adminConfig();
+    vi.spyOn(api, "changeAdminConfig").mockImplementation(() => {
+      written.push("fallback");
+      return Promise.resolve({ ...stored, noMembershipTypeRuleSetId: "rule-set" });
+    });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const parameter = await screen.findByTestId("rule-CANCELLATION_DEADLINE-minMinutes");
+    await waitFor(() => expect(parameter).toBeEnabled());
+    fireEvent.change(screen.getByTestId("rule-set-name"), { target: { value: "Standard rules" } });
+    fireEvent.change(parameter, { target: { value: "120" } });
+    await userEvent.selectOptions(screen.getByTestId("no-membership-type-rule-set"), "rule-set");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
+
+    // then
+    expect(await screen.findByTestId("admin-save-success")).toHaveTextContent("The booking rules were saved.");
+    expect(written).toEqual(["name", "CANCELLATION_DEADLINE", "fallback"]);
+    expect(screen.getByTestId("rule-set-choose-rule-set")).toHaveTextContent("Standard rules");
+    expect(screen.queryByTestId("save-booking-rules")).not.toBeInTheDocument();
+  });
+
+  it("given a rule the instance refuses, when the page is saved, then what came before is kept, the rest stays unsaved and the rule is named", async () => {
+    // given
+    vi.spyOn(api, "changeRuleSet").mockResolvedValue({ id: "rule-set", name: "Standard rules", active: true });
+    vi.spyOn(api, "setRule").mockRejectedValue(new ApiError(400));
+    const changing = vi.spyOn(api, "changeAdminConfig");
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const parameter = await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
+    await waitFor(() => expect(parameter).toHaveValue(7));
+    fireEvent.change(screen.getByTestId("rule-set-name"), { target: { value: "Standard rules" } });
+    fireEvent.change(parameter, { target: { value: "400" } });
+    await userEvent.selectOptions(screen.getByTestId("no-membership-type-rule-set"), "rule-set");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-booking-rules"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("Advance booking window was not saved.");
+    expect(screen.queryByTestId("admin-save-success"), "a partial save is not a success").not.toBeInTheDocument();
+    expect(changing, "nothing is sent after the refused rule").not.toHaveBeenCalled();
+    expect(screen.getByTestId("rule-set-choose-rule-set"), "the name before it was kept").toHaveTextContent("Standard rules");
+    expect(screen.getByTestId("save-booking-rules"), "the rule and the fallback are still unsaved").toBeEnabled();
+
+    // when
+    await userEvent.click(screen.getByTestId("discard-booking-rules"));
+
+    // then
+    expect(screen.getByTestId("rule-set-name"), "discarding keeps what was saved").toHaveValue("Standard rules");
+    expect(parameter).toHaveValue(7);
+    expect(screen.getByTestId("no-membership-type-rule-set")).toHaveValue("");
+  });
+
+  it("given edits to the name, a rule and the fallback, when they are discarded, then the stored values return and nothing is left to lose", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminRuleSetsView configurationChanged={() => undefined} />
+    </UnsavedChangesProvider></MemoryRouter>);
+    const parameter = await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
+    await waitFor(() => expect(parameter).toHaveValue(7));
+    fireEvent.change(screen.getByTestId("rule-set-name"), { target: { value: "Standard rules" } });
+    fireEvent.change(parameter, { target: { value: "9" } });
+    await userEvent.click(screen.getByTestId("rule-NO_COURT_BOOKING-applies"));
+    await userEvent.selectOptions(screen.getByTestId("no-membership-type-rule-set"), "rule-set");
+    await waitFor(() => expect(screen.getByTestId("unsaved-count"), "one page save is one change to lose").toHaveTextContent("1"));
+
+    // when
+    await userEvent.click(screen.getByTestId("discard-booking-rules"));
+
+    // then
+    expect(screen.getByTestId("rule-set-name")).toHaveValue("Standard");
+    expect(parameter).toHaveValue(7);
+    expect(screen.getByTestId("rule-NO_COURT_BOOKING-applies")).not.toBeChecked();
+    expect(screen.getByTestId("no-membership-type-rule-set")).toHaveValue("");
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given an edited rule, when another rule set is chosen, then the edit is not dropped silently", async () => {
+    // given
+    vi.spyOn(api, "ruleSets").mockResolvedValue([
+      { id: "rule-set", name: "Standard", active: true },
+      { id: "rule-set-2", name: "Juniors", active: true }
+    ]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const parameter = await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
+    await waitFor(() => expect(parameter).toHaveValue(7));
+    fireEvent.change(parameter, { target: { value: "9" } });
+
+    // when
+    await userEvent.click(screen.getByTestId("rule-set-choose-rule-set-2"));
+
+    // then
+    expect(await screen.findByTestId("unsaved-changes")).toBeInTheDocument();
+    expect(screen.getByTestId("rule-set-choose-rule-set")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("given an edited fallback, when another rule set is chosen, then the fallback edit stays because it belongs to no set", async () => {
+    // given
+    vi.spyOn(api, "ruleSets").mockResolvedValue([
+      { id: "rule-set", name: "Standard", active: true },
+      { id: "rule-set-2", name: "Juniors", active: true }
+    ]);
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("no-membership-type-rule-set");
+    await userEvent.selectOptions(screen.getByTestId("no-membership-type-rule-set"), "rule-set");
+
+    // when
+    await userEvent.click(screen.getByTestId("rule-set-choose-rule-set-2"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("rule-set-choose-rule-set-2")).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.queryByTestId("unsaved-changes")).not.toBeInTheDocument();
+    expect(screen.getByTestId("no-membership-type-rule-set")).toHaveValue("rule-set");
+  });
+
+  it("given an edited rule, when a new rule set is created, then the question comes before the new set opens", async () => {
+    // given
+    vi.spyOn(api, "createRuleSet").mockResolvedValue({ id: "rule-set-2", name: "Juniors", active: true });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const parameter = await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
+    await waitFor(() => expect(parameter).toHaveValue(7));
+    fireEvent.change(parameter, { target: { value: "9" } });
+    await userEvent.type(screen.getByTestId("new-rule-set-name"), "Juniors");
+
+    // when
+    await userEvent.click(screen.getByTestId("create-rule-set"));
+
+    // then
+    expect(await screen.findByTestId("rule-set-choose-rule-set-2")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("unsaved-changes")).toBeInTheDocument();
+    expect(parameter).toHaveValue(9);
   });
 });
 

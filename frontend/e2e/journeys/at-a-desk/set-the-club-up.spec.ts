@@ -51,11 +51,11 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     // then
     await expect(page.locator('[data-testid^="court-row-"]')).toHaveCount(2);
 
-    // when — the hours it opens them
+    // when — the hours it opens them, which differ from the week it was shipped with
     await reachAdministration(page, "admin-opening-hours-link");
     await expect(page.getByTestId("hours-open-MONDAY")).toBeVisible();
-    await writeTime(page.getByTestId("apply-opens-at"), "08:00");
-    await writeTime(page.getByTestId("apply-closes-at"), "22:00");
+    await writeTime(page.getByTestId("apply-opens-at"), "07:00");
+    await writeTime(page.getByTestId("apply-closes-at"), "21:00");
     for (const day of WEEK) await activate(page.getByTestId(`apply-day-${day}`));
     await activate(page.getByTestId("apply-hours"));
     await activate(page.getByTestId("save-opening-hours"));

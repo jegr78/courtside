@@ -11,13 +11,14 @@ import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { useFragmentTarget } from "../navigation/useFragmentTarget";
-import { describedByMark } from "../unsaved/markId";
-import { UnsavedMark } from "../unsaved/UnsavedMark";
+import { useUnsavedMark } from "../unsaved/registry";
+import { SaveBar } from "../unsaved/SaveBar";
 import { brandContrast } from "../brandColor";
 import { ColorInput } from "../components/ColorInput";
 import { ownedFields, useClubConfigForm } from "./configuration/clubConfigForm";
 
 const MAX_LOGO_BYTES = 1024 * 1024;
+const FORM = "club-profile-form";
 
 function BrandColorField({ kind, label, value, changed }: {
   kind: "primary" | "accent";
@@ -50,7 +51,7 @@ function timeZones(current: string): string[] {
 export function AdminConfigurationView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
   const { message: error, report, refuse, clear } = useReportedFailure();
-  const { config, unsaved, loaded, applied, change: changeConfig, save } = useClubConfigForm(configurationChanged, ownedFields.clubProfile);
+  const { config, unsaved, loaded, applied, change: changeConfig, discard, save } = useClubConfigForm(configurationChanged, ownedFields.clubProfile);
   const [logo, setLogo] = useState<{ url?: string | null; uploaded: boolean }>();
   const [logoFile, setLogoFile] = useState<File>();
   const [configurationPending, setConfigurationPending] = useState(false);
@@ -77,7 +78,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     };
   }, [loadAttempt, loaded, report]);
 
-  const unsavedConfiguration = unsaved || logoFile !== undefined;
+  useUnsavedMark("club-logo", logoFile !== undefined);
 
   function selectLogoFile(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0];
@@ -102,14 +103,19 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     setLogo({ url: changed.logoUrl, uploaded: changed.logoUploaded });
   }
 
+  // A logo is written on its own, so it leaves whatever the profile form still holds unsaved alone.
+  function applyLogo(changed: AdminClubConfig) {
+    configurationChanged(changed);
+    setLogo({ url: changed.logoUrl, uploaded: changed.logoUploaded });
+  }
+
   async function uploadLogo() {
     if (!logoFile || configurationPending) return;
     setConfigurationPending(true);
     clear();
     setSuccess(undefined);
     try {
-      const changed = await api.uploadClubLogo(logoFile);
-      applyConfiguration(changed);
+      applyLogo(await api.uploadClubLogo(logoFile));
       setLogoFile(undefined);
       if (logoInput.current) logoInput.current.value = "";
       setSuccess(t("admin.config.logoUploaded"));
@@ -126,8 +132,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     clear();
     setSuccess(undefined);
     try {
-      const changed = await api.deleteClubLogo();
-      applyConfiguration(changed);
+      applyLogo(await api.deleteClubLogo());
       setSuccess(t("admin.config.logoRemoved"));
     } catch (failure) {
       report(failure);
@@ -159,7 +164,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
       : <>
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
-        <form data-testid="club-profile-columns" noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-2 lg:items-start xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.25fr)]">
+        <form id={FORM} data-testid="club-profile-columns" noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-2 lg:items-start xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.25fr)]">
             <div data-testid="club-identity" className="grid gap-4">
               <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />
               <div className="grid gap-1">
@@ -191,7 +196,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
               </div>
               <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} className="max-w-32" label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
             </div>
-            <div data-testid="club-appearance" className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 lg:col-span-2 xl:row-span-2">
+            <div data-testid="club-appearance" className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 lg:col-span-2">
               <BrandColorField kind="primary" label={t("admin.config.primaryColor")} value={config.primaryColor} changed={(primaryColor) => changeConfig({ primaryColor })} />
               <BrandColorField kind="accent" label={t("admin.config.accentColor")} value={config.accentColor} changed={(accentColor) => changeConfig({ accentColor })} />
               <fieldset data-testid="logo-fieldset" className="min-w-0 grid gap-2 rounded-xl border p-4 sm:col-span-2">
@@ -224,13 +229,9 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
                 <p className="text-muted text-sm">{t("admin.config.logoUrlHelp")}</p>
               </fieldset>
             </div>
-          <div data-testid="club-profile-save" className="flex flex-wrap items-center gap-3 lg:col-span-2">
-            <Button variant="primary" data-testid="save-club-config" type="submit"
-                    aria-describedby={describedByMark("club-configuration", unsavedConfiguration)}
-                    disabled={configurationPending}>{t("admin.save")}</Button>
-            <UnsavedMark id="club-configuration" unsaved={unsavedConfiguration} />
-          </div>
         </form>
+        <SaveBar id="club-configuration" subject={t("admin.config.title")} saveTestId="save-club-config" form={FORM}
+                 unsaved={unsaved} pending={configurationPending} discard={discard} />
       </>}
   </section>;
 }

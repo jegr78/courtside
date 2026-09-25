@@ -62,6 +62,19 @@ explicit browser choice wins over an account locale and persists locally. Theme 
 the same rule, with dark as the initial value. Neither preference depends on translated text or an
 authenticated session.
 
+## Saving
+
+Every administrative page commits its edits through one save bar. The bar appears once a field
+differs from what the instance stored, names the page or entry it saves and offers to save or to
+discard. It holds the page's one entry in the unsaved-changes registry, so leaving the page or
+reloading it asks first. A page that writes several records sends them one after another in the
+order the page shows them and stops at the first refusal. What was written stays written, the
+refused part and everything after it stay unsaved, and the message names the refused part.
+
+Actions that stand apart from a page's fields keep a button of their own, labelled with what it
+does: creating something, uploading or removing a logo, activating or deactivating, ending a
+membership and sending credentials.
+
 ## Accessibility
 
 Colour is never the sole carrier of state. Interactive controls retain visible keyboard focus,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { api, type MembershipType, type MembershipTypeRequest, type RuleSet } from "../api/client";
+import { api, type MembershipType, type RuleSet } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
@@ -11,8 +11,8 @@ import { SuccessFeedback } from "../components/SuccessFeedback";
 import { TextField } from "../components/TextField";
 import { formString } from "../forms/formString";
 import { differs } from "../unsaved/differs";
-import { describedByMark } from "../unsaved/markId";
-import { UnsavedMark } from "../unsaved/UnsavedMark";
+import { SaveBar } from "../unsaved/SaveBar";
+import { saveInTurn } from "../unsaved/saveInTurn";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
 
 const NAME_LENGTH = 60;
@@ -21,6 +21,12 @@ const HOLDER_PAGE = 200;
 interface Holders {
   count: number;
   more: boolean;
+}
+
+type TypeEdit = { name: string; ruleSetId: string; grantsAccount: boolean };
+
+function stored(type: MembershipType): TypeEdit {
+  return { name: type.name, ruleSetId: type.ruleSetId ?? "", grantsAccount: type.grantsAccount };
 }
 
 export function AdminMembershipTypesView() {
@@ -32,6 +38,7 @@ export function AdminMembershipTypesView() {
   const [holders, setHolders] = useState<Record<string, Holders>>({});
   const [success, setSuccess] = useState<string>();
   const [pending, setPending] = useState(false);
+  const [edits, setEdits] = useState<Record<string, TypeEdit>>({});
   const [loadAttempt, retryLoad] = useRetry();
 
   const reportError = useCallback((failure: unknown) => {
@@ -79,8 +86,36 @@ export function AdminMembershipTypesView() {
     }
   }
 
-  async function saveType(id: string, request: MembershipTypeRequest) {
-    await mutate(() => api.changeMembershipType(id, request));
+  function replace(changed: MembershipType) {
+    setTypes((current) => current?.map((type) => type.id === changed.id ? changed : type));
+  }
+
+  function edit(type: MembershipType, changed: Partial<TypeEdit>) {
+    setEdits((current) => ({ ...current, [type.id]: { ...(current[type.id] ?? stored(type)), ...changed } }));
+  }
+
+  const edited = (types ?? []).filter((type) => type.id in edits && differs(edits[type.id], stored(type)));
+
+  async function saveTypes() {
+    if (pending) return;
+    setPending(true);
+    clear();
+    setSuccess(undefined);
+    try {
+      await saveInTurn(edited.map((type) => ({
+        subject: type.name,
+        run: async () => {
+          const { name, ruleSetId, grantsAccount } = edits[type.id];
+          replace(await api.changeMembershipType(type.id, { name, ruleSetId: ruleSetId || null, grantsAccount }));
+          setEdits((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== type.id)));
+        }
+      })));
+      setSuccess(t("admin.membershipTypes.saved"));
+    } catch (failure) {
+      reportError(failure);
+    } finally {
+      setPending(false);
+    }
   }
 
   async function toggleType(type: MembershipType) {
@@ -137,7 +172,8 @@ export function AdminMembershipTypesView() {
                   ruleSets={ruleSets}
                   holders={holders[type.id]}
                   disabled={pending}
-                  save={(request) => saveType(type.id, request)}
+                  value={edits[type.id] ?? stored(type)}
+                  changed={(changed) => edit(type, changed)}
                   toggle={() => toggleType(type)}
                 />)}
               </tbody>
@@ -161,6 +197,8 @@ export function AdminMembershipTypesView() {
           </label>
           <Button variant="primary" data-testid="create-membership-type" disabled={pending} className="justify-self-start" type="submit">{t("admin.create")}</Button>
         </form>
+        <SaveBar id="membership-types" subject={t("admin.membershipTypes.title")} saveTestId="save-membership-types"
+                 unsaved={edited.length > 0} pending={pending} save={() => void saveTypes()} discard={() => setEdits({})} />
       </>}
   </section>;
 }
@@ -169,22 +207,17 @@ function holderCount(holders: Holders): string {
   return holders.more ? `${holders.count}+` : String(holders.count);
 }
 
-function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: {
+function MembershipTypeRow({ type, ruleSets, holders, disabled, value, changed, toggle }: {
   type: MembershipType;
   ruleSets: RuleSet[];
   holders: Holders | undefined;
   disabled: boolean;
-  save: (request: MembershipTypeRequest) => Promise<void>;
+  value: TypeEdit;
+  changed: (changed: Partial<TypeEdit>) => void;
   toggle: () => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [name, setName] = useState(type.name);
-  const [ruleSetId, setRuleSetId] = useState(type.ruleSetId ?? "");
-  const [grantsAccount, setGrantsAccount] = useState(type.grantsAccount);
-  const mark = `membership-type:${type.id}`;
-  const unsaved = differs(
-    { name, ruleSetId: ruleSetId || null, grantsAccount },
-    { name: type.name, ruleSetId: type.ruleSetId ?? null, grantsAccount: type.grantsAccount });
+  const { name, ruleSetId, grantsAccount } = value;
   const cell = "grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] items-center gap-3 md:table-cell md:border-t md:p-2 md:align-middle";
   const label = "font-medium md:hidden";
 
@@ -194,7 +227,7 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
       <span className="flex min-w-0 items-center gap-2">
         <input data-testid={`membership-type-name-${type.id}`} aria-label={t("admin.membershipTypes.name")} disabled={disabled}
                maxLength={NAME_LENGTH} className="form-control w-0 min-w-24 flex-1 rounded-lg border px-3 py-1.5 font-semibold"
-               value={name} onChange={(event) => setName(event.target.value)} />
+               value={name} onChange={(event) => changed({ name: event.target.value })} />
         <span data-testid={`membership-type-state-${type.id}`} className={`shrink-0 text-sm ${type.active ? "text-muted" : "font-semibold"}`}>
           {t(type.active ? "admin.membershipTypes.offered" : "admin.membershipTypes.retired")}
         </span>
@@ -204,7 +237,7 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
       <span aria-hidden="true" data-testid="membership-type-label-rule-set" className={label}>{t("admin.membershipTypes.ruleSet")}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         <select data-testid={`membership-type-rule-set-${type.id}`} aria-label={t("admin.membershipTypes.ruleSet")} disabled={disabled}
-                className="form-control w-0 min-w-28 flex-1 rounded-lg border px-3 py-1.5" value={ruleSetId} onChange={(event) => setRuleSetId(event.target.value)}>
+                className="form-control w-0 min-w-28 flex-1 rounded-lg border px-3 py-1.5" value={ruleSetId} onChange={(event) => changed({ ruleSetId: event.target.value })}>
           <option value="">{t("admin.membershipTypes.noRuleSet")}</option>
           {ruleSets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
         </select>
@@ -217,7 +250,7 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
     <td className={cell}>
       <span aria-hidden="true" data-testid="membership-type-label-grants-account" className={label}>{t("admin.membershipTypes.grantsAccount")}</span>
       <input data-testid={`membership-type-grants-account-${type.id}`} aria-label={t("admin.membershipTypes.grantsAccount")} disabled={disabled}
-             type="checkbox" className="size-5" checked={grantsAccount} onChange={(event) => setGrantsAccount(event.target.checked)} />
+             type="checkbox" className="size-5" checked={grantsAccount} onChange={(event) => changed({ grantsAccount: event.target.checked })} />
     </td>
     <td className={cell}>
       <span aria-hidden="true" data-testid="membership-type-label-members" className={label}>{t("admin.membershipTypes.members")}</span>
@@ -232,11 +265,8 @@ function MembershipTypeRow({ type, ruleSets, holders, disabled, save, toggle }: 
     </td>
     <td className="min-w-0 md:border-t md:p-2 md:align-middle">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" data-testid={`save-membership-type-${type.id}`} aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button"
-                className="px-3 py-1.5 text-sm" onClick={() => void save({ name, ruleSetId: ruleSetId || null, grantsAccount })}>{t("admin.save")}</Button>
         <Button variant={type.active ? "destructive" : "primary"} data-testid={`toggle-membership-type-${type.id}`} disabled={disabled} type="button"
                 className="px-3 py-1.5 text-sm" onClick={() => void toggle()}>{t(type.active ? "admin.deactivate" : "admin.activate")}</Button>
-        <UnsavedMark id={mark} unsaved={unsaved} />
       </div>
     </td>
   </tr>;

@@ -965,6 +965,7 @@ describe("App build identity", () => {
       .toHaveAttribute("content", "#b85c38"));
 
     // when
+    fireEvent.change(await screen.findByTestId("primary-color-value"), { target: { value: "#1a4d8f" } });
     fireEvent.click(await screen.findByTestId("save-club-config"));
 
     // then

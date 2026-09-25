@@ -22,6 +22,25 @@ The same sidebar returns you to the court plan.
 
 ![The administration navigation with four areas and the link to the court plan.](../screenshots/en/admin-navigation.png)
 
+## Saving changes
+
+Every administration page saves the same way. As soon as you change a field, a bar appears at the
+bottom. It names the page or entry whose changes are not saved yet. *Save* commits every change on
+the page at once. *Discard changes* restores what is stored.
+
+Courtside saves the parts of a page in the order they appear there. If it refuses a part, the
+message names that part. Everything before it is saved; the refused part and everything after it
+stay in the bar until you correct them and save again.
+
+If you leave a page with unsaved changes, Courtside asks first. This also applies when you reload or
+close the tab.
+
+Only actions that act independently of the rest of the page have a button of their own, for
+example creating something, uploading or removing a logo, deactivating something or sending
+credentials. Their label says what they do.
+
+![The bar with unsaved changes to the courts, save and discard.](../screenshots/en/save-bar.png)
+
 ## The guided path: Setup
 
 Open *Club → Setup*. The overview checks the current state and marks every step as complete, open or
@@ -86,7 +105,8 @@ Open *Club → Deadlines and reminders*.
 
 ## Facility → Courts
 
-A court needs a unique number and a name. You can edit both later.
+A court needs a unique number and a name. Edit both directly in the list and save all changed
+courts together.
 
 Deactivate a court that the club no longer uses. It disappears from the court plan but remains in
 past bookings and reports. Courtside notifies members whose future bookings are affected.
@@ -98,7 +118,7 @@ past bookings and reports. Courtside notifies members whose future bookings are 
 1. Enter an opening and closing time for every open weekday.
 2. Mark days without play as closed.
 3. Use *Apply the same times* to copy one period to several days.
-4. Save the whole week.
+4. Save the week with the bar at the bottom.
 
 Courtside does not save a day when either time is missing. Members cannot book outside the opening
 hours. If you shorten opening hours later, Courtside notifies members with affected bookings.
@@ -140,7 +160,7 @@ uses. If all limited items are booked, Courtside refuses further selections for 
 ## Booking rules
 
 Open *Club → Booking rules*. A membership type points to a rule set. The overview shows every rule set
-with its state and the membership types it applies to. Choose a rule set there to edit its rules. Each rule set may contain these rules once:
+with its state and the membership types it applies to. Choose a rule set there to edit its rules. The *In this rule set* box beside each rule decides whether the set contains it. Each rule set may contain these rules once:
 
 | Rule | Setting |
 |---|---|
@@ -161,6 +181,10 @@ should receive different rules.
 Below the overview, select a rule set for people without a current membership type if
 membership-related rules should still apply to them. Opening hours and the booking grid apply even
 without this selection.
+
+The selected rule set's name and rules and the rule set for people without a membership type are
+saved together. If you choose another rule set before saving, Courtside asks first, because the name
+and the rules belong to the selected set.
 
 ![Booking rules with the overview of rule sets, permitted ranges and links to global settings.](../screenshots/en/booking-rules.png)
 
@@ -193,10 +217,11 @@ name and email address later.
 
 After opening a person, you can edit three areas:
 
-* **Person** contains personal details and the language used for notifications.
+* **Person** contains first name, last name and email address.
 * **Membership** contains type, start and end. End a membership instead of deleting it. You can
   correct the end date later.
-* **Account** contains username, roles, state and credentials. An account requires an email address.
+* **Account** contains username, the language used for notifications, roles, state and credentials.
+  An account requires an email address.
 
 ### Send credentials
 

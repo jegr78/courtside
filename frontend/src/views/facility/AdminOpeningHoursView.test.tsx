@@ -132,6 +132,8 @@ describe("AdminOpeningHoursView", () => {
     show();
     const user = userEvent.setup();
     await screen.findByTestId("hours-open-MONDAY");
+    await user.clear(screen.getByTestId("hours-close-MONDAY"));
+    await user.type(screen.getByTestId("hours-close-MONDAY"), "21:45");
 
     // when
     await user.click(screen.getByTestId("save-opening-hours"));
@@ -169,6 +171,8 @@ describe("AdminOpeningHoursView", () => {
     show();
     const user = userEvent.setup();
     await screen.findByTestId("hours-closed-FRIDAY");
+    await user.clear(screen.getByTestId("hours-close-MONDAY"));
+    await user.type(screen.getByTestId("hours-close-MONDAY"), "21:00");
     await user.click(screen.getByTestId("save-opening-hours"));
     await screen.findByRole("status");
 
@@ -197,6 +201,8 @@ describe("AdminOpeningHoursView", () => {
     show();
     const user = userEvent.setup();
     await screen.findByTestId("hours-open-MONDAY");
+    await user.clear(screen.getByTestId("hours-close-MONDAY"));
+    await user.type(screen.getByTestId("hours-close-MONDAY"), "21:45");
     await user.click(screen.getByTestId("save-opening-hours"));
     await screen.findByTestId("hours-error-MONDAY");
 
@@ -223,6 +229,8 @@ describe("AdminOpeningHoursView", () => {
     show();
     const user = userEvent.setup();
     await screen.findByTestId("hours-open-MONDAY");
+    await user.clear(screen.getByTestId("hours-close-MONDAY"));
+    await user.type(screen.getByTestId("hours-close-MONDAY"), "21:45");
     await user.click(screen.getByTestId("save-opening-hours"));
     await screen.findByTestId("hours-error-MONDAY");
 
@@ -247,6 +255,51 @@ describe("AdminOpeningHoursView", () => {
 
     // then
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+  });
+
+  it("given an untouched week, when the view loads, then no save is offered", async () => {
+    // when
+    show();
+    await screen.findByTestId("hours-open-MONDAY");
+
+    // then
+    expect(screen.queryByTestId("save-opening-hours"), "a clean week offers nothing to save").toBeNull();
+  });
+
+  it("given an edited day, when the edit is discarded, then the stored week returns and nothing is left unsaved", async () => {
+    // given
+    show(true);
+    const user = userEvent.setup();
+    await screen.findByTestId("hours-closed-MONDAY");
+    await user.click(screen.getByTestId("hours-closed-MONDAY"));
+    expect(screen.getByTestId("unsaved-mark-opening-hours")).toHaveTextContent("Opening hours");
+
+    // when
+    await user.click(screen.getByTestId("discard-opening-hours"));
+
+    // then
+    expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue("08:00");
+    expect(screen.getByTestId("hours-closed-MONDAY")).not.toBeChecked();
+    expect(screen.queryByTestId("save-bar")).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given an edited week, when it is saved, then the bar leaves with the work it held", async () => {
+    // given
+    vi.spyOn(api, "setAdminWeeklyOpeningHours").mockResolvedValue(week({}));
+    show(true);
+    const user = userEvent.setup();
+    await screen.findByTestId("hours-closed-MONDAY");
+    await user.click(screen.getByTestId("hours-closed-MONDAY"));
+    expect(screen.getByTestId("save-bar")).toBeVisible();
+
+    // when
+    await user.click(screen.getByTestId("save-opening-hours"));
+
+    // then
+    expect(await screen.findByTestId("admin-save-success")).toBeVisible();
+    expect(screen.queryByTestId("save-bar")).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
   });
 
   it("given hours a board is about to shorten, when the impact is asked for, then it is asked for the new hours", async () => {

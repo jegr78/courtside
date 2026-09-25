@@ -34,7 +34,13 @@
       "id": "participant-card-label",
       "journey": "stored-admin",
       "field": "participantCard.label",
-      "sink": "option-text"
+      "sink": "option-text-and-form-value"
+    },
+    {
+      "id": "court-name-form-value",
+      "journey": "stored-admin",
+      "field": "court.name",
+      "sink": "form-value"
     },
     {
       "id": "rule-set-name",

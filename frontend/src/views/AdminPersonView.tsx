@@ -16,8 +16,8 @@ import { TextField } from "../components/TextField";
 import { downloadJson } from "../downloads/downloadJson";
 import { formString } from "../forms/formString";
 import { differs } from "../unsaved/differs";
-import { describedByMark } from "../unsaved/markId";
-import { UnsavedMark } from "../unsaved/UnsavedMark";
+import { SaveBar } from "../unsaved/SaveBar";
+import { saveInTurn, StepFailed, type SaveStep } from "../unsaved/saveInTurn";
 import { useUnsavedForm } from "../unsaved/useUnsavedForm";
 
 const roles: Role[] = [
@@ -33,6 +33,30 @@ function sameRoles(chosen: readonly Role[], saved: readonly Role[]): boolean {
   return chosen.length === saved.length && chosen.every((role) => saved.includes(role));
 }
 
+interface Membership {
+  membershipTypeId: string;
+  startedOn: string;
+  endedOn: string;
+}
+
+type Draft = { person?: PersonRequest; membership?: Membership; username?: string; locale?: string; roles?: Role[] };
+
+function storedPerson(entry: RosterEntry): PersonRequest {
+  return { firstName: entry.firstName, lastName: entry.lastName, email: entry.email };
+}
+
+function storedMembership(entry: RosterEntry): Membership {
+  return {
+    membershipTypeId: entry.membershipTypeId ?? "",
+    startedOn: entry.membershipStartedOn ?? "",
+    endedOn: entry.membershipEndedOn ?? ""
+  };
+}
+
+function isRecentAuth(failure: unknown): boolean {
+  return failure instanceof ApiError && failure.problem?.type === RECENT_AUTH;
+}
+
 function arrivedFromPersonCreation(state: unknown): boolean {
   return typeof state === "object" && state !== null && "personCreated" in state
     && state.personCreated === true;
@@ -40,7 +64,7 @@ function arrivedFromPersonCreation(state: unknown): boolean {
 
 export function AdminPersonView() {
   const { t } = useTranslation();
-  const { message: error, report, clear } = useReportedFailure();
+  const { message: error, report, refuse, clear } = useReportedFailure();
   const location = useLocation();
   const { personId = "" } = useParams();
   const { club, error: clubError, load: loadClub } = useClubConfiguration();
@@ -52,6 +76,7 @@ export function AdminPersonView() {
   const [pending, setPending] = useState(false);
   const [retry, setRetry] = useState<{ run: () => Promise<void> }>();
   const [reauthenticationFailure, setReauthenticationFailure] = useState<string>();
+  const [draft, setDraft] = useState<Draft>({});
   const [loadAttempt, retryLoad] = useRetry();
 
   const reportError = useCallback((failure: unknown) => {
@@ -147,6 +172,91 @@ export function AdminPersonView() {
     }
   }
 
+  function edit(changed: Draft) {
+    setDraft((current) => ({ ...current, ...changed }));
+  }
+
+  function settle(part: keyof Draft) {
+    setDraft((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== part)));
+  }
+
+  const storedLocale = entry?.locale ?? club?.defaultLocale ?? "";
+  const edited = {
+    person: entry !== undefined && draft.person !== undefined && differs(draft.person, storedPerson(entry)),
+    membership: entry !== undefined && draft.membership !== undefined && differs(draft.membership, storedMembership(entry)),
+    username: entry !== undefined && draft.username !== undefined && draft.username !== (entry.username ?? ""),
+    locale: draft.locale !== undefined && draft.locale !== storedLocale,
+    roles: entry !== undefined && draft.roles !== undefined && !sameRoles(draft.roles, entry.roles)
+  };
+  const unsaved = Object.values(edited).some(Boolean);
+
+  function step(part: keyof Draft, subject: string, write: () => Promise<RosterEntry>): SaveStep[] {
+    return edited[part] ? [{
+      subject: t(subject),
+      run: async () => {
+        setEntry(await write());
+        settle(part);
+      }
+    }] : [];
+  }
+
+  async function runSteps(steps: SaveStep[]) {
+    try {
+      await saveInTurn(steps);
+      clear();
+      setSuccess(t("admin.roster.saved"));
+    } catch (failure) {
+      // A step that needs a fresh sign-in resumes from itself once the administrator has proved it.
+      if (failure instanceof StepFailed && isRecentAuth(failure.cause)) {
+        setReauthenticationFailure(undefined);
+        setRetry({ run: () => resume(failure.remaining) });
+      } else {
+        reportError(failure);
+      }
+    }
+  }
+
+  // A later step that asks again takes over the retry, so a second proof never replays a written step.
+  async function resume(remaining: SaveStep[]) {
+    try {
+      await saveInTurn(remaining);
+    } catch (failure) {
+      if (!(failure instanceof StepFailed && isRecentAuth(failure.cause))) throw failure;
+      setRetry({ run: () => resume(failure.remaining) });
+      throw failure.cause;
+    }
+    clear();
+    setSuccess(t("admin.roster.saved"));
+  }
+
+  async function savePage() {
+    if (pending || !entry) return;
+    clear();
+    setSuccess(undefined);
+    const { person, membership, username, locale, roles: chosen } = draft;
+    if (edited.membership && !membership?.membershipTypeId) {
+      setSuccess(undefined);
+      refuse(t("admin.person.membershipNeedsType"));
+      return;
+    }
+    setPending(true);
+    try {
+      await runSteps([
+        ...step("person", "admin.person.person", () => api.changePerson(personId, person ?? storedPerson(entry))),
+        ...step("membership", "admin.person.membership", () => api.assignMembership(personId, {
+          membershipTypeId: membership?.membershipTypeId ?? "",
+          startedOn: membership?.startedOn || null,
+          endedOn: membership?.endedOn || null
+        })),
+        ...step("username", "admin.roster.username", () => api.changeAccountUsername(personId, username ?? "")),
+        ...step("locale", "admin.person.accountLocale", () => api.changeAccountLocale(personId, locale ?? storedLocale)),
+        ...step("roles", "admin.roster.roles", () => api.changeAccountRoles(personId, chosen ?? []))
+      ]);
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function exportData() {
     if (pending) return;
     setPending(true);
@@ -184,21 +294,35 @@ export function AdminPersonView() {
             <Button variant="primary" disabled={pending} type="submit">{t("accountSecurity.continue")}</Button>
           </form>
         </Modal>}
-        <PersonSection entry={entry} disabled={pending} save={(person) => mutate(() => api.changePerson(personId, person))} />
+        <PersonSection disabled={pending} person={draft.person ?? storedPerson(entry)} changed={(person) => edit({ person })} />
         <MembershipSection
           entry={entry}
           types={types}
           disabled={pending}
-          save={(membership) => mutate(() => api.assignMembership(personId, membership))}
+          membership={draft.membership ?? storedMembership(entry)}
+          changed={(membership) => edit({ membership })}
+          end={async (endedOn) => {
+            const stored = storedMembership(entry);
+            const ended = await mutate(() => api.assignMembership(personId, {
+              membershipTypeId: stored.membershipTypeId, startedOn: stored.startedOn || null, endedOn
+            }));
+            // Ending writes the end alone, so an unsaved type or start stays in the bar with the new end.
+            if (ended) setDraft((current) => current.membership
+              ? { ...current, membership: { ...current.membership, endedOn: ended.membershipEndedOn ?? "" } }
+              : current);
+            return ended;
+          }}
         />
         {entry.accountId
           ? <AccountSection
             entry={entry}
-            club={club}
             disabled={pending}
-            saveRoles={(chosen) => mutate(() => api.changeAccountRoles(personId, chosen))}
-            saveUsername={(username) => mutate(() => api.changeAccountUsername(personId, username))}
-            saveLocale={(locale) => mutate(() => api.changeAccountLocale(personId, locale))}
+            supportedLocales={club.supportedLocales}
+            username={draft.username ?? entry.username ?? ""}
+            locale={draft.locale ?? storedLocale}
+            chosenRoles={draft.roles ?? entry.roles}
+            changed={edit}
+            addressUnsaved={draft.person !== undefined && (draft.person.email ?? null) !== (entry.email ?? null)}
             sendCredentials={() => mutate(() => api.requestAccountCredentials(personId), "admin.person.credentialsSent")}
             toggleAccount={() => mutate(() => api.setAccountActive(personId, !entry.enabled))}
             endSessions={() => runSecurityAction(() => api.endAccountSessions(personId), "admin.person.sessionsEnded")}
@@ -219,67 +343,41 @@ export function AdminPersonView() {
         <Link data-testid="person-audit-link" className="font-semibold underline" to={`/admin/audit?subjectId=${personId}`}>
           {t("admin.person.auditLink")}
         </Link>
+        <SaveBar id="person" subject={`${entry.firstName} ${entry.lastName}`} saveTestId="save-person"
+                 unsaved={unsaved} pending={pending} save={() => void savePage()} discard={() => setDraft({})} />
       </>}
   </section>;
 }
 
 type Saved = Promise<RosterEntry | undefined>;
 
-function PersonSection({ entry, disabled, save }: { entry: RosterEntry; disabled: boolean; save: (person: PersonRequest) => Saved }) {
+function PersonSection({ person, disabled, changed }: { person: PersonRequest; disabled: boolean; changed: (person: PersonRequest) => void }) {
   const { t } = useTranslation();
-  const [person, setPerson] = useState<PersonRequest>({
-    firstName: entry.firstName, lastName: entry.lastName, email: entry.email
-  });
-  const mark = `person:${entry.personId}`;
-  const unsaved = differs(person, { firstName: entry.firstName, lastName: entry.lastName, email: entry.email });
   return <section className="grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.person.person")}</h2>
     <div className="grid gap-3 md:grid-cols-3">
-      <TextField data-testid="person-first-name" disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.roster.firstName")} value={person.firstName} onChange={(event) => setPerson({ ...person, firstName: event.target.value })} />
-      <TextField data-testid="person-last-name" disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} value={person.lastName} onChange={(event) => setPerson({ ...person, lastName: event.target.value })} />
-      <TextField data-testid="person-email" disabled={disabled} type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} value={person.email ?? ""} onChange={(event) => setPerson({ ...person, email: event.target.value || null })} />
-    </div>
-    <div className="flex flex-wrap items-center gap-3">
-      <Button variant="primary" data-testid="save-person" aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button" onClick={() => void save(person)}>{t("admin.save")}</Button>
-      <UnsavedMark id={mark} unsaved={unsaved} />
+      <TextField data-testid="person-first-name" disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.roster.firstName")} value={person.firstName} onChange={(event) => changed({ ...person, firstName: event.target.value })} />
+      <TextField data-testid="person-last-name" disabled={disabled} maxLength={NAME_LENGTH} label={t("admin.roster.lastName")} value={person.lastName} onChange={(event) => changed({ ...person, lastName: event.target.value })} />
+      <TextField data-testid="person-email" disabled={disabled} type="email" maxLength={EMAIL_LENGTH} label={t("admin.roster.email")} value={person.email ?? ""} onChange={(event) => changed({ ...person, email: event.target.value || null })} />
     </div>
   </section>;
 }
 
-interface Membership {
-  membershipTypeId: string;
-  startedOn: string | null;
-  endedOn: string | null;
-}
-
-function MembershipSection({ entry, types, disabled, save }: {
+function MembershipSection({ entry, types, disabled, membership, changed, end }: {
   entry: RosterEntry;
   types: MembershipType[];
   disabled: boolean;
-  save: (membership: Membership) => Saved;
+  membership: Membership;
+  changed: (membership: Membership) => void;
+  end: (endedOn: string) => Saved;
 }) {
   const { t } = useTranslation();
-  const [typeId, setTypeId] = useState(entry.membershipTypeId ?? "");
-  const [startedOn, setStartedOn] = useState(entry.membershipStartedOn ?? "");
-  const [endedOn, setEndedOn] = useState(entry.membershipEndedOn ?? "");
   const [ending, setEnding] = useState(false);
   const [chosenEnd, setChosenEnd] = useState(entry.membershipEndedOn ?? "");
-  const membershipMark = `membership:${entry.personId}`;
-  const unsavedMembership = differs(
-    { typeId, startedOn, endedOn },
-    {
-      typeId: entry.membershipTypeId ?? "",
-      startedOn: entry.membershipStartedOn ?? "",
-      endedOn: entry.membershipEndedOn ?? ""
-    });
   const running = Boolean(entry.membershipTypeId) && !entry.membershipEndedOn;
 
   async function endMembership() {
-    const saved = await save({ membershipTypeId: typeId, startedOn: startedOn || null, endedOn: chosenEnd || null });
-    if (saved) {
-      setEndedOn(saved.membershipEndedOn ?? "");
-      setEnding(false);
-    }
+    if (await end(chosenEnd)) setEnding(false);
   }
 
   return <section data-testid="person-membership" className="grid gap-3 rounded-xl border p-4">
@@ -287,19 +385,15 @@ function MembershipSection({ entry, types, disabled, save }: {
     <div className="grid gap-3 md:grid-cols-3">
       <label className="grid gap-2 font-medium">
         {t("admin.person.membershipType")}
-        <select data-testid="membership-type" disabled={disabled} className="form-control rounded-lg border px-3 py-3" value={typeId} onChange={(event) => setTypeId(event.target.value)}>
+        <select data-testid="membership-type" disabled={disabled} className="form-control rounded-lg border px-3 py-3" value={membership.membershipTypeId} onChange={(event) => changed({ ...membership, membershipTypeId: event.target.value })}>
           <option value="">{t("admin.person.noMembershipType")}</option>
           {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
         </select>
       </label>
-      <TextField data-testid="membership-started-on" disabled={disabled} type="date" label={t("admin.person.startedOn")} value={startedOn} onChange={(event) => setStartedOn(event.target.value)} />
-      <TextField data-testid="membership-ended-on" disabled={disabled} type="date" label={t("admin.person.endedOn")} value={endedOn} onChange={(event) => setEndedOn(event.target.value)} />
+      <TextField data-testid="membership-started-on" disabled={disabled} type="date" label={t("admin.person.startedOn")} value={membership.startedOn} onChange={(event) => changed({ ...membership, startedOn: event.target.value })} />
+      <TextField data-testid="membership-ended-on" disabled={disabled} type="date" label={t("admin.person.endedOn")} value={membership.endedOn} onChange={(event) => changed({ ...membership, endedOn: event.target.value })} />
     </div>
-    <div className="flex flex-wrap items-center gap-3">
-      <Button variant="primary" data-testid="save-membership" aria-describedby={describedByMark(membershipMark, unsavedMembership)} disabled={disabled || !typeId} type="button" onClick={() => void save({ membershipTypeId: typeId, startedOn: startedOn || null, endedOn: endedOn || null })}>{t("admin.save")}</Button>
-      {running && <Button variant="destructive" data-testid="end-membership" disabled={disabled} type="button" onClick={() => setEnding(true)}>{t("admin.person.endMembership")}</Button>}
-      <UnsavedMark id={membershipMark} unsaved={unsavedMembership} />
-    </div>
+    {running && <Button variant="destructive" data-testid="end-membership" disabled={disabled} className="justify-self-start" type="button" onClick={() => setEnding(true)}>{t("admin.person.endMembership")}</Button>}
     {ending && <Modal labelledBy="end-membership-title" closed={() => setEnding(false)}>
       <div className="grid gap-4">
         <h2 id="end-membership-title" className="text-2xl font-bold">{t("admin.person.endMembershipTitle")}</h2>
@@ -314,25 +408,21 @@ function MembershipSection({ entry, types, disabled, save }: {
   </section>;
 }
 
-function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLocale, sendCredentials, toggleAccount, endSessions, endAllSessions }: {
+function AccountSection({ entry, disabled, supportedLocales, username, locale, chosenRoles, changed, addressUnsaved, sendCredentials, toggleAccount, endSessions, endAllSessions }: {
   entry: RosterEntry;
-  club: ClubConfig;
+  addressUnsaved: boolean;
   disabled: boolean;
-  saveRoles: (roles: Role[]) => Saved;
-  saveUsername: (username: string) => Saved;
-  saveLocale: (locale: string) => Saved;
+  supportedLocales: ClubConfig["supportedLocales"];
+  username: string;
+  locale: string;
+  chosenRoles: Role[];
+  changed: (draft: Draft) => void;
   sendCredentials: () => Saved;
   toggleAccount: () => Saved;
   endSessions: () => Promise<void>;
   endAllSessions: () => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [username, setUsername] = useState(entry.username ?? "");
-  const [locale, setLocale] = useState(entry.locale ?? club.defaultLocale);
-  const [chosenRoles, setChosenRoles] = useState(entry.roles);
-  const unsavedUsername = username !== (entry.username ?? "");
-  const unsavedLocale = locale !== (entry.locale ?? club.defaultLocale);
-  const unsavedRoles = !sameRoles(chosenRoles, entry.roles);
   const [replacing, setReplacing] = useState(false);
   const [endingAll, setEndingAll] = useState(false);
 
@@ -352,28 +442,14 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
 
   return <section className="grid gap-3 rounded-xl border p-4">
     <h2 className="text-2xl font-bold">{t("admin.person.account")}</h2>
-    <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-      <TextField data-testid="account-username" disabled={disabled} autoComplete="off" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} value={username} onChange={(event) => setUsername(event.target.value)} />
-      <div className="flex flex-wrap items-center gap-3 self-end">
-        <Button variant="primary" data-testid="save-username" aria-describedby={describedByMark(`account-username:${entry.personId}`, unsavedUsername)} disabled={disabled} type="button" onClick={() => void saveUsername(username)}>{t("admin.save")}</Button>
-        <UnsavedMark id={`account-username:${entry.personId}`} unsaved={unsavedUsername} />
-      </div>
-    </div>
-    <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+    <div className="grid gap-3 md:grid-cols-2">
+      <TextField data-testid="account-username" disabled={disabled} autoComplete="off" maxLength={USERNAME_LENGTH} label={t("admin.roster.username")} value={username} onChange={(event) => changed({ username: event.target.value })} />
       <label className="grid gap-2 font-medium">
         {t("admin.person.accountLocale")}
-        <LocaleSelect testId="account-locale" disabled={disabled} className="form-control rounded-lg border px-3 py-2" value={locale} supported={club.supportedLocales} changed={setLocale} />
+        <LocaleSelect testId="account-locale" disabled={disabled} className="form-control rounded-lg border px-3 py-2" value={locale} supported={supportedLocales} changed={(chosen) => changed({ locale: chosen })} />
       </label>
-      <div className="flex flex-wrap items-center gap-3 self-end">
-        <Button variant="primary" data-testid="save-locale" aria-describedby={describedByMark(`account-locale:${entry.personId}`, unsavedLocale)} disabled={disabled} type="button" onClick={() => void saveLocale(locale)}>{t("admin.save")}</Button>
-        <UnsavedMark id={`account-locale:${entry.personId}`} unsaved={unsavedLocale} />
-      </div>
     </div>
-    <RoleCheckboxes testIdPrefix="account-roles" disabled={disabled} selected={chosenRoles} changed={setChosenRoles} />
-    <div className="flex flex-wrap items-center gap-3">
-      <Button variant="primary" data-testid="save-roles" aria-describedby={describedByMark(`account-roles:${entry.personId}`, unsavedRoles)} disabled={disabled} type="button" onClick={() => void saveRoles(chosenRoles)}>{t("admin.save")}</Button>
-      <UnsavedMark id={`account-roles:${entry.personId}`} unsaved={unsavedRoles} />
-    </div>
+    <RoleCheckboxes testIdPrefix="account-roles" disabled={disabled} selected={chosenRoles} changed={(roles) => changed({ roles })} />
     <div className="grid gap-2">
       <span className="font-medium">{t("admin.person.credentialState")}</span>
       <p data-testid="credential-state" data-state={entry.credentialState ?? "AWAITING_CREDENTIAL"}
@@ -382,7 +458,10 @@ function AccountSection({ entry, club, disabled, saveRoles, saveUsername, saveLo
       </p>
       <CredentialDestination entry={entry} />
       <LastMessage entry={entry} />
-      <Button variant="secondary" data-testid="send-credentials" disabled={disabled || !entry.enabled} className="justify-self-start" type="button" onClick={send}>{t("admin.person.sendCredentials")}</Button>
+      {addressUnsaved && <p id="send-credentials-waits" data-testid="send-credentials-waits" className="text-muted text-sm">{t("admin.person.credentialsWaitForAddress")}</p>}
+      <Button variant="secondary" data-testid="send-credentials" disabled={disabled || !entry.enabled || addressUnsaved}
+              aria-describedby={addressUnsaved ? "send-credentials-waits" : undefined}
+              className="justify-self-start" type="button" onClick={send}>{t("admin.person.sendCredentials")}</Button>
     </div>
     <Button variant={entry.enabled ? "destructive" : "primary"} data-testid="toggle-account" disabled={disabled} className="justify-self-start" type="button" onClick={() => void toggleAccount()}>{t(entry.enabled ? "admin.deactivate" : "admin.activate")}</Button>
     <div className="flex flex-wrap gap-3">

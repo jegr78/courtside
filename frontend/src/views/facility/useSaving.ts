@@ -44,5 +44,5 @@ export function useSaving() {
     }
   }
 
-  return { error, success, pending, reportError, refuse, save };
+  return { error, success, pending, reportError, refuse, clear, save };
 }

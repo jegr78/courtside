@@ -109,16 +109,22 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("administration-link").click();
     await expect(page.getByTestId("setup-progress")).toBeVisible();
   },
+  // The bar appears only once something is unsaved, so a renamed court brings it on screen.
+  "save-bar": async (page) => {
+    await page.getByTestId("admin-courts-link").click();
+    await page.locator('[data-testid^="edit-court-name-"]').first().fill("Centre Court");
+    await expect(page.getByTestId("save-bar")).toBeVisible();
+  },
   "admin-setup": async (page) => {
     await expect(page.getByTestId("setup-progress")).toBeVisible();
   },
   "club-appearance": async (page) => {
     await page.getByTestId("admin-configuration-link").click();
-    await expect(page.getByTestId("save-club-config")).toBeVisible();
+    await expect(page.getByTestId("logo-url")).toBeEnabled();
   },
   "deadlines": async (page) => {
     await page.getByTestId("admin-deadlines-link").click();
-    await expect(page.getByTestId("save-deadlines")).toBeVisible();
+    await expect(page.getByTestId("booking-reminder-hours")).toBeEnabled();
   },
   "booking-rules": async (page) => {
     await page.getByTestId("admin-rule-sets-link").click();
@@ -130,7 +136,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   },
   "opening-hours": async (page) => {
     await page.getByTestId("admin-opening-hours-link").click();
-    await expect(page.getByTestId("save-opening-hours")).toBeVisible();
+    await expect(page.getByTestId("hours-open-MONDAY")).toBeEnabled();
   },
   "booking-card": async (page) => {
     await page.getByTestId("admin-booking-cards-link").click();
@@ -172,6 +178,9 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("column-FIRST_NAME").selectOption("Given");
     await page.getByTestId("column-LAST_NAME").selectOption("Family");
     await page.getByTestId("column-EMAIL").selectOption("Mail");
+    // The typed source brings the sticky save bar, which would otherwise cover a field mid-form.
+    await page.setViewportSize({ width: 1280, height: 2000 });
+    await expect(page.getByTestId("save-bar")).toBeVisible();
   },
   "utilisation": async (page, visualDate) => {
     await page.getByTestId("admin-utilisation-link").click();
@@ -268,6 +277,7 @@ test("every surface the facility is described on is captured", async ({ page, jo
   await capture(page, "opening-hours", journeyService.visualDate);
   await capture(page, "booking-card", journeyService.visualDate);
   await capture(page, "slot-fillers", journeyService.visualDate);
+  await capture(page, "save-bar", journeyService.visualDate);
 });
 
 test("every surface the members are kept on is captured", async ({ page, journeyService }, info) => {

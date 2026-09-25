@@ -59,10 +59,12 @@ export function useClubConfigForm(configurationChanged: (config: ClubConfig) => 
     setConfig((current) => current ? { ...current, ...changed } : current);
   }, []);
 
+  const discard = useCallback(() => setConfig(saved), [saved]);
+
   const save = useCallback(async (edited: ClubConfigRequest): Promise<AdminClubConfig> => {
     const fresh = editable(await api.adminConfig());
     return api.changeAdminConfig(withOwn(fresh, edited, owned));
   }, [owned]);
 
-  return { config, saved, unsaved: differs(config, saved), loaded, applied, change, save };
+  return { config, saved, unsaved: differs(config, saved), loaded, applied, change, discard, save };
 }
