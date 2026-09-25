@@ -9,7 +9,9 @@ input and browser-engine behaviour; it is not evidence for operating-system inte
 physical device.
 
 The application shell is available offline after installation. Booking, account and administration
-operations require the network. Workbox uses `NetworkOnly` for every API request except the
+operations require the network. The precache holds the member surface and every language bundle,
+but not the administration surface: its chunk loads when an administrator opens it, and the build
+policy refuses a build whose entry or precache says otherwise. Workbox uses `NetworkOnly` for every API request except the
 member-owned `GET /api/my/bookings`, which uses a seven-day `StaleWhileRevalidate` cache. Its page
 also carries the club time zone and court labels, so the cached response is self-contained. The PWA
 journey inspects Cache Storage after authenticated activity and offline reloads. A German and an
