@@ -783,6 +783,8 @@ const de = {
   "unsaved.question_one": "Eine Änderung ist noch nicht gespeichert. Wenn du die Seite verlässt, geht sie verloren.",
   "unsaved.question_other": "{{count}} Änderungen sind noch nicht gespeichert. Wenn du die Seite verlässt, gehen sie verloren.",
   "unsaved.mark": "Noch nicht gespeichert",
+  "unsaved.bar": "Noch nicht gespeichert: {{subject}}",
+  "unsaved.discardChanges": "Änderungen verwerfen",
   "unsaved.stay": "Hierbleiben",
   "unsaved.discard": "Verwerfen und verlassen",
   "error.title": "Diese Seite lässt sich gerade nicht anzeigen.",
