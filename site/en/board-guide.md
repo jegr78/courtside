@@ -139,9 +139,8 @@ uses. If all limited items are booked, Courtside refuses further selections for 
 
 ## Booking rules
 
-Open *Club → Booking rules*. A membership type points to a rule set. The overview at the top shows
-every rule set with its state and the membership types it applies to. Choose a rule set there to
-edit its rules below. Each rule set may contain these rules once:
+Open *Club → Booking rules*. A membership type points to a rule set. The overview shows every rule set
+with its state and the membership types it applies to. Choose a rule set there to edit its rules. Each rule set may contain these rules once:
 
 | Rule | Setting |
 |---|---|
@@ -159,7 +158,7 @@ Retiring a rule set does not stop it from applying to membership types already a
 only removes the set from new selections. Assign another rule set first if the affected members
 should receive different rules.
 
-Beside the overview, select a rule set for people without a current membership type if
+Below the overview, select a rule set for people without a current membership type if
 membership-related rules should still apply to them. Opening hours and the booking grid apply even
 without this selection.
 

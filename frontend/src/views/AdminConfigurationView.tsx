@@ -152,7 +152,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     }
   }
 
-  return <section data-testid="admin-configuration-view" className="surface-panel min-w-0 grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl sm:p-8">
+  return <section data-testid="admin-configuration-view" className="surface-panel min-w-0 grid gap-6 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl">
     <h1 className="text-3xl font-bold">{t("admin.config.title")}</h1>
     {!config
       ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
@@ -160,72 +160,71 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
         <form noValidate onSubmit={(event) => void saveConfig(event)} className="grid gap-5">
-          <h2 className="text-2xl font-bold">{t("admin.config.club")}</h2>
-          <div data-testid="club-identity" className="grid gap-5 [&>*]:min-w-0 md:grid-cols-[2fr_1fr] md:items-start">
-            <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />
-            <div className="grid gap-1">
-              <TextField data-testid="short-name" maxLength={12} label={t("admin.config.shortName")} value={config.shortName ?? ""} onChange={(event) => changeConfig({ shortName: event.target.value || null })} />
-              <p className="text-muted text-sm">{t("admin.config.shortNameHelp")}</p>
-            </div>
-          </div>
-          <div data-testid="club-appearance" className="grid gap-5 [&>*]:min-w-0 sm:grid-cols-2">
-            <BrandColorField kind="primary" label={t("admin.config.primaryColor")} value={config.primaryColor} changed={(primaryColor) => changeConfig({ primaryColor })} />
-            <BrandColorField kind="accent" label={t("admin.config.accentColor")} value={config.accentColor} changed={(accentColor) => changeConfig({ accentColor })} />
-            <fieldset className="min-w-0 grid gap-5 rounded-xl border p-4 sm:col-span-2 md:grid-cols-2 md:items-start">
-              <legend className="px-1 font-semibold">{t("admin.config.logo")}</legend>
-              <div className="grid min-w-0 gap-3">
-                {logo?.url && <img data-testid="logo-preview" src={logo.url} alt={t("admin.config.logoPreview")}
-                                  className="max-h-32 max-w-64 object-contain" />}
-                <label className="grid gap-2 font-medium">
-                  {t("admin.config.logoFile")}
-                  <input ref={logoInput} data-testid="logo-file" type="file" accept="image/png,image/jpeg"
-                         disabled={configurationPending} onChange={selectLogoFile}
-                         className="form-control min-w-0 w-full rounded-lg border px-3 py-3" />
-                </label>
-                <p className="text-muted text-sm">{t("admin.config.logoHelp")}</p>
-                <div className="flex flex-wrap gap-3">
-                  <Button data-testid="upload-logo" type="button" variant="secondary"
-                          disabled={!logoFile || configurationPending} onClick={() => void uploadLogo()}>
-                    {t("admin.config.logoUpload")}
-                  </Button>
-                  {logo?.uploaded && <Button data-testid="remove-logo" type="button" variant="destructive"
-                                            disabled={configurationPending} onClick={() => void removeLogo()}>
-                    {t("admin.config.logoRemove")}
-                  </Button>}
-                </div>
+          <div data-testid="club-profile-columns" className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-2 lg:items-start xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.25fr)]">
+            <div data-testid="club-identity" className="grid gap-4">
+              <TextField data-testid="club-name" label={t("admin.config.clubName")} value={config.clubName} onChange={(event) => changeConfig({ clubName: event.target.value })} />
+              <div className="grid gap-1">
+                <TextField data-testid="short-name" maxLength={12} label={t("admin.config.shortName")} value={config.shortName ?? ""} onChange={(event) => changeConfig({ shortName: event.target.value || null })} />
+                <p className="text-muted text-sm">{t("admin.config.shortNameHelp")}</p>
               </div>
-              <div className="grid min-w-0 gap-1">
-                <TextField data-testid="logo-url" label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""}
-                           onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
-                <p className="text-muted text-sm">{t("admin.config.logoUrlHelp")}</p>
-              </div>
-            </fieldset>
-          </div>
-          <div data-testid="club-links" className="grid gap-5 [&>*]:min-w-0 md:grid-cols-3 md:items-start">
-            <TextField data-testid="imprint-url" label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
-            <TextField data-testid="privacy-url" label={t("admin.config.privacyUrl")} value={config.privacyUrl ?? ""} onChange={(event) => changeConfig({ privacyUrl: event.target.value || null })} />
-            <div className="grid gap-1">
-              <TextField data-testid="documentation-url" label={t("admin.config.documentationUrl")} value={config.documentationUrl ?? ""} onChange={(event) => changeConfig({ documentationUrl: event.target.value || null })} />
-              <p className="text-muted text-sm">{t("admin.config.documentationUrlHelp")}</p>
+              <TextField data-testid="imprint-url" label={t("admin.config.imprintUrl")} value={config.imprintUrl ?? ""} onChange={(event) => changeConfig({ imprintUrl: event.target.value || null })} />
+              <TextField data-testid="privacy-url" label={t("admin.config.privacyUrl")} value={config.privacyUrl ?? ""} onChange={(event) => changeConfig({ privacyUrl: event.target.value || null })} />
             </div>
-          </div>
-          <div data-testid="club-locale-and-time" className="grid gap-5 [&>*]:min-w-0 md:grid-cols-3 md:items-start">
-            <label className="grid gap-2 font-medium">
-              {t("admin.config.defaultLocale")}
-              <LocaleSelect testId="default-locale" className="form-control rounded-lg border px-3 py-3" value={config.defaultLocale} supported={supported} changed={(defaultLocale) => changeConfig({ defaultLocale })} />
-            </label>
-            <div className="grid gap-1">
+            <div data-testid="club-settings" className="grid gap-4">
+              <div className="grid gap-1">
+                <TextField data-testid="documentation-url" label={t("admin.config.documentationUrl")} value={config.documentationUrl ?? ""} onChange={(event) => changeConfig({ documentationUrl: event.target.value || null })} />
+                <p className="text-muted text-sm">{t("admin.config.documentationUrlHelp")}</p>
+              </div>
               <label className="grid gap-2 font-medium">
-                {t("admin.config.timeZone")}
-                <select data-testid="time-zone" className="form-control min-w-0 rounded-lg border px-3 py-3"
-                        value={config.timeZone}
-                        onChange={(event) => changeConfig({ timeZone: event.target.value })}>
-                  {timeZones(config.timeZone).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
-                </select>
+                {t("admin.config.defaultLocale")}
+                <LocaleSelect testId="default-locale" className="form-control rounded-lg border px-3 py-3" value={config.defaultLocale} supported={supported} changed={(defaultLocale) => changeConfig({ defaultLocale })} />
               </label>
-              <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
+              <div className="grid gap-1">
+                <label className="grid gap-2 font-medium">
+                  {t("admin.config.timeZone")}
+                  <select data-testid="time-zone" className="form-control min-w-0 rounded-lg border px-3 py-3"
+                          value={config.timeZone}
+                          onChange={(event) => changeConfig({ timeZone: event.target.value })}>
+                    {timeZones(config.timeZone).map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+                  </select>
+                </label>
+                <p className="text-muted text-sm">{t("admin.config.timeZoneHelp")}</p>
+              </div>
+              <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} className="max-w-32" label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
             </div>
-            <TextField id="slot-minutes" data-testid="slot-minutes" type="number" min={5} max={120} step={5} className="max-w-32" label={t("admin.config.slotMinutes")} value={config.slotMinutes} onChange={(event) => changeConfig({ slotMinutes: Number(event.target.value) })} />
+            <div data-testid="club-appearance" className="grid gap-5 [&>*]:min-w-0 sm:grid-cols-2 lg:col-span-2">
+              <BrandColorField kind="primary" label={t("admin.config.primaryColor")} value={config.primaryColor} changed={(primaryColor) => changeConfig({ primaryColor })} />
+              <BrandColorField kind="accent" label={t("admin.config.accentColor")} value={config.accentColor} changed={(accentColor) => changeConfig({ accentColor })} />
+              <fieldset className="min-w-0 grid gap-4 rounded-xl border p-4 sm:col-span-2 sm:grid-cols-2 sm:items-start">
+                <legend className="px-1 font-semibold">{t("admin.config.logo")}</legend>
+                <div className="grid min-w-0 gap-3">
+                  {logo?.url && <img data-testid="logo-preview" src={logo.url} alt={t("admin.config.logoPreview")}
+                                    className="max-h-16 max-w-48 object-contain" />}
+                  <label className="grid gap-2 font-medium">
+                    {t("admin.config.logoFile")}
+                    <input ref={logoInput} data-testid="logo-file" type="file" accept="image/png,image/jpeg"
+                           disabled={configurationPending} onChange={selectLogoFile}
+                           className="form-control min-w-0 w-full rounded-lg border px-3 py-3" />
+                  </label>
+                  <p className="text-muted text-sm">{t("admin.config.logoHelp")}</p>
+                  <div className="flex flex-wrap gap-3">
+                    <Button data-testid="upload-logo" type="button" variant="secondary"
+                            disabled={!logoFile || configurationPending} onClick={() => void uploadLogo()}>
+                      {t("admin.config.logoUpload")}
+                    </Button>
+                    {logo?.uploaded && <Button data-testid="remove-logo" type="button" variant="destructive"
+                                              disabled={configurationPending} onClick={() => void removeLogo()}>
+                      {t("admin.config.logoRemove")}
+                    </Button>}
+                  </div>
+                </div>
+                <div className="grid min-w-0 gap-1">
+                  <TextField data-testid="logo-url" label={t("admin.config.logoUrl")} value={config.logoUrl ?? ""}
+                             onChange={(event) => changeConfig({ logoUrl: event.target.value || null })} />
+                  <p className="text-muted text-sm">{t("admin.config.logoUrlHelp")}</p>
+                </div>
+              </fieldset>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="primary" data-testid="save-club-config" type="submit"

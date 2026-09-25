@@ -147,8 +147,8 @@ Auswahlen für denselben Zeitraum ab.
 ## Buchungsregeln
 
 Öffne *Verein → Buchungsregeln*. Eine Mitgliedsart verweist auf ein Regelwerk. Die Übersicht
-oben zeigt jedes Regelwerk mit seinem Status und den Mitgliedsarten, für die es gilt. Wähle dort
-ein Regelwerk, um darunter seine Regeln zu bearbeiten. Jedes Regelwerk kann diese Regeln höchstens
+zeigt jedes Regelwerk mit seinem Status und den Mitgliedsarten, für die es gilt. Wähle dort ein
+Regelwerk, um seine Regeln zu bearbeiten. Jedes Regelwerk kann diese Regeln höchstens
 einmal enthalten:
 
 | Regel | Einstellung |
@@ -167,7 +167,7 @@ Beim Stilllegen bleibt ein Regelwerk für bereits zugeordnete Mitgliedsarten wir
 nicht mehr für neue Zuordnungen bereit. Weise den betroffenen Mitgliedsarten zuerst ein anderes
 Regelwerk zu, wenn sich ihre Regeln ändern sollen.
 
-Wähle neben der Übersicht ein Regelwerk für Personen ohne aktuelle Mitgliedsart, wenn auch für
+Wähle unter der Übersicht ein Regelwerk für Personen ohne aktuelle Mitgliedsart, wenn auch für
 diese Gruppe mitgliedschaftsbezogene Regeln gelten sollen. Ohne Auswahl gelten weiterhin
 Öffnungszeiten und Buchungsraster.
 

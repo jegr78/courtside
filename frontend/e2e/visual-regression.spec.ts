@@ -1,5 +1,5 @@
 import { type Locator, type Page } from "@playwright/test";
-import { expect, test } from "./fixtures";
+import { expect, selectPreference, test } from "./fixtures";
 
 // Locale, theme, viewport and timezone are fixed here; the renderer is fixed by the project,
 // which draws in the pinned image rather than in whatever browser the host provides.
@@ -233,3 +233,36 @@ async function stableScreenshot(surface: Locator, name: string, mask?: Locator):
     ...screenshotOptions, mask: mask ? [mask] : []
   });
 }
+
+test("each configuration surface fits the desktop screen without scrolling in either language", async ({ page }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  const surfaces = [
+    { link: "admin-configuration-link", view: "admin-configuration-view", ready: "logo-url" },
+    { link: "admin-deadlines-link", view: "admin-deadlines-view", ready: "booking-reminder-hours" },
+    { link: "admin-rule-sets-link", view: "admin-rule-sets-view", ready: "rule-ADVANCE_WINDOW-maxDays" }
+  ];
+
+  for (const language of ["de", "en"]) {
+    await selectPreference(page, "#locale-preference", language);
+    await expect(page.locator("html")).toHaveAttribute("lang", language);
+    await page.getByTestId("administration-link").click();
+    for (const surface of surfaces) {
+      // when
+      await page.getByTestId(surface.link).click();
+      await expect(page.getByTestId(surface.ready)).toBeEnabled();
+      await page.evaluate(() => document.fonts.ready);
+      const measured = await page.evaluate((view) => ({
+        document: document.documentElement.scrollHeight,
+        viewport: window.innerHeight,
+        view: Math.round(document.querySelector(`[data-testid='${view}']`)!.getBoundingClientRect().height),
+        navigation: Math.round(document.querySelector("[data-testid='admin-navigation']")!.getBoundingClientRect().height)
+      }), surface.view);
+
+      // then
+      expect.soft(measured.document, `${language} ${surface.view} needs scrolling: ${JSON.stringify(measured)}`)
+        .toBeLessThanOrEqual(measured.viewport);
+    }
+    await page.getByTestId("court-plan-link").click();
+  }
+});

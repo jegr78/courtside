@@ -212,25 +212,25 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
     }
   }
 
-  const cell = "grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-3 md:table-cell md:border-t md:p-2 md:align-middle";
+  const cell = "grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-3 md:table-cell md:border-t md:px-2 md:py-1 md:align-middle";
   const cellLabel = "font-medium md:hidden";
 
-  return <section data-testid="admin-rule-sets-view" className="surface-panel min-w-0 grid gap-8 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl sm:p-8">
+  return <section data-testid="admin-rule-sets-view" className="surface-panel min-w-0 grid gap-6 rounded-2xl border p-6 shadow-[0_20px_50px_var(--cs-shadow)] [&>*]:min-w-0 [&>*]:max-w-5xl">
     <h1 className="text-3xl font-bold">{t("admin.rules.title")}</h1>
     {!config
       ? (error ? <LoadFailure message={error} retry={() => { clear(); retryLoad(); }} /> : <p role="status">{t("status.loading")}</p>)
       : <>
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
-        <div data-testid="booking-rules" className="grid gap-8">
+        <div data-testid="booking-rules" className="grid gap-6 [&>*]:min-w-0 xl:grid-cols-[minmax(0,4fr)_minmax(0,6fr)] xl:items-start">
           <div className="grid gap-4">
             <h2 id="rule-set-overview-heading" className="text-2xl font-bold">{t("admin.ruleSets.overview")}</h2>
             <table data-testid="rule-set-overview" aria-labelledby="rule-set-overview-heading" className="w-full border-collapse text-left">
               <thead className="sr-only md:not-sr-only">
                 <tr className="text-muted text-sm">
-                  <th scope="col" className="p-2 font-semibold">{t("admin.rules.ruleSet")}</th>
-                  <th scope="col" className="p-2 font-semibold">{t("admin.ruleSets.state")}</th>
-                  <th scope="col" className="p-2 font-semibold">{t("admin.ruleSets.appliesTo")}</th>
+                  <th scope="col" className="px-2 py-1 font-semibold">{t("admin.rules.ruleSet")}</th>
+                  <th scope="col" className="px-2 py-1 font-semibold">{t("admin.ruleSets.state")}</th>
+                  <th scope="col" className="px-2 py-1 font-semibold">{t("admin.ruleSets.appliesTo")}</th>
                 </tr>
               </thead>
               <tbody className="grid gap-3 md:table-row-group">
@@ -264,40 +264,48 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
                 })}
               </tbody>
             </table>
-            <div className="grid gap-5 md:grid-cols-2 md:items-start">
-              <form noValidate {...newRuleSet.form} onSubmit={(event) => { event.preventDefault(); void addRuleSet(event.currentTarget); }} className="grid gap-3 rounded-xl border p-4 sm:grid-cols-[1fr_auto] sm:items-end">
-                <TextField data-testid="new-rule-set-name" disabled={pending} name="name" maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.newRuleSet")} />
-                <Button variant="primary" data-testid="create-rule-set" disabled={pending} type="submit">{t("admin.create")}</Button>
-              </form>
-              <form noValidate onSubmit={(event) => void saveFallback(event)} className="grid gap-3 rounded-xl border p-4">
-                <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                  <label className="grid gap-2 font-medium">
-                    {t("admin.config.noMembershipTypeRuleSet")}
-                    <select data-testid="no-membership-type-rule-set" className="form-control min-w-0 rounded-lg border px-3 py-3"
-                            value={config.noMembershipTypeRuleSetId ?? ""}
-                            onChange={(event) => change({ noMembershipTypeRuleSetId: event.target.value || null })}>
-                      <option value="">{t("admin.config.noMembershipTypeRuleSetNone")}</option>
-                      {assignableRuleSets.map((ruleSet) => <option key={ruleSet.id} value={ruleSet.id}>{ruleSet.name}</option>)}
-                    </select>
-                  </label>
-                  <Button variant="primary" data-testid="save-no-membership-type-rule-set" type="submit"
-                          aria-describedby={describedByMark("rule-set-fallback", unsavedFallback)}
-                          disabled={fallbackPending}>{t("admin.save")}</Button>
-                </div>
-                <UnsavedMark id="rule-set-fallback" unsaved={unsavedFallback} />
-                <p className="text-muted text-sm">{t("admin.config.noMembershipTypeRuleSetHelp")}</p>
-              </form>
+            <form noValidate {...newRuleSet.form} onSubmit={(event) => { event.preventDefault(); void addRuleSet(event.currentTarget); }} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+              <TextField data-testid="new-rule-set-name" disabled={pending} name="name" maxLength={RULE_SET_NAME_LENGTH} className="py-2" label={t("admin.rules.newRuleSet")} />
+              <Button variant="primary" data-testid="create-rule-set" disabled={pending} type="submit" className="py-2">{t("admin.create")}</Button>
+            </form>
+            <form noValidate onSubmit={(event) => void saveFallback(event)} className="grid gap-2 rounded-xl border p-3">
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                <label className="grid gap-2 font-medium">
+                  {t("admin.config.noMembershipTypeRuleSet")}
+                  <select data-testid="no-membership-type-rule-set" className="form-control min-w-0 rounded-lg border px-3 py-2"
+                          value={config.noMembershipTypeRuleSetId ?? ""}
+                          onChange={(event) => change({ noMembershipTypeRuleSetId: event.target.value || null })}>
+                    <option value="">{t("admin.config.noMembershipTypeRuleSetNone")}</option>
+                    {assignableRuleSets.map((ruleSet) => <option key={ruleSet.id} value={ruleSet.id}>{ruleSet.name}</option>)}
+                  </select>
+                </label>
+                <Button variant="primary" data-testid="save-no-membership-type-rule-set" type="submit" className="py-2"
+                        aria-describedby={describedByMark("rule-set-fallback", unsavedFallback)}
+                        disabled={fallbackPending}>{t("admin.save")}</Button>
+              </div>
+              <UnsavedMark id="rule-set-fallback" unsaved={unsavedFallback} />
+              <p className="text-muted text-sm">{t("admin.config.noMembershipTypeRuleSetHelp")}</p>
+            </form>
+            <div data-testid="club-wide-rules" className="grid gap-2">
+              <h3 data-testid="club-wide-rules-heading" className="text-xl font-bold">{t("admin.rules.clubWide")}</h3>
+              <p data-testid="club-wide-rules-note" className="text-muted text-sm">{t("admin.rules.clubWideHelp")}</p>
+              <ul data-testid="club-wide-rules-list" className="grid gap-1">
+                {ruleTypes.filter((type) => !type.configurable).map((type) => <li key={type.ruleType} className="flex flex-wrap items-baseline gap-x-3">
+                  <h4 data-testid={`rule-${type.ruleType}-title`} className="font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>
+                  <GlobalRuleLink ruleType={type.ruleType} />
+                </li>)}
+              </ul>
             </div>
           </div>
-          <section id="rule-set" data-testid="rule-set-editor" tabIndex={-1} aria-labelledby="rule-set-editor-heading" className="grid gap-5">
+          <section id="rule-set" data-testid="rule-set-editor" tabIndex={-1} aria-labelledby="rule-set-editor-heading" className="grid gap-3">
             <h2 id="rule-set-editor-heading" className="text-2xl font-bold">{t("admin.ruleSets.selected")}</h2>
-            {selectedRuleSet && <div className="grid gap-3 rounded-xl border p-4">
-              <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
-                <TextField data-testid="rule-set-name" disabled={pending} maxLength={RULE_SET_NAME_LENGTH} label={t("admin.rules.ruleSetName")} value={ruleSetName} onChange={(event) => setRuleSetName(event.target.value)} />
-                <Button variant="primary" data-testid="save-rule-set" aria-describedby={describedByMark(`rule-set:${selectedRuleSet.id}`, unsavedRuleSetName)} disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.changeRuleSet(selectedRuleSet.id, { name: ruleSetName }))}>{t("admin.save")}</Button>
-                <Button variant={selectedRuleSet.active ? "destructive" : "primary"} data-testid="toggle-rule-set" disabled={pending} type="button" onClick={() => void toggleRuleSet(selectedRuleSet)}>{t(selectedRuleSet.active ? "admin.deactivate" : "admin.activate")}</Button>
-                <UnsavedMark id={`rule-set:${selectedRuleSet.id}`} unsaved={unsavedRuleSetName} />
+            {selectedRuleSet && <div className="grid gap-2">
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+                <TextField data-testid="rule-set-name" disabled={pending} maxLength={RULE_SET_NAME_LENGTH} className="py-2" label={t("admin.rules.ruleSetName")} value={ruleSetName} onChange={(event) => setRuleSetName(event.target.value)} />
+                <Button variant="primary" data-testid="save-rule-set" className="py-2" aria-describedby={describedByMark(`rule-set:${selectedRuleSet.id}`, unsavedRuleSetName)} disabled={pending} type="button" onClick={() => void mutateRuleSet(() => api.changeRuleSet(selectedRuleSet.id, { name: ruleSetName }))}>{t("admin.save")}</Button>
+                <Button variant={selectedRuleSet.active ? "destructive" : "primary"} data-testid="toggle-rule-set" className="py-2" disabled={pending} type="button" onClick={() => void toggleRuleSet(selectedRuleSet)}>{t(selectedRuleSet.active ? "admin.deactivate" : "admin.activate")}</Button>
               </div>
+              <UnsavedMark id={`rule-set:${selectedRuleSet.id}`} unsaved={unsavedRuleSetName} />
               <p data-testid="rule-set-retire-note" className="text-muted text-sm">
                 {boundTypes(selectedRuleSet.id).length === 0
                   ? t("admin.rules.retireUnused")
@@ -309,19 +317,10 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
               stay={() => setPendingRuleSetId(undefined)}
               discard={() => { chooseRuleSet(pendingRuleSetId); setPendingRuleSetId(undefined); }}
             />}
-            <div data-testid="rule-set-rules" className="grid gap-4">
+            <div data-testid="rule-set-rules" className="grid gap-2">
               <h3 data-testid="rule-set-rules-heading" className="text-xl font-bold">{t("admin.rules.ofRuleSet")}</h3>
-              <div data-testid="rule-set-rules-list" className="grid gap-4 [&>*]:min-w-0 md:grid-cols-2 lg:grid-cols-3">
+              <div data-testid="rule-set-rules-list" className="grid [&>*]:min-w-0">
                 {ruleTypes.filter((type) => type.configurable).map((type) => <RuleEditor key={type.ruleType} type={type} definition={rules.find((rule) => rule.ruleType === type.ruleType)} disabled={loadedRuleSetId !== selectedRuleSetId} save={saveRule} remove={removeRule} />)}
-              </div>
-            </div>
-            <div data-testid="club-wide-rules" className="grid gap-4">
-              <div className="grid gap-1">
-                <h3 data-testid="club-wide-rules-heading" className="text-xl font-bold">{t("admin.rules.clubWide")}</h3>
-                <p data-testid="club-wide-rules-note" className="text-muted text-sm">{t("admin.rules.clubWideHelp")}</p>
-              </div>
-              <div data-testid="club-wide-rules-list" className="grid gap-4 [&>*]:min-w-0 md:grid-cols-2 lg:grid-cols-3">
-                {ruleTypes.filter((type) => !type.configurable).map((type) => <RuleEditor key={type.ruleType} type={type} definition={undefined} disabled save={saveRule} remove={removeRule} />)}
               </div>
             </div>
           </section>
@@ -344,20 +343,27 @@ function RuleEditor({ type, definition, disabled, save, remove }: { type: RuleTy
   const params = edited ?? saved;
   const mark = `rule:${type.ruleType}`;
   const unsaved = differs(params, saved);
-  return <article className="grid content-start gap-4 rounded-xl border p-4">
-    <div><h4 data-testid={`rule-${type.ruleType}-title`} className="text-lg font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>{!type.configurable && <GlobalRuleLink ruleType={type.ruleType} />}</div>
-    {type.configurable && <>
-      {type.parameters.length === 0 && <p data-testid={`rule-${type.ruleType}-description`} className="text-muted text-sm">{t(`admin.rules.description.${type.ruleType}`, { defaultValue: "" })}</p>}
-      {type.parameters.map((parameter) => <div key={parameter.name} className="grid gap-1">
-        <TextField data-testid={`rule-${type.ruleType}-${parameter.name}`} disabled={disabled} type="number" className="max-w-40" label={t(`admin.rules.parameter.${parameter.name}`)} value={params[parameter.name] ?? ""} onChange={(event) => setEdited({ ...params, [parameter.name]: Number(event.target.value) })} />
-        <p data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted text-sm">{t("admin.rules.range", { minimum: parameter.minimum, maximum: parameter.maximum })}</p>
-      </div>)}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" data-testid={`save-rule-${type.ruleType}`} aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button" onClick={() => void save(type.ruleType, params)}>{t("admin.save")}</Button>
-        {definition && <Button variant="destructive" data-testid={`remove-rule-${type.ruleType}`} disabled={disabled} type="button" onClick={() => void remove(type.ruleType)}>{t("admin.rules.remove")}</Button>}
-        <UnsavedMark id={mark} unsaved={unsaved} />
-      </div>
-    </>}
+  return <article className="grid gap-x-3 gap-y-1 border-t py-1.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+    <div className="grid min-w-0 gap-1">
+      <h4 data-testid={`rule-${type.ruleType}-title`} className="font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>
+      {type.parameters.map((parameter) => <p key={parameter.name} className="text-sm">
+        <label htmlFor={`rule-${type.ruleType}-${parameter.name}`}>{t(`admin.rules.parameter.${parameter.name}`)}</label>
+        {" "}<span id={`rule-${type.ruleType}-${parameter.name}-range`} data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted whitespace-nowrap">
+          {t("admin.rules.range", { minimum: parameter.minimum, maximum: parameter.maximum })}
+        </span>
+      </p>)}
+    </div>
+    <div className="flex flex-wrap items-center gap-2">
+      {type.parameters.map((parameter) => <input key={parameter.name} id={`rule-${type.ruleType}-${parameter.name}`} data-testid={`rule-${type.ruleType}-${parameter.name}`}
+                                                 aria-describedby={`rule-${type.ruleType}-${parameter.name}-range`} disabled={disabled} type="number"
+                                                 min={parameter.minimum} max={parameter.maximum}
+                                                 className="form-control w-24 max-w-40 rounded-lg border px-3 py-1.5"
+                                                 value={params[parameter.name] ?? ""} onChange={(event) => setEdited({ ...params, [parameter.name]: Number(event.target.value) })} />)}
+      <Button variant="primary" data-testid={`save-rule-${type.ruleType}`} className="px-3 py-1.5 text-sm" aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button" onClick={() => void save(type.ruleType, params)}>{t("admin.save")}</Button>
+      {definition && <Button variant="destructive" data-testid={`remove-rule-${type.ruleType}`} className="px-3 py-1.5 text-sm" disabled={disabled} type="button" onClick={() => void remove(type.ruleType)}>{t("admin.rules.remove")}</Button>}
+      <UnsavedMark id={mark} unsaved={unsaved} />
+    </div>
+    {type.parameters.length === 0 && <p data-testid={`rule-${type.ruleType}-description`} className="text-muted text-sm sm:col-span-2">{t(`admin.rules.description.${type.ruleType}`, { defaultValue: "" })}</p>}
   </article>;
 }
 

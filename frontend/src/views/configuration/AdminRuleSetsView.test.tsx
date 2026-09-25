@@ -131,18 +131,23 @@ describe("AdminRuleSetsView", () => {
     expect(screen.getByTestId("rule-OPENING_HOURS-global")).toHaveAttribute("href", "/admin/facility/opening-hours");
     expect(screen.getByTestId("rule-SLOT_GRID-global")).toHaveAttribute("href", "/admin/configuration#slot-minutes");
     await waitFor(() => expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue(7));
-    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range")).toHaveTextContent("Allowed range: 1 to 365");
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays-range")).toHaveTextContent("Allowed: 1 to 365");
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveAccessibleDescription("Allowed: 1 to 365");
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), "the browser knows the range too").toHaveAttribute("min", "1");
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveAttribute("max", "365");
   });
 
-  it("given the rules of a set, when the page is laid out, then they share rows and their numbers need no full-width input", async () => {
+  it("given the rules page, when it is laid out at desktop width, then the overview and the selected set stand side by side", async () => {
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("rule-ADVANCE_WINDOW-maxDays");
 
     // then
-    expect(screen.getByTestId("rule-set-rules-list")).toHaveClass("md:grid-cols-2", "lg:grid-cols-3");
-    expect(screen.getByTestId("club-wide-rules-list")).toHaveClass("md:grid-cols-2");
-    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveClass("max-w-40");
+    expect(screen.getByTestId("booking-rules")).toHaveClass("xl:grid-cols-[minmax(0,4fr)_minmax(0,6fr)]");
+    expect(screen.getByTestId("rule-set-editor"), "the rules sit beside the overview, not below it")
+      .toContainElement(screen.getByTestId("rule-set-rules"));
+    expect(screen.getByTestId("rule-set-editor")).not.toContainElement(screen.getByTestId("rule-set-overview"));
+    expect(screen.getByTestId("rule-ADVANCE_WINDOW-maxDays"), "a number of days needs no full-width input").toHaveClass("w-24");
   });
 
   it("given a changed rule, when saving it, then the selected set is written once its rules have arrived", async () => {
@@ -511,7 +516,7 @@ describe("AdminRuleSetsView", () => {
     expect(screen.getByTestId("rule-CANCELLATION_DEADLINE-title")).toHaveTextContent("Cancellation deadline");
     expect(deadline).toHaveAccessibleName("Minimum minutes before the booking starts");
     expect(screen.getByTestId("rule-CANCELLATION_DEADLINE-minMinutes-range"))
-      .toHaveTextContent("Allowed range: 0 to 525600");
+      .toHaveTextContent("Allowed: 0 to 525600");
   });
 
   it("given a rule with no parameters, when it is saved, then it is written without any parameter", async () => {

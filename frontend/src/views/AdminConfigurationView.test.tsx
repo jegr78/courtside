@@ -373,19 +373,22 @@ describe("AdminConfigurationView", () => {
     expect(api.ruleSets, "the club page has no use for rule sets").not.toHaveBeenCalled();
   });
 
-  it("given the short settings, when the club page is laid out, then they share a row at desktop width", async () => {
+  it("given the club page, when it is laid out at desktop width, then its groups stand side by side", async () => {
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("club-name");
 
     // then
-    const row = screen.getByTestId("club-locale-and-time");
-    expect(row, "language, time zone and grid sit side by side").toHaveClass("md:grid-cols-3");
-    for (const field of ["default-locale", "time-zone", "slot-minutes"]) {
-      expect(row, `${field} is in the shared row`).toContainElement(screen.getByTestId(field));
+    const columns = screen.getByTestId("club-profile-columns");
+    expect(columns, "identity, settings and appearance share one row").toHaveClass("xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.25fr)]");
+    expect(screen.getByTestId("club-appearance"), "both colours and the logo take half the row").toHaveClass("lg:col-span-2");
+    for (const field of ["club-name", "short-name", "imprint-url", "privacy-url"]) {
+      expect(screen.getByTestId("club-identity"), `${field} is part of the identity`).toContainElement(screen.getByTestId(field));
     }
-    expect(screen.getByTestId("club-links"), "the three links share a row").toHaveClass("md:grid-cols-3");
-    expect(screen.getByTestId("club-identity"), "name and short name share a row").toHaveClass("md:grid-cols-[2fr_1fr]");
+    for (const field of ["documentation-url", "default-locale", "time-zone", "slot-minutes"]) {
+      expect(screen.getByTestId("club-settings"), `${field} is part of the settings`).toContainElement(screen.getByTestId(field));
+    }
+    expect(screen.getByTestId("slot-minutes"), "a number of minutes needs no full-width input").toHaveClass("max-w-32");
   });
 
   it("given the time-grid fragment, when configuration loads, then the owned setting receives focus", async () => {
