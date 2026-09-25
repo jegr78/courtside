@@ -7,8 +7,7 @@ import { Button } from "../../components/Button";
 import { ImpactPanel } from "../../components/ImpactPanel";
 import { TextField } from "../../components/TextField";
 import { differs } from "../../unsaved/differs";
-import { describedByMark } from "../../unsaved/markId";
-import { UnsavedMark } from "../../unsaved/UnsavedMark";
+import { SaveBar } from "../../unsaved/SaveBar";
 import { CardPreview } from "./CardPreview";
 import { AllowedRoleCheckboxes, BookingRules, Checkbox, CardColorField, ManagingRoleCheckboxes, PlayerCounts } from "./cardControls";
 import { FacilityPage } from "./FacilityPage";
@@ -101,12 +100,10 @@ export function AdminBookingCardView() {
           </BookingRules>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" disabled={disabled} data-testid="save-card" aria-describedby={describedByMark(MARK, differs(card, confirmed))} type="button" onClick={() => void saveCard()}>{t("admin.save")}</Button>
-        <Button variant={card.active ? "destructive" : "primary"} disabled={disabled} data-testid="toggle-card" type="button" onClick={() => void toggleActive()}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
-        <UnsavedMark id={MARK} unsaved={differs(card, confirmed)} />
-      </div>
+      <Button variant={card.active ? "destructive" : "primary"} disabled={disabled} data-testid="toggle-card" className="justify-self-start" type="button" onClick={() => void toggleActive()}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
       <ImpactPanel kind="booking-card" subject={card.id} timeZone={club.timeZone} ask={() => api.bookingCardImpact(card.id)} reportError={reportError} />
+      <SaveBar id={MARK} subject={t("admin.facility.card")} saveTestId="save-card" unsaved={differs(card, confirmed)}
+               pending={disabled} save={() => void saveCard()} discard={() => setCard(confirmed)} />
     </>}
   </FacilityPage>;
 }

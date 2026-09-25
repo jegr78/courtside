@@ -29,71 +29,97 @@ describe("AdminSlotFillersView", () => {
     show();
 
     // then
-    expect(await screen.findByTestId("edit-participant-card-label-filler-1")).toHaveTextContent("Ball machine");
-    expect(screen.getByTestId("edit-participant-card-capacity-filler-1")).toHaveTextContent("1");
+    expect(await screen.findByTestId("edit-participant-card-label-filler-1")).toHaveValue("Ball machine");
+    expect(screen.getByTestId("edit-participant-card-capacity-filler-1")).toHaveValue(1);
     expect(screen.getByTestId("participant-card-row-filler-1")).toHaveTextContent("Active");
     expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByTestId("save-slot-fillers"), "a clean list has nothing to save").not.toBeInTheDocument();
   });
 
-  it("opens only one participant-card cell editor at a time", async () => {
-    vi.spyOn(api, "adminParticipantCards").mockResolvedValue([
-      { id: "filler-1", label: "Ball machine", capacity: 1, active: true },
-      { id: "filler-2", label: "Partner wanted", capacity: null, active: false }
-    ]);
-    show();
-
-    await userEvent.click(await screen.findByTestId("edit-participant-card-label-filler-1"));
-    expect(screen.getByTestId("participant-card-editor")).toHaveValue("Ball machine");
-
-    await userEvent.click(screen.getByTestId("edit-participant-card-capacity-filler-2"));
-    expect(screen.getAllByTestId("participant-card-editor")).toHaveLength(1);
-    expect(screen.getByTestId("participant-card-editor")).toHaveValue(null);
-  });
-
-  it("dismisses an inline edit without changing the stored value and restores focus", async () => {
-    show();
-    const value = await screen.findByTestId("edit-participant-card-label-filler-1");
-    await userEvent.click(value);
-    await userEvent.type(screen.getByTestId("participant-card-editor"), " changed");
-
-    await userEvent.keyboard("{Escape}");
-
-    expect(screen.getByTestId("edit-participant-card-label-filler-1")).toHaveTextContent("Ball machine");
-    expect(screen.getByTestId("edit-participant-card-label-filler-1")).toHaveFocus();
-  });
-
-  it("does not confirm an invalid inline value", async () => {
-    show();
-    await userEvent.click(await screen.findByTestId("edit-participant-card-label-filler-1"));
-    await userEvent.clear(screen.getByTestId("participant-card-editor"));
-    await userEvent.type(screen.getByTestId("participant-card-editor"), "   ");
-    expect(screen.getByTestId("confirm-participant-card-edit")).toBeDisabled();
-
-    await userEvent.click(screen.getByTestId("edit-participant-card-capacity-filler-1"));
-    await userEvent.clear(screen.getByTestId("participant-card-editor"));
-    await userEvent.type(screen.getByTestId("participant-card-editor"), "1.5");
-    expect(screen.getByTestId("confirm-participant-card-edit")).toBeDisabled();
-  });
-
-  it("does not let an earlier save response close a newer cell editor", async () => {
+  it("given two edited fillers, when the page is saved once, then each is written", async () => {
+    // given
     vi.spyOn(api, "adminParticipantCards").mockResolvedValue([
       { id: "filler-1", label: "Ball machine", capacity: 1, active: true },
       { id: "filler-2", label: "Partner wanted", capacity: null, active: true }
     ]);
-    let answer!: (card: { id: string; label: string; capacity: number; active: boolean }) => void;
-    const changing = vi.spyOn(api, "changeParticipantCard").mockReturnValue(new Promise((resolve) => { answer = resolve; }));
-    show();
-    await userEvent.click(await screen.findByTestId("edit-participant-card-label-filler-1"));
-    await userEvent.type(screen.getByTestId("participant-card-editor"), "!");
-    await userEvent.click(screen.getByTestId("confirm-participant-card-edit"));
-    await waitFor(() => expect(changing).toHaveBeenCalled());
+    const changing = vi.spyOn(api, "changeParticipantCard").mockImplementation((id, request) =>
+      Promise.resolve({ id, label: request.label, capacity: request.capacity ?? null, active: true }));
+    show(true);
+    await userEvent.type(await screen.findByTestId("edit-participant-card-label-filler-1"), "!");
+    await userEvent.type(screen.getByTestId("edit-participant-card-capacity-filler-2"), "3");
+    await waitFor(() => expect(screen.getByTestId("unsaved-count"), "one page save is one change to lose").toHaveTextContent("1"));
+
+    // when
+    await userEvent.click(screen.getByTestId("save-slot-fillers"));
+
+    // then
+    expect(await screen.findByTestId("admin-save-success")).toBeVisible();
     expect(changing).toHaveBeenCalledWith("filler-1", { label: "Ball machine!", capacity: 1 });
-    expect(screen.getByTestId("edit-participant-card-capacity-filler-1")).toBeDisabled();
+    expect(changing).toHaveBeenCalledWith("filler-2", { label: "Partner wanted", capacity: 3 });
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
 
-    await userEvent.click(screen.getByTestId("edit-participant-card-label-filler-2"));
-    answer({ id: "filler-1", label: "Ball machine!", capacity: 1, active: true });
+  it("given an edited label, when the edit is discarded, then the stored value returns", async () => {
+    // given
+    show(true);
+    const label = await screen.findByTestId("edit-participant-card-label-filler-1");
+    await userEvent.type(label, " changed");
 
-    await waitFor(() => expect(screen.getByTestId("participant-card-editor")).toHaveValue("Partner wanted"));
+    // when
+    await userEvent.click(screen.getByTestId("discard-slot-fillers"));
+
+    // then
+    expect(label).toHaveValue("Ball machine");
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given a blank label or a fractional count, when the page is saved, then nothing is written and the field is marked", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeParticipantCard");
+    show();
+    const label = await screen.findByTestId("edit-participant-card-label-filler-1");
+    const capacity = screen.getByTestId("edit-participant-card-capacity-filler-1");
+    await userEvent.clear(label);
+    await userEvent.type(label, "   ");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-slot-fillers"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("Correct the marked slot filler before saving.");
+    expect(label).toHaveAttribute("aria-invalid", "true");
+    expect(capacity).not.toHaveAttribute("aria-invalid");
+
+    // when
+    await userEvent.type(label, "Ball machine");
+    await userEvent.clear(capacity);
+    await userEvent.type(capacity, "1.5");
+    await userEvent.click(screen.getByTestId("save-slot-fillers"));
+
+    // then
+    expect(capacity).toHaveAttribute("aria-invalid", "true");
+    expect(label).not.toHaveAttribute("aria-invalid");
+    expect(changing).not.toHaveBeenCalled();
+  });
+
+  it("given a first filler the instance refuses, when the page is saved, then the fillers after it are not sent and it is named", async () => {
+    // given
+    vi.spyOn(api, "adminParticipantCards").mockResolvedValue([
+      { id: "filler-1", label: "Ball machine", capacity: 1, active: true },
+      { id: "filler-2", label: "Partner wanted", capacity: null, active: true }
+    ]);
+    const changing = vi.spyOn(api, "changeParticipantCard").mockRejectedValue(new Error("unavailable"));
+    show();
+    await userEvent.type(await screen.findByTestId("edit-participant-card-label-filler-1"), "!");
+    await userEvent.type(screen.getByTestId("edit-participant-card-label-filler-2"), "?");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-slot-fillers"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("Ball machine was not saved.");
+    expect(changing, "nothing is sent after the first refusal").toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("edit-participant-card-label-filler-2")).toHaveValue("Partner wanted?");
   });
 
   // The page's one primary action opens it, so a board never scrolls past the list to add a filler.
@@ -105,18 +131,6 @@ describe("AdminSlotFillersView", () => {
     const create = await screen.findByTestId("create-participant-card");
     const first = screen.getByTestId("edit-participant-card-label-filler-1");
     expect(create.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it("given an edited filler, when it is counted, then it is asked about on its own", async () => {
-    // given
-    show(true);
-    await userEvent.click(await screen.findByTestId("edit-participant-card-label-filler-1"));
-
-    // when
-    await userEvent.type(screen.getByTestId("participant-card-editor"), "!");
-
-    // then
-    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
   });
 
   it("given the create form is filled in, when it is read, then it holds work", async () => {
@@ -135,15 +149,14 @@ describe("AdminSlotFillersView", () => {
     const changing = vi.spyOn(api, "changeParticipantCard")
       .mockResolvedValue({ id: "filler-1", label: "Ball machine", capacity: 2, active: true });
     show();
-    await userEvent.click(await screen.findByTestId("edit-participant-card-capacity-filler-1"));
+    const capacity = await screen.findByTestId("edit-participant-card-capacity-filler-1");
 
     // when
-    await userEvent.clear(screen.getByTestId("participant-card-editor"));
-    await userEvent.type(screen.getByTestId("participant-card-editor"), "2");
-    await userEvent.keyboard("{Enter}");
+    await userEvent.clear(capacity);
+    await userEvent.type(capacity, "2{Enter}");
 
     // then
-    expect(changing).toHaveBeenCalledWith("filler-1", { label: "Ball machine", capacity: 2 });
+    await waitFor(() => expect(changing).toHaveBeenCalledWith("filler-1", { label: "Ball machine", capacity: 2 }));
   });
 
   it("given a card the club owns any number of, when the count is cleared, then it is sent as unlimited", async () => {
@@ -151,14 +164,13 @@ describe("AdminSlotFillersView", () => {
     const changing = vi.spyOn(api, "changeParticipantCard")
       .mockResolvedValue({ id: "filler-1", label: "Looking for a partner", capacity: null, active: true });
     show();
-    await userEvent.click(await screen.findByTestId("edit-participant-card-capacity-filler-1"));
 
     // when
-    await userEvent.clear(screen.getByTestId("participant-card-editor"));
-    await userEvent.click(screen.getByTestId("confirm-participant-card-edit"));
+    await userEvent.clear(await screen.findByTestId("edit-participant-card-capacity-filler-1"));
+    await userEvent.click(screen.getByTestId("save-slot-fillers"));
 
     // then — absent means unlimited, and an empty field is how a board says that
-    expect(changing).toHaveBeenCalledWith("filler-1", { label: "Ball machine", capacity: null });
+    await waitFor(() => expect(changing).toHaveBeenCalledWith("filler-1", { label: "Ball machine", capacity: null }));
   });
 
   it("when a slot filler is added, then it is created and joins the list", async () => {
@@ -174,7 +186,7 @@ describe("AdminSlotFillersView", () => {
 
     // then
     expect(creating).toHaveBeenCalledWith({ label: "Looking for a partner", capacity: null });
-    expect(await screen.findByTestId("edit-participant-card-label-filler-2")).toHaveTextContent("Looking for a partner");
+    expect(await screen.findByTestId("edit-participant-card-label-filler-2")).toHaveValue("Looking for a partner");
   });
 
   it("given a card taken out of service, when it is toggled, then no dialog stands in the way", async () => {
@@ -197,24 +209,23 @@ describe("AdminSlotFillersView", () => {
       .mockResolvedValueOnce({ id: "filler-1", label: "Ball machine", capacity: 1, active: false })
       .mockResolvedValueOnce({ id: "filler-1", label: "Ball machine", capacity: 1, active: true });
     show();
-    await userEvent.click(await screen.findByTestId("edit-participant-card-label-filler-1"));
-    await userEvent.type(screen.getByTestId("participant-card-editor"), " two");
+    await userEvent.type(await screen.findByTestId("edit-participant-card-label-filler-1"), " two");
 
     // when
     await userEvent.click(screen.getByTestId("toggle-participant-card-filler-1"));
 
     // then
     await waitFor(() => expect(screen.getByTestId("toggle-participant-card-filler-1")).toHaveTextContent("Activate"));
-    expect(screen.getByTestId("participant-card-editor")).toHaveValue("Ball machine two");
-    expect(screen.getByTestId("unsaved-mark-participant-card:filler-1")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-participant-card-label-filler-1")).toHaveValue("Ball machine two");
+    expect(screen.getByTestId("unsaved-mark-slot-fillers")).toBeInTheDocument();
 
     // when — the way back is the same change
     await userEvent.click(screen.getByTestId("toggle-participant-card-filler-1"));
 
     // then
     await waitFor(() => expect(screen.getByTestId("toggle-participant-card-filler-1")).toHaveTextContent("Deactivate"));
-    expect(screen.getByTestId("participant-card-editor")).toHaveValue("Ball machine two");
-    expect(screen.getByTestId("unsaved-mark-participant-card:filler-1")).toBeInTheDocument();
+    expect(screen.getByTestId("edit-participant-card-label-filler-1")).toHaveValue("Ball machine two");
+    expect(screen.getByTestId("unsaved-mark-slot-fillers")).toBeInTheDocument();
   });
 
   it("given slot fillers cannot load, when opening the view, then the failure replaces the loading state", async () => {

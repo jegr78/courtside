@@ -220,6 +220,33 @@ describe("AdminBookingCardView", () => {
     expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1");
   });
 
+  it("given an untouched card, when the page loads, then no save is offered", async () => {
+    // when
+    show();
+    await screen.findByTestId("card-label");
+
+    // then
+    expect(screen.queryByTestId("save-card")).toBeNull();
+    expect(screen.getByTestId("toggle-card"), "taking the card out of service is its own action").toBeVisible();
+  });
+
+  it("given an edited card, when the edit is discarded, then the stored card returns and nothing is left unsaved", async () => {
+    // given
+    show("card-1", true);
+    await screen.findByTestId("card-label");
+    await userEvent.type(screen.getByTestId("card-label"), "!");
+    await userEvent.click(screen.getByTestId("card-guest-allowed"));
+    expect(screen.getByTestId("unsaved-mark-booking-card")).toHaveTextContent("Booking card");
+
+    // when
+    await userEvent.click(screen.getByTestId("discard-booking-card"));
+
+    // then
+    expect(screen.getByTestId("card-label")).toHaveValue("Member booking");
+    expect(screen.getByTestId("card-guest-allowed")).toBeChecked();
+    expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0");
+  });
+
   it("given a navigation state that merely resembles the creation mark, when the page opens, then nothing announces a created card", async () => {
     // given / when
     for (const cardCreated of [1, "true", "cardCreated", {}, [true]]) {
@@ -239,6 +266,7 @@ describe("AdminBookingCardView", () => {
     show("card-1", false, { cardCreated: true });
     await screen.findByTestId("card-label");
     expect(screen.getByTestId("admin-save-success")).toHaveTextContent("The booking card was created.");
+    await userEvent.type(screen.getByTestId("card-label"), "!");
 
     // when
     await userEvent.click(screen.getByTestId("save-card"));
