@@ -188,7 +188,7 @@ The message includes the applicable number. Correct the marked fields and submit
 Courtside releases the court immediately. If the cancellation deadline has passed, the booking
 remains and Courtside tells you which deadline applied.
 
-![Upcoming and past bookings with the cancellation button.](../screenshots/en/my-bookings.png)
+![Upcoming bookings with the cancellation button, the past ones folded away below them.](../screenshots/en/my-bookings.png)
 
 ## Series
 

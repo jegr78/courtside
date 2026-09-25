@@ -190,7 +190,7 @@ Die konkrete Zahl steht in der Meldung. Ändere die markierten Angaben und sende
 Courtside gibt den Platz sofort frei. Ist die Stornierungsfrist abgelaufen, bleibt die Buchung
 bestehen und Courtside nennt dir die geltende Frist.
 
-![Bevorstehende und vergangene Buchungen mit der Schaltfläche zum Stornieren.](screenshots/de/my-bookings.png)
+![Bevorstehende Buchungen mit der Schaltfläche zum Stornieren, die vergangenen eingeklappt darunter.](screenshots/de/my-bookings.png)
 
 ## Serientermine
 
