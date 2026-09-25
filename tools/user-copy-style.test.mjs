@@ -36,8 +36,7 @@ const formalInstruction = new RegExp(
 );
 
 test("given German user copy, when it addresses the reader, then it consistently uses du", () => {
-  const frontend = read("frontend/src/i18n.ts");
-  const germanFrontend = frontend.slice(frontend.indexOf("de: {"), frontend.indexOf("  en: {"));
+  const germanFrontend = read("frontend/src/locales/de.ts");
 
   for (const path of germanFiles) {
     assert.doesNotMatch(read(path), formalInstruction, `${path} addresses the reader formally`);
@@ -50,7 +49,8 @@ test("given maintained documentation and user copy, then it avoids typographic A
   const paths = [
     "README.md",
     "deploy/README.md",
-    "frontend/src/i18n.ts",
+    "frontend/src/locales/de.ts",
+    "frontend/src/locales/en.ts",
     "src/main/resources/messages.properties",
     "src/main/resources/messages_de.properties",
     "src/main/resources/mail.properties",

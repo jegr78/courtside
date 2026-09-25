@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { useMemo, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, AppRoutes } from "./App";
 import { api, type SessionStatus } from "./api/client";
 import { ClubConfigurationProvider } from "./club/ClubConfigurationProvider";
@@ -25,6 +25,8 @@ function RoutedShell({ initialEntries = ["/"], children }: { initialEntries?: st
   return <ClubConfigurationProvider><RouterProvider router={router} /></ClubConfigurationProvider>;
 }
 
+// The administration arrives as its own chunk, so it is compiled once here rather than inside a test's wait.
+beforeAll(() => import("./views/AdminRoutes"));
 
 describe("AppRoutes", () => {
   beforeEach(async () => {
@@ -210,11 +212,12 @@ describe("AppRoutes", () => {
     expect(await screen.findByTestId("sign-in-link")).toHaveAttribute("href", "/login");
   });
 
-  it("given an admin session, when opening configuration, then the protected admin view is available", () => {
+  it("given an admin session, when opening configuration, then the protected admin view is available", async () => {
     // given
     vi.spyOn(api, "adminConfig").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "ruleSets").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "ruleTypes").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "membershipTypes").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
     render(<RoutedShell initialEntries={["/admin/configuration"]}><AppRoutes session={{
@@ -226,16 +229,18 @@ describe("AppRoutes", () => {
     }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
 
     // then
+    expect(await screen.findByTestId("admin-configuration-view")).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   // The two audiences do not share a layout: inside administration the surface carries its own
   // navigation, and the member bar would offer a second, competing way back to the court plan.
-  it("given an admin session, when opening an administrative page, then the member bar gives way to it", () => {
+  it("given an admin session, when opening an administrative page, then the member bar gives way to it", async () => {
     // given
     vi.spyOn(api, "adminConfig").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "ruleSets").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "ruleTypes").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "membershipTypes").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
     render(<RoutedShell initialEntries={["/admin/configuration"]}><AppRoutes session={{
@@ -247,8 +252,8 @@ describe("AppRoutes", () => {
     }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
 
     // then
+    expect(await screen.findByTestId("admin-navigation")).toBeInTheDocument();
     expect(screen.queryByTestId("primary-navigation")).not.toBeInTheDocument();
-    expect(screen.getByTestId("admin-navigation")).toBeInTheDocument();
     expect(screen.getByTestId("court-plan-link")).toHaveAttribute("href", "/");
   });
 
@@ -326,12 +331,13 @@ describe("AppRoutes", () => {
     ["/admin/facility/opening-hours", "admin-opening-hours-view"],
     ["/admin/facility/booking-cards", "admin-booking-cards-view"],
     ["/admin/facility/slot-fillers", "admin-slot-fillers-view"]
-  ])("given an admin session, when opening %s, then %s is the page", (address, view) => {
+  ])("given an admin session, when opening %s, then %s is the page", async (address, view) => {
     // given
     vi.spyOn(api, "adminCourts").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "adminOpeningHours").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "adminBookingCards").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "adminParticipantCards").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "config").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
     render(<RoutedShell initialEntries={[address]}><AppRoutes session={{
@@ -343,7 +349,7 @@ describe("AppRoutes", () => {
     }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
 
     // then
-    expect(screen.getByTestId(view)).toBeInTheDocument();
+    expect(await screen.findByTestId(view)).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 

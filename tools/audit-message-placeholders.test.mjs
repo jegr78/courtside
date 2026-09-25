@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { localeSources } from "./i18n-bundle.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -33,21 +34,17 @@ const nullSafeContexts = () => {
   return contexts;
 };
 
-const auditMessages = (source) => {
-  const blocks = source.match(
-    /^ {2}de: \{ translation: \{\n([\s\S]*?)\n {2}\} \},\n {2}en: \{ translation: \{\n([\s\S]*?)\n {2}\} \}\n\};/m
+const auditMessages = () => {
+  const { de, en } = localeSources();
+  const messagesOf = (source) => new Map(
+    [...source.matchAll(/^\s*"(audit\.event\.[^"]+)":\s*"([^"]*)"/gm)].map((match) => [match[1], match[2]])
   );
-  assert.ok(blocks, "could not locate the de and en translation blocks in i18n.ts");
-  const messagesOf = (block) => new Map(
-    [...block.matchAll(/^\s*"(audit\.event\.[^"]+)":\s*"([^"]*)"/gm)].map((match) => [match[1], match[2]])
-  );
-  return { de: messagesOf(blocks[1]), en: messagesOf(blocks[2]) };
+  return { de: messagesOf(de), en: messagesOf(en) };
 };
 
 test("given every audit message, when checking its placeholders, then each names a field the event carries or a known derived value", () => {
   // given
-  const source = readFileSync(join(root, "frontend/src/i18n.ts"), "utf8");
-  const { de, en } = auditMessages(source);
+  const { de, en } = auditMessages();
   const fields = fieldsPerEventType("domain-event-payload.properties");
 
   // when
@@ -70,8 +67,7 @@ test("given every audit message, when checking its placeholders, then each names
 
 test("given a message that interpolates a nullable field, when checking its variants, then the view reaches a null-safe one", () => {
   // given
-  const source = readFileSync(join(root, "frontend/src/i18n.ts"), "utf8");
-  const { de, en } = auditMessages(source);
+  const { de, en } = auditMessages();
   const nullableFields = fieldsPerEventType("domain-event-nullable-field.properties");
   const contexts = nullSafeContexts();
 

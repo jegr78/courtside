@@ -1,4 +1,4 @@
-import { availableLocales, type SupportedLocale } from "../i18n";
+import { availableLocales, supportedLocale, type SupportedLocale } from "../i18n";
 
 export function LocaleSelect({ id, testId, value, disabled, supported, className, changed }: {
   id?: string;
@@ -15,7 +15,10 @@ export function LocaleSelect({ id, testId, value, disabled, supported, className
     disabled={disabled}
     className={className}
     value={value}
-    onChange={(event) => changed(event.target.value as SupportedLocale)}
+    onChange={(event) => {
+      const locale = supportedLocale(event.target.value);
+      if (locale) changed(locale);
+    }}
   >
     {availableLocales(supported).map((locale) =>
       <option key={locale} value={locale}>{endonym(locale)}</option>)}

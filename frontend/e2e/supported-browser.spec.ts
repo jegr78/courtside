@@ -163,6 +163,39 @@ test("an administrator can open both core administration views", async ({ page }
   await expect(page.getByTestId("create-court")).toBeVisible();
 });
 
+test("a member's pages load without the administration and without the language nobody chose", async ({ page }) => {
+  // given
+  await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "de"));
+  const scripts: string[] = [];
+  page.on("request", (request) => {
+    if (request.resourceType() === "script") scripts.push(new URL(request.url()).pathname);
+  });
+
+  // when
+  await signIn(page, "doe.jane");
+  await page.getByTestId("my-bookings-link").click();
+  await expect(page.getByTestId("my-bookings-page")).toBeVisible();
+
+  // then
+  await expect(page.locator("html")).toHaveAttribute("lang", "de");
+  expect(scripts.filter((path) => /\/assets\/(?:AdminRoutes|en)-[^/]+\.js$/.test(path)),
+    "a member's first load carries the member surface and the active language only").toEqual([]);
+});
+
+test("an administration chunk a newer deployment replaced offers a reload rather than a blank page", async ({ page }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  await page.route(/\/assets\/AdminRoutes-[^/]+\.js$/, (route) => route.fulfill({ status: 404 }));
+
+  // when
+  await page.getByTestId("administration-link").click();
+
+  // then
+  await expect(page.getByTestId("load-failure")).toBeVisible();
+  await expect(page.getByTestId("retry-load")).toBeEnabled();
+  await expect(page.getByTestId("admin-setup-view")).toHaveCount(0);
+});
+
 test("a member books a court with an idempotency key the browser could generate", async ({ page, journeyService }, testInfo) => {
   // given
   const overTls = testInfo.project.metadata.plainOrigin !== true;

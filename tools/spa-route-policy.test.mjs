@@ -9,6 +9,7 @@ const frontendRequire = createRequire(new URL("../frontend/package.json", import
 const ts = frontendRequire("typescript");
 
 const ROUTER = `${repository}frontend/src/App.tsx`;
+const MOUNTED_ROUTERS = { "/admin": `${repository}frontend/src/views/AdminRoutes.tsx` };
 const VIEW_CONTROLLERS = `${repository}src/main/java/org/courtside/shared/web/SpaConfiguration.java`;
 const SHELL_ACCESS = `${repository}src/main/java/org/courtside/identity/internal/SecurityConfiguration.java`;
 
@@ -60,10 +61,29 @@ test("given a route inside an element attribute, when reading the routes, then t
   assert.deepEqual(clientRoutes(source), ["/admin", "/admin/hidden", "/admin/facility"]);
 });
 
+// Administration loads as a chunk of its own, so its routes live in a router mounted under a splat route.
+test("given a splat route mounting another router, when reading the routes, then that router's paths sit beneath it", () => {
+  // given
+  const application = 'const a = <Routes><Route path="/courts" element={<X />} /><Route path="/admin/*" element={<Y />} /></Routes>;';
+  const mounted = 'const b = <Routes><Route element={<Shell />}><Route index element={<X />} />'
+    + '<Route path="roster/:personId" element={<Z />} /></Route></Routes>;';
+
+  // when / then
+  assert.deepEqual(clientRoutes(application), ["/courts", "/admin"]);
+  assert.deepEqual(mountPoints(application), ["/admin"]);
+  assert.deepEqual(clientRoutes(mounted, "/admin"), ["/admin/roster/:personId"]);
+});
+
+test("given the application router, when it mounts another router, then the gate reads that router too", () => {
+  // when / then
+  assert.deepEqual(mountPoints(readFileSync(ROUTER, "utf8")), Object.keys(MOUNTED_ROUTERS),
+    "a splat route whose router the gate does not read hides every route beneath it");
+});
+
 test("given a client route, when the server serves the shell, then it forwards to the application", () => {
   // when / then
   assert.deepEqual(
-    clientRoutes(readFileSync(ROUTER, "utf8")).map(asServerPath).toSorted(),
+    applicationRoutes().map(asServerPath).toSorted(),
     forwardedRoutes(readFileSync(VIEW_CONTROLLERS, "utf8")).toSorted()
   );
 });
@@ -73,7 +93,7 @@ test("given a client route, when it is opened before signing in, then the shell 
   const permitted = new Set(permittedPaths(readFileSync(SHELL_ACCESS, "utf8")));
 
   // when
-  const unreachable = clientRoutes(readFileSync(ROUTER, "utf8"))
+  const unreachable = applicationRoutes()
     .map(asServerPath)
     .filter((route) => !permitted.has(route));
 
@@ -81,7 +101,18 @@ test("given a client route, when it is opened before signing in, then the shell 
   assert.deepEqual(unreachable, []);
 });
 
-function clientRoutes(source) {
+function applicationRoutes() {
+  return [...new Set([
+    ...clientRoutes(readFileSync(ROUTER, "utf8")),
+    ...Object.entries(MOUNTED_ROUTERS).flatMap(([base, path]) => clientRoutes(readFileSync(path, "utf8"), base))
+  ])];
+}
+
+function mountPoints(source) {
+  return [...source.matchAll(/<Route\s+path="([^"]+)\/\*"/g)].map((match) => match[1]);
+}
+
+function clientRoutes(source, base = "") {
   const file = ts.createSourceFile("router.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const routes = [];
   function visit(node, parent) {
@@ -106,9 +137,9 @@ function clientRoutes(source) {
   }
 
   function named(path, parent) {
-    return path && path !== "*" ? beneath(parent, path) : undefined;
+    return path && path !== "*" ? beneath(parent, path.replace(/\/\*$/, "")) : undefined;
   }
-  visit(file, "");
+  visit(file, base);
   return [...new Set(routes)];
 }
 

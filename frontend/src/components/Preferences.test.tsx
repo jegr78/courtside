@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError } from "../api/client";
-import i18n, { applyAccountLocale, initialLocale } from "../i18n";
+import i18n, { applyAccountLocale, initialLocale, localeBundles } from "../i18n";
+import en from "../locales/en";
 import { applyTheme } from "../theme";
 import { Preferences } from "./Preferences";
 
@@ -22,6 +23,7 @@ beforeEach(async () => {
   } });
   window.localStorage.clear();
   applyTheme("dark");
+  i18n.addResourceBundle("en", "translation", en);
   await i18n.changeLanguage("de");
 });
 
@@ -167,6 +169,24 @@ it("given the account refuses the change, when selecting another language, then 
   expect(await screen.findByTestId("preferences-failure")).toBeInTheDocument();
   await userEvent.click(screen.getByTestId("preferences-menu"));
   expect(screen.getByTestId("preferences-failure")).toBeVisible();
+});
+
+it("given a language that cannot be fetched, when selecting it, then the member is told and the page keeps its language", async () => {
+  // given
+  i18n.removeResourceBundle("en", "translation");
+  vi.spyOn(localeBundles, "en").mockRejectedValue(new TypeError("Failed to fetch dynamically imported module"));
+  const stored = vi.spyOn(api, "changeOwnLocale").mockResolvedValue(undefined);
+  render(<Preferences authenticated signedOut={() => undefined} />);
+  await openPreferences();
+
+  // when
+  await userEvent.selectOptions(document.getElementById("locale-preference")!, "en");
+
+  // then
+  expect(await screen.findByTestId("preferences-failure"))
+    .toHaveTextContent("Diese Sprache lässt sich gerade nicht laden. Prüfe deine Verbindung.");
+  expect(document.getElementById("locale-preference")).toHaveValue("de");
+  expect(stored, "an account must not be told a language the page could not show").not.toHaveBeenCalled();
 });
 
 it("given an instance that ships one language, when offering the choice, then only that one is offered", () => {

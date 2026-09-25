@@ -4,11 +4,11 @@ import { RouterProvider } from "react-router-dom";
 import "@fontsource-variable/archivo";
 import "@fontsource-variable/geist-mono";
 import { createAppRouter } from "./router";
-import "./i18n";
+import { localeReady } from "./i18n";
 import "./styles.css";
 
-createRoot(document.getElementById("root")!).render(
+void localeReady.then(() => createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <RouterProvider router={createAppRouter()} />
   </StrictMode>
-);
+));

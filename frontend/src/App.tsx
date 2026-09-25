@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
@@ -7,7 +7,6 @@ import { api, type ClubConfig, type SessionStatus, type SourceOffer } from "./ap
 import { Alert } from "./components/Alert";
 import { BuildIdentity, EnvironmentMarker } from "./components/BuildIdentity";
 import { Preferences } from "./components/Preferences";
-import { AdminShell } from "./components/AdminShell";
 import { PrimaryNavigation } from "./components/PrimaryNavigation";
 import { PwaLifecycle } from "./components/PwaLifecycle";
 import { UnsavedChangesProvider } from "./unsaved/UnsavedChangesProvider";
@@ -18,30 +17,17 @@ import { applyAccountLocale, supportedLocale } from "./i18n";
 import {
   clearPersonalBookingsOfflineData, listenForOtherClientSessionChanges, offlineMemberSession
 } from "./offlineBookings";
+import { lazySurface } from "./navigation/lazySurface";
 import { HomeView } from "./views/HomeView";
 import { InitialPasswordView } from "./views/InitialPasswordView";
 import { LoginView } from "./views/LoginView";
 import { MyBookingsPage } from "./views/MyBookingsPage";
 import { MyMessagesView } from "./views/MyMessagesView";
 import { AccountSecurityView } from "./views/AccountSecurityView";
-import { AdminAuditView } from "./views/AdminAuditView";
-import { AdminMessagesView } from "./views/AdminMessagesView";
-import { AdminOperationalLogsView } from "./views/AdminOperationalLogsView";
-import { AdminConfigurationView } from "./views/AdminConfigurationView";
-import { AdminBookingCardView } from "./views/facility/AdminBookingCardView";
-import { AdminBookingCardsView } from "./views/facility/AdminBookingCardsView";
-import { AdminCourtsView } from "./views/facility/AdminCourtsView";
-import { AdminOpeningHoursView } from "./views/facility/AdminOpeningHoursView";
-import { AdminSlotFillersView } from "./views/facility/AdminSlotFillersView";
-import { AdminMembershipTypesView } from "./views/AdminMembershipTypesView";
-import { AdminExportView } from "./views/AdminExportView";
-import { AdminFacilityUtilisationView } from "./views/AdminFacilityUtilisationView";
-import { AdminImportView } from "./views/AdminImportView";
-import { AdminPersonView } from "./views/AdminPersonView";
-import { AdminRosterView } from "./views/AdminRosterView";
-import { AdminSetupView } from "./views/AdminSetupView";
 
 const DEFAULT_DOCUMENTATION_URL = "https://jegr78.github.io/courtside/";
+
+const AdminRoutes = lazySurface(() => import("./views/AdminRoutes"));
 
 interface AppRoutesProps {
   session: SessionStatus;
@@ -56,6 +42,7 @@ interface AppRoutesProps {
 
 export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut,
   configurationChanged, clubName, offline = false }: AppRoutesProps) {
+  const { t } = useTranslation();
   const { pathname } = useLocation();
   const administrative = pathname === "/admin" || pathname.startsWith("/admin/");
 
@@ -89,29 +76,11 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
         signedOut={() => signedOut?.()} />
       : <Navigate to="/login" replace />} />
     {/* The role is asked once for the whole surface rather than once per destination. */}
-    <Route path="/admin" element={session.roles.includes("ADMIN") ? <AdminShell /> : <Navigate to="/" replace />}>
-      <Route index element={<Navigate to="/admin/setup" replace />} />
-      <Route path="setup" element={<AdminSetupView />} />
-      <Route path="configuration" element={<AdminConfigurationView configurationChanged={(changed) => configurationChanged?.(changed)} />} />
-      <Route path="facility">
-        <Route index element={<Navigate to="/admin/facility/courts" replace />} />
-        <Route path="courts" element={<AdminCourtsView />} />
-        <Route path="opening-hours" element={<AdminOpeningHoursView />} />
-        <Route path="booking-cards" element={<AdminBookingCardsView />} />
-        <Route path="booking-cards/:cardId" element={<AdminBookingCardView />} />
-        <Route path="slot-fillers" element={<AdminSlotFillersView />} />
-      </Route>
-      <Route path="roster" element={<AdminRosterView />} />
-      <Route path="roster/:personId" element={<AdminPersonView />} />
-      <Route path="membership-types" element={<AdminMembershipTypesView />} />
-      <Route path="import" element={<AdminImportView />} />
-      <Route path="export" element={<AdminExportView />} />
-      <Route path="utilisation" element={<AdminFacilityUtilisationView />} />
-      <Route path="audit" element={<AdminAuditView />} />
-      <Route path="messages" element={<AdminMessagesView />} />
-      <Route path="operational-logs" element={<AdminOperationalLogsView />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Route>
+    <Route path="/admin/*" element={session.roles.includes("ADMIN")
+      ? <Suspense fallback={<p role="status">{t("status.loading")}</p>}>
+        <AdminRoutes configurationChanged={(changed) => configurationChanged?.(changed)} />
+      </Suspense>
+      : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </div>

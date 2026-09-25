@@ -1,6 +1,14 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
+
+// Tests switch languages synchronously, so every bundle the browser fetches on demand is there already.
+vi.mock("../i18n", async (importOriginal) => {
+  const loaded = await importOriginal<typeof import("../i18n")>();
+  const { default: en } = await import("../locales/en");
+  loaded.default.addResourceBundle("en", "translation", en);
+  return loaded;
+});
 
 // jsdom implements no media queries at all. This answers a width query from the window and refuses
 // every other kind, because a stub that guesses would report a match nobody asked about.

@@ -48,6 +48,11 @@ const BOUNDARIES = {
     classification: "resolved against the shipped locales, and dropped when it names none",
     test: "src/i18n.test.ts#given a stored language this build does not ship, when the language is read, then the default is used"
   },
+  "src/navigation/recoverStaleDocument.ts location": {
+    value: "no external value",
+    classification: "reloads the document once a newer worker took over, and reads nothing off the location",
+    test: "src/navigation/recoverStaleDocument.test.ts#given a newer version waiting, when recovering, then it takes over before the one reload"
+  },
   "src/navigation/useFragmentTarget.ts useLocation": {
     value: "the fragment the address carries",
     classification: "compared with one known target id, and moves the focus nowhere else",

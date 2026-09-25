@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
-import { relative, resolve } from "node:path";
+import { posix, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -25,6 +25,10 @@ const inlineStyle = /<style\b[^>]*>([\s\S]*?)<\/style\b[^>]*>/gi;
 const commentOpener = "<!--";
 const javascriptType = /^(?:module|text\/javascript|application\/javascript|text\/ecmascript)$/i;
 const scriptType = /\stype\s*=\s*["']?([^"'>\s]+)/i;
+const moduleEntry = /<script\b[^>]*\btype\s*=\s*["']?module["']?[^>]*\bsrc\s*=\s*["']?\/?([^"'>\s]+)/gi;
+const precacheEntry = /\{\s*url\s*:\s*"([^"]+)"/g;
+const administrationMarker = /^admin-/;
+const localeBundleKey = "app.name";
 
 function filesBelow(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -165,7 +169,93 @@ export function verifyBrowserBuild(directory) {
   }
 }
 
+function scriptTree(source) {
+  return parse(source, { ecmaVersion: "latest", sourceType: "module", allowHashBang: true });
+}
+
+function nodesOf(tree) {
+  const nodes = [];
+  const pending = [tree];
+  while (pending.length > 0) {
+    const node = pending.pop();
+    if (Array.isArray(node)) {
+      pending.push(...node);
+    } else if (node !== null && typeof node === "object") {
+      if (typeof node.type === "string") nodes.push(node);
+      pending.push(...Object.values(node));
+    }
+  }
+  return nodes;
+}
+
+function stringValue(node) {
+  if (node.type === "Literal" && typeof node.value === "string") return node.value;
+  if (node.type === "TemplateLiteral" && node.expressions.length === 0) return node.quasis[0].value.cooked;
+  return undefined;
+}
+
+function chunkReading(resource, source) {
+  const nodes = nodesOf(scriptTree(source));
+  const staticImports = nodes
+    .filter(({ type, source: from }) => ["ImportDeclaration", "ExportAllDeclaration", "ExportNamedDeclaration"]
+      .includes(type) && from?.type === "Literal")
+    .map(({ source: from }) => posix.join(posix.dirname(resource), from.value));
+  const administration = nodes.map(stringValue)
+    .filter((value) => value !== undefined && administrationMarker.test(value));
+  const localeBundles = nodes.filter(({ type, properties }) => type === "ObjectExpression"
+    && properties.some(({ key }) => key && stringValue(key) === localeBundleKey)).length;
+  return { staticImports, administration, localeBundles };
+}
+
+// The entry chunk and every chunk it imports statically are what a member downloads before the first paint.
+export function verifyMemberSurface(directory) {
+  const root = resolve(directory);
+  const shell = readFileSync(resolve(root, "index.html"), "utf8");
+  const entries = [...shell.matchAll(moduleEntry)].map(([, path]) => path);
+  if (entries.length !== 1) throw new Error("The browser build has no module entry script");
+  const chunks = new Map(filesBelow(root)
+    .map((path) => browserBuildResource(path, root))
+    .filter((resource) => resource.startsWith("assets/") && resource.endsWith(".js"))
+    .map((resource) => [resource, chunkReading(resource, readFileSync(resolve(root, resource), "utf8"))]));
+  const memberSurface = new Set();
+  const pending = [entries[0]];
+  while (pending.length > 0) {
+    const resource = pending.pop();
+    if (memberSurface.has(resource)) continue;
+    const chunk = chunks.get(resource);
+    if (chunk === undefined) throw new Error(`The member entry imports ${resource}, which the build does not ship`);
+    memberSurface.add(resource);
+    pending.push(...chunk.staticImports);
+  }
+  for (const resource of memberSurface) {
+    const [marker] = chunks.get(resource).administration;
+    if (marker !== undefined) {
+      throw new Error(`The member entry carries the administration surface: ${marker} in ${resource}`);
+    }
+  }
+  const entryLocales = [...memberSurface].reduce((sum, resource) => sum + chunks.get(resource).localeBundles, 0);
+  if (entryLocales !== 1) {
+    throw new Error(`The member entry carries ${entryLocales} locale bundles instead of the default one`);
+  }
+  const deferred = [...chunks.keys()].filter((resource) => !memberSurface.has(resource));
+  const administration = deferred.filter((resource) => chunks.get(resource).administration.length > 0);
+  if (administration.length === 0) throw new Error("The browser build no longer identifies its administration surface");
+  const locales = deferred.filter((resource) => chunks.get(resource).localeBundles > 0);
+  if (locales.length === 0) throw new Error("The browser build ships no locale bundle outside the member entry");
+  const worker = resolve(root, "sw.js");
+  const precached = new Set(existsSync(worker)
+    ? [...readFileSync(worker, "utf8").matchAll(precacheEntry)].map(([, url]) => url) : []);
+  if (precached.size === 0) throw new Error("The browser build has no precache manifest");
+  const cachedAdministration = administration.find((resource) => precached.has(resource));
+  if (cachedAdministration !== undefined) {
+    throw new Error(`The precache holds the administration surface in ${cachedAdministration}`);
+  }
+  const missing = [...memberSurface, ...locales].find((resource) => !precached.has(resource));
+  if (missing !== undefined) throw new Error(`The precache misses ${missing}, which the member surface needs offline`);
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv.length !== 3) throw new Error("Usage: browser-build-policy.mjs <build-directory>");
   verifyBrowserBuild(process.argv[2]);
+  verifyMemberSurface(process.argv[2]);
 }

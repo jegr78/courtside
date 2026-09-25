@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { browserBuildComments, browserBuildFileName, browserBuildInventoryGaps, browserBuildMarkupComments,
-  browserBuildOrigins, browserBuildResource, verifyBrowserBuild } from "./browser-build-policy.mjs";
+  browserBuildOrigins, browserBuildResource, verifyBrowserBuild, verifyMemberSurface } from "./browser-build-policy.mjs";
 
 const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const frontend = join(repository, "frontend");
@@ -64,6 +64,94 @@ test("given a production browser build, when inspecting its files, then only inv
   assert.throws(() => verifyBrowserBuild(build({
     "assets/app.mjs": "console.log('Courtside')"
   })), /unreviewed public resource/);
+});
+
+function memberSurfaceBuild(context) {
+  const build = temporaryBuild(context);
+  const surface = {
+    "index.html": "<script type=\"module\" crossorigin src=\"/assets/index-a1.js\"></script>",
+    "assets/index-a1.js": "import{s}from\"./shared-b2.js\";const de={\"app.name\":\"Courtside\"};"
+      + "s(()=>import(\"./AdminRoutes-c3.js\"),()=>import(\"./en-d4.js\"),\"administration-link\")",
+    "assets/shared-b2.js": "export const s=(...a)=>a",
+    "assets/AdminRoutes-c3.js": "export default ()=>({\"data-testid\":\"admin-shell\"})",
+    "assets/en-d4.js": "export default {\"app.name\":\"Courtside\"}",
+    "sw.js": "precacheAndRoute([{url:\"index.html\",revision:\"1\"},{url:\"assets/index-a1.js\",revision:null},"
+      + "{url:\"assets/shared-b2.js\",revision:null},{url:\"assets/en-d4.js\",revision:null}])"
+  };
+  return (changes = {}) => build({ ...surface, ...changes });
+}
+
+test("given a build whose entry holds the member surface and the default locale, when checking it, then it passes", (context) => {
+  // given
+  const build = memberSurfaceBuild(context);
+
+  // when / then
+  verifyMemberSurface(build());
+});
+
+test("given an administration view reached statically from the entry, when checking the build, then it is refused", (context) => {
+  // given
+  const build = memberSurfaceBuild(context);
+
+  // when / then
+  assert.throws(() => verifyMemberSurface(build({
+    "assets/index-a1.js": "const de={\"app.name\":\"Courtside\"};export const v=\"admin-setup-view\";"
+      + "import(\"./AdminRoutes-c3.js\");import(\"./en-d4.js\")"
+  })), /member entry carries the administration surface: admin-setup-view in assets\/index-a1\.js/);
+  assert.throws(() => verifyMemberSurface(build({
+    "assets/shared-b2.js": "export const s=(...a)=>a;export const v={\"data-testid\":`admin-shell`}"
+  })), /administration surface: admin-shell in assets\/shared-b2\.js/,
+  "a chunk the entry imports statically loads with it");
+});
+
+test("given a second locale bundle in the entry, when checking the build, then it is refused", (context) => {
+  // given
+  const build = memberSurfaceBuild(context);
+
+  // when / then
+  assert.throws(() => verifyMemberSurface(build({
+    "assets/shared-b2.js": "export const s=(...a)=>a;export const en={\"app.name\":\"Courtside\"}"
+  })), /member entry carries 2 locale bundles instead of the default one/);
+  assert.throws(() => verifyMemberSurface(build({
+    "assets/index-a1.js": "import(\"./AdminRoutes-c3.js\");import(\"./en-d4.js\");export const x={\"app\":1}",
+    "assets/shared-b2.js": "export const de={\"app.name\":\"Courtside\"}"
+  })), /member entry carries 0 locale bundles instead of the default one/,
+  "without the default bundle a failed fetch would leave keys on screen");
+});
+
+test("given a build whose markers no longer match anything, when checking it, then the check fails closed", (context) => {
+  // given
+  const build = memberSurfaceBuild(context);
+
+  // when / then
+  assert.throws(() => verifyMemberSurface(build({
+    "assets/AdminRoutes-c3.js": "export default ()=>({\"data-testid\":\"board-shell\"})"
+  })), /no longer identifies its administration surface/);
+  assert.throws(() => verifyMemberSurface(build({
+    "assets/en-d4.js": "export default {\"title\":\"Courtside\"}"
+  })), /ships no locale bundle outside the member entry/);
+  assert.throws(() => verifyMemberSurface(build({
+    "index.html": "<script src=\"/assets/index-a1.js\"></script>"
+  })), /no module entry script/);
+  assert.throws(() => verifyMemberSurface(build({ "sw.js": "self.skipWaiting()" })), /no precache manifest/);
+});
+
+test("given the precache, when it holds administration or misses the member surface, then the build is refused", (context) => {
+  // given
+  const build = memberSurfaceBuild(context);
+  const precache = (urls) => `precacheAndRoute([${urls.map((url) => `{url:"${url}",revision:null}`).join(",")}])`;
+
+  // when / then
+  assert.throws(() => verifyMemberSurface(build({
+    "sw.js": precache(["index.html", "assets/index-a1.js", "assets/shared-b2.js", "assets/en-d4.js",
+      "assets/AdminRoutes-c3.js"])
+  })), /precache holds the administration surface in assets\/AdminRoutes-c3\.js/);
+  assert.throws(() => verifyMemberSurface(build({
+    "sw.js": precache(["index.html", "assets/index-a1.js", "assets/en-d4.js"])
+  })), /precache misses assets\/shared-b2\.js/);
+  assert.throws(() => verifyMemberSurface(build({
+    "sw.js": precache(["index.html", "assets/index-a1.js", "assets/shared-b2.js"])
+  })), /precache misses assets\/en-d4\.js/, "an offline launch in the other language needs its bundle");
 });
 
 test("given every form an origin is written in, when the extractor reads it, then the host it names is the host a browser dials", () => {
@@ -255,6 +343,7 @@ test("given production browser sources, when building the web root, then metadat
 
   // then
   verifyBrowserBuild(output);
+  verifyMemberSurface(output);
   assert.deepEqual(browserBuildInventoryGaps(output), [],
     "an entry the build no longer produces is a review the inventory still claims to have had");
   const shipped = readdirSync(output, { recursive: true, withFileTypes: true })
