@@ -529,7 +529,7 @@ test("an admin changes club configuration and a booking rule through the browser
   // chosen rather than assumed: its own seeded window is what says the switch has landed.
   await page.getByTestId(`rule-set-choose-${STANDARD_RULE_SET}`).click();
   await expect(page.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue("7");
-  await expect(withoutMembershipType, "the fallback belongs to no set, so switching keeps it").toHaveValue(offered);
+  await expect(withoutMembershipType, "the fallback belongs to no set, so switching keeps it").toHaveValue(offered ?? "");
   await page.getByTestId("rule-ADVANCE_WINDOW-maxDays").fill("1");
   const fallbackSaved = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/config") && response.request().method() === "PUT"
