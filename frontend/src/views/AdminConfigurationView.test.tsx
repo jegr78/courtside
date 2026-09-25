@@ -391,6 +391,19 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("slot-minutes"), "a number of minutes needs no full-width input").toHaveClass("max-w-32");
   });
 
+  it("given the logo fieldset, when it is laid out, then the file field has the fieldset's whole width to itself", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("logo-file");
+
+    // then
+    expect(screen.getByTestId("club-logo").className, "a browser's file control truncates its text in a shared column")
+      .not.toMatch(/grid-cols/);
+    expect(screen.getByTestId("club-logo-actions")).toContainElement(screen.getByTestId("logo-url"));
+    expect(screen.getByTestId("club-logo-actions")).toContainElement(screen.getByTestId("upload-logo"));
+    expect(screen.getByTestId("club-logo-actions")).not.toContainElement(screen.getByTestId("logo-file"));
+  });
+
   it("given the time-grid fragment, when configuration loads, then the owned setting receives focus", async () => {
     // given
     render(<MemoryRouter initialEntries={["/admin/configuration#slot-minutes"]}><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
