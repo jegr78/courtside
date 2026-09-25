@@ -25,7 +25,7 @@ class ShippedBundleParityTest {
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([^}]*)}");
 
     @ParameterizedTest
-    @ValueSource(strings = {"messages", "mail", "seed"})
+    @ValueSource(strings = {"messages", "mail", "seed", "manifest"})
     void givenATranslatedBundle_whenComparingItWithItsBase_thenNeitherSideCarriesAKeyTheOtherLacks(
             String family) throws IOException {
         // given
@@ -42,7 +42,7 @@ class ShippedBundleParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"messages", "mail", "seed"})
+    @ValueSource(strings = {"messages", "mail", "seed", "manifest"})
     void givenATranslatedValue_whenComparingItsPlaceholders_thenItNamesTheSameOnes(String family)
             throws IOException {
         // given
@@ -82,7 +82,7 @@ class ShippedBundleParityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"messages", "mail", "seed"})
+    @ValueSource(strings = {"messages", "mail", "seed", "manifest"})
     void givenAShippedBundle_whenReadingWhatItSays_thenNoValueOfItIsBlank(String family)
             throws IOException {
         // given

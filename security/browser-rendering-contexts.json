@@ -13,6 +13,12 @@
       "sink": "document-title"
     },
     {
+      "id": "club-name-app-title",
+      "journey": "stored-member",
+      "field": "installedAppName",
+      "sink": "meta-content"
+    },
+    {
       "id": "court-name-text",
       "journey": "stored-member",
       "field": "court.name",

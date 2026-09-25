@@ -13,7 +13,7 @@ const configurationView = readFileSync(
 
 // what the instance serves rather than what a board sets: the locales it ships, and the logo
 // projection that logoUrl and logoUploaded already account for
-const derived = ["supportedLocales", "logoFallbackUrl"];
+const derived = ["supportedLocales", "logoFallbackUrl", "installedAppName"];
 
 function declaredFields(schemaName) {
   const schema = document.components.schemas[schemaName];

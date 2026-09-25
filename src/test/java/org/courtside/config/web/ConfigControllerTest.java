@@ -188,7 +188,7 @@ class ConfigControllerTest extends AbstractIntegrationTest {
         ResultActions answer = mockMvc.perform(get("/api/admin/config")).andExpect(status().isOk());
         // the setup overview compares this answer against factory values, so an unset field has to
         // arrive as a null rather than as a missing key
-        for (String field : new String[]{"logoUrl", "imprintUrl", "privacyUrl", "documentationUrl",
+        for (String field : new String[]{"logoUrl", "imprintUrl", "privacyUrl", "documentationUrl", "shortName",
                 "logoFallbackUrl", "noMembershipTypeRuleSetId"}) {
             answer.andExpect(jsonPath("$." + field).hasJsonPath())
                     .andExpect(jsonPath("$." + field).doesNotExist());

@@ -52,6 +52,9 @@ public class ClubConfiguration {
     @Column(name = "documentation_url")
     private String documentationUrl;
 
+    @Column(name = "short_name")
+    private String shortName;
+
     @Column(name = "default_locale", nullable = false)
     private String defaultLocale;
 
@@ -84,6 +87,7 @@ public class ClubConfiguration {
         this.imprintUrl = command.imprintUrl();
         this.privacyUrl = command.privacyUrl();
         this.documentationUrl = command.documentationUrl();
+        this.shortName = command.shortName();
         this.defaultLocale = command.defaultLocale();
         this.slotMinutes = command.slotDuration().minutes();
         this.timeZone = command.timeZone();

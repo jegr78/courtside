@@ -32,6 +32,11 @@ class ConfigRequestValidator implements Validator {
         if (defaultLocale != null && !languages.supports(defaultLocale)) {
             errors.rejectValue("defaultLocale", "Language");
         }
+        String shortName = request.getShortName();
+        // The contract's \S admits Unicode spaces that the stored name's own blank check refuses.
+        if (shortName != null && shortName.isBlank()) {
+            errors.rejectValue("shortName", "Pattern");
+        }
         String timeZone = request.getTimeZone();
         if (timeZone != null) {
             try {

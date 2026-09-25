@@ -295,6 +295,25 @@ The PWA manifest and the browser tab icon use the same identity: the club logo, 
 mark while none is set. Logo URLs are root-relative or HTTPS. Remote logos disclose the visitor's
 address and Courtside origin to their host, so club-hosted images are preferred.
 
+An installed instance carries the club rather than the product. `/api/public/config/icon` serves PNG
+icons at 180, 192 and 512 pixels, rasterised from the uploaded logo or drawn from the Courtside mark.
+A maskable icon is opaque and keeps its content inside the central 80 % a launcher may crop to: a logo
+sits on the colour of its top-left pixel when that pixel is opaque and on white otherwise, the mark
+on shade. A logo configured only as a URL is never fetched by the server, so such a club keeps the
+URL as its plain icon and gets the Courtside mark for the PNG and maskable icons. The manifest names
+each icon with a version derived from the logo, so a new logo reaches an installed app as a new URL.
+iOS ignores the manifest and reads the `apple-touch-icon` link, which names the 180-pixel maskable
+icon.
+
+The manifest's `short_name` is what fits under a home-screen icon, at most twelve characters. A
+board may choose one; otherwise it is the club name when that fits, its leading words when they do,
+and its first twelve characters otherwise. `background_color` is the dark page colour the
+application paints first, so the splash screen does not flash another colour, and `theme_color` is
+the primary colour. The web client also sets `<meta name="theme-color">` to the primary colour
+whenever the club configuration arrives or changes, so the status bar follows a new colour without a
+release. `lang` and the texts of the description and the two shortcuts, to the court plan and to the
+member's own bookings, follow the club's default language.
+
 Grid changes are refused when active or future bookings or opening hours no longer align. Time-zone
 changes are refused while a confirmed booking has not ended. These writes serialize with booking
 and opening-hours changes through the club configuration row.

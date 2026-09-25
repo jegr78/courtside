@@ -898,6 +898,70 @@ describe("App build identity", () => {
     expect(screen.getByTestId("club-brand-name")).toHaveTextContent("Example Racquet Club");
   });
 
+  it("given the colour the page ships with, when the club arrives, then the status bar takes the club's primary colour", async () => {
+    // given
+    document.head.querySelectorAll('meta[name="theme-color"], meta[name="apple-mobile-web-app-title"]')
+      .forEach((meta) => meta.remove());
+    document.head.insertAdjacentHTML("beforeend", '<meta name="theme-color" content="#AF5030" />'
+      + '<meta name="apple-mobile-web-app-title" content="Courtside" />');
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({ ...club, primaryColor: "#1a4d8f" });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<RoutedShell><App /></RoutedShell>);
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club"));
+    expect(document.head.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1);
+    expect(document.head.querySelector('meta[name="theme-color"]')).toHaveAttribute("content", "#1a4d8f");
+    expect(document.head.querySelector('meta[name="apple-mobile-web-app-title"]'))
+      .toHaveAttribute("content", "Example Tennis Club");
+  });
+
+  it("given a name for the installed app, when the club arrives, then the home-screen title takes it over the full club name", async () => {
+    // given
+    document.head.querySelectorAll('meta[name="apple-mobile-web-app-title"]').forEach((meta) => meta.remove());
+    document.head.insertAdjacentHTML("beforeend", '<meta name="apple-mobile-web-app-title" content="Courtside" />');
+    vi.spyOn(api, "session").mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockResolvedValue({ ...club, installedAppName: "Example TC" });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+
+    // when
+    render(<RoutedShell><App /></RoutedShell>);
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("club-brand-name")).toHaveTextContent("Example Tennis Club"));
+    expect(document.head.querySelector('meta[name="apple-mobile-web-app-title"]'))
+      .toHaveAttribute("content", "Example TC");
+  });
+
+  it("given a board saving a new primary colour, when the configuration page reports it, then the status bar follows without a release", async () => {
+    // given
+    vi.spyOn(api, "session").mockResolvedValue({
+      authenticated: true, username: "admin", displayName: "Example Administrator",
+      roles: ["ADMIN"], passwordChangeRequired: false
+    });
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "adminConfig").mockResolvedValue(adminClub);
+    vi.spyOn(api, "ruleSets").mockResolvedValue([{ id: "rule-set", name: "Standard", active: true }]);
+    vi.spyOn(api, "ruleTypes").mockResolvedValue([]);
+    vi.spyOn(api, "rules").mockResolvedValue([]);
+    vi.spyOn(api, "membershipTypes").mockResolvedValue([]);
+    vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...adminClub, primaryColor: "#1a4d8f" });
+    render(<RoutedShell initialEntries={["/admin/configuration"]}><App /></RoutedShell>);
+    await waitFor(() => expect(document.head.querySelector('meta[name="theme-color"]'))
+      .toHaveAttribute("content", "#b85c38"));
+
+    // when
+    fireEvent.click(await screen.findByTestId("save-club-config"));
+
+    // then
+    expect(await screen.findByTestId("admin-save-success")).toBeInTheDocument();
+    expect(document.head.querySelector('meta[name="theme-color"]')).toHaveAttribute("content", "#1a4d8f");
+  });
+
   it("given a mid luminance club colour, when the shell loads, then the higher contrast text colour is used", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);

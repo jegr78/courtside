@@ -131,6 +131,7 @@ class SafeMethodStateInvarianceTest extends AbstractIntegrationTest {
             entry("/api/public/booking-grid", read()),
             entry("/api/public/config", read()),
             entry("/api/public/config/logo", read()),
+            entry("/api/public/config/icon", read("size=192")),
             entry("/api/public/booking-cards", read()),
             entry("/api/public/booking-card-legend", read()),
             entry("/api/public/participant-cards", read()),

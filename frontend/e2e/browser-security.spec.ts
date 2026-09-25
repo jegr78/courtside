@@ -318,9 +318,14 @@ test("stored values remain data across roles without entering browser storage or
   // then
   await expect(page.getByTestId("club-brand-name")).toHaveText(payload);
   await expect(page).toHaveTitle(payload);
+  const installedAppName = await page.evaluate(async () =>
+    ((await (await fetch("/api/public/config")).json()) as { installedAppName: string }).installedAppName);
+  expect(payload.startsWith(installedAppName), "the home-screen title is derived from the stored club name").toBe(true);
+  await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute("content", installedAppName);
   await expect(page.getByTestId("court-plan-view")).toContainText(payload);
   expect(await page.evaluate(() => globalThis.__courtsideXss)).toBe("not-executed");
-  await expectRenderingContexts("stored-member", ["club-name-text", "club-name-title", "court-name-text"]);
+  await expectRenderingContexts("stored-member",
+    ["club-name-text", "club-name-title", "club-name-app-title", "court-name-text"]);
   expect(consoleEvents.some(({ containsSensitiveData }) => containsSensitiveData)).toBe(false);
   const authenticated = await browserInventory(page);
   expect(authenticated.cacheRequests.filter((path) => path.startsWith("/api/"))).toEqual([]);

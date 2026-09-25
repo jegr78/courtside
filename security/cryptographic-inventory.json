@@ -378,6 +378,32 @@
       ]
     },
     {
+      "id": "app-icon-version",
+      "purpose": "Name the rendering of the installed app's icons so a browser may keep one until the logo or the drawing changes",
+      "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output over the logo digest and the rendering version. A collision would keep a stale icon cached and nothing more."
+      },
+      "class": "content-hash",
+      "owner": "club-operator",
+      "storageBoundary": "Computed per request and carried in the icon URLs of the manifest; nothing stores it.",
+      "permittedUse": "Cache validation of the served icons. It is not an integrity guarantee.",
+      "rotation": "Not applicable: no key.",
+      "revocation": "Not applicable.",
+      "recovery": "None is needed; it is recomputed from what it names.",
+      "retirement": "Replaceable with any digest; a changed algorithm invalidates cached icons once.",
+      "evidence": "src/test/java/org/courtside/config/web/InstalledAppTest.java",
+      "detects": [
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/config/internal/InstalledAppService.java"
+      ]
+    },
+    {
       "id": "person-fingerprint",
       "purpose": "Match an imported row against a person already on the roster",
       "algorithm": "SHA-256",

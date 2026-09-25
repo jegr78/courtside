@@ -12,6 +12,7 @@ public record ClubConfigurationSnapshot(
         String imprintUrl,
         String privacyUrl,
         String documentationUrl,
+        String shortName,
         String defaultLocale,
         int slotMinutes,
         String timeZone,
@@ -32,6 +33,7 @@ public record ClubConfigurationSnapshot(
                 configuration.getImprintUrl(),
                 configuration.getPrivacyUrl(),
                 configuration.getDocumentationUrl(),
+                configuration.getShortName(),
                 configuration.getDefaultLocale(),
                 configuration.getSlotMinutes(),
                 configuration.getTimeZone(),
@@ -40,6 +42,10 @@ public record ClubConfigurationSnapshot(
                 configuration.getPasswordResetTokenMinutes(),
                 configuration.getBookingReminderHours(),
                 configuration.getNoMembershipTypeRuleSetId());
+    }
+
+    public String effectiveShortName() {
+        return shortName != null ? shortName : AppShortName.derivedFrom(clubName);
     }
 
     private static String effectiveLogoUrl(ClubConfiguration configuration) {

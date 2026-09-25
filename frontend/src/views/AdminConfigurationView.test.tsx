@@ -145,6 +145,66 @@ describe("AdminConfigurationView", () => {
       expect.objectContaining({ documentationUrl: "https://docs.example.org/courtside" })));
   });
 
+  it("given a short name for the app icon, when saving, then the club's choice is written", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, logoUploaded: false,
+      shortName: "ETC Example"
+    });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("short-name");
+
+    // when
+    await userEvent.type(screen.getByTestId("short-name"), "ETC Example");
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(
+      expect.objectContaining({ shortName: "ETC Example" })));
+  });
+
+  it("given the short name field, when a board types past what fits under an icon, then the field stops at twelve characters", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("short-name");
+
+    // when
+    await userEvent.type(screen.getByTestId("short-name"), "Example Tennis Club");
+
+    // then
+    expect(screen.getByTestId("short-name")).toHaveValue("Example Tenn");
+  });
+
+  it("given a stored short name, when it is cleared, then the manifest can derive one again", async () => {
+    // given
+    vi.spyOn(api, "adminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, logoUploaded: false,
+      shortName: "ETC Example"
+    });
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({
+      clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
+      defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30,
+      timeZone: "Europe/Berlin", newAccountCredentialHours: 168, passwordResetCredentialHours: 24,
+      passwordResetTokenMinutes: 60, bookingReminderHours: 24, logoUploaded: false
+    });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId("short-name")).toHaveValue("ETC Example"));
+
+    // when
+    await userEvent.clear(screen.getByTestId("short-name"));
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledWith(
+      expect.objectContaining({ shortName: null })));
+  });
+
   it("given stored brand colours, when choosing a new primary colour, then the field and live contrast preview agree", async () => {
     // given
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);

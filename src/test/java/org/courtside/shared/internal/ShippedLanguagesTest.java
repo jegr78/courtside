@@ -64,6 +64,16 @@ class ShippedLanguagesTest {
     }
 
     @Test
+    void givenALanguageTranslatedEverywhereButTheInstalledApp_whenStarting_thenItRefusesToStart() {
+        // when / then
+        assertThatThrownBy(() -> languagesOf("messages_fr.properties", "mail_fr.properties",
+                "seed_fr.properties", "").tags())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("fr")
+                .hasMessageContaining("manifest");
+    }
+
+    @Test
     void whenAskedAboutALanguageItDoesNotShip_thenItSaysSo() {
         // given
         SupportedLanguages languages = languagesOf("messages_de.properties", "mail_de.properties", "seed_de.properties");
@@ -85,10 +95,16 @@ class ShippedLanguagesTest {
 
     private static SupportedLanguages languagesOf(String screenBundles, String mailBundles,
                                                   String seedBundles) {
+        return languagesOf(screenBundles, mailBundles, seedBundles, seedBundles.replace("seed_", "manifest_"));
+    }
+
+    private static SupportedLanguages languagesOf(String screenBundles, String mailBundles,
+                                                  String seedBundles, String manifestBundles) {
         return new ShippedLanguages(new StubResolver(Map.of(
                 "classpath*:messages_*.properties", screenBundles,
                 "classpath*:mail_*.properties", mailBundles,
-                "classpath*:seed_*.properties", seedBundles)));
+                "classpath*:seed_*.properties", seedBundles,
+                "classpath*:manifest_*.properties", manifestBundles)));
     }
 
     private record StubResolver(Map<String, String> fileNamesByPattern) implements ResourcePatternResolver {

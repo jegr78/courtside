@@ -1,6 +1,7 @@
 package org.courtside.config.internal;
 
 import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -19,11 +20,15 @@ public final class ClubLogo {
     private final byte[] content;
     private final String mediaType;
     private final String digest;
+    private final int width;
+    private final int height;
 
-    private ClubLogo(byte[] content, String mediaType, String digest) {
+    private ClubLogo(byte[] content, Image image, String digest) {
         this.content = content.clone();
-        this.mediaType = mediaType;
+        this.mediaType = image.mediaType();
         this.digest = digest;
+        this.width = image.width();
+        this.height = image.height();
     }
 
     public byte[] content() {
@@ -38,6 +43,24 @@ public final class ClubLogo {
         return digest;
     }
 
+    public int width() {
+        return width;
+    }
+
+    public int height() {
+        return height;
+    }
+
+    BufferedImage decoded() {
+        try {
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(content));
+            if (image == null) throw new IllegalStateException("The stored club logo cannot be decoded");
+            return image;
+        } catch (IOException e) {
+            throw new IllegalStateException("The stored club logo cannot be decoded", e);
+        }
+    }
+
     static ClubLogo parse(byte[] bytes) {
         if (bytes == null || bytes.length == 0) throw invalid("config.logo.empty");
         if (bytes.length > MAX_BYTES) throw invalid("config.logo.tooLarge");
@@ -50,7 +73,7 @@ public final class ClubLogo {
         }
         byte[] normalized = normalize(bytes, image.mediaType());
         if (normalized.length > MAX_BYTES) throw invalid("config.logo.tooLarge");
-        return new ClubLogo(normalized, image.mediaType(), sha256(normalized));
+        return new ClubLogo(normalized, image, sha256(normalized));
     }
 
     static ClubLogo stored(byte[] content, String mediaType, String digest) {
@@ -62,7 +85,7 @@ public final class ClubLogo {
         if (image == null || !image.mediaType().equals(mediaType) || !sha256(content).equals(digest)) {
             throw new IllegalStateException("The stored club logo metadata does not match its content");
         }
-        return new ClubLogo(content, mediaType, digest);
+        return new ClubLogo(content, image, digest);
     }
 
     private static Image png(byte[] bytes) {

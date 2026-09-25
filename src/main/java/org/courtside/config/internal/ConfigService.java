@@ -53,11 +53,11 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
     }
 
     public ClubLogo logo() {
-        ClubLogo logo = currentEntity().uploadedLogo();
-        if (logo == null) {
-            throw new ClubLogoNotFoundException();
-        }
-        return logo;
+        return uploadedLogo().orElseThrow(ClubLogoNotFoundException::new);
+    }
+
+    public Optional<ClubLogo> uploadedLogo() {
+        return Optional.ofNullable(currentEntity().uploadedLogo());
     }
 
     private ClubConfiguration currentEntity() {
@@ -214,6 +214,7 @@ public class ConfigService implements BookingGridSettings, BookingGridCoordinati
         addIfChanged(fields, "imprintUrl", configuration.getImprintUrl(), command.imprintUrl());
         addIfChanged(fields, "privacyUrl", configuration.getPrivacyUrl(), command.privacyUrl());
         addIfChanged(fields, "documentationUrl", configuration.getDocumentationUrl(), command.documentationUrl());
+        addIfChanged(fields, "shortName", configuration.getShortName(), command.shortName());
         addIfChanged(fields, "newAccountCredentialHours",
                 configuration.getNewAccountCredentialHours(), command.newAccountCredential().hours());
         addIfChanged(fields, "passwordResetCredentialHours",

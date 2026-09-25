@@ -92,6 +92,20 @@ class ConfigAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheConfiguration_whenOnlyTheShortNameChanges_thenTheEventNamesTheFieldAndNoValue() {
+        // given
+        ClubConfigurationSnapshot current = config.current();
+
+        // when
+        config.update(withShortName(current, "ETC Example"));
+
+        // then
+        Map<String, Object> payload = latestPayloadOf(ConfigEvent.ClubChanged.TYPE);
+        assertThat(payload).containsEntry("changedFields", List.of("shortName"));
+        assertThat(payload.toString()).doesNotContain("ETC Example");
+    }
+
+    @Test
     void givenTheConfiguration_whenTheDefaultLocaleChanges_thenItsOwnEventCarriesTheNewLocale() {
         // given
         ClubConfigurationSnapshot current = config.current();
@@ -207,7 +221,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
             ClubConfigurationSnapshot current, String privacyUrl) {
         return new ChangeClubConfigurationCommand(current.clubName(), current.primaryColor(),
                 current.accentColor(), current.logoFallbackUrl(), current.imprintUrl(), privacyUrl,
-                current.documentationUrl(),
+                current.documentationUrl(), current.shortName(),
                 current.defaultLocale(), new BookingSlotDuration(current.slotMinutes()),
                 current.timeZone(), new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
@@ -219,7 +233,19 @@ class ConfigAuditTest extends AbstractIntegrationTest {
             ClubConfigurationSnapshot current, String documentationUrl) {
         return new ChangeClubConfigurationCommand(current.clubName(), current.primaryColor(),
                 current.accentColor(), current.logoFallbackUrl(), current.imprintUrl(),
-                current.privacyUrl(), documentationUrl, current.defaultLocale(),
+                current.privacyUrl(), documentationUrl, current.shortName(), current.defaultLocale(),
+                new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
+                new CredentialLifetime(current.newAccountCredentialHours()),
+                new CredentialLifetime(current.passwordResetCredentialHours()),
+                new ResetTokenLifetime(60), new ReminderLeadTime(current.bookingReminderHours()),
+                current.noMembershipTypeRuleSetId());
+    }
+
+    private static ChangeClubConfigurationCommand withShortName(
+            ClubConfigurationSnapshot current, String shortName) {
+        return new ChangeClubConfigurationCommand(current.clubName(), current.primaryColor(),
+                current.accentColor(), current.logoFallbackUrl(), current.imprintUrl(),
+                current.privacyUrl(), current.documentationUrl(), shortName, current.defaultLocale(),
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
@@ -238,7 +264,7 @@ class ConfigAuditTest extends AbstractIntegrationTest {
                                                          UUID noMembershipTypeRuleSetId) {
         return new ChangeClubConfigurationCommand(clubName, current.primaryColor(), current.accentColor(),
                 current.logoFallbackUrl(), current.imprintUrl(), current.privacyUrl(),
-                current.documentationUrl(), locale,
+                current.documentationUrl(), current.shortName(), locale,
                 new BookingSlotDuration(minutes), timeZone,
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()), new ResetTokenLifetime(60), new ReminderLeadTime(24),

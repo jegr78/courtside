@@ -248,6 +248,28 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenStoringAShortNameThatCannotFitUnderAnIcon_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE club_config SET short_name = 'Example Tennis'
+                WHERE id = '00000000-0000-0000-0000-000000000001'
+                """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("club_config_short_name_fits_an_icon_label");
+    }
+
+    @Test
+    void whenStoringABlankShortName_thenTheDatabaseRefusesIt() {
+        // when / then
+        assertThatThrownBy(() -> jdbc.sql("""
+                UPDATE club_config SET short_name = '   '
+                WHERE id = '00000000-0000-0000-0000-000000000001'
+                """).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("club_config_short_name_fits_an_icon_label");
+    }
+
+    @Test
     void whenInsertingARuleDefinitionThatIsNotAKnownRuleType_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""
