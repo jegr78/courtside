@@ -2,77 +2,15 @@ import type { TFunction } from "i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
-import { api, type AuditEntry, type AuditSearch, type DayOfWeek } from "../api/client";
+import { api, type AuditEntry, type AuditSearch } from "../api/client";
+import { actorLabel, auditMessage, subjectLabel } from "../audit/auditText";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
-import { formatDateTime, shortTime, zonedDateTime } from "../time/clubZone";
+import { formatDateTime, zonedDateTime } from "../time/clubZone";
 import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
 import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
-
-const enabledFlagByEventType: Record<string, string> = {
-  "roster.account.availabilityChanged": "enabled"
-};
-
-const isoWeekdayNumbers: Record<DayOfWeek, number> = {
-  MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3, THURSDAY: 4, FRIDAY: 5, SATURDAY: 6, SUNDAY: 7
-};
-
-const weekdayByIsoNumber = new Map<number, DayOfWeek>(
-  Object.entries(isoWeekdayNumbers).map(([weekday, isoNumber]) => [isoNumber, weekday as DayOfWeek]));
-
-const nullSafeContexts: { eventType: string; field: string; context: string }[] = [
-  { eventType: "card.participantCard.added", field: "capacity", context: "unlimited" },
-  { eventType: "roster.membership.written", field: "startedOn", context: "unknownStart" }
-];
-
-function paramsLabel(params: Record<string, unknown>, t: TFunction): string {
-  return Object.entries(params)
-    .map(([name, value]) => `${t(`admin.rules.parameter.${name}`)}: ${String(value)}`)
-    .join(", ");
-}
-
-function weekdayLabel(entry: AuditEntry, t: TFunction): string | undefined {
-  const dayOfWeek = entry.parameters.dayOfWeek;
-  const weekday = typeof dayOfWeek === "number" ? weekdayByIsoNumber.get(dayOfWeek) : undefined;
-  return weekday === undefined ? undefined : t(`weekday.${weekday}`);
-}
-
-function isNullish(value: unknown): boolean {
-  return value === null || value === undefined;
-}
-
-function contextFor(entry: AuditEntry): string | undefined {
-  if (entry.eventType.endsWith(".availabilityChanged")) {
-    const flagKey = enabledFlagByEventType[entry.eventType] ?? "active";
-    return entry.parameters[flagKey] ? "active" : "inactive";
-  }
-  return nullSafeContexts.find((candidate) => candidate.eventType === entry.eventType
-    && isNullish(entry.parameters[candidate.field]))?.context;
-}
-
-function auditMessage(entry: AuditEntry, t: TFunction): string {
-  const context = contextFor(entry);
-  const weekday = weekdayLabel(entry, t);
-  const ruleType = typeof entry.parameters.ruleType === "string"
-    ? t(`admin.rules.type.${entry.parameters.ruleType}`)
-    : undefined;
-  const params = typeof entry.parameters.params === "object" && entry.parameters.params !== null
-    ? paramsLabel(entry.parameters.params as Record<string, unknown>, t)
-    : undefined;
-  const opensAt = typeof entry.parameters.opensAt === "string" ? shortTime(entry.parameters.opensAt) : undefined;
-  const closesAt = typeof entry.parameters.closesAt === "string" ? shortTime(entry.parameters.closesAt) : undefined;
-  return t(`audit.event.${entry.eventType}`, {
-    ...entry.parameters,
-    ...(weekday !== undefined ? { weekday } : {}),
-    ...(ruleType !== undefined ? { ruleType } : {}),
-    ...(params !== undefined ? { params } : {}),
-    ...(opensAt !== undefined ? { opensAt } : {}),
-    ...(closesAt !== undefined ? { closesAt } : {}),
-    ...(context ? { context } : {})
-  });
-}
 
 const EVENT_TYPE_LABEL = "audit.eventType.";
 
@@ -81,15 +19,6 @@ function eventTypeChoices(bundle: Record<string, unknown> | undefined, language:
     .filter((key) => key.startsWith(EVENT_TYPE_LABEL))
     .map((key) => ({ eventType: key.slice(EVENT_TYPE_LABEL.length), label: t(key) }))
     .sort((left, right) => left.label.localeCompare(right.label, language));
-}
-
-function actorLabel(entry: AuditEntry, t: TFunction): string {
-  if (!entry.actorAccountId) return t("audit.actor.system");
-  return entry.actorUsername ?? entry.actorAccountId;
-}
-
-function subjectLabel(entry: AuditEntry, t: TFunction): string {
-  return entry.subjectName ?? weekdayLabel(entry, t) ?? entry.subjectId;
 }
 
 export function AdminAuditView() {

@@ -19,9 +19,9 @@ function availabilityChangedFlags() {
 }
 
 function viewFlagByEventType() {
-  const source = readFileSync(join(root, "frontend/src/views/AdminAuditView.tsx"), "utf8");
+  const source = readFileSync(join(root, "frontend/src/audit/auditText.ts"), "utf8");
   const block = source.match(/enabledFlagByEventType: Record<string, string> = \{([\s\S]*?)\};/);
-  assert.ok(block, "could not locate enabledFlagByEventType in AdminAuditView.tsx");
+  assert.ok(block, "could not locate enabledFlagByEventType in auditText.ts");
   return new Map([...block[1].matchAll(/"([^"]+)":\s*"([^"]+)"/g)].map((match) => [match[1], match[2]]));
 }
 
@@ -40,7 +40,7 @@ test("given every availabilityChanged event type, when checking each locale, the
   assert.deepEqual(missing(en), [], "en is missing an _active/_inactive variant for an availabilityChanged type");
 });
 
-test("given every availabilityChanged event type, when checking its recorded flag field, then AdminAuditView resolves that exact field", () => {
+test("given every availabilityChanged event type, when checking its recorded flag field, then the audit text resolves that exact field", () => {
   // given
   const flags = availabilityChangedFlags();
   const viewFlags = viewFlagByEventType();
@@ -53,7 +53,7 @@ test("given every availabilityChanged event type, when checking its recorded fla
 
   // then
   assert.deepEqual(unresolved, [],
-    "AdminAuditView.tsx's enabledFlagByEventType does not name the actual flag field for these types "
+    "auditText.ts's enabledFlagByEventType does not name the actual flag field for these types "
     + "(add \"<type>\": \"<field>\" or the type will silently render as inactive either way): "
     + unresolved.map(({ type, flag }) => `${type} (payload carries "${flag}")`).join(", "));
 });

@@ -24,13 +24,13 @@ const fieldsPerEventType = (inventory) => new Map(
 
 // The view returns one of these contexts for a null field; any other sibling key it cannot reach.
 const nullSafeContexts = () => {
-  const source = readFileSync(join(root, "frontend/src/views/AdminAuditView.tsx"), "utf8");
+  const source = readFileSync(join(root, "frontend/src/audit/auditText.ts"), "utf8");
   const block = source.match(/const nullSafeContexts[^=]*=\s*\[([\s\S]*?)\n\];/);
-  assert.ok(block, "could not locate nullSafeContexts in AdminAuditView.tsx");
+  assert.ok(block, "could not locate nullSafeContexts in auditText.ts");
   const contexts = [...block[1].matchAll(
     /\{\s*eventType:\s*"([^"]+)",\s*field:\s*"([^"]+)",\s*context:\s*"([^"]+)"\s*\}/g
   )].map(([, eventType, field, context]) => ({ eventType, field, context }));
-  assert.ok(contexts.length > 0, "nullSafeContexts in AdminAuditView.tsx lists no context");
+  assert.ok(contexts.length > 0, "nullSafeContexts in auditText.ts lists no context");
   return contexts;
 };
 
