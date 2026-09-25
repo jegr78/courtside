@@ -70,6 +70,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("booking-dialog")).toHaveCount(0);
     await page.getByTestId("my-bookings-link").click();
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();
+    await expect(page.getByTestId("upcoming-bookings")).toBeVisible();
   },
   "participations": async (page) => {
     await expect(page.getByTestId("participations")).toBeVisible();

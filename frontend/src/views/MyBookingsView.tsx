@@ -209,9 +209,11 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
       {participations.length === 0 ? <p className="text-muted">{t("participations.empty")}</p>
         : <ul className="grid gap-3">{participations.map((participation) =>
           <li key={participation.id} data-testid={`participation-${participation.id}`} data-status={participation.status} className="border-structural grid gap-1 rounded-xl border p-4">
-            <span className="font-semibold">{participation.cardLabel}</span>
-            <span>{formatBookingPeriod(participation.startsAt, participation.endsAt, locale, timeZone)}</span>
-            <span>{participation.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
+            <span data-testid="booking-title" className="grid font-semibold">
+              <span>{formatBookingPeriod(participation.startsAt, participation.endsAt, locale, timeZone)}</span>
+              <span>{participation.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
+            </span>
+            <span data-testid="booking-card-label" className="text-muted text-sm">{participation.cardLabel}</span>
             {participation.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
             <div className="pt-1">
               <Button variant="destructive" data-testid="withdraw-participation" data-booking-id={participation.id} className="px-3 py-2" disabled={leaving === participation.id} onClick={() => void withdraw(participation.id)}>{t("participations.withdraw")}</Button>

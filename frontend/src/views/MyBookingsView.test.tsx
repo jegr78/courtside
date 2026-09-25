@@ -522,6 +522,19 @@ it("given the bookings cannot be read, when the member tries again, then they ap
   expect(screen.queryByTestId("load-failure"), "the failure leaves once the read succeeds").not.toBeInTheDocument();
 });
 
+it("given a participation, when it is listed, then it is titled by when and where like the member's own bookings", async () => {
+  // given
+  recordedAsCoPlayer();
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+
+  // then
+  const entry = await screen.findByTestId(`participation-${participationId}`);
+  expect(within(entry).getByTestId("booking-title"), "the label no longer leads").not.toHaveTextContent(within(entry).getByTestId("booking-card-label").textContent ?? "");
+  expect(within(entry).getByTestId("booking-title").compareDocumentPosition(within(entry).getByTestId("booking-card-label")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 it("given the withdrawal fails, when the member tries, then the reason is shown rather than swallowed", async () => {
   recordedAsCoPlayer();
   vi.spyOn(api, "withdrawParticipation").mockRejectedValue(
