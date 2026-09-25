@@ -82,6 +82,8 @@ Open *Club → Deadlines and reminders*.
 * A password reset code may remain valid for between 15 minutes and one day. The member must
   request a new code after it expires.
 
+![Lifetimes for one-time passwords and codes and the reminder before a booking.](../screenshots/en/deadlines.png)
+
 ## Facility → Courts
 
 A court needs a unique number and a name. You can edit both later.

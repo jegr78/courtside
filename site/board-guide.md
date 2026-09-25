@@ -85,6 +85,8 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
 * Der Code zum Zurücksetzen darf zwischen 15 Minuten und einem Tag gültig sein. Nach Ablauf muss das
   Mitglied einen neuen Code anfordern.
 
+![Die Fristen für Einmalpasswörter und Codes und die Erinnerung vor einer Buchung.](screenshots/de/deadlines.png)
+
 ## Anlage → Plätze
 
 Ein Platz braucht eine eindeutige Nummer und einen Namen. Beides kannst du später ändern.
