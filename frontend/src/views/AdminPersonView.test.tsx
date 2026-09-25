@@ -255,6 +255,70 @@ describe("AdminPersonView", () => {
     expect(prove).toHaveBeenCalledWith("admin-password");
   });
 
+  it("given two steps that each ask for a fresh sign-in, when both are proved, then every step is written exactly once", async () => {
+    // given
+    const person = vi.spyOn(api, "changePerson").mockResolvedValue({ ...jane, firstName: "Mary" });
+    const roles = vi.spyOn(api, "changeAccountRoles")
+      .mockRejectedValueOnce(new ApiError(403, {
+        type: "urn:courtside:error:recent-authentication-required",
+        title: "Recent authentication required", status: 403
+      }))
+      .mockResolvedValue({ ...jane, firstName: "Mary", roles: ["MEMBER", "TRAINER"] });
+    const locale = vi.spyOn(api, "changeAccountLocale")
+      .mockRejectedValueOnce(new ApiError(403, {
+        type: "urn:courtside:error:recent-authentication-required",
+        title: "Recent authentication required", status: 403
+      }))
+      .mockResolvedValue({ ...jane, firstName: "Mary", locale: "en" });
+    vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
+    showPerson();
+    await screen.findByTestId("person-first-name");
+    await userEvent.clear(screen.getByTestId("person-first-name"));
+    await userEvent.type(screen.getByTestId("person-first-name"), "Mary");
+    await userEvent.selectOptions(screen.getByTestId("account-locale"), "en");
+    await userEvent.click(screen.getByTestId("account-roles-TRAINER"));
+    await userEvent.click(screen.getByTestId("save-person"));
+
+    // when
+    for (let proof = 0; proof < 2; proof += 1) {
+      const dialog = await screen.findByRole("dialog");
+      await userEvent.type(input("admin-reauthentication-password"), "admin-password");
+      await userEvent.click(within(dialog).getByRole("button"));
+      await waitFor(() => expect(roles).toHaveBeenCalledTimes(proof + 1));
+    }
+
+    // then
+    await waitFor(() => expect(roles).toHaveBeenCalledTimes(2));
+    expect(person, "the name is written once").toHaveBeenCalledOnce();
+    expect(locale, "one refusal, one write, and no replay after the second proof").toHaveBeenCalledTimes(2);
+    expect(roles, "one refusal, one write").toHaveBeenCalledTimes(2);
+    expect(await screen.findByTestId("admin-save-success")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("given an earlier save was confirmed, when the next page save waits for a fresh sign-in, then the old confirmation is gone", async () => {
+    // given
+    vi.spyOn(api, "changePerson").mockResolvedValue({ ...jane, firstName: "Mary" });
+    vi.spyOn(api, "changeAccountRoles").mockRejectedValue(new ApiError(403, {
+        type: "urn:courtside:error:recent-authentication-required",
+        title: "Recent authentication required", status: 403
+      }));
+    showPerson();
+    await screen.findByTestId("person-first-name");
+    await userEvent.clear(screen.getByTestId("person-first-name"));
+    await userEvent.type(screen.getByTestId("person-first-name"), "Mary");
+    await userEvent.click(screen.getByTestId("save-person"));
+    await screen.findByTestId("admin-save-success");
+    await userEvent.click(screen.getByTestId("account-roles-TRAINER"));
+
+    // when
+    await userEvent.click(screen.getByTestId("save-person"));
+
+    // then
+    await screen.findByRole("dialog");
+    expect(screen.queryByTestId("admin-save-success"), "nothing claims this save succeeded").not.toBeInTheDocument();
+  });
+
   it("reports rejected administrator reauthentication inside the open dialog", async () => {
     // given
     vi.spyOn(api, "changeAccountRoles").mockRejectedValue(new ApiError(403, {

@@ -216,11 +216,14 @@ export function AdminPersonView() {
     }
   }
 
+  // A later step that asks again takes over the retry, so a second proof never replays a written step.
   async function resume(remaining: SaveStep[]) {
     try {
       await saveInTurn(remaining);
     } catch (failure) {
-      throw failure instanceof StepFailed && isRecentAuth(failure.cause) ? failure.cause : failure;
+      if (!(failure instanceof StepFailed && isRecentAuth(failure.cause))) throw failure;
+      setRetry({ run: () => resume(failure.remaining) });
+      throw failure.cause;
     }
     clear();
     setSuccess(t("admin.roster.saved"));
@@ -228,6 +231,8 @@ export function AdminPersonView() {
 
   async function savePage() {
     if (pending || !entry) return;
+    clear();
+    setSuccess(undefined);
     const { person, membership, username, locale, roles: chosen } = draft;
     if (edited.membership && !membership?.membershipTypeId) {
       setSuccess(undefined);
