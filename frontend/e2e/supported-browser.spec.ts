@@ -165,6 +165,7 @@ test("an administrator can open both core administration views", async ({ page }
 
 test("a member's pages load without the administration and without the language nobody chose", async ({ page }) => {
   // given
+  await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "de"));
   const scripts: string[] = [];
   page.on("request", (request) => {
     if (request.resourceType() === "script") scripts.push(new URL(request.url()).pathname);
