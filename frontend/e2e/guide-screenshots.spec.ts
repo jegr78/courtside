@@ -117,6 +117,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.getByTestId("save-club-config")).toBeVisible();
   },
   "booking-rules": async (page) => {
+    await page.getByTestId("admin-rule-sets-link").click();
     await expect(page.getByTestId("rule-set-name")).toBeVisible();
   },
   "courts": async (page) => {

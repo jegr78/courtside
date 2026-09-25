@@ -4,7 +4,7 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
   const overflow = await page.evaluate(() => {
     const viewportWidth = document.documentElement.clientWidth;
     if (document.documentElement.scrollWidth <= viewportWidth) return [];
-    return [...document.querySelectorAll("body, main, [data-testid='admin-shell'], [data-testid='admin-configuration-view'], [data-testid='admin-configuration-view'] form, fieldset")]
+    return [...document.querySelectorAll("body, main, [data-testid='admin-shell'], [data-testid='admin-configuration-view'], [data-testid='admin-configuration-view'] form, [data-testid='admin-deadlines-view'], [data-testid='admin-rule-sets-view'], [data-testid='rule-set-overview'], fieldset")]
       .map((element) => ({
         tag: element.tagName.toLowerCase(),
         testId: element.getAttribute("data-testid"),
@@ -284,6 +284,24 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   await expect(page.getByTestId("footer-imprint")).toBeVisible();
   await expect(page.getByTestId("footer-privacy")).toBeVisible();
   await expect(page.getByTestId("footer-documentation")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  // when
+  await page.getByTestId("admin-menu").tap();
+  await page.getByTestId("admin-deadlines-link").tap();
+
+  // then
+  await expect(page.getByTestId("save-deadlines")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  // when
+  await page.getByTestId("admin-menu").tap();
+  await page.getByTestId("admin-rule-sets-link").tap();
+
+  // then
+  await expect(page.getByTestId("rule-set-name")).toBeVisible();
+  const ruleSetRow = page.getByTestId("rule-set-overview").locator("tbody tr").first();
+  expect(await ruleSetRow.evaluate((element) => getComputedStyle(element).display), "a rule set is a card on a phone").toBe("grid");
   await expectNoHorizontalOverflow(page);
 
   // when

@@ -97,6 +97,21 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   await stableScreenshot(page.getByTestId("admin-configuration-view"), "admin-configuration.png");
 
   // when
+  await page.getByTestId("admin-deadlines-link").click();
+  await expect(page.getByTestId("save-deadlines")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-deadlines-view"), "admin-deadlines.png");
+
+  // when
+  await page.getByTestId("admin-rule-sets-link").click();
+  await expect(page.getByTestId("rule-set-name")).toBeVisible();
+  await expect(page.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toBeEnabled();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-rule-sets-view"), "admin-rule-sets.png");
+
+  // when
   await page.goto("/admin/facility/courts");
   await expect(page.getByTestId("create-court")).toBeVisible();
 

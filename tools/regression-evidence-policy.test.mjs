@@ -13,7 +13,7 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
   const principalSurfaces = [
     "court-plan", "booking-dialog", "booking-validation", "personal-bookings",
     "my-messages", "series-preview", "primary-navigation", "admin-navigation", "admin-menu-folded",
-    "admin-setup", "admin-configuration", "admin-courts", "admin-opening-hours", "admin-booking-cards",
+    "admin-setup", "admin-configuration", "admin-deadlines", "admin-rule-sets", "admin-courts", "admin-opening-hours", "admin-booking-cards",
     "admin-booking-card",
     "admin-slot-fillers", "admin-roster", "admin-membership-types",
     "admin-import", "admin-export", "admin-utilisation", "admin-audit", "admin-messages"

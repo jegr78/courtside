@@ -482,20 +482,14 @@ test("an admin changes club configuration and a booking rule through the browser
   await page.getByTestId("logo-url").fill("/icon.svg");
   await clubName.press("Tab");
   await expect(clubName).toHaveValue("Example Racquet Club");
-  const withoutMembershipType = page.getByTestId("no-membership-type-rule-set");
-  const offered = await withoutMembershipType.locator("option").nth(1).getAttribute("value");
-  expect(offered).toBeTruthy();
-  await withoutMembershipType.selectOption(offered);
   const configSaved = page.waitForResponse((response) =>
     response.url().endsWith("/api/admin/config") && response.request().method() === "PUT"
   );
   await page.getByTestId("save-club-config").click();
   const configResponse = await configSaved;
   expect(configResponse.status()).toBe(200);
-  const changedConfig =
-    await configResponse.json() as { clubName: string; noMembershipTypeRuleSetId: string };
+  const changedConfig = await configResponse.json() as { clubName: string };
   expect(changedConfig.clubName).toBe("Example Racquet Club");
-  expect(changedConfig.noMembershipTypeRuleSetId).toBe(offered);
   await expect(page.getByTestId("admin-save-success")).toBeVisible();
   await expect(page.getByTestId("club-brand-name")).toHaveText("Example Racquet Club");
   await page.getByTestId("logo-file").setInputFiles({
@@ -516,9 +510,35 @@ test("an admin changes club configuration and a booking rule through the browser
   await page.getByTestId("remove-logo").click();
   expect((await logoRemoved).status()).toBe(200);
   await expect(page.getByTestId("club-logo")).toHaveAttribute("src", "/icon.svg");
+  await page.getByTestId("admin-deadlines-link").click();
+  await page.getByTestId("new-account-credential-hours").fill("72");
+  const deadlinesSaved = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/config") && response.request().method() === "PUT"
+  );
+  await page.getByTestId("save-deadlines").click();
+  const deadlines = await (await deadlinesSaved).json() as { clubName: string; newAccountCredentialHours: number };
+  expect(deadlines.newAccountCredentialHours).toBe(72);
+  expect(deadlines.clubName, "the deadlines page sends the club name it did not show").toBe("Example Racquet Club");
+  await page.getByTestId("admin-rule-sets-link").click();
+  await expect(page.getByTestId("rule-set-overview")).toBeVisible();
+  const withoutMembershipType = page.getByTestId("no-membership-type-rule-set");
+  const offered = await withoutMembershipType.locator("option").nth(1).getAttribute("value");
+  expect(offered).toBeTruthy();
+  await withoutMembershipType.selectOption(offered);
+  const fallbackSaved = page.waitForResponse((response) =>
+    response.url().endsWith("/api/admin/config") && response.request().method() === "PUT"
+  );
+  await page.getByTestId("save-no-membership-type-rule-set").click();
+  const fallback = await (await fallbackSaved).json() as {
+    clubName: string; newAccountCredentialHours: number; noMembershipTypeRuleSetId: string;
+  };
+  expect(fallback.noMembershipTypeRuleSetId).toBe(offered);
+  expect(fallback.clubName).toBe("Example Racquet Club");
+  expect(fallback.newAccountCredentialHours).toBe(72);
+  await expect(page.getByTestId(`rule-set-applies-${offered}`)).toBeVisible();
   // The editor opens on whichever rule set sorts first, so the one this member is measured by is
   // chosen rather than assumed: its own seeded window is what says the switch has landed.
-  await page.getByTestId("rule-set").selectOption(STANDARD_RULE_SET);
+  await page.getByTestId(`rule-set-choose-${STANDARD_RULE_SET}`).click();
   await expect(page.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toHaveValue("7");
   await page.getByTestId("rule-ADVANCE_WINDOW-maxDays").fill("1");
   const ruleSaved = page.waitForResponse((response) =>

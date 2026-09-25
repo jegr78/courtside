@@ -40,7 +40,7 @@
       "id": "rule-set-name",
       "journey": "stored-admin",
       "field": "ruleSet.name",
-      "sink": "option-text"
+      "sink": "text-and-option-text"
     },
     {
       "id": "person-fields",
