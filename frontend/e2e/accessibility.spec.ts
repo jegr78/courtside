@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, selectJourneyDate, selectPreference, test } from "./fixtures";
+import { expect, expectAdministrationOverview, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { productFailure } from "./browser-diagnostics";
 import { STANDARD_RULE_SET } from "./shipped-rows";
 
@@ -131,6 +131,13 @@ for (const locale of ["de", "en"]) {
     await page.goto("/");
     await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "configuration-admin");
+
+    // when
+    await page.goto("/admin");
+    await expectAdministrationOverview(page);
+
+    // then
+    await expectNoWcagViolations(page);
 
     // when
     await page.goto("/admin/setup");

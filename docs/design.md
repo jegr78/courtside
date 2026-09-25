@@ -318,9 +318,16 @@ Grid changes are refused when active or future bookings or opening hours no long
 changes are refused while a confirmed booking has not ended. These writes serialize with booking
 and opening-hours changes through the club configuration row.
 
-The setup overview derives progress from current configuration, facilities, membership types and
+The setup checklist derives progress from current configuration, facilities, membership types and
 roster state. It stores no checklist flags and shows a failed state request instead of partial
 progress.
+
+Administration opens on an overview. It shows today's bookings by the club's calendar date and the
+ones still to come, the accounts whose holder has not chosen a password yet, refused and failed
+messages, and the latest recorded changes. Each part reads the endpoint its own page reads, asks
+for five entries, fails on its own and links to that page with the matching filter. The setup
+checklist leads the overview unfolded while a required step is open and folds to one line once all
+of them are complete. `/admin/setup` shows it in full.
 
 ## Membership data exchange
 

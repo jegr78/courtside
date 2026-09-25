@@ -471,6 +471,10 @@ test("stored text projections remain inert on administrative and managed views",
   await expect(auditRow.getByTestId("audit-subject")).toHaveText("1");
   await expect(auditRow.getByTestId("audit-actor")).toHaveText(payload);
   await expect(auditRow.getByTestId("audit-message")).toContainText(payload);
+  await page.goto("/admin");
+  const latestChange = page.getByTestId("overview-changes-entry").first();
+  await expect(latestChange, "the newest recorded change leads the overview as text").toContainText(payload);
+  await expect(latestChange.locator("img")).toHaveCount(0);
   expect(await page.evaluate(() => globalThis.__courtsideXss)).toBe("not-executed");
   expect(consoleDisclosures.some(Boolean)).toBe(false);
   await expectRenderingContexts("stored-admin", [

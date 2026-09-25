@@ -1,4 +1,4 @@
-import { expect, selectJourneyDate, selectPreference, test } from "./fixtures";
+import { expect, expectAdministrationOverview, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { credentialIn, messagesTo, messageTo } from "./mailbox";
 import { MEMBER_BOOKING_CARD, STANDARD_RULE_SET } from "./shipped-rows";
 
@@ -257,11 +257,12 @@ test("the bootstrap admin can replace the initial password and continue with set
   await page.getByTestId("username").fill("bootstrap-admin");
   await page.getByTestId("password").fill("permanent-password");
   await page.getByTestId("login-submit").click();
-  await expect(page.getByTestId("admin-setup-view")).toBeVisible();
-  await expect(page.getByTestId("setup-progress")).toBeVisible();
+  await expectAdministrationOverview(page);
 
   await page.reload();
-  await expect(page.getByTestId("admin-setup-view")).toBeVisible();
+  await expectAdministrationOverview(page);
+  await page.getByTestId("admin-setup-link").click();
+  await expect(page.getByTestId("setup-progress")).toBeVisible();
   await page.getByTestId("court-plan-link").click();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
   await page.getByTestId("preferences-menu").click();
@@ -471,7 +472,7 @@ test("an admin changes club configuration and a booking rule through the browser
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await page.getByTestId("administration-link").click();
-  await expect(page.getByTestId("admin-setup-view")).toBeVisible();
+  await expect(page.getByTestId("admin-overview-view")).toBeVisible();
   await page.getByTestId("admin-configuration-link").click();
   await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
   await expect(page.getByTestId("time-zone")).toHaveValue("Europe/Berlin");
@@ -964,7 +965,8 @@ test("a checkbox, the setup progress and the file picker take their colours from
       };
       const colours = {
         primary: read("var(--club-primary)"), primaryText: read("var(--club-primary-text)"), border: read("var(--cs-border)"),
-        input: read("var(--cs-input)"), raised: read("var(--cs-raised)"), text: read("var(--cs-text)")
+        input: read("var(--cs-input)"), raised: read("var(--cs-raised)"), text: read("var(--cs-text)"),
+        successBorder: read("var(--cs-notice-success-border)"), successText: read("var(--cs-notice-success-text)")
       };
       probe.remove();
       return colours;
@@ -976,6 +978,10 @@ test("a checkbox, the setup progress and the file picker take their colours from
     // then
     await expect(page.getByTestId("setup-progress-bar"), `${appearance}: the track is a raised surface`).toHaveCSS("background-color", tokens.raised);
     await expect(page.getByTestId("setup-progress-fill"), `${appearance}: the progress is the club's action colour`).toHaveCSS("background-color", tokens.primary);
+    const complete = page.getByTestId("setup-step-configuration").getByTestId("setup-state-badge");
+    await expect(complete).toHaveAttribute("data-state", "complete");
+    await expect(complete, `${appearance}: a complete step is outlined in the success tone`).toHaveCSS("border-top-color", tokens.successBorder);
+    await expect(complete, `${appearance}: a complete step is labelled in the success tone`).toHaveCSS("color", tokens.successText);
 
     // when
     await page.getByTestId("admin-messages-link").click();
@@ -1100,7 +1106,7 @@ test("an admin adds a person, gives them an account, and that person signs in an
   await page.getByTestId("username").fill("configuration-admin");
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
-  await expect(page.getByTestId("admin-setup-view")).toBeVisible();
+  await expect(page.getByTestId("admin-overview-view")).toBeVisible();
   await page.goto(`/admin/roster/${personId}`);
   await expect(page.getByTestId("credential-state"))
     .toHaveAttribute("data-state", "PASSWORD_CHOSEN");

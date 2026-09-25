@@ -1,4 +1,4 @@
-import { expect, selectJourneyDate, test } from "./fixtures";
+import { expect, expectAdministrationOverview, selectJourneyDate, test } from "./fixtures";
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => {
@@ -253,11 +253,11 @@ test("member and administration surfaces remain usable on a touch viewport", asy
   // which one is open rather than leaving that to a marker nobody can see while it is folded
   await expect(page.getByTestId("admin-menu")).toBeVisible();
   await expect(page.getByTestId("admin-courts-link")).not.toBeVisible();
-  await expect(page.getByTestId("admin-setup-view")).toBeVisible();
+  await expectAdministrationOverview(page);
   await expectNoHorizontalOverflow(page);
 
   // when
-  const pageTop = async () => (await page.getByTestId("admin-setup-view").boundingBox())!.y;
+  const pageTop = async () => (await page.getByTestId("admin-overview-view").boundingBox())!.y;
   const before = await pageTop();
   await page.getByTestId("admin-menu").tap();
 

@@ -172,6 +172,15 @@ export async function selectJourneyDate(page: Page, visualDate: string): Promise
   await day.click();
 }
 
+// The overview renders every card's loading line in its first frame, so none left means all answered.
+export async function expectAdministrationOverview(page: Page): Promise<void> {
+  const overview = page.getByTestId("admin-overview-view");
+  await expect(overview).toBeVisible();
+  await expect(overview.getByTestId("overview-setup")).toBeVisible();
+  await expect(overview.getByRole("status")).toHaveCount(0);
+  await expect(overview.getByTestId("load-failure")).toHaveCount(0);
+}
+
 export async function selectPreference(page: Page, selector: "#locale-preference" | "#theme-preference", value: string): Promise<void> {
   const menu = page.getByTestId("preferences-menu");
   await menu.click();
