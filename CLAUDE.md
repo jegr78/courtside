@@ -14,17 +14,6 @@ AGPL-3.0, distributed as a container image plus a reference deployment.
   addresses members and boards, not contributors, so it follows the product's locale rule rather
   than the English-documentation rule above — which still governs everything in `docs/`.
 
-## Technology Stack
-
-* **Runtime:** Java 25 (Eclipse Temurin), Maven via `./mvnw`, Spring Boot 4.1
-* **Modularity:** Spring Modulith 2.1 — module boundaries verified at build time
-* **DB:** PostgreSQL 17 only. Flyway migrations. Testcontainers in tests.
-* **API:** REST/JSON, **contract-first** — the OpenAPI document is the source of truth and the
-  Java interfaces and models are generated from it, not the other way round. RFC 9457 Problem
-  Details for errors. See issue #31.
-* **Frontend:** React + Vite PWA (later milestone), consuming the same public API
-* **Testing:** JUnit 5, AssertJ, Mockito, Testcontainers
-
 ## Environment
 
 This project targets Java 25. If it is not the default JDK on the machine, point every Maven
@@ -194,15 +183,6 @@ fails on the missing `BuildProperties` bean.
 * **Applies equally to subagents.** Every prompt that writes code must carry this rule.
 
 ## Conventions
-
-### Naming
-
-* **Entities:** singular PascalCase (`Court`, `Booking`, `CourtAllocation`)
-* **Tables and columns:** singular snake_case (`court`, `booking_card`, `created_at`)
-* **Repositories:** `{Entity}Repository` — **Services:** `{Domain}Service`
-* **Controllers:** `{Entity}Controller` — **Request/response records:** `{X}Request` / `{X}Response`
-* **Methods:** camelCase, verb-first. **Booleans:** `isActive()`, `isGuestAllowed()`
-* **Ports:** interface named for what it does (`AccessControlPort`, `BookingCounter`)
 
 ### Lombok
 
