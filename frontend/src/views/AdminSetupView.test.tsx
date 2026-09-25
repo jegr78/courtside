@@ -198,6 +198,29 @@ describe("AdminSetupView", () => {
     expect(api.roster).toHaveBeenCalledTimes(2);
   });
 
+  it("given a complete, an open and an optional step, when setup is read, then each badge carries its state in a mark and an outline", async () => {
+    // given
+    vi.mocked(api.membershipTypes).mockResolvedValue([]);
+
+    // when
+    render(<MemoryRouter><AdminSetupView /></MemoryRouter>);
+
+    // then
+    await screen.findByTestId("setup-progress");
+    const badge = (step: string) => within(screen.getByTestId(`setup-step-${step}`)).getByTestId("setup-state-badge");
+    const mark = (step: string) => within(badge(step)).getByTestId("setup-state-mark");
+    expect(badge("configuration")).toHaveAttribute("data-state", "complete");
+    expect(badge("membership-types")).toHaveAttribute("data-state", "next");
+    expect(badge("import")).toHaveAttribute("data-state", "optional");
+    expect(new Set([mark("configuration"), mark("membership-types"), mark("import")].map((element) => element.textContent)).size,
+      "every state has a symbol of its own that survives forced colours").toBe(3);
+    expect(badge("membership-types"), "an open step is outlined heavier than a complete one").toHaveClass("border-2");
+    expect(badge("configuration")).not.toHaveClass("border-2");
+    expect(badge("import"), "an optional step is outlined dashed").toHaveClass("border-dashed");
+    expect(badge("configuration").className, "a complete step is not drawn like an open one")
+      .not.toEqual(badge("membership-types").className);
+  });
+
   it("given the setup state is available, when its steps are read, then every one links to its working surface", async () => {
     // when
     render(<MemoryRouter><AdminSetupView /></MemoryRouter>);
