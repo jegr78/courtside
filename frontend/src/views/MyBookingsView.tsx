@@ -143,7 +143,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
     setSuccess(undefined);
     setAction(chosen);
   };
-  return <section className="mt-8" aria-labelledby="my-bookings-title">
+  return <section className="mt-4 sm:mt-8" aria-labelledby="my-bookings-title">
     <h2 id="my-bookings-title" data-testid="my-bookings-title" className="text-2xl font-bold">{t("myBookings.title")}</h2>
     {offline && refreshedAt && grid && <p data-testid="bookings-offline-as-of" role="status"
       className="surface-raised border-structural mt-4 rounded-xl border px-4 py-3">
@@ -153,7 +153,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
-      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} t={t} />
+      <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} t={t} />
       {sections.past.length === 0
         ? <p data-testid="past-bookings" className="text-muted">{t("myBookings.noPast")}</p>
         : <details data-testid="past-bookings">
@@ -224,16 +224,15 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-function BookingSection({ testId, title, empty, bookings, courtNames, locale, timeZone, actionable = false, managed = false, action, t }: {
-  testId: string; title?: string; empty: string; bookings: Appointment[]; courtNames: Map<string, string>;
+function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, managed = false, action, t }: {
+  testId: string; title?: string; titleHidden?: boolean; empty: string; bookings: Appointment[]; courtNames: Map<string, string>;
   locale: string; timeZone: string; actionable?: boolean; managed?: boolean; action: (value: { kind: "cancel" | "move" | "detail"; booking: Appointment; managed: boolean }) => void; t: Translate;
 }) {
   const groups = groupBookings(bookings);
   return <section data-testid={testId}>
-    {title && <h3 className="text-xl font-semibold">{title}</h3>}
-    {groups.length === 0 ? <p className="text-muted mt-3">{empty}</p> : <div className="mt-3 grid gap-4">{groups.map((group) =>
-      <article key={group.key} className="border-structural rounded-xl border p-4">
-        {group.series && <p data-testid="series-marker" className="mb-2 font-semibold">{t("myBookings.series")}</p>}
+    {title && <h3 className={titleHidden ? "sr-only" : "text-xl font-semibold"}>{title}</h3>}
+    {groups.length === 0 ? <p className={titleHidden ? "text-muted" : "text-muted mt-3"}>{empty}</p> : <div className={`grid gap-3 sm:gap-4 ${titleHidden ? "" : "mt-3"}`}>{groups.map((group) =>
+      <article key={group.key} className="border-structural rounded-xl border p-3 sm:p-4">
         <ul className="grid gap-3">{group.bookings.map((booking) => <li key={booking.id} data-testid={`booking-${booking.id}`} data-status={booking.status} className="border-structural grid gap-1 border-b pb-3 last:border-0 last:pb-0">
           <span data-testid="booking-title" className="grid font-semibold">
             <span>{formatBookingPeriod(booking.startsAt, booking.endsAt, locale, timeZone)}</span>
@@ -242,6 +241,7 @@ function BookingSection({ testId, title, empty, bookings, courtNames, locale, ti
           <span data-testid="booking-card-label" className="text-muted flex items-center gap-2 text-sm">
             <span aria-hidden="true" className="inline-block size-3 shrink-0 rounded-sm border" style={{ backgroundColor: booking.cardColor }} />
             {booking.cardLabel}
+            {group.series && <span data-testid="series-marker" className="rounded-full border px-2 font-semibold">{t("myBookings.series")}</span>}
           </span>
           {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
           {managed && "participantCount" in booking && <span>{t("managedAppointments.participants", { count: booking.participantCount })}</span>}
