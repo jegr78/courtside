@@ -14,13 +14,14 @@ export async function recoverStaleDocument(): Promise<void> {
   newer.postMessage({ type: "SKIP_WAITING" });
 }
 
-function installed(worker: ServiceWorker | null): Promise<ServiceWorker | null> {
-  if (!worker) return Promise.resolve(null);
+function installed(candidate: ServiceWorker | null): Promise<ServiceWorker | null> {
+  if (!candidate) return Promise.resolve(null);
+  const worker = candidate;
   return new Promise((settle) => {
     function settled() {
-      if (worker!.state !== "installed" && worker!.state !== "redundant") return false;
-      worker!.removeEventListener("statechange", settled);
-      settle(worker!.state === "installed" ? worker : null);
+      if (worker.state !== "installed" && worker.state !== "redundant") return false;
+      worker.removeEventListener("statechange", settled);
+      settle(worker.state === "installed" ? worker : null);
       return true;
     }
     if (!settled()) worker.addEventListener("statechange", settled);
