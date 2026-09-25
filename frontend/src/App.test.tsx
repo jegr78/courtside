@@ -217,6 +217,7 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "adminConfig").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "ruleSets").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "ruleTypes").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "membershipTypes").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
     render(<RoutedShell initialEntries={["/admin/configuration"]}><AppRoutes session={{
@@ -239,6 +240,7 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "adminConfig").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "ruleSets").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "ruleTypes").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "membershipTypes").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
     render(<RoutedShell initialEntries={["/admin/configuration"]}><AppRoutes session={{
