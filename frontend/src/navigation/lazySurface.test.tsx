@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,7 +48,7 @@ describe("lazySurface", () => {
     // then
     expect(screen.getByTestId("load-failure"))
       .toHaveTextContent("Dieser Bereich lässt sich gerade nicht laden. Lade die Seite neu.");
-    expect(reload, "a rejected chunk import is remembered, so only a new document fetches it again")
-      .toHaveBeenCalledOnce();
+    await waitFor(() => expect(reload,
+      "a rejected chunk import is remembered, so only a new document fetches it again").toHaveBeenCalledOnce());
   });
 });
