@@ -20,10 +20,12 @@ class FacilityUtilisationController implements AdminReportsApi {
     public ResponseEntity<ApiFacilityUtilisation> facilityUtilisation(LocalDate from, LocalDate to) {
         FacilityUtilisationService.FacilityUtilisation report = utilisation.report(from, to);
         return ResponseEntity.ok(new ApiFacilityUtilisation(
-                report.from(), report.to(), report.timeZone(), report.courts().stream()
-                .map(court -> new ApiCourtUtilisation(
-                        court.courtId(), court.courtNumber(), court.courtName(),
-                        court.bookingCount(), court.occupiedMinutes()))
-                .toList()));
+                report.from(), report.to(), report.timeZone(), report.openMinutes(),
+                report.courts().stream()
+                        .map(court -> new ApiCourtUtilisation(
+                                court.courtId(), court.courtNumber(), court.courtName(),
+                                court.bookingCount(), court.occupiedMinutes(),
+                                court.occupiedOpenMinutes(), court.occupancy()))
+                        .toList()));
     }
 }

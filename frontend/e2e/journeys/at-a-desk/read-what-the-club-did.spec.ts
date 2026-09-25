@@ -12,13 +12,19 @@ test("given a board preparing its annual meeting, when they read how busy the co
 
     // when — how busy the courts were
     await reachAdministration(page, "admin-utilisation-link");
+
+    // then — last month answers before anything is entered
     await expect(page.getByTestId("admin-facility-utilisation-view")).toBeVisible();
+    await expect(page.locator('[data-testid^="utilisation-row-"]').first()).toBeVisible();
+    const lastMonth = await page.getByTestId("utilisation-period").textContent() ?? "";
+
+    // when — a day of their own choosing
     await writeDate(page.getByTestId("utilisation-from"), journeyService.visualDate);
     await writeDate(page.getByTestId("utilisation-to"), journeyService.visualDate);
     await activate(page.getByTestId("utilisation-read"));
 
     // then
-    await expect(page.getByTestId("utilisation-period")).toBeVisible();
+    await expect(page.getByTestId("utilisation-period")).not.toHaveText(lastMonth);
     await expect(page.locator('[data-testid^="utilisation-row-"]').first()).toBeVisible();
 
     // when — what the club changed

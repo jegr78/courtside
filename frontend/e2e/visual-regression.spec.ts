@@ -161,7 +161,7 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 
   // when
   await page.goto("/admin/utilisation");
-  await expect(page.getByTestId("utilisation-read")).toBeVisible();
+  await expect(page.getByTestId("utilisation-row-1")).toBeVisible();
 
   // then
   await stableScreenshot(page.getByTestId("admin-facility-utilisation-view"), "admin-utilisation.png");

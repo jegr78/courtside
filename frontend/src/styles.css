@@ -229,6 +229,21 @@ input[type="time"] {
     color: var(--cs-destructive-text);
     background: var(--cs-destructive);
   }
+
+  .occupancy-bar {
+    background: var(--cs-raised);
+    border-color: var(--cs-border);
+  }
+
+  .occupancy-bar-fill {
+    background: var(--club-primary);
+  }
+}
+
+@media (forced-colors: active) {
+  .occupancy-bar-fill {
+    background: CanvasText;
+  }
 }
 
 .day-plan-table {

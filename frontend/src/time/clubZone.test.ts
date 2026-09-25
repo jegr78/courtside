@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { bookingTimeSlot, formatBookingPeriod, isPastSlot, isValidZonedDateTime, zonedDateTime } from "./clubZone";
+import { bookingTimeSlot, formatBookingPeriod, formatDateRange, isPastSlot, isValidZonedDateTime, zonedDateTime } from "./clubZone";
 
 const localTimeIn = (isoInstant: string, timeZone: string) =>
   new Intl.DateTimeFormat("en-GB", {
@@ -143,4 +143,22 @@ it("given a booking crosses a club-day boundary, when formatting its period, the
 
   // then
   expect(period).toBe("12.08.2026, 23:30 – 13.08.2026, 00:30");
+});
+
+it("given two local dates, when formatting them as a range, then each reads in the locale and neither shifts a day", () => {
+  // when
+  const english = formatDateRange("2026-04-01", "2026-04-30", "en");
+  const german = formatDateRange("2026-03-29", "2026-10-25", "de");
+
+  // then
+  expect(english.replace(/\s/g, " ")).toBe("Apr 1 – 30, 2026");
+  expect(german.replace(/\s/g, " ")).toBe("29.03. – 25.10.2026");
+});
+
+it("given the same date twice, when formatting it as a range, then it reads as that one day", () => {
+  // when
+  const single = formatDateRange("2026-05-13", "2026-05-13", "en");
+
+  // then
+  expect(single).toBe("May 13, 2026");
 });
