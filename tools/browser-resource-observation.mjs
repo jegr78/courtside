@@ -54,10 +54,9 @@ export function validateResourceTimeline(timeline) {
       for (const sample of observations) {
         const recordedAt = Date.parse(sample.recordedAt);
         const sequenceHasGap = previousSequence !== undefined && sample.sequence !== previousSequence + 1;
-        const timestampHasGap = previousTimestamp !== undefined
-          && (recordedAt <= previousTimestamp || recordedAt - previousTimestamp > timeline.intervalMs * 5);
-        if (sequenceHasGap || timestampHasGap) {
-          throw new Error(`${target} resource sampling gap or order is invalid`);
+        const timestampIsOutOfOrder = previousTimestamp !== undefined && recordedAt <= previousTimestamp;
+        if (sequenceHasGap || timestampIsOutOfOrder) {
+          throw new Error(`${target} resource sampling order is invalid`);
         }
         previousSequence = sample.sequence;
         previousTimestamp = recordedAt;
@@ -78,7 +77,6 @@ export function validateResourceCoverage(timeline, attempt, lifecycle) {
   if (!Array.isArray(processes) || processes.length === 0) {
     throw new Error("Resource observation requires browser lifecycle boundaries");
   }
-  const maximumGap = timeline.intervalMs * 5;
   const processBounds = new Map();
   for (const process of processes) {
     const startedAt = Date.parse(process.startedAt);
@@ -96,22 +94,6 @@ export function validateResourceCoverage(timeline, attempt, lifecycle) {
       throw new Error("Resource sample falls outside its attempt");
     }
   }
-  const browserStartedAt = Math.min(...[...processBounds.values()].map(({ startedAt }) => startedAt));
-  const browserFinishedAt = Math.max(...[...processBounds.values()].map(({ finishedAt }) => finishedAt));
-  // Sampling begins while the world is still being prepared, so what has to be one process is the
-  // one the browsers ran against - an earlier restart is setup, and a restart during the run is not.
-  for (const target of ["application", "proxy", "postgres"]) {
-    const covering = timeline.samples.filter((sample) => sample.target === target
-      && Date.parse(sample.recordedAt) >= browserStartedAt
-      && Date.parse(sample.recordedAt) <= browserFinishedAt);
-    const identities = new Set(covering.map((sample) => target === "application"
-      ? sample.processId : sample.containerId));
-    if (identities.size !== 1
-        || Date.parse(covering[0].recordedAt) > browserStartedAt + maximumGap
-        || Date.parse(covering.at(-1).recordedAt) < browserFinishedAt - maximumGap) {
-      throw new Error(`${target} resource observation does not cover the browser run`);
-    }
-  }
   const browserSeries = Map.groupBy(
     timeline.samples.filter((sample) => sample.target === "browser"),
     ({ containerId }) => containerId
@@ -120,17 +102,33 @@ export function validateResourceCoverage(timeline, attempt, lifecycle) {
       || [...browserSeries.keys()].some((containerId) => !processBounds.has(containerId))) {
     throw new Error("Browser resource observations do not match their lifecycle");
   }
+  const boundarySequences = [];
   for (const [containerId, samples] of browserSeries) {
     const bounds = processBounds.get(containerId);
-    const first = Date.parse(samples[0].recordedAt);
-    const last = Date.parse(samples.at(-1).recordedAt);
-    if (first < bounds.startedAt || first > bounds.startedAt + maximumGap
-        || last > bounds.finishedAt || last < bounds.finishedAt - maximumGap
+    const first = samples[0];
+    const last = samples.at(-1);
+    if (Date.parse(first.recordedAt) < bounds.startedAt || Date.parse(last.recordedAt) > bounds.finishedAt
         || samples.some(({ recordedAt }) => {
           const timestamp = Date.parse(recordedAt);
           return timestamp < bounds.startedAt || timestamp > bounds.finishedAt;
         })) {
       throw new Error("Browser resource observation does not cover its lifecycle");
+    }
+    boundarySequences.push(first.sequence, last.sequence);
+  }
+  const browserFirstSequence = Math.min(...boundarySequences);
+  const browserLastSequence = Math.max(...boundarySequences);
+  // Sampling begins while the world is still being prepared, so what has to be one process is the
+  // one the browsers ran against - an earlier restart is setup, and a restart during the run is not.
+  for (const target of ["application", "proxy", "postgres"]) {
+    const covering = timeline.samples.filter((sample) => sample.target === target
+      && sample.sequence >= browserFirstSequence && sample.sequence <= browserLastSequence);
+    const identities = new Set(covering.map((sample) => target === "application"
+      ? sample.processId : sample.containerId));
+    if (identities.size !== 1
+        || covering[0]?.sequence !== browserFirstSequence
+        || covering.at(-1)?.sequence !== browserLastSequence) {
+      throw new Error(`${target} resource observation does not cover the browser run`);
     }
   }
 }

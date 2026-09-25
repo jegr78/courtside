@@ -670,10 +670,16 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     await resourceSamplePending;
     if (resourceSampleFailure) throw resourceSampleFailure;
   };
-  const stopResourceSampling = async () => {
-    resourceSamplingStopped = true;
+  const captureResourceBoundary = async () => {
     await pauseResourceSampling();
     await retainResourceSample();
+  };
+  const resumeResourceSampling = () => {
+    resourceSampleTimer = setInterval(sampleResources, 1_000);
+  };
+  const stopResourceSampling = async () => {
+    resourceSamplingStopped = true;
+    await captureResourceBoundary();
   };
   const stopBrowser = async (browserName: string): Promise<void> => {
     const browser = browserServers.get(browserName);
@@ -681,8 +687,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     const id = browser.container.getId();
     try {
       if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true") {
-        await pauseResourceSampling();
-        await retainResourceSample();
+        await captureResourceBoundary();
       }
       await completeCleanup([
         async () => {
@@ -696,7 +701,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     } finally {
       browserServers.delete(browserName);
       if (process.env.COURTSIDE_WEBKIT_RELIABILITY === "true" && !resourceSamplingStopped) {
-        resourceSampleTimer = setInterval(sampleResources, 1_000);
+        resumeResourceSampling();
       }
     }
   };
@@ -995,6 +1000,10 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       browserServers.set(browserName, { container, endpoint, locale });
       browserLifecycle.start(browserName, container.getId(), new Date().toISOString());
       retainBrowserLifecycle();
+      if (retainReliabilityResources) {
+        await captureResourceBoundary();
+        resumeResourceSampling();
+      }
       return endpoint;
     };
     const releasePinnedBrowser = async (browserName: string): Promise<void> => {

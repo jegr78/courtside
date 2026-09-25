@@ -29,13 +29,10 @@ test("given a completed run, when validating its timeline, then all targets and 
     samples: evidence.samples.map(({ pids, ...sample }) => sample) }), /pids/);
   assert.throws(() => validateResourceTimeline({ ...evidence,
     samples: evidence.samples.map((sample) => sample.target === "browser" && sample.sequence === 2
-      ? { ...sample, recordedAt: "2026-09-05T08:00:08.000Z" } : sample) }), /sampling gap/);
+      ? { ...sample, recordedAt: "2026-09-05T08:00:00.000Z" } : sample) }), /order/);
   assert.throws(() => validateResourceTimeline({ ...evidence,
     samples: evidence.samples.map((sample) => sample.target === "browser" && sample.sequence === 2
-      ? { ...sample, recordedAt: "2026-09-05T08:00:00.000Z" } : sample) }), /sampling gap/);
-  assert.throws(() => validateResourceTimeline({ ...evidence,
-    samples: evidence.samples.map((sample) => sample.target === "browser" && sample.sequence === 2
-      ? { ...sample, sequence: 3 } : sample) }), /sampling gap/);
+      ? { ...sample, sequence: 3 } : sample) }), /order/);
   assert.throws(() => validateResourceTimeline({ ...evidence,
     samples: evidence.samples.filter(({ sequence }) => sequence !== 1) }), /sequence is incomplete/);
   assert.throws(() => validateResourceTimeline({ ...evidence,
@@ -43,6 +40,17 @@ test("given a completed run, when validating its timeline, then all targets and 
   }), /sequence is incomplete/);
   assert.throws(() => validateResourceTimeline({ ...evidence,
     samples: [...evidence.samples, { ...evidence.samples[0], target: "mail-sink" }] }), /target/);
+});
+
+test("given a slow but contiguous observation, when validating its timeline, then scheduler delay is not missing evidence", () => {
+  // given
+  const evidence = timeline();
+  const delayed = evidence.samples.map((sample) => sample.sequence === 2
+    ? { ...sample, recordedAt: "2026-09-05T08:00:08.000Z" }
+    : sample);
+
+  // when / then
+  validateResourceTimeline({ ...evidence, samples: delayed });
 });
 
 // An attempt samples from the moment the world is first prepared until the last browser is gone,
