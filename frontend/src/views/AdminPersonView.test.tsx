@@ -83,7 +83,7 @@ describe("AdminPersonView", () => {
     expect(screen.getByTestId("account-username")).toHaveValue("doe.jane.2");
   });
 
-  it("given the membership and the account are edited, when they are counted, then each one is asked about on its own", async () => {
+  it("given the membership and the account are edited, when they are counted, then the page is asked about once", async () => {
     // given
     showPerson();
     await screen.findByTestId("account-username");
@@ -93,21 +93,129 @@ describe("AdminPersonView", () => {
     await userEvent.type(screen.getByTestId("account-username"), "!");
 
     // then
-    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("2"));
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
   });
 
-  it("given the username is edited, when the account is read, then only that save is marked", async () => {
+  it("given the username is edited, when the page is read, then one bar names the person it saves", async () => {
     // given
     showPerson();
     const username = await screen.findByTestId("account-username");
+    expect(screen.queryByTestId("save-person"), "an untouched person offers nothing to save").not.toBeInTheDocument();
 
     // when
     await userEvent.type(username, "!");
 
     // then
-    expect(await screen.findByTestId("unsaved-mark-account-username:person-1")).toBeInTheDocument();
-    expect(screen.queryByTestId("unsaved-mark-account-roles:person-1")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("unsaved-mark-account-locale:person-1")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("unsaved-mark-person")).toHaveTextContent("Not saved yet: Jane Doe");
+    expect(screen.getAllByTestId("save-bar")).toHaveLength(1);
+  });
+
+  it("given the name, the membership and the username are edited, when the page is saved once, then each is written in page order", async () => {
+    // given
+    const written: string[] = [];
+    vi.spyOn(api, "changePerson").mockImplementation(() => {
+      written.push("person");
+      return Promise.resolve({ ...jane, firstName: "Mary" });
+    });
+    vi.spyOn(api, "assignMembership").mockImplementation(() => {
+      written.push("membership");
+      return Promise.resolve({ ...jane, firstName: "Mary", membershipTypeId: "type-2" });
+    });
+    vi.spyOn(api, "changeAccountUsername").mockImplementation(() => {
+      written.push("username");
+      return Promise.resolve({ ...jane, firstName: "Mary", membershipTypeId: "type-2", username: "major.mary" });
+    });
+    showPerson();
+    await screen.findByTestId("person-first-name");
+    await userEvent.clear(screen.getByTestId("person-first-name"));
+    await userEvent.type(screen.getByTestId("person-first-name"), "Mary");
+    await userEvent.selectOptions(screen.getByTestId("membership-type"), "type-2");
+    await userEvent.clear(screen.getByTestId("account-username"));
+    await userEvent.type(screen.getByTestId("account-username"), "major.mary");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-person"));
+
+    // then
+    expect(await screen.findByTestId("admin-save-success")).toBeInTheDocument();
+    expect(written).toEqual(["person", "membership", "username"]);
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given the username the instance refuses, when the page is saved, then the name before it is kept and the username stays unsaved", async () => {
+    // given
+    vi.spyOn(api, "changePerson").mockResolvedValue({ ...jane, firstName: "Mary" });
+    vi.spyOn(api, "changeAccountUsername").mockRejectedValue(new ApiError(409));
+    const locale = vi.spyOn(api, "changeAccountLocale");
+    showPerson();
+    await screen.findByTestId("person-first-name");
+    await userEvent.clear(screen.getByTestId("person-first-name"));
+    await userEvent.type(screen.getByTestId("person-first-name"), "Mary");
+    await userEvent.type(screen.getByTestId("account-username"), "!");
+    await userEvent.selectOptions(screen.getByTestId("account-locale"), "en");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-person"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("Username was not saved.");
+    expect(locale, "nothing is sent after the refused step").not.toHaveBeenCalled();
+    expect(screen.queryByTestId("admin-save-success")).not.toBeInTheDocument();
+
+    // when
+    await userEvent.click(screen.getByTestId("discard-person"));
+
+    // then
+    expect(screen.getByTestId("person-first-name"), "the saved name stays").toHaveValue("Mary");
+    expect(screen.getByTestId("account-username")).toHaveValue("doe.jane");
+    expect(screen.getByTestId("account-locale")).toHaveValue("de");
+  });
+
+  it("given a membership without a type, when the page is saved, then nothing is sent and the type is asked for", async () => {
+    // given
+    const assigning = vi.spyOn(api, "assignMembership");
+    const changing = vi.spyOn(api, "changePerson");
+    showPerson({ ...jane, membershipTypeId: null, membershipStartedOn: null });
+    await screen.findByTestId("membership-started-on");
+    await userEvent.type(screen.getByTestId("person-first-name"), "!");
+    await userEvent.type(screen.getByTestId("membership-started-on"), "2026-02-01");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-person"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("Choose a membership type");
+    expect(assigning).not.toHaveBeenCalled();
+    expect(changing, "a refused page sends none of its parts").not.toHaveBeenCalled();
+  });
+
+  it("given a saved name and roles that need a fresh sign-in, when the administrator proves it, then only the roles are sent again", async () => {
+    // given
+    const person = vi.spyOn(api, "changePerson").mockResolvedValue({ ...jane, firstName: "Mary" });
+    const roles = vi.spyOn(api, "changeAccountRoles")
+      .mockRejectedValueOnce(new ApiError(403, {
+        type: "urn:courtside:error:recent-authentication-required",
+        title: "Recent authentication required", status: 403
+      }))
+      .mockResolvedValue({ ...jane, firstName: "Mary", roles: ["MEMBER", "TRAINER"] });
+    vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
+    showPerson();
+    await screen.findByTestId("person-first-name");
+    await userEvent.clear(screen.getByTestId("person-first-name"));
+    await userEvent.type(screen.getByTestId("person-first-name"), "Mary");
+    await userEvent.click(screen.getByTestId("account-roles-TRAINER"));
+
+    // when
+    await userEvent.click(screen.getByTestId("save-person"));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.type(input("admin-reauthentication-password"), "admin-password");
+    await userEvent.click(within(dialog).getByRole("button"));
+
+    // then
+    await waitFor(() => expect(roles).toHaveBeenCalledTimes(2));
+    expect(person, "the step that already succeeded is not repeated").toHaveBeenCalledOnce();
+    expect(await screen.findByTestId("admin-save-success")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
   });
 
   it("given only a role is ticked on the account form, when it is read, then it holds work", async () => {
@@ -132,11 +240,11 @@ describe("AdminPersonView", () => {
       .mockResolvedValue({ ...jane, roles: ["MEMBER", "TRAINER"] });
     const prove = vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
     showPerson();
-    await screen.findByTestId("save-roles");
+    await screen.findByTestId("account-roles-TRAINER");
     await userEvent.click(screen.getByTestId("account-roles-TRAINER"));
 
     // when
-    await userEvent.click(screen.getByTestId("save-roles"));
+    await userEvent.click(screen.getByTestId("save-person"));
     const dialog = await screen.findByRole("dialog");
     await userEvent.type(input("admin-reauthentication-password"), "admin-password");
     await userEvent.click(within(dialog).getByRole("button"));
@@ -158,9 +266,9 @@ describe("AdminPersonView", () => {
       title: "Reauthentication failed", status: 403
     }));
     showPerson();
-    await screen.findByTestId("save-roles");
+    await screen.findByTestId("account-roles-TRAINER");
     await userEvent.click(screen.getByTestId("account-roles-TRAINER"));
-    await userEvent.click(screen.getByTestId("save-roles"));
+    await userEvent.click(screen.getByTestId("save-person"));
     const dialog = await screen.findByRole("dialog");
 
     // when
@@ -180,9 +288,9 @@ describe("AdminPersonView", () => {
     }));
     vi.spyOn(api, "reauthenticate").mockResolvedValue(undefined);
     showPerson();
-    await screen.findByTestId("save-roles");
+    await screen.findByTestId("account-roles-TRAINER");
     await userEvent.click(screen.getByTestId("account-roles-TRAINER"));
-    await userEvent.click(screen.getByTestId("save-roles"));
+    await userEvent.click(screen.getByTestId("save-person"));
     const dialog = await screen.findByRole("dialog");
 
     // when
@@ -424,7 +532,7 @@ describe("AdminPersonView", () => {
 
     // when
     await userEvent.selectOptions(screen.getByTestId("membership-type"), "type-2");
-    await userEvent.click(screen.getByTestId("save-membership"));
+    await userEvent.click(screen.getByTestId("save-person"));
 
     // then
     expect(api.assignMembership).toHaveBeenCalledWith("person-1", {
@@ -474,7 +582,7 @@ describe("AdminPersonView", () => {
     // when
     await userEvent.clear(screen.getByTestId("membership-ended-on"));
     await userEvent.type(screen.getByTestId("membership-ended-on"), "2026-04-30");
-    await userEvent.click(screen.getByTestId("save-membership"));
+    await userEvent.click(screen.getByTestId("save-person"));
 
     // then
     expect(api.assignMembership).toHaveBeenCalledWith("person-1", {
@@ -529,7 +637,7 @@ describe("AdminPersonView", () => {
 
     // when
     await userEvent.click(screen.getByTestId("account-roles-TREASURER"));
-    await userEvent.click(screen.getByTestId("save-roles"));
+    await userEvent.click(screen.getByTestId("save-person"));
 
     // then
     expect(api.changeAccountRoles).toHaveBeenCalledWith("person-1", ["MEMBER", "TREASURER"]);
@@ -558,7 +666,7 @@ describe("AdminPersonView", () => {
 
     // when
     await userEvent.click(screen.getByTestId("account-roles-ADMIN"));
-    await userEvent.click(screen.getByTestId("save-roles"));
+    await userEvent.click(screen.getByTestId("save-person"));
 
     // then
     expect(await screen.findByTestId("admin-save-success")).toBeInTheDocument();
@@ -576,7 +684,7 @@ describe("AdminPersonView", () => {
 
     // when
     await userEvent.click(screen.getByTestId("account-roles-ADMIN"));
-    await userEvent.click(screen.getByTestId("save-roles"));
+    await userEvent.click(screen.getByTestId("save-person"));
 
     // then
     expect(await screen.findByRole("alert")).toBeInTheDocument();
@@ -592,7 +700,7 @@ describe("AdminPersonView", () => {
     // when
     await userEvent.clear(screen.getByTestId("account-username"));
     await userEvent.type(screen.getByTestId("account-username"), "doe.j");
-    await userEvent.click(screen.getByTestId("save-username"));
+    await userEvent.click(screen.getByTestId("save-person"));
 
     // then
     expect(api.changeAccountUsername).toHaveBeenCalledWith("person-1", "doe.j");
@@ -606,7 +714,7 @@ describe("AdminPersonView", () => {
 
     // when
     await userEvent.selectOptions(screen.getByTestId("account-locale"), "en");
-    await userEvent.click(screen.getByTestId("save-locale"));
+    await userEvent.click(screen.getByTestId("save-person"));
 
     // then
     expect(api.changeAccountLocale).toHaveBeenCalledWith("person-1", "en");

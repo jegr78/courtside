@@ -2,12 +2,10 @@ import { useEffect, useId, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type CanonicalField, type ImportSource, type ImportSourceRequest, type MembershipType } from "../../api/client";
 import { EncodingUnreadableHereError, NotUtf8Error, readCsvColumn, readCsvHeader, suggestSeparator } from "../../import/read-csv";
-import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { differs } from "../../unsaved/differs";
 import { importSourceMark } from "./importSourceMark";
-import { describedByMark } from "../../unsaved/markId";
-import { UnsavedMark } from "../../unsaved/UnsavedMark";
+import { SaveBar } from "../../unsaved/SaveBar";
 
 const FIELDS: CanonicalField[] = [
   "EXTERNAL_ID", "FIRST_NAME", "LAST_NAME", "EMAIL", "MEMBERSHIP_TYPE"
@@ -173,6 +171,18 @@ export function ImportSourceForm({ source, types, disabled, save }: {
     void save(requested());
   }
 
+  function discard() {
+    setSourceKey(confirmed.sourceKey);
+    setDisplayName(confirmed.displayName);
+    setMapping(mappingOf(source));
+    setCategories(confirmed.membershipTypes);
+    setDefaultType(confirmed.defaultMembershipTypeId);
+    setOwned(confirmed.ownedFields);
+    setThreshold(String(confirmed.removalWarningPercent));
+    setSeparator(confirmed.separator);
+    setEncoding(confirmed.encoding);
+  }
+
   const mark = importSourceMark(source);
   // Assigned on both sides: an unassigned category is dropped from the request, so comparing it
   // against one the server still holds would mark a source unsaved with nothing to save.
@@ -251,9 +261,7 @@ export function ImportSourceForm({ source, types, disabled, save }: {
 
     <TextField data-testid="source-threshold" disabled={disabled} type="number" min={0} max={100} label={t("admin.import.removalWarning")} value={threshold} onChange={(event) => setThreshold(event.target.value)} />
 
-    <div className="flex flex-wrap items-center gap-3">
-      <Button variant="primary" data-testid="save-source" aria-describedby={describedByMark(mark, unsaved)} disabled={disabled} type="button" onClick={submit}>{t("admin.save")}</Button>
-      <UnsavedMark id={mark} unsaved={unsaved} />
-    </div>
+    <SaveBar id={mark} subject={source?.displayName ?? t("admin.import.newSource")} saveTestId="save-source"
+             unsaved={unsaved} pending={disabled} save={submit} discard={discard} />
   </section>;
 }

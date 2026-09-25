@@ -233,6 +233,7 @@ describe("ImportSourceForm", () => {
     // given
     const save = vi.fn().mockResolvedValue(undefined);
     show(existing, save);
+    await userEvent.type(screen.getByTestId("source-name"), " export");
 
     // when
     await userEvent.click(screen.getByTestId("save-source"));
@@ -320,6 +321,22 @@ it("given a described source, when its name is edited and typed back, then nothi
   await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
 });
 
+it("given a described source, when an edit is discarded, then the stored description returns and nothing is left to lose", async () => {
+  // given
+  show(existing, () => Promise.resolve());
+  await userEvent.type(await screen.findByTestId("source-name"), "!");
+  await userEvent.click(screen.getByTestId("owned-FIRST_NAME"));
+  expect(screen.getByTestId("unsaved-mark-import-source:source-1")).toHaveTextContent("Not saved yet: Membership system");
+
+  // when
+  await userEvent.click(screen.getByTestId("discard-import-source:source-1"));
+
+  // then
+  expect(screen.getByTestId("source-name")).toHaveValue("Membership system");
+  expect(screen.getByTestId("owned-FIRST_NAME")).not.toBeChecked();
+  await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+});
+
 // The column mapping is a record inside the request, and rebuilding it reorders its keys.
 it("given an owned field ticked and unticked again, when the source is read, then nothing is left to lose", async () => {
   // given
@@ -366,9 +383,10 @@ it("given a column a club named __proto__, when it is mapped, then it stays a co
   // which is the very confusion this guards against.
   const columns = JSON.parse('{"__proto__":"EXTERNAL_ID"}') as ImportSource["columns"];
   show({ ...existing, columns }, save);
+  await userEvent.type(await screen.findByTestId("source-name"), " export");
 
   // when
-  await userEvent.click(await screen.findByTestId("save-source"));
+  await userEvent.click(screen.getByTestId("save-source"));
 
   // then
   expect(Object.keys(save.mock.calls[0][0].columns ?? {})).toContain("__proto__");

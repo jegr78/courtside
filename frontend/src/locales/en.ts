@@ -229,6 +229,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.person.title": "Person",
   "admin.person.person": "Person",
   "admin.person.membership": "Membership",
+  "admin.person.membershipNeedsType": "Choose a membership type before saving the membership.",
   "admin.person.accountLocale": "Language for notifications",
   "admin.person.account": "Account",
   "admin.import.title": "Import",

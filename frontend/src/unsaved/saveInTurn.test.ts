@@ -22,12 +22,18 @@ it("given a step that fails, when saving in turn, then the steps after it do not
   const refused = new ApiError(409);
   const later = vi.fn();
 
-  // when / then
-  await expect(saveInTurn([
-    { subject: "Adults", run: async () => undefined },
-    { subject: "Juniors", run: () => Promise.reject(refused) },
-    { subject: "Seniors", run: later }
-  ])).rejects.toEqual(new StepFailed("Juniors", refused));
+  const juniors = { subject: "Juniors", run: () => Promise.reject(refused) };
+  const seniors = { subject: "Seniors", run: later };
+
+  // when
+  const failure = await saveInTurn([{ subject: "Adults", run: async () => undefined }, juniors, seniors])
+    .catch((thrown: unknown) => thrown);
+
+  // then
+  expect(failure).toBeInstanceOf(StepFailed);
+  expect((failure as StepFailed).subject).toBe("Juniors");
+  expect((failure as StepFailed).cause).toBe(refused);
+  expect((failure as StepFailed).remaining, "a retry resumes with the refused step").toEqual([juniors, seniors]);
   expect(later, "nothing is sent after the first refusal").not.toHaveBeenCalled();
 });
 
