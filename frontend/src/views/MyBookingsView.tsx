@@ -152,9 +152,14 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
     {loadError && <LoadFailure message={loadError} retry={() => { clearLoad(); void load(); }} />}
     {error && <Alert>{error}</Alert>}
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
-    {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-8 lg:grid-cols-2">
+    {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
       <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} t={t} />
-      <BookingSection testId="past-bookings" title={t("myBookings.past")} empty={t("myBookings.noPast")} bookings={sections.past} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} action={chooseAction} t={t} />
+      {sections.past.length === 0
+        ? <p data-testid="past-bookings" className="text-muted">{t("myBookings.noPast")}</p>
+        : <details data-testid="past-bookings">
+          <summary data-testid="past-bookings-summary" className="cursor-pointer font-semibold">{t("myBookings.pastCount", { count: sections.past.length })}</summary>
+          <div className="mt-3"><BookingSection testId="past-booking-list" empty={t("myBookings.noPast")} bookings={sections.past} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} action={chooseAction} t={t} /></div>
+        </details>}
     </div>}
     {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
     {!offline && showManaged && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
@@ -192,6 +197,10 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
     }
   }
 
+  if (participations.length === 0 && !nextCursor) {
+    return <p data-testid="participations" className="text-muted mt-8">{t("participations.empty")}</p>;
+  }
+
   return <section className="border-structural mt-10 border-t pt-8" aria-labelledby="participations-title">
     <h2 id="participations-title" data-testid="participations-title" className="text-2xl font-bold">{t("participations.title")}</h2>
     <p className="text-muted mt-2">{t("participations.description")}</p>
@@ -216,19 +225,24 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
 type Translate = ReturnType<typeof useTranslation>["t"];
 
 function BookingSection({ testId, title, empty, bookings, courtNames, locale, timeZone, actionable = false, managed = false, action, t }: {
-  testId: string; title: string; empty: string; bookings: Appointment[]; courtNames: Map<string, string>;
+  testId: string; title?: string; empty: string; bookings: Appointment[]; courtNames: Map<string, string>;
   locale: string; timeZone: string; actionable?: boolean; managed?: boolean; action: (value: { kind: "cancel" | "move" | "detail"; booking: Appointment; managed: boolean }) => void; t: Translate;
 }) {
   const groups = groupBookings(bookings);
   return <section data-testid={testId}>
-    <h3 className="text-xl font-semibold">{title}</h3>
+    {title && <h3 className="text-xl font-semibold">{title}</h3>}
     {groups.length === 0 ? <p className="text-muted mt-3">{empty}</p> : <div className="mt-3 grid gap-4">{groups.map((group) =>
       <article key={group.key} className="border-structural rounded-xl border p-4">
         {group.series && <p data-testid="series-marker" className="mb-2 font-semibold">{t("myBookings.series")}</p>}
         <ul className="grid gap-3">{group.bookings.map((booking) => <li key={booking.id} data-testid={`booking-${booking.id}`} data-status={booking.status} className="border-structural grid gap-1 border-b pb-3 last:border-0 last:pb-0">
-          <span className="font-semibold">{booking.cardLabel}</span>
-          <span>{formatBookingPeriod(booking.startsAt, booking.endsAt, locale, timeZone)}</span>
-          <span>{booking.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
+          <span data-testid="booking-title" className="grid font-semibold">
+            <span>{formatBookingPeriod(booking.startsAt, booking.endsAt, locale, timeZone)}</span>
+            <span>{booking.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
+          </span>
+          <span data-testid="booking-card-label" className="text-muted flex items-center gap-2 text-sm">
+            <span aria-hidden="true" className="inline-block size-3 shrink-0 rounded-sm border" style={{ backgroundColor: booking.cardColor }} />
+            {booking.cardLabel}
+          </span>
           {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
           {managed && "participantCount" in booking && <span>{t("managedAppointments.participants", { count: booking.participantCount })}</span>}
           {actionable && <div className="flex flex-wrap gap-2 pt-1">

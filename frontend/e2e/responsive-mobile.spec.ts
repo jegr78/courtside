@@ -189,6 +189,39 @@ test("a member reaches every destination from the bottom of a touch viewport", a
   expect(clearance!.reserved).toBeGreaterThanOrEqual(clearance!.bar);
 });
 
+test("a member holding two upcoming bookings sees both on the phone without scrolling", async ({ page, journeyService }) => {
+  // given
+  const booking = "70000000-0000-0000-0000-0000000000b1";
+  await journeyService.executeSql(`
+    INSERT INTO booking (id, card_id, status, booked_by, note)
+    VALUES ('${booking}', '11111111-1111-1111-1111-111111111111', 'CONFIRMED', '00000000-0000-0000-0000-000000000102', NULL);
+    INSERT INTO booking_participant (id, booking_id, kind, person_id, position)
+    VALUES ('71000000-0000-0000-0000-0000000000b1', '${booking}', 'MEMBER', '00000000-0000-0000-0000-000000000101', 0);
+    INSERT INTO court_allocation (id, booking_id, court_id, starts_at, ends_at, status)
+    VALUES ('72000000-0000-0000-0000-0000000000b1', '${booking}', 'dddddddd-0000-0000-0000-000000000003',
+      (DATE '${journeyService.visualDate}' + 3 + TIME '09:00') AT TIME ZONE 'Europe/Berlin',
+      (DATE '${journeyService.visualDate}' + 3 + TIME '10:00') AT TIME ZONE 'Europe/Berlin', 'CONFIRMED');`);
+  try {
+    await signIn(page, "doe.jane");
+
+    // when
+    await page.getByTestId("my-bookings-link").tap();
+
+    // then
+    const upcoming = page.getByTestId("upcoming-bookings").locator("li[data-status]");
+    await expect(upcoming).toHaveCount(2);
+    const bar = await page.getByTestId("primary-navigation-bar").boundingBox();
+    expect(bar).not.toBeNull();
+    for (const entry of await upcoming.all()) {
+      await expect(entry, "each upcoming booking is on screen as the page opens").toBeInViewport({ ratio: 1 });
+      const box = await entry.boundingBox();
+      expect(box!.y + box!.height, "and not hidden behind the navigation bar").toBeLessThanOrEqual(bar!.y);
+    }
+  } finally {
+    await journeyService.executeSql(`DELETE FROM booking WHERE id = '${booking}';`);
+  }
+});
+
 test("member and administration surfaces remain usable on a touch viewport", async ({ page, journeyService }) => {
   // given
   await signIn(page, "doe.jane");

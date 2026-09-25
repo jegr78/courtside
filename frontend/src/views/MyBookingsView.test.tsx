@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, vi } from "vitest";
 import { api } from "../api/client";
@@ -112,11 +112,47 @@ it("given past and upcoming occurrences, when loaded, then the series is grouped
   const title = screen.getByTestId("my-bookings-title");
   expect(title).toHaveRole("heading");
   expect(title).toHaveTextContent("My bookings");
-  expect(screen.getByTestId("past-bookings")).toHaveTextContent("Past");
+  expect(screen.getByTestId("past-bookings")).toHaveTextContent(i18n.t("myBookings.pastCount", { count: 1 }));
   expect(screen.getAllByTestId("series-marker")).toHaveLength(2);
   expect(screen.getByTestId(`booking-${upcomingId}`)).toHaveTextContent("Centre Court");
   expect(screen.getByTestId(`booking-${upcomingId}`)).toHaveTextContent("Aug 12, 2026, 6:00 PM – 7:00 PM");
   expect(screen.getByTestId("booking-44444444-4444-4444-4444-444444444444")).toHaveTextContent("Centre Court");
+});
+
+it("given upcoming and past bookings, when loaded, then the upcoming lead and the past fold into one line with their count", async () => {
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  const upcoming = await screen.findByTestId("upcoming-bookings");
+  const past = screen.getByTestId("past-bookings");
+  expect(upcoming.compareDocumentPosition(past) & Node.DOCUMENT_POSITION_FOLLOWING, "the upcoming come first").toBeTruthy();
+  expect(past.tagName, "the past cost a line until opened").toBe("DETAILS");
+  expect(past).not.toHaveAttribute("open");
+  expect(screen.getByTestId("past-bookings-summary")).toHaveTextContent(i18n.t("myBookings.pastCount", { count: 1 }));
+});
+
+it("given a booking, when it is listed, then its title names when and where and the card label follows as a secondary mark", async () => {
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  const booking = await screen.findByTestId(`booking-${upcomingId}`);
+  const title = within(booking).getByTestId("booking-title");
+  expect(title).toHaveTextContent("Aug 12, 2026, 6:00 PM – 7:00 PM");
+  expect(title).toHaveTextContent("Centre Court");
+  expect(title, "the label no longer leads").not.toHaveTextContent("Member booking");
+  expect(within(booking).getByTestId("booking-card-label")).toHaveTextContent("Member booking");
+  expect(title.compareDocumentPosition(within(booking).getByTestId("booking-card-label")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it("given nobody recorded this member as a co-player, when loaded, then that costs one line rather than a section", async () => {
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  expect(await screen.findByTestId("participations")).toHaveTextContent(i18n.t("participations.empty"));
+  expect(screen.queryByTestId("participations-title"), "an empty list needs no heading of its own").not.toBeInTheDocument();
 });
 
 it("given no appointments or participations, when loaded, then every empty section names its next step", async () => {
@@ -134,6 +170,7 @@ it("given no appointments or participations, when loaded, then every empty secti
   expect(screen.getByTestId("past-bookings")).toHaveTextContent(
     "Your completed and cancelled bookings appear here after their date has passed."
   );
+  expect(screen.getByTestId("past-bookings").tagName, "nothing to fold stays a line").toBe("P");
   expect(screen.getByTestId("managed-bookings")).toHaveTextContent(
     "Appointments covered by your club role appear here. Create an appointment series below or wait for a matching booking."
   );
