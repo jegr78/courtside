@@ -121,6 +121,44 @@ describe("AdminRuleSetsView", () => {
     expect(screen.getByTestId("rule-set-applies-rule-set")).toHaveTextContent("People without a membership type");
   });
 
+  it("given another page saved new deadlines after this one loaded, when the fallback is saved, then the newer deadlines survive", async () => {
+    // given
+    const stored = await api.adminConfig();
+    vi.mocked(api.adminConfig)
+      .mockResolvedValueOnce(stored)
+      .mockResolvedValue({ ...stored, passwordResetTokenMinutes: 15, newAccountCredentialHours: 12, clubName: "Example Racquet Club" });
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, noMembershipTypeRuleSetId: "rule-set" });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("no-membership-type-rule-set");
+
+    // when
+    await userEvent.selectOptions(screen.getByTestId("no-membership-type-rule-set"), "rule-set");
+    await userEvent.click(screen.getByTestId("save-no-membership-type-rule-set"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledTimes(1));
+    expect(changing.mock.calls[0][0], "fields the page does not own are read again just before the write").toMatchObject({
+      passwordResetTokenMinutes: 15, newAccountCredentialHours: 12, clubName: "Example Racquet Club",
+      noMembershipTypeRuleSetId: "rule-set"
+    });
+  });
+
+  it("given the configuration cannot be read again, when the fallback is saved, then nothing is written and the failure is shown", async () => {
+    // given
+    const stored = await api.adminConfig();
+    vi.mocked(api.adminConfig).mockResolvedValueOnce(stored).mockRejectedValue(new ApiError(503));
+    const changing = vi.spyOn(api, "changeAdminConfig");
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("no-membership-type-rule-set");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-no-membership-type-rule-set"));
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(changing, "a write built on an unread configuration could revert another page").not.toHaveBeenCalled();
+  });
+
   it("given every rule type, when the rule sets load, then each rule is shown with its range and the club-wide ones point to where they are set", async () => {
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);

@@ -24,7 +24,7 @@ import { describedByMark } from "../../unsaved/markId";
 import { UnsavedChangesQuestion } from "../../unsaved/UnsavedChangesQuestion";
 import { UnsavedMark } from "../../unsaved/UnsavedMark";
 import { useUnsavedForm } from "../../unsaved/useUnsavedForm";
-import { useClubConfigForm } from "./clubConfigForm";
+import { ownedFields, useClubConfigForm } from "./clubConfigForm";
 
 const RULE_SET_NAME_LENGTH = 60;
 
@@ -32,7 +32,7 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
   const { t } = useTranslation();
   const { message: error, report, clear } = useReportedFailure();
   const newRuleSet = useUnsavedForm("rule-set:new");
-  const { config, saved, unsaved: unsavedFallback, loaded, applied, change } = useClubConfigForm(configurationChanged);
+  const { config, saved, unsaved: unsavedFallback, loaded, applied, change, save: sendFallback } = useClubConfigForm(configurationChanged, ownedFields.ruleSets);
   const [fallbackPending, setFallbackPending] = useState(false);
   const [pendingRuleSetId, setPendingRuleSetId] = useState<string>();
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
@@ -187,7 +187,7 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
     clear();
     setSuccess(undefined);
     try {
-      applied(await api.changeAdminConfig(config));
+      applied(await sendFallback(config));
       setSuccess(t("admin.ruleSets.fallbackSaved"));
     } catch (failure) {
       report(failure);

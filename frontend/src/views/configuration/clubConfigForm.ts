@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { AdminClubConfig, ClubConfig, ClubConfigRequest } from "../../api/client";
+import { api, type AdminClubConfig, type ClubConfig, type ClubConfigRequest } from "../../api/client";
 import { differs } from "../../unsaved/differs";
 
 // Named field by field so a request-only shape cannot pick up what the response adds to it.
@@ -24,8 +24,22 @@ export function editable(loaded: AdminClubConfig): ClubConfigRequest {
   };
 }
 
-// Every surface edits a part of one request, so each keeps the whole of it and sends it back complete.
-export function useClubConfigForm(configurationChanged: (config: ClubConfig) => void) {
+type ConfigField = keyof ClubConfigRequest;
+
+export const ownedFields = {
+  clubProfile: ["clubName", "shortName", "primaryColor", "accentColor", "logoUrl", "imprintUrl", "privacyUrl",
+    "documentationUrl", "defaultLocale", "timeZone", "slotMinutes"],
+  deadlines: ["newAccountCredentialHours", "passwordResetCredentialHours", "passwordResetTokenMinutes", "bookingReminderHours"],
+  ruleSets: ["noMembershipTypeRuleSetId"]
+} satisfies Record<string, readonly ConfigField[]>;
+
+function withOwn(fresh: ClubConfigRequest, edited: ClubConfigRequest, owned: readonly ConfigField[]): ClubConfigRequest {
+  return owned.reduce((request, field) => ({ ...request, [field]: edited[field] }), fresh);
+}
+
+// Each surface owns part of one request, and the rest is read again just before the write so a
+// page opened earlier cannot put back what another page has saved since.
+export function useClubConfigForm(configurationChanged: (config: ClubConfig) => void, owned: readonly ConfigField[]) {
   const [config, setConfig] = useState<ClubConfigRequest>();
   const [saved, setSaved] = useState<ClubConfigRequest>();
 
@@ -45,5 +59,10 @@ export function useClubConfigForm(configurationChanged: (config: ClubConfig) => 
     setConfig((current) => current ? { ...current, ...changed } : current);
   }, []);
 
-  return { config, saved, unsaved: differs(config, saved), loaded, applied, change };
+  const save = useCallback(async (edited: ClubConfigRequest): Promise<AdminClubConfig> => {
+    const fresh = editable(await api.adminConfig());
+    return api.changeAdminConfig(withOwn(fresh, edited, owned));
+  }, [owned]);
+
+  return { config, saved, unsaved: differs(config, saved), loaded, applied, change, save };
 }

@@ -463,6 +463,43 @@ describe("AdminConfigurationView", () => {
     expect(changeConfig.mock.calls[0][0]).not.toHaveProperty("supportedLocales");
   });
 
+  it("given another page saved new deadlines after this one loaded, when the club profile is saved, then the newer deadlines survive", async () => {
+    // given
+    const stored = await api.adminConfig();
+    vi.mocked(api.adminConfig)
+      .mockResolvedValueOnce(stored)
+      .mockResolvedValue({ ...stored, bookingReminderHours: 2, noMembershipTypeRuleSetId: "rule-set", clubName: "Stale on purpose" });
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, clubName: "Example Racquet Club" });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("club-name");
+
+    // when
+    fireEvent.change(screen.getByTestId("club-name"), { target: { value: "Example Racquet Club" } });
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledTimes(1));
+    expect(changing.mock.calls[0][0], "the page's own field keeps what the board typed; the others are read again").toMatchObject({
+      clubName: "Example Racquet Club", bookingReminderHours: 2, noMembershipTypeRuleSetId: "rule-set"
+    });
+  });
+
+  it("given the configuration cannot be read again, when the club profile is saved, then nothing is written and the failure is shown", async () => {
+    // given
+    const stored = await api.adminConfig();
+    vi.mocked(api.adminConfig).mockResolvedValueOnce(stored).mockRejectedValue(new ApiError(503));
+    const changing = vi.spyOn(api, "changeAdminConfig");
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("club-name");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-club-config"));
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(changing, "a write built on an unread configuration could revert another page").not.toHaveBeenCalled();
+  });
+
   it("given a typed club name, when the language changes, then nothing is fetched again", async () => {
     // given
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);

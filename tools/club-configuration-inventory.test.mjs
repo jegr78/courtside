@@ -57,6 +57,31 @@ test("given a field a board may change, when the configuration form submits, the
     "the configuration forms' editable list has drifted from ClubConfigRequest");
 });
 
+function ownedFields(source) {
+  const start = source.search(/^export const ownedFields = \{/mu);
+  assert.ok(start >= 0, "ownedFields is gone, so this guard no longer reads what each page owns");
+  const end = source.indexOf("\n}", start);
+  assert.ok(end > start, "ownedFields has no closing brace at the start of a line");
+  const pages = [...source.slice(start, end).matchAll(/^ {2}(\w+): \[([^\]]*)\]/gmu)]
+    .map(([, page, list]) => [page, [...list.matchAll(/"(\w+)"/gu)].map(([, field]) => field)]);
+  assert.ok(pages.length > 1, "ownedFields resolved to fewer than two pages, so this guard would compare nothing");
+  return pages;
+}
+
+test("given every field a board may change, when the configuration pages save, then exactly one page owns it", () => {
+  // given
+  const pages = ownedFields(configurationRequest);
+  const owned = pages.flatMap(([, fields]) => fields);
+
+  // when / then
+  for (const field of new Set(owned)) {
+    const owners = pages.filter(([, fields]) => fields.includes(field)).map(([page]) => page);
+    assert.equal(owners.length, 1, `${field} is owned by ${owners.join(" and ")}, so their saves would overwrite each other`);
+  }
+  assert.deepEqual(owned.toSorted(), declaredFields("ClubConfigRequest").toSorted(),
+    "a ClubConfigRequest field no page owns is written back from whatever was read, and a field that is not in the request is owned for nothing");
+});
+
 test("given a field excluded from the comparison, when the document is read, then no board can write it", () => {
   // when / then
   const declared = declaredFields("AdminClubConfig");

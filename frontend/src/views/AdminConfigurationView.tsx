@@ -15,7 +15,7 @@ import { describedByMark } from "../unsaved/markId";
 import { UnsavedMark } from "../unsaved/UnsavedMark";
 import { brandContrast } from "../brandColor";
 import { ColorInput } from "../components/ColorInput";
-import { useClubConfigForm } from "./configuration/clubConfigForm";
+import { ownedFields, useClubConfigForm } from "./configuration/clubConfigForm";
 
 const MAX_LOGO_BYTES = 1024 * 1024;
 
@@ -50,7 +50,7 @@ function timeZones(current: string): string[] {
 export function AdminConfigurationView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
   const { message: error, report, refuse, clear } = useReportedFailure();
-  const { config, unsaved, loaded, applied, change: changeConfig } = useClubConfigForm(configurationChanged);
+  const { config, unsaved, loaded, applied, change: changeConfig, save } = useClubConfigForm(configurationChanged, ownedFields.clubProfile);
   const [logo, setLogo] = useState<{ url?: string | null; uploaded: boolean }>();
   const [logoFile, setLogoFile] = useState<File>();
   const [configurationPending, setConfigurationPending] = useState(false);
@@ -143,7 +143,7 @@ export function AdminConfigurationView({ configurationChanged }: { configuration
     clear();
     setSuccess(undefined);
     try {
-      applyConfiguration(await api.changeAdminConfig(config));
+      applyConfiguration(await save(config));
       setSuccess(t("admin.config.saved"));
     } catch (failure) {
       report(failure);

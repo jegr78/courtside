@@ -10,12 +10,12 @@ import { useReportedFailure } from "../../failures/useReportedFailure";
 import { useRetry } from "../../failures/useRetry";
 import { describedByMark } from "../../unsaved/markId";
 import { UnsavedMark } from "../../unsaved/UnsavedMark";
-import { useClubConfigForm } from "./clubConfigForm";
+import { ownedFields, useClubConfigForm } from "./clubConfigForm";
 
 export function AdminDeadlinesView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
   const { message: error, report, clear } = useReportedFailure();
-  const { config, unsaved, loaded, applied, change } = useClubConfigForm(configurationChanged);
+  const { config, unsaved, loaded, applied, change, save: send } = useClubConfigForm(configurationChanged, ownedFields.deadlines);
   const [pending, setPending] = useState(false);
   const [success, setSuccess] = useState<string>();
   const [loadAttempt, retryLoad] = useRetry();
@@ -41,7 +41,7 @@ export function AdminDeadlinesView({ configurationChanged }: { configurationChan
     clear();
     setSuccess(undefined);
     try {
-      applied(await api.changeAdminConfig(config));
+      applied(await send(config));
       setSuccess(t("admin.deadlines.saved"));
     } catch (failure) {
       report(failure);

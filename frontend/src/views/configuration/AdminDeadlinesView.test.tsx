@@ -85,6 +85,43 @@ describe("AdminDeadlinesView", () => {
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
   });
 
+  it("given another page saved the club's links after this one loaded, when the deadlines are saved, then the newer links survive", async () => {
+    // given
+    vi.mocked(api.adminConfig)
+      .mockResolvedValueOnce(stored)
+      .mockResolvedValue({ ...stored, imprintUrl: "/imprint-2", noMembershipTypeRuleSetId: "other" });
+    const changing = vi.spyOn(api, "changeAdminConfig").mockResolvedValue({ ...stored, bookingReminderHours: 3 });
+    show();
+    await screen.findByTestId("booking-reminder-hours");
+
+    // when
+    await userEvent.clear(screen.getByTestId("booking-reminder-hours"));
+    await userEvent.type(screen.getByTestId("booking-reminder-hours"), "3");
+    await userEvent.click(screen.getByTestId("save-deadlines"));
+
+    // then
+    await waitFor(() => expect(changing).toHaveBeenCalledTimes(1));
+    expect(changing.mock.calls[0][0], "fields the page does not own are read again just before the write")
+      .toMatchObject({ imprintUrl: "/imprint-2", noMembershipTypeRuleSetId: "other", bookingReminderHours: 3 });
+  });
+
+  it("given the configuration cannot be read again, when the deadlines are saved, then nothing is written and the failure is shown", async () => {
+    // given
+    vi.mocked(api.adminConfig)
+      .mockResolvedValueOnce(stored)
+      .mockRejectedValue(new ApiError(503));
+    const changing = vi.spyOn(api, "changeAdminConfig");
+    show();
+    await screen.findByTestId("booking-reminder-hours");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-deadlines"));
+
+    // then
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(changing, "a write built on an unread configuration could revert another page").not.toHaveBeenCalled();
+  });
+
   it("given the deadlines page, when it loads, then the club's identity and rules are not on it", async () => {
     // when
     show();
