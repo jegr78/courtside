@@ -433,6 +433,7 @@ const de = {
   "admin.facility.editNumber": "Platznummer ändern",
   "admin.facility.editName": "Namen ändern",
   "admin.facility.unnamedCourt": "Ohne Namen",
+  "admin.facility.courtNumberInvalid": "Eine Platznummer muss eine ganze Zahl von 1 bis 999 sein. Korrigiere den markierten Platz vor dem Speichern.",
   "admin.facility.allCards": "Alle Karten",
   "admin.facility.bookingRules": "Buchungsregeln",
   "admin.facility.columnCard": "Karte",

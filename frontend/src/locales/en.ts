@@ -435,6 +435,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.facility.editNumber": "Change the court number",
   "admin.facility.editName": "Change the name",
   "admin.facility.unnamedCourt": "No name",
+  "admin.facility.courtNumberInvalid": "A court number must be a whole number from 1 to 999. Correct the marked court before saving.",
   "admin.facility.allCards": "All cards",
   "admin.facility.bookingRules": "Booking rules",
   "admin.facility.columnCard": "Card",
