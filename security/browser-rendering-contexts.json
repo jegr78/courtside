@@ -15,7 +15,7 @@
     {
       "id": "club-name-app-title",
       "journey": "stored-member",
-      "field": "clubName",
+      "field": "installedAppName",
       "sink": "meta-content"
     },
     {
