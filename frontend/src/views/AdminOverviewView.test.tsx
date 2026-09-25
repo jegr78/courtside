@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -99,6 +99,22 @@ describe("AdminOverviewView", () => {
     expect(upcoming[2]).toHaveTextContent("Garden Court");
     expect(api.allocations).toHaveBeenCalledWith("2026-09-25");
     expect(within(today).getByRole("link")).toHaveAttribute("href", "/");
+  });
+
+  it("given a court without a name, when its booking is still to come today, then the court is named by its number", async () => {
+    // given
+    vi.mocked(api.courts).mockResolvedValue([{ id: "court-3", number: 3, name: null }]);
+    vi.mocked(api.allocations).mockResolvedValue([
+      allocation("booking-late", "court-3", "2026-09-25T16:00:00Z", "2026-09-25T17:00:00Z", "Training")
+    ]);
+
+    // when
+    show();
+
+    // then
+    const entry = await within(screen.getByTestId("overview-today")).findByTestId("overview-today-entry");
+    expect(entry).toHaveTextContent(i18n.t("court.number", { number: 3 }));
+    expect(entry, "an identifier is never shown in place of a name").not.toHaveTextContent("court-3");
   });
 
   it("given the club's day has already turned while UTC's has not, when the overview opens, then it reads the club's date", async () => {
@@ -262,6 +278,21 @@ describe("AdminOverviewView", () => {
     expect(setup).toHaveAttribute("open");
     expect(within(setup).getByTestId("setup-step-configuration")).toHaveAttribute("data-state", "complete");
     expect(within(setup).getByTestId("overview-setup-link")).toHaveAttribute("href", "/admin/setup");
+  });
+
+  it("given a board unfolded a finished setup, when the language changes, then the steps stay unfolded", async () => {
+    // given
+    show();
+    const setup = await screen.findByTestId("overview-setup");
+    await userEvent.click(within(setup).getByTestId("overview-setup-summary"));
+    expect(setup).toHaveAttribute("open");
+
+    // when
+    await act(() => i18n.changeLanguage("de"));
+
+    // then
+    expect(within(setup).getByTestId("overview-setup-summary")).toHaveTextContent("Einrichtung abgeschlossen");
+    expect(setup, "a render does not fold back what the board opened").toHaveAttribute("open");
   });
 
   it("given setup is incomplete, when the overview opens, then the steps lead the page unfolded", async () => {

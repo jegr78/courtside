@@ -104,7 +104,7 @@ function TodayCard({ clock }: { clock: () => Date }) {
     {({ allocations, courts, now }) => {
       if (allocations.length === 0) return <p data-testid="overview-today-empty">{t("admin.overview.today.empty")}</p>;
       const bookings = new Set(allocations.map((allocation) => allocation.bookingId)).size;
-      const names = new Map(courts.map((court) => [court.id, court.name]));
+      const names = new Map(courts.map((court) => [court.id, court.name || t("court.number", { number: court.number })]));
       const upcoming = allocations
         .filter((allocation) => Date.parse(allocation.endsAt) > now)
         .sort((left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt)
@@ -117,9 +117,10 @@ function TodayCard({ clock }: { clock: () => Date }) {
           : <>
             <h3 className="text-muted text-sm font-bold">{t("admin.overview.today.upcoming")}</h3>
             <ul className="grid gap-2">
-              {upcoming.map((allocation) => <li key={`${allocation.bookingId}-${allocation.courtId}`} data-testid="overview-today-entry" className="grid gap-0.5">
+              {upcoming.map((allocation) => <li key={`${allocation.bookingId}-${allocation.courtId}`} data-testid="overview-today-entry"
+                data-booking-id={allocation.bookingId} data-court-id={allocation.courtId} className="grid gap-0.5">
                 <span className="font-mono text-sm tabular-nums">{formatBookingTimeRange(allocation.startsAt, allocation.endsAt, language, timeZone!)}</span>
-                <span className="[overflow-wrap:anywhere]">{names.get(allocation.courtId) ?? allocation.courtId} · {allocation.cardLabel}</span>
+                <span className="[overflow-wrap:anywhere]">{[names.get(allocation.courtId), allocation.cardLabel].filter(Boolean).join(" · ")}</span>
               </li>)}
             </ul>
           </>}
