@@ -382,6 +382,8 @@ test("stored text projections remain inert on administrative and managed views",
       WHERE id = '33333333-3333-3333-3333-333333333333';
     UPDATE participant_card SET label = $payload$${payload}$payload$
       WHERE id = '55555555-5555-5555-5555-555555555555';
+    UPDATE court SET name = $payload$${payload}$payload$
+      WHERE id = 'dddddddd-0000-0000-0000-000000000003';
     UPDATE rule_set SET name = $payload$${payload}$payload$
       WHERE id = 'aaaaaaaa-0000-0000-0000-000000000001';
     UPDATE person SET first_name = $payload$${payload}$payload$, last_name = 'Projection',
@@ -436,6 +438,13 @@ test("stored text projections remain inert on administrative and managed views",
   await expect(page.getByTestId("card-link-33333333-3333-3333-3333-333333333333")).toHaveText(payload);
   await page.getByTestId("card-link-33333333-3333-3333-3333-333333333333").click();
   await expect(page.getByTestId("card-label")).toHaveValue(payload);
+  await page.goto("/admin/facility/courts");
+  await expect(page.getByTestId("edit-court-name-dddddddd-0000-0000-0000-000000000003")).toHaveValue(payload);
+  await expect(page.getByTestId("court-row-dddddddd-0000-0000-0000-000000000003").locator("img")).toHaveCount(0);
+  await page.goto("/admin/facility/slot-fillers");
+  await expect(page.getByTestId("edit-participant-card-label-55555555-5555-5555-5555-555555555555")).toHaveValue(payload);
+  await expect(page.getByTestId("participant-card-row-55555555-5555-5555-5555-555555555555").locator("img")).toHaveCount(0);
+  expect(await page.evaluate(() => globalThis.__courtsideXss), "a stored name shown as a field value runs nothing").toBe("not-executed");
   await page.goto("/admin/roster");
   await expect(page.getByTestId("roster-filter").locator(
     'option[value="cccccccc-0000-0000-0000-000000000001"]')).toHaveText(payload);
@@ -465,7 +474,7 @@ test("stored text projections remain inert on administrative and managed views",
   expect(await page.evaluate(() => globalThis.__courtsideXss)).toBe("not-executed");
   expect(consoleDisclosures.some(Boolean)).toBe(false);
   await expectRenderingContexts("stored-admin", [
-    "booking-card-label", "participant-card-label", "rule-set-name", "person-fields",
+    "booking-card-label", "participant-card-label", "court-name-form-value", "rule-set-name", "person-fields",
     "account-username", "membership-type-name", "import-source-name", "external-reference-id",
     "booking-note", "guest-name", "audit-projection"
   ]);
