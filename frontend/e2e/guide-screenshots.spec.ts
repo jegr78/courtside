@@ -178,6 +178,9 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("column-FIRST_NAME").selectOption("Given");
     await page.getByTestId("column-LAST_NAME").selectOption("Family");
     await page.getByTestId("column-EMAIL").selectOption("Mail");
+    // The typed source brings the sticky save bar, which would otherwise cover a field mid-form.
+    await page.setViewportSize({ width: 1280, height: 2000 });
+    await expect(page.getByTestId("save-bar")).toBeVisible();
   },
   "utilisation": async (page, visualDate) => {
     await page.getByTestId("admin-utilisation-link").click();
