@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { type Locator, type Page } from "@playwright/test";
 import { expect, selectPreference, test } from "./fixtures";
 
@@ -251,18 +252,40 @@ test("each configuration surface fits the desktop screen without scrolling in ei
       // when
       await page.getByTestId(surface.link).click();
       await expect(page.getByTestId(surface.ready)).toBeEnabled();
-      await page.evaluate(() => document.fonts.ready);
-      const measured = await page.evaluate((view) => ({
-        document: document.documentElement.scrollHeight,
-        viewport: window.innerHeight,
-        view: Math.round(document.querySelector(`[data-testid='${view}']`)!.getBoundingClientRect().height),
-        navigation: Math.round(document.querySelector("[data-testid='admin-navigation']")!.getBoundingClientRect().height)
-      }), surface.view);
 
       // then
-      expect.soft(measured.document, `${language} ${surface.view} needs scrolling: ${JSON.stringify(measured)}`)
-        .toBeLessThanOrEqual(measured.viewport);
+      await expectToFit(page, `${language} ${surface.view}`, surface.view);
+    }
+
+    // when — a club that uploaded its logo is the ordinary case, not the seed's empty one
+    await page.getByTestId("admin-configuration-link").click();
+    await page.getByTestId("logo-file").setInputFiles(fileURLToPath(new URL("journey-files/club-logo.png", import.meta.url)));
+    await page.getByTestId("upload-logo").click();
+    try {
+      await expect(page.getByTestId("remove-logo")).toBeVisible();
+      await page.reload();
+      await expect(page.getByTestId("logo-preview")).toBeVisible();
+      await expect(page.getByTestId("remove-logo")).toBeEnabled();
+
+      // then
+      await expectToFit(page, `${language} admin-configuration-view with an uploaded logo`, "admin-configuration-view");
+    } finally {
+      await page.getByTestId("remove-logo").click();
+      await expect(page.getByTestId("remove-logo")).toHaveCount(0);
     }
     await page.getByTestId("court-plan-link").click();
   }
 });
+
+async function expectToFit(page: Page, name: string, view: string): Promise<void> {
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForFunction(() => [...document.images].every((image) => image.complete));
+  const measured = await page.evaluate((testId) => ({
+    document: document.documentElement.scrollHeight,
+    viewport: window.innerHeight,
+    view: Math.round(document.querySelector(`[data-testid='${testId}']`)!.getBoundingClientRect().height),
+    navigation: Math.round(document.querySelector("[data-testid='admin-navigation']")!.getBoundingClientRect().height)
+  }), view);
+  expect.soft(measured.document, `${name} needs scrolling: ${JSON.stringify(measured)}`)
+    .toBeLessThanOrEqual(measured.viewport);
+}

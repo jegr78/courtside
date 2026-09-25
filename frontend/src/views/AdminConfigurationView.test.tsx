@@ -382,6 +382,8 @@ describe("AdminConfigurationView", () => {
     const columns = screen.getByTestId("club-profile-columns");
     expect(columns, "identity, settings and appearance share one row").toHaveClass("xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.25fr)]");
     expect(screen.getByTestId("club-appearance"), "both colours and the logo take half the row").toHaveClass("lg:col-span-2");
+    expect(screen.getByTestId("club-appearance"), "the save button may sit under the shorter columns").toHaveClass("xl:row-span-2");
+    expect(screen.getByTestId("club-profile-columns")).toContainElement(screen.getByTestId("save-club-config"));
     for (const field of ["club-name", "short-name", "imprint-url", "privacy-url"]) {
       expect(screen.getByTestId("club-identity"), `${field} is part of the identity`).toContainElement(screen.getByTestId(field));
     }
@@ -391,17 +393,22 @@ describe("AdminConfigurationView", () => {
     expect(screen.getByTestId("slot-minutes"), "a number of minutes needs no full-width input").toHaveClass("max-w-32");
   });
 
-  it("given the logo fieldset, when it is laid out, then the file field has the fieldset's whole width to itself", async () => {
+  it("given an uploaded logo, when the logo fieldset is laid out, then its preview shares a row instead of adding one", async () => {
+    // given
+    vi.mocked(api.adminConfig).mockResolvedValue({ ...(await api.adminConfig()), logoUrl: "/api/public/config/logo?v=1", logoUploaded: true });
+
     // when
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
-    await screen.findByTestId("logo-file");
+    const preview = await screen.findByTestId("logo-preview");
 
     // then
+    expect(screen.getByTestId("logo-help-row"), "the preview sits beside the file help").toContainElement(preview);
+    expect(preview, "the preview is no taller than the help beside it").toHaveClass("max-h-10");
     expect(screen.getByTestId("logo-fieldset").className, "a browser's file control truncates its text in a shared column")
       .not.toMatch(/grid-cols/);
-    expect(screen.getByTestId("logo-actions")).toContainElement(screen.getByTestId("logo-url"));
     expect(screen.getByTestId("logo-actions")).toContainElement(screen.getByTestId("upload-logo"));
-    expect(screen.getByTestId("logo-actions")).not.toContainElement(screen.getByTestId("logo-file"));
+    expect(screen.getByTestId("logo-actions")).toContainElement(screen.getByTestId("remove-logo"));
+    expect(screen.getByTestId("logo-actions")).toContainElement(screen.getByTestId("logo-url"));
   });
 
   it("given the time-grid fragment, when configuration loads, then the owned setting receives focus", async () => {
