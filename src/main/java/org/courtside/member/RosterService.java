@@ -88,7 +88,7 @@ public class RosterService {
         return CursorPage.of(ids, limit, this::load, RosterEntry::personId);
     }
 
-    public RosterPage search(String query, UUID membershipTypeId, Role role,
+    public RosterPage search(String query, UUID membershipTypeId, boolean currentMembersOnly, Role role,
                              Set<CredentialState> credentialStates,
                              SortField sortField, SortDirection sortDirection,
                              UUID cursor, int limit) {
@@ -98,12 +98,12 @@ public class RosterService {
         requireKnownCursor(cursor);
         String fragment = normalize(query);
         Instant now = clock.instant();
-        List<UUID> ids = rosterQuery.findIds(fragment, membershipTypeId, role, credentialStates, now,
+        List<UUID> ids = rosterQuery.findIds(fragment, membershipTypeId, currentMembersOnly, role, credentialStates, now,
                 field, direction, cursor, limit + 1);
         CursorPage.Result<RosterEntry> page = CursorPage.of(ids, limit,
                 personIds -> load(personIds, now), RosterEntry::personId);
         return new RosterPage(page.items(), page.nextCursor(),
-                rosterQuery.count(fragment, membershipTypeId, role, credentialStates, now));
+                rosterQuery.count(fragment, membershipTypeId, currentMembersOnly, role, credentialStates, now));
     }
 
     public Set<UUID> personIdsHoldingAnAccount(List<UUID> personIds) {

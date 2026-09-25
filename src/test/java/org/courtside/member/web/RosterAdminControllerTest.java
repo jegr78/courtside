@@ -158,6 +158,28 @@ class RosterAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenACurrentMembersCriterion_whenListingTheRoster_thenOnlyCurrentMembersAreCounted()
+            throws Exception {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createPerson("Mary", "Major", "mary.major@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+
+        // when / then
+        mockMvc.perform(searchRoster("""
+                        {"currentMembers":true,"limit":1}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matching").value(1))
+                .andExpect(jsonPath("$.entries[0].personId").value(jane.toString()))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+        mockMvc.perform(searchRoster("{\"currentMembers\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matching").value(2));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenACredentialStateCriterion_whenListingTheRoster_thenThePageAndTheCountFollowIt()
             throws Exception {
         // given

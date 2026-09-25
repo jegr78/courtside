@@ -45,14 +45,8 @@ function configurationChanged(configuration: AdminClubConfig): boolean {
     .some(([key, value]) => configuration[key as keyof AdminClubConfig] !== value);
 }
 
-async function hasCurrentMember(isActive: () => boolean): Promise<boolean> {
-  let cursor: string | undefined;
-  do {
-    const page = await api.roster({ limit: 200, ...(cursor ? { cursor } : {}) });
-    if (page.entries.some((entry) => entry.membershipTypeId && !entry.membershipEndedOn)) return true;
-    cursor = page.nextCursor ?? undefined;
-  } while (cursor && isActive());
-  return false;
+async function hasCurrentMember(): Promise<boolean> {
+  return (await api.roster({ limit: 1, currentMembers: true })).matching > 0;
 }
 
 export function useSetupSteps() {
@@ -67,7 +61,7 @@ export function useSetupSteps() {
       api.adminCourts(),
       api.adminOpeningHours(),
       api.membershipTypes(),
-      hasCurrentMember(() => active),
+      hasCurrentMember(),
       api.importSources()
     ]).then(([configuration, courts, openingHours, membershipTypes, roster, importSources]) => {
       if (!active) return;
