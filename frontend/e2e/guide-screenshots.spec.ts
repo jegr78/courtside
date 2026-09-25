@@ -109,6 +109,12 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("administration-link").click();
     await expect(page.getByTestId("setup-progress")).toBeVisible();
   },
+  // The bar appears only once something is unsaved, so a renamed court brings it on screen.
+  "save-bar": async (page) => {
+    await page.getByTestId("admin-courts-link").click();
+    await page.locator('[data-testid^="edit-court-name-"]').first().fill("Centre Court");
+    await expect(page.getByTestId("save-bar")).toBeVisible();
+  },
   "admin-setup": async (page) => {
     await expect(page.getByTestId("setup-progress")).toBeVisible();
   },
@@ -268,6 +274,7 @@ test("every surface the facility is described on is captured", async ({ page, jo
   await capture(page, "opening-hours", journeyService.visualDate);
   await capture(page, "booking-card", journeyService.visualDate);
   await capture(page, "slot-fillers", journeyService.visualDate);
+  await capture(page, "save-bar", journeyService.visualDate);
 });
 
 test("every surface the members are kept on is captured", async ({ page, journeyService }, info) => {

@@ -104,6 +104,15 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   // then
   await stableScreenshot(page.getByTestId("admin-deadlines-view"), "admin-deadlines.png");
 
+  // when — the save bar is only on screen once something is unsaved
+  await page.getByTestId("booking-reminder-hours").fill("12");
+  await expect(page.getByTestId("save-bar")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-deadlines-view"), "admin-deadlines-unsaved.png");
+  await page.getByTestId("discard-deadlines").click();
+  await expect(page.getByTestId("save-bar")).toHaveCount(0);
+
   // when
   await page.getByTestId("admin-rule-sets-link").click();
   await expect(page.getByTestId("rule-set-name")).toBeVisible();

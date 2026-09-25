@@ -23,6 +23,26 @@ Die Seitenleiste ordnet die Verwaltung in vier Bereiche:
 
 ![Die Verwaltungsnavigation mit den vier Bereichen und dem Link zum Platzplan.](screenshots/de/admin-navigation.png)
 
+## Änderungen speichern
+
+Jede Seite der Verwaltung speichert auf dieselbe Weise. Sobald du ein Feld änderst, erscheint am
+unteren Rand eine Leiste. Sie nennt die Seite oder den Eintrag, dessen Änderungen noch nicht
+gespeichert sind. *Speichern* übernimmt alle Änderungen der Seite auf einmal. *Änderungen
+verwerfen* stellt den gespeicherten Stand wieder her.
+
+Courtside speichert die Teile einer Seite in der Reihenfolge, in der sie dort stehen. Lehnt es
+einen Teil ab, nennt die Meldung diesen Teil. Alles davor ist gespeichert, der abgelehnte Teil und
+alles danach bleiben in der Leiste, bis du korrigierst und erneut speicherst.
+
+Verlässt du eine Seite mit ungespeicherten Änderungen, fragt Courtside vorher nach. Das gilt auch
+beim Neuladen oder Schließen des Tabs.
+
+Eine eigene Schaltfläche haben nur Aktionen, die unabhängig vom Rest der Seite wirken, zum Beispiel
+etwas neu anlegen, ein Logo hochladen oder entfernen, etwas deaktivieren oder Zugangsdaten senden.
+Ihre Beschriftung sagt, was sie tut.
+
+![Die Leiste mit ungespeicherten Änderungen der Plätze, Speichern und Verwerfen.](screenshots/de/save-bar.png)
+
 ## Der geführte Weg: Einrichtung
 
 Öffne *Verein → Einrichtung*. Die Übersicht prüft den aktuellen Stand und kennzeichnet jeden
@@ -89,7 +109,8 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
 
 ## Anlage → Plätze
 
-Ein Platz braucht eine eindeutige Nummer und einen Namen. Beides kannst du später ändern.
+Ein Platz braucht eine eindeutige Nummer und einen Namen. Beides änderst du direkt in der Liste
+und speicherst alle geänderten Plätze gemeinsam.
 
 Deaktiviere einen Platz, den der Verein nicht mehr nutzt. Der Platz verschwindet aus dem
 Platzplan, bleibt aber in vergangenen Buchungen und Auswertungen erhalten. Courtside benachrichtigt
@@ -102,7 +123,7 @@ Mitglieder mit betroffenen zukünftigen Buchungen.
 1. Trage für jeden geöffneten Wochentag eine Öffnungs- und eine Schließzeit ein.
 2. Markiere Tage ohne Spielbetrieb als geschlossen.
 3. Nutze *Gleiche Zeiten übernehmen*, um ein Zeitfenster auf mehrere Tage anzuwenden.
-4. Speichere die gesamte Woche.
+4. Speichere die Woche mit der Leiste am unteren Rand.
 
 Courtside speichert keinen Tag, bei dem eine der beiden Zeiten fehlt. Außerhalb der Öffnungszeiten
 sind keine Buchungen möglich. Wenn du Öffnungszeiten später verkürzt, benachrichtigt Courtside
@@ -148,8 +169,8 @@ Auswahlen für denselben Zeitraum ab.
 
 Öffne *Verein → Buchungsregeln*. Eine Mitgliedsart verweist auf ein Regelwerk. Die Übersicht
 zeigt jedes Regelwerk mit seinem Status und den Mitgliedsarten, für die es gilt. Wähle dort ein
-Regelwerk, um seine Regeln zu bearbeiten. Jedes Regelwerk kann diese Regeln höchstens
-einmal enthalten:
+Regelwerk, um seine Regeln zu bearbeiten. Das Kästchen *In diesem Regelwerk* neben jeder Regel legt
+fest, ob das Regelwerk sie enthält. Jedes Regelwerk kann diese Regeln höchstens einmal enthalten:
 
 | Regel | Einstellung |
 |---|---|
@@ -170,6 +191,10 @@ Regelwerk zu, wenn sich ihre Regeln ändern sollen.
 Wähle unter der Übersicht ein Regelwerk für Personen ohne aktuelle Mitgliedsart, wenn auch für
 diese Gruppe mitgliedschaftsbezogene Regeln gelten sollen. Ohne Auswahl gelten weiterhin
 Öffnungszeiten und Buchungsraster.
+
+Name und Regeln des gewählten Regelwerks und das Regelwerk für Personen ohne Mitgliedsart speicherst
+du gemeinsam. Wählst du ein anderes Regelwerk, bevor du gespeichert hast, fragt Courtside nach,
+weil Name und Regeln zum gewählten Regelwerk gehören.
 
 ![Die Buchungsregeln mit der Übersicht der Regelwerke, erlaubten Bereichen und Verweisen auf globale Einstellungen.](screenshots/de/booking-rules.png)
 
