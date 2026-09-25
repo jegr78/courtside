@@ -284,6 +284,7 @@ describe("AdminConfigurationView", () => {
     const upload = vi.spyOn(api, "uploadClubLogo").mockReturnValue(result.promise);
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     const input = await screen.findByTestId("logo-file");
+    await userEvent.type(screen.getByTestId("club-name"), "!");
     await userEvent.upload(input, new File([new Uint8Array([1])], "club.png", { type: "image/png" }));
 
     // when
@@ -382,8 +383,6 @@ describe("AdminConfigurationView", () => {
     const columns = screen.getByTestId("club-profile-columns");
     expect(columns, "identity, settings and appearance share one row").toHaveClass("xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)_minmax(0,1.25fr)]");
     expect(screen.getByTestId("club-appearance"), "both colours and the logo take half the row").toHaveClass("lg:col-span-2");
-    expect(screen.getByTestId("club-appearance"), "the save button may sit under the shorter columns").toHaveClass("xl:row-span-2");
-    expect(screen.getByTestId("club-profile-columns")).toContainElement(screen.getByTestId("save-club-config"));
     for (const field of ["club-name", "short-name", "imprint-url", "privacy-url"]) {
       expect(screen.getByTestId("club-identity"), `${field} is part of the identity`).toContainElement(screen.getByTestId(field));
     }
@@ -498,6 +497,7 @@ describe("AdminConfigurationView", () => {
     const changing = vi.spyOn(api, "changeAdminConfig");
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("club-name");
+    await userEvent.type(screen.getByTestId("club-name"), "!");
 
     // when
     await userEvent.click(screen.getByTestId("save-club-config"));
@@ -533,6 +533,7 @@ describe("AdminConfigurationView", () => {
     }));
     render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
     await screen.findByTestId("club-name");
+    await userEvent.type(screen.getByTestId("club-name"), "!");
 
     // when
     await userEvent.click(screen.getByTestId("save-club-config"));
@@ -600,6 +601,68 @@ describe("AdminConfigurationView", () => {
 
     // then
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given an untouched profile, when the page loads, then no save is offered", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("club-name");
+
+    // then
+    expect(screen.queryByTestId("save-club-config")).not.toBeInTheDocument();
+  });
+
+  it("given an edited profile, when the edit is discarded, then the stored values return and nothing is left to lose", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminConfigurationView configurationChanged={() => undefined} />
+    </UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("club-name");
+    await userEvent.type(screen.getByTestId("club-name"), " North");
+    expect(screen.getByTestId("unsaved-mark-club-configuration")).toHaveTextContent("Club profile");
+
+    // when
+    await userEvent.click(screen.getByTestId("discard-club-configuration"));
+
+    // then
+    expect(screen.getByTestId("club-name")).toHaveValue("Example Tennis Club");
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given a chosen logo file, when it is not uploaded yet, then leaving would lose it but the profile's save does not claim it", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminConfigurationView configurationChanged={() => undefined} />
+    </UnsavedChangesProvider></MemoryRouter>);
+    const input = await screen.findByTestId("logo-file");
+
+    // when
+    await userEvent.upload(input, new File([new Uint8Array([1])], "club.png", { type: "image/png" }));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
+    expect(screen.queryByTestId("save-club-config"), "the upload is its own action").not.toBeInTheDocument();
+    expect(screen.getByTestId("upload-logo")).toBeEnabled();
+  });
+
+  it("given an edited club name, when a logo is uploaded, then the typed name survives and stays unsaved", async () => {
+    // given
+    const stored = await api.adminConfig();
+    vi.spyOn(api, "uploadClubLogo").mockResolvedValue({ ...stored, logoUploaded: true, logoUrl: "/api/public/config/logo?v=1" });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminConfigurationView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const input = await screen.findByTestId("logo-file");
+    await userEvent.type(screen.getByTestId("club-name"), " North");
+    await userEvent.upload(input, new File([new Uint8Array([1])], "club.png", { type: "image/png" }));
+
+    // when
+    await userEvent.click(screen.getByTestId("upload-logo"));
+
+    // then
+    await screen.findByTestId("remove-logo");
+    expect(screen.getByTestId("club-name")).toHaveValue("Example Tennis Club North");
+    expect(screen.getByTestId("save-club-config"), "the name still waits for the profile's save").toBeEnabled();
   });
 });
 

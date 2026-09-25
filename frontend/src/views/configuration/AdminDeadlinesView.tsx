@@ -2,20 +2,18 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type ClubConfig } from "../../api/client";
 import { Alert } from "../../components/Alert";
-import { Button } from "../../components/Button";
 import { LoadFailure } from "../../components/LoadFailure";
 import { SuccessFeedback } from "../../components/SuccessFeedback";
 import { TextField } from "../../components/TextField";
 import { useReportedFailure } from "../../failures/useReportedFailure";
 import { useRetry } from "../../failures/useRetry";
-import { describedByMark } from "../../unsaved/markId";
-import { UnsavedMark } from "../../unsaved/UnsavedMark";
+import { SaveBar } from "../../unsaved/SaveBar";
 import { ownedFields, useClubConfigForm } from "./clubConfigForm";
 
 export function AdminDeadlinesView({ configurationChanged }: { configurationChanged: (config: ClubConfig) => void }) {
   const { t } = useTranslation();
   const { message: error, report, clear } = useReportedFailure();
-  const { config, unsaved, loaded, applied, change, save: send } = useClubConfigForm(configurationChanged, ownedFields.deadlines);
+  const { config, unsaved, loaded, applied, change, discard, save: send } = useClubConfigForm(configurationChanged, ownedFields.deadlines);
   const [pending, setPending] = useState(false);
   const [success, setSuccess] = useState<string>();
   const [loadAttempt, retryLoad] = useRetry();
@@ -57,7 +55,7 @@ export function AdminDeadlinesView({ configurationChanged }: { configurationChan
       : <>
         {error && <Alert testId="admin-error">{error}</Alert>}
         {success && <SuccessFeedback testId="admin-save-success">{success}</SuccessFeedback>}
-        <form noValidate onSubmit={(event) => void save(event)} className="grid gap-5">
+        <form id="deadlines-form" noValidate onSubmit={(event) => void save(event)} className="grid gap-5">
           <div data-testid="deadline-fields" className="grid gap-5 [&>*]:min-w-0 md:grid-cols-2 md:items-start">
             <TextField data-testid="new-account-credential-hours" type="number" min={1} max={168} className="max-w-32" label={t("admin.config.newAccountCredentialHours")} value={config.newAccountCredentialHours} onChange={(event) => change({ newAccountCredentialHours: Number(event.target.value) })} />
             <TextField data-testid="password-reset-credential-hours" type="number" min={1} max={168} className="max-w-32" label={t("admin.config.passwordResetCredentialHours")} value={config.passwordResetCredentialHours} onChange={(event) => change({ passwordResetCredentialHours: Number(event.target.value) })} />
@@ -70,12 +68,8 @@ export function AdminDeadlinesView({ configurationChanged }: { configurationChan
               <p className="text-muted text-sm">{t("admin.config.bookingReminderHoursHelp")}</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button variant="primary" data-testid="save-deadlines" type="submit"
-                    aria-describedby={describedByMark("deadlines", unsaved)}
-                    disabled={pending}>{t("admin.save")}</Button>
-            <UnsavedMark id="deadlines" unsaved={unsaved} />
-          </div>
+          <SaveBar id="deadlines" subject={t("admin.deadlines.title")} saveTestId="save-deadlines" form="deadlines-form"
+                   unsaved={unsaved} pending={pending} discard={discard} />
         </form>
       </>}
   </section>;

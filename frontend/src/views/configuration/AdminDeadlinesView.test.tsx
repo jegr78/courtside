@@ -113,6 +113,7 @@ describe("AdminDeadlinesView", () => {
     const changing = vi.spyOn(api, "changeAdminConfig");
     show();
     await screen.findByTestId("booking-reminder-hours");
+    await userEvent.type(screen.getByTestId("booking-reminder-hours"), "0");
 
     // when
     await userEvent.click(screen.getByTestId("save-deadlines"));
@@ -157,6 +158,30 @@ describe("AdminDeadlinesView", () => {
     await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("1"));
   });
 
+  it("given an edited deadline, when it is discarded, then the stored value returns and nothing is left unsaved", async () => {
+    // given
+    show();
+    await screen.findByTestId("password-reset-token-minutes");
+    await userEvent.type(screen.getByTestId("password-reset-token-minutes"), "0");
+
+    // when
+    await userEvent.click(screen.getByTestId("discard-deadlines"));
+
+    // then
+    expect(screen.getByTestId("password-reset-token-minutes")).toHaveValue(60);
+    expect(screen.queryByTestId("save-deadlines")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given untouched deadlines, when the page loads, then no save is offered", async () => {
+    // when
+    show();
+    await screen.findByTestId("password-reset-token-minutes");
+
+    // then
+    expect(screen.queryByTestId("save-deadlines")).not.toBeInTheDocument();
+  });
+
   it("given the API rejects a deadline, when saving, then its validation code is reported", async () => {
     // given
     vi.spyOn(api, "changeAdminConfig").mockRejectedValue(new ApiError(400, {
@@ -167,12 +192,14 @@ describe("AdminDeadlinesView", () => {
     }));
     show();
     await screen.findByTestId("password-reset-token-minutes");
+    await userEvent.type(screen.getByTestId("password-reset-token-minutes"), "0");
 
     // when
     await userEvent.click(screen.getByTestId("save-deadlines"));
 
     // then
     expect(await screen.findByRole("alert")).toHaveTextContent("1440");
+    expect(screen.getByTestId("unsaved-mark-deadlines"), "a refused save leaves the work unsaved").toBeVisible();
   });
 
   it("given the configuration cannot load, when opening the page, then the failure replaces the loading state", async () => {
