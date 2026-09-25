@@ -53,6 +53,10 @@ function isTableHeadShown(): boolean {
 
 type Translate = (key: string, values?: Record<string, unknown>) => string;
 
+function accessFilter(value: string | null): AccessFilter | undefined {
+  return value === NOT_CHOSEN || CREDENTIAL_STATES.includes(value as CredentialState) ? value as AccessFilter : undefined;
+}
+
 function credentialStates(filter: AccessFilter | undefined): CredentialState[] | undefined {
   if (!filter) return undefined;
   return filter === NOT_CHOSEN ? CREDENTIAL_STATES.filter((state) => state !== "PASSWORD_CHOSEN") : [filter];
@@ -113,6 +117,7 @@ export function AdminRosterView() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedMembershipTypeId = searchParams.get("membershipTypeId") || undefined;
+  const requestedAccess = accessFilter(searchParams.get("access"));
   const headVisible = useSyncExternalStore(subscribeToTableHead, isTableHeadShown, () => true);
   const [entries, setEntries] = useState<RosterEntry[]>();
   const [matching, setMatching] = useState(0);
@@ -120,18 +125,21 @@ export function AdminRosterView() {
   const [nextCursor, setNextCursor] = useState<string>();
   const [pageCursor, setPageCursor] = useState<string>();
   const [previousCursors, setPreviousCursors] = useState<(string | undefined)[]>([]);
-  const [criteria, setCriteria] = useState<Criteria>({ membershipTypeId: requestedMembershipTypeId, sortBy: "NAME", sortDirection: "ASC" });
+  const [criteria, setCriteria] = useState<Criteria>({ membershipTypeId: requestedMembershipTypeId, access: requestedAccess,
+    sortBy: "NAME", sortDirection: "ASC" });
   const { message: error, report: reportError, clear } = useReportedFailure();
   const [pending, setPending] = useState(false);
   const [loadAttempt, retryLoad] = useRetry();
 
   useEffect(() => {
     let active = true;
+    const states = credentialStates(requestedAccess);
     void Promise.all([api.roster({ limit: PAGE_SIZE,
-      ...(requestedMembershipTypeId ? { membershipTypeId: requestedMembershipTypeId } : {}) }), api.membershipTypes()])
+      ...(requestedMembershipTypeId ? { membershipTypeId: requestedMembershipTypeId } : {}),
+      ...(states ? { credentialStates: states } : {}) }), api.membershipTypes()])
       .then(([page, membershipTypes]) => {
         if (!active) return;
-        setCriteria({ membershipTypeId: requestedMembershipTypeId, sortBy: "NAME", sortDirection: "ASC" });
+        setCriteria({ membershipTypeId: requestedMembershipTypeId, access: requestedAccess, sortBy: "NAME", sortDirection: "ASC" });
         setEntries(page.entries);
         setMatching(page.matching);
         setNextCursor(page.nextCursor ?? undefined);
@@ -145,7 +153,7 @@ export function AdminRosterView() {
     return () => {
       active = false;
     };
-  }, [loadAttempt, reportError, requestedMembershipTypeId]);
+  }, [loadAttempt, reportError, requestedAccess, requestedMembershipTypeId]);
 
   async function read(requested: Criteria, requestedCursor?: string, history: (string | undefined)[] = []) {
     if (pending) return;

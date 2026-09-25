@@ -63,7 +63,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       ? <Navigate to="/" replace />
       : <AccountRecoveryView />} />
     <Route path="/login" element={session.authenticated
-      ? <Navigate to={passwordChanged && session.roles.includes("ADMIN") ? "/admin/setup" : "/"} replace />
+      ? <Navigate to={passwordChanged && session.roles.includes("ADMIN") ? "/admin" : "/"} replace />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
     <Route path="/my-bookings" element={session.authenticated
       ? <MyBookingsPage session={session} offline={offline} />

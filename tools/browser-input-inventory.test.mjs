@@ -73,6 +73,11 @@ const BOUNDARIES = {
     classification: "compared with the ids of the rule sets the instance returned, and the first one otherwise",
     test: "src/views/configuration/AdminRuleSetsView.test.tsx#given a rule set the address names but the club does not have, when the rule sets open, then the first one is chosen"
   },
+  "src/views/AdminMessagesView.tsx useSearchParams": {
+    value: "whether the log opens on refused and failed messages",
+    classification: "compared strictly with true, so any other value opens the whole log",
+    test: "src/views/AdminMessagesView.test.tsx#given an unsettled value in the address that is not true, when the log is opened, then every message is read"
+  },
   "src/views/AdminPersonView.tsx useLocation": {
     value: "the mark the roster set when it navigated here",
     classification: "compared strictly with true, so nothing else announces a created person",
@@ -89,9 +94,9 @@ const BOUNDARIES = {
     test: "src/views/AdminRosterView.test.tsx#given a phone, when the roster loads, then the hidden column sort buttons leave the tab order"
   },
   "src/views/AdminRosterView.tsx useSearchParams": {
-    value: "the membership type the roster is filtered by",
-    classification: "passed to the instance, which answers the refusal the view reports",
-    test: "src/views/AdminRosterView.test.tsx#given a membership type the address names but the instance refuses, when the roster is opened, then the refusal is shown instead of an unfiltered roster"
+    value: "the membership type and the access state the roster is filtered by",
+    classification: "the type is passed to the instance, which answers the refusal the view reports; the access state is compared with the filters the roster offers and dropped otherwise",
+    test: "src/views/AdminRosterView.test.tsx#given an access filter the address names but the roster does not offer, when the roster is opened, then it reads everybody"
   },
   "src/views/ApplicationErrorView.tsx location": {
     value: "no external value",
