@@ -28,6 +28,8 @@ describe("AdminNavigation", () => {
     const club = screen.getByTestId("admin-group-club");
     expect(within(club).getByTestId("admin-setup-link")).toBeInTheDocument();
     expect(within(club).getByTestId("admin-configuration-link")).toBeInTheDocument();
+    expect(within(club).getByTestId("admin-deadlines-link")).toHaveAttribute("href", "/admin/deadlines");
+    expect(within(club).getByTestId("admin-rule-sets-link")).toHaveAttribute("href", "/admin/rule-sets");
     const facility = screen.getByTestId("admin-group-facility");
     expect(within(facility).getByTestId("admin-courts-link")).toBeInTheDocument();
     expect(within(facility).getByTestId("admin-opening-hours-link")).toBeInTheDocument();
@@ -59,6 +61,16 @@ describe("AdminNavigation", () => {
     expect(screen.getByTestId("admin-opening-hours-link")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("admin-courts-link")).not.toHaveAttribute("aria-current");
     expect(screen.getByTestId("admin-configuration-link")).not.toHaveAttribute("aria-current");
+  });
+
+  it("given the booking rules are open, when the navigation is read, then the club profile is not current too", () => {
+    // when
+    show("/admin/rule-sets");
+
+    // then
+    expect(screen.getByTestId("admin-rule-sets-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("admin-configuration-link")).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("admin-deadlines-link")).not.toHaveAttribute("aria-current");
   });
 
   it("given setup is current on a narrow screen, when the navigation is folded, then its control names setup", () => {
@@ -164,7 +176,7 @@ describe("AdminNavigation", () => {
 
     // then
     expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
-    expect(screen.getByTestId("admin-menu")).toHaveTextContent("Configuration");
+    expect(screen.getByTestId("admin-menu")).toHaveTextContent("Club profile");
   });
 
   it("given a phone, when the folded navigation is read, then it reads as a menu rather than a field", () => {

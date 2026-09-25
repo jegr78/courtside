@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { productFailure } from "./browser-diagnostics";
+import { STANDARD_RULE_SET } from "./shipped-rows";
 
 async function expectNoWcagViolations(page: import("@playwright/test").Page) {
   const results = await new AxeBuilder({ page })
@@ -142,6 +143,21 @@ for (const locale of ["de", "en"]) {
     await page.getByTestId("admin-configuration-link").click();
     await expect(page.getByTestId("admin-configuration-view")).toBeVisible();
     await expect(page.getByTestId("save-club-config")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+
+    // when
+    await page.getByTestId("admin-deadlines-link").click();
+    await expect(page.getByTestId("save-deadlines")).toBeVisible();
+
+    // then
+    await expectNoWcagViolations(page);
+
+    // when
+    await page.getByTestId("admin-rule-sets-link").click();
+    await expect(page.getByTestId("rule-set-overview")).toBeVisible();
+    await expect(page.getByTestId("rule-set-name")).toBeVisible();
 
     // then
     await expectNoWcagViolations(page);
@@ -509,6 +525,26 @@ test("core administration is operable using only the keyboard", async ({ page, b
     (window as typeof window & { configurationWrites: number }).configurationWrites
   )).toBe(2);
   await expect(page.getByTestId("admin-save-success")).toBeVisible();
+});
+
+test("a rule set is chosen from the overview using only the keyboard", async ({ page, browserName }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  await page.goto("/admin/rule-sets");
+  const standard = page.getByTestId(`rule-set-choose-${STANDARD_RULE_SET}`);
+  await expect(page.getByTestId("rule-set-overview")).toBeVisible();
+  await page.getByTestId("new-rule-set-name").fill("Example junior rules");
+  await page.getByTestId("create-rule-set").click();
+  await expect(standard).toHaveAttribute("aria-pressed", "false");
+  await page.getByTestId("admin-rule-sets-link").focus();
+
+  // when
+  await tabToTestId(page, `rule-set-choose-${STANDARD_RULE_SET}`, browserName === "webkit" ? "Alt+Tab" : "Tab");
+  await page.keyboard.press("Enter");
+
+  // then
+  await expect(standard).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("rule-set-name")).not.toHaveValue("Example junior rules");
 });
 
 test("the core layout reflows at the 400 percent zoom equivalent", async ({ page }) => {

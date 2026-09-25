@@ -27,7 +27,9 @@ const groups: Group[] = [
     heading: "nav.adminClub",
     destinations: [
       { to: "/admin/setup", testId: "admin-setup-link", label: "nav.adminSetup" },
-      { to: "/admin/configuration", testId: "admin-configuration-link", label: "nav.adminConfiguration" }
+      { to: "/admin/configuration", testId: "admin-configuration-link", label: "nav.adminConfiguration" },
+      { to: "/admin/deadlines", testId: "admin-deadlines-link", label: "nav.adminDeadlines" },
+      { to: "/admin/rule-sets", testId: "admin-rule-sets-link", label: "nav.adminRuleSets" }
     ]
   },
   {
@@ -131,7 +133,7 @@ export function AdminNavigation() {
       <Link data-testid="court-plan-link" to="/" className="focus-ring rounded-lg font-semibold underline-offset-4">
         {t("nav.courts")}
       </Link>
-      {groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2">
+      {groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2 lg:gap-1">
         <p id={`${group.testId}-heading`} className="text-muted text-xs font-bold tracking-wide uppercase">{t(group.heading)}</p>
         {group.destinations.map((destination) => <Link
           key={destination.testId}
@@ -139,7 +141,7 @@ export function AdminNavigation() {
           data-testid={destination.testId}
           aria-current={isCurrent(destination, pathname) ? "page" : undefined}
           onClick={() => { if (!laidOpen) setUnfolded(false); }}
-          className="focus-ring rounded-lg px-3 py-2 font-semibold aria-[current]:bg-(--cs-raised)"
+          className="focus-ring rounded-lg px-3 py-2 font-semibold lg:py-1 aria-[current]:bg-(--cs-raised)"
         >{t(destination.label)}</Link>)}
       </div>)}
     </nav>

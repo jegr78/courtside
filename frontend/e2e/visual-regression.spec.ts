@@ -1,5 +1,6 @@
+import { fileURLToPath } from "node:url";
 import { type Locator, type Page } from "@playwright/test";
-import { expect, test } from "./fixtures";
+import { expect, selectPreference, test } from "./fixtures";
 
 // Locale, theme, viewport and timezone are fixed here; the renderer is fixed by the project,
 // which draws in the pinned image rather than in whatever browser the host provides.
@@ -95,6 +96,21 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 
   // then
   await stableScreenshot(page.getByTestId("admin-configuration-view"), "admin-configuration.png");
+
+  // when
+  await page.getByTestId("admin-deadlines-link").click();
+  await expect(page.getByTestId("save-deadlines")).toBeVisible();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-deadlines-view"), "admin-deadlines.png");
+
+  // when
+  await page.getByTestId("admin-rule-sets-link").click();
+  await expect(page.getByTestId("rule-set-name")).toBeVisible();
+  await expect(page.getByTestId("rule-ADVANCE_WINDOW-maxDays")).toBeEnabled();
+
+  // then
+  await stableScreenshot(page.getByTestId("admin-rule-sets-view"), "admin-rule-sets.png");
 
   // when
   await page.goto("/admin/facility/courts");
@@ -217,4 +233,59 @@ async function stableScreenshot(surface: Locator, name: string, mask?: Locator):
   await expect(surface).toHaveScreenshot(name, {
     ...screenshotOptions, mask: mask ? [mask] : []
   });
+}
+
+test("each configuration surface fits the desktop screen without scrolling in either language", async ({ page }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  const surfaces = [
+    { link: "admin-configuration-link", view: "admin-configuration-view", ready: "logo-url" },
+    { link: "admin-deadlines-link", view: "admin-deadlines-view", ready: "booking-reminder-hours" },
+    { link: "admin-rule-sets-link", view: "admin-rule-sets-view", ready: "rule-ADVANCE_WINDOW-maxDays" }
+  ];
+
+  for (const language of ["de", "en"]) {
+    await selectPreference(page, "#locale-preference", language);
+    await expect(page.locator("html")).toHaveAttribute("lang", language);
+    await page.getByTestId("administration-link").click();
+    for (const surface of surfaces) {
+      // when
+      await page.getByTestId(surface.link).click();
+      await expect(page.getByTestId(surface.ready)).toBeEnabled();
+
+      // then
+      await expectToFit(page, `${language} ${surface.view}`, surface.view);
+    }
+
+    // when — a club that uploaded its logo is the ordinary case, not the seed's empty one
+    await page.getByTestId("admin-configuration-link").click();
+    await page.getByTestId("logo-file").setInputFiles(fileURLToPath(new URL("journey-files/club-logo.png", import.meta.url)));
+    await page.getByTestId("upload-logo").click();
+    try {
+      await expect(page.getByTestId("remove-logo")).toBeVisible();
+      await page.reload();
+      await expect(page.getByTestId("logo-preview")).toBeVisible();
+      await expect(page.getByTestId("remove-logo")).toBeEnabled();
+
+      // then
+      await expectToFit(page, `${language} admin-configuration-view with an uploaded logo`, "admin-configuration-view");
+    } finally {
+      await page.getByTestId("remove-logo").click();
+      await expect(page.getByTestId("remove-logo")).toHaveCount(0);
+    }
+    await page.getByTestId("court-plan-link").click();
+  }
+});
+
+async function expectToFit(page: Page, name: string, view: string): Promise<void> {
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForFunction(() => [...document.images].every((image) => image.complete));
+  const measured = await page.evaluate((testId) => ({
+    document: document.documentElement.scrollHeight,
+    viewport: window.innerHeight,
+    view: Math.round(document.querySelector(`[data-testid='${testId}']`)!.getBoundingClientRect().height),
+    navigation: Math.round(document.querySelector("[data-testid='admin-navigation']")!.getBoundingClientRect().height)
+  }), view);
+  expect.soft(measured.document, `${name} needs scrolling: ${JSON.stringify(measured)}`)
+    .toBeLessThanOrEqual(measured.viewport);
 }

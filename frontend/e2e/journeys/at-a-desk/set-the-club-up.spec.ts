@@ -35,7 +35,10 @@ test("given a volunteer installing Courtside for their club on the evening it ar
     await expect(page.getByTestId("admin-save-success")).toBeVisible();
 
     // and what its members may do
-    await page.getByTestId("rule-set").selectOption({ index: 0 });
+    await reachAdministration(page, "admin-rule-sets-link");
+    const firstRuleSet = page.getByTestId("rule-set-overview").getByRole("button").first();
+    await activate(firstRuleSet);
+    await expect(firstRuleSet).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("rule-set-name")).toBeVisible();
 
     // when — the courts it has

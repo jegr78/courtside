@@ -116,7 +116,12 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("admin-configuration-link").click();
     await expect(page.getByTestId("save-club-config")).toBeVisible();
   },
+  "deadlines": async (page) => {
+    await page.getByTestId("admin-deadlines-link").click();
+    await expect(page.getByTestId("save-deadlines")).toBeVisible();
+  },
   "booking-rules": async (page) => {
+    await page.getByTestId("admin-rule-sets-link").click();
     await expect(page.getByTestId("rule-set-name")).toBeVisible();
   },
   "courts": async (page) => {
@@ -248,6 +253,7 @@ test("every surface the club's own configuration shows is captured", async ({ pa
   await capture(page, "admin-navigation", journeyService.visualDate);
   await capture(page, "admin-setup", journeyService.visualDate);
   await capture(page, "club-appearance", journeyService.visualDate);
+  await capture(page, "deadlines", journeyService.visualDate);
   await capture(page, "booking-rules", journeyService.visualDate);
 });
 

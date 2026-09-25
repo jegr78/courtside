@@ -13,7 +13,7 @@ The sidebar divides administration into four areas:
 
 | Area | Contents |
 |---|---|
-| **Club** | Setup and configuration |
+| **Club** | Setup, club profile, deadlines and reminders, booking rules |
 | **Facility** | Courts, opening hours, booking cards and slot fillers |
 | **People** | People, accounts, membership types and imports |
 | **Records** | Utilisation, data exports, change log and message log |
@@ -29,7 +29,7 @@ optional.
 
 Complete the steps in this order:
 
-1. **Configure the club.** Enter its name, colours, logo, language, time zone and account settings.
+1. **Configure the club.** Enter its name, colours, logo, language and time zone.
 2. **Prepare the facility.** Add at least one enabled court and one open weekday.
 3. **Offer membership types.** Connect membership types to booking rules and account rights.
 4. **Add members.** Record at least one current membership.
@@ -40,9 +40,9 @@ You can leave the overview at any time. Courtside recalculates its state when yo
 
 ![The setup overview with five steps and their current state.](../screenshots/en/admin-setup.png)
 
-## Club → Configuration
+## Club → Club profile
 
-Open *Club → Configuration* to edit settings for the whole instance.
+Open *Club → Club profile* to edit who the club is and how Courtside presents it.
 
 ### Club and appearance
 
@@ -72,7 +72,9 @@ time it opens.
   future bookings.
 * The **Booking grid** determines the rows in the court plan and the permitted start times.
 
-### Messages and credentials
+## Club → Deadlines and reminders
+
+Open *Club → Deadlines and reminders*.
 
 * Set **Reminder before a booking** to 0 to disable reminders. Any other value sets the interval in
   hours.
@@ -80,10 +82,7 @@ time it opens.
 * A password reset code may remain valid for between 15 minutes and one day. The member must
   request a new code after it expires.
 
-### People without a membership type
-
-Select a rule set for people without a current membership type if membership-related rules should
-still apply to them. Opening hours and the booking grid apply even without this selection.
+![Lifetimes for one-time passwords and codes and the reminder before a booking.](../screenshots/en/deadlines.png)
 
 ## Facility → Courts
 
@@ -140,8 +139,8 @@ uses. If all limited items are booked, Courtside refuses further selections for 
 
 ## Booking rules
 
-Open the booking rules under *Club → Configuration*. A membership type points to a rule set. Each
-rule set may contain these rules once:
+Open *Club → Booking rules*. A membership type points to a rule set. The overview shows every rule set
+with its state and the membership types it applies to. Choose a rule set there to edit its rules. Each rule set may contain these rules once:
 
 | Rule | Setting |
 |---|---|
@@ -159,7 +158,11 @@ Retiring a rule set does not stop it from applying to membership types already a
 only removes the set from new selections. Assign another rule set first if the affected members
 should receive different rules.
 
-![Booking rules with a rule set, permitted ranges and links to global settings.](../screenshots/en/booking-rules.png)
+Below the overview, select a rule set for people without a current membership type if
+membership-related rules should still apply to them. Opening hours and the booking grid apply even
+without this selection.
+
+![Booking rules with the overview of rule sets, permitted ranges and links to global settings.](../screenshots/en/booking-rules.png)
 
 ## People → Membership types
 

@@ -40,7 +40,7 @@
       "id": "rule-set-name",
       "journey": "stored-admin",
       "field": "ruleSet.name",
-      "sink": "option-text"
+      "sink": "text-and-option-text"
     },
     {
       "id": "person-fields",
@@ -58,7 +58,7 @@
       "id": "membership-type-name",
       "journey": "stored-admin",
       "field": "membershipType.name",
-      "sink": "option-text-and-form-value"
+      "sink": "text-option-text-and-form-value"
     },
     {
       "id": "import-source-name",

@@ -83,6 +83,11 @@
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
     },
     {
+      "name": "deadlines",
+      "surface": "admin-deadlines-view",
+      "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }
+    },
+    {
       "name": "courts",
       "surface": "admin-courts-view",
       "pages": { "de": "site/board-guide.md", "en": "site/en/board-guide.md" }

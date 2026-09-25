@@ -68,10 +68,10 @@ const BOUNDARIES = {
     classification: "passed to the instance, which answers the refusal the view reports",
     test: "src/views/AdminAuditView.test.tsx#given a subject the address names but the instance refuses, when the log is opened, then the refusal is shown instead of an unfiltered log"
   },
-  "src/views/AdminConfigurationView.tsx useSearchParams": {
-    value: "the rule set the configuration opens on",
+  "src/views/configuration/AdminRuleSetsView.tsx useSearchParams": {
+    value: "the rule set the booking rules open on",
     classification: "compared with the ids of the rule sets the instance returned, and the first one otherwise",
-    test: "src/views/AdminConfigurationView.test.tsx#given a rule set the address names but the club does not have, when the configuration opens, then the first one is chosen"
+    test: "src/views/configuration/AdminRuleSetsView.test.tsx#given a rule set the address names but the club does not have, when the rule sets open, then the first one is chosen"
   },
   "src/views/AdminPersonView.tsx useLocation": {
     value: "the mark the roster set when it navigated here",

@@ -14,7 +14,7 @@ Die Seitenleiste ordnet die Verwaltung in vier Bereiche:
 
 | Bereich | Inhalt |
 |---|---|
-| **Verein** | Einrichtung und Konfiguration |
+| **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln |
 | **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
 | **Mitglieder** | Personen, Konten, Mitgliedsarten und Import |
 | **Nachweise** | Auslastung, Datenexport, Änderungsprotokoll und Nachrichtenprotokoll |
@@ -30,8 +30,7 @@ Schritt als abgeschlossen, offen oder optional.
 
 Arbeite die Schritte in dieser Reihenfolge ab:
 
-1. **Verein konfigurieren.** Hinterlege Name, Farben, Logo, Sprache, Zeitzone und
-   Kontoeinstellungen.
+1. **Verein konfigurieren.** Hinterlege Name, Farben, Logo, Sprache und Zeitzone.
 2. **Anlage vorbereiten.** Lege mindestens einen aktiven Platz und einen geöffneten Wochentag
    an.
 3. **Mitgliedsarten anbieten.** Verbinde Mitgliedsarten mit Buchungsregeln und Kontorechten.
@@ -44,9 +43,9 @@ neu.
 
 ![Die Einrichtungsübersicht mit fünf Schritten und deren Status.](screenshots/de/admin-setup.png)
 
-## Verein → Konfiguration
+## Verein → Vereinsprofil
 
-Öffne *Verein → Konfiguration* und bearbeite die Einstellungen für die gesamte Instanz.
+Öffne *Verein → Vereinsprofil* und bearbeite, wer der Verein ist und wie Courtside ihn zeigt.
 
 ### Verein und Darstellung
 
@@ -76,7 +75,9 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
   nur ändern, solange keine zukünftige Buchung vorhanden ist.
 * Das **Buchungsraster** bestimmt die Zeilen im Platzplan und die zulässigen Startzeiten.
 
-### Nachrichten und Zugangsdaten
+## Verein → Fristen und Erinnerungen
+
+Öffne *Verein → Fristen und Erinnerungen*.
 
 * Der Wert 0 bei **Erinnerung vor einer Buchung** schaltet Erinnerungen aus. Ein anderer Wert legt
   den Abstand in Stunden fest.
@@ -84,11 +85,7 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
 * Der Code zum Zurücksetzen darf zwischen 15 Minuten und einem Tag gültig sein. Nach Ablauf muss das
   Mitglied einen neuen Code anfordern.
 
-### Personen ohne Mitgliedsart
-
-Wähle ein Regelwerk für Personen ohne aktuelle Mitgliedsart, wenn auch für diese Gruppe
-mitgliedschaftsbezogene Regeln gelten sollen. Ohne Auswahl gelten weiterhin Öffnungszeiten und
-Buchungsraster.
+![Die Fristen für Einmalpasswörter und Codes und die Erinnerung vor einer Buchung.](screenshots/de/deadlines.png)
 
 ## Anlage → Plätze
 
@@ -149,8 +146,10 @@ Auswahlen für denselben Zeitraum ab.
 
 ## Buchungsregeln
 
-Öffne die Buchungsregeln unter *Verein → Konfiguration*. Eine Mitgliedsart verweist auf ein
-Regelwerk. Jedes Regelwerk kann diese Regeln höchstens einmal enthalten:
+Öffne *Verein → Buchungsregeln*. Eine Mitgliedsart verweist auf ein Regelwerk. Die Übersicht
+zeigt jedes Regelwerk mit seinem Status und den Mitgliedsarten, für die es gilt. Wähle dort ein
+Regelwerk, um seine Regeln zu bearbeiten. Jedes Regelwerk kann diese Regeln höchstens
+einmal enthalten:
 
 | Regel | Einstellung |
 |---|---|
@@ -168,7 +167,11 @@ Beim Stilllegen bleibt ein Regelwerk für bereits zugeordnete Mitgliedsarten wir
 nicht mehr für neue Zuordnungen bereit. Weise den betroffenen Mitgliedsarten zuerst ein anderes
 Regelwerk zu, wenn sich ihre Regeln ändern sollen.
 
-![Die Buchungsregeln mit Regelwerk, erlaubten Bereichen und Verweisen auf globale Einstellungen.](screenshots/de/booking-rules.png)
+Wähle unter der Übersicht ein Regelwerk für Personen ohne aktuelle Mitgliedsart, wenn auch für
+diese Gruppe mitgliedschaftsbezogene Regeln gelten sollen. Ohne Auswahl gelten weiterhin
+Öffnungszeiten und Buchungsraster.
+
+![Die Buchungsregeln mit der Übersicht der Regelwerke, erlaubten Bereichen und Verweisen auf globale Einstellungen.](screenshots/de/booking-rules.png)
 
 ## Mitglieder → Mitgliedsarten
 

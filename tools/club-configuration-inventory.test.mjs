@@ -8,8 +8,8 @@ const yaml = require("js-yaml");
 
 const document = yaml.load(readFileSync(new URL("../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
 const setupView = readFileSync(new URL("../frontend/src/views/AdminSetupView.tsx", import.meta.url), "utf8");
-const configurationView = readFileSync(
-  new URL("../frontend/src/views/AdminConfigurationView.tsx", import.meta.url), "utf8");
+const configurationRequest = readFileSync(
+  new URL("../frontend/src/views/configuration/clubConfigForm.ts", import.meta.url), "utf8");
 
 // what the instance serves rather than what a board sets: the locales it ships, and the logo
 // projection that logoUrl and logoUploaded already account for
@@ -52,9 +52,34 @@ test("given a field a board configures, when the setup step judges the club, the
 test("given a field a board may change, when the configuration form submits, then the editable list names it", () => {
   // when / then
   assert.deepEqual(
-    listedFields(configurationView, "function editable\\(", 4).toSorted(),
+    listedFields(configurationRequest, "export function editable\\(", 4).toSorted(),
     declaredFields("ClubConfigRequest").toSorted(),
-    "AdminConfigurationView's editable list has drifted from ClubConfigRequest");
+    "the configuration forms' editable list has drifted from ClubConfigRequest");
+});
+
+function ownedFields(source) {
+  const start = source.search(/^export const ownedFields = \{/mu);
+  assert.ok(start >= 0, "ownedFields is gone, so this guard no longer reads what each page owns");
+  const end = source.indexOf("\n}", start);
+  assert.ok(end > start, "ownedFields has no closing brace at the start of a line");
+  const pages = [...source.slice(start, end).matchAll(/^ {2}(\w+): \[([^\]]*)\]/gmu)]
+    .map(([, page, list]) => [page, [...list.matchAll(/"(\w+)"/gu)].map(([, field]) => field)]);
+  assert.ok(pages.length > 1, "ownedFields resolved to fewer than two pages, so this guard would compare nothing");
+  return pages;
+}
+
+test("given every field a board may change, when the configuration pages save, then exactly one page owns it", () => {
+  // given
+  const pages = ownedFields(configurationRequest);
+  const owned = pages.flatMap(([, fields]) => fields);
+
+  // when / then
+  for (const field of new Set(owned)) {
+    const owners = pages.filter(([, fields]) => fields.includes(field)).map(([page]) => page);
+    assert.equal(owners.length, 1, `${field} is owned by ${owners.join(" and ")}, so their saves would overwrite each other`);
+  }
+  assert.deepEqual(owned.toSorted(), declaredFields("ClubConfigRequest").toSorted(),
+    "a ClubConfigRequest field no page owns is written back from whatever was read, and a field that is not in the request is owned for nothing");
 });
 
 test("given a field excluded from the comparison, when the document is read, then no board can write it", () => {
