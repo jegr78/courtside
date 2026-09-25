@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { problemMessage } from "../api/problem-message";
+import { describeFailure } from "../unsaved/saveInTurn";
 
 type Describe = (failure: unknown, t: TFunction) => string | undefined;
 type Reported = { failure: unknown; describe: Describe } | { message: string };
@@ -14,7 +14,7 @@ export function useReportedFailure() {
   const [reported, setReported] = useState<Reported>();
 
   const report = useCallback(
-    (failure: unknown, describe: Describe = problemMessage) => setReported({ failure, describe }), []);
+    (failure: unknown, describe: Describe = describeFailure) => setReported({ failure, describe }), []);
   const refuse = useCallback((message: string) => setReported({ message }), []);
   const clear = useCallback(() => setReported(undefined), []);
 

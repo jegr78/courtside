@@ -785,6 +785,7 @@ const de = {
   "unsaved.mark": "Noch nicht gespeichert",
   "unsaved.bar": "Noch nicht gespeichert: {{subject}}",
   "unsaved.discardChanges": "Änderungen verwerfen",
+  "unsaved.stepFailed": "{{subject}} wurde nicht gespeichert. {{reason}}",
   "unsaved.stay": "Hierbleiben",
   "unsaved.discard": "Verwerfen und verlassen",
   "error.title": "Diese Seite lässt sich gerade nicht anzeigen.",

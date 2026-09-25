@@ -787,6 +787,7 @@ const en: Record<keyof typeof de, string> = {
   "unsaved.mark": "Not saved yet",
   "unsaved.bar": "Not saved yet: {{subject}}",
   "unsaved.discardChanges": "Discard changes",
+  "unsaved.stepFailed": "{{subject}} was not saved. {{reason}}",
   "unsaved.stay": "Stay here",
   "unsaved.discard": "Discard and leave",
   "error.title": "This page cannot be shown right now.",

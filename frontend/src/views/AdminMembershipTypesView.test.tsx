@@ -202,7 +202,7 @@ describe("AdminMembershipTypesView", () => {
     // when
     await userEvent.clear(screen.getByTestId("membership-type-name-type-1"));
     await userEvent.type(screen.getByTestId("membership-type-name-type-1"), "Adult");
-    await userEvent.click(screen.getByTestId("save-membership-type-type-1"));
+    await userEvent.click(screen.getByTestId("save-membership-types"));
 
     // then
     expect(api.changeMembershipType).toHaveBeenCalledWith("type-1", { name: "Adult", ruleSetId: "rules-1", grantsAccount: false });
@@ -216,7 +216,7 @@ describe("AdminMembershipTypesView", () => {
 
     // when
     await userEvent.selectOptions(screen.getByTestId("membership-type-rule-set-type-1"), "");
-    await userEvent.click(screen.getByTestId("save-membership-type-type-1"));
+    await userEvent.click(screen.getByTestId("save-membership-types"));
 
     // then
     expect(api.changeMembershipType).toHaveBeenCalledWith("type-1", { name: "Adults", ruleSetId: null, grantsAccount: false });
@@ -304,7 +304,7 @@ describe("AdminMembershipTypesView", () => {
 
     // when
     await userEvent.click(screen.getByTestId("membership-type-grants-account-type-1"));
-    await userEvent.click(screen.getByTestId("save-membership-type-type-1"));
+    await userEvent.click(screen.getByTestId("save-membership-types"));
 
     // then
     expect(api.changeMembershipType).toHaveBeenCalledWith("type-1",
@@ -318,5 +318,98 @@ describe("AdminMembershipTypesView", () => {
     // then
     expect(await screen.findByTestId("membership-type-grants-account-type-2")).toBeChecked();
     expect(screen.getByTestId("membership-type-grants-account-type-1")).not.toBeChecked();
+  });
+  it("given untouched types, when the page loads, then no save is offered", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-1");
+
+    // then
+    expect(screen.queryByTestId("save-membership-types")).not.toBeInTheDocument();
+  });
+
+  it("given two edited types, when the page is saved once, then both are sent and nothing is left to lose", async () => {
+    // given
+    const changing = vi.spyOn(api, "changeMembershipType").mockImplementation((id, request) =>
+      Promise.resolve({ ...(id === "type-1" ? adults : juniors), ...request }));
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminMembershipTypesView />
+    </UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-1");
+    await userEvent.type(screen.getByTestId("membership-type-name-type-1"), " A");
+    await userEvent.click(screen.getByTestId("membership-type-grants-account-type-2"));
+    await waitFor(() => expect(screen.getByTestId("unsaved-count"), "one page save is one change to lose").toHaveTextContent("1"));
+
+    // when
+    await userEvent.click(screen.getByTestId("save-membership-types"));
+
+    // then
+    expect(await screen.findByTestId("admin-save-success")).toBeVisible();
+    expect(changing).toHaveBeenCalledTimes(2);
+    expect(changing).toHaveBeenCalledWith("type-1", { name: "Adults A", ruleSetId: "rules-1", grantsAccount: false });
+    expect(changing).toHaveBeenCalledWith("type-2", { name: "Juniors", ruleSetId: null, grantsAccount: false });
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given a second type the instance refuses, when the page is saved, then the first is kept, the second stays unsaved and is named", async () => {
+    // given
+    vi.spyOn(api, "changeMembershipType").mockImplementation((id, request) => id === "type-1"
+      ? Promise.resolve({ ...adults, ...request })
+      : Promise.reject(new ApiError(409)));
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-1");
+    await userEvent.type(screen.getByTestId("membership-type-name-type-1"), " A");
+    await userEvent.type(screen.getByTestId("membership-type-name-type-2"), " B");
+
+    // when
+    await userEvent.click(screen.getByTestId("save-membership-types"));
+
+    // then
+    expect(await screen.findByRole("alert")).toHaveTextContent("Juniors was not saved.");
+    expect(screen.queryByTestId("admin-save-success"), "a partial save is not a success").not.toBeInTheDocument();
+    expect(screen.getByTestId("save-membership-types"), "the refused type is still unsaved").toBeEnabled();
+
+    // when
+    await userEvent.click(screen.getByTestId("discard-membership-types"));
+
+    // then
+    expect(screen.getByTestId("membership-type-name-type-1"), "the saved type keeps its new name").toHaveValue("Adults A");
+    expect(screen.getByTestId("membership-type-name-type-2")).toHaveValue("Juniors");
+  });
+
+  it("given edited types, when the edits are discarded, then every row shows what is stored", async () => {
+    // given
+    render(<MemoryRouter><UnsavedChangesProvider>
+      <UnsavedCount />
+      <AdminMembershipTypesView />
+    </UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-1");
+    await userEvent.type(screen.getByTestId("membership-type-name-type-1"), " A");
+    await userEvent.selectOptions(screen.getByTestId("membership-type-rule-set-type-2"), "rules-1");
+
+    // when
+    await userEvent.click(screen.getByTestId("discard-membership-types"));
+
+    // then
+    expect(screen.getByTestId("membership-type-name-type-1")).toHaveValue("Adults");
+    expect(screen.getByTestId("membership-type-rule-set-type-2")).toHaveValue("");
+    await waitFor(() => expect(screen.getByTestId("unsaved-count")).toHaveTextContent("0"));
+  });
+
+  it("given an edited name, when its type is retired, then the edit survives and still waits for the save", async () => {
+    // given
+    vi.spyOn(api, "setMembershipTypeActive").mockResolvedValue({ ...adults, active: false });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-1");
+    await userEvent.type(screen.getByTestId("membership-type-name-type-1"), " A");
+
+    // when
+    await userEvent.click(screen.getByTestId("toggle-membership-type-type-1"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("toggle-membership-type-type-1")).toHaveTextContent("Activate"));
+    expect(screen.getByTestId("membership-type-name-type-1")).toHaveValue("Adults A");
+    expect(screen.getByTestId("save-membership-types")).toBeInTheDocument();
   });
 });
