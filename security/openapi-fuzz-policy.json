@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "image": "schemathesis/schemathesis:v4.27.2@sha256:49d134254ef0a507252610be759cdbf25847c4cb68b68997132ce7050329d6ff",
+  "image": "schemathesis/schemathesis:v4.28.0@sha256:0a71757c60ccdba270c154a859d9dd3d019625f782f23ab36ad604771e15f78b",
   "seed": 24820260821,
   "maxExamples": 5,
   "workers": 1,

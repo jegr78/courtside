@@ -8,7 +8,7 @@
     "schemaVersion": { "const": 1 },
     "testIds": { "const": ["CSA-RES-001"] },
     "targetFingerprint": { "$ref": "#/$defs/digest" },
-    "image": { "type": "string", "pattern": "^grafana/k6:2\\.2\\.0@sha256:[a-f0-9]{64}$" },
+    "image": { "type": "string", "pattern": "^grafana/k6:2\\.3\\.0@sha256:[a-f0-9]{64}$" },
     "policyDigest": { "$ref": "#/$defs/digest" },
     "policyFileDigest": { "$ref": "#/$defs/digest" },
     "scriptDigest": { "$ref": "#/$defs/digest" },

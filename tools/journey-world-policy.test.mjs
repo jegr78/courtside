@@ -39,8 +39,16 @@ test("given several browser projects, when Playwright runs them, then one global
   assert.doesNotMatch(fixtures, /startJourneyService/);
   assert.doesNotMatch(fixtures, /service\.stop/);
   assert.match(playwright, /workers: 1/);
-  assert.match(playwright, /timeout: 60_000/);
   assert.match(playwright, /Unsupported browser project order/);
+});
+
+test("given hosted browser jobs have an outer deadline, when the runner is slow, then Playwright adds no wall-clock deadline", () => {
+  // given / when / then
+  assert.match(playwright, /\n  timeout: 0,/);
+  assert.match(playwright, /expect: \{ timeout: 0,/);
+  assert.match(playwright, /actionTimeout: 0/);
+  assert.match(playwright, /navigationTimeout: 0/);
+  assert.doesNotMatch(playwright, /\n  timeout: (?!0,)\d/);
 });
 
 test("given release-critical journey commands, when the runner is slow, then only the outer gate owns their deadline", () => {
