@@ -198,6 +198,10 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("utilisation-read").click();
     await expect(page.getByTestId("utilisation-period")).not.toHaveText(lastMonth);
     await expect(page.getByTestId("utilisation-row-1")).toBeVisible();
+    await expect(page.getByTestId("statistics-confirmed")).toBeVisible();
+    await expect(page.getByTestId("statistics-members-total")).toBeVisible();
+    await expect(page.getByTestId("statistics-messages").getByRole("status")).toHaveCount(0);
+    await expect(page.getByTestId("statistics-choice-1m")).toBeEnabled();
   }
 };
 

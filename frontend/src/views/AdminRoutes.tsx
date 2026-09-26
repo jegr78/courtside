@@ -4,7 +4,7 @@ import { AdminShell } from "../components/AdminShell";
 import { AdminAuditView } from "./AdminAuditView";
 import { AdminConfigurationView } from "./AdminConfigurationView";
 import { AdminExportView } from "./AdminExportView";
-import { AdminFacilityUtilisationView } from "./AdminFacilityUtilisationView";
+import { AdminStatisticsView } from "./AdminStatisticsView";
 import { AdminImportView } from "./AdminImportView";
 import { AdminMembershipTypesView } from "./AdminMembershipTypesView";
 import { AdminMessagesView } from "./AdminMessagesView";
@@ -44,7 +44,7 @@ export default function AdminRoutes({ configurationChanged }: {
       <Route path="membership-types" element={<AdminMembershipTypesView />} />
       <Route path="import" element={<AdminImportView />} />
       <Route path="export" element={<AdminExportView />} />
-      <Route path="utilisation" element={<AdminFacilityUtilisationView />} />
+      <Route path="utilisation" element={<AdminStatisticsView />} />
       <Route path="audit" element={<AdminAuditView />} />
       <Route path="messages" element={<AdminMessagesView />} />
       <Route path="operational-logs" element={<AdminOperationalLogsView />} />

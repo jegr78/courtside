@@ -471,6 +471,13 @@ test("stored text projections remain inert on administrative and managed views",
   await expect(auditRow.getByTestId("audit-subject")).toHaveText("1");
   await expect(auditRow.getByTestId("audit-actor")).toHaveText(payload);
   await expect(auditRow.getByTestId("audit-message")).toContainText(payload);
+  await page.goto("/admin/utilisation");
+  const statistics = page.getByTestId("admin-facility-utilisation-view");
+  await expect(page.getByTestId("utilisation-row-3-label"), "a stored court name is text on the statistics").toContainText(payload);
+  await expect(page.getByTestId("statistics-card-33333333-3333-3333-3333-333333333333-label")).toContainText(payload);
+  await expect(page.getByTestId("statistics-participant-card-55555555-5555-5555-5555-555555555555-label")).toHaveText(payload);
+  await expect(page.getByTestId("statistics-membership-type-cccccccc-0000-0000-0000-000000000001-label")).toHaveText(payload);
+  await expect(statistics.locator("img")).toHaveCount(0);
   await onTheVisualDay(page, journeyService.visualDate);
   await page.goto("/admin");
   const latestChange = page.getByTestId("overview-changes-entry").first();

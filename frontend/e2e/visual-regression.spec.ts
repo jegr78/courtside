@@ -199,6 +199,10 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
   // when
   await page.goto("/admin/utilisation");
   await expect(page.getByTestId("utilisation-row-1")).toBeVisible();
+  await expect(page.getByTestId("statistics-confirmed")).toBeVisible();
+  await expect(page.getByTestId("statistics-members-total")).toBeVisible();
+  await expect(page.getByTestId("statistics-messages").getByRole("status")).toHaveCount(0);
+  await expect(page.getByTestId("statistics-choice-1m")).toBeEnabled();
 
   // then
   await stableScreenshot(page.getByTestId("admin-facility-utilisation-view"), "admin-utilisation.png");
