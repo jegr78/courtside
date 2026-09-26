@@ -38,6 +38,7 @@ class AccountStatisticsService implements AccountStatistics {
                                COUNT(*) FILTER (WHERE a.last_login_at IS NULL) AS never
                         FROM user_account a
                         CROSS JOIN bounds b
+                        WHERE a.enabled
                         """)
                 .param("zone", clubTimeZone.zoneId().getId())
                 .param("lastDay", lastDay)

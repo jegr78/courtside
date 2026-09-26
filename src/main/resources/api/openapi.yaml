@@ -2490,6 +2490,7 @@ components:
 
     AccountFigures:
       type: object
+      description: Enabled accounts only.
       required: [accounts, passwordChosen, withoutChosenPassword, signedInWithin30Days,
                  signedInWithin90Days, neverSignedIn]
       properties:
@@ -6652,8 +6653,8 @@ paths:
         day and, in a confirmed booking starting in the period, booked it or was recorded as a
         participant. Guests and participant cards are never members.
 
-        Account figures describe the accounts as they are now. `lastLoginAt` keeps only the latest
-        sign-in, so for a period in the past the sign-in windows count the accounts whose latest
+        Account figures describe the enabled accounts as they are now; a disabled account counts in
+        none of them. `lastLoginAt` keeps only the latest sign-in, so for a period in the past the sign-in windows count the accounts whose latest
         sign-in falls inside them. Administrators only.
       security:
         - sessionCookie: []

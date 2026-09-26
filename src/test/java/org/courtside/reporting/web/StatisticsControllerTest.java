@@ -322,6 +322,9 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
         UUID maryAccount = identity.createEnabledAccount(mary, "mary.major", Set.of(Role.MEMBER));
         UUID richardAccount = identity.createEnabledAccount(richard, "richard.miles", Set.of(Role.MEMBER));
         identity.requirePasswordChange("richard.miles");
+        UUID departed = members.addPerson("Richard", "Roe", "richard.roe@example.org");
+        UUID departedAccount = identity.createAccount(departed, "richard.roe", Set.of(Role.MEMBER));
+        signedIn(departedAccount, "2026-04-28T10:00:00Z");
         signedIn(janeAccount, "2026-04-25T10:00:00Z");
         signedIn(maryAccount, "2026-02-15T10:00:00Z");
         signedIn(richardAccount, "2026-05-05T10:00:00Z");
