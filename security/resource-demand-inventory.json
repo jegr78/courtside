@@ -290,6 +290,7 @@
         "exportPersonData",
         "exportRoster",
         "facilityUtilisation",
+        "readStatisticsRange",
         "readUtilisationStatistics",
         "readBookingStatistics",
         "readMemberStatistics",

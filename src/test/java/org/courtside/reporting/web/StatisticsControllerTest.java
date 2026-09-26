@@ -72,6 +72,31 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenNoBooking_whenReadingTheRange_thenThereIsNoFirstBookingDay() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/range"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstBookingOn").value(nullValue()))
+                .andExpect(jsonPath("$.today").value("2026-05-12"))
+                .andExpect(jsonPath("$.timeZone").value("Europe/Berlin"));
+    }
+
+    @Test
+    void givenACancelledBookingJustAfterLocalMidnight_whenReadingTheRange_thenItsClubDayIsTheFirst() throws Exception {
+        // given
+        UUID court = facility.createCourt(1, "Centre");
+        allocate(booking(MEMBER_CARD, "CONFIRMED", null), court,
+                "2026-04-02T08:00:00Z", "2026-04-02T09:00:00Z", "CONFIRMED");
+        allocate(booking(MEMBER_CARD, "CANCELLED", null), court,
+                "2026-03-31T22:30:00Z", "2026-03-31T23:30:00Z", "CANCELLED");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/range"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstBookingOn").value("2026-04-01"));
+    }
+
+    @Test
     void givenBookingsClosuresAndCancellations_whenReadingAWeek_thenOccupancyLeavesClosuresOut() throws Exception {
         // given
         openEveryDay(LocalTime.of(8, 0), LocalTime.of(12, 0));

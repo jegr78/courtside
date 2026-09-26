@@ -139,6 +139,7 @@ class AuditedOperationCoverageTest {
             "StatisticsService#bookings",
             "StatisticsService#members",
             "StatisticsService#messages",
+            "StatisticsService#range",
             "StatisticsService#utilisation",
             "SubjectAccessService#answerFor");
 

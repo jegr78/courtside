@@ -66,6 +66,7 @@ export type SubjectAccessExport = components["schemas"]["SubjectAccessExport"];
 export type FacilityUtilisation = components["schemas"]["FacilityUtilisation"];
 export type CourtUtilisation = components["schemas"]["CourtUtilisation"];
 export type StatisticsPeriodQuery = { from: string; to: string };
+export type StatisticsRange = components["schemas"]["StatisticsRange"];
 export type UtilisationStatistics = components["schemas"]["UtilisationStatistics"];
 export type BookingStatistics = components["schemas"]["BookingStatistics"];
 export type MemberStatistics = components["schemas"]["MemberStatistics"];
@@ -231,8 +232,7 @@ function csrfToken(): string | undefined {
   return cookie ? decodeURIComponent(cookie.substring(name.length + 1)) : undefined;
 }
 
-function statisticsPath(section: string, period?: StatisticsPeriodQuery): string {
-  const path = `/api/admin/statistics/${section}`;
+function withPeriod(path: string, period?: StatisticsPeriodQuery): string {
   return period ? `${path}?${new URLSearchParams(period).toString()}` : path;
 }
 
@@ -457,14 +457,15 @@ export const api = {
     period
       ? `/api/admin/reports/facility-utilisation?${new URLSearchParams(period).toString()}`
       : "/api/admin/reports/facility-utilisation"),
+  statisticsRange: () => request<StatisticsRange>("/api/admin/statistics/range"),
   utilisationStatistics: (period?: StatisticsPeriodQuery) =>
-    request<UtilisationStatistics>(statisticsPath("utilisation", period)),
+    request<UtilisationStatistics>(withPeriod("/api/admin/statistics/utilisation", period)),
   bookingStatistics: (period?: StatisticsPeriodQuery) =>
-    request<BookingStatistics>(statisticsPath("bookings", period)),
+    request<BookingStatistics>(withPeriod("/api/admin/statistics/bookings", period)),
   memberStatistics: (period?: StatisticsPeriodQuery) =>
-    request<MemberStatistics>(statisticsPath("members", period)),
+    request<MemberStatistics>(withPeriod("/api/admin/statistics/members", period)),
   messageStatistics: (period?: StatisticsPeriodQuery) =>
-    request<MessageStatistics>(statisticsPath("messages", period)),
+    request<MessageStatistics>(withPeriod("/api/admin/statistics/messages", period)),
   exportBookings: (parameters: BookingExportParameters) => requestFile(
     `/api/admin/export/bookings?${new URLSearchParams(parameters).toString()}`, { method: "POST" }),
   exportRoster: (parameters: RosterExportParameters) => requestFile(

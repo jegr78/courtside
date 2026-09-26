@@ -335,7 +335,9 @@ of them are complete. `/admin/setup` shows it in full.
 Statistics answer four reads under `/api/admin/statistics`: utilisation, bookings, members and
 messages. Each takes a period of club-local dates of any length between the years 0001 and 9999,
 defaults to the last full calendar month, answers aggregates only and repeats its figures for the
-equally long period before it. None of them names a person.
+equally long period before it. None of them names a person. A fifth read, `range`, answers the
+club-local date of the earliest allocation of any booking and today's date, so "all time" is the
+period between them.
 
 - Utilisation counts confirmed allocations inside open time. Open time comes from today's weekly
   opening hours, because neither hours nor court availability are dated. A court counts towards

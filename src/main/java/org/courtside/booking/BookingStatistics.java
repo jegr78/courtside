@@ -2,6 +2,7 @@ package org.courtside.booking;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface BookingStatistics {
@@ -37,6 +38,8 @@ public interface BookingStatistics {
 
     record ParticipantCardUse(UUID cardId, String label, long uses) {
     }
+
+    Optional<LocalDate> firstBookingOn();
 
     Utilisation utilisation(LocalDate from, LocalDate to);
 

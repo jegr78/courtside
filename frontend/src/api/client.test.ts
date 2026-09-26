@@ -676,12 +676,14 @@ it("given a period, when reading each statistics section, then the section is as
   await api.bookingStatistics(period);
   await api.memberStatistics(period);
   await api.messageStatistics();
+  await api.statisticsRange();
 
   // then
   expect(asked).toEqual([
     "/api/admin/statistics/utilisation?from=2026-05-04&to=2026-05-10",
     "/api/admin/statistics/bookings?from=2026-05-04&to=2026-05-10",
     "/api/admin/statistics/members?from=2026-05-04&to=2026-05-10",
-    "/api/admin/statistics/messages"
+    "/api/admin/statistics/messages",
+    "/api/admin/statistics/range"
   ]);
 });

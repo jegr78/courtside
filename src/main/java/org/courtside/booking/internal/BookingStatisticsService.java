@@ -25,6 +25,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -141,6 +142,16 @@ class BookingStatisticsService implements BookingStatistics {
     private final FacilityService facility;
     private final CardService cards;
     private final ClubTimeZone clubTimeZone;
+
+    @Override
+    public Optional<LocalDate> firstBookingOn() {
+        List<LocalDate> first = jdbc.sql(
+                        "SELECT CAST(timezone(:zone, MIN(starts_at)) AS date) AS first FROM court_allocation")
+                .param("zone", clubTimeZone.zoneId().getId())
+                .query((rs, row) -> rs.getObject("first", LocalDate.class))
+                .list();
+        return Optional.ofNullable(first.getFirst());
+    }
 
     @Override
     public Utilisation utilisation(LocalDate from, LocalDate to) {

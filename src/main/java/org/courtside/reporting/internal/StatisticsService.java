@@ -56,6 +56,14 @@ public class StatisticsService {
                                 Compared<List<MessageStatistics.KindCount>> previous) {
     }
 
+    public record RangeReport(LocalDate firstBookingOn, LocalDate today, String timeZone) {
+    }
+
+    public RangeReport range() {
+        return new RangeReport(bookings.firstBookingOn().orElse(null),
+                LocalDate.ofInstant(clock.instant(), clubTimeZone.zoneId()), timeZone());
+    }
+
     public UtilisationReport utilisation(LocalDate from, LocalDate to) {
         StatisticsPeriod period = resolve(from, to);
         return new UtilisationReport(period, timeZone(),

@@ -20,6 +20,7 @@ import org.courtside.api.ApiPreviousMemberFigures;
 import org.courtside.api.ApiPreviousMessageCounts;
 import org.courtside.api.ApiPreviousUtilisation;
 import org.courtside.api.ApiStatisticsPeriod;
+import org.courtside.api.ApiStatisticsRange;
 import org.courtside.api.ApiUtilisationBucket;
 import org.courtside.api.ApiUtilisationProgression;
 import org.courtside.api.ApiUtilisationStatistics;
@@ -40,6 +41,13 @@ import java.util.List;
 class StatisticsController implements AdminStatisticsApi {
 
     private final StatisticsService statistics;
+
+    @Override
+    public ResponseEntity<ApiStatisticsRange> readStatisticsRange() {
+        StatisticsService.RangeReport range = statistics.range();
+        return ResponseEntity.ok(new ApiStatisticsRange()
+                .firstBookingOn(range.firstBookingOn()).today(range.today()).timeZone(range.timeZone()));
+    }
 
     @Override
     public ResponseEntity<ApiUtilisationStatistics> readUtilisationStatistics(LocalDate from, LocalDate to) {

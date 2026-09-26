@@ -444,6 +444,7 @@
         "bookingCardImpact",
         "openingHoursImpact",
         "facilityUtilisation",
+        "readStatisticsRange",
         "readUtilisationStatistics",
         "readBookingStatistics",
         "readMemberStatistics",
