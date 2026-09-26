@@ -27,8 +27,8 @@ public record SubjectAccessRecord(Instant producedAt, UUID personId, String firs
 
     public record Account(UUID accountId, String username, String locale, boolean enabled,
                           Instant createdAt, boolean passwordChangeRequired,
-                          @Nullable Instant credentialsExpireAt, CredentialState credentialState,
-                          Set<Role> roles) {
+                          @Nullable Instant credentialsExpireAt, @Nullable Instant lastLoginAt,
+                          CredentialState credentialState, Set<Role> roles) {
     }
 
     public record Membership(UUID membershipTypeId, @Nullable String membershipType,

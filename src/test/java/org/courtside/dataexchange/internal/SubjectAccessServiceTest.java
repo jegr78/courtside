@@ -134,6 +134,24 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenOneAccountSignedInAndOneNever_whenTheAnswerIsProduced_thenEachCarriesItsLastSignIn() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID signedInId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID neverId = identity.createAccount(personId, "jane.doe.dormant", Set.of(Role.MEMBER));
+        identity.recordSignIn(signedInId, SIX_PM);
+
+        // when
+        SubjectAccessRecord answer = subjectAccess.answerFor(personId);
+
+        // then
+        assertThat(answer.accounts())
+                .extracting(SubjectAccessRecord.Account::accountId, SubjectAccessRecord.Account::lastLoginAt)
+                .as("the recorded sign-in instant is part of the answer, and an unused account says none")
+                .containsExactly(tuple(signedInId, SIX_PM), tuple(neverId, null));
+    }
+
+    @Test
     void givenAPersonWithoutAnAccount_whenTheAnswerIsProduced_thenTheMessageSectionsAreEmpty() {
         // given
         UUID personId = roster.addPerson("John", "Roe", "john.roe@example.org");

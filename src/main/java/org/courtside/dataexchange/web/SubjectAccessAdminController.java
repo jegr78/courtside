@@ -99,7 +99,8 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 ApiSubjectAccessAccount.CredentialStateEnum.fromValue(account.credentialState().name()),
                 account.roles().stream().map(Role::name).sorted().map(ApiRole::fromValue).toList())
                 .passwordChangeRequired(account.passwordChangeRequired())
-                .credentialsExpireAt(WireTypes.toOffsetDateTime(account.credentialsExpireAt()));
+                .credentialsExpireAt(WireTypes.toOffsetDateTime(account.credentialsExpireAt()))
+                .lastLoginAt(WireTypes.toOffsetDateTime(account.lastLoginAt()));
     }
 
     private static ApiSubjectAccessMembership toMembership(SubjectAccessRecord.Membership membership) {

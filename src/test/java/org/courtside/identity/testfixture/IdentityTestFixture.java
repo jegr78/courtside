@@ -6,6 +6,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -13,6 +14,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -24,6 +27,7 @@ public class IdentityTestFixture {
     private final UserAccountRepository accounts;
     private final UserDetailsService userDetails;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcClient jdbc;
 
     public void signInAs(String username) {
         UserDetails details = userDetails.loadUserByUsername(username);
@@ -87,6 +91,13 @@ public class IdentityTestFixture {
         UserAccount account = accounts.findById(createAccount(personId, username, passwordHash, roles)).orElseThrow();
         account.enable();
         return accounts.save(account).getId();
+    }
+
+    public void recordSignIn(UUID accountId, Instant signedInAt) {
+        jdbc.sql("UPDATE user_account SET last_login_at = :signedInAt WHERE id = :id")
+                .param("signedInAt", Timestamp.from(signedInAt))
+                .param("id", accountId)
+                .update();
     }
 
     public void requirePasswordChange(String username) {

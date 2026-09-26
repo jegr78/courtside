@@ -54,6 +54,10 @@ public class UserAccount {
     @Column(name = "credentials_expire_at")
     private Instant credentialsExpireAt;
 
+    // Read-only here: only the sign-in writes it, so a stale entity cannot flush an older value back.
+    @Column(name = "last_login_at", insertable = false, updatable = false)
+    private Instant lastLoginAt;
+
     @Column(name = "security_epoch", nullable = false)
     private long securityEpoch;
 

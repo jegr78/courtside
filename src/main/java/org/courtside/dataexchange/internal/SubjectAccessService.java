@@ -105,7 +105,7 @@ public class SubjectAccessService {
         return new SubjectAccessRecord.Account(account.getId(), account.getUsername(),
                 account.getLocale(), account.isEnabled(), account.getCreatedAt(),
                 account.isPasswordChangeRequired(), account.getCredentialsExpireAt(),
-                account.credentialState(now), account.getRoles());
+                account.getLastLoginAt(), account.credentialState(now), account.getRoles());
     }
 
     private List<SubjectAccessRecord.Membership> membershipsOf(UUID personId) {
