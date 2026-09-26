@@ -2,7 +2,7 @@ name: courtside-mail-smoke
 
 services:
   mail:
-    image: stalwartlabs/stalwart:v0.16.22@sha256:388dcb75a70727c5b551249a6d34b1f1321294852489e4fa3a4e6be698b7c4f0
+    image: stalwartlabs/stalwart:v0.16.23@sha256:be215678796691bc39bdda918ecc50d14a9032a099a1d1950e51950aec7e2592
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -104,7 +104,7 @@ services:
       - "127.0.0.1::8025"
 
   plan:
-    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    image: alpine:3@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     security_opt:
       - no-new-privileges:true
     cap_drop:

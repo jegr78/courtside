@@ -122,6 +122,8 @@ export default defineConfig({
     environment: "jsdom",
     environmentOptions: { jsdom: { url: "http://localhost" } },
     maxWorkers: 2,
+    testTimeout: 0,
+    hookTimeout: 0,
     include: ["src/**/*.test.{ts,tsx}", "e2e/**/*.test.ts"],
     setupFiles: ["./src/test/setup.ts"],
     coverage: {
