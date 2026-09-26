@@ -53,6 +53,17 @@ test("given a slow but contiguous observation, when validating its timeline, the
   validateResourceTimeline({ ...evidence, samples: delayed });
 });
 
+test("given serial observations within one millisecond, when validating them, then sequence preserves their order", () => {
+  // given
+  const evidence = timeline();
+  const sameMillisecond = evidence.samples.map((sample) => sample.sequence === 2
+    ? { ...sample, recordedAt: "2026-09-05T08:00:01.000Z" }
+    : sample);
+
+  // when / then
+  validateResourceTimeline({ ...evidence, samples: sameMillisecond });
+});
+
 // An attempt samples from the moment the world is first prepared until the last browser is gone,
 // and the lifecycle names the window each browser container was alive for.
 function attempt({ applicationRestartsAfterSample = 0 } = {}) {
@@ -107,6 +118,14 @@ test("given one process throughout, when the coverage is read, then the run is c
 test("given the application restarted before the first browser, when the coverage is read, then preparing the world is not a hole in the run", () => {
   // given — taking a seeded world per language restarts the application while no browser exists yet
   const { timeline, boundaries, lifecycle } = attempt({ applicationRestartsAfterSample: 9 });
+
+  // when / then
+  validateResourceCoverage(timeline, boundaries, lifecycle);
+});
+
+test("given a setup application is observed once before replacement, when coverage is read, then the browser run still decides", () => {
+  // given
+  const { timeline, boundaries, lifecycle } = attempt({ applicationRestartsAfterSample: 1 });
 
   // when / then
   validateResourceCoverage(timeline, boundaries, lifecycle);

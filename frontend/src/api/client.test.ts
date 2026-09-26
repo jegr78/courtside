@@ -417,15 +417,12 @@ it("given a name fragment, when searching participant members, then the url carr
   expect(requested?.pathname).toBe("/api/public/participant-members");
 });
 
-it("given a snapshot file, when creating a preview, then both parts go out under a boundary the browser chose", async () => {
+it("given a snapshot file, when creating a preview, then multipart fields are sent without overriding the browser boundary", async () => {
   // given
-  let contentType: string | null = "unset";
-  let body = "";
-  server.use(http.post("/api/admin/import/sources/s1/previews", async ({ request }) => {
-    contentType = request.headers.get("Content-Type");
-    body = await request.text();
-    return HttpResponse.json({ previewId: "p1" }, { status: 201 });
-  }));
+  document.cookie = "XSRF-TOKEN=csrf-token; Path=/";
+  const send = vi.spyOn(globalThis, "fetch").mockResolvedValue(HttpResponse.json(
+    { previewId: "p1" }, { status: 201 }
+  ));
   const file = new File(["externalId,firstName\n4711,Jane\n"], "roster.csv", { type: "text/csv" });
 
   // when
@@ -433,12 +430,15 @@ it("given a snapshot file, when creating a preview, then both parts go out under
 
   // then
   expect(preview.previewId).toBe("p1");
-  expect(contentType).toMatch(/^multipart\/form-data; boundary=/);
-  expect(body).toContain('name="file"');
-  expect(body).toContain('name="mode"');
-  expect(body).toContain("UPDATE_ONLY");
-  expect(body).toContain('name="encoding"');
-  expect(body).toContain("WINDOWS_1252");
+  expect(send).toHaveBeenCalledOnce();
+  const [path, init] = send.mock.calls[0];
+  expect(path).toBe("/api/admin/import/sources/s1/previews");
+  expect(new Headers(init?.headers).has("Content-Type")).toBe(false);
+  expect(new Headers(init?.headers).get("X-XSRF-TOKEN")).toBe("csrf-token");
+  const form = init?.body as FormData;
+  expect(form.get("file")).toBe(file);
+  expect(form.get("mode")).toBe("UPDATE_ONLY");
+  expect(form.get("encoding")).toBe("WINDOWS_1252");
 });
 
 it("given a name fragment, when searching the roster, then the criteria are the body and the url is bare", async () => {
