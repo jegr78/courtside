@@ -200,8 +200,8 @@ public class SecurityConfiguration {
                                             request.getHeader("User-Agent")).name());
                             if (authentication.getPrincipal() instanceof CourtsideUserDetails user) {
                                 securityEvents.authenticationSucceeded(user.accountId());
-                                signIns.signedIn(user.accountId());
                                 recentAuthentication.record(request);
+                                signIns.signedIn(user.accountId());
                             }
                             if (authentication.getAuthorities().stream().anyMatch(authority ->
                                     authority.getAuthority().equals(
