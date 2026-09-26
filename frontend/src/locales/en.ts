@@ -527,6 +527,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.statistics.utilisation.noOpenTime": "No bookable time was left in this period, so there is no occupancy.",
   "admin.statistics.utilisation.openNote": "Open time counts every day of the period with the opening hours as they are configured today.",
   "admin.statistics.progression.WEEK": "Week by week",
+  "admin.statistics.progression.booked": "{{booked}} booked",
   "admin.statistics.progression.MONTH": "Month by month",
   "admin.statistics.hours.heading": "By weekday and hour",
   "admin.statistics.hours.explain": "Occupancy of each hour starting at the time shown. Empty cells lie outside the opening hours.",

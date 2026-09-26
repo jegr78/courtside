@@ -525,6 +525,7 @@ const de = {
   "admin.statistics.utilisation.noOpenTime": "In diesem Zeitraum blieb keine buchbare Zeit, daher gibt es keine Belegung.",
   "admin.statistics.utilisation.openNote": "Die Öffnungszeit rechnet jeden Tag des Zeitraums mit den Öffnungszeiten, wie sie heute eingestellt sind.",
   "admin.statistics.progression.WEEK": "Verlauf je Woche",
+  "admin.statistics.progression.booked": "{{booked}} gebucht",
   "admin.statistics.progression.MONTH": "Verlauf je Monat",
   "admin.statistics.hours.heading": "Nach Wochentag und Uhrzeit",
   "admin.statistics.hours.explain": "Belegung je Stunde, die zur genannten Uhrzeit beginnt. Leere Felder liegen außerhalb der Öffnungszeiten.",

@@ -91,7 +91,7 @@ export function UtilisationSection({ from, to, onAnswered }: {
           <KeyFigure testId="statistics-closed" label={t("admin.statistics.utilisation.closed")} format={format}
             value={format.duration(totals.closedMinutes)}
             kind="duration" current={totals.closedMinutes} previous={previous?.closedMinutes} />
-          <KeyFigure testId="statistics-allocations" label={t("admin.statistics.utilisation.bookings")} format={format}
+          <KeyFigure testId="statistics-booking-count" label={t("admin.statistics.utilisation.bookings")} format={format}
             value={format.count(report.cards.filter((card) => !card.closure).reduce((sum, card) => sum + card.bookings, 0))} />
         </KeyFigures>
         {totals.occupancy === null && <p data-testid="statistics-no-open-time">{t("admin.statistics.utilisation.noOpenTime")}</p>}
@@ -103,7 +103,7 @@ export function UtilisationSection({ from, to, onAnswered }: {
             label: formatDateRange(bucket.startsOn, bucket.endsOn, format.language),
             ratio: bucket.totals.occupancy,
             value: bucket.totals.occupancy === null ? "-" : format.percent(bucket.totals.occupancy),
-            detail: t("admin.statistics.utilisation.booked") + " " + format.duration(bucket.totals.bookedMinutes)
+            detail: t("admin.statistics.progression.booked", { booked: format.duration(bucket.totals.bookedMinutes) })
           }))} />
         <HourTable hours={report.hours} format={format} />
         <BarList testId="statistics-courts" heading={t("admin.statistics.courts.heading")}

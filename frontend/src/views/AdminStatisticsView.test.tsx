@@ -163,7 +163,7 @@ describe("AdminStatisticsView", () => {
     expect(screen.getByTestId("statistics-booked-change")).toHaveTextContent("+25% against the period before");
     expect(screen.getByTestId("statistics-closed-change")).toHaveAttribute("data-direction", "none");
     expect(screen.getByTestId("statistics-closed-change")).toHaveTextContent("Unchanged against the period before");
-    expect(screen.getByTestId("statistics-allocations-value")).toHaveTextContent("12");
+    expect(screen.getByTestId("statistics-booking-count-value")).toHaveTextContent("12");
     expect(screen.getByTestId("statistics-open-note")).toHaveTextContent("opening hours as they are configured today");
   });
 
@@ -281,6 +281,7 @@ describe("AdminStatisticsView", () => {
     expect(within(screen.getByTestId("statistics-progression")).getByRole("heading")).toHaveTextContent("Week by week");
     expect(screen.getByTestId("statistics-bucket-2026-02-02-value")).toHaveTextContent("40%");
     expect(screen.getByTestId("statistics-bucket-2026-02-02-bar")).toHaveStyle({ width: "40%" });
+    expect(screen.getByTestId("statistics-bucket-2026-02-02")).toHaveTextContent("15:00 booked");
   });
 
   it("given bookings, members and messages, when their sections show, then every figure and stored name is there as text", async () => {
