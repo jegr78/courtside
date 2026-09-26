@@ -661,3 +661,29 @@ it("given a repeated write, when it goes out again, then it carries the same bod
   expect(seen[1]).toEqual(seen[0]);
   expect(seen[1].key).toBe("attempt-1");
 });
+
+it("given a period, when reading each statistics section, then the section is asked for exactly that period", async () => {
+  // given
+  const asked: string[] = [];
+  server.use(http.get("/api/admin/statistics/:section", ({ request }) => {
+    asked.push(new URL(request.url).pathname + new URL(request.url).search);
+    return HttpResponse.json({});
+  }));
+  const period = { from: "2026-05-04", to: "2026-05-10" };
+
+  // when
+  await api.utilisationStatistics(period);
+  await api.bookingStatistics(period);
+  await api.memberStatistics(period);
+  await api.messageStatistics();
+  await api.statisticsRange();
+
+  // then
+  expect(asked).toEqual([
+    "/api/admin/statistics/utilisation?from=2026-05-04&to=2026-05-10",
+    "/api/admin/statistics/bookings?from=2026-05-04&to=2026-05-10",
+    "/api/admin/statistics/members?from=2026-05-04&to=2026-05-10",
+    "/api/admin/statistics/messages",
+    "/api/admin/statistics/range"
+  ]);
+});

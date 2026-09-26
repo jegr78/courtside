@@ -132,6 +132,8 @@ tags:
     description: Recent bounded diagnostics from the reference deployment.
   - name: admin-subject-access
     description: Answering what this instance holds about one named person.
+  - name: admin-statistics
+    description: How the club is doing over a period, as aggregates that name nobody.
 
 security:
   - sessionCookie: []
@@ -179,6 +181,21 @@ components:
       in: query
       required: false
       schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+    StatisticsFrom:
+      name: from
+      in: query
+      required: false
+      description: |
+        The first day of the period, inclusive, in the club time zone. Given together with `to` or
+        not at all; without both the period is the last full calendar month. Both dates lie in the
+        years 0001 to 9999 and the period spans at most 36,525 days, a hundred years.
+      schema: { type: string, format: date }
+    StatisticsTo:
+      name: to
+      in: query
+      required: false
+      description: The last day of the period, inclusive, in the club time zone.
+      schema: { type: string, format: date }
 
   schemas:
 
@@ -2193,6 +2210,370 @@ components:
         courts:
           type: array
           items: { $ref: "#/components/schemas/CourtUtilisation" }
+
+    StatisticsPeriod:
+      type: object
+      description: An inclusive range of local dates in `timeZone`.
+      required: [from, to, timeZone]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        timeZone: { type: string }
+
+    StatisticsRange:
+      type: object
+      required: [firstBookingOn, today, timeZone]
+      properties:
+        firstBookingOn: { type: [string, "null"], format: date }
+        today: { type: string, format: date }
+        timeZone: { type: string }
+
+    UtilisationTotals:
+      type: object
+      required: [openMinutes, courtCount, capacityMinutes, closedMinutes, bookedMinutes, occupancy]
+      properties:
+        openMinutes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: |
+            Minutes the facility was open, from the current weekly opening hours read as wall-clock
+            time in the club time zone; a day that changes to or from daylight saving time counts
+            the minutes that elapsed.
+        courtCount:
+          type: integer
+          format: int32
+          minimum: 0
+          description: |
+            Courts active now, plus inactive courts that held a confirmed allocation in the scope
+            these totals cover.
+        capacityMinutes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: "`openMinutes` times `courtCount`."
+        closedMinutes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Confirmed closure minutes inside open time, over every court.
+        bookedMinutes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Confirmed minutes of every other card inside open time, over every court.
+        occupancy:
+          type: [number, "null"]
+          format: double
+          minimum: 0
+          maximum: 1
+          description: |
+            `bookedMinutes / (capacityMinutes - closedMinutes)`, and `null` when no court time was
+            left to book.
+
+    PreviousUtilisation:
+      type: object
+      description: The same totals for the equally long period that ends the day before `from`.
+      required: [period, totals]
+      properties:
+        period: { $ref: "#/components/schemas/StatisticsPeriod" }
+        totals: { $ref: "#/components/schemas/UtilisationTotals" }
+
+    CourtStatistics:
+      type: object
+      required: [courtId, courtNumber, courtName, active, bookings, closedMinutes, bookedMinutes, occupancy]
+      properties:
+        courtId: { type: string, format: uuid }
+        courtNumber: { type: integer, format: int32, minimum: 1, maximum: 999 }
+        courtName: { type: [string, "null"] }
+        active: { type: boolean }
+        bookings:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Distinct confirmed bookings other than closures holding this court in the period.
+        closedMinutes: { type: integer, format: int64, minimum: 0 }
+        bookedMinutes: { type: integer, format: int64, minimum: 0 }
+        occupancy:
+          type: [number, "null"]
+          format: double
+          minimum: 0
+          maximum: 1
+          description: "`bookedMinutes / (openMinutes - closedMinutes)` for this court."
+
+    CardUtilisation:
+      type: object
+      required: [cardId, label, color, closure, bookings, minutes]
+      properties:
+        cardId: { type: string, format: uuid }
+        label: { type: string }
+        color: { type: string }
+        closure:
+          type: boolean
+          description: True for the card whose minutes are `closedMinutes`.
+        bookings:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Distinct confirmed bookings under this card holding a court in the period.
+        minutes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Their minutes inside open time.
+
+    HourUtilisation:
+      type: object
+      description: |
+        One hour of the club-local week. A day that falls back from daylight saving time passes
+        the repeated hour twice and counts both.
+      required: [isoWeekday, hour, openMinutes, closedMinutes, bookedMinutes, occupancy]
+      properties:
+        isoWeekday: { type: integer, format: int32, minimum: 1, maximum: 7 }
+        hour: { type: integer, format: int32, minimum: 0, maximum: 23 }
+        openMinutes:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Facility open minutes in this hour over the period, for one court.
+        closedMinutes: { type: integer, format: int64, minimum: 0 }
+        bookedMinutes: { type: integer, format: int64, minimum: 0 }
+        occupancy:
+          type: [number, "null"]
+          format: double
+          minimum: 0
+          maximum: 1
+          description: "`bookedMinutes / (openMinutes * courtCount - closedMinutes)`."
+
+    UtilisationBucket:
+      type: object
+      required: [startsOn, endsOn, totals]
+      properties:
+        startsOn: { type: string, format: date }
+        endsOn: { type: string, format: date }
+        totals: { $ref: "#/components/schemas/UtilisationTotals" }
+
+    UtilisationProgression:
+      type: object
+      required: [granularity, buckets]
+      properties:
+        granularity:
+          type: string
+          enum: [WEEK, MONTH]
+        buckets:
+          type: array
+          items: { $ref: "#/components/schemas/UtilisationBucket" }
+
+    UtilisationStatistics:
+      type: object
+      required: [period, totals, previous, courts, cards, hours, progression]
+      properties:
+        period: { $ref: "#/components/schemas/StatisticsPeriod" }
+        totals: { $ref: "#/components/schemas/UtilisationTotals" }
+        previous:
+          oneOf:
+            - $ref: "#/components/schemas/PreviousUtilisation"
+            - type: "null"
+          description: "`null` when the preceding period would start before the year 0001."
+        courts:
+          type: array
+          description: Every court in number order.
+          items: { $ref: "#/components/schemas/CourtStatistics" }
+        cards:
+          type: array
+          description: Every booking card, active or not.
+          items: { $ref: "#/components/schemas/CardUtilisation" }
+        hours:
+          type: array
+          description: All 168 hours of the week, Monday 0 o'clock first.
+          items: { $ref: "#/components/schemas/HourUtilisation" }
+        progression: { $ref: "#/components/schemas/UtilisationProgression" }
+
+    BookingFigures:
+      type: object
+      required: [confirmed, cancelled, cancellationRate, series, single, withGuests, guestEntries]
+      properties:
+        confirmed: { type: integer, format: int64, minimum: 0 }
+        cancelled: { type: integer, format: int64, minimum: 0 }
+        cancellationRate:
+          type: [number, "null"]
+          format: double
+          minimum: 0
+          maximum: 1
+          description: "`cancelled / (confirmed + cancelled)`, and `null` without any booking."
+        series:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Confirmed bookings that are an occurrence of a series.
+        single: { type: integer, format: int64, minimum: 0 }
+        withGuests:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Confirmed bookings with at least one guest.
+        guestEntries:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Guest entries across the confirmed bookings.
+
+    PreviousBookingFigures:
+      type: object
+      required: [period, figures]
+      properties:
+        period: { $ref: "#/components/schemas/StatisticsPeriod" }
+        figures: { $ref: "#/components/schemas/BookingFigures" }
+
+    ParticipantCardUse:
+      type: object
+      required: [cardId, label, uses]
+      properties:
+        cardId: { type: string, format: uuid }
+        label: { type: string }
+        uses:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Participant slots this card filled in confirmed bookings.
+
+    BookingStatistics:
+      type: object
+      required: [period, figures, previous, participantCards]
+      properties:
+        period: { $ref: "#/components/schemas/StatisticsPeriod" }
+        figures: { $ref: "#/components/schemas/BookingFigures" }
+        previous:
+          oneOf:
+            - $ref: "#/components/schemas/PreviousBookingFigures"
+            - type: "null"
+          description: "`null` when the preceding period would start before the year 0001."
+        participantCards:
+          type: array
+          description: Every participant card, active or not.
+          items: { $ref: "#/components/schemas/ParticipantCardUse" }
+
+    MemberFigures:
+      type: object
+      required: [members, joins, leavings, activeMembers, activeShare]
+      properties:
+        members:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Memberships running on the period's last day.
+        joins:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Memberships that started in the period.
+        leavings:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Memberships that ended in the period.
+        activeMembers: { type: integer, format: int64, minimum: 0 }
+        activeShare:
+          type: [number, "null"]
+          format: double
+          minimum: 0
+          maximum: 1
+          description: "`activeMembers / members`, and `null` without members."
+
+    PreviousMemberFigures:
+      type: object
+      required: [period, figures]
+      properties:
+        period: { $ref: "#/components/schemas/StatisticsPeriod" }
+        figures: { $ref: "#/components/schemas/MemberFigures" }
+
+    MembershipTypeCount:
+      type: object
+      required: [membershipTypeId, name, members]
+      properties:
+        membershipTypeId: { type: string, format: uuid }
+        name: { type: string }
+        members:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Running memberships of this type on the period's last day.
+
+    AccountFigures:
+      type: object
+      description: Enabled accounts only.
+      required: [accounts, passwordChosen, withoutChosenPassword, signedInWithin30Days,
+                 signedInWithin90Days, neverSignedIn]
+      properties:
+        accounts: { type: integer, format: int64, minimum: 0 }
+        passwordChosen:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Accounts whose holder has set a password of their own.
+        withoutChosenPassword:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Accounts still awaiting, holding or past a one-time credential.
+        signedInWithin30Days:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Latest sign-in within the 30 days that end with the period's last day.
+        signedInWithin90Days: { type: integer, format: int64, minimum: 0 }
+        neverSignedIn: { type: integer, format: int64, minimum: 0 }
+
+    MemberStatistics:
+      type: object
+      required: [period, figures, previous, membershipTypes, accounts]
+      properties:
+        period: { $ref: "#/components/schemas/StatisticsPeriod" }
+        figures: { $ref: "#/components/schemas/MemberFigures" }
+        previous:
+          oneOf:
+            - $ref: "#/components/schemas/PreviousMemberFigures"
+            - type: "null"
+          description: "`null` when the preceding period would start before the year 0001."
+        membershipTypes:
+          type: array
+          description: Every membership type, active or not.
+          items: { $ref: "#/components/schemas/MembershipTypeCount" }
+        accounts: { $ref: "#/components/schemas/AccountFigures" }
+
+    MessageKindCount:
+      type: object
+      required: [kind, queued, handedOver, refused, failed]
+      properties:
+        kind: { $ref: "#/components/schemas/MessageKind" }
+        queued: { type: integer, format: int64, minimum: 0 }
+        handedOver: { type: integer, format: int64, minimum: 0 }
+        refused: { type: integer, format: int64, minimum: 0 }
+        failed: { type: integer, format: int64, minimum: 0 }
+
+    PreviousMessageCounts:
+      type: object
+      required: [period, kinds]
+      properties:
+        period: { $ref: "#/components/schemas/StatisticsPeriod" }
+        kinds:
+          type: array
+          items: { $ref: "#/components/schemas/MessageKindCount" }
+
+    MessageStatistics:
+      type: object
+      required: [period, kinds, previous]
+      properties:
+        period: { $ref: "#/components/schemas/StatisticsPeriod" }
+        kinds:
+          type: array
+          description: Every message kind, in the order `MessageKind` declares them.
+          items: { $ref: "#/components/schemas/MessageKindCount" }
+        previous:
+          oneOf:
+            - $ref: "#/components/schemas/PreviousMessageCounts"
+            - type: "null"
+          description: "`null` when the preceding period would start before the year 0001."
 
     AuditEntry:
       type: object
@@ -6207,6 +6588,166 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+
+  /api/admin/statistics/range:
+    get:
+      tags: [admin-statistics]
+      operationId: readStatisticsRange
+      summary: The dates a period covering all of the club's bookings would run between.
+      description: |
+        `firstBookingOn` is the club-local date of the earliest allocation start of any booking,
+        confirmed or cancelled, and `null` while there is none. `today` is the club-local date now.
+        Reading the sections from `firstBookingOn` to `today` covers everything the club has
+        booked. Administrators only.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The bounds of the club's booking history.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StatisticsRange" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/admin/statistics/utilisation:
+    get:
+      tags: [admin-statistics]
+      operationId: readUtilisationStatistics
+      summary: How full the courts were in a period, and when.
+      description: |
+        Open time comes from the weekly opening hours as they are configured now, because the
+        product keeps no dated opening hours and no dated court availability. For the same reason a
+        court counts towards capacity when it is active now or when it held a confirmed allocation
+        in the scope being computed: the period for the totals and the hours of the week, the
+        bucket for each progression entry. Only confirmed allocations count, and only their minutes inside open
+        time. Allocations under the shipped "court closed" card are closures: they are reported
+        as `closedMinutes` and taken out of the time a court could have been booked, so occupancy
+        is `bookedMinutes / (capacityMinutes - closedMinutes)`. An allocation crossing either end
+        of the period contributes the minutes inside it.
+
+        The period spans at most 36,525 days. The progression is bucketed by ISO week (Monday to Sunday)
+        for periods of up to 92 days and by calendar month beyond; the first and last bucket are
+        cut at the period's ends. Administrators only.
+
+        Every statistics read stops after 30 seconds of database work and answers `503` with
+        `urn:courtside:error:statement-timeout`; a shorter period is the remedy.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/StatisticsFrom"
+        - $ref: "#/components/parameters/StatisticsTo"
+      responses:
+        "200":
+          description: Utilisation of the period and of the period before it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UtilisationStatistics" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/admin/statistics/bookings:
+    get:
+      tags: [admin-statistics]
+      operationId: readBookingStatistics
+      summary: How members booked in a period.
+      description: |
+        A booking belongs to the period its earliest allocation starts in, whatever became of it
+        later; a booking over several courts counts once. Closures are not bookings of members
+        and are left out. Series, guests and participant cards are counted over confirmed bookings
+        only, because a cancelled booking was not played. Administrators only.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/StatisticsFrom"
+        - $ref: "#/components/parameters/StatisticsTo"
+      responses:
+        "200":
+          description: Booking behaviour in the period and in the period before it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookingStatistics" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/admin/statistics/members:
+    get:
+      tags: [admin-statistics]
+      operationId: readMemberStatistics
+      summary: How many members the club had at the end of a period, and how many of them played.
+      description: |
+        A membership runs on a day when it started on or before that day and has no end date or
+        ends after it. Members are counted by the membership type they hold now, because type
+        changes keep no history. An active member holds a running membership on the period's last
+        day and, in a confirmed booking starting in the period, booked it or was recorded as a
+        participant. Guests and participant cards are never members.
+
+        Account figures describe the enabled accounts as they are now; a disabled account counts in
+        none of them. `lastLoginAt` keeps only the latest sign-in, so for a period in the past the sign-in windows count the accounts whose latest
+        sign-in falls inside them. Administrators only.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/StatisticsFrom"
+        - $ref: "#/components/parameters/StatisticsTo"
+      responses:
+        "200":
+          description: Members, activity and accounts for the period.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberStatistics" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/admin/statistics/messages:
+    get:
+      tags: [admin-statistics]
+      operationId: readMessageStatistics
+      summary: What became of the messages queued in a period, per kind.
+      description: |
+        Every message kind appears, with a count per state, for the messages queued in the period.
+        Administrators only.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: "#/components/parameters/StatisticsFrom"
+        - $ref: "#/components/parameters/StatisticsTo"
+      responses:
+        "200":
+          description: Message counts for the period and the period before it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageStatistics" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/admin/messages:
     get:

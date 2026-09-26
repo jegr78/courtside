@@ -25,6 +25,8 @@ import java.util.UUID;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BookingCard {
 
+    public static final UUID COURT_CLOSED = UUID.fromString("44444444-4444-4444-4444-444444444444");
+
     @Id
     private UUID id;
 

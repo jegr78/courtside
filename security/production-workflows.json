@@ -438,12 +438,17 @@
       "actors": [
         "ADMIN"
       ],
-      "entryPoints": "Impact, utilisation, message-history, audit-log and bounded operational-log endpoints.",
+      "entryPoints": "Impact, utilisation, statistics, message-history, audit-log and bounded operational-log endpoints.",
       "operationIds": [
         "courtImpact",
         "bookingCardImpact",
         "openingHoursImpact",
         "facilityUtilisation",
+        "readStatisticsRange",
+        "readUtilisationStatistics",
+        "readBookingStatistics",
+        "readMemberStatistics",
+        "readMessageStatistics",
         "readMessageLog",
         "readAuditLog",
         "searchAuditLog",
@@ -457,7 +462,7 @@
       ],
       "alternatePaths": [
         "Impact reads page through all affected future bookings before a configuration write.",
-        "Reports use the club time zone and bounded periods.",
+        "Reports use the club time zone; utilisation reports stop at 366 days, statistics accept periods of at most 36,525 days in the years 0001 to 9999.",
         "Message and audit records expose privacy-safe event metadata to the permitted board role.",
         "Operational records come only from the fixed application, database and proxy sources and are redacted before bounded storage."
       ],
@@ -469,6 +474,11 @@
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/ImpactService.java",
         "src/main/java/org/courtside/booking/internal/FacilityUtilisationService.java",
+        "src/main/java/org/courtside/reporting/internal/StatisticsService.java",
+        "src/main/java/org/courtside/booking/internal/BookingStatisticsService.java",
+        "src/main/java/org/courtside/member/internal/MembershipStatisticsService.java",
+        "src/main/java/org/courtside/identity/internal/AccountStatisticsService.java",
+        "src/main/java/org/courtside/notification/internal/MessageStatisticsService.java",
         "src/main/java/org/courtside/audit/internal/AuditService.java",
         "src/main/java/org/courtside/notification/internal/MessageLogService.java",
         "src/main/java/org/courtside/operations/internal/OperationalLogService.java",
@@ -477,7 +487,9 @@
       "evidence": [
         "src/test/java/org/courtside/booking/web/ImpactControllerTest.java#givenACursorFromAnotherCourt_whenRequestingImpact_thenNoPositionedBookingsAreDisclosed",
         "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenTheEndPrecedesTheStart_whenReportingUtilisation_thenThePeriodViolationIsReturned",
-        "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused"
+        "src/test/java/org/courtside/operations/OperationalLogAdminControllerTest.java#givenAMemberOrMissingCsrf_whenSearching_thenAccessIsRefused",
+        "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAnEndBeforeTheStart_whenReadingUtilisation_thenThePeriodOrderIsRefused",
+        "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenMembersWhoPlayedLeftOrOnlyCancelled_whenReadingLastMonth_thenOnlyRunningPlayersAreActive"
       ]
     },
     {
