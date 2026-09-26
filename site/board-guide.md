@@ -10,7 +10,7 @@ Nur aktive Konten mit der Rolle **Administrator** können die Verwaltung öffnen
 erscheint *Verwaltung* in der Hauptnavigation. Andere Konten erhalten auch über eine direkt
 eingegebene Adresse keinen Zugriff.
 
-Die Seitenleiste ordnet die Verwaltung in vier Bereiche:
+Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter in vier Bereiche:
 
 | Bereich | Inhalt |
 |---|---|
@@ -22,6 +22,19 @@ Die Seitenleiste ordnet die Verwaltung in vier Bereiche:
 Über dieselbe Leiste kehrst du zum Platzplan zurück.
 
 ![Die Verwaltungsnavigation mit den vier Bereichen und dem Link zum Platzplan.](screenshots/de/admin-navigation.png)
+
+## Die Übersicht
+
+Die Verwaltung öffnet mit der *Übersicht*. Sie zeigt die heutigen Buchungen und die, die noch
+anstehen, die Personen ohne eigenes Passwort, abgelehnte oder fehlgeschlagene Nachrichten und die
+letzten Änderungen. Jeder Teil führt zu der Seite, auf der du weiterarbeitest, schon passend
+gefiltert.
+
+Solange ein erforderlicher Schritt der Einrichtung offen ist, steht die Einrichtung aufgeklappt
+ganz oben. Sind alle erledigt, fasst die Übersicht sie in einer Zeile zusammen. Ein Klick darauf
+klappt die Schritte wieder auf.
+
+![Die Übersicht mit den heutigen Buchungen, Konten ohne eigenes Passwort, Nachrichten und Änderungen.](screenshots/de/admin-overview.png)
 
 ## Änderungen speichern
 
@@ -45,8 +58,9 @@ Ihre Beschriftung sagt, was sie tut.
 
 ## Der geführte Weg: Einrichtung
 
-Öffne *Verein → Einrichtung*. Die Übersicht prüft den aktuellen Stand und kennzeichnet jeden
-Schritt als abgeschlossen, offen oder optional.
+Öffne *Verein → Einrichtung*. Die Checkliste prüft den aktuellen Stand und kennzeichnet jeden
+Schritt als abgeschlossen, offen oder optional. Ein Haken steht für abgeschlossen, ein Pfeil für
+offen und ein Kreis für optional.
 
 Arbeite die Schritte in dieser Reihenfolge ab:
 
@@ -58,10 +72,10 @@ Arbeite die Schritte in dieser Reihenfolge ab:
 5. **Mitglieder importieren.** Dieser Schritt ist nur nötig, wenn eine andere
    Mitgliederverwaltung die führende Liste enthält.
 
-Du kannst die Übersicht jederzeit verlassen. Beim nächsten Öffnen ermittelt Courtside den Stand
+Du kannst die Checkliste jederzeit verlassen. Beim nächsten Öffnen ermittelt Courtside den Stand
 neu.
 
-![Die Einrichtungsübersicht mit fünf Schritten und deren Status.](screenshots/de/admin-setup.png)
+![Die Checkliste der Einrichtung mit fünf Schritten und deren Status.](screenshots/de/admin-setup.png)
 
 ## Verein → Vereinsprofil
 

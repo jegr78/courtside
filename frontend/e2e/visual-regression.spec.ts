@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { type Locator, type Page } from "@playwright/test";
-import { expect, selectPreference, test } from "./fixtures";
+import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectPreference, test } from "./fixtures";
 
 // Locale, theme, viewport and timezone are fixed here; the renderer is fixed by the project,
 // which draws in the pinned image rather than in whatever browser the host provides.
@@ -74,7 +74,7 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
     page.getByTestId("move-preview").locator("li p"));
 });
 
-test("stable administration surfaces match their reviewed baselines", async ({ page }) => {
+test("stable administration surfaces match their reviewed baselines", async ({ page, journeyService }) => {
   // given
   await signIn(page, "configuration-admin");
 
@@ -83,11 +83,23 @@ test("stable administration surfaces match their reviewed baselines", async ({ p
 
   // when — every gate below waits for something the view renders only once its data arrived,
   // never for the section itself, which is on screen while the request is still in flight
+  await onTheVisualDay(page, journeyService.visualDate);
   await page.getByTestId("administration-link").click();
-  await expect(page.getByTestId("setup-progress")).toBeVisible();
+  await expectAdministrationOverview(page);
+  await expect(page.getByTestId("overview-today-entry").first()).toBeVisible();
 
   // then
   await stableScreenshot(page.getByTestId("admin-navigation"), "admin-navigation.png");
+  await stableScreenshot(page.getByTestId("admin-overview-view"), "admin-overview.png");
+
+  // when
+  await backAtTheJourneyInstant(page);
+
+  // when
+  await page.getByTestId("admin-setup-link").click();
+  await expect(page.getByTestId("setup-progress")).toBeVisible();
+
+  // then
   await stableScreenshot(page.getByTestId("admin-setup-view"), "admin-setup.png");
 
   // when

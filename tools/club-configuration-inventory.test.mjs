@@ -7,7 +7,7 @@ const require = createRequire(new URL("../frontend/package.json", import.meta.ur
 const yaml = require("js-yaml");
 
 const document = yaml.load(readFileSync(new URL("../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
-const setupView = readFileSync(new URL("../frontend/src/views/AdminSetupView.tsx", import.meta.url), "utf8");
+const setupView = readFileSync(new URL("../frontend/src/views/setup/useSetupSteps.ts", import.meta.url), "utf8");
 const configurationRequest = readFileSync(
   new URL("../frontend/src/views/configuration/clubConfigForm.ts", import.meta.url), "utf8");
 
@@ -46,7 +46,7 @@ test("given a field a board configures, when the setup step judges the club, the
   assert.deepEqual(
     listedFields(setupView, "const factoryConfiguration", 2).toSorted(),
     declaredFields("AdminClubConfig").filter((field) => !derived.includes(field)).toSorted(),
-    "AdminSetupView's factory configuration has drifted from AdminClubConfig");
+    "useSetupSteps's factory configuration has drifted from AdminClubConfig");
 });
 
 test("given a field a board may change, when the configuration form submits, then the editable list names it", () => {

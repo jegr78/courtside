@@ -77,7 +77,9 @@ membership and sending credentials.
 
 ## Accessibility
 
-Colour is never the sole carrier of state. Interactive controls retain visible keyboard focus,
+Colour is never the sole carrier of state. A setup step's badge adds a symbol and an outline to
+its tone: a check mark on a solid border when complete, an arrow on a heavier border while open and
+a circle on a dashed border when optional. Interactive controls retain visible keyboard focus,
 and reduced-motion preferences suppress non-essential transitions. Times use tabular numerals.
 Modal surfaces, inputs and controls consume the same semantic tokens as the page instead of
 maintaining theme-specific component variants.

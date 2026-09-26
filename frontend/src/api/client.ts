@@ -116,6 +116,7 @@ export interface RosterCriteria {
   cursor?: string;
   limit?: number;
   membershipTypeId?: string;
+  currentMembers?: boolean;
   role?: Role;
   credentialStates?: CredentialState[];
   sortBy?: RosterSortField;
@@ -338,12 +339,13 @@ export const api = {
   setParticipantCardActive: (id: string, active: boolean) => request<ParticipantCard>(`/api/admin/participant-cards/${id}/active`, {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
-  roster: ({ query, cursor, limit = 50, membershipTypeId, role, credentialStates,
+  roster: ({ query, cursor, limit = 50, membershipTypeId, currentMembers, role, credentialStates,
     sortBy = "NAME", sortDirection = "ASC" }: RosterCriteria = {}) => request<RosterPage>(
     "/api/admin/roster-search", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ limit, ...(query ? { query } : {}), ...(cursor ? { cursor } : {}),
-        ...(membershipTypeId ? { membershipTypeId } : {}), ...(role ? { role } : {}),
+        ...(membershipTypeId ? { membershipTypeId } : {}), ...(currentMembers ? { currentMembers } : {}),
+        ...(role ? { role } : {}),
         ...(credentialStates?.length ? { credentialStates } : {}), sortBy, sortDirection })
     }
   ),

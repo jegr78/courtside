@@ -296,10 +296,14 @@ describe("AppRoutes", () => {
 
     // then
     expect(screen.getByTestId("primary-navigation")).toBeInTheDocument();
-    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin/setup");
+    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin");
   });
 
-  it.each(["/login", "/admin"])("given an administrator, when opening %s, then setup is the next step", async (address) => {
+  it.each([
+    ["/login", "admin-overview-view"],
+    ["/admin", "admin-overview-view"],
+    ["/admin/setup", "admin-setup-view"]
+  ])("given an administrator of an unfinished instance, when opening %s, then setup is the next step", async (address, view) => {
     // given
     vi.spyOn(api, "adminConfig").mockResolvedValue({
       clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
@@ -313,6 +317,10 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "membershipTypes").mockResolvedValue([]);
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null, matching: 0 });
     vi.spyOn(api, "importSources").mockResolvedValue([]);
+    vi.spyOn(api, "allocations").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "courts").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "messages").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "audit").mockReturnValue(new Promise<never>(() => undefined));
 
     // when
     render(<RoutedShell initialEntries={[address]}><AppRoutes session={{
@@ -324,7 +332,8 @@ describe("AppRoutes", () => {
     }} refreshSession={() => Promise.resolve()} passwordChanged={address === "/login"} /></RoutedShell>);
 
     // then
-    expect(await screen.findByTestId("admin-setup-view")).toBeInTheDocument();
+    expect(await screen.findByTestId(view)).toBeInTheDocument();
+    expect(await screen.findByTestId("setup-progress"), "an unfinished setup is on screen, not folded away").toBeVisible();
     expect(screen.getByTestId("setup-progress")).toHaveTextContent("1 von 4");
   });
 

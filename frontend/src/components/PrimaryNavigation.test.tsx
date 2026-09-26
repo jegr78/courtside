@@ -89,7 +89,7 @@ describe("PrimaryNavigation", () => {
   // The destinations themselves live in the administration's own navigation, not in this bar.
   it("given an administrator, when rendered, then administration is offered as one destination", () => {
     show(administrator);
-    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin/setup");
+    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin");
     for (const destination of adminDestinations) {
       expect(screen.queryByTestId(destination)).not.toBeInTheDocument();
     }

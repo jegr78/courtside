@@ -21,14 +21,14 @@ public class RosterListQuery {
 
     private final JdbcClient jdbc;
 
-    public List<UUID> findIds(String nameFragment, UUID membershipTypeId, Role role,
+    public List<UUID> findIds(String nameFragment, UUID membershipTypeId, boolean currentMembersOnly, Role role,
                               Set<CredentialState> credentialStates, Instant now,
                               RosterService.SortField field,
                               RosterService.SortDirection direction,
                               UUID cursor, int limit) {
         Map<String, Object> parameters = new HashMap<>();
-        String roster = roster(criteria(nameFragment, membershipTypeId, role, credentialStates, now,
-                parameters));
+        String roster = roster(criteria(nameFragment, membershipTypeId, currentMembersOnly, role,
+                credentialStates, now, parameters));
         if (cursor != null) {
             parameters.put("cursor", cursor);
             Integer matches = jdbc.sql(roster + " SELECT count(*) FROM roster WHERE id = :cursor")
@@ -48,16 +48,16 @@ public class RosterListQuery {
                 .params(parameters).query(UUID.class).list();
     }
 
-    public long count(String nameFragment, UUID membershipTypeId, Role role,
+    public long count(String nameFragment, UUID membershipTypeId, boolean currentMembersOnly, Role role,
                       Set<CredentialState> credentialStates, Instant now) {
         Map<String, Object> parameters = new HashMap<>();
-        String roster = roster(criteria(nameFragment, membershipTypeId, role, credentialStates, now,
-                parameters));
+        String roster = roster(criteria(nameFragment, membershipTypeId, currentMembersOnly, role,
+                credentialStates, now, parameters));
         return jdbc.sql(roster + " SELECT count(*) FROM roster")
                 .params(parameters).query(Long.class).single();
     }
 
-    private static String criteria(String nameFragment, UUID membershipTypeId, Role role,
+    private static String criteria(String nameFragment, UUID membershipTypeId, boolean currentMembersOnly, Role role,
                                    Set<CredentialState> credentialStates, Instant now,
                                    Map<String, Object> parameters) {
         parameters.put("nameFragment", nameFragment);
@@ -74,6 +74,13 @@ public class RosterListQuery {
                                   AND filtered_member.ended_on IS NULL)
                     """);
             parameters.put("membershipTypeId", membershipTypeId);
+        }
+        if (currentMembersOnly) {
+            criteria.append("""
+                    AND EXISTS (SELECT 1 FROM member current_member
+                                WHERE current_member.person_id = p.id
+                                  AND current_member.ended_on IS NULL)
+                    """);
         }
         if (role != null) {
             criteria.append("""

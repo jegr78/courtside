@@ -21,6 +21,8 @@ interface Group {
   destinations: Destination[];
 }
 
+const overview: Destination = { to: "/admin", testId: "admin-overview-link", label: "nav.adminOverview" };
+
 const groups: Group[] = [
   {
     testId: "admin-group-club",
@@ -66,12 +68,12 @@ const groups: Group[] = [
 
 // A person is opened from the roster and stays part of it, so the roster stays where a board is.
 function isCurrent(destination: Destination, pathname: string): boolean {
+  if (destination === overview) return pathname.replace(/\/$/, "") === overview.to;
   return pathname === destination.to || pathname.startsWith(`${destination.to}/`);
 }
 
 function currentLabel(pathname: string): string | undefined {
-  return groups
-    .flatMap((group) => group.destinations)
+  return [overview, ...groups.flatMap((group) => group.destinations)]
     .find((destination) => isCurrent(destination, pathname))
     ?.label;
 }
@@ -129,21 +131,27 @@ export function AdminNavigation() {
       </span>
       <span data-testid="admin-menu-indicator" aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-180">▾</span>
     </summary>
-    <nav aria-label={t("nav.administration")} className="surface-panel absolute inset-x-0 top-full z-20 mt-2 grid max-h-[70vh] gap-5 overflow-y-auto rounded-xl border p-4 shadow-xl lg:static lg:mt-0 lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+    <nav aria-label={t("nav.administration")} className="surface-panel absolute inset-x-0 top-full z-20 mt-2 grid max-h-[70vh] gap-5 overflow-y-auto lg:gap-4 rounded-xl border p-4 shadow-xl lg:static lg:mt-0 lg:max-h-none lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
       <Link data-testid="court-plan-link" to="/" className="focus-ring rounded-lg font-semibold underline-offset-4">
         {t("nav.courts")}
       </Link>
+      <NavigationLink destination={overview} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />
       {groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2 lg:gap-1">
         <p id={`${group.testId}-heading`} className="text-muted text-xs font-bold tracking-wide uppercase">{t(group.heading)}</p>
-        {group.destinations.map((destination) => <Link
-          key={destination.testId}
-          to={destination.to}
-          data-testid={destination.testId}
-          aria-current={isCurrent(destination, pathname) ? "page" : undefined}
-          onClick={() => { if (!laidOpen) setUnfolded(false); }}
-          className="focus-ring rounded-lg px-3 py-2 font-semibold lg:py-1 aria-[current]:bg-(--cs-raised)"
-        >{t(destination.label)}</Link>)}
+        {group.destinations.map((destination) => <NavigationLink key={destination.testId} destination={destination}
+          pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />)}
       </div>)}
     </nav>
   </details>;
+}
+
+function NavigationLink({ destination, pathname, chosen }: { destination: Destination; pathname: string; chosen: () => void }) {
+  const { t } = useTranslation();
+  return <Link
+    to={destination.to}
+    data-testid={destination.testId}
+    aria-current={isCurrent(destination, pathname) ? "page" : undefined}
+    onClick={chosen}
+    className="focus-ring rounded-lg px-3 py-2 font-semibold lg:py-1 aria-[current]:bg-(--cs-raised)"
+  >{t(destination.label)}</Link>;
 }

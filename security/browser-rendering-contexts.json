@@ -37,6 +37,12 @@
       "sink": "option-text-and-form-value"
     },
     {
+      "id": "court-name-admin-text",
+      "journey": "stored-admin",
+      "field": "court.name",
+      "sink": "text"
+    },
+    {
       "id": "court-name-form-value",
       "journey": "stored-admin",
       "field": "court.name",

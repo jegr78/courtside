@@ -50,6 +50,7 @@ class RosterAdminController implements AdminRosterApi {
     public ResponseEntity<ApiRosterPage> searchRoster(ApiRosterSearchRequest request) {
         RosterService.RosterPage page = roster.search(request.getQuery(),
                 request.getMembershipTypeId(),
+                Boolean.TRUE.equals(request.getCurrentMembers()),
                 request.getRole() == null ? null : Role.valueOf(request.getRole().name()),
                 credentialStates(request.getCredentialStates()),
                 RosterService.SortField.valueOf(request.getSortBy().name()),

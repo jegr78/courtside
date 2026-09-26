@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, type MessageEntry } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
@@ -21,7 +21,8 @@ export function AdminMessagesView() {
   const { club, error: clubError, load: loadClub } = useClubConfiguration();
   const [entries, setEntries] = useState<MessageEntry[]>();
   const [cursor, setCursor] = useState<string>();
-  const [unsettled, setUnsettled] = useState(false);
+  const [search] = useSearchParams();
+  const [unsettled, setUnsettled] = useState(() => search.get("unsettled") === "true");
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
   const [loadAttempt, retryLoad] = useRetry();

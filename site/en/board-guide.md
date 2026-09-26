@@ -9,7 +9,7 @@ Only enabled accounts with the **Administrator** role can open the administratio
 see *Administration* in the main navigation. Other accounts cannot enter by typing the address
 directly.
 
-The sidebar divides administration into four areas:
+The sidebar leads to the overview at the top and divides administration below it into four areas:
 
 | Area | Contents |
 |---|---|
@@ -21,6 +21,17 @@ The sidebar divides administration into four areas:
 The same sidebar returns you to the court plan.
 
 ![The administration navigation with four areas and the link to the court plan.](../screenshots/en/admin-navigation.png)
+
+## The overview
+
+Administration opens on the *Overview*. It shows today's bookings and the ones still to come, the
+people without a password of their own, refused or failed messages and the latest changes. Each
+part leads to the page where you continue, already filtered.
+
+While a required setup step is still open, setup sits unfolded at the top. Once all of them are
+done, the overview sums setup up in one line. Selecting it unfolds the steps again.
+
+![The overview with today's bookings, accounts without a password of their own, messages and changes.](../screenshots/en/admin-overview.png)
 
 ## Saving changes
 
@@ -43,8 +54,8 @@ credentials. Their label says what they do.
 
 ## The guided path: Setup
 
-Open *Club → Setup*. The overview checks the current state and marks every step as complete, open or
-optional.
+Open *Club → Setup*. The checklist checks the current state and marks every step as complete, open
+or optional. A check mark stands for complete, an arrow for open and a circle for optional.
 
 Complete the steps in this order:
 
@@ -55,9 +66,9 @@ Complete the steps in this order:
 5. **Import members.** This is only needed when another membership system holds the authoritative
    list.
 
-You can leave the overview at any time. Courtside recalculates its state when you return.
+You can leave the checklist at any time. Courtside recalculates its state when you return.
 
-![The setup overview with five steps and their current state.](../screenshots/en/admin-setup.png)
+![The setup checklist with five steps and their current state.](../screenshots/en/admin-setup.png)
 
 ## Club → Club profile
 

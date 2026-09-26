@@ -1521,6 +1521,12 @@ components:
             ended does not match, even though the entry still names the type its holder last held
             — `membershipTypeId` on an entry answers "of what were they a member", and this
             field answers "of what are they one". Combining it with `query` narrows by both.
+        currentMembers:
+          type: boolean
+          default: false
+          description: |
+            Only the people who hold a membership of any type **right now**, in the sense
+            `membershipTypeId` uses. A membership that has ended does not match.
         role:
           $ref: "#/components/schemas/Role"
           description: Only people whose displayed account holds this role.

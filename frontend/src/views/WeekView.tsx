@@ -1,5 +1,6 @@
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { allocationLabel } from "../booking/allocationLabel";
 import {
   api, type Allocation, type BookingCardLegendEntry, type BookingEligibility, type BookingGrid, type PublicCourt
 } from "../api/client";
@@ -547,19 +548,6 @@ function renderCell(
   return <td key={court.id} className={`${cellClass} day-plan-free-cell p-1`}>
     {content}
   </td>;
-}
-
-function allocationLabel(
-  allocation: Allocation,
-  t: ReturnType<typeof useTranslation>["t"]
-): string {
-  if (allocation.ownBooking && allocation.showGenericOccupancy) {
-    return [t("booking.viewer"), ...(allocation.participantLastNames ?? [])].join(", ");
-  }
-  if (!allocation.showGenericOccupancy) return allocation.cardLabel;
-  return allocation.participantCount
-    ? t("booking.occupiedWithParticipants", { count: allocation.participantCount })
-    : t("booking.occupied");
 }
 
 function currentLineOffset(currentTime: string, opensAt: string, slotMinutes: number, slotHeight: number): number {

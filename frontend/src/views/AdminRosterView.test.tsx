@@ -167,6 +167,33 @@ describe("AdminRosterView", () => {
     expect(screen.queryByTestId("roster-row-person-1")).toBeNull();
   });
 
+  it("given the address asks for everybody without a password of their own, when the roster is opened, then it reads and shows that filter", async () => {
+    // given
+    vi.mocked(api.roster).mockResolvedValue({ entries: [trainer, blocked], nextCursor: null, matching: 2 });
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/roster?access=NOT_CHOSEN"]}>
+      <UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("roster-row-person-4")).toBeInTheDocument();
+    expect(api.roster).toHaveBeenCalledWith({
+      limit: 20, credentialStates: ["AWAITING_CREDENTIAL", "CREDENTIAL_ISSUED", "CREDENTIAL_EXPIRED"]
+    });
+    expect(screen.getByTestId("roster-credential-filter"), "the filter shows what the list was narrowed by").toHaveValue("NOT_CHOSEN");
+  });
+
+  it("given an access filter the address names but the roster does not offer, when the roster is opened, then it reads everybody", async () => {
+    // when
+    render(<MemoryRouter initialEntries={["/admin/roster?access=EVERYTHING"]}>
+      <UnsavedChangesProvider><AdminRosterView /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("roster-row-person-1")).toBeInTheDocument();
+    expect(api.roster).toHaveBeenCalledWith({ limit: 20 });
+    expect(screen.getByTestId("roster-credential-filter")).toHaveValue("");
+  });
+
   it("given the roster cannot load, when opening the view, then the failure replaces the loading state", async () => {
     // given
     vi.spyOn(api, "roster").mockRejectedValue(new Error("unavailable"));

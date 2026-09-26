@@ -67,7 +67,7 @@ class RosterListTest extends AbstractIntegrationTest {
 
         // when
         RosterService.RosterPage page = roster.search(
-                null, null, null, Set.of(), null, null, null, 50);
+                null, null, false, null, Set.of(), null, null, null, 50);
 
         // then
         assertThat(page.items())
@@ -133,14 +133,14 @@ class RosterListTest extends AbstractIntegrationTest {
 
         // when
         RosterService.RosterPage page = roster.search(
-                null, null, Role.TRAINER, Set.of(), RosterService.SortField.NAME,
+                null, null, false, Role.TRAINER, Set.of(), RosterService.SortField.NAME,
                 RosterService.SortDirection.ASC, null, 50);
 
         // then
         assertThat(page.items()).extracting(RosterService.RosterEntry::personId)
                 .containsExactly(trainer);
         assertThatThrownBy(() -> roster.search(
-                null, null, Role.TRAINER, Set.of(), RosterService.SortField.NAME,
+                null, null, false, Role.TRAINER, Set.of(), RosterService.SortField.NAME,
                 RosterService.SortDirection.ASC, member, 50))
                 .isInstanceOf(RosterCursorUnknownException.class);
     }
@@ -157,10 +157,10 @@ class RosterListTest extends AbstractIntegrationTest {
 
         // when
         RosterService.RosterPage first = roster.search(
-                null, null, null, Set.of(), RosterService.SortField.USERNAME,
+                null, null, false, null, Set.of(), RosterService.SortField.USERNAME,
                 RosterService.SortDirection.DESC, null, 2);
         RosterService.RosterPage second = roster.search(
-                null, null, null, Set.of(), RosterService.SortField.USERNAME,
+                null, null, false, null, Set.of(), RosterService.SortField.USERNAME,
                 RosterService.SortDirection.DESC, first.nextCursor(), 2);
 
         // then
@@ -170,10 +170,10 @@ class RosterListTest extends AbstractIntegrationTest {
                 .containsExactly("alpha");
 
         RosterService.RosterPage firstByName = roster.search(
-                null, null, null, Set.of(), RosterService.SortField.NAME,
+                null, null, false, null, Set.of(), RosterService.SortField.NAME,
                 RosterService.SortDirection.DESC, null, 2);
         RosterService.RosterPage secondByName = roster.search(
-                null, null, null, Set.of(), RosterService.SortField.NAME,
+                null, null, false, null, Set.of(), RosterService.SortField.NAME,
                 RosterService.SortDirection.DESC, firstByName.nextCursor(), 2);
         assertThat(firstByName.items()).extracting(RosterService.RosterEntry::personId)
                 .containsExactly(gamma, beta);
@@ -203,16 +203,16 @@ class RosterListTest extends AbstractIntegrationTest {
                 .containsExactly(active, disabled, noAccount);
         assertThat(sortedIds(RosterService.SortField.ROLES))
                 .containsExactly(disabled, active, noAccount);
-        assertThat(roster.search(null, adults.getId(), null, Set.of(), RosterService.SortField.USERNAME,
+        assertThat(roster.search(null, adults.getId(), false, null, Set.of(), RosterService.SortField.USERNAME,
                 RosterService.SortDirection.ASC, null, 50).items())
                 .extracting(RosterService.RosterEntry::personId)
                 .containsExactly(active);
 
         RosterService.RosterPage first = roster.search(
-                null, null, null, Set.of(), RosterService.SortField.USERNAME,
+                null, null, false, null, Set.of(), RosterService.SortField.USERNAME,
                 RosterService.SortDirection.ASC, null, 2);
         RosterService.RosterPage second = roster.search(
-                null, null, null, Set.of(), RosterService.SortField.USERNAME,
+                null, null, false, null, Set.of(), RosterService.SortField.USERNAME,
                 RosterService.SortDirection.ASC, first.nextCursor(), 2);
         assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
                 .containsExactly(active, disabled);
@@ -222,9 +222,9 @@ class RosterListTest extends AbstractIntegrationTest {
 
     private List<UUID> sortedIds(RosterService.SortField field) {
         RosterService.RosterPage first = roster.search(
-                null, null, null, Set.of(), field, RosterService.SortDirection.ASC, null, 2);
+                null, null, false, null, Set.of(), field, RosterService.SortDirection.ASC, null, 2);
         RosterService.RosterPage second = roster.search(
-                null, null, null, Set.of(), field, RosterService.SortDirection.ASC, first.nextCursor(), 2);
+                null, null, false, null, Set.of(), field, RosterService.SortDirection.ASC, first.nextCursor(), 2);
         return Stream.concat(first.items().stream(), second.items().stream())
                 .map(RosterService.RosterEntry::personId).toList();
     }
@@ -474,7 +474,7 @@ class RosterListTest extends AbstractIntegrationTest {
 
         // when
         List<RosterService.RosterEntry> everybody = roster.search(
-                null, null, null, Set.of(), null, null, null, 50).items();
+                null, null, false, null, Set.of(), null, null, null, 50).items();
 
         // then
         assertThat(idsIn(CredentialState.AWAITING_CREDENTIAL)).containsExactlyInAnyOrder(awaiting);
@@ -508,9 +508,9 @@ class RosterListTest extends AbstractIntegrationTest {
 
         // when
         RosterService.RosterPage first = roster.search(
-                null, null, null, notYetChosen, null, null, null, 2);
+                null, null, false, null, notYetChosen, null, null, null, 2);
         RosterService.RosterPage second = roster.search(
-                null, null, null, notYetChosen, null, null, first.nextCursor(), 2);
+                null, null, false, null, notYetChosen, null, null, first.nextCursor(), 2);
 
         // then
         assertThat(first.items()).extracting(RosterService.RosterEntry::personId)
@@ -531,15 +531,37 @@ class RosterListTest extends AbstractIntegrationTest {
         members.save(memberSince(janet, OTHER_MEMBERSHIP_TYPE_ID));
 
         // when
-        RosterService.RosterPage everybody = roster.search(null, null, null, Set.of(), null, null, null, 1);
-        RosterService.RosterPage named = roster.search("doe", null, null, Set.of(), null, null, null, 1);
+        RosterService.RosterPage everybody = roster.search(null, null, false, null, Set.of(), null, null, null, 1);
+        RosterService.RosterPage named = roster.search("doe", null, false, null, Set.of(), null, null, null, 1);
         RosterService.RosterPage holders = roster.search(
-                "doe", MEMBERSHIP_TYPE_ID, null, Set.of(), null, null, null, 1);
+                "doe", MEMBERSHIP_TYPE_ID, false, null, Set.of(), null, null, null, 1);
 
         // then
         assertThat(everybody.matching()).isEqualTo(3);
         assertThat(named.matching()).isEqualTo(2);
         assertThat(holders.matching()).isEqualTo(1);
+    }
+
+    @Test
+    void givenCurrentEndedAndNoMemberships_whenSearchingForCurrentMembers_thenOnlyTheCurrentOneMatches() {
+        // given
+        UUID jane = identity.createPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID john = identity.createPerson("John", "Roe", "john.roe@example.org");
+        identity.createPerson("Mary", "Major", "mary.major@example.org");
+        members.save(memberSince(jane, MEMBERSHIP_TYPE_ID));
+        Member ended = memberSince(john, OTHER_MEMBERSHIP_TYPE_ID);
+        ended.endOn(MemberFixtures.MEMBER_SINCE.plusMonths(3));
+        members.save(ended);
+
+        // when
+        RosterService.RosterPage current = roster.search(null, null, true, null, Set.of(), null, null, null, 1);
+        RosterService.RosterPage everybody = roster.search(null, null, false, null, Set.of(), null, null, null, 1);
+
+        // then
+        assertThat(current.items()).extracting(RosterService.RosterEntry::personId).containsExactly(jane);
+        assertThat(current.matching()).as("an ended membership and no membership do not count as current").isEqualTo(1);
+        assertThat(current.nextCursor()).isNull();
+        assertThat(everybody.matching()).isEqualTo(3);
     }
 
     @Test
@@ -550,9 +572,9 @@ class RosterListTest extends AbstractIntegrationTest {
         UUID displayed = identity.createAccountAwaitingCredentials(jane, "jane.doe", Set.of(Role.MEMBER));
 
         // when
-        RosterService.RosterPage awaiting = roster.search(null, null, null,
+        RosterService.RosterPage awaiting = roster.search(null, null, false, null,
                 Set.of(CredentialState.AWAITING_CREDENTIAL), null, null, null, 50);
-        RosterService.RosterPage chosen = roster.search(null, null, null,
+        RosterService.RosterPage chosen = roster.search(null, null, false, null,
                 Set.of(CredentialState.PASSWORD_CHOSEN), null, null, null, 50);
 
         // then
@@ -567,7 +589,7 @@ class RosterListTest extends AbstractIntegrationTest {
     }
 
     private List<UUID> idsIn(CredentialState state) {
-        return roster.search(null, null, null, Set.of(state), null, null, null, 50).items().stream()
+        return roster.search(null, null, false, null, Set.of(state), null, null, null, 50).items().stream()
                 .map(RosterService.RosterEntry::personId).toList();
     }
 }

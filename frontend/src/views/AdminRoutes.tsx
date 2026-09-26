@@ -9,6 +9,7 @@ import { AdminImportView } from "./AdminImportView";
 import { AdminMembershipTypesView } from "./AdminMembershipTypesView";
 import { AdminMessagesView } from "./AdminMessagesView";
 import { AdminOperationalLogsView } from "./AdminOperationalLogsView";
+import { AdminOverviewView } from "./AdminOverviewView";
 import { AdminPersonView } from "./AdminPersonView";
 import { AdminRosterView } from "./AdminRosterView";
 import { AdminSetupView } from "./AdminSetupView";
@@ -25,7 +26,7 @@ export default function AdminRoutes({ configurationChanged }: {
 }) {
   return <Routes>
     <Route element={<AdminShell />}>
-      <Route index element={<Navigate to="/admin/setup" replace />} />
+      <Route index element={<AdminOverviewView />} />
       <Route path="setup" element={<AdminSetupView />} />
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={configurationChanged} />} />
       <Route path="deadlines" element={<AdminDeadlinesView configurationChanged={configurationChanged} />} />

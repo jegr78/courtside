@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
-import { expect, selectJourneyDate, test } from "./fixtures";
+import { expect, onTheVisualDay, selectJourneyDate, test } from "./fixtures";
 import { PROXY_BOUNDARY_HOST } from "./global-setup";
 
 const payload = `<img src=x onerror="globalThis.__courtsideXss='executed'">cross-role`;
@@ -471,10 +471,21 @@ test("stored text projections remain inert on administrative and managed views",
   await expect(auditRow.getByTestId("audit-subject")).toHaveText("1");
   await expect(auditRow.getByTestId("audit-actor")).toHaveText(payload);
   await expect(auditRow.getByTestId("audit-message")).toContainText(payload);
+  await onTheVisualDay(page, journeyService.visualDate);
+  await page.goto("/admin");
+  const latestChange = page.getByTestId("overview-changes-entry").first();
+  await expect(latestChange, "the newest recorded change leads the overview as text").toContainText(payload);
+  await expect(latestChange.locator("img")).toHaveCount(0);
+  const today = page.getByTestId("overview-today");
+  await expect(today.locator('[data-testid="overview-today-entry"][data-court-id="dddddddd-0000-0000-0000-000000000003"]'),
+    "a stored court name is text on the overview").toContainText(payload);
+  await expect(today.locator('[data-testid="overview-today-entry"][data-booking-id="70000000-0000-0000-0000-000000000004"]'),
+    "a stored card label is text on the overview").toContainText(payload);
+  await expect(today.locator("img")).toHaveCount(0);
   expect(await page.evaluate(() => globalThis.__courtsideXss)).toBe("not-executed");
   expect(consoleDisclosures.some(Boolean)).toBe(false);
   await expectRenderingContexts("stored-admin", [
-    "booking-card-label", "participant-card-label", "court-name-form-value", "rule-set-name", "person-fields",
+    "booking-card-label", "participant-card-label", "court-name-admin-text", "court-name-form-value", "rule-set-name", "person-fields",
     "account-username", "membership-type-name", "import-source-name", "external-reference-id",
     "booking-note", "guest-name", "audit-projection"
   ]);

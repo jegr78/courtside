@@ -63,7 +63,7 @@ describe("AdminSetupView", () => {
     vi.spyOn(api, "membershipTypes").mockResolvedValue([
       { id: "type-1", name: "Adults", ruleSetId: null, active: true, grantsAccount: false }
     ]);
-    vi.spyOn(api, "roster").mockResolvedValue({ entries: [currentMember], nextCursor: null, matching: 0 });
+    vi.spyOn(api, "roster").mockResolvedValue({ entries: [currentMember], nextCursor: null, matching: 1 });
     vi.spyOn(api, "importSources").mockResolvedValue([]);
   });
 
@@ -168,11 +168,9 @@ describe("AdminSetupView", () => {
     expect(screen.getByTestId("setup-step-facility")).toHaveAttribute("data-state", "next");
   });
 
-  it("given a later roster page fails, when setup is opened, then incomplete membership evidence is not presented", async () => {
+  it("given the roster cannot be read, when setup is opened, then incomplete membership evidence is not presented", async () => {
     // given
-    vi.mocked(api.roster)
-      .mockResolvedValueOnce({ entries: [], nextCursor: "page-2", matching: 0 })
-      .mockRejectedValueOnce(new Error("unavailable"));
+    vi.mocked(api.roster).mockRejectedValueOnce(new Error("unavailable"));
 
     // when
     render(<MemoryRouter><AdminSetupView /></MemoryRouter>);
@@ -182,11 +180,9 @@ describe("AdminSetupView", () => {
     expect(screen.queryByTestId("setup-progress")).not.toBeInTheDocument();
   });
 
-  it("given a current member on a later page, when setup is opened, then the roster step is complete", async () => {
+  it("given a large roster with current members, when setup is opened, then one request for a single current member decides the step", async () => {
     // given
-    vi.mocked(api.roster)
-      .mockResolvedValueOnce({ entries: [{ ...currentMember, membershipEndedOn: "2026-08-31" }], nextCursor: "page-2", matching: 0 })
-      .mockResolvedValueOnce({ entries: [currentMember], nextCursor: "page-3", matching: 0 });
+    vi.mocked(api.roster).mockResolvedValue({ entries: [currentMember], nextCursor: currentMember.personId, matching: 1200 });
 
     // when
     render(<MemoryRouter><AdminSetupView /></MemoryRouter>);
@@ -194,8 +190,31 @@ describe("AdminSetupView", () => {
     // then
     await screen.findByTestId("setup-progress");
     expect(screen.getByTestId("setup-step-roster")).toHaveAttribute("data-state", "complete");
-    expect(api.roster).toHaveBeenNthCalledWith(2, { cursor: "page-2", limit: 200 });
-    expect(api.roster).toHaveBeenCalledTimes(2);
+    expect(api.roster).toHaveBeenCalledWith({ limit: 1, currentMembers: true });
+    expect(api.roster, "the roster is not paged through to find one current member").toHaveBeenCalledTimes(1);
+  });
+
+  it("given a complete, an open and an optional step, when setup is read, then each badge carries its state in a mark and an outline", async () => {
+    // given
+    vi.mocked(api.membershipTypes).mockResolvedValue([]);
+
+    // when
+    render(<MemoryRouter><AdminSetupView /></MemoryRouter>);
+
+    // then
+    await screen.findByTestId("setup-progress");
+    const badge = (step: string) => within(screen.getByTestId(`setup-step-${step}`)).getByTestId("setup-state-badge");
+    const mark = (step: string) => within(badge(step)).getByTestId("setup-state-mark");
+    expect(badge("configuration")).toHaveAttribute("data-state", "complete");
+    expect(badge("membership-types")).toHaveAttribute("data-state", "next");
+    expect(badge("import")).toHaveAttribute("data-state", "optional");
+    expect(new Set([mark("configuration"), mark("membership-types"), mark("import")].map((element) => element.textContent)).size,
+      "every state has a symbol of its own that survives forced colours").toBe(3);
+    expect(badge("membership-types"), "an open step is outlined heavier than a complete one").toHaveClass("border-2");
+    expect(badge("configuration")).not.toHaveClass("border-2");
+    expect(badge("import"), "an optional step is outlined dashed").toHaveClass("border-dashed");
+    expect(badge("configuration").className, "a complete step is not drawn like an open one")
+      .not.toEqual(badge("membership-types").className);
   });
 
   it("given the setup state is available, when its steps are read, then every one links to its working surface", async () => {

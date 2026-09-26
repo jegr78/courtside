@@ -55,6 +55,35 @@ describe("AdminMessagesView", () => {
     await i18n.changeLanguage("en");
   });
 
+  it("given the address asks for refused and failed messages, when the log is opened, then only those are read and the filter says so", async () => {
+    // given
+    vi.spyOn(api, "messages").mockResolvedValue({ entries: [refused], nextCursor: null });
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/messages?unsettled=true"]}>
+      <WithClubConfiguration club={clubConfig}><AdminMessagesView /></WithClubConfiguration></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("message-row")).toHaveAttribute("data-state", "REFUSED");
+    expect(api.messages).toHaveBeenCalledWith(undefined, 50, { unsettled: true });
+    expect(api.messages).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("messages-unsettled-filter")).toBeChecked();
+  });
+
+  it("given an unsettled value in the address that is not true, when the log is opened, then every message is read", async () => {
+    // given
+    vi.spyOn(api, "messages").mockResolvedValue({ entries: [handedOver], nextCursor: null });
+
+    // when
+    render(<MemoryRouter initialEntries={["/admin/messages?unsettled=yes"]}>
+      <WithClubConfiguration club={clubConfig}><AdminMessagesView /></WithClubConfiguration></MemoryRouter>);
+
+    // then
+    expect(await screen.findByTestId("message-row")).toBeInTheDocument();
+    expect(api.messages).toHaveBeenCalledWith(undefined, 50, { unsettled: false });
+    expect(screen.getByTestId("messages-unsettled-filter")).not.toBeChecked();
+  });
+
   it("given a handed-over message, when the log is shown, then the row rests there and claims no delivery", async () => {
     // given
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [handedOver], nextCursor: null });

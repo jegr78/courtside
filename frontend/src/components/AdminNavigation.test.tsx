@@ -61,6 +61,22 @@ describe("AdminNavigation", () => {
     expect(screen.getByTestId("admin-opening-hours-link")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("admin-courts-link")).not.toHaveAttribute("aria-current");
     expect(screen.getByTestId("admin-configuration-link")).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("admin-overview-link"), "the overview is not current beneath every page it heads")
+      .not.toHaveAttribute("aria-current");
+  });
+
+  it("given the overview is open on a narrow screen, when the navigation is read, then only the overview is current and the control names it", () => {
+    // given
+    resizeTo(375);
+
+    // when
+    show("/admin");
+
+    // then
+    expect(screen.getByTestId("admin-overview-link")).toHaveAttribute("href", "/admin");
+    expect(screen.getByTestId("admin-overview-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("admin-setup-link")).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("admin-menu")).toHaveTextContent("Overview");
   });
 
   it("given the booking rules are open, when the navigation is read, then the club profile is not current too", () => {

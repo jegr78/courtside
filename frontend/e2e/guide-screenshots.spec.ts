@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { type Page, type TestInfo } from "@playwright/test";
-import { expect, selectPreference, test } from "./fixtures";
+import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectPreference, test } from "./fixtures";
 
 // The guides are read in the light theme on a page column, in the language its project names, and
 // the height is the dialogue's bound: a shorter screen scrolls one and publishes it cut off.
@@ -107,7 +107,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
   },
   "admin-navigation": async (page) => {
     await page.getByTestId("administration-link").click();
-    await expect(page.getByTestId("setup-progress")).toBeVisible();
+    await expectAdministrationOverview(page);
   },
   // The bar appears only once something is unsaved, so a renamed court brings it on screen.
   "save-bar": async (page) => {
@@ -115,7 +115,14 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.locator('[data-testid^="edit-court-name-"]').first().fill("Centre Court");
     await expect(page.getByTestId("save-bar")).toBeVisible();
   },
+  "admin-overview": async (page, visualDate) => {
+    await onTheVisualDay(page, visualDate);
+    await page.goto("/admin");
+    await expectAdministrationOverview(page);
+    await expect(page.getByTestId("overview-today-entry").first()).toBeVisible();
+  },
   "admin-setup": async (page) => {
+    await page.getByTestId("admin-setup-link").click();
     await expect(page.getByTestId("setup-progress")).toBeVisible();
   },
   "club-appearance": async (page) => {
@@ -260,6 +267,8 @@ test("every surface the club's own configuration shows is captured", async ({ pa
 
   // when / then
   await capture(page, "admin-navigation", journeyService.visualDate);
+  await capture(page, "admin-overview", journeyService.visualDate);
+  await backAtTheJourneyInstant(page);
   await capture(page, "admin-setup", journeyService.visualDate);
   await capture(page, "club-appearance", journeyService.visualDate);
   await capture(page, "deadlines", journeyService.visualDate);

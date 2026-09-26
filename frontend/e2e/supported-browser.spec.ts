@@ -146,7 +146,7 @@ test("an administrator can open both core administration views", async ({ page }
   await page.getByTestId("administration-link").click();
 
   // then
-  await expect(page.getByTestId("admin-setup-view")).toBeVisible();
+  await expect(page.getByTestId("admin-overview-view")).toBeVisible();
 
   // when
   await page.getByTestId("admin-configuration-link").click();
@@ -193,7 +193,7 @@ test("an administration chunk a newer deployment replaced offers a reload rather
   // then
   await expect(page.getByTestId("load-failure")).toBeVisible();
   await expect(page.getByTestId("retry-load")).toBeEnabled();
-  await expect(page.getByTestId("admin-setup-view")).toHaveCount(0);
+  await expect(page.getByTestId("admin-overview-view")).toHaveCount(0);
 });
 
 test("a member books a court with an idempotency key the browser could generate", async ({ page, journeyService }, testInfo) => {
