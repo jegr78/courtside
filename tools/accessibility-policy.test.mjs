@@ -40,6 +40,14 @@ test("given the required accessibility gate, when inspecting its browser coverag
   assert.match(concurrentSession, /async \(\{ pinnedBrowser, journeyService \}/);
 });
 
+test("given member accessibility states, when one state fails, then the report identifies that surface", () => {
+  // given / when / then
+  assert.doesNotMatch(accessibility, /member views and booking dialog meet automated WCAG 2\.2 AA checks/);
+  assert.match(accessibility, /court plan and booking dialog meet automated WCAG 2\.2 AA checks/);
+  assert.match(accessibility, /bookings view meets automated WCAG 2\.2 AA checks/);
+  assert.match(accessibility, /messages view meets automated WCAG 2\.2 AA checks/);
+});
+
 test("given browser gates fail, when reporting their outcome, then product and harness claims remain distinct", () => {
   assert.match(playwright, /browser-gate-reporter/);
   assert.match(playwright, /name: "webkit-core"/);

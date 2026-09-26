@@ -392,8 +392,8 @@ test("given the security Compose file, when inspecting boundaries, then resource
   assert.match(compose, /\/var\/lib\/postgresql\/data:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
   assert.match(compose, /zaproxy\/zap-stable:[\w.]+@sha256:[a-f0-9]{64}/);
-  assert.match(compose, /schemathesis\/schemathesis:v4\.27\.2@sha256:[a-f0-9]{64}/);
-  assert.match(compose, /grafana\/k6:2\.2\.0@sha256:[a-f0-9]{64}/);
+  assert.match(compose, /schemathesis\/schemathesis:v4\.28\.0@sha256:[a-f0-9]{64}/);
+  assert.match(compose, /grafana\/k6:2\.3\.0@sha256:[a-f0-9]{64}/);
   assert.match(compose, /MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"/);
   assert.match(compose, /profiles: \[assessment\]/);
   assert.match(compose, /\/zap\/wrk:uid=1000,gid=1000,mode=0700,size=25m/);
