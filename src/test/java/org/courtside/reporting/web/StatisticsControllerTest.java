@@ -160,6 +160,23 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAWindowOpeningInTheRepeatedHour_whenReadingThatDay_thenOpenAndBookedTimeAgree() throws Exception {
+        // given
+        openEveryDay(LocalTime.of(2, 30), LocalTime.of(5, 0));
+        UUID court = facility.createCourt(1, "Centre");
+        allocate(booking(MEMBER_CARD, "CONFIRMED", null), court,
+                "2026-10-24T23:00:00Z", "2026-10-25T05:00:00Z", "CONFIRMED");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/utilisation")
+                        .param("from", "2026-10-25").param("to", "2026-10-25"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totals.openMinutes").value(150))
+                .andExpect(jsonPath("$.totals.bookedMinutes").value(150))
+                .andExpect(jsonPath("$.totals.occupancy").value(closeTo(1.0, 1e-9), Double.class));
+    }
+
+    @Test
     void givenACourtHeldThroughTheSpringChange_whenReadingThatDay_thenTheMissingHourIsNotOpen() throws Exception {
         // given
         openEveryDay(LocalTime.of(1, 0), LocalTime.of(5, 0));
