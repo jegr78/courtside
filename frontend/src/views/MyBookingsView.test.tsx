@@ -580,6 +580,23 @@ it("given a manager, when the managed section is read, then a series can be star
   expect(await screen.findByTestId("new-series")).toBeInTheDocument();
 });
 
+it("given the managed list is still loading, when personal bookings arrive first, then no replaceable series opener is interactive", async () => {
+  // given
+  let releaseManaged: () => void = () => undefined;
+  const managedAppointments = vi.spyOn(api, "managedAppointments").mockImplementation(() => new Promise((resolve) => {
+    releaseManaged = () => resolve({ items: [] });
+  }));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
+  await waitFor(() => expect(managedAppointments).toHaveBeenCalledOnce());
+
+  // then
+  expect(screen.queryByTestId("new-series")).not.toBeInTheDocument();
+  releaseManaged();
+  expect(await screen.findByTestId("new-series")).toBeInTheDocument();
+});
+
 it("given a series that was just created, when the managed list reloads, then its result stays on screen", async () => {
   // given
   let releaseReload: () => void = () => undefined;

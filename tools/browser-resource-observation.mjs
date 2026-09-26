@@ -48,13 +48,17 @@ export function validateResourceTimeline(timeline) {
     }
     const series = Map.groupBy(samples, (sample) => target === "application" ? sample.processId : sample.containerId);
     for (const observations of series.values()) {
-      if (observations.length < 2) throw new Error(`${target} resource timeline requires two samples per process`);
+      if (target === "browser" && observations.length < 2) {
+        throw new Error(`${target} resource timeline requires two samples per process`);
+      }
       let previousSequence;
       let previousTimestamp;
       for (const sample of observations) {
         const recordedAt = Date.parse(sample.recordedAt);
         const sequenceHasGap = previousSequence !== undefined && sample.sequence !== previousSequence + 1;
-        const timestampIsOutOfOrder = previousTimestamp !== undefined && recordedAt <= previousTimestamp;
+        // ISO timestamps have millisecond precision. Two serial observations may therefore carry
+        // the same timestamp even though their sequence proves their order.
+        const timestampIsOutOfOrder = previousTimestamp !== undefined && recordedAt < previousTimestamp;
         if (sequenceHasGap || timestampIsOutOfOrder) {
           throw new Error(`${target} resource sampling order is invalid`);
         }

@@ -36,6 +36,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
   const [participationsNextCursor, setParticipationsNextCursor] = useState<string>();
   const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [managedReady, setManagedReady] = useState(false);
   const { message: error, report, clear } = useReportedFailure();
   const { message: loadError, report: reportLoad, clear: clearLoad } = useReportedFailure();
   const [success, setSuccess] = useState<string>();
@@ -65,6 +66,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
       setManagedNextCursor(managedPage.nextCursor ?? undefined);
       setCourts(availableCourts);
       setGrid(bookingGrid);
+      setManagedReady(true);
       clearLoad();
     } catch (failure) {
       reportLoad(failure);
@@ -162,7 +164,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
         </details>}
     </div>}
     {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
-    {!offline && showManaged && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
+    {!offline && showManaged && managedReady && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
       <h2 id="managed-appointments-title" data-testid="managed-appointments-title" className="text-2xl font-bold">{t("managedAppointments.title")}</h2>
       <p className="text-muted mt-2">{t("managedAppointments.description")}</p>
       <div className="mt-4"><BookingSection testId="managed-bookings" title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={chooseAction} t={t} /></div>

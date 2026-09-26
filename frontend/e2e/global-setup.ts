@@ -33,6 +33,7 @@ import {
   type ResourceObservation,
   type ResourceTarget
 } from "./resource-timeline";
+import { ResourceSampling } from "./resource-sampling";
 import { browserLanguage } from "./browser-language";
 import {
   browserContainerLabels,
@@ -648,34 +649,17 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     resourceTimeline.append(await Promise.all(observations), new Date().toISOString());
     writeFileSync(resourceTimelinePath, `${JSON.stringify(resourceTimeline.evidence(), null, 2)}\n`, { mode: 0o600 });
   };
-  let resourceSampleTimer: NodeJS.Timeout | undefined;
-  let resourceSamplePending: Promise<void> | undefined;
-  let resourceSampleFailure: Error | undefined;
+  const resourceSampling = new ResourceSampling(retainResourceSample, 1_000);
   let resourceSamplingStopped = false;
-  const sampleResources = () => {
-    if (resourceSamplePending) return;
-    resourceSamplePending = retainResourceSample()
-      .catch((error) => { resourceSampleFailure = error instanceof Error ? error : new Error("Resource sampling failed"); })
-      .finally(() => { resourceSamplePending = undefined; });
-  };
   const startResourceSampling = async () => {
-    resourceSampleFailure = undefined;
     resourceSamplingStopped = false;
-    await retainResourceSample();
-    resourceSampleTimer = setInterval(sampleResources, 1_000);
-  };
-  const pauseResourceSampling = async () => {
-    clearInterval(resourceSampleTimer);
-    resourceSampleTimer = undefined;
-    await resourceSamplePending;
-    if (resourceSampleFailure) throw resourceSampleFailure;
+    await resourceSampling.start();
   };
   const captureResourceBoundary = async () => {
-    await pauseResourceSampling();
-    await retainResourceSample();
+    await resourceSampling.captureBoundary();
   };
   const resumeResourceSampling = () => {
-    resourceSampleTimer = setInterval(sampleResources, 1_000);
+    resourceSampling.resume();
   };
   const stopResourceSampling = async () => {
     resourceSamplingStopped = true;
@@ -1105,8 +1089,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
       }
     };
   } catch (error) {
-    clearInterval(resourceSampleTimer);
-    await resourceSamplePending;
+    await resourceSampling.pause();
     application?.kill();
     try {
       await completeCleanup([stopContainers, () => breachCheck?.close() ?? Promise.resolve()]);
