@@ -12,11 +12,15 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
+
+import javax.sql.DataSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.courtside.identity.AccountFixtures.enabled;
@@ -52,6 +56,9 @@ class LastSignInTest extends AbstractIntegrationTest {
 
     @Autowired
     private Clock clock;
+
+    @Autowired
+    private DataSource dataSource;
 
     private MockMvc mockMvc;
 
@@ -135,6 +142,28 @@ class LastSignInTest extends AbstractIntegrationTest {
 
         // then
         assertThat(lastSignIn()).as("last_login_at after a refused sign-in").isEqualTo(EARLIER_SIGN_IN);
+    }
+
+    @Test
+    void givenTheAccountRowIsHeldByAnotherChange_whenItSignsIn_thenTheSignInSucceedsWithoutWaitingForTheRow() throws Exception {
+        // given
+        recordEarlierSignIn();
+        try (Connection holder = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            try (PreparedStatement lock = holder.prepareStatement(
+                    "SELECT id FROM user_account WHERE id = ? FOR UPDATE")) {
+                lock.setObject(1, janeId);
+                lock.executeQuery();
+            }
+
+            // when
+            mockMvc.perform(signIn("correct-horse", "192.0.2.74")).andExpect(status().isOk());
+
+            // then
+            holder.rollback();
+        }
+        assertThat(lastSignIn()).as("a sign-in during another change of the account is not held up by it")
+                .isEqualTo(EARLIER_SIGN_IN);
     }
 
     private MockHttpServletRequestBuilder signIn(String password, String address) {

@@ -11,8 +11,11 @@ import java.util.UUID;
 
 interface SignInRecordRepository extends Repository<UserAccount, UUID> {
 
-    // Outside the entity's version, so a member signing in never fails an administrator's edit.
+    // Skips a row another change holds, so a sign-in never waits on it; the next sign-in records the time.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "UPDATE user_account SET last_login_at = :signedInAt WHERE id = :id", nativeQuery = true)
+    @Query(value = """
+            UPDATE user_account SET last_login_at = :signedInAt
+            WHERE id = (SELECT id FROM user_account WHERE id = :id FOR NO KEY UPDATE SKIP LOCKED)
+            """, nativeQuery = true)
     int recordSignIn(@Param("id") UUID id, @Param("signedInAt") Instant signedInAt);
 }
