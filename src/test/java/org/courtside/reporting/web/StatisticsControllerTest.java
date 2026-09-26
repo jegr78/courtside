@@ -158,10 +158,10 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/admin/statistics/utilisation")
                         .param("from", "2026-05-05").param("to", "2026-05-05"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totals.occupancy").value(closeTo(1.0, 1e-9), Double.class))
                 .andExpect(jsonPath("$.totals.courtCount").value(2))
                 .andExpect(jsonPath("$.totals.capacityMinutes").value(480))
                 .andExpect(jsonPath("$.totals.bookedMinutes").value(480))
-                .andExpect(jsonPath("$.totals.occupancy").value(closeTo(1.0, 1e-9), Double.class))
                 .andExpect(jsonPath(hour(2, 8) + ".occupancy").value(closeTo(1.0, 1e-9), Double.class));
         mockMvc.perform(get("/api/admin/statistics/utilisation")
                         .param("from", "2026-05-05").param("to", "2026-05-12"))
