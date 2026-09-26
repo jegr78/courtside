@@ -1,6 +1,7 @@
 package org.courtside.card.internal;
 
 import lombok.extern.slf4j.Slf4j;
+import org.courtside.card.BookingCard;
 import org.courtside.config.ClubIdentity;
 import org.courtside.config.ConfigEvent;
 import org.courtside.shared.ShippedNames;
@@ -28,7 +29,7 @@ class ShippedCardNaming implements ApplicationRunner {
             UUID.fromString("11111111-1111-1111-1111-111111111111"), "bookingCard.member",
             UUID.fromString("22222222-2222-2222-2222-222222222222"), "bookingCard.training",
             UUID.fromString("33333333-3333-3333-3333-333333333333"), "bookingCard.leagueMatch",
-            UUID.fromString("44444444-4444-4444-4444-444444444444"), "bookingCard.courtClosed");
+            BookingCard.COURT_CLOSED, "bookingCard.courtClosed");
 
     private static final Map<UUID, String> PARTICIPANT_CARDS = Map.of(
             UUID.fromString("55555555-5555-5555-5555-555555555555"), "participantCard.ballMachine",

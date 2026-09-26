@@ -56,6 +56,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:court-number-taken",
             "urn:courtside:error:court-unavailable",
             "urn:courtside:error:facility-utilisation-period-invalid",
+            "urn:courtside:error:statistics-period-invalid",
             "urn:courtside:error:import-external-id-taken",
             "urn:courtside:error:import-external-reference-not-found",
             "urn:courtside:error:import-person-already-linked",

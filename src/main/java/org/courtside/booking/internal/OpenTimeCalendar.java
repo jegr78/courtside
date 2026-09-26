@@ -1,0 +1,115 @@
+package org.courtside.booking.internal;
+
+import org.courtside.shared.OpeningWindow;
+
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.time.zone.ZoneOffsetTransition;
+import java.time.zone.ZoneRules;
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.TreeSet;
+
+final class OpenTimeCalendar {
+
+    private static final LocalDate A_MONDAY = LocalDate.of(2024, 1, 1);
+
+    private final Map<DayOfWeek, OpeningWindow> week = new EnumMap<>(DayOfWeek.class);
+    private final ZoneId zone;
+    private final long[][] regularDay = new long[7][24];
+    private final long[] regularTotal = new long[7];
+
+    OpenTimeCalendar(Map<DayOfWeek, OpeningWindow> week, ZoneId zone) {
+        this.week.putAll(week);
+        this.zone = zone;
+        for (DayOfWeek day : DayOfWeek.values()) {
+            long[] cells = day(A_MONDAY.plusDays(day.getValue() - 1L), ZoneOffset.UTC);
+            System.arraycopy(cells, 0, regularDay[day.getValue() - 1], 0, 24);
+            for (long cell : cells) {
+                regularTotal[day.getValue() - 1] += cell;
+            }
+        }
+    }
+
+    long openSeconds(LocalDate from, LocalDate to) {
+        long total = 0;
+        for (DayOfWeek day : DayOfWeek.values()) {
+            total += occurrences(day, from, to) * regularTotal[day.getValue() - 1];
+        }
+        for (LocalDate irregular : irregularDays(from, to)) {
+            int index = irregular.getDayOfWeek().getValue() - 1;
+            for (long cell : day(irregular, zone)) {
+                total += cell;
+            }
+            total -= regularTotal[index];
+        }
+        return total;
+    }
+
+    long[][] hourSeconds(LocalDate from, LocalDate to) {
+        long[][] hours = new long[7][24];
+        for (DayOfWeek day : DayOfWeek.values()) {
+            long times = occurrences(day, from, to);
+            for (int hour = 0; hour < 24; hour++) {
+                hours[day.getValue() - 1][hour] = times * regularDay[day.getValue() - 1][hour];
+            }
+        }
+        for (LocalDate irregular : irregularDays(from, to)) {
+            int index = irregular.getDayOfWeek().getValue() - 1;
+            long[] actual = day(irregular, zone);
+            for (int hour = 0; hour < 24; hour++) {
+                hours[index][hour] += actual[hour] - regularDay[index][hour];
+            }
+        }
+        return hours;
+    }
+
+    // Local times resolve as PostgreSQL resolves them: a gap moves forward, an overlap takes the later offset.
+    private long[] day(LocalDate date, ZoneId in) {
+        long[] cells = new long[24];
+        OpeningWindow window = week.get(date.getDayOfWeek());
+        if (window == null) {
+            return cells;
+        }
+        ZonedDateTime opens = ZonedDateTime.of(date, window.opensAt(), in).withLaterOffsetAtOverlap();
+        Instant closes = ZonedDateTime.of(date, window.closesAt(), in).withLaterOffsetAtOverlap().toInstant();
+        Instant hourStart = opens.truncatedTo(ChronoUnit.HOURS).toInstant();
+        while (hourStart.isBefore(closes)) {
+            Instant hourEnd = hourStart.plus(1, ChronoUnit.HOURS);
+            Instant pieceStart = hourStart.isAfter(opens.toInstant()) ? hourStart : opens.toInstant();
+            Instant pieceEnd = hourEnd.isBefore(closes) ? hourEnd : closes;
+            if (pieceEnd.isAfter(pieceStart)) {
+                cells[hourStart.atZone(in).getHour()] += Duration.between(pieceStart, pieceEnd).toSeconds();
+            }
+            hourStart = hourEnd;
+        }
+        return cells;
+    }
+
+    private static long occurrences(DayOfWeek day, LocalDate from, LocalDate to) {
+        long days = ChronoUnit.DAYS.between(from, to) + 1;
+        long offset = Math.floorMod(day.getValue() - from.getDayOfWeek().getValue(), 7);
+        return days <= offset ? 0 : (days - offset + 6) / 7;
+    }
+
+    private NavigableSet<LocalDate> irregularDays(LocalDate from, LocalDate to) {
+        NavigableSet<LocalDate> days = new TreeSet<>();
+        ZoneRules rules = zone.getRules();
+        Instant end = to.plusDays(2).atStartOfDay(ZoneOffset.UTC).toInstant();
+        ZoneOffsetTransition transition = rules.nextTransition(
+                from.minusDays(2).atStartOfDay(ZoneOffset.UTC).toInstant());
+        while (transition != null && transition.getInstant().isBefore(end)) {
+            days.add(LocalDate.ofInstant(transition.getInstant(), transition.getOffsetBefore()));
+            days.add(LocalDate.ofInstant(transition.getInstant(), transition.getOffsetAfter()));
+            transition = rules.nextTransition(transition.getInstant());
+        }
+        return days.subSet(from, true, to, true);
+    }
+}

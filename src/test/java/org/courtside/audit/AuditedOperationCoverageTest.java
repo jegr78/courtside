@@ -136,6 +136,10 @@ class AuditedOperationCoverageTest {
             "RuleAdminService#rulesOf",
             "RuleAdminService#setRule",
             "RuleAdminService#setRuleSetActive",
+            "StatisticsService#bookings",
+            "StatisticsService#members",
+            "StatisticsService#messages",
+            "StatisticsService#utilisation",
             "SubjectAccessService#answerFor");
 
     @Test

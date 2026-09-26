@@ -7,5 +7,9 @@
   "getCourt": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getBookingCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getParticipantCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
-  "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding."
+  "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding.",
+  "readUtilisationStatistics": "The statistics page and the overview's key figures read this through api.client and are built in their own change; until they land no view calls it.",
+  "readBookingStatistics": "The statistics page and the overview's key figures read this through api.client and are built in their own change; until they land no view calls it.",
+  "readMemberStatistics": "The statistics page and the overview's key figures read this through api.client and are built in their own change; until they land no view calls it.",
+  "readMessageStatistics": "The statistics page and the overview's key figures read this through api.client and are built in their own change; until they land no view calls it."
 }

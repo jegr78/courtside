@@ -38,7 +38,7 @@ The current product includes:
 - roster, booking and per-person data exports;
 - localized email notifications and a message log;
 - an append-only audit log;
-- court-utilisation reporting;
+- court-utilisation reporting and board statistics for any period;
 - a React and Vite progressive web application;
 - a multi-architecture image and four reference deployment recipes.
 
@@ -128,6 +128,7 @@ as one application process and uses PostgreSQL 17.
 | `identity` | People, accounts, roles, credentials and sessions |
 | `member` | Membership types, memberships and roster administration |
 | `notification` | Email creation, delivery state and preferences |
+| `reporting` | Board statistics composed from the read ports of the other modules |
 | `rules` | Rule-set administration and rule evaluation |
 | `shared` | Shared domain events and cross-cutting value types |
 
@@ -141,7 +142,9 @@ module's `package-info.java` declares allowed dependencies. Modulith verificatio
 undeclared dependencies and cycles. `shared` and generated `api` are the shared modules.
 
 `booking` depends on `rules`, `facility`, `member` and `card`. Notification and audit behavior uses
-domain events instead of reverse dependencies into the booking core.
+domain events instead of reverse dependencies into the booking core. `reporting` reads booking,
+membership, account and message figures through interfaces those modules publish in their base
+packages; none of them depends on it.
 
 Controllers implement generated interfaces and translate HTTP. Services own business operations.
 Repositories persist state and do not decide policy.
@@ -328,6 +331,29 @@ messages, and the latest recorded changes. Each part reads the endpoint its own 
 for five entries, fails on its own and links to that page with the matching filter. The setup
 checklist leads the overview unfolded while a required step is open and folds to one line once all
 of them are complete. `/admin/setup` shows it in full.
+
+Statistics answer four reads under `/api/admin/statistics`: utilisation, bookings, members and
+messages. Each takes a period of club-local dates of any length between the years 0001 and 9999,
+defaults to the last full calendar month, answers aggregates only and repeats its figures for the
+equally long period before it. None of them names a person.
+
+- Utilisation counts confirmed allocations inside open time. Open time comes from today's weekly
+  opening hours for every court, active or not, because neither hours nor court availability are
+  dated. Allocations under the shipped "court closed" card are closures: they are reported
+  separately and taken out of the bookable time, so occupancy is booked time divided by open time
+  minus closed time. A club card of its own is never treated as a closure. The weekday and hour
+  grid uses club-local hours, and the progression uses ISO weeks up to 92 days and calendar months
+  beyond.
+- A booking belongs to the period its earliest allocation starts in. Closures are left out of the
+  booking figures; series, guests and participant cards count confirmed bookings only.
+- A membership runs on a day when it started on or before it and has no end date or ends after it.
+  An active member holds a running membership on the period's last day and, in a confirmed booking
+  starting in the period, booked it or was recorded as a participant. Members are grouped by the
+  type they hold now, because type changes keep no history.
+- Account figures describe the accounts as they are now. Only the latest sign-in is stored, so for
+  a past period the 30- and 90-day windows count the accounts whose latest sign-in falls inside
+  them.
+- Messages are counted per kind and state by the time they were queued.
 
 ## Membership data exchange
 
