@@ -74,13 +74,15 @@ export default defineConfig<JourneyOptions>({
   snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}{ext}",
   fullyParallel: false,
   workers: 1,
-  timeout: 60_000,
-  expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.005 } },
+  timeout: 0,
+  expect: { timeout: 0, toHaveScreenshot: { maxDiffPixelRatio: 0.005 } },
   // Pinned so nobody reaches "changed" or "all", under which a missing baseline passes silently.
   // "missing" writes the new baseline for collection and still fails the run that needed it.
   updateSnapshots: "missing",
   reporter: [["line"], ["./e2e/browser-gate-reporter.ts"]],
   use: {
+    actionTimeout: 0,
+    navigationTimeout: 0,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "off"

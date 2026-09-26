@@ -20,19 +20,13 @@ updates:
     schedule:
       interval: weekly
     groups:
-      vitest:
+      frontend-minor-and-patch:
+        applies-to: version-updates
         patterns:
-          - "vitest"
-          - "@vitest/*"
-      testing-library:
-        patterns:
-          - "@testing-library/*"
-      eslint:
-        patterns:
-          - "eslint"
-          - "eslint-*"
-          - "@eslint/*"
-          - "typescript-eslint"
+          - "*"
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: npm
     directory: "/site"
@@ -48,3 +42,8 @@ updates:
     directory: "/deploy"
     schedule:
       interval: weekly
+    groups:
+      deployment-images:
+        applies-to: version-updates
+        patterns:
+          - "*"

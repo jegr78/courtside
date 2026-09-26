@@ -25,9 +25,17 @@ export function validateDependabot(candidate) {
       assert.ok(update.groups !== null && !Array.isArray(update.groups) && Object.keys(update.groups).length > 0);
       for (const [name, group] of Object.entries(update.groups)) {
         assert.match(name, /^[a-z0-9-]+$/);
-        assert.deepEqual(Object.keys(group), ["patterns"]);
+        assert.deepEqual(Object.keys(group).sort(), Object.keys(group).filter((key) =>
+          ["applies-to", "patterns", "update-types"].includes(key)).sort());
         assert.ok(Array.isArray(group.patterns) && group.patterns.length > 0);
         assert.ok(group.patterns.every((pattern) => typeof pattern === "string" && pattern.length > 0));
+        if (group["applies-to"] !== undefined) {
+          assert.ok(["security-updates", "version-updates"].includes(group["applies-to"]));
+        }
+        if (group["update-types"] !== undefined) {
+          assert.ok(Array.isArray(group["update-types"]) && group["update-types"].length > 0);
+          assert.ok(group["update-types"].every((type) => ["major", "minor", "patch"].includes(type)));
+        }
       }
     }
     if (update.ignore !== undefined) {
@@ -95,6 +103,12 @@ test("given Dependabot nested fields are malformed, when validating, then each f
   const unknownGroupField = structuredClone(source);
   unknownGroupField.updates[0].groups.spring.command = "ignored";
   cases.push(unknownGroupField);
+  const invalidGroupUpdateType = structuredClone(source);
+  invalidGroupUpdateType.updates[2].groups["frontend-minor-and-patch"]["update-types"] = ["all"];
+  cases.push(invalidGroupUpdateType);
+  const invalidGroupApplication = structuredClone(source);
+  invalidGroupApplication.updates[2].groups["frontend-minor-and-patch"]["applies-to"] = "all-updates";
+  cases.push(invalidGroupApplication);
   const invalidUpdateType = structuredClone(source);
   invalidUpdateType.updates.at(-1).ignore = [{ "dependency-name": "example", "update-types": ["all"] }];
   cases.push(invalidUpdateType);

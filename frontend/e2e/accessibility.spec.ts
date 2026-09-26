@@ -86,7 +86,7 @@ for (const locale of ["de", "en"]) {
 
   });
 
-  test(`${locale} member views and booking dialog meet automated WCAG 2.2 AA checks`, async ({ page, journeyService }) => {
+  test(`${locale} court plan and booking dialog meet automated WCAG 2.2 AA checks`, async ({ page, journeyService }) => {
     // given
     await page.goto("/");
     await selectPreference(page, "#locale-preference", locale);
@@ -102,12 +102,33 @@ for (const locale of ["de", "en"]) {
     await page.locator('[data-testid="free-slot"][data-state="free"]').first().click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expectNoWcagViolations(page);
-    await page.keyboard.press("Escape");
+  });
+
+  test(`${locale} bookings view meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await selectPreference(page, "#locale-preference", locale);
+    await signIn(page, "doe.jane");
+
+    // when
     await page.getByTestId("my-bookings-link").click();
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();
+
+    // then
     await expectNoWcagViolations(page);
+  });
+
+  test(`${locale} messages view meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await selectPreference(page, "#locale-preference", locale);
+    await signIn(page, "doe.jane");
+
+    // when
     await page.getByTestId("my-messages-link").click();
     await expect(page.getByTestId("my-messages-view")).toBeVisible();
+
+    // then
     await expectNoWcagViolations(page);
   });
 
