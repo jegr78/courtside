@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, type BookingStatistics, type MemberStatistics, type MessageStatistics,
   type StatisticsRange, type UtilisationStatistics } from "../api/client";
@@ -88,6 +88,11 @@ const range: StatisticsRange = { firstBookingOn: "2024-04-12", today: "2026-03-3
 function Address() {
   const location = useLocation();
   return <output data-testid="address">{location.search}</output>;
+}
+
+function Back() {
+  const navigate = useNavigate();
+  return <button type="button" data-testid="back" onClick={() => void navigate(-1)} />;
 }
 
 function show(entry = "/admin/utilisation") {
@@ -349,6 +354,23 @@ describe("AdminStatisticsView", () => {
     }
     expect(screen.getByTestId("utilisation-from")).toHaveValue("2026-01-01");
     expect(screen.getByTestId("statistics-choice-3m")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("given a chosen period, when the board goes back to the plain address, then the default period is read and fills the form again", async () => {
+    // given
+    const read = reads();
+    render(<MemoryRouter initialEntries={["/admin/utilisation", "/admin/utilisation?from=2026-01-01&to=2026-03-31"]} initialIndex={1}>
+      <AdminStatisticsView /><Address /><Back /></MemoryRouter>);
+    await loaded();
+    expect(screen.getByTestId("utilisation-from")).toHaveValue("2026-01-01");
+
+    // when
+    await userEvent.click(screen.getByTestId("back"));
+
+    // then
+    await waitFor(() => expect(read.utilisation).toHaveBeenLastCalledWith(undefined));
+    await waitFor(() => expect(screen.getByTestId("utilisation-from")).toHaveValue("2026-02-01"));
+    expect(screen.getByTestId("utilisation-to")).toHaveValue("2026-02-28");
   });
 
   it("given an address whose period ends before it starts, when the statistics open, then the default period is read instead", async () => {

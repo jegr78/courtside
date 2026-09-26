@@ -27,7 +27,7 @@ export function AdminStatisticsView() {
   const [noBookings, setNoBookings] = useState(false);
 
   useEffect(() => {
-    if (period) setFields(period);
+    setFields(period ?? { from: "", to: "" });
   }, [period]);
 
   const fill = useCallback((answered: Period) =>
