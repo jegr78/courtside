@@ -8,6 +8,8 @@ import java.util.Optional;
 
 public record StatisticsPeriod(LocalDate from, LocalDate to) {
 
+    static final long MAX_DAYS = 36_525;
+
     static StatisticsPeriod resolve(LocalDate from, LocalDate to, LocalDate today) {
         if (from == null && to == null) {
             YearMonth lastMonth = YearMonth.from(today).minusMonths(1);
@@ -21,6 +23,10 @@ public record StatisticsPeriod(LocalDate from, LocalDate to) {
         }
         if (to.isBefore(from)) {
             throw new StatisticsPeriodInvalidException("reporting.statistics.periodOrder", Map.of());
+        }
+        if (ChronoUnit.DAYS.between(from, to) + 1 > MAX_DAYS) {
+            throw new StatisticsPeriodInvalidException("reporting.statistics.periodTooLong",
+                    Map.of("maxDays", MAX_DAYS));
         }
         return new StatisticsPeriod(from, to);
     }

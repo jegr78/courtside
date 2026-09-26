@@ -707,6 +707,7 @@ const de = {
   "booking.facilityUtilisation.dateOutOfRange": "Die Jahreszahlen müssen zwischen 0001 und 9999 liegen.",
   "booking.facilityUtilisation.periodIncomplete": "Gib Beginn und Ende an oder keines von beiden für den letzten Monat.",
   "reporting.statistics.periodOrder": "Das Enddatum darf nicht vor dem Startdatum liegen.",
+  "reporting.statistics.periodTooLong": "Der Zeitraum darf höchstens {{maxDays}} Tage umfassen.",
   "reporting.statistics.dateOutOfRange": "Die Jahreszahlen müssen zwischen 0001 und 9999 liegen.",
   "reporting.statistics.periodIncomplete": "Gib Beginn und Ende an oder keines von beiden für den letzten Monat.",
   "booking.rule.startsInPast": "Eine Buchung darf nicht in der Vergangenheit beginnen.",

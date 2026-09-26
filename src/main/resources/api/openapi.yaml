@@ -187,7 +187,8 @@ components:
       required: false
       description: |
         The first day of the period, inclusive, in the club time zone. Given together with `to` or
-        not at all; without both the period is the last full calendar month.
+        not at all; without both the period is the last full calendar month. Both dates lie in the
+        years 0001 to 9999 and the period spans at most 36,525 days, a hundred years.
       schema: { type: string, format: date }
     StatisticsTo:
       name: to
@@ -6627,7 +6628,7 @@ paths:
         is `bookedMinutes / (capacityMinutes - closedMinutes)`. An allocation crossing either end
         of the period contributes the minutes inside it.
 
-        The period has no length limit. The progression is bucketed by ISO week (Monday to Sunday)
+        The period spans at most 36,525 days. The progression is bucketed by ISO week (Monday to Sunday)
         for periods of up to 92 days and by calendar month beyond; the first and last bucket are
         cut at the period's ends. Administrators only.
       security:

@@ -30,6 +30,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.closeTo;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -303,7 +304,7 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenTheWholeAcceptedRange_whenReadingUtilisation_thenItAnswersWithoutAPreviousPeriod() throws Exception {
+    void givenAHundredYears_whenReadingUtilisation_thenItAnswersInMonthlyBuckets() throws Exception {
         // given
         openEveryDay(LocalTime.of(8, 0), LocalTime.of(12, 0));
         UUID court = facility.createCourt(1, "Centre");
@@ -312,12 +313,27 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
 
         // when / then
         mockMvc.perform(get("/api/admin/statistics/utilisation")
-                        .param("from", "0001-01-01").param("to", "9999-12-31"))
+                        .param("from", "1926-05-13").param("to", "2026-05-12"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totals.bookedMinutes").value(60))
                 .andExpect(jsonPath("$.progression.granularity").value("MONTH"))
-                .andExpect(jsonPath("$.progression.buckets.length()").value(9999 * 12))
+                .andExpect(jsonPath("$.progression.buckets.length()").value(lessThanOrEqualTo(1202)))
+                .andExpect(jsonPath("$.previous.period.from").value("1826-05-12"));
+        mockMvc.perform(get("/api/admin/statistics/utilisation")
+                        .param("from", "0001-01-01").param("to", "0001-01-31"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.previous").value(nullValue()));
+    }
+
+    @Test
+    void givenAHundredYearsAndADay_whenReadingUtilisation_thenThePeriodIsRefusedAsTooLong() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/utilisation")
+                        .param("from", "1926-05-12").param("to", "2026-05-12"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:statistics-period-invalid"))
+                .andExpect(jsonPath("$.violations[0].code").value("reporting.statistics.periodTooLong"))
+                .andExpect(jsonPath("$.violations[0].params.maxDays").value(36525));
     }
 
     @Test

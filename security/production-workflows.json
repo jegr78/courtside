@@ -462,7 +462,7 @@
       ],
       "alternatePaths": [
         "Impact reads page through all affected future bookings before a configuration write.",
-        "Reports use the club time zone; utilisation reports stop at 366 days, statistics accept any period in the years 0001 to 9999.",
+        "Reports use the club time zone; utilisation reports stop at 366 days, statistics accept periods of at most 36,525 days in the years 0001 to 9999.",
         "Message and audit records expose privacy-safe event metadata to the permitted board role.",
         "Operational records come only from the fixed application, database and proxy sources and are redacted before bounded storage."
       ],
