@@ -123,6 +123,7 @@ public class SecurityConfiguration {
             LoginVerificationCapacity credentialVerificationCapacity,
             LoginRateLimitHandler loginRateLimitHandler,
             SecurityEventLog securityEvents,
+            SignInRecorder signIns,
             CurrentUser currentUser,
             RecentAuthentication recentAuthentication,
             UserAccountRepository accounts,
@@ -199,6 +200,7 @@ public class SecurityConfiguration {
                                             request.getHeader("User-Agent")).name());
                             if (authentication.getPrincipal() instanceof CourtsideUserDetails user) {
                                 securityEvents.authenticationSucceeded(user.accountId());
+                                signIns.signedIn(user.accountId());
                                 recentAuthentication.record(request);
                             }
                             if (authentication.getAuthorities().stream().anyMatch(authority ->

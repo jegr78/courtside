@@ -122,7 +122,9 @@ may lie in the future: nothing compares them with today, so a future date would 
 honours.
 
 `security_epoch` invalidates every session an account holds; `version` is the optimistic lock;
-`credentials_expire_at` bounds an issued one-time credential.
+`credentials_expire_at` bounds an issued one-time credential. `last_login_at` is the instant of the
+account's latest successful sign-in and stays null until the first one. A sign-in overwrites it
+without touching `version`, and a failed or refused attempt leaves it as it was.
 
 **`password_reset_token` holds at most one row per account**, because `account_id` is its primary
 key. Asking again replaces the code that was outstanding, the delete and the insert are what do
