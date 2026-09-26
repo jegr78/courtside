@@ -94,7 +94,7 @@ function KeyFigure({ name, period, read, figure }: {
   }
   const { value, detail, change } = figure;
   return <Link data-testid={testId} to={`/admin/utilisation?${new URLSearchParams(period).toString()}`}
-    className={`${tile} focus-ring hover:border-[var(--cs-accent)]`}>
+    className={`${tile} focus-ring hover:border-(--club-primary)`}>
     {label}
     <span data-testid={`${testId}-value`} className="text-3xl font-bold tabular-nums">{value}</span>
     {detail && <span data-testid={`${testId}-detail`} className="text-sm">{detail}</span>}
