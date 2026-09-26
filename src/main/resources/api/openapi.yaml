@@ -2496,6 +2496,10 @@ components:
         createdAt: { type: string, format: date-time }
         passwordChangeRequired: { type: boolean }
         credentialsExpireAt: { type: [string, "null"], format: date-time }
+        lastLoginAt:
+          type: [string, "null"]
+          format: date-time
+          description: The account's latest successful sign-in, null when it never signed in.
         credentialState:
           type: string
           enum: [AWAITING_CREDENTIAL, CREDENTIAL_ISSUED, CREDENTIAL_EXPIRED, PASSWORD_CHOSEN]

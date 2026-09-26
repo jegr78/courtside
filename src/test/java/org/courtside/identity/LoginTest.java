@@ -197,9 +197,9 @@ class LoginTest extends AbstractIntegrationTest {
         assertThat(Arrays.stream(UserAccount.class.getDeclaredFields())
                         .filter(field -> TemporalAccessor.class.isAssignableFrom(field.getType()))
                         .map(java.lang.reflect.Field::getName))
-                .containsExactlyInAnyOrder("createdAt", "credentialsExpireAt");
-        jdbc.sql("UPDATE user_account SET created_at = TIMESTAMPTZ '2000-01-01 00:00:00Z' "
-                        + "WHERE username = :username")
+                .containsExactlyInAnyOrder("createdAt", "credentialsExpireAt", "lastLoginAt");
+        jdbc.sql("UPDATE user_account SET created_at = TIMESTAMPTZ '2000-01-01 00:00:00Z', "
+                        + "last_login_at = TIMESTAMPTZ '2000-01-01 00:00:00Z' WHERE username = :username")
                 .param("username", "doe.jane")
                 .update();
 

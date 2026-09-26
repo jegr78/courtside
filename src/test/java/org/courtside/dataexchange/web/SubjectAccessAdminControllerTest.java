@@ -137,6 +137,25 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenOneAccountSignedInAndOneNever_whenABoardAsks_thenEachAnswersItsLastSignIn()
+            throws Exception {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        identity.createAccount(personId, "jane.doe.dormant", Set.of(Role.MEMBER));
+        UUID signedInId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.TRAINER));
+        identity.recordSignIn(signedInId, SIX_PM);
+
+        // when / then
+        mockMvc.perform(export(personId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accounts[0].username").value("jane.doe"))
+                .andExpect(jsonPath("$.accounts[0].lastLoginAt").value("2026-05-13T16:00:00Z"))
+                .andExpect(jsonPath("$.accounts[1].username").value("jane.doe.dormant"))
+                .andExpect(jsonPath("$.accounts[1].lastLoginAt").value(nullValue()));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenAPersonWhoHoldsNoAccount_whenABoardAsks_thenTheAnswerIsCompleteWithoutOne()
             throws Exception {
         // given

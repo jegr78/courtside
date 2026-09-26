@@ -1261,7 +1261,7 @@
         "lifecycle": "account-cascade"
       },
       "last_login_at": {
-        "level": "operational",
+        "level": "personal",
         "lifecycle": "account-cascade"
       },
       "locale": {
