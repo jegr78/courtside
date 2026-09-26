@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api, type Allocation, type AuditPage, type CredentialState, type MessagePage, type PublicCourt,
   type RosterPage } from "../api/client";
 import { actorLabel, auditMessage } from "../audit/auditText";
+import { allocationLabel } from "../booking/allocationLabel";
 import { useClubConfiguration } from "../club/registry";
 import { LoadFailure } from "../components/LoadFailure";
 import { useRetry } from "../failures/useRetry";
@@ -120,7 +121,7 @@ function TodayCard({ clock }: { clock: () => Date }) {
               {upcoming.map((allocation) => <li key={`${allocation.bookingId}-${allocation.courtId}`} data-testid="overview-today-entry"
                 data-booking-id={allocation.bookingId} data-court-id={allocation.courtId} className="grid gap-0.5">
                 <span className="font-mono text-sm tabular-nums">{formatBookingTimeRange(allocation.startsAt, allocation.endsAt, language, timeZone!)}</span>
-                <span className="[overflow-wrap:anywhere]">{[names.get(allocation.courtId), allocation.cardLabel].filter(Boolean).join(" · ")}</span>
+                <span className="[overflow-wrap:anywhere]">{[names.get(allocation.courtId), allocationLabel(allocation, t)].filter(Boolean).join(" · ")}</span>
               </li>)}
             </ul>
           </>}

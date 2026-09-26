@@ -117,6 +117,23 @@ describe("AdminOverviewView", () => {
     expect(entry, "an identifier is never shown in place of a name").not.toHaveTextContent("court-3");
   });
 
+  it("given a booking whose card generic occupancy hides, when it is still to come today, then it reads as booked", async () => {
+    // given
+    vi.mocked(api.courts).mockResolvedValue([{ id: "court-1", number: 1, name: "Court 1" }]);
+    vi.mocked(api.allocations).mockResolvedValue([{
+      ...allocation("booking-member", "court-1", "2026-09-25T16:00:00Z", "2026-09-25T17:00:00Z", "?"),
+      showGenericOccupancy: true
+    }]);
+
+    // when
+    show();
+
+    // then
+    const entry = await within(screen.getByTestId("overview-today")).findByTestId("overview-today-entry");
+    expect(entry).toHaveTextContent(i18n.t("booking.occupied"));
+    expect(entry, "the placeholder the server sends is not a label").not.toHaveTextContent("?");
+  });
+
   it("given the club's day has already turned while UTC's has not, when the overview opens, then it reads the club's date", async () => {
     // when
     show(() => new Date("2026-09-25T22:30:00Z"));
