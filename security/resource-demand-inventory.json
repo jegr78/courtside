@@ -316,7 +316,8 @@
       "evidence": [
         "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenMoreThan366Days_whenReportingUtilisation_thenThePeriodLimitIsReturned",
         "src/test/java/org/courtside/dataexchange/internal/RosterExportServiceTest.java#givenMorePeopleThanOnePageHolds_whenTheRosterIsExported_thenTheFileHoldsEveryOne",
-        "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenTheWholeAcceptedRange_whenReadingUtilisation_thenItAnswersWithoutAPreviousPeriod"
+        "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenTheWholeAcceptedRange_whenReadingUtilisation_thenItAnswersWithoutAPreviousPeriod",
+        "src/test/java/org/courtside/reporting/StatisticsQueryBudgetTest.java#givenMoreBookingsCourtsAndARetiredCourt_whenReadingEverySection_thenTheStatementCountStaysTheSame"
       ]
     },
     {

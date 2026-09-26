@@ -48,12 +48,13 @@ class BookingStatisticsService implements BookingStatistics {
             started AS (
                 SELECT b.id, b.status, b.series_id, b.booked_by
                 FROM booking b
-                JOIN (SELECT booking_id, MIN(starts_at) AS starts_at
-                      FROM court_allocation GROUP BY booking_id) first ON first.booking_id = b.id
-                CROSS JOIN bounds
-                WHERE first.starts_at >= bounds.starts_at
-                  AND first.starts_at < bounds.ends_at
-                  AND b.card_id <> :closure
+                WHERE b.card_id <> :closure
+                  AND b.id IN (SELECT a.booking_id FROM court_allocation a
+                               WHERE a.starts_at >= timezone(:zone, CAST(:fromDay AS timestamp))
+                                 AND a.starts_at < timezone(:zone, CAST(:toDay AS timestamp) + interval '1 day'))
+                  AND NOT EXISTS (SELECT 1 FROM court_allocation e
+                                  WHERE e.booking_id = b.id
+                                    AND e.starts_at < timezone(:zone, CAST(:fromDay AS timestamp)))
             )""";
 
     private static final String UTILISATION = "WITH " + BOUNDS + """
@@ -65,9 +66,10 @@ class BookingStatisticsService implements BookingStatistics {
                 FROM court_allocation a
                 JOIN booking b ON b.id = a.booking_id
                 CROSS JOIN bounds
-                WHERE a.status = 'CONFIRMED'
-                  AND a.starts_at < bounds.ends_at
-                  AND a.ends_at > bounds.starts_at
+                WHERE a.status <> 'CANCELLED'
+                  AND tstzrange(a.starts_at, a.ends_at, '[)')
+                      && tstzrange(timezone(:zone, CAST(:fromDay AS timestamp)),
+                                   timezone(:zone, CAST(:toDay AS timestamp) + interval '1 day'), '[)')
             ),
             opened AS (
                 SELECT h.booking_id, h.court_id, h.card_id, h.closure,
@@ -95,27 +97,30 @@ class BookingStatisticsService implements BookingStatistics {
                 CROSS JOIN LATERAL generate_series(date_trunc('hour', o.starts_at, :zone),
                     o.ends_at - interval '1 microsecond', interval '1 hour') AS hour(starts_at)
             ),
-            facts AS (
-                SELECT booking_id, court_id, card_id, closure, local_hour, seconds FROM pieces
-                UNION ALL
-                SELECT booking_id, court_id, card_id, closure, CAST(NULL AS timestamp),
-                       CAST(0 AS numeric)
-                FROM held
+            cells AS (
+                SELECT court_id, card_id, closure, seconds,
+                       CAST(EXTRACT(ISODOW FROM local_hour) AS integer) AS weekday,
+                       CAST(EXTRACT(HOUR FROM local_hour) AS integer) AS hour,
+                       CAST(date_trunc(:granularity, local_hour) AS date) AS bucket
+                FROM pieces
             )
             SELECT CASE WHEN GROUPING(court_id) = 0 THEN 'COURT'
                         WHEN GROUPING(card_id) = 0 THEN 'CARD'
                         WHEN GROUPING(weekday) = 0 THEN 'HOUR'
                         ELSE 'BUCKET' END AS dimension,
                    court_id, card_id, weekday, hour, bucket, closure,
-                   CAST(FLOOR(SUM(seconds) / 60) AS bigint) AS minutes,
-                   COUNT(DISTINCT booking_id) AS bookings
-            FROM (SELECT f.*,
-                         CAST(EXTRACT(ISODOW FROM local_hour) AS integer) AS weekday,
-                         CAST(EXTRACT(HOUR FROM local_hour) AS integer) AS hour,
-                         CAST(date_trunc(:granularity, local_hour) AS date) AS bucket
-                  FROM facts f) x
+                   CAST(FLOOR(SUM(seconds) / 60) AS bigint) AS minutes, CAST(0 AS bigint) AS bookings
+            FROM cells
             GROUP BY GROUPING SETS ((court_id, closure), (card_id), (weekday, hour, closure),
                                    (bucket, closure))
+            UNION ALL
+            SELECT 'COURT', court_id, NULL, NULL, NULL, NULL, closure, 0, COUNT(*)
+            FROM (SELECT DISTINCT court_id, closure, booking_id FROM held) per_court
+            GROUP BY court_id, closure
+            UNION ALL
+            SELECT 'CARD', NULL, card_id, NULL, NULL, NULL, closure, 0, COUNT(*)
+            FROM (SELECT DISTINCT card_id, closure, booking_id FROM held) per_card
+            GROUP BY card_id, closure
             """;
 
     private static final String RETIRED_COURTS_HELD = "WITH " + BOUNDS + """
@@ -171,7 +176,8 @@ class BookingStatisticsService implements BookingStatistics {
                 hourFigures(calendar.hourSeconds(from, to), courtCount, facts),
                 granularity,
                 buckets(from, to, granularity, calendar, activeCourts(courts),
-                        retiredCourtsByBucket(from, to, granularity), facts));
+                        courts.stream().allMatch(Court::isActive)
+                                ? Map.of() : retiredCourtsByBucket(from, to, granularity), facts));
     }
 
     @Override
@@ -259,6 +265,8 @@ class BookingStatisticsService implements BookingStatistics {
     }
 
     private List<Fact> facts(LocalDate from, LocalDate to, Granularity granularity) {
+        // The planner cannot size the generated series, and compiling for its estimate costs more than the query.
+        jdbc.sql("SET LOCAL jit = off").update();
         Map<String, Object> parameters = new HashMap<>(periodParameters(from, to));
         parameters.put("granularity", granularity == Granularity.WEEK ? "week" : "month");
         return jdbc.sql(UTILISATION).params(parameters).query(BookingStatisticsService::fact).list();
@@ -344,15 +352,16 @@ class BookingStatisticsService implements BookingStatistics {
     }
 
     private List<CardFigures> cardFigures(List<Fact> facts) {
-        Map<UUID, Fact> byCard = facts.stream().filter(fact -> fact.dimension().equals("CARD"))
-                .collect(Collectors.toMap(Fact::cardId, fact -> fact));
+        Map<UUID, List<Fact>> byCard = facts.stream().filter(fact -> fact.dimension().equals("CARD"))
+                .collect(Collectors.groupingBy(Fact::cardId));
         return cards.allCards().stream()
                 .sorted(Comparator.comparing(BookingCard::getLabel))
                 .map(card -> {
-                    Fact fact = byCard.get(card.getId());
+                    List<Fact> rows = byCard.getOrDefault(card.getId(), List.of());
                     return new CardFigures(card.getId(), card.getLabel(), card.getColor(),
                             BookingCard.COURT_CLOSED.equals(card.getId()),
-                            fact == null ? 0 : fact.bookings(), fact == null ? 0 : fact.minutes());
+                            rows.stream().mapToLong(Fact::bookings).sum(),
+                            rows.stream().mapToLong(Fact::minutes).sum());
                 })
                 .toList();
     }
