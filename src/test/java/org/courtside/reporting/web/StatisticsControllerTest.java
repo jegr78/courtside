@@ -141,6 +141,41 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenACourtDeactivatedAfterItWasBooked_whenReadingItsPeriod_thenItCountsAsCapacityOnlyWhereItWasHeld()
+            throws Exception {
+        // given
+        openEveryDay(LocalTime.of(8, 0), LocalTime.of(12, 0));
+        UUID centre = facility.createCourt(1, "Centre");
+        UUID retired = facility.createCourt(2, "Clay");
+        facility.createInactiveCourt(3, "Grass");
+        allocate(booking(MEMBER_CARD, "CONFIRMED", null), centre,
+                "2026-05-05T06:00:00Z", "2026-05-05T10:00:00Z", "CONFIRMED");
+        allocate(booking(MEMBER_CARD, "CONFIRMED", null), retired,
+                "2026-05-05T06:00:00Z", "2026-05-05T10:00:00Z", "CONFIRMED");
+        facility.deactivateCourt(retired);
+
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/utilisation")
+                        .param("from", "2026-05-05").param("to", "2026-05-05"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totals.courtCount").value(2))
+                .andExpect(jsonPath("$.totals.capacityMinutes").value(480))
+                .andExpect(jsonPath("$.totals.bookedMinutes").value(480))
+                .andExpect(jsonPath("$.totals.occupancy").value(closeTo(1.0, 1e-9), Double.class))
+                .andExpect(jsonPath(hour(2, 8) + ".occupancy").value(closeTo(1.0, 1e-9), Double.class));
+        mockMvc.perform(get("/api/admin/statistics/utilisation")
+                        .param("from", "2026-05-05").param("to", "2026-05-12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totals.courtCount").value(2))
+                .andExpect(jsonPath("$.totals.occupancy").value(closeTo(480.0 / 3840, 1e-9), Double.class))
+                .andExpect(jsonPath("$.progression.buckets[0].totals.courtCount").value(2))
+                .andExpect(jsonPath("$.progression.buckets[0].totals.capacityMinutes").value(2880))
+                .andExpect(jsonPath("$.progression.buckets[1].totals.courtCount").value(1))
+                .andExpect(jsonPath("$.progression.buckets[1].totals.capacityMinutes").value(480))
+                .andExpect(jsonPath("$.previous.totals.courtCount").value(1));
+    }
+
+    @Test
     void givenACourtHeldThroughTheAutumnChange_whenReadingThatDay_thenTheRepeatedHourCountsTwice() throws Exception {
         // given
         openEveryDay(LocalTime.of(1, 0), LocalTime.of(5, 0));

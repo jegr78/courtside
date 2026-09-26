@@ -2235,7 +2235,9 @@ components:
           type: integer
           format: int32
           minimum: 0
-          description: Every court the club has, active or not.
+          description: |
+            Courts active now, plus inactive courts that held a confirmed allocation in the scope
+            these totals cover.
         capacityMinutes:
           type: integer
           format: int64
@@ -6584,9 +6586,11 @@ paths:
       operationId: readUtilisationStatistics
       summary: How full the courts were in a period, and when.
       description: |
-        Open time comes from the weekly opening hours as they are configured now, for every court
-        the club has, active or not, because the product keeps no dated opening hours and no dated
-        court availability. Only confirmed allocations count, and only their minutes inside open
+        Open time comes from the weekly opening hours as they are configured now, because the
+        product keeps no dated opening hours and no dated court availability. For the same reason a
+        court counts towards capacity when it is active now or when it held a confirmed allocation
+        in the scope being computed: the period for the totals and the hours of the week, the
+        bucket for each progression entry. Only confirmed allocations count, and only their minutes inside open
         time. Allocations under the shipped "court closed" card are closures: they are reported
         as `closedMinutes` and taken out of the time a court could have been booked, so occupancy
         is `bookedMinutes / (capacityMinutes - closedMinutes)`. An allocation crossing either end

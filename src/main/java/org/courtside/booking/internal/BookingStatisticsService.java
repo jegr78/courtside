@@ -25,6 +25,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -116,6 +117,26 @@ class BookingStatisticsService implements BookingStatistics {
                                    (bucket, closure))
             """;
 
+    private static final String RETIRED_COURTS_HELD = "WITH " + BOUNDS + """
+            ,
+            held AS (
+                SELECT a.court_id, GREATEST(a.starts_at, bounds.starts_at) AS starts_at,
+                       LEAST(a.ends_at, bounds.ends_at) AS ends_at
+                FROM court_allocation a
+                JOIN court c ON c.id = a.court_id AND NOT c.active
+                CROSS JOIN bounds
+                WHERE a.status = 'CONFIRMED'
+                  AND a.starts_at < bounds.ends_at
+                  AND a.ends_at > bounds.starts_at
+            )
+            SELECT DISTINCT h.court_id, CAST(bucket.starts_on AS date) AS bucket
+            FROM held h
+            CROSS JOIN LATERAL generate_series(
+                date_trunc(:granularity, timezone(:zone, h.starts_at)),
+                timezone(:zone, h.ends_at - interval '1 microsecond'),
+                CAST('1 ' || :granularity AS interval)) AS bucket(starts_on)
+            """;
+
     private final JdbcClient jdbc;
     private final FacilityService facility;
     private final CardService cards;
@@ -131,21 +152,23 @@ class BookingStatisticsService implements BookingStatistics {
         List<Court> courts = facility.allCourts().stream()
                 .sorted(Comparator.comparingInt(Court::getNumber)).toList();
         long openMinutes = calendar.openSeconds(from, to) / 60;
+        int courtCount = countedCourts(courts, facts);
         return new Utilisation(
-                totals(openMinutes, courts.size(), facts, "COURT"),
+                totals(openMinutes, courtCount, facts, "COURT"),
                 courtFigures(courts, openMinutes, facts),
                 cardFigures(facts),
-                hourFigures(calendar.hourSeconds(from, to), courts.size(), facts),
+                hourFigures(calendar.hourSeconds(from, to), courtCount, facts),
                 granularity,
-                buckets(from, to, granularity, calendar, courts.size(), facts));
+                buckets(from, to, granularity, calendar, activeCourts(courts),
+                        retiredCourtsByBucket(from, to, granularity), facts));
     }
 
     @Override
     public UtilisationTotals utilisationTotals(LocalDate from, LocalDate to) {
         requirePeriod(from, to);
         long openMinutes = calendar().openSeconds(from, to) / 60;
-        return totals(openMinutes, facility.allCourts().size(), facts(from, to, Granularity.WEEK),
-                "COURT");
+        List<Fact> facts = facts(from, to, Granularity.WEEK);
+        return totals(openMinutes, countedCourts(facility.allCourts(), facts), facts, "COURT");
     }
 
     @Override
@@ -228,6 +251,25 @@ class BookingStatisticsService implements BookingStatistics {
         Map<String, Object> parameters = new HashMap<>(periodParameters(from, to));
         parameters.put("granularity", granularity == Granularity.WEEK ? "week" : "month");
         return jdbc.sql(UTILISATION).params(parameters).query(BookingStatisticsService::fact).list();
+    }
+
+    // A court counts where it is active now or held a confirmed allocation, since no availability is dated.
+    private static int countedCourts(List<Court> courts, List<Fact> facts) {
+        Set<UUID> held = facts.stream().filter(fact -> fact.dimension().equals("COURT"))
+                .map(Fact::courtId).collect(Collectors.toSet());
+        return (int) courts.stream().filter(court -> court.isActive() || held.contains(court.getId())).count();
+    }
+
+    private static int activeCourts(List<Court> courts) {
+        return (int) courts.stream().filter(Court::isActive).count();
+    }
+
+    private Map<LocalDate, Long> retiredCourtsByBucket(LocalDate from, LocalDate to, Granularity granularity) {
+        Map<String, Object> parameters = new HashMap<>(periodParameters(from, to));
+        parameters.put("granularity", granularity == Granularity.WEEK ? "week" : "month");
+        return jdbc.sql(RETIRED_COURTS_HELD).params(parameters)
+                .query((rs, row) -> rs.getObject("bucket", LocalDate.class)).list().stream()
+                .collect(Collectors.groupingBy(bucket -> bucket, Collectors.counting()));
     }
 
     private Map<String, Object> periodParameters(LocalDate from, LocalDate to) {
@@ -326,7 +368,8 @@ class BookingStatisticsService implements BookingStatistics {
     }
 
     private static List<Bucket> buckets(LocalDate from, LocalDate to, Granularity granularity,
-                                        OpenTimeCalendar calendar, int courtCount, List<Fact> facts) {
+                                        OpenTimeCalendar calendar, int activeCourts,
+                                        Map<LocalDate, Long> retiredCourts, List<Fact> facts) {
         Map<LocalDate, List<Fact>> byBucket = facts.stream()
                 .filter(fact -> fact.dimension().equals("BUCKET") && fact.bucket() != null)
                 .collect(Collectors.groupingBy(Fact::bucket));
@@ -339,6 +382,7 @@ class BookingStatisticsService implements BookingStatistics {
             LocalDate last = granularity == Granularity.WEEK
                     ? key.plusDays(6) : key.with(TemporalAdjusters.lastDayOfMonth());
             LocalDate endsOn = last.isAfter(to) ? to : last;
+            int courtCount = activeCourts + retiredCourts.getOrDefault(key, 0L).intValue();
             buckets.add(new Bucket(startsOn, endsOn, totals(calendar.openSeconds(startsOn, endsOn) / 60,
                     courtCount, byBucket.getOrDefault(key, List.of()), "BUCKET")));
             startsOn = endsOn.plusDays(1);

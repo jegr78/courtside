@@ -338,8 +338,9 @@ defaults to the last full calendar month, answers aggregates only and repeats it
 equally long period before it. None of them names a person.
 
 - Utilisation counts confirmed allocations inside open time. Open time comes from today's weekly
-  opening hours for every court, active or not, because neither hours nor court availability are
-  dated. Allocations under the shipped "court closed" card are closures: they are reported
+  opening hours, because neither hours nor court availability are dated. A court counts towards
+  capacity when it is active now or held a confirmed allocation in the scope computed: the period
+  for the totals and the weekday and hour grid, each bucket for the progression. Allocations under the shipped "court closed" card are closures: they are reported
   separately and taken out of the bookable time, so occupancy is booked time divided by open time
   minus closed time. A club card of its own is never treated as a closure. The weekday and hour
   grid uses club-local hours, and the progression uses ISO weeks up to 92 days and calendar months
