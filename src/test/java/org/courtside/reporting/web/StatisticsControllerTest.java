@@ -342,6 +342,9 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
                 "2026-05-08T08:00:00Z", "2026-05-08T12:00:00Z", "CONFIRMED");
         allocate(booking(MEMBER_CARD, "CONFIRMED", null), clay,
                 "2026-05-03T21:00:00Z", "2026-05-03T23:00:00Z", "CONFIRMED");
+        UUID startedBefore = booking(MEMBER_CARD, "CONFIRMED", null);
+        allocate(startedBefore, centre, "2026-05-03T20:00:00Z", "2026-05-03T21:00:00Z", "CONFIRMED");
+        allocate(startedBefore, clay, "2026-05-04T08:00:00Z", "2026-05-04T09:00:00Z", "CONFIRMED");
 
         // when / then
         mockMvc.perform(get("/api/admin/statistics/bookings")
@@ -357,7 +360,7 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.participantCards[?(@.cardId == '" + BALL_MACHINE + "')].uses").value(1))
                 .andExpect(jsonPath("$.participantCards[?(@.cardId == '" + LOOKING_FOR_A_PARTNER + "')].uses").value(0))
                 .andExpect(jsonPath("$.previous.period.from").value("2026-04-27"))
-                .andExpect(jsonPath("$.previous.figures.confirmed").value(1))
+                .andExpect(jsonPath("$.previous.figures.confirmed").value(2))
                 .andExpect(jsonPath("$.previous.figures.cancelled").value(0))
                 .andExpect(jsonPath("$.previous.figures.cancellationRate").value(closeTo(0.0, 1e-9), Double.class));
     }
