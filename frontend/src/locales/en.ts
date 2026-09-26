@@ -861,6 +861,7 @@ const en: Record<keyof typeof de, string> = {
   "error.type.court-unavailable": "Someone else just booked this court. Choose another time.",
   "error.type.credential-issue-rate-limited": "This account has been sent credentials too often. Try again later.",
   "error.type.database-lock-unavailable": "Courtside is busy right now. Try again in a moment.",
+  "error.type.statement-timeout": "This took too long to work out. Ask for a shorter period.",
   "error.type.facility-utilisation-period-invalid": "No utilisation can be reported for this period. Check its start and end.",
   "error.type.statistics-period-invalid": "No statistics can be read for this period. Check its start and end.",
   "error.type.idempotency-key-reused": "The page sent a request Courtside cannot process. Reload the page and try again.",

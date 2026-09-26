@@ -6611,6 +6611,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/admin/statistics/utilisation:
     get:
@@ -6631,6 +6633,9 @@ paths:
         The period spans at most 36,525 days. The progression is bucketed by ISO week (Monday to Sunday)
         for periods of up to 92 days and by calendar month beyond; the first and last bucket are
         cut at the period's ends. Administrators only.
+
+        Every statistics read stops after 30 seconds of database work and answers `503` with
+        `urn:courtside:error:statement-timeout`; a shorter period is the remedy.
       security:
         - sessionCookie: []
       parameters:
@@ -6648,6 +6653,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/admin/statistics/bookings:
     get:
@@ -6676,6 +6683,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/admin/statistics/members:
     get:
@@ -6709,6 +6718,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/admin/statistics/messages:
     get:
@@ -6735,6 +6746,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/admin/messages:
     get:

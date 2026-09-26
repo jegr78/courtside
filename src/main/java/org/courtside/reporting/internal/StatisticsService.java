@@ -6,6 +6,7 @@ import org.courtside.config.ClubTimeZone;
 import org.courtside.identity.AccountStatistics;
 import org.courtside.member.MembershipStatistics;
 import org.courtside.notification.MessageStatistics;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,12 +21,16 @@ import java.util.function.Function;
 @Transactional(readOnly = true)
 public class StatisticsService {
 
+    // A read over a long period must give its connection back rather than hold it indefinitely.
+    private static final String STATEMENT_TIMEOUT = "30s";
+
     private final BookingStatistics bookings;
     private final MembershipStatistics memberships;
     private final AccountStatistics accounts;
     private final MessageStatistics messages;
     private final ClubTimeZone clubTimeZone;
     private final Clock clock;
+    private final JdbcClient jdbc;
 
     public record Compared<T>(StatisticsPeriod period, T figures) {
     }
@@ -60,12 +65,14 @@ public class StatisticsService {
     }
 
     public RangeReport range() {
+        limitStatementTime();
         return new RangeReport(bookings.firstBookingOn().orElse(null),
                 LocalDate.ofInstant(clock.instant(), clubTimeZone.zoneId()), timeZone());
     }
 
     public UtilisationReport utilisation(LocalDate from, LocalDate to) {
         StatisticsPeriod period = resolve(from, to);
+        limitStatementTime();
         return new UtilisationReport(period, timeZone(),
                 bookings.utilisation(period.from(), period.to()),
                 previous(period, p -> bookings.utilisationTotals(p.from(), p.to())));
@@ -73,6 +80,7 @@ public class StatisticsService {
 
     public BookingReport bookings(LocalDate from, LocalDate to) {
         StatisticsPeriod period = resolve(from, to);
+        limitStatementTime();
         return new BookingReport(period, timeZone(),
                 bookings.bookingFigures(period.from(), period.to()),
                 previous(period, p -> bookings.bookingFigures(p.from(), p.to())),
@@ -81,6 +89,7 @@ public class StatisticsService {
 
     public MemberReport members(LocalDate from, LocalDate to) {
         StatisticsPeriod period = resolve(from, to);
+        limitStatementTime();
         return new MemberReport(period, timeZone(), memberFigures(period),
                 previous(period, this::memberFigures),
                 memberships.runningByType(period.to()),
@@ -89,6 +98,7 @@ public class StatisticsService {
 
     public MessageReport messages(LocalDate from, LocalDate to) {
         StatisticsPeriod period = resolve(from, to);
+        limitStatementTime();
         return new MessageReport(period, timeZone(),
                 messages.queuedBetween(period.from(), period.to()),
                 previous(period, p -> messages.queuedBetween(p.from(), p.to())));
@@ -99,6 +109,10 @@ public class StatisticsService {
         long active = bookings.activeMembers(period.from(), period.to());
         return new MemberFigures(membership.running(), membership.joins(), membership.leavings(), active,
                 membership.running() == 0 ? null : (double) active / membership.running());
+    }
+
+    private void limitStatementTime() {
+        jdbc.sql("SET LOCAL statement_timeout = '" + STATEMENT_TIMEOUT + "'").update();
     }
 
     private StatisticsPeriod resolve(LocalDate from, LocalDate to) {

@@ -337,7 +337,8 @@ messages. Each takes a period of club-local dates in the years 0001 to 9999 span
 36,525 days, defaults to the last full calendar month, answers aggregates only and repeats its figures for the
 equally long period before it. None of them names a person. A fifth read, `range`, answers the
 club-local date of the earliest allocation of any booking and today's date, so "all time" is the
-period between them.
+period between them. Each read runs its statements under a 30-second statement timeout and answers
+`503` with `urn:courtside:error:statement-timeout` when it runs out.
 
 - Utilisation counts confirmed allocations inside open time. Open time comes from today's weekly
   opening hours, because neither hours nor court availability are dated. A court counts towards

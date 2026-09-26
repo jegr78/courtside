@@ -14,6 +14,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -68,6 +69,17 @@ class SharedExceptionHandler {
     @ExceptionHandler({PessimisticLockException.class, PessimisticLockingFailureException.class})
     ProblemDetail handleUnavailableDatabaseLock(Exception exception) {
         ProblemDetail problem = unavailableDatabaseLock();
+        logAnswered(problem);
+        return problem;
+    }
+
+    @ExceptionHandler(QueryTimeoutException.class)
+    ProblemDetail handleStatementTimeout(QueryTimeoutException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                "The request took longer than this instance allows; ask for less at once");
+        problem.setType(URI.create("urn:courtside:error:statement-timeout"));
+        problem.setTitle("Statement timed out");
+        problem.setProperty("retryable", false);
         logAnswered(problem);
         return problem;
     }

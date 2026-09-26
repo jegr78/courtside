@@ -297,7 +297,7 @@
         "readMessageStatistics"
       ],
       "growthDrivers": "Roster export grows with matching members, subject access with one person's retained history, booking export and reporting with allocations in the selected period, and statistics with allocations, members, accounts and messages in the period plus one progression bucket per week or month of it.",
-      "inputOrDataBound": "Booking export and utilisation report periods stop at 366 days and subject access stops at one person. Statistics periods stop at 36,525 days in the years 0001 to 9999, so the progression answers at most about 1,200 monthly buckets. Open time is computed per weekday and per daylight-saving change rather than per day. Each allocation is clipped to the period before it is split into days and open hours, so that splitting is bounded by the period even though an allocation itself has no length ceiling. Roster and retained person history have no row ceiling beyond the club's own data set.",
+      "inputOrDataBound": "Booking export and utilisation report periods stop at 366 days and subject access stops at one person. Statistics periods stop at 36,525 days in the years 0001 to 9999, so the progression answers at most about 1,200 monthly buckets. Open time is computed per weekday and per daylight-saving change rather than per day. Each allocation is clipped to the period before it is split into days and open hours, so that splitting is bounded by the period even though an allocation itself has no length ceiling. Every statistics read runs under a 30-second statement timeout. Roster and retained person history have no row ceiling beyond the club's own data set.",
       "concurrencyOrRateBound": "These administrator-only synchronous reads have no per-operation concurrency gate; container, database pool and deployment resource limits are the outer bound.",
       "executionModel": "The application reads and renders each response synchronously; roster pagination uses pages of 200 internally before constructing one response file.",
       "failureBehavior": "Invalid periods and encodings fail before export; a database or rendering failure returns no successful file rather than a partial application state change.",
@@ -317,7 +317,8 @@
         "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenMoreThan366Days_whenReportingUtilisation_thenThePeriodLimitIsReturned",
         "src/test/java/org/courtside/dataexchange/internal/RosterExportServiceTest.java#givenMorePeopleThanOnePageHolds_whenTheRosterIsExported_thenTheFileHoldsEveryOne",
         "src/test/java/org/courtside/reporting/StatisticsQueryBudgetTest.java#givenMoreBookingsCourtsAndARetiredCourt_whenReadingEverySection_thenTheStatementCountStaysTheSame",
-        "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAHundredYearsAndADay_whenReadingUtilisation_thenThePeriodIsRefusedAsTooLong"
+        "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAHundredYearsAndADay_whenReadingUtilisation_thenThePeriodIsRefusedAsTooLong",
+        "src/test/java/org/courtside/reporting/web/StatisticsStatementTimeoutTest.java#givenEveryStatisticsRead_whenItQueriesTheDatabase_thenItsTransactionCarriesTheStatementTimeout"
       ]
     },
     {

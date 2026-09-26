@@ -859,6 +859,7 @@ const de = {
   "error.type.court-unavailable": "Dieser Platz wurde gerade anderweitig gebucht. Bitte wähle einen anderen Termin.",
   "error.type.credential-issue-rate-limited": "Diesem Konto wurden zu oft Zugangsdaten geschickt. Versuche es später erneut.",
   "error.type.database-lock-unavailable": "Courtside ist gerade beschäftigt. Versuche es in einem Moment erneut.",
+  "error.type.statement-timeout": "Das hat zu lange gedauert. Wähle einen kürzeren Zeitraum.",
   "error.type.facility-utilisation-period-invalid": "Für diesen Zeitraum lässt sich keine Auslastung berechnen. Prüfe Beginn und Ende.",
   "error.type.statistics-period-invalid": "Für diesen Zeitraum lassen sich keine Statistiken berechnen. Prüfe Beginn und Ende.",
   "error.type.idempotency-key-reused": "Die Seite hat eine Anfrage gesendet, die Courtside nicht verarbeiten kann. Lade die Seite neu und versuche es erneut.",
