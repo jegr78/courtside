@@ -29,7 +29,7 @@ services:
       - "127.0.0.1::8080"
 
   proxy:
-    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     security_opt:
       - no-new-privileges:true
     environment:
@@ -41,7 +41,7 @@ services:
       - caddy-config:/config
 
   mail-certificate:
-    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -67,7 +67,7 @@ services:
       retries: 2
 
   mail-reload:
-    image: node:26-alpine@sha256:ef24c5053d50fdc3e4e56eb4e7ddb7861874ab0fdc797046ba897581deb8e868
+    image: node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -97,7 +97,7 @@ services:
       retries: 2
 
   sink:
-    image: axllent/mailpit:v1.31@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
+    image: axllent/mailpit:v1.31@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
     security_opt:
       - no-new-privileges:true
     ports:

@@ -55,7 +55,7 @@ services:
       - "127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT:-8081}:8080"
 
   mail-certificate:
-    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     profiles: [mail]
     restart: unless-stopped
     logging: *logging
@@ -89,7 +89,7 @@ services:
       start_period: 60s
 
   mail-reload:
-    image: node:26-alpine@sha256:ef24c5053d50fdc3e4e56eb4e7ddb7861874ab0fdc797046ba897581deb8e868
+    image: node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80
     profiles: [mail]
     restart: unless-stopped
     logging: *logging

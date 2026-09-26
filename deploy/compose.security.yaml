@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     pull_policy: never
     environment:
       POSTGRES_DB: courtside_security
@@ -115,7 +115,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   callback:
-    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     pull_policy: never
     command: ["caddy", "respond", "--listen", ":8080", "--body", "callback-ok"]
     read_only: true
@@ -139,7 +139,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   proxy:
-    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     pull_policy: never
     read_only: true
     tmpfs:
