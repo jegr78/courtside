@@ -186,6 +186,35 @@ describe("AdminStatisticsView", () => {
     expect(screen.getByTestId("statistics-active-share-change")).toHaveTextContent("-1 percentage points");
   });
 
+  it("given a period after a quiet one, when the figures show, then time and counts rise by their amount and empty lists are left out", async () => {
+    // given
+    reads();
+    vi.spyOn(api, "utilisationStatistics").mockResolvedValue({
+      ...utilisation, previous: { period: before, totals: totals(0, 600, null) }
+    });
+    vi.spyOn(api, "bookingStatistics").mockResolvedValue({
+      ...bookings,
+      figures: { confirmed: 0, cancelled: 0, cancellationRate: null, series: 0, single: 0, withGuests: 0, guestEntries: 0 },
+      participantCards: []
+    });
+    vi.spyOn(api, "memberStatistics").mockResolvedValue({
+      ...members, figures: { ...members.figures, activeShare: null }, membershipTypes: []
+    });
+
+    // when
+    show();
+
+    // then
+    await loaded();
+    expect(screen.getByTestId("statistics-booked-change")).toHaveTextContent("+50:00 against the period before");
+    expect(screen.queryByTestId("statistics-occupancy-change")).toBeNull();
+    expect(screen.getByTestId("statistics-cancellation-rate-value")).toHaveTextContent("-");
+    expect(screen.getByTestId("statistics-series-bar")).toHaveStyle({ width: "0%" });
+    expect(screen.getByTestId("statistics-active-share-value")).toHaveTextContent("-");
+    expect(screen.queryByTestId("statistics-participant-cards")).toBeNull();
+    expect(screen.queryByTestId("statistics-membership-types")).toBeNull();
+  });
+
   it("given no period before the chosen one, when the figures show, then no change is claimed", async () => {
     // given
     reads();
