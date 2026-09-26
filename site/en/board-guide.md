@@ -9,10 +9,6 @@ Only enabled accounts with the **Administrator** role can open the administratio
 see *Administration* in the main navigation. Other accounts cannot enter by typing the address
 directly.
 
-Administration opens on the *Overview*. It shows today's bookings, the people without a password of
-their own, refused or failed messages and the latest changes. Each part leads to the page where you
-continue. While a required setup step is still open, setup sits unfolded at the top.
-
 The sidebar leads to the overview at the top and divides administration below it into four areas:
 
 | Area | Contents |
@@ -25,6 +21,17 @@ The sidebar leads to the overview at the top and divides administration below it
 The same sidebar returns you to the court plan.
 
 ![The administration navigation with four areas and the link to the court plan.](../screenshots/en/admin-navigation.png)
+
+## The overview
+
+Administration opens on the *Overview*. It shows today's bookings and the ones still to come, the
+people without a password of their own, refused or failed messages and the latest changes. Each
+part leads to the page where you continue, already filtered.
+
+While a required setup step is still open, setup sits unfolded at the top. Once all of them are
+done, the overview sums setup up in one line. Selecting it unfolds the steps again.
+
+![The overview with today's bookings, accounts without a password of their own, messages and changes.](../screenshots/en/admin-overview.png)
 
 ## Saving changes
 
@@ -59,9 +66,7 @@ Complete the steps in this order:
 5. **Import members.** This is only needed when another membership system holds the authoritative
    list.
 
-You can leave the checklist at any time. Courtside recalculates its state when you return. Once
-every required step is complete, the administration overview sums up setup in one line. Selecting
-it unfolds the steps again.
+You can leave the checklist at any time. Courtside recalculates its state when you return.
 
 ![The setup checklist with five steps and their current state.](../screenshots/en/admin-setup.png)
 

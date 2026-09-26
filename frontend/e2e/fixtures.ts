@@ -172,6 +172,15 @@ export async function selectJourneyDate(page: Page, visualDate: string): Promise
   await day.click();
 }
 
+// The seeded bookings lie on the visual date, so a page that reads today needs its morning.
+export async function onTheVisualDay(page: Page, visualDate: string): Promise<void> {
+  await page.clock.setFixedTime(new Date(`${visualDate}T06:00:00Z`));
+}
+
+export async function backAtTheJourneyInstant(page: Page): Promise<void> {
+  await page.clock.setFixedTime(new Date(journeyInstant));
+}
+
 // The overview renders every card's loading line in its first frame, so none left means all answered.
 export async function expectAdministrationOverview(page: Page): Promise<void> {
   const overview = page.getByTestId("admin-overview-view");

@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
-import { expect, selectJourneyDate, test } from "./fixtures";
+import { expect, onTheVisualDay, selectJourneyDate, test } from "./fixtures";
 import { PROXY_BOUNDARY_HOST } from "./global-setup";
 
 const payload = `<img src=x onerror="globalThis.__courtsideXss='executed'">cross-role`;
@@ -471,7 +471,7 @@ test("stored text projections remain inert on administrative and managed views",
   await expect(auditRow.getByTestId("audit-subject")).toHaveText("1");
   await expect(auditRow.getByTestId("audit-actor")).toHaveText(payload);
   await expect(auditRow.getByTestId("audit-message")).toContainText(payload);
-  await page.clock.setFixedTime(new Date(`${journeyService.visualDate}T04:00:00Z`));
+  await onTheVisualDay(page, journeyService.visualDate);
   await page.goto("/admin");
   const latestChange = page.getByTestId("overview-changes-entry").first();
   await expect(latestChange, "the newest recorded change leads the overview as text").toContainText(payload);
