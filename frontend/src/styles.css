@@ -41,6 +41,11 @@
   --cs-notice-info-surface: var(--cs-raised);
   --cs-notice-info-border: var(--cs-border);
   --cs-notice-info-text: var(--cs-text);
+  --cs-heat-1: #2f2920;
+  --cs-heat-2: #483023;
+  --cs-heat-3: #603826;
+  --cs-heat-4: #783f29;
+  --cs-heat-5: #91472c;
   font-family: "Archivo Variable", Archivo, ui-sans-serif, system-ui, sans-serif;
   color: var(--cs-text);
   background: var(--cs-page);
@@ -70,6 +75,11 @@
   --cs-notice-success-surface: oklch(97.9% 0.021 166.113);
   --cs-notice-success-border: oklch(84.5% 0.143 164.978);
   --cs-notice-success-text: oklch(37.8% 0.077 168.94);
+  --cs-heat-1: #f5eae6;
+  --cs-heat-2: #ecd5cd;
+  --cs-heat-3: #e2c0b4;
+  --cs-heat-4: #d7a898;
+  --cs-heat-5: #cc8f7b;
 }
 
 body {
@@ -245,6 +255,16 @@ input[type="time"] {
     background: CanvasText;
   }
 }
+
+.stat-heat-table td {
+  color: var(--cs-text);
+}
+
+.stat-heat-1 { background: var(--cs-heat-1); }
+.stat-heat-2 { background: var(--cs-heat-2); }
+.stat-heat-3 { background: var(--cs-heat-3); }
+.stat-heat-4 { background: var(--cs-heat-4); }
+.stat-heat-5 { background: var(--cs-heat-5); }
 
 .day-plan-table {
   width: 100%;

@@ -687,3 +687,15 @@ it("given a period, when reading each statistics section, then the section is as
     "/api/admin/statistics/range"
   ]);
 });
+
+it("given the statistics range, when it is read, then the client asks the range read and returns its answer", async () => {
+  // given
+  server.use(http.get("/api/admin/statistics/range", () =>
+    HttpResponse.json({ firstBookingOn: "2024-04-12", today: "2026-09-26" })));
+
+  // when
+  const range = await api.statisticsRange();
+
+  // then
+  expect(range).toEqual({ firstBookingOn: "2024-04-12", today: "2026-09-26" });
+});

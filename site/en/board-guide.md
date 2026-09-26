@@ -16,7 +16,7 @@ The sidebar leads to the overview at the top and divides administration below it
 | **Club** | Setup, club profile, deadlines and reminders, booking rules |
 | **Facility** | Courts, opening hours, booking cards and slot fillers |
 | **People** | People, accounts, membership types and imports |
-| **Records** | Utilisation, data exports, change log and message log |
+| **Records** | Statistics, data exports, change log and message log |
 
 The same sidebar returns you to the court plan.
 
@@ -356,10 +356,22 @@ roles again.
 
 The **Records** area has five views.
 
-* **Utilisation** opens on the last full month. For each court it shows the confirmed playing time
-  and its share of the opening hours in the period. It includes courts without bookings. The share
-  uses the opening hours as they are configured today. Time booked outside the opening hours does
-  not count towards it, and closures count as occupied.
+* **Statistics** opens on the last full month. At the top you choose another period: 7 days, 1, 3,
+  6 or 12 months up to today, everything since the first booking, the previous calendar year or two
+  dates of your own. The period is part of the page address, so a bookmark opens the same figures
+  again. Every key figure states its change against the equally long period before. All figures
+  are totals and name nobody.
+  * Utilisation shows occupancy, booked and closed time, the progression week by week or month by
+    month, a table by weekday and hour, and the figures per court and per booking card. Occupancy
+    is booked time divided by open time without closures. It uses the opening hours as they are
+    configured today. Time played outside the opening hours does not count.
+  * Booking behaviour shows confirmed and cancelled bookings, the cancellation rate, series and
+    single bookings, guests and the slot fillers used.
+  * Members shows the members at the end of the period, joins, leavings, active members, membership
+    types and accounts. An active member holds a membership at the end of the period and booked or
+    was entered into a confirmed booking within it. For periods whose bookings have been
+    pseudonymised, this figure is unavailable.
+  * Messages counts per kind how many are in progress, handed over, refused or failed.
 * **Data export** creates CSV files for bookings or members. The booking export omits the person who
   booked. The member export contains personal data and creates no change-log entry.
 * **Change log** lists administrative changes with time, subject and acting account. Search by a
@@ -373,7 +385,7 @@ The **Records** area has five views.
   durable log archive and cannot inspect arbitrary server containers. The source is not
   authenticated: a local process on the server can imitate one of the fixed source names.
 
-![Utilisation by court with booking count, occupied time and share of the opening hours.](../screenshots/en/utilisation.png)
+![Statistics with the period choice and the utilisation key figures with their change.](../screenshots/en/utilisation.png)
 
 ## Two rules that hold everywhere
 

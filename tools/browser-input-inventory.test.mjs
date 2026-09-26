@@ -68,6 +68,11 @@ const BOUNDARIES = {
     classification: "passed to the instance, which answers the refusal the view reports",
     test: "src/views/AdminAuditView.test.tsx#given a subject the address names but the instance refuses, when the log is opened, then the refusal is shown instead of an unfiltered log"
   },
+  "src/views/AdminStatisticsView.tsx useSearchParams": {
+    value: "the period the statistics are read for",
+    classification: "taken only as two real dates with the start not after the end, and the default period otherwise; the instance checks the period again",
+    test: "src/views/AdminStatisticsView.test.tsx#given an address whose period ends before it starts, when the statistics open, then the default period is read instead"
+  },
   "src/views/configuration/AdminRuleSetsView.tsx useSearchParams": {
     value: "the rule set the booking rules open on",
     classification: "compared with the ids of the rule sets the instance returned, and the first one otherwise",

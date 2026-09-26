@@ -17,7 +17,7 @@ Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter i
 | **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln |
 | **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
 | **Mitglieder** | Personen, Konten, Mitgliedsarten und Import |
-| **Nachweise** | Auslastung, Datenexport, Änderungsprotokoll und Nachrichtenprotokoll |
+| **Nachweise** | Statistik, Datenexport, Änderungsprotokoll und Nachrichtenprotokoll |
 
 Über dieselbe Leiste kehrst du zum Platzplan zurück.
 
@@ -371,10 +371,23 @@ aktivieren und Mitgliedsrollen neu vergeben.
 
 Unter **Nachweise** findest du fünf Ansichten.
 
-* **Auslastung** zeigt beim Öffnen den letzten vollen Monat. Für jeden Platz stehen dort die
-  bestätigte Spielzeit und ihr Anteil an den Öffnungszeiten des Zeitraums. Plätze ohne Buchung sind
-  enthalten. Der Anteil rechnet mit den Öffnungszeiten, wie sie heute eingestellt sind. Spielzeit
-  außerhalb der Öffnungszeiten zählt nicht dazu, Sperrungen zählen als belegt.
+* **Statistik** zeigt beim Öffnen den letzten vollen Monat. Oben wählst du einen anderen Zeitraum:
+  7 Tage, 1, 3, 6 oder 12 Monate bis heute, alles seit der ersten Buchung, das letzte Kalenderjahr
+  oder zwei Daten deiner Wahl. Der Zeitraum steht in der Adresse der Seite, ein Lesezeichen öffnet
+  also dieselbe Auswertung. Jede Kennzahl nennt ihre Veränderung gegenüber dem gleich langen
+  Zeitraum davor. Alle Zahlen sind Summen und nennen niemanden.
+  * Die Auslastung zeigt Belegung, gebuchte und gesperrte Zeit, den Verlauf je Woche oder Monat,
+    eine Tabelle nach Wochentag und Uhrzeit und die Werte je Platz und je Buchungskarte. Belegung
+    ist gebuchte Zeit geteilt durch die Öffnungszeit ohne Sperrungen. Sie rechnet mit den
+    Öffnungszeiten, wie sie heute eingestellt sind. Spielzeit außerhalb der Öffnungszeiten zählt
+    nicht.
+  * Das Buchungsverhalten zeigt bestätigte und stornierte Buchungen, die Stornoquote, Serien und
+    Einzelbuchungen, Gäste und genutzte Platzfüller.
+  * Bei den Mitgliedern stehen Bestand am Ende des Zeitraums, Eintritte, Austritte, aktive Mitglieder,
+    Mitgliedsarten und Konten. Aktiv ist, wer am Ende des Zeitraums Mitglied ist und im Zeitraum
+    eine bestätigte Buchung angelegt hat oder darin eingetragen war. Für Zeiträume, deren Buchungen
+    schon pseudonymisiert sind, fehlt diese Zahl.
+  * Die Nachrichten zählen je Art, wie viele in Arbeit, übergeben, abgelehnt oder fehlgeschlagen sind.
 * **Datenexport** erstellt CSV-Dateien für Buchungen oder Mitglieder. Der Buchungsexport enthält
   keine buchende Person. Der Mitgliederexport enthält personenbezogene Daten und erzeugt keinen
   Eintrag im Änderungsprotokoll.
@@ -390,7 +403,7 @@ Unter **Nachweise** findest du fünf Ansichten.
   kein dauerhaftes Logarchiv und zeigt keine beliebigen Container des Servers. Die Quelle ist nicht
   authentifiziert: Ein lokaler Prozess auf dem Server kann einen der festen Quellnamen nachahmen.
 
-![Die Auslastung je Platz mit Buchungszahl, belegter Zeit und Anteil an den Öffnungszeiten.](screenshots/de/utilisation.png)
+![Die Statistik mit Zeitraumwahl, Kennzahlen zur Auslastung und ihrer Veränderung.](screenshots/de/utilisation.png)
 
 ## Zwei Regeln, die überall gelten
 
