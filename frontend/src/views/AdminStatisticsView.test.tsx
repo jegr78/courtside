@@ -83,7 +83,7 @@ const messages: MessageStatistics = {
   previous: null
 };
 
-const range: StatisticsRange = { firstBookingOn: "2024-04-12", today: "2026-03-31" };
+const range: StatisticsRange = { firstBookingOn: "2024-04-12", today: "2026-03-31", timeZone: "Europe/Berlin" };
 
 function Address() {
   const location = useLocation();
@@ -461,7 +461,7 @@ describe("AdminStatisticsView", () => {
   it("given a club without any booking, when all time is chosen, then the page says so and asks nothing", async () => {
     // given
     const read = reads();
-    read.range.mockResolvedValue({ firstBookingOn: null, today: "2026-03-31" });
+    read.range.mockResolvedValue({ firstBookingOn: null, today: "2026-03-31", timeZone: "Europe/Berlin" });
     show();
     await loaded();
 

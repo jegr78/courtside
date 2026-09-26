@@ -60,7 +60,7 @@ describe("statistics periods", () => {
 
   it("given a first booking in the past, when choosing all time, then the period runs from it to today", () => {
     // when
-    const period = allTime({ firstBookingOn: "2024-04-12", today: "2026-09-26" });
+    const period = allTime({ firstBookingOn: "2024-04-12", today: "2026-09-26", timeZone: "Europe/Berlin" });
 
     // then
     expect(period).toEqual({ from: "2024-04-12", to: "2026-09-26" });
@@ -68,7 +68,7 @@ describe("statistics periods", () => {
 
   it("given only bookings still to come, when choosing all time, then the period is today alone rather than one ending before it starts", () => {
     // when
-    const period = allTime({ firstBookingOn: "2026-10-03", today: "2026-09-26" });
+    const period = allTime({ firstBookingOn: "2026-10-03", today: "2026-09-26", timeZone: "Europe/Berlin" });
 
     // then
     expect(period).toEqual({ from: "2026-09-26", to: "2026-09-26" });
@@ -76,7 +76,7 @@ describe("statistics periods", () => {
 
   it("given no booking at all, when choosing all time, then there is no period to read", () => {
     // when
-    const period = allTime({ firstBookingOn: null, today: "2026-09-26" });
+    const period = allTime({ firstBookingOn: null, today: "2026-09-26", timeZone: "Europe/Berlin" });
 
     // then
     expect(period).toBeUndefined();
@@ -84,7 +84,7 @@ describe("statistics periods", () => {
 
   it("given a period that equals a quick choice, when matching it, then that choice is named", () => {
     // given
-    const range = { firstBookingOn: "2024-04-12", today: "2026-09-26" };
+    const range = { firstBookingOn: "2024-04-12", today: "2026-09-26", timeZone: "Europe/Berlin" };
 
     // when / then
     expect(matchingChoice({ from: "2026-08-27", to: "2026-09-26" }, range)).toBe("1m");
