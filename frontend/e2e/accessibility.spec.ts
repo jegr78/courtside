@@ -22,7 +22,12 @@ async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.getByTestId("username").fill(username);
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
-  await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  await expectCourtPlanLoaded(page);
+}
+
+async function expectCourtPlanLoaded(page: import("@playwright/test").Page) {
+  // A keyboard walk that starts while the plan still renders resumes inside it and laps the footer.
+  await expect(page.getByTestId("week-grid")).toBeVisible();
 }
 
 type TabWalkPosition = "reached" | "moving" | "lapped" | "trapped";
@@ -473,7 +478,7 @@ test("login and cancellation are operable using only the keyboard", async ({ pag
   await page.keyboard.press("Enter");
 
   // then
-  await expect(page.getByTestId("court-plan-view")).toBeVisible();
+  await expectCourtPlanLoaded(page);
   await tabToTestId(page, "my-bookings-link", tabKey);
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
