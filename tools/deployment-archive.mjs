@@ -9,7 +9,7 @@ import { crc32 } from "node:zlib";
 const YAML = createRequire(new URL("../frontend/package.json", import.meta.url))("yaml");
 
 const roots = ["courtside", "recipe.sh", ".env.example", "README.md", "container-contract.md",
-  "compose.recovery-check.yaml", "examples", "guides"];
+  "compose.booking-seed.yaml", "compose.recovery-check.yaml", "examples", "guides"];
 
 export function recipeNames(deploy) {
   return readdirSync(join(deploy, "recipes")).filter((entry) => entry.endsWith(".recipe"))
@@ -221,10 +221,14 @@ function digestOf(content) {
   return createHash("sha256").update(content).digest("hex");
 }
 
-export function manifestOf({ version, revision, image, repository, ref, workflow = "release.yml", entries }) {
+export function manifestOf({ version, revision, image, bookingSeedImage, repository, ref,
+  workflow = "release.yml", entries }) {
   if (!/^[0-9a-f]{40}$/.test(revision ?? "")) throw new Error("the archive needs a full source revision");
   if (!/@sha256:[0-9a-f]{64}$/.test(image ?? "")) {
     throw new Error("the archive needs an image a digest pins, not a floating tag");
+  }
+  if (!/@sha256:[0-9a-f]{64}$/.test(bookingSeedImage ?? "")) {
+    throw new Error("the archive needs a booking seed image a digest pins, not a floating tag");
   }
   if (!/^[\w.+-]+$/.test(version ?? "")) throw new Error("the archive needs a plain version");
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository ?? "")) throw new Error("the archive needs its repository");
@@ -248,6 +252,7 @@ export function manifestOf({ version, revision, image, repository, ref, workflow
     version,
     revision,
     image,
+    bookingSeedImage,
     signer,
     recipes: entries.filter((entry) => entry.path.startsWith("recipes/"))
       .map((entry) => basename(entry.path, ".recipe")),
@@ -295,10 +300,10 @@ function zipOf(entries) {
   return Buffer.concat([...locals, directory, end]);
 }
 
-export function buildArchive({ deploy, version, revision, image, repository, ref, workflow }) {
+export function buildArchive({ deploy, version, revision, image, bookingSeedImage, repository, ref, workflow }) {
   const entries = archiveEntries(deploy);
   refuseSecrets(entries);
-  const manifest = manifestOf({ version, revision, image, repository, ref, workflow, entries });
+  const manifest = manifestOf({ version, revision, image, bookingSeedImage, repository, ref, workflow, entries });
   const prefix = `courtside-deployment-${version}`;
   const carried = [...entries, { path: "manifest.json", mode: 0o644,
     content: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8") }]
@@ -324,6 +329,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     version,
     revision: option("revision"),
     image: option("image"),
+    bookingSeedImage: option("booking-seed-image"),
     repository: option("repository"),
     ref: option("ref"),
     workflow: process.argv.includes("--workflow") ? option("workflow") : undefined,

@@ -17,9 +17,10 @@ shasum -a 256 -c courtside-deployment-<version>.zip.sha256
 `--source-ref` is what ties the archive to the tag it claims; without it a genuine archive from any
 release of this project satisfies the check.
 
-`manifest.json` inside the archive names the release, the digest-pinned image it was built against, the
-source revision and the release workflow that attests it, and carries a SHA-256 for every file
-beside it. Unpack the archive, configure `.env` and adapt the deployment to your infrastructure.
+`manifest.json` inside the archive names the release, its digest-pinned application and booking-seed
+images, the source revision and the release workflow that attests it, and carries a SHA-256 for
+every file beside it. Unpack the archive, configure `.env` and adapt the deployment to your
+infrastructure.
 
 You need Docker with Compose 2.33.1 or newer. `compose.yaml` declares this minimum because older
 versions cannot select the dedicated egress networks safely. The file also lists every supported
@@ -188,6 +189,39 @@ the installation root, where it would be an unowned entry that blocks destructiv
 launcher neither backs up nor removes this external directory; remove it explicitly after the
 synthetic acceptance deployment has been retired. The messages are readable at
 `http://127.0.0.1:${COURTSIDE_ACCEPTANCE_MAIL_PORT}/`.
+
+### Sample booking history on an acceptance installation
+
+An installed UAT can add repeatable booking history without a repository checkout, Java, Maven,
+Node.js or a local image build. The release manifest pins a separate booking-seed image to the
+same source revision as the application. The normal application image contains no fixture classes.
+
+Preview the plan first:
+
+```sh
+/srv/courtside/current/courtside seed-bookings
+```
+
+The command works only when the installation is an acceptance instance. Synthetic mail selects
+`UAT` automatically; another acceptance setup must set `COURTSIDE_ENVIRONMENT="UAT"` in its
+installed `.env`. The command targets only the installation's bundled PostgreSQL database and
+reuses its selected database identity. External databases, custom application images and local
+Compose overrides are refused because the archive cannot bind them to the published seed image and
+its recovery path. The preview reports planned, existing, conflicting and unavailable booking
+kinds without writing. Apply the plan with the exact project-specific confirmation printed by the
+preview. For the default project:
+
+```sh
+/srv/courtside/current/courtside seed-bookings \
+  --confirm 'seed bookings in courtside'
+```
+
+Apply creates and verifies a normal recovery unit before the seed container starts. Existing
+accounts, roles, courts, configuration and bookings remain in place. Conflicting sample bookings
+are skipped, and deterministic identifiers make a repeated apply add nothing twice. A failed seed
+transaction writes no partial plan; retain the printed recovery unit until the result has been
+checked in the UI. Use the recovery procedure below if the complete pre-seed database state must
+be restored.
 
 ## Start the instance for the first time
 

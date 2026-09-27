@@ -54,7 +54,7 @@ After installation, always use the installed launcher:
 ## Operate and harden
 
 - [Operations handbook](guides/operations.md) covers bootstrap completion, diagnosis, backup,
-  restore checks, updates, adoption, rotation and removal.
+  restore checks, acceptance-data seeding, updates, adoption, rotation and removal.
 - [Stalwart guide](guides/stalwart.md) covers the self-hosted mail plan, DNS, certificates and
   delivery checks.
 - [Optional hardening](guides/hardening.md) covers separate database identities and verified TLS.

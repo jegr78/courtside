@@ -8,7 +8,7 @@ import { request as httpsRequest } from "node:https";
 import { BlockList, createConnection, createServer, isIP } from "node:net";
 import { availableParallelism, totalmem } from "node:os";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import {
@@ -899,6 +899,20 @@ export function uatSmokeEnvironment(version, environment = process.env, checkout
   const resolved = { ...environment };
   if (version) resolved.COURTSIDE_UAT_IMAGE = uatImageReference(version, environment, checkout);
   return resolved;
+}
+
+export function uatBookingSeedCandidate(environment = process.env) {
+  const image = environment.COURTSIDE_UAT_BOOKING_SEED_IMAGE;
+  const composeFile = environment.COURTSIDE_UAT_BOOKING_SEED_COMPOSE;
+  if (!image && !composeFile) return null;
+  if (!image || !composeFile) {
+    throw new Error("the UAT smoke needs both the candidate booking seed image and Compose file");
+  }
+  if (!/@sha256:[0-9a-f]{64}$/.test(image) || !isAbsolute(composeFile)
+      || !composeFile.endsWith("/compose.booking-seed.yaml")) {
+    throw new Error("the UAT smoke booking seed candidate is invalid");
+  }
+  return { image, composeFile };
 }
 
 export function redactUatDiagnostics(value, secrets) {

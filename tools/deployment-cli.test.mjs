@@ -48,6 +48,7 @@ function fixture(use, releaseVersion = "0.1.0") {
     version: releaseVersion,
     revision,
     image: `ghcr.io/jegr78/courtside@sha256:${digest}`,
+    bookingSeedImage: `ghcr.io/jegr78/courtside@sha256:${"b".repeat(64)}`,
     signer: manifestSigner(releaseVersion),
     recipes: ["existing-infrastructure", "full-self-hosted", "funnel", "standard"],
     files: fileInventory(archive),
@@ -63,6 +64,7 @@ previous=''
 for argument in "$@"; do
   if [ "$previous" = '--env-file' ] && [ -f "$argument" ]; then
     sed -n 's/^COURTSIDE_RECOVERY_IMAGE_//p' "$argument" | sed 's/^/recovery-image=/' >> "${dockerLog}"
+    sed -n '/^COURTSIDE_BOOKING_SEED_/p' "$argument" >> "${dockerLog}"
   fi
   previous=$argument
 done
@@ -145,6 +147,7 @@ function releaseArchive(root, version, imageDigest = "b".repeat(64)) {
     version,
     revision: "fedcba9876543210fedcba9876543210fedcba98",
     image: `ghcr.io/jegr78/courtside@sha256:${imageDigest}`,
+    bookingSeedImage: `ghcr.io/jegr78/courtside@sha256:${"c".repeat(64)}`,
     signer: manifestSigner(version),
     recipes: ["existing-infrastructure", "full-self-hosted", "funnel", "standard"],
     files: fileInventory(archive),
@@ -189,6 +192,20 @@ function initialize(context, changes = {}, environment = {}) {
   return run(context.archive, context.target,
     ["init", "--answers", answers(context.root, changes), "--yes"],
     { ...context.environment, ...environment });
+}
+
+function makeInstalledManifestLegacy(target) {
+  const release = realpathSync(join(target, "current"));
+  const manifest = join(release, "manifest.json");
+  const body = JSON.parse(readFileSync(manifest, "utf8"));
+  delete body.bookingSeedImage;
+  chmodSync(manifest, 0o600);
+  writeFileSync(manifest, `${JSON.stringify(body, null, 2)}\n`);
+  chmodSync(manifest, 0o400);
+  const digest = createHash("sha256").update(readFileSync(manifest)).digest("hex");
+  const configuration = join(target, "config", "installation.conf");
+  writeFileSync(configuration, readFileSync(configuration, "utf8")
+    .replace(/^release_manifest_sha256=.*$/m, `release_manifest_sha256=${digest}`));
 }
 
 test("given a release archive, when init is confirmed, then it publishes one private versioned installation", () => {
@@ -807,6 +824,57 @@ test("given an installed instance, when backup succeeds, then one private verifi
   });
 });
 
+test("given an installed UAT instance, when booking seed is previewed and applied, then only apply backs up and writes", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    const environmentFile = join(context.target, "config", ".env");
+    writeFileSync(environmentFile, `${readFileSync(environmentFile, "utf8")}COURTSIDE_ENVIRONMENT="UAT"\n`);
+
+    // when
+    const preview = run(context.archive, context.target, ["seed-bookings"], context.environment);
+    const apply = run(context.archive, context.target,
+      ["seed-bookings", "--confirm", "seed bookings in example-club"], context.environment);
+
+    // then
+    assert.equal(preview.status, 0, preview.stderr);
+    assert.equal(apply.status, 0, apply.stderr);
+    const invocation = readFileSync(context.dockerLog, "utf8");
+    assert.match(invocation, /compose\.booking-seed\.yaml .*run --rm --no-deps app/);
+    assert.match(invocation, new RegExp(`COURTSIDE_BOOKING_SEED_IMAGE=ghcr.io/jegr78/courtside@sha256:${"b".repeat(64)}`));
+    assert.match(invocation, /COURTSIDE_BOOKING_SEED_WRITE=false/);
+    assert.match(invocation, /COURTSIDE_BOOKING_SEED_WRITE=true/);
+    assert.equal((invocation.match(/ pg_dump /g) ?? []).length, 1);
+  });
+});
+
+test("given a production installation or the wrong confirmation, when booking seed starts, then it writes nothing", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+
+    // when
+    const production = run(context.archive, context.target, ["seed-bookings"], context.environment);
+    const environmentFile = join(context.target, "config", ".env");
+    writeFileSync(environmentFile, `${readFileSync(environmentFile, "utf8")}COURTSIDE_ENVIRONMENT="UAT"\n`);
+    const unconfirmed = run(context.archive, context.target,
+      ["seed-bookings", "--confirm", "example-club"], context.environment);
+    writeFileSync(join(context.target, "config", "local.override.yaml"), "services: {}\n");
+    const overridden = run(context.archive, context.target,
+      ["seed-bookings", "--confirm", "seed bookings in example-club"], context.environment);
+
+    // then
+    assert.equal(production.status, 2);
+    assert.match(production.stderr, /only available when COURTSIDE_ENVIRONMENT is UAT/);
+    assert.equal(unconfirmed.status, 2);
+    assert.match(unconfirmed.stderr, /requires --confirm 'seed bookings in example-club'/);
+    assert.equal(overridden.status, 2);
+    assert.match(overridden.stderr, /refuses an installation with a local Compose override/);
+    assert.ok(!existsSync(context.dockerLog)
+      || !/compose\.booking-seed\.yaml| pg_dump /.test(readFileSync(context.dockerLog, "utf8")));
+  });
+});
+
 test("given self-hosted mail, when backup runs, then both Stalwart stores share one controlled interruption", () => {
   fixture((context) => {
     // given
@@ -1056,6 +1124,35 @@ test("given a newer exact release, when update becomes healthy, then it selects 
     assert.match(invocations, / stop app/);
     assert.match(invocations, / up -d --wait/);
     assert.doesNotMatch(invocations, / down .*--volumes| down --volumes/);
+  });
+});
+
+test("given an installed release before booking seed images, when it is backed up and updated, then legacy recovery stays readable", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context).status, 0);
+    makeInstalledManifestLegacy(context.target);
+    const backup = run(context.archive, context.target, ["backup"], context.environment);
+    assert.equal(backup.status, 0, backup.stderr);
+    const legacyRecovery = join(context.target, "backups",
+      readdirSync(join(context.target, "backups")).find((entry) => entry.startsWith("recovery-")));
+    const next = releaseArchive(context.root, "0.1.1");
+
+    // when
+    const update = run(context.archive, context.target,
+      ["update", "--archive", next, "--yes"], context.environment);
+    const restoreCheck = run(context.archive, context.target,
+      ["restore-check", "--recovery", legacyRecovery], {
+        ...context.environment,
+        COURTSIDE_RESTORE_USERNAME: "doe.jane",
+        COURTSIDE_RESTORE_PASSWORD: "restore-private-value",
+      });
+
+    // then
+    assert.equal(update.status, 0, update.stderr);
+    assert.equal(restoreCheck.status, 0, restoreCheck.stderr);
+    assert.equal(realpathSync(join(context.target, "current")),
+      realpathSync(join(context.target, "releases", "0.1.1")));
   });
 });
 

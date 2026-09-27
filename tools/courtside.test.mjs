@@ -19,7 +19,7 @@ import {
   performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
   funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
   redactUatDiagnostics, resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference,
-  uatSmokeEnvironment, repositoryFromRemote, uatBookingSeedPlans,
+  uatSmokeEnvironment, repositoryFromRemote, uatBookingSeedCandidate, uatBookingSeedPlans,
   validateNode, validatePublicAddress
 } from "./courtside.mjs";
 
@@ -103,6 +103,21 @@ test("given a persistent UAT image, when planning its booking seed, then the fix
   assert.equal(preview.run.environment.COURTSIDE_UAT_BOOKING_SEED_WRITE, "false");
   assert.equal(write.run.environment.COURTSIDE_UAT_BOOKING_SEED_WRITE, "true");
   assert.ok(preview.run.args.some((argument) => argument.endsWith("compose.uat-db.yaml")));
+});
+
+test("given an optional published booking seed candidate, when UAT smoke resolves it, then absence skips and partial input fails", () => {
+  // given
+  const image = `ghcr.io/example/courtside@sha256:${"a".repeat(64)}`;
+  const composeFile = "/tmp/candidate/compose.booking-seed.yaml";
+
+  // when / then
+  assert.equal(uatBookingSeedCandidate({}), null);
+  assert.deepEqual(uatBookingSeedCandidate({ COURTSIDE_UAT_BOOKING_SEED_IMAGE: image,
+    COURTSIDE_UAT_BOOKING_SEED_COMPOSE: composeFile }), { image, composeFile });
+  assert.throws(() => uatBookingSeedCandidate({ COURTSIDE_UAT_BOOKING_SEED_IMAGE: image }),
+    /needs both/);
+  assert.throws(() => uatBookingSeedCandidate({ COURTSIDE_UAT_BOOKING_SEED_COMPOSE: composeFile }),
+    /needs both/);
 });
 
 test("given macOS or Linux, when resolving executables, then the POSIX Maven wrapper is used", () => {

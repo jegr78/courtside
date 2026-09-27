@@ -35,6 +35,37 @@ test("given more than seven dated images, when retention is planned, then only t
   assert.deepEqual(plan.keptDatedTags, versions.slice(2).map(({ tags }) => tags[0]).reverse());
 });
 
+test("given paired booking seed nightlies, when retention is planned, then their moving and newest dated tags remain", () => {
+  // given
+  const versions = Array.from({ length: 9 }, (_, index) => {
+    const day = String(index + 1).padStart(2, "0");
+    const tags = [`booking-seed-nightly-202609${day}-abc${String(index).padStart(4, "0")}`];
+    if (index === 8) tags.push("booking-seed-nightly", "booking-seed-nightly-candidate");
+    return version(index + 1, `sha256:${String(index + 1).repeat(64).slice(0, 64)}`, tags);
+  });
+
+  // when
+  const plan = planNightlyImageRetention({ versions,
+    manifests: manifests(...versions.map(({ digest }) => digest)), now });
+
+  // then
+  assert.deepEqual(plan.deleteVersionIds, [1, 2]);
+  assert.deepEqual(plan.keepVersionIds, [3, 4, 5, 6, 7, 8, 9]);
+});
+
+test("given an expired booking seed release candidate, when retention is planned, then it is deleted", () => {
+  // given
+  const digest = `sha256:${"e".repeat(64)}`;
+  const versions = [version(1, digest,
+    [`booking-seed-release-candidate-${"d".repeat(40)}`], "2026-08-29T11:59:59.999Z")];
+
+  // when
+  const plan = planNightlyImageRetention({ versions, manifests: manifests(digest), now });
+
+  // then
+  assert.deepEqual(plan.deleteVersionIds, [1]);
+});
+
 test("given several publications on one date, when retention is planned, then registry time decides which is newest", () => {
   // given
   const versions = Array.from({ length: 8 }, (_, index) => version(index + 1,

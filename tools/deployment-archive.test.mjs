@@ -19,6 +19,7 @@ const release = {
   version: "0.1.0",
   revision: "0123456789abcdef0123456789abcdef01234567",
   image: "ghcr.io/jegr78/courtside@sha256:" + "a".repeat(64),
+  bookingSeedImage: "ghcr.io/jegr78/courtside@sha256:" + "b".repeat(64),
   repository: "jegr78/courtside",
   ref: "refs/tags/v0.1.0",
 };
@@ -177,6 +178,7 @@ test("given a release, when its archive is built, then the manifest it carries n
   assert.equal(manifest.version, release.version);
   assert.equal(manifest.revision, release.revision);
   assert.equal(manifest.image, release.image);
+  assert.equal(manifest.bookingSeedImage, release.bookingSeedImage);
   assert.equal(manifest.signer,
     "https://github.com/jegr78/courtside/.github/workflows/release.yml@refs/tags/v0.1.0");
   scratch((directory) => {
@@ -218,6 +220,8 @@ test("given an image no digest pins or a short revision, when the archive is bui
   assert.throws(() => buildArchive({ deploy, ...release, image: "ghcr.io/jegr78/courtside:0.1.0" }),
     /digest/);
   assert.throws(() => buildArchive({ deploy, ...release, revision: "0123456" }), /revision/);
+  assert.throws(() => buildArchive({ deploy, ...release, bookingSeedImage: "ghcr.io/jegr78/courtside:seed" }),
+    /booking seed image/);
 });
 
 test("given an invalid release or nightly identity, when the archive is built, then it is refused", () => {

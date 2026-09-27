@@ -1,8 +1,17 @@
 import { pathToFileURL } from "node:url";
 
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
-const datedTagPattern = /^nightly-\d{8}-[a-f0-9]{7}$/;
-const releaseCandidateTagPattern = /^release-candidate-[a-f0-9]{40}$/;
+const datedTagPatterns = [
+  /^nightly-\d{8}-[a-f0-9]{7}$/,
+  /^booking-seed-nightly-\d{8}-[a-f0-9]{7}$/,
+];
+const releaseCandidateTagPattern = /^(?:booking-seed-)?release-candidate-[a-f0-9]{40}$/;
+const movingNightlyTags = new Set([
+  "nightly",
+  "nightly-candidate",
+  "booking-seed-nightly",
+  "booking-seed-nightly-candidate",
+]);
 const attachmentTagPattern = /^sha256-([a-f0-9]{64})(?:\.(?:att|sbom|sig))?$/;
 const oneDay = 86_400_000;
 const releaseEvidenceWindow = 14 * oneDay;
@@ -70,20 +79,21 @@ export function planNightlyImageRetention({ versions, manifests, now }) {
     throw new Error("manifests are invalid");
   }
   const observedAt = timestamp(now, "now");
-  const keptDatedTags = versions.flatMap(({ tags, updatedAt }) => tags
-    .filter((tag) => datedTagPattern.test(tag))
+  const keptDatedTags = datedTagPatterns.flatMap((pattern) => versions.flatMap(({ tags, updatedAt }) => tags
+    .filter((tag) => pattern.test(tag))
     .map((tag) => ({ tag, updatedAt: timestamp(updatedAt, "version updatedAt").valueOf() })))
     .toSorted((left, right) => right.updatedAt - left.updatedAt || right.tag.localeCompare(left.tag))
     .slice(0, 7)
-    .map(({ tag }) => tag);
+    .map(({ tag }) => tag));
   const keptDated = new Set(keptDatedTags);
   const byDigest = new Map(versions.map((version) => [version.digest, version]));
   const releaseCandidateCutoff = observedAt.valueOf() - releaseEvidenceWindow;
   const keptDigests = new Set(versions.filter(({ tags, updatedAt }) => tags.some((tag) =>
-    tag === "nightly" || tag === "nightly-candidate" || keptDated.has(tag)
+    movingNightlyTags.has(tag) || keptDated.has(tag)
       || (releaseCandidateTagPattern.test(tag)
         && timestamp(updatedAt, "version updatedAt").valueOf() >= releaseCandidateCutoff)
-      || (!tag.startsWith("nightly") && !tag.startsWith("release-candidate-")
+      || (!tag.startsWith("nightly") && !tag.startsWith("booking-seed-nightly")
+        && !tag.startsWith("release-candidate-") && !tag.startsWith("booking-seed-release-candidate-")
         && !attachmentTagPattern.test(tag))))
     .map(({ digest }) => digest));
 
