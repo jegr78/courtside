@@ -22,6 +22,7 @@ const manifest = {
   version: "0.1.0-rc.2",
   revision: "a".repeat(40),
   image: `ghcr.io/jegr78/courtside@sha256:${"b".repeat(64)}`,
+  bookingSeedImage: `ghcr.io/jegr78/courtside@sha256:${"e".repeat(64)}`,
   recipes: ["existing-infrastructure", "full-self-hosted", "funnel", "standard"],
   files: { "courtside": "c".repeat(64) },
   archiveSha256: "d".repeat(64),
@@ -135,22 +136,30 @@ test("given the candidate archive, when qualification inspects it, then evidence
   try {
     // given
     const built = buildArchive({ deploy, version: manifest.version, revision: manifest.revision,
-      image: manifest.image, repository: "jegr78/courtside", ref: "refs/tags/v0.1.0-rc.2" });
+      image: manifest.image, bookingSeedImage: manifest.bookingSeedImage,
+      repository: "jegr78/courtside", ref: "refs/tags/v0.1.0-rc.2" });
     const archive = join(scratch, built.name);
     writeFileSync(archive, built.zip);
 
     // when
     const inspected = inspectDeploymentArchive({ archive, destination: join(scratch, "extracted"),
-      expectedImage: manifest.image, selectedRecipes: ["standard", "full-self-hosted"] });
+      expectedImage: manifest.image, expectedBookingSeedImage: manifest.bookingSeedImage,
+      selectedRecipes: ["standard", "full-self-hosted"] });
 
     // then
     assert.equal(inspected.archiveDigest, built.sha256);
     assert.equal(inspected.manifest.image, manifest.image);
+    assert.equal(inspected.evidence.bookingSeedImage, manifest.bookingSeedImage);
     assert.deepEqual(inspected.recipes, ["full-self-hosted", "standard"]);
     assert.doesNotMatch(JSON.stringify(inspected.evidence), new RegExp(scratch));
     assert.throws(() => inspectDeploymentArchive({ archive, destination: join(scratch, "wrong-image"),
       expectedImage: `ghcr.io/jegr78/courtside@sha256:${"d".repeat(64)}`,
+      expectedBookingSeedImage: manifest.bookingSeedImage,
       selectedRecipes: ["standard"] }), /does not name the expected image/);
+    assert.throws(() => inspectDeploymentArchive({ archive, destination: join(scratch, "wrong-seed-image"),
+      expectedImage: manifest.image,
+      expectedBookingSeedImage: `ghcr.io/jegr78/courtside@sha256:${"f".repeat(64)}`,
+      selectedRecipes: ["standard"] }), /does not name the expected booking seed image/);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }

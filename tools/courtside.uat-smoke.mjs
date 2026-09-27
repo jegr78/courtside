@@ -4,7 +4,8 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
-  localRequest, newBootstrapPassword, redactUatDiagnostics, uatImageReference, uatSmokeEnvironment
+  localRequest, newBootstrapPassword, redactUatDiagnostics, uatBookingSeedCandidate,
+  uatImageReference, uatSmokeEnvironment
 } from "./courtside.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -37,6 +38,17 @@ function cli(args, environment = process.env) {
 
 function composeRun(...args) {
   return run("docker", [...compose, ...args], { environment: smokeEnvironment });
+}
+
+function previewBookingSeed() {
+  const candidate = uatBookingSeedCandidate();
+  if (!candidate) return;
+  const output = run("docker", [...compose, "-f", candidate.composeFile,
+    "run", "--rm", "--no-deps", "app"], {
+    environment: { ...smokeEnvironment, COURTSIDE_BOOKING_SEED_IMAGE: candidate.image,
+      COURTSIDE_BOOKING_SEED_WRITE: "false" },
+  });
+  assert.match(output, /UAT booking seed previewed: planned=\d+, inserted=0, existing=\d+, conflicts=\d+, unavailable=/);
 }
 
 function rememberCookies(jar, response) {
@@ -224,6 +236,7 @@ try {
     "__Host-SESSION", { httpOnly: true });
   [session, sharedSession, login].forEach(assertNoLegacyAuthenticationCookies);
   assert.notEqual(accountCount, "0");
+  previewBookingSeed();
 
   await logIn(cookies, password);
   const passwordChange = await requestWithCookies(cookies, {

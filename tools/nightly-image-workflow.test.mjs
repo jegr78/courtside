@@ -100,6 +100,19 @@ test("given a new verified revision, when its image is built, then one candidate
   assert.equal(tags, "ghcr.io/${{ github.repository }}:nightly-candidate");
 });
 
+test("given a nightly revision, when acceptance fixtures are published, then the archive pins their separate image", () => {
+  // when / then
+  assert.match(source, /cp -R target\/fixtures-classes build\/fixtures\/classes/);
+  assert.match(source, /file: Dockerfile\.fixtures/);
+  assert.match(source, /booking-seed-digest: \$\{\{ steps\.booking-seed-push\.outputs\.digest \}\}/);
+  assert.match(source, /--booking-seed-image "\$BOOKING_SEED_IMAGE"/);
+  assert.match(source, /COURTSIDE_UAT_BOOKING_SEED_IMAGE: ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ needs\.image\.outputs\.booking-seed-digest \}\}/);
+  assert.match(source, /COURTSIDE_UAT_BOOKING_SEED_COMPOSE=\$\(find "\$RUNNER_TEMP\/courtside-deployment"/);
+  assert.match(source, /trivy-booking-seed-\$\{\{ matrix\.architecture \}\}\.json/);
+  assert.match(source, /--subject \$\{\{ needs\.image\.outputs\.booking-seed-digest \}\}/);
+  assert.match(source, /booking-seed-nightly-\$\{\{ needs\.select\.outputs\.date \}\}-\$\{\{ needs\.select\.outputs\.short_sha \}\}/);
+});
+
 test("given a pull-request branch dispatch, when the candidate runs, then it uses the real image and qualification jobs without publishing", () => {
   // when / then
   assert.deepEqual(workflow.jobs.package.needs, "select");
@@ -137,7 +150,7 @@ test("given the runtime base image, when the Courtside image is assembled, then 
   assert.match(dockerfile, /rm -f \/usr\/bin\/pebble/);
 });
 
-test("given a qualified main image, when it is published, then verified evidence precedes the two nightly tags", () => {
+test("given qualified main images, when they are published, then verified evidence precedes their nightly tags", () => {
   // given
   const publish = source.slice(source.indexOf("\n  publish:\n"), source.indexOf("\n  retention:\n"));
 
@@ -152,16 +165,22 @@ test("given a qualified main image, when it is published, then verified evidence
   assert.match(publish, /verificationRunId/);
   assert.match(publish, /\.commit == \$commit and \.verificationRunId == \$runId/);
   assert.match(publish, /cosign sign --yes "\$IMAGE"/);
+  assert.match(publish, /cosign sign --yes "\$BOOKING_SEED_IMAGE"/);
+  assert.match(publish, /courtside-booking-seed-nightly\.spdx\.json/);
+  assert.match(publish,
+    /subject-digest: \$\{\{ needs\.image\.outputs\.booking-seed-digest \}\}/);
   assert.match(publish,
     /\.github\/workflows\/nightly-image\.yml@refs\/heads\/main/);
   assert.match(publish, /gh attestation verify/);
   assert.deepEqual(
     [...publish.matchAll(/--signer-workflow "([^"]+)"/g)].map((match) => match[1]),
-    Array(3).fill("$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml"),
+    Array(6).fill("$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml"),
   );
-  assert.equal([...publish.matchAll(/--bundle-from-oci/g)].length, 1);
+  assert.equal([...publish.matchAll(/--bundle-from-oci/g)].length, 2);
   assert.match(publish,
     /gh attestation verify "oci:\/\/\$IMAGE" --repo "\$GITHUB_REPOSITORY" \\\s+--bundle-from-oci \\\s+--signer-workflow "\$GITHUB_REPOSITORY\/\.github\/workflows\/nightly-image\.yml"[\s\S]+?--predicate-type "\$NIGHTLY_SOURCE_PREDICATE"/);
+  assert.match(publish,
+    /gh attestation verify "oci:\/\/\$BOOKING_SEED_IMAGE" --repo "\$GITHUB_REPOSITORY" \\\s+--bundle-from-oci \\\s+--signer-workflow "\$GITHUB_REPOSITORY\/\.github\/workflows\/nightly-image\.yml"[\s\S]+?--predicate-type "\$NIGHTLY_SOURCE_PREDICATE"/);
   assert.doesNotMatch(publish, /--signer-workflow "\$GITHUB_SERVER_URL/);
   assert.ok(publish.indexOf("cosign verify") < publish.indexOf("docker buildx imagetools create"));
   assert.ok(publish.indexOf("gh attestation verify") < publish.indexOf("docker buildx imagetools create"));
@@ -171,6 +190,8 @@ test("given a qualified main image, when it is published, then verified evidence
   assert.deepEqual([...publish.matchAll(/--tag "([^"]+)"/g)].map((match) => match[1]), [
     "ghcr.io/${{ github.repository }}:nightly",
     "ghcr.io/${{ github.repository }}:nightly-${{ needs.select.outputs.date }}-${{ needs.select.outputs.short_sha }}",
+    "ghcr.io/${{ github.repository }}:booking-seed-nightly",
+    "ghcr.io/${{ github.repository }}:booking-seed-nightly-${{ needs.select.outputs.date }}-${{ needs.select.outputs.short_sha }}",
   ]);
 });
 

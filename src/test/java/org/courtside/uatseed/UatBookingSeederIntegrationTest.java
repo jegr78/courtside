@@ -202,7 +202,7 @@ class UatBookingSeederIntegrationTest extends AbstractIntegrationTest {
                 "PRODUCTION", "jdbc:postgresql://db:5432/courtside", false).seed())
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("only target");
         assertThatThrownBy(() -> new UatBookingSeeder(jdbc, transactionManager, clock,
-                "UAT", "jdbc:postgresql://db:5432/courtside_prod", false).seed())
+                "UAT", "jdbc:postgresql://database.example.org:5432/club", false).seed())
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("only target");
     }
 

@@ -1,0 +1,15 @@
+services:
+  app:
+    image: ${COURTSIDE_BOOKING_SEED_IMAGE:?set COURTSIDE_BOOKING_SEED_IMAGE}
+    restart: "no"
+    entrypoint:
+      - java
+      - --sun-misc-unsafe-memory-access=deny
+      - -XX:MaxRAMPercentage=75.0
+      - -XX:+ExitOnOutOfMemoryError
+      - -Dloader.main=org.courtside.uatseed.UatBookingSeedApplication
+      - org.springframework.boot.loader.launch.PropertiesLauncher
+    command: !reset []
+    environment:
+      SPRING_PROFILES_ACTIVE: uat-seed
+      COURTSIDE_UAT_BOOKING_SEED_WRITE: ${COURTSIDE_BOOKING_SEED_WRITE:-false}

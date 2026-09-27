@@ -71,7 +71,8 @@ export function collectRuntimeIdentity({ architecture = process.arch,
   };
 }
 
-export function inspectDeploymentArchive({ archive, destination, expectedImage, selectedRecipes }) {
+export function inspectDeploymentArchive({ archive, destination, expectedImage, expectedBookingSeedImage,
+  selectedRecipes }) {
   if (!isAbsolute(archive) || !archive.endsWith(".zip") || !existsSync(archive)) {
     throw new Error("qualification archive must be an existing absolute zip path");
   }
@@ -105,6 +106,9 @@ export function inspectDeploymentArchive({ archive, destination, expectedImage, 
     const manifest = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
     validateManifest(manifest, selectedRecipes[0]);
     if (manifest.image !== expectedImage) throw new Error("deployment archive does not name the expected image");
+    if (manifest.bookingSeedImage !== expectedBookingSeedImage) {
+      throw new Error("deployment archive does not name the expected booking seed image");
+    }
     for (const recipe of selectedRecipes) {
       if (!manifest.recipes.includes(recipe)) throw new Error(`deployment archive omits recipe ${recipe}`);
     }
@@ -130,6 +134,7 @@ export function inspectDeploymentArchive({ archive, destination, expectedImage, 
         schemaVersion: 1,
         archive: { version: manifest.version, revision: manifest.revision, digest: archiveDigest },
         image: manifest.image,
+        bookingSeedImage: manifest.bookingSeedImage,
         recipes: chosen,
         fileCount: declared.length,
         outcome: "passed",
@@ -310,6 +315,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       archive: option("archive"),
       destination: option("destination"),
       expectedImage: option("image"),
+      expectedBookingSeedImage: option("booking-seed-image"),
       selectedRecipes: option("recipes").split(",").filter(Boolean),
     });
     const renderedRecipes = renderDeploymentRecipes({ root: inspected.root,

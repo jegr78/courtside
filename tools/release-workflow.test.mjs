@@ -30,6 +30,20 @@ test("given a release image, when publishing it, then the same digest is qualifi
     /\n  publish:\n    needs: \[archive, build, browser, image, qualify, mail, security-record, upgrade, restore\]/);
 });
 
+test("given a release build, when acceptance fixtures are published, then a separate digest-bound image enters the archive", () => {
+  // when / then
+  assert.match(workflow, /cp -R target\/fixtures-classes build\/fixtures\/classes/);
+  assert.match(workflow, /file: Dockerfile\.fixtures/);
+  assert.match(workflow, /build-args: BASE_IMAGE=ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ steps\.push\.outputs\.digest \}\}/);
+  assert.match(workflow, /booking-seed-digest: \$\{\{ steps\.booking-seed-push\.outputs\.digest \}\}/);
+  assert.match(workflow, /--booking-seed-image "\$BOOKING_SEED_IMAGE"/);
+  assert.match(workflow, /COURTSIDE_UAT_BOOKING_SEED_IMAGE: ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ needs\.image\.outputs\.booking-seed-digest \}\}/);
+  assert.match(workflow, /COURTSIDE_UAT_BOOKING_SEED_COMPOSE=\$\(find "\$RUNNER_TEMP\/courtside-deployment"/);
+  assert.match(workflow, /trivy-booking-seed-\$\{\{ matrix\.architecture \}\}\.json/);
+  assert.match(workflow, /--subject \$\{\{ needs\.image\.outputs\.booking-seed-digest \}\}/);
+  assert.match(workflow, /booking-seed-\$\{GITHUB_REF_NAME#v\}/);
+});
+
 test("given a release build, when browser tests run, then WebKit axe qualification is required", () => {
   // when / then
   assert.match(workflow,
@@ -86,11 +100,16 @@ test("given a qualified manifest, when publishing it, then tags and signatures a
   assert.match(publish, /docker buildx imagetools create/);
   assert.match(publish, /ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ needs\.image\.outputs\.digest \}\}/);
   assert.match(publish, /cosign sign --yes "\$IMAGE"/);
+  assert.match(publish, /cosign sign --yes "\$BOOKING_SEED_IMAGE"/);
+  assert.match(publish, /courtside-booking-seed-\$\{\{ github\.ref_name \}\}\.spdx\.json/);
+  assert.match(publish, /courtside-booking-seed\.spdx\.json/);
+  assert.match(publish,
+    /subject-digest: \$\{\{ needs\.image\.outputs\.booking-seed-digest \}\}/);
   assert.match(publish, /cosign verify/);
   assert.match(publish, /gh attestation verify/);
   assert.deepEqual(
     [...publish.matchAll(/--signer-workflow "([^"]+)"/g)].map((match) => match[1]),
-    Array(3).fill("$GITHUB_REPOSITORY/.github/workflows/release.yml"),
+    Array(5).fill("$GITHUB_REPOSITORY/.github/workflows/release.yml"),
   );
   assert.doesNotMatch(publish, /--signer-workflow "\$GITHUB_SERVER_URL/);
   assert.match(publish, /node tools\/security-supply-chain\.mjs/);
