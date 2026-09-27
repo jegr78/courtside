@@ -139,12 +139,15 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const selectedDay = days.find((day) => formatDate(day) === selectedDate);
   const selectedAllocations = selectedDate ? data?.allocations.get(selectedDate) ?? [] : [];
   const daySlots = selectedDay && data ? slotsFor(selectedDay, data.grid) : [];
+  const outsideSlots = selectedDate && data
+    ? slotsOutsideHours(selectedDate, daySlots, selectedAllocations, data.grid) : [];
   const isToday = selectedDate === dateInTimeZoneValue(currentInstant, data?.grid.timeZone);
   const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
-  const slots = daySlots;
+  const slots = [...daySlots, ...outsideSlots].sort();
+  const isOutside = (slot: string) => outsideSlots.includes(slot);
 
   function isBookable(courtId: string, slot: string): boolean {
-    if (!data || !selectedDate) return false;
+    if (!data || !selectedDate || isOutside(slot)) return false;
     if (isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant)) return false;
     return !isOccupied(selectedAllocations, courtId, slot, data.grid.timeZone);
   }
@@ -313,6 +316,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         ? scrollToSlot(planRef.current, currentSlot)
         : selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.now")}</Button>
     </div>}
+    {data && hasCourts && daySlots.length === 0 && slots.length > 0 && <p data-testid="day-closed-notice"
+      className="text-muted mt-4">{t("week.closed")}</p>}
     {data && hasCourts && <div
       ref={planRef}
       data-testid="week-grid"
@@ -344,8 +349,9 @@ export function WeekView({ today, clock = systemClock, canBook = true,
             const past = selectedDate
               ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant)
               : false;
+            const outside = isOutside(slot);
             return <tr key={slot} data-testid={`slot-row-${slot}`} data-slot={slot}
-              data-state={past ? "past" : "remaining"}
+              data-state={outside ? "outside" : past ? "past" : "remaining"}
               className="day-plan-slot-row" style={{ "--slot-height": `${slotHeight}px` } as CSSProperties}>
             <th scope="row" data-testid={`slot-heading-${slot}`} className="font-value surface-panel border-structural whitespace-nowrap border-b px-3 text-left font-medium">
               {slot}
@@ -361,6 +367,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
                 setCancellation(allocation);
               },
               past,
+              outside,
               bookingAllowed,
               slot === slots[0],
               {
@@ -380,9 +387,9 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         role="img"
         aria-label={t("week.currentTime", { time: currentTime })}
         className="current-time-line"
-        style={{ top: `${48 + currentLineOffset(currentTime, slots[0], data.grid.slotMinutes, slotHeight)}px` }}
+        style={{ top: `${48 + currentLineOffset(currentTime, slots, data.grid.slotMinutes, slotHeight)}px` }}
       />}
-      {slots.length === 0 && <p className="text-muted px-4 py-6 text-center">{t("week.closed")}</p>}
+      {slots.length === 0 && <p data-testid="day-closed" className="text-muted px-4 py-6 text-center">{t("week.closed")}</p>}
     </div>}
     {data && hasCourts && <ul data-testid="court-plan-legend" className="text-muted mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t("week.legend")}>
       <li><span className="day-plan-legend free" aria-hidden="true" />{t("week.available")}</li>
@@ -487,6 +494,7 @@ function renderCell(
   book: () => void,
   cancel: (allocation: Allocation) => void,
   isPast: boolean,
+  isOutside: boolean,
   canBook: boolean,
   isFirstVisibleSlot: boolean,
   drag: { selected: boolean; start: (pointerType: string) => void; extend: () => void }
@@ -527,6 +535,14 @@ function renderCell(
   const isCovered = isOccupied(allocations, court.id, slot, timeZone);
   const courtName = court.name || t("court.number", { number: court.number });
   if (isCovered) return null;
+  if (isOutside) {
+    return <td key={court.id} className={`${cellClass} day-plan-free-cell p-1`}>
+      <div data-testid="outside-slot" data-date={date} data-court-number={court.number} data-slot={slot}
+        data-state="outside" className="day-plan-slot day-plan-free-slot flex w-full items-center justify-center rounded-md px-2 text-sm">
+        {t("week.outside")}
+      </div>
+    </td>;
+  }
   const content = canBook ? <button
       type="button"
       data-testid="free-slot"
@@ -550,8 +566,12 @@ function renderCell(
   </td>;
 }
 
-function currentLineOffset(currentTime: string, opensAt: string, slotMinutes: number, slotHeight: number): number {
-  return Math.max(0, (timeToMinutes(currentTime) - timeToMinutes(opensAt)) / slotMinutes * slotHeight);
+function currentLineOffset(currentTime: string, slots: string[], slotMinutes: number, slotHeight: number): number {
+  const now = timeToMinutes(currentTime);
+  const row = slots.findLastIndex((slot) => timeToMinutes(slot) <= now);
+  if (row === -1) return 0;
+  const into = Math.min(slotMinutes, now - timeToMinutes(slots[row]));
+  return (row + into / slotMinutes) * slotHeight;
 }
 
 // Bringing the slot into view would take the page with it and pull the navigation out from under
@@ -587,6 +607,28 @@ function slotsFor(day: Date, grid: BookingGrid): string[] {
     const minutes = start + index * grid.slotMinutes;
     return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
   }).filter((time) => isValidZonedDateTime(formatDate(day), time, grid.timeZone));
+}
+
+// Hours are not dated, so a booking may lie where today's hours no longer open; the plan still shows it.
+function slotsOutsideHours(date: string, open: string[], allocations: Allocation[], grid: BookingGrid): string[] {
+  const step = grid.slotMinutes;
+  const origin = open.length > 0 ? timeToMinutes(open[0]) % step : 0;
+  const outside = new Set<string>();
+  for (const allocation of allocations) {
+    const startsOnDay = localDate(allocation.startsAt, grid.timeZone) === date;
+    const endsOnDay = localDate(allocation.endsAt, grid.timeZone) === date;
+    const from = startsOnDay ? timeToMinutes(formatTime(allocation.startsAt, grid.timeZone)) : 0;
+    const to = endsOnDay ? timeToMinutes(formatTime(allocation.endsAt, grid.timeZone)) : 24 * 60;
+    for (let minutes = from - ((from - origin) % step + step) % step; minutes < to; minutes += step) {
+      const slot = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+      if (!open.includes(slot) && isValidZonedDateTime(date, slot, grid.timeZone)) outside.add(slot);
+    }
+  }
+  return [...outside];
+}
+
+function localDate(timestamp: string, timeZone: string): string | undefined {
+  return dateInTimeZoneValue(new Date(timestamp), timeZone);
 }
 
 function formatWeekday(date: Date, language: string): string {

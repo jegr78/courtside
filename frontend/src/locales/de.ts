@@ -669,6 +669,7 @@ const de = {
   "week.noCourtOpen": "Der Verein hat zurzeit keinen Platz zum Buchen freigegeben.",
   "week.closed": "An diesem Tag ist die Anlage geschlossen.",
   "week.available": "Frei",
+  "week.outside": "Geschlossen",
   "week.past": "Vergangen",
   "week.pastLabel": "{{court}} um {{time}} Uhr liegt in der Vergangenheit",
   "week.now": "Zur aktuellen Zeit",

@@ -318,7 +318,9 @@ input[type="time"] {
 }
 
 .day-plan-slot-row[data-state="past"] > th,
-.day-plan-slot-row[data-state="past"] > td {
+.day-plan-slot-row[data-state="past"] > td,
+.day-plan-slot-row[data-state="outside"] > th,
+.day-plan-slot-row[data-state="outside"] > td {
   background-image: repeating-linear-gradient(135deg, transparent 0 8px,
     color-mix(in srgb, var(--cs-muted) 7%, transparent) 8px 10px);
 }
@@ -362,7 +364,8 @@ input[type="time"] {
   outline-offset: -1px;
 }
 
-.day-plan-slot[data-state="past"] {
+.day-plan-slot[data-state="past"],
+.day-plan-slot[data-state="outside"] {
   color: var(--cs-muted);
   background: repeating-linear-gradient(135deg, transparent 0 7px, var(--cs-raised) 7px 10px);
 }
@@ -515,7 +518,8 @@ input[type="time"] {
     display: none;
   }
 
-  .day-plan [data-state="past"]::after {
+  .day-plan [data-state="past"]::after,
+  .day-plan .day-plan-slot[data-state="outside"]::after {
     font-size: 0.75rem;
     content: "—";
   }

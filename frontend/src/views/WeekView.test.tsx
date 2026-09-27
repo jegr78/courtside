@@ -1407,3 +1407,96 @@ it("given a day in another week, when returning to the current time, then today 
   await waitFor(() => expect(screen.getByTestId("day-selector-2026-08-10")).toHaveAttribute("aria-pressed", "true"));
   expect(await screen.findByTestId("current-time-line")).toBeInTheDocument();
 });
+
+function openingHoursWith(overrides: Partial<Record<string, [string | null, string | null]>>) {
+  const days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
+  return {
+    timeZone: "Europe/Berlin",
+    slotMinutes: 30,
+    openingHours: days.map((dayOfWeek) => {
+      const [opensAt, closesAt] = overrides[dayOfWeek] ?? ["08:00:00", "22:00:00"];
+      return { dayOfWeek, opensAt, closesAt };
+    })
+  };
+}
+
+it("given a closed day that still carries a booking, when showing it, then the booking stands in rows outside the opening hours", async () => {
+  // given
+  vi.spyOn(api, "bookingGrid").mockResolvedValue(openingHoursWith({ MONDAY: [null, null] }));
+
+  // when
+  render(<WeekView today={clubInstant("09:00")} />);
+
+  // then
+  const allocation = await screen.findByTestId("allocation");
+  expect(screen.getByTestId("slot-row-18:00"), "a booking on a closed day is still shown").toContainElement(allocation);
+  expect(screen.getByTestId("day-closed-notice")).toHaveTextContent("The facility is closed on this day.");
+  expect(screen.getAllByTestId(/^slot-row-/).map((row) => row.dataset.slot)).toEqual(["18:00", "18:30"]);
+  expect(screen.getByTestId("slot-row-18:00")).toHaveAttribute("data-state", "outside");
+  const outside = screen.getAllByTestId("outside-slot");
+  expect(outside, "the other court is not offered for booking").toHaveLength(2);
+  expect(outside[0]).not.toHaveRole("button");
+  expect(outside[0]).toHaveTextContent("Closed");
+  expect(screen.queryAllByTestId("free-slot")).toHaveLength(0);
+});
+
+it("given shortened opening hours, when showing a day with a later booking, then the open rows and the booking's rows both show", async () => {
+  // given
+  vi.spyOn(api, "bookingGrid").mockResolvedValue(openingHoursWith({ MONDAY: ["08:00:00", "12:00:00"] }));
+
+  // when
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // then
+  expect(await screen.findByTestId("allocation")).toBeInTheDocument();
+  const rows = screen.getAllByTestId(/^slot-row-/);
+  expect(rows.map((row) => row.dataset.slot)).toEqual(
+    ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "18:00", "18:30"]);
+  expect(screen.getByTestId("slot-row-11:30")).toHaveAttribute("data-state", "remaining");
+  expect(screen.getByTestId("slot-row-18:30")).toHaveAttribute("data-state", "outside");
+  expect(screen.getAllByTestId("free-slot"), "only open rows offer booking").toHaveLength(16);
+  expect(screen.queryByTestId("day-closed-notice"), "an open day carries no closed notice").not.toBeInTheDocument();
+  expect(screen.getByTestId("day-selector-2026-08-10")).toHaveTextContent("16 free slots");
+});
+
+it("given a closed day without bookings, when showing it, then the closed notice stands alone", async () => {
+  // given
+  vi.spyOn(api, "bookingGrid").mockResolvedValue(openingHoursWith({ TUESDAY: [null, null] }));
+  render(<WeekView today={clubInstant("09:00")} />);
+  await screen.findByTestId("allocation");
+
+  // when
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-11"));
+
+  // then
+  expect(await screen.findByTestId("day-closed")).toHaveTextContent("The facility is closed on this day.");
+  expect(screen.queryAllByTestId(/^slot-row-/)).toHaveLength(0);
+  expect(screen.queryByTestId("day-closed-notice")).not.toBeInTheDocument();
+});
+
+it("given a weekday closed after its bookings were played, when looking back at it, then the past booking is still shown", async () => {
+  // given
+  vi.spyOn(api, "bookingGrid").mockResolvedValue(openingHoursWith({ MONDAY: [null, null] }));
+  render(<WeekView today={new Date("2026-08-12T10:00:00+02:00")} />);
+  await screen.findByTestId("day-selector-2026-08-10");
+
+  // when
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-10"));
+
+  // then
+  expect(await screen.findByTestId("allocation"), "history survives a later closure").toBeInTheDocument();
+  expect(screen.getByTestId("slot-row-18:00")).toHaveAttribute("data-state", "outside");
+});
+
+it("given German, when a row lies outside the opening hours, then its free cells read as closed in German", async () => {
+  // given
+  await i18n.changeLanguage("de");
+  vi.spyOn(api, "bookingGrid").mockResolvedValue(openingHoursWith({ MONDAY: [null, null] }));
+
+  // when
+  render(<WeekView today={clubInstant("09:00")} />);
+
+  // then
+  expect((await screen.findAllByTestId("outside-slot"))[0]).toHaveTextContent("Geschlossen");
+  expect(screen.getByTestId("day-closed-notice")).toHaveTextContent("An diesem Tag ist die Anlage geschlossen.");
+});
