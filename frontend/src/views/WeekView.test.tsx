@@ -1500,3 +1500,16 @@ it("given German, when a row lies outside the opening hours, then its free cells
   expect((await screen.findAllByTestId("outside-slot"))[0]).toHaveTextContent("Geschlossen");
   expect(screen.getByTestId("day-closed-notice")).toHaveTextContent("An diesem Tag ist die Anlage geschlossen.");
 });
+
+it("given a gap between the open rows and a booking's rows, when the time falls in the booking, then the current-time line sits on that row", async () => {
+  // given
+  vi.spyOn(api, "bookingGrid").mockResolvedValue(openingHoursWith({ MONDAY: ["08:00:00", "12:00:00"] }));
+
+  // when
+  render(<WeekView today={clubInstant("18:15")} />);
+
+  // then
+  const line = await screen.findByTestId("current-time-line");
+  expect(line, "eight open rows, then half of the 18:00 row, 40 pixels each below the 48-pixel header")
+    .toHaveStyle({ top: "388px" });
+});
