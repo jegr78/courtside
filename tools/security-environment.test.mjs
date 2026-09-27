@@ -389,7 +389,7 @@ test("given the security Compose file, when inspecting boundaries, then resource
   assert.equal((compose.match(/pull_policy: never/g) ?? []).length, 9);
   assert.equal((compose.match(/org\.courtside\.security\.run-id:/g) ?? []).length, 14);
   assert.equal((compose.match(/org\.courtside\.security\.instance-fingerprint:/g) ?? []).length, 14);
-  assert.match(compose, /\/var\/lib\/postgresql\/data:size=512m/);
+  assert.match(compose, /\/var\/lib\/postgresql\/18\/docker:size=512m/);
   assert.match(compose, /https:\/\/localhost\/api\/source/);
   assert.match(compose, /zaproxy\/zap-stable:[\w.]+@sha256:[a-f0-9]{64}/);
   assert.match(compose, /schemathesis\/schemathesis:v4\.28\.0@sha256:[a-f0-9]{64}/);

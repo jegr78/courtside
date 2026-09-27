@@ -22,7 +22,7 @@ DNS or firewall rules, upload diagnostics or enable scheduled jobs.
 | --- | --- | --- |
 | One host, bundled PostgreSQL and an external SMTP relay | `standard` | [Standard](guides/standard.md) |
 | One host, bundled PostgreSQL and self-hosted Stalwart mail | `full-self-hosted` | [Full self-hosted](guides/full-self-hosted.md) |
-| An existing HTTPS ingress, PostgreSQL 17 and SMTP service | `existing-infrastructure` | [Existing infrastructure](guides/existing-infrastructure.md) |
+| An existing HTTPS ingress, PostgreSQL 18 and SMTP service | `existing-infrastructure` | [Existing infrastructure](guides/existing-infrastructure.md) |
 | Tailscale Funnel, bundled PostgreSQL and an external SMTP relay | `funnel` | [Funnel](guides/funnel.md) |
 
 Every recipe routes browser traffic through the Courtside-managed Caddy policy. The application

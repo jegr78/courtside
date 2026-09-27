@@ -344,7 +344,7 @@ test("given the production architecture, when validating it, then every claim sa
       { from: "operator", to: registryComponent },
       `${reviewed.service} image source is not classified`);
   }
-  assert.equal(imageRegistry("postgres:17-alpine@sha256:" + "a".repeat(64)), "docker.io");
+  assert.equal(imageRegistry("postgres:18-alpine@sha256:" + "a".repeat(64)), "docker.io");
   assert.equal(imageRegistry("ghcr.io/example/image:1"), "ghcr.io");
   assert.equal(imageRegistry("quay.io/example/image:1"), "quay.io");
 });

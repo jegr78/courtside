@@ -3,7 +3,7 @@
 This document lists the data Courtside stores and the relationships between its tables. See
 `docs/design.md` for the decisions behind the schema.
 
-Courtside uses PostgreSQL 17. Flyway applies the migrations in
+Courtside uses PostgreSQL 18. Flyway applies the migrations in
 `src/main/resources/db/migration`. The diagrams below show the schema after all migrations have
 run, not the state created by an individual migration.
 

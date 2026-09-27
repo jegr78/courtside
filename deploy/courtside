@@ -958,10 +958,10 @@ verify_recovery_unit() {
 
 postgres_image() {
   local image
-  image=$(sed -n 's/^[[:space:]]*image: \(postgres:17-alpine@sha256:[0-9a-f]\{64\}\)$/\1/p' \
+  image=$(sed -n 's/^[[:space:]]*image: \(postgres:18-alpine@sha256:[0-9a-f]\{64\}\)$/\1/p' \
     "$installation_directory/current/compose.yaml" | head -n 1)
-  [[ "$image" =~ ^postgres:17-alpine@sha256:[0-9a-f]{64}$ ]] \
-    || refuse "the installed release has no pinned PostgreSQL 17 image"
+  [[ "$image" =~ ^postgres:18-alpine@sha256:[0-9a-f]{64}$ ]] \
+    || refuse "the installed release has no pinned PostgreSQL 18 image"
   printf '%s' "$image"
 }
 
@@ -1496,12 +1496,12 @@ command_restore_check() {
   chmod 600 "$cookie_jar"
   restore_cleanup_active=true
   if ! "${restore_compose[@]}" up -d --wait db; then
-    failure="PostgreSQL 17 did not become healthy"
+    failure="PostgreSQL 18 did not become healthy"
   else
     table_count=$("${restore_compose[@]}" exec -T db psql -U courtside -d courtside -tAc \
       "select count(*) from pg_tables where schemaname = 'public'") || failure="the empty-target check failed"
     table_count=${table_count//[[:space:]]/}
-    [ -n "$failure" ] || [ "$table_count" = 0 ] || failure="the PostgreSQL 17 restore target was not empty"
+    [ -n "$failure" ] || [ "$table_count" = 0 ] || failure="the PostgreSQL 18 restore target was not empty"
   fi
   if [ -z "$failure" ] && ! "${restore_compose[@]}" exec -T db pg_restore --clean --if-exists --no-owner \
     --single-transaction --exit-on-error -U courtside -d courtside < "$selected_recovery/database.dump"; then
@@ -1528,7 +1528,7 @@ command_restore_check() {
   rm -rf -- "$restore_runtime"
   temporary_path=""
   [ -z "$failure" ] || refuse "restore-check failed: $failure"
-  printf 'Recovery unit %s restored into empty PostgreSQL 17 and passed login and domain-data probes\n' \
+  printf 'Recovery unit %s restored into empty PostgreSQL 18 and passed login and domain-data probes\n' \
     "$selected_recovery"
 }
 

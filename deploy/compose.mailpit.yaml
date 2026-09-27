@@ -17,7 +17,7 @@ services:
       acceptance-mail: {}
 
   mailpit:
-    image: axllent/mailpit:v1.31@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
+    image: axllent/mailpit:v1.31@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
     restart: unless-stopped
     logging: *logging
     mem_limit: 256m

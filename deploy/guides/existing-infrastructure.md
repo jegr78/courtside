@@ -1,6 +1,6 @@
 # Existing infrastructure recipe
 
-Choose `existing-infrastructure` when an operator-owned HTTPS ingress, PostgreSQL 17 and SMTP relay
+Choose `existing-infrastructure` when an operator-owned HTTPS ingress, PostgreSQL 18 and SMTP relay
 already exist. Courtside still runs Caddy on `127.0.0.1:8080`. The outer ingress must replace client
 forwarding headers, set `X-Forwarded-Proto: https` and send the expected host.
 
@@ -37,5 +37,5 @@ The database account must be able to run the selected migration model. Prefer th
 `doctor` can validate the rendered configuration and the local Caddy boundary. It cannot certify
 the external ingress, database service, public certificate or SMTP provider. An unavailable
 external observation is `WARN` or `unknown`, not a software pass. Test the exact outer-ingress
-headers and run a recovery-unit restore against an empty compatible PostgreSQL 17 target before
+headers and run a recovery-unit restore against an empty compatible PostgreSQL 18 target before
 opening the instance to members.

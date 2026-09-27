@@ -2,7 +2,7 @@ name: courtside-perf
 
 services:
   db:
-    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     environment:
       POSTGRES_DB: courtside_perf
       POSTGRES_USER: courtside
@@ -10,7 +10,7 @@ services:
     cpus: 2.0
     mem_limit: 2g
     volumes:
-      - db:/var/lib/postgresql/data
+      - db:/var/lib/postgresql
     networks:
       - backend
     healthcheck:
@@ -21,7 +21,7 @@ services:
 
   # A booking hands its message over on an executor that makes the caller wait once the queue fills.
   mail:
-    image: axllent/mailpit:v1.31@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
+    image: axllent/mailpit:v1.31@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
     user: ${COURTSIDE_PERF_MAIL_USER:?run node tools/courtside.mjs perf}
     command:
       - --smtp-tls-cert
@@ -84,7 +84,7 @@ services:
       retries: 120
 
   proxy:
-    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     security_opt:
       - no-new-privileges:true
     cap_drop:

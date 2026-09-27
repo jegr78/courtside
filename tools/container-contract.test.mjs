@@ -200,6 +200,24 @@ test("given the bundled database and migrations, when the contract describes Pos
     "the database version and the transport refusal");
   });
 
+test("given the pinned PostgreSQL images, when a recipe keeps their data, then it mounts the directory the image stores it under",
+  () => {
+    // given
+    const deploy = fileURLToPath(new URL("../deploy", import.meta.url));
+    const recipes = readdirSync(deploy)
+      .filter((name) => /^compose[\w.-]*\.yaml$/.test(name))
+      .map((name) => ({ name, source: readFileSync(`${deploy}/${name}`, "utf8") }))
+      .filter(({ source }) => /image: postgres:\d+/.test(source));
+
+    // when
+    const legacy = recipes.filter(({ source }) => /\/var\/lib\/postgresql\/data\b/.test(source)).map(({ name }) => name);
+
+    // then
+    assert.ok(recipes.length > 1, "no recipe pins a PostgreSQL image any more");
+    assert.deepEqual(legacy, [],
+      "PostgreSQL 18 images keep their data below /var/lib/postgresql and refuse a mount at /var/lib/postgresql/data");
+  });
+
 test("given the image's one-shot commands, when the contract describes migrations, then each command, its invocation and its input are stated",
   () => {
     // given

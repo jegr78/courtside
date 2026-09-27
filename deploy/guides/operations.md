@@ -141,7 +141,7 @@ and a recipe names the components that belong together:
 |---|---|---|---|
 | `standard` | bundled PostgreSQL | Caddy with public TLS | an external SMTP relay |
 | `full-self-hosted` | bundled PostgreSQL | Caddy with public TLS | this deployment's own Stalwart server |
-| `existing-infrastructure` | external PostgreSQL 17 | your HTTPS ingress, then Caddy | an external SMTP relay |
+| `existing-infrastructure` | external PostgreSQL 18 | your HTTPS ingress, then Caddy | an external SMTP relay |
 | `funnel` | bundled PostgreSQL | Tailscale Funnel, then Caddy | an external SMTP relay |
 
 `existing-infrastructure` reaches its database over a network the deployment does not own, so
@@ -1138,7 +1138,7 @@ default.
 | `COURTSIDE_MAIL_RELAY_TARGET` | `mail` | Where the relay test connects. The service on the compose network by default, because a host seldom reaches its own published port from inside a container. |
 | `COURTSIDE_MAIL_MEMORY` | `512m` | Memory ceiling for the mail server, which is the one container taking unauthenticated traffic from the internet. |
 | `COURTSIDE_MEMORY` | `1g` | Memory ceiling for the application container. |
-| `COURTSIDE_DATABASE_URL` | *required with an external database* | JDBC URL of the PostgreSQL 17 database the `existing-infrastructure` recipe uses, for example `jdbc:postgresql://database.example.org:5432/courtside`. |
+| `COURTSIDE_DATABASE_URL` | *required with an external database* | JDBC URL of the PostgreSQL 18 database the `existing-infrastructure` recipe uses, for example `jdbc:postgresql://database.example.org:5432/courtside`. |
 | `COURTSIDE_DATABASE_USERNAME` | *required with an external database and without `compose.database-identities.yaml`* | The role the application signs in as. The identity overlay replaces it with file-backed credentials. |
 | `COURTSIDE_DATABASE_PASSWORD` | *required with an external database and without `compose.database-identities.yaml`* | That role's password. |
 | `COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES` | *required with synthetic mail* | Host directory holding `cert.pem` and `key.pem`, the certificate Mailpit serves for STARTTLS. |
@@ -1189,7 +1189,7 @@ verification concurrency settings above instead.
 
 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD` are set by
 `compose.yaml`, and by `compose.external-database.yaml` from the `COURTSIDE_DATABASE_*` values when
-PostgreSQL runs outside Compose. The application needs PostgreSQL 17 and will not run on anything
+PostgreSQL runs outside Compose. The application needs PostgreSQL 18 and will not run on anything
 else.
 
 ## Diagnose slow requests and queries
@@ -1345,7 +1345,7 @@ custom trust mode rather than substituting the official release image.
 Retention reads and verifies only recovery units directly below the configured `backups/`
 directory. An unknown or malformed target stops pruning.
 
-Prove a recovery unit in a disposable PostgreSQL 17 target. Supply an existing account whose
+Prove a recovery unit in a disposable PostgreSQL 18 target. Supply an existing account whose
 persisted password and court data should survive the restore. In a private shell, read the password
 without echo into <code>COURTSIDE_RESTORE_PASSWORD</code>, export it, set
 <code>COURTSIDE_RESTORE_USERNAME</code>, and run
@@ -1398,7 +1398,7 @@ retains the provider-first new value. Other lifecycle commands stop while such r
 
 ## Image updates between releases
 
-Every image the recipe files name other than Courtside itself, `postgres:17-alpine`,
+Every image the recipe files name other than Courtside itself, `postgres:18-alpine`,
 `caddy:2-alpine`, `stalwartlabs/stalwart` and `alpine:3` among them, is pinned by digest, not by
 floating tag,
 so `docker compose pull` alone will never change them. That is deliberate: a club's database, its
@@ -1407,7 +1407,7 @@ means the digests do not update themselves. Dependabot opens a pull request agai
 when one of them gets a new patch release; a maintainer bumping the digest here is how it reaches
 your instance, take the updated Compose files and run `docker compose up -d` to apply it.
 Until then, you can raise it yourself: look up the current tag's digest with
-`docker buildx imagetools inspect postgres:17-alpine` (or any of the others) and replace the
+`docker buildx imagetools inspect postgres:18-alpine` (or any of the others) and replace the
 `@sha256:…` suffix in the Compose file that names it.
 
 ## One setting to review for your domain

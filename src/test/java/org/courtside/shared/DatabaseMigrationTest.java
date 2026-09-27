@@ -1,5 +1,6 @@
 package org.courtside.shared;
 
+import org.courtside.TestPostgres;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -19,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DatabaseMigrationTest {
 
     @Container
-    private static final PostgreSQLContainer<?> DATABASE = new PostgreSQLContainer<>("postgres:17-alpine");
+    private static final PostgreSQLContainer<?> DATABASE = new PostgreSQLContainer<>(TestPostgres.deployedImage());
 
     @TempDir
     private Path temporaryDirectory;

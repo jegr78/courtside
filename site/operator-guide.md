@@ -10,7 +10,7 @@ von der Release-Seite herunter und prüfe Attestierung und SHA-256-Prüfsumme, b
 | --- | --- |
 | Ein Linux-Host, mitgeliefertes PostgreSQL, externer SMTP-Relay | `standard` |
 | Ein Linux-Host mit PostgreSQL und eigenem Stalwart-Mailserver | `full-self-hosted` |
-| Vorhandener HTTPS-Eingang, PostgreSQL 17 und SMTP-Dienst | `existing-infrastructure` |
+| Vorhandener HTTPS-Eingang, PostgreSQL 18 und SMTP-Dienst | `existing-infrastructure` |
 | Öffentlicher Zugang über Tailscale Funnel | `funnel` |
 
 Die [generierten Rezeptbefehle](generated-operator-recipes.md) stammen aus denselben Rezeptdateien,

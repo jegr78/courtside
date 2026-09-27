@@ -14,7 +14,7 @@ test("given active assessment configuration, when resolving images, then all pin
   // then
   assert.deepEqual(images.map((image) => image.split("@")[0]), [
     "caddy:2-alpine",
-    "postgres:17-alpine",
+    "postgres:18-alpine",
     "schemathesis/schemathesis:v4.28.0",
     "zaproxy/zap-stable:2.17.0",
   ]);
@@ -34,7 +34,7 @@ test("given an unpinned compose image, when resolving images, then resolution fa
   // given
   const directory = mkdtempSync(join(tmpdir(), "security-images-"));
   const compose = join(directory, "compose.yaml");
-  writeFileSync(compose, "services:\n  database:\n    image: postgres:17-alpine\n");
+  writeFileSync(compose, "services:\n  database:\n    image: postgres:18-alpine\n");
 
   // when / then
   assert.throws(

@@ -4,7 +4,7 @@ Courtside is a court booking system for sports clubs. Each club runs a separate 
 book courts, trainers reserve training periods and groundskeepers close courts. Courtside stores all
 three as bookings and uses the booking type to apply the correct rules.
 
-Java 25, Spring Boot 4.1, Spring Modulith, PostgreSQL 17. Licensed under AGPL-3.0.
+Java 25, Spring Boot 4.1, Spring Modulith, PostgreSQL 18. Licensed under AGPL-3.0.
 
 **Status:** Courtside has no tagged release yet. The reference deployment in [`deploy/`](deploy/)
 expects a published image, so run Courtside from source until the first release.
@@ -14,7 +14,7 @@ expects a published image, so run Courtside from source until the first release.
 - JDK 25 (Eclipse Temurin)
 - Node.js 24 or later
 - Docker for PostgreSQL and the Testcontainers test suite
-- PostgreSQL 17. The non-overlap guarantee is a GiST exclusion constraint; no other database
+- PostgreSQL 18. The non-overlap guarantee is a GiST exclusion constraint; no other database
   will do.
 
 ## Running locally
@@ -117,7 +117,7 @@ JAVA_HOME=/path/to/temurin-25 node tools/courtside.mjs check
 Commit the reviewed changes first. The command applies the same conservative path classification as
 pull-request CI, checks out that commit in a temporary worktree and runs the required local backend,
 frontend, combined, or full verification there. Use `check --plan` to inspect the decision and
-`check --full` to escalate it. Testcontainers starts PostgreSQL 17 for every selected code profile,
+`check --full` to escalate it. Testcontainers starts PostgreSQL 18 for every selected code profile,
 so Docker has to be running for those profiles. The suite never mocks the database: collision
 handling is the database's job and is tested as such.
 
