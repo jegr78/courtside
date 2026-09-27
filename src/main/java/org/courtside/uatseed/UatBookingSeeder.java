@@ -1,6 +1,7 @@
 package org.courtside.uatseed;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -26,6 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Component
+@Profile("uat-seed")
 class UatBookingSeeder {
 
     static final String MARKER = "[uat-booking-seed:v1:";

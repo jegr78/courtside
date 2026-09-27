@@ -9,6 +9,7 @@ import org.courtside.member.testfixture.MemberTestFixture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -50,6 +51,9 @@ class UatBookingSeederIntegrationTest extends AbstractIntegrationTest {
     private Clock clock;
 
     @Autowired
+    private ApplicationContext applicationContext;
+
+    @Autowired
     private IdentityTestFixture identity;
 
     @Autowired
@@ -57,6 +61,15 @@ class UatBookingSeederIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private FacilityTestFixture facility;
+
+    @Test
+    void givenTheRegularApplicationProfile_whenInspectingFixtureBeans_thenTheUatSeederRemainsInactive() {
+        // given / when
+        var seeders = applicationContext.getBeansOfType(UatBookingSeeder.class);
+
+        // then
+        assertThat(seeders).isEmpty();
+    }
 
     @Test
     void givenExistingMembersAndRoles_whenPreviewingWritingAndRepeating_thenOnlyStableBookingsAreAdded() {
