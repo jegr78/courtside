@@ -10,7 +10,7 @@ and verify its attestation and SHA-256 checksum before extracting it.
 | --- | --- |
 | One Linux host, bundled PostgreSQL and an external SMTP relay | `standard` |
 | One Linux host with PostgreSQL and self-hosted Stalwart mail | `full-self-hosted` |
-| Existing HTTPS ingress, PostgreSQL 17 and SMTP service | `existing-infrastructure` |
+| Existing HTTPS ingress, PostgreSQL 18 and SMTP service | `existing-infrastructure` |
 | Public access through Tailscale Funnel | `funnel` |
 
 The [generated recipe commands](generated-operator-recipes.md) come from the same recipe files the
@@ -49,7 +49,7 @@ unit, exercise it with `restore-check` and remove the bootstrap values with
 
 An update creates a recovery unit first. It does not promise an automatic database downgrade after
 a newer migration has run. Retain the previous release and regularly test recovery against an empty
-PostgreSQL 17 target.
+PostgreSQL 18 target.
 
 For acceptance testing, each nightly run that builds and qualifies a new image retains
 `nightly-deployment-archive` for 14 days. Download it from a successful `main` run. Its

@@ -46,7 +46,7 @@
           "positiveBoundaries": "Single and series allocations accept free and exactly adjacent ranges.",
           "negativeBoundaries": "Overlapping ranges, retries and concurrent commits cannot create double occupancy.",
           "level": "PostgreSQL integration, E2E", "frequency": ["PR", "nightly"],
-          "environment": "PostgreSQL 17, packaged app", "syntheticData": "Fixed courts, slots and competing accounts",
+          "environment": "PostgreSQL 18, packaged app", "syntheticData": "Fixed courts, slots and competing accounts",
           "evidenceType": "Constraint and coordinated-race results", "owner": "Booking",
           "openGap": "Browser-visible concurrent races remain assigned to #218."
         },
@@ -66,7 +66,7 @@
           "positiveBoundaries": "An identical idempotent retry returns the one completed operation.",
           "negativeBoundaries": "Mismatched keys, timeouts, constraint failures and concurrent delivery leave no duplicate or partial state.",
           "level": "PostgreSQL integration, E2E", "frequency": ["PR", "nightly"],
-          "environment": "PostgreSQL 17", "syntheticData": "Stable request and operation IDs",
+          "environment": "PostgreSQL 18", "syntheticData": "Stable request and operation IDs",
           "evidenceType": "Row-state and typed-error assertions", "owner": "Booking",
           "openGap": "Cross-browser ambiguous-timeout evidence remains assigned to #218."
         },
@@ -76,7 +76,7 @@
           "positiveBoundaries": "Listing and withdrawing work across pages, for a booking that has already happened as much as for one ahead.",
           "negativeBoundaries": "Own bookings, a booking they are not recorded in and a repeated withdrawal are refused identically, and no response carries a name.",
           "level": "Unit, PostgreSQL integration, contract, React, E2E", "frequency": ["PR"],
-          "environment": "PostgreSQL 17, packaged app", "syntheticData": "Two members and a booking naming one of them",
+          "environment": "PostgreSQL 18, packaged app", "syntheticData": "Two members and a booking naming one of them",
           "evidenceType": "Row state, typed-error and wire assertions", "owner": "Booking and identity",
           "openGap": "Removing oneself from a managed card's roster reaches the managing role through the appointment detail, not through a notification."
         }
@@ -91,7 +91,7 @@
           "positiveBoundaries": "Authorized create, update, deactivate and membership transitions persist for the intended person.",
           "negativeBoundaries": "Duplicate identities and every unauthorized role or cross-person operation are rejected without disclosure.",
           "level": "PostgreSQL integration, contract, React, E2E", "frequency": ["PR", "release"],
-          "environment": "PostgreSQL 17, packaged app", "syntheticData": "Approved placeholder roster",
+          "environment": "PostgreSQL 18, packaged app", "syntheticData": "Approved placeholder roster",
           "evidenceType": "Required build and administration journey", "owner": "Membership and identity",
           "openGap": "A membership type does not yet gate account creation or booking; that is tracked by #354."
         },
@@ -101,7 +101,7 @@
           "positiveBoundaries": "First and repeated imports create, match, update and deactivate by stable external reference.",
           "negativeBoundaries": "Duplicate or missing references, malformed rows and conflicting usernames cannot cause partial state or account takeover.",
           "level": "Unit, property, PostgreSQL integration, React, E2E", "frequency": ["PR", "release"],
-          "environment": "PostgreSQL 17, packaged app", "syntheticData": "NetXP-like and eBusy-like CSV fixtures with no real data",
+          "environment": "PostgreSQL 18, packaged app", "syntheticData": "NetXP-like and eBusy-like CSV fixtures with no real data",
           "evidenceType": "Preview, transaction and post-sync invariants, and seeded parsing and partition properties", "owner": "Membership and integration",
           "openGap": "An import does not create accounts for the people it creates; that is tracked by #354."
         }
@@ -126,7 +126,7 @@
           "positiveBoundaries": "A confirmed write remains the final persisted and displayed state.",
           "negativeBoundaries": "Double submits, out-of-order responses, constraint conflicts and refresh failures cannot claim stale success.",
           "level": "PostgreSQL integration, React, E2E", "frequency": ["PR", "nightly"],
-          "environment": "PostgreSQL 17, browser", "syntheticData": "Deterministic conflicting updates",
+          "environment": "PostgreSQL 18, browser", "syntheticData": "Deterministic conflicting updates",
           "evidenceType": "Final row state and UI trace", "owner": "Administration",
           "openGap": "None open: writers of one account row serialize on it instead of refusing the later one, so a confirmed change is the final state, and a browser journey proves that a court and a role changed behind an open dialog fail closed."
         }
@@ -187,17 +187,17 @@
           "positiveBoundaries": "Previous patch, minor and supported skipped-version upgrades preserve data and invariants.",
           "negativeBoundaries": "Interrupted or invalid migrations fail without serving an inconsistent schema.",
           "level": "CLI contract, release qualification", "frequency": ["PR", "release"],
-          "environment": "PostgreSQL 17 and candidate image", "syntheticData": "Version-owned synthetic dataset",
+          "environment": "PostgreSQL 18 and candidate image", "syntheticData": "Version-owned synthetic dataset",
           "evidenceType": "CLI state-transition tests, migration logs and invariant checksums", "owner": "Database and release",
           "openGap": "No downgrade is promised after a newer schema has run; recovery uses the pre-update recovery unit."
         },
         {
           "id": "OP-3", "impact": "P0", "likelihood": "Low",
           "invariant": "A documented backup restores into an empty compatible environment and passes functional and integrity checks.",
-          "positiveBoundaries": "The application writes a synthetic club through its public API; its backup and the legacy-schema fixture each restore into empty PostgreSQL 17, and the matching image reads the restored login, booking and logo.",
+          "positiveBoundaries": "The application writes a synthetic club through its public API; its backup and the legacy-schema fixture each restore into empty PostgreSQL 18, and the matching image reads the restored login, booking and logo.",
           "negativeBoundaries": "A corrupt archive leaves no database objects, an interrupted restore preserves the usable database, and the restored exclusion constraint still rejects overlap.",
           "level": "CLI contract, release qualification", "frequency": ["PR", "periodic", "release"],
-          "environment": "Fresh PostgreSQL 17", "syntheticData": "API-written and legacy-schema synthetic datasets, including an outstanding event publication",
+          "environment": "Fresh PostgreSQL 18", "syntheticData": "API-written and legacy-schema synthetic datasets, including an outstanding event publication",
           "evidenceType": "CLI recovery-unit checks, before-and-after table and sequence evidence, backup sizes, image ID and schema version", "owner": "Operations",
           "openGap": "The relay is stopped before a second API booking so the backup contains an application-written outstanding Modulith publication; remote storage remains operator-owned."
         },

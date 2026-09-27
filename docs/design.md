@@ -66,7 +66,7 @@ configuration, secrets and backups beneath a path-bound installation marker. It 
 its versioned configuration as data and resolves every Compose invocation from the selected
 recipe. Its recovery units bind a validated
 PostgreSQL dump to that release, image, configuration, local material and checksum inventory;
-restore checks use the locally trusted immutable release model, an empty PostgreSQL 17 target and
+restore checks use the locally trusted immutable release model, an empty PostgreSQL 18 target and
 the matching application image, with cleanup recorded before the target starts. Exact-release
 updates create a recovery unit before pulling or migrating, never start an older application after
 a newer schema may have run and never claim an automatic database rollback. The manifest carries
@@ -114,7 +114,7 @@ name. A club-defined name survives later language changes.
 ## Architecture
 
 Courtside is a modular monolith built with Java 25, Spring Boot 4.1 and Spring Modulith 2.1. It runs
-as one application process and uses PostgreSQL 17.
+as one application process and uses PostgreSQL 18.
 
 | Module | Responsibility |
 | --- | --- |

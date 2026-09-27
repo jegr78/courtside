@@ -2954,7 +2954,7 @@
       "surface": "member-booking",
       "profile": "active",
       "prerequisites": [
-        "PostgreSQL 17",
+        "PostgreSQL 18",
         "Coordinated concurrent clients"
       ],
       "expectedSecureOutcome": "Competing writes preserve one occupancy, authorization, participant capacity and idempotency without partial state.",

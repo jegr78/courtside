@@ -92,7 +92,7 @@ case "$*" in
   *'volume inspect '*) [ -f "${join(root, "docker-volume-exists")}" ] && exit 0 || exit 1 ;;
   *'network ls --filter label=com.docker.compose.project='*) printf '%s\n' 'example-club_default' ;;
   *'network inspect '*'--format'*) printf '%s\n' 'example-club|default' ;;
-  *'ps -a --filter label=com.docker.compose.project='*'{{.Label "com.docker.compose.service"}}|{{.Image}}'*) if [ -f "${join(root, "docker-adoption-containers")}" ]; then cat "${join(root, "docker-adoption-containers")}"; else printf '%s\n' 'app|ghcr.io/jegr78/courtside@sha256:${digest}' 'db|postgres:17-alpine' 'proxy|caddy:2'; fi ;;
+  *'ps -a --filter label=com.docker.compose.project='*'{{.Label "com.docker.compose.service"}}|{{.Image}}'*) if [ -f "${join(root, "docker-adoption-containers")}" ]; then cat "${join(root, "docker-adoption-containers")}"; else printf '%s\n' 'app|ghcr.io/jegr78/courtside@sha256:${digest}' 'db|postgres:18-alpine' 'proxy|caddy:2'; fi ;;
   *'ps -a --filter label=com.docker.compose.project='*'com.docker.compose.config-hash'*) printf '%s\n' 'app hash-app' 'db hash-db' 'proxy hash-proxy' ;;
   *'ps -a --filter label=com.docker.compose.project='*'{{.Label "com.docker.compose.service"}}'*) if [ -f "${join(root, "docker-adoption-services")}" ]; then cat "${join(root, "docker-adoption-services")}"; else printf '%s\n' 'app' 'db' 'proxy'; fi ;;
   *' config --services') if [ -f "${join(root, "docker-expected-services")}" ]; then cat "${join(root, "docker-expected-services")}"; else printf '%s\n' 'app' 'db' 'proxy'; fi ;;
@@ -911,7 +911,7 @@ test("given a backup command owns the installation lock, when another lifecycle 
   });
 });
 
-test("given a recovery unit, when restore-check runs, then it uses an empty PostgreSQL 17 target and probes restored behavior", () => {
+test("given a recovery unit, when restore-check runs, then it uses an empty PostgreSQL 18 target and probes restored behavior", () => {
   fixture((context) => {
     // given
     assert.equal(initialize(context).status, 0);
@@ -935,7 +935,7 @@ test("given a recovery unit, when restore-check runs, then it uses an empty Post
     const invocations = readFileSync(context.dockerLog, "utf8");
     assert.match(invocations, /ps -a --format json/);
     assert.match(readFileSync(join(recovery, "release", "compose.recovery-check.yaml"), "utf8"),
-      /postgres:17-alpine@sha256:/);
+      /postgres:18-alpine@sha256:/);
     assert.match(invocations, /pg_restore .*--exit-on-error/);
     assert.match(invocations, / up -d --wait app/);
     const curlLog = readFileSync(join(context.root, "curl.log"), "utf8");

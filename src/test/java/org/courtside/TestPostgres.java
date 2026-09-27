@@ -2,6 +2,7 @@ package org.courtside;
 
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,6 +28,10 @@ public final class TestPostgres {
                 .withCopyToContainer(Transferable.of(pair.key()), mounted(overlay, "key"))
                 .withCommand("sh", "-c", serverCommand(overlay));
         return postgres;
+    }
+
+    public static DockerImageName deployedImage() {
+        return TestcontainersConfiguration.deployedPostgresImage();
     }
 
     public static PostgreSQLContainer sharedPlaintext() {

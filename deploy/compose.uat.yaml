@@ -15,7 +15,7 @@ services:
       POSTGRES_USER: courtside
       POSTGRES_PASSWORD: courtside-uat
     volumes:
-      - db:/var/lib/postgresql/data
+      - db:/var/lib/postgresql
     depends_on:
       log-collector:
         condition: service_healthy

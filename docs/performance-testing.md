@@ -106,7 +106,7 @@ node tools/courtside.mjs perf-stop
 node tools/courtside.mjs perf-reset courtside-perf
 ```
 
-`perf` verifies the source, builds the local image, and starts PostgreSQL 17, the application, a
+`perf` verifies the source, builds the local image, and starts PostgreSQL 18, the application, a
 Mailpit relay, and a dedicated Caddy boundary. The application is available at
 `https://localhost:9443`; its local CA is intentionally disposable. The CLI generates one shared
 password, stores it only in the ignored `build/perf-environment.json` with owner-only permissions

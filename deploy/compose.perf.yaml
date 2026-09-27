@@ -10,7 +10,7 @@ services:
     cpus: 2.0
     mem_limit: 2g
     volumes:
-      - db:/var/lib/postgresql/data
+      - db:/var/lib/postgresql
     networks:
       - backend
     healthcheck:

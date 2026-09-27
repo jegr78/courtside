@@ -87,7 +87,7 @@ lets the database and proxy start only after that check is healthy.
 
 ## The database
 
-Courtside runs on PostgreSQL 17 and is tested on nothing else. The schema needs the `btree_gist`
+Courtside runs on PostgreSQL 18 and is tested on nothing else. The schema needs the `btree_gist`
 extension, because a booking's court occupancy is a GiST exclusion constraint.
 
 The application connects with `SPRING_DATASOURCE_URL`, a `jdbc:postgresql://host:port/database`

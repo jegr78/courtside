@@ -1328,14 +1328,14 @@ test("given UAT persistence, when reading its Compose contract, then data, CA, T
   // when / then
   assert.match(compose, /COURTSIDE_COOKIE_SECURE: "true"/);
   assert.match(compose, /COURTSIDE_ENVIRONMENT: UAT/);
-  assert.match(compose, /postgres:17-alpine@sha256:[a-f0-9]{64}/);
+  assert.match(compose, /postgres:18-alpine@sha256:[a-f0-9]{64}/);
   assert.match(compose, /caddy:2-alpine@sha256:[a-f0-9]{64}/);
   assert.match(compose, /COURTSIDE_UAT_ADMIN_PASSWORD/);
   assert.doesNotMatch(compose, /courtside-admin/);
   assert.doesNotMatch(compose, /5433:5432/);
   assert.match(databaseOverride, /127\.0\.0\.1:5433:5432/);
   assert.match(compose, /caddy-data:\/data/);
-  assert.match(compose, /db:\/var\/lib\/postgresql\/data/);
+  assert.match(compose, /db:\/var\/lib\/postgresql$/m);
   assert.match(caddy, /auto_https disable_redirects/);
   assert.match(caddy, /method GET HEAD/);
   assert.match(caddy, /path \/ \/courts \/login/);

@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: courtside
       POSTGRES_PASSWORD: ${COURTSIDE_RECOVERY_DATABASE_PASSWORD:?set COURTSIDE_RECOVERY_DATABASE_PASSWORD}
     volumes:
-      - db:/var/lib/postgresql/data
+      - db:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U courtside -d courtside"]
       interval: 2s
