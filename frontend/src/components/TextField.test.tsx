@@ -50,6 +50,28 @@ it("given a password field in a form, when its visibility control is activated, 
   expect(submit, "showing the password is not a submission").not.toHaveBeenCalled();
 });
 
+it("given a revealed password, when its form is submitted, then the field is masked before the browser reads it", async () => {
+  // given
+  const seen: string[] = [];
+  const submit = vi.fn((event: { preventDefault: () => void }) => {
+    event.preventDefault();
+    seen.push(screen.getByTestId("password").getAttribute("type") ?? "");
+  });
+  render(<form onSubmit={submit}>
+    <TextField id="password" label="Password" data-testid="password" type="password" defaultValue="secret-entry" />
+    <button type="submit" data-testid="submit">Save</button>
+  </form>);
+  await userEvent.click(screen.getByTestId("password-visibility"));
+
+  // when
+  await userEvent.click(screen.getByTestId("submit"));
+
+  // then
+  expect(seen, "a password manager or form history reads a password field, not text").toEqual(["password"]);
+  expect(screen.getByTestId("password")).toHaveAttribute("type", "password");
+  expect(screen.getByTestId("password-visibility")).toHaveAttribute("aria-pressed", "false");
+});
+
 it("given German, when a password field renders, then its visibility control is named in German", async () => {
   // given
   await i18n.changeLanguage("de");

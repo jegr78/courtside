@@ -1,4 +1,4 @@
-import { type InputHTMLAttributes, useState } from "react";
+import { type InputHTMLAttributes, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -21,10 +21,26 @@ export function TextField({ label, id, className = "", type, ...props }: TextFie
 function PasswordField({ label, id, className = "", ...props }: Omit<TextFieldProps, "type">) {
   const { t } = useTranslation();
   const [isVisible, setVisible] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const field = input.current;
+    const form = field?.form;
+    if (!field || !form) return;
+    // Password managers and form history read the field type on submit, before React re-renders.
+    const mask = () => {
+      field.type = "password";
+      setVisible(false);
+    };
+    form.addEventListener("submit", mask, { capture: true });
+    return () => form.removeEventListener("submit", mask, { capture: true });
+  }, []);
+
   return <div className="grid gap-2">
     <label className="font-medium" htmlFor={id}>{label}</label>
     <div className="relative">
       <input
+        ref={input}
         id={id}
         type={isVisible ? "text" : "password"}
         className={`form-control w-full rounded-lg border py-3 pr-12 pl-3 ${className}`}
