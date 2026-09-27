@@ -43,6 +43,7 @@ const devComposeFile = join(root, "deploy", "compose.dev.yaml");
 const devComposeArgs = ["compose", "-p", "courtside-dev", "-f", devComposeFile];
 const uatComposeFile = join(root, "deploy", "compose.uat.yaml");
 const uatDbComposeFile = join(root, "deploy", "compose.uat-db.yaml");
+const uatSeedComposeFile = join(root, "deploy", "compose.uat-seed.yaml");
 const uatProject = "courtside-uat";
 const funnelTarget = "http://127.0.0.1:8083";
 const stateFile = join(root, "build", "dev-processes.json");
@@ -85,7 +86,8 @@ export function parseArguments(argv) {
   const supported = new Set([
     "build", "verify", "check", "dev", "dev-debug", "dev-stop", "dev-reset", "uat", "uat-stop",
     "uat-share", "uat-logs", "uat-db-shell", "uat-cert", "uat-backup", "uat-restore",
-    "uat-reset", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset", "perf-run", "perf-promote", "perf-compare",
+    "uat-reset", "uat-seed-bookings", "perf", "perf-stop", "perf-logs", "perf-db-shell", "perf-reset",
+    "perf-run", "perf-promote", "perf-compare",
     "security", "security-seed", "security-verify", "security-plan", "security-run", "security-report",
     "security-stop",
     "security-cleanup", "security-recover", "security-reset",
@@ -129,6 +131,8 @@ export function parseArguments(argv) {
     } else if (["dev", "uat", "perf"].includes(flag) && command === "status" && !options.environment) {
       options.environment = flag;
     } else if (flag === "--confirm" && command === "uat-restore") {
+      options.confirm = requiredOptionValue(flags, ++index, "--confirm");
+    } else if (flag === "--confirm" && command === "uat-seed-bookings") {
       options.confirm = requiredOptionValue(flags, ++index, "--confirm");
     } else if (flag === "--all" && command === "uat-reset") {
       options.all = true;
@@ -194,6 +198,9 @@ export function parseArguments(argv) {
   }
   if (command === "uat-reset" && options.confirm !== uatProject) {
     throw new Error(`uat-reset requires the exact project name '${uatProject}'`);
+  }
+  if (command === "uat-seed-bookings" && options.confirm && options.confirm !== uatProject) {
+    throw new Error(`uat-seed-bookings writes only with --confirm ${uatProject}`);
   }
   if (command === "perf-reset" && options.confirm !== perfProject) {
     throw new Error(`perf-reset requires the exact project name '${perfProject}'`);
@@ -613,6 +620,10 @@ async function execute(options) {
   }
   if (options.command === "uat-reset") {
     resetUat(options.all);
+    return;
+  }
+  if (options.command === "uat-seed-bookings") {
+    seedUatBookings(options.confirm === uatProject);
     return;
   }
   if (options.command === "perf") {
@@ -1645,6 +1656,38 @@ function backupTimestamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
 }
 
+export function uatBookingSeedPlans(state, write) {
+  const environment = {
+    ...process.env,
+    COURTSIDE_UAT_IMAGE: state.image,
+    COURTSIDE_UAT_ADMIN_PASSWORD: "",
+    COURTSIDE_UAT_BOOKING_SEED_WRITE: String(write)
+  };
+  return {
+    package: processPlans(parseArguments(["build"])).single,
+    image: fixtureImagePlan("courtside:uat-booking-seed-local", state.image),
+    run: {
+      command: "docker",
+      args: [...uatComposeArgs(state.dbPort), "-f", uatSeedComposeFile,
+        "run", "--rm", "booking-seed"],
+      environment
+    }
+  };
+}
+
+function seedUatBookings(write) {
+  const state = readUatState();
+  if (write) backupUat();
+  const plans = uatBookingSeedPlans(state, write);
+  runInteractive(plans.package);
+  stageFixtureClasses();
+  runInteractive(plans.image);
+  runInteractive(plans.run);
+  if (!write) {
+    process.stdout.write(`Preview only. Re-run with --confirm ${uatProject} to write the displayed dataset.\n`);
+  }
+}
+
 function restoreUat(file) {
   const source = resolve(root, file);
   const state = readUatState();
@@ -2153,7 +2196,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> <IMAGE_DIGEST>\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json>\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> <IMAGE_DIGEST>\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json>\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;
