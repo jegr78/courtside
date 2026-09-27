@@ -44,6 +44,8 @@ $env:JAVA_HOME = "C:\path\to\temurin-25"
 | `node tools/courtside.mjs uat-cert [file]` | Exports the UAT root certificate and prints trust instructions. |
 | `node tools/courtside.mjs uat-backup [file]` | Creates a portable compressed PostgreSQL dump. |
 | `node tools/courtside.mjs uat-restore <file> --confirm courtside-uat` | Replaces the UAT database from a dump and restarts the application. |
+| `node tools/courtside.mjs uat-seed-bookings` | Previews additive sample bookings against the existing UAT database. |
+| `node tools/courtside.mjs uat-seed-bookings --confirm courtside-uat` | Backs up UAT and adds the previewed sample bookings. |
 | `node tools/courtside.mjs uat-reset courtside-uat` | Deletes the UAT database but retains its local CA. |
 | `node tools/courtside.mjs uat-reset courtside-uat --all` | Deletes the UAT database and local CA. |
 | `node tools/courtside.mjs status dev` | Reports Dev health, processes, ports, containers, and volumes. |
@@ -122,6 +124,22 @@ PostgreSQL stays inside the Compose network unless UAT is started with `--db-por
 access without publishing a port, use `uat-db-shell`. External clients use database `courtside`,
 username `courtside`, password `courtside-uat`, and JDBC URL
 `jdbc:postgresql://127.0.0.1:5433/courtside`.
+
+### Sample booking history
+
+Run `node tools/courtside.mjs uat-seed-bookings` first. This is a read-only preview that reports
+planned bookings, bookings already present, scheduling conflicts, and booking types for which the
+current accounts have no eligible role. The plan spans eight weeks in the past and twelve weeks in
+the future. It includes singles, doubles, guest and ball-machine bookings, weekday training series
+on two courts, fortnightly weekend league-match series on every active court, and court closures.
+
+Apply the plan with
+`node tools/courtside.mjs uat-seed-bookings --confirm courtside-uat`. The command creates a
+timestamped UAT backup before writing. It reads the existing active courts, current memberships,
+enabled accounts, and roles; it neither creates nor changes any of them. Existing bookings are
+also retained. Conflicting sample occurrences are skipped, and deterministic fixture identifiers
+make repeated runs idempotent. The one-shot fixture image is derived from the UAT image recorded by
+the CLI and is not used by the running application or production image.
 
 ### Local TLS trust
 

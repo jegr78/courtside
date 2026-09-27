@@ -11,14 +11,15 @@ import { test } from "node:test";
 import {
   assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
-  openBackupForRestore, packagedApplicationJar, processPlans, requiredPorts, restoreDatabase, runInteractive, runLifecyclePlans, startProcesses,
+  openBackupForRestore, packagedApplicationJar, processPlans, requiredPorts, restoreDatabase, runInteractive,
+  runLifecyclePlans, startProcesses,
   superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfComposePlan, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
   funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
   redactUatDiagnostics, resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference,
-  uatSmokeEnvironment, repositoryFromRemote,
+  uatSmokeEnvironment, repositoryFromRemote, uatBookingSeedPlans,
   validateNode, validatePublicAddress
 } from "./courtside.mjs";
 
@@ -77,6 +78,31 @@ function passingBrowserPerformanceResult() {
 test("given Windows, when resolving executables, then wrapper commands use cmd launchers", () => {
   // when / then
   assert.deepEqual(executableNames("win32"), { maven: "mvnw.cmd", npm: "npm.cmd" });
+});
+
+test("given UAT booking data, when parsing the command, then writes require the exact confirmation", () => {
+  // when / then
+  assert.equal(parseArguments(["uat-seed-bookings"]).confirm, undefined);
+  assert.equal(parseArguments(["uat-seed-bookings", "--confirm", "courtside-uat"]).confirm,
+    "courtside-uat");
+  assert.throws(() => parseArguments(["uat-seed-bookings", "--confirm", "wrong"]),
+    /--confirm courtside-uat/);
+});
+
+test("given a persistent UAT image, when planning its booking seed, then the fixture overlays that image", () => {
+  // given
+  const state = { image: "ghcr.io/example/courtside:1.2.3", dbPort: true };
+
+  // when
+  const preview = uatBookingSeedPlans(state, false);
+  const write = uatBookingSeedPlans(state, true);
+
+  // then
+  assert.ok(preview.image.args.includes("BASE_IMAGE=ghcr.io/example/courtside:1.2.3"));
+  assert.ok(preview.run.args.some((argument) => argument.endsWith("compose.uat-seed.yaml")));
+  assert.equal(preview.run.environment.COURTSIDE_UAT_BOOKING_SEED_WRITE, "false");
+  assert.equal(write.run.environment.COURTSIDE_UAT_BOOKING_SEED_WRITE, "true");
+  assert.ok(preview.run.args.some((argument) => argument.endsWith("compose.uat-db.yaml")));
 });
 
 test("given macOS or Linux, when resolving executables, then the POSIX Maven wrapper is used", () => {

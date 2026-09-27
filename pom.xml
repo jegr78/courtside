@@ -286,9 +286,11 @@
                                         <include>org/courtside/demo/**</include>
                                         <include>org/courtside/performance/**</include>
                                         <include>org/courtside/securityassessment/**</include>
+                                        <include>org/courtside/uatseed/**</include>
                                         <include>application-demo.yaml</include>
                                         <include>application-perf.yaml</include>
                                         <include>application-security.yaml</include>
+                                        <include>application-uat-seed.yaml</include>
                                         <include>security-assessment-dataset.properties</include>
                                     </includes>
                                 </resource>
@@ -327,9 +329,11 @@
                                 <exclude>org/courtside/demo/**</exclude>
                                 <exclude>org/courtside/performance/**</exclude>
                                 <exclude>org/courtside/securityassessment/**</exclude>
+                                <exclude>org/courtside/uatseed/**</exclude>
                                 <exclude>application-demo.yaml</exclude>
                                 <exclude>application-perf.yaml</exclude>
                                 <exclude>application-security.yaml</exclude>
+                                <exclude>application-uat-seed.yaml</exclude>
                                 <exclude>security-assessment-dataset.properties</exclude>
                             </excludes>
                         </configuration>

@@ -82,12 +82,14 @@ public class ReferenceDeploymentSecurityTest {
             "image: ${COURTSIDE_SECURITY_IMAGE:?required}";
     private static final String SECURITY_FIXTURES_IMAGE_ALIAS =
             "image: ${COURTSIDE_SECURITY_FIXTURES_IMAGE:?required}";
+    private static final String UAT_BOOKING_SEED_LOCAL_IMAGE =
+            "image: courtside:uat-booking-seed-local";
     private static final String FIXTURE_IMAGE_BASE = "FROM ${BASE_IMAGE}";
     private static final Set<String> OWN_IMAGE_REFERENCES =
             Set.of(GHCR_RELEASE_IMAGE, CUSTOM_IMAGE, UAT_LOCAL_IMAGE_ALIAS, PERF_LOCAL_IMAGE_ALIAS,
                     UPGRADE_CANDIDATE_IMAGE_ALIAS, RESTORE_CANDIDATE_IMAGE_ALIAS,
                     SECURITY_CANDIDATE_IMAGE_ALIAS, SECURITY_FIXTURES_IMAGE_ALIAS,
-                    FIXTURE_IMAGE_BASE);
+                    UAT_BOOKING_SEED_LOCAL_IMAGE, FIXTURE_IMAGE_BASE);
 
     @Test
     void whenReadingImageSources_thenEveryThirdPartyImageIsPinnedByDigest() throws IOException {

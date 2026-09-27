@@ -1,0 +1,16 @@
+spring:
+  main:
+    banner-mode: "off"
+  flyway:
+    enabled: false
+  jpa:
+    open-in-view: false
+
+logging:
+  level:
+    root: WARN
+
+management:
+  endpoint:
+    health:
+      validate-group-membership: false

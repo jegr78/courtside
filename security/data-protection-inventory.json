@@ -291,6 +291,11 @@
       "level": "personal",
       "holds": "The bookings one person made, assembled to answer a subject-access request.",
       "bounded": "The request that built it."
+    },
+    "UatBookingSeeder": {
+      "level": "personal",
+      "holds": "The identifiers of current members selected as participants in synthetic UAT bookings.",
+      "bounded": "The one-shot UAT seed process."
     }
   },
   "exportedFields": {

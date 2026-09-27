@@ -1,0 +1,33 @@
+services:
+  booking-seed:
+    image: courtside:uat-booking-seed-local
+    pull_policy: never
+    entrypoint:
+      - java
+      - --sun-misc-unsafe-memory-access=deny
+      - -XX:MaxRAMPercentage=75.0
+      - -XX:+ExitOnOutOfMemoryError
+      - -Dloader.main=org.courtside.uatseed.UatBookingSeedApplication
+      - org.springframework.boot.loader.launch.PropertiesLauncher
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: uat-seed
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/courtside
+      SPRING_DATASOURCE_USERNAME: courtside
+      SPRING_DATASOURCE_PASSWORD: courtside-uat
+      COURTSIDE_ENVIRONMENT: UAT
+      COURTSIDE_UAT_BOOKING_SEED_WRITE: ${COURTSIDE_UAT_BOOKING_SEED_WRITE:-false}
+      COURTSIDE_MAIL_RELAY_HOST: mail.invalid
+      COURTSIDE_MAIL_FROM: no-reply@example.org
+      COURTSIDE_MAIL_REPLY_TO: board@example.org
+    networks:
+      - backend
