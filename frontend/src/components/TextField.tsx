@@ -1,12 +1,19 @@
-import { type InputHTMLAttributes, useEffect, useRef, useState } from "react";
+import { type HTMLInputTypeAttribute, type InputHTMLAttributes, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
+interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "id"> {
   label: string;
 }
 
-export function TextField({ label, id, className = "", type, ...props }: TextFieldProps) {
-  if (type === "password") return <PasswordField label={label} id={id} className={className} {...props} />;
+type TextFieldProps<T extends HTMLInputTypeAttribute> = FieldProps & { type?: T }
+  & ([T] extends ["password"] ? { id: string } : { id?: string });
+
+export function TextField<T extends HTMLInputTypeAttribute = "text">(
+  { label, id, className = "", type, ...props }: TextFieldProps<T>
+) {
+  if (type === "password" && id !== undefined) {
+    return <PasswordField label={label} id={id} className={className} {...props} />;
+  }
   return <label className="grid gap-2 font-medium" htmlFor={id}>
     {label}
     <input
@@ -18,7 +25,7 @@ export function TextField({ label, id, className = "", type, ...props }: TextFie
   </label>;
 }
 
-function PasswordField({ label, id, className = "", ...props }: Omit<TextFieldProps, "type">) {
+function PasswordField({ label, id, className = "", ...props }: FieldProps & { id: string }) {
   const { t } = useTranslation();
   const [isVisible, setVisible] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -52,8 +59,7 @@ function PasswordField({ label, id, className = "", ...props }: Omit<TextFieldPr
       <button
         type="button"
         data-testid={`${id}-visibility`}
-        aria-label={t("password.show")}
-        aria-pressed={isVisible}
+        aria-label={t(isVisible ? "password.hide" : "password.show")}
         aria-controls={id}
         onClick={() => setVisible((current) => !current)}
         className="focus-ring text-muted absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg hover:text-(--cs-text)"

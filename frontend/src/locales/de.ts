@@ -72,6 +72,7 @@ const de = {
   "password.title": "Einmalpasswort ersetzen",
   "password.description": "Lege ein dauerhaftes Passwort fest, bevor du Courtside verwendest.",
   "password.new": "Neues Passwort",
+  "password.hide": "Passwort verbergen",
   "password.show": "Passwort anzeigen",
   "password.confirm": "Neues Passwort bestätigen",
   "password.submit": "Passwort speichern",

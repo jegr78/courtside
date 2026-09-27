@@ -1,10 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import i18n from "../i18n";
 import { TextField } from "./TextField";
 
-afterEach(async () => {
+beforeEach(async () => {
   await i18n.changeLanguage("en");
 });
 
@@ -14,14 +14,15 @@ it("given a password field, when its visibility control is activated twice, then
   const field = screen.getByTestId("password");
   const control = screen.getByTestId("password-visibility");
   expect(field, "a password starts masked").toHaveAttribute("type", "password");
-  expect(control).toHaveAttribute("aria-pressed", "false");
+  expect(control).toHaveAccessibleName("Show password");
+  expect(control, "the name carries the state, not a pressed flag").not.toHaveAttribute("aria-pressed");
 
   // when
   await userEvent.click(control);
 
   // then
   expect(field, "the control reveals what was typed").toHaveAttribute("type", "text");
-  expect(control).toHaveAttribute("aria-pressed", "true");
+  expect(control, "a revealed password offers to hide it").toHaveAccessibleName("Hide password");
   expect(control).toHaveAttribute("aria-controls", "password");
   expect(field).toHaveValue("secret-entry");
   expect(field, "a revealed password is not sent to a spelling service").toHaveAttribute("spellcheck", "false");
@@ -33,7 +34,7 @@ it("given a password field, when its visibility control is activated twice, then
 
   // then
   expect(field, "a second activation masks it again").toHaveAttribute("type", "password");
-  expect(control).toHaveAttribute("aria-pressed", "false");
+  expect(control).toHaveAccessibleName("Show password");
 });
 
 it("given a password field in a form, when its visibility control is activated, then the form is not submitted", async () => {
@@ -69,7 +70,7 @@ it("given a revealed password, when its form is submitted, then the field is mas
   // then
   expect(seen, "a password manager or form history reads a password field, not text").toEqual(["password"]);
   expect(screen.getByTestId("password")).toHaveAttribute("type", "password");
-  expect(screen.getByTestId("password-visibility")).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByTestId("password-visibility")).toHaveAccessibleName("Show password");
 });
 
 it("given German, when a password field renders, then its visibility control is named in German", async () => {
@@ -80,7 +81,14 @@ it("given German, when a password field renders, then its visibility control is 
   render(<TextField id="password" label="Passwort" data-testid="password" type="password" />);
 
   // then
-  expect(screen.getByTestId("password-visibility")).toHaveAccessibleName("Passwort anzeigen");
+  const control = screen.getByTestId("password-visibility");
+  expect(control).toHaveAccessibleName("Passwort anzeigen");
+
+  // when
+  await userEvent.click(control);
+
+  // then
+  expect(control).toHaveAccessibleName("Passwort verbergen");
 });
 
 it("given a plain text field, when it renders, then it offers no visibility control", () => {
@@ -99,4 +107,12 @@ it("given a password field, when it renders, then its label still names the fiel
   // then
   expect(screen.getByTestId("password")).toHaveAccessibleName("Password");
   expect(screen.getByTestId("password-visibility")).toHaveAccessibleName("Show password");
+});
+
+it("given a password field without an id, when it is written, then it does not compile", () => {
+  // @ts-expect-error a password field needs an id for its label and its visibility control
+  const unnamed = <TextField label="Password" type="password" />;
+
+  // then
+  expect(unnamed.props).not.toHaveProperty("id");
 });
