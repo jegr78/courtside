@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import {
-  api, type AdminClubConfig, type Allocation, type AuditEntry, type ClubConfig, type MessageEntry, type RosterEntry
+  api, type AdminClubConfig, type Allocation, type AuditEntry, type BookingStatistics, type ClubConfig, type MemberStatistics,
+  type MessageEntry, type RosterEntry, type StatisticsPeriodQuery, type UtilisationStatistics
 } from "../api/client";
 import i18n from "../i18n";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
@@ -47,7 +48,50 @@ const courtAdded: AuditEntry = {
   subjectName: "Court 3", actorAccountId: "77777777-7777-7777-7777-777777777777", actorUsername: "mary.major"
 };
 
+function utilisationOf(occupancy: number | null, previousOccupancy: number | null | undefined, period: StatisticsPeriodQuery): UtilisationStatistics {
+  const totals = (value: number | null) => ({
+    openMinutes: 6000, courtCount: 2, capacityMinutes: 12000, closedMinutes: 0, bookedMinutes: 0, occupancy: value
+  });
+  return {
+    period: { ...period, timeZone: "Europe/Berlin" }, totals: totals(occupancy),
+    previous: previousOccupancy === undefined ? null
+      : { period: { from: "2026-09-12", to: "2026-09-18", timeZone: "Europe/Berlin" }, totals: totals(previousOccupancy) },
+    courts: [], cards: [], hours: [], progression: { granularity: "WEEK", buckets: [] }
+  };
+}
+
+function bookingsOf(confirmed: number, previousConfirmed: number | undefined, period: StatisticsPeriodQuery): BookingStatistics {
+  const figures = (value: number) => ({
+    confirmed: value, cancelled: 0, cancellationRate: null, series: 0, single: value, withGuests: 0, guestEntries: 0
+  });
+  return {
+    period: { ...period, timeZone: "Europe/Berlin" }, figures: figures(confirmed),
+    previous: previousConfirmed === undefined ? null
+      : { period: { from: "2026-09-14", to: "2026-09-20", timeZone: "Europe/Berlin" }, figures: figures(previousConfirmed) },
+    participantCards: []
+  };
+}
+
+type Members = { members: number; joins: number; activeMembers: number; activeShare: number | null };
+
+function membersOf(current: Members, previous: Members | undefined, period: StatisticsPeriodQuery): MemberStatistics {
+  return {
+    period: { ...period, timeZone: "Europe/Berlin" }, figures: { ...current, leavings: 0 },
+    previous: previous === undefined ? null
+      : { period: { from: "2026-07-28", to: "2026-08-26", timeZone: "Europe/Berlin" }, figures: { ...previous, leavings: 0 } },
+    membershipTypes: [],
+    accounts: { accounts: 0, passwordChosen: 0, withoutChosenPassword: 0, signedInWithin30Days: 0, signedInWithin90Days: 0, neverSignedIn: 0 }
+  };
+}
+
+const unchangedMembers: Members = { members: 90, joins: 0, activeMembers: 30, activeShare: 1 / 3 };
+
 const middayInBerlin = () => new Date("2026-09-25T10:30:00Z");
+
+async function loadedFigure(name: string) {
+  await screen.findByTestId(`overview-figure-${name}-value`);
+  return screen.getByTestId(`overview-figure-${name}`);
+}
 
 function show(clock = middayInBerlin) {
   render(<MemoryRouter><WithClubConfiguration club={club}><AdminOverviewView clock={clock} /></WithClubConfiguration></MemoryRouter>);
@@ -72,6 +116,145 @@ describe("AdminOverviewView", () => {
     vi.spyOn(api, "allocations").mockResolvedValue([]);
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [], nextCursor: null });
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [] });
+    vi.spyOn(api, "utilisationStatistics").mockImplementation((period) => Promise.resolve(utilisationOf(0.5, 0.5, period!)));
+    vi.spyOn(api, "bookingStatistics").mockImplementation((period) => Promise.resolve(bookingsOf(10, 10, period!)));
+    vi.spyOn(api, "memberStatistics").mockImplementation((period) => Promise.resolve(membersOf(unchangedMembers, unchangedMembers, period!)));
+  });
+
+  it("given the club's figures and the periods before, when the overview opens, then each shows its value and which way it moved", async () => {
+    // given
+    vi.mocked(api.utilisationStatistics).mockImplementation((period) => Promise.resolve(utilisationOf(0.624, 0.576, period!)));
+    vi.mocked(api.bookingStatistics).mockImplementation((period) => Promise.resolve(bookingsOf(41, 45, period!)));
+    vi.mocked(api.memberStatistics).mockImplementation((period) => Promise.resolve(membersOf(
+      { members: 95, joins: 3, activeMembers: 38, activeShare: 0.4 },
+      { members: 92, joins: 1, activeMembers: 38, activeShare: 38 / 92 }, period!)));
+
+    // when
+    show();
+
+    // then
+    const utilisation = await loadedFigure("utilisation");
+    expect(within(utilisation).getByTestId("overview-figure-utilisation-value")).toHaveTextContent("62%");
+    const utilisationChange = within(utilisation).getByTestId("overview-figure-utilisation-change");
+    expect(utilisationChange, "the change is taken between the two percentages the board reads").toHaveAttribute("data-trend", "up");
+    expect(utilisationChange).toHaveTextContent("4 points more than the 7 days before");
+
+    const bookings = await loadedFigure("bookings");
+    expect(within(bookings).getByTestId("overview-figure-bookings-value")).toHaveTextContent("41");
+    expect(within(bookings).getByTestId("overview-figure-bookings-change")).toHaveAttribute("data-trend", "down");
+    expect(within(bookings).getByTestId("overview-figure-bookings-change")).toHaveTextContent("4 fewer than last week");
+
+    const active = await loadedFigure("active");
+    expect(within(active).getByTestId("overview-figure-active-value")).toHaveTextContent("38");
+    expect(within(active).getByTestId("overview-figure-active-detail")).toHaveTextContent("40% of members");
+    expect(within(active).getByTestId("overview-figure-active-change")).toHaveAttribute("data-trend", "unchanged");
+
+    const members = screen.getByTestId("overview-figure-members");
+    expect(within(members).getByTestId("overview-figure-members-value")).toHaveTextContent("95");
+    expect(within(members).getByTestId("overview-figure-members-detail")).toHaveTextContent("3 joined in 30 days");
+    expect(within(members).getByTestId("overview-figure-members-change")).toHaveAttribute("data-trend", "up");
+    expect(within(members).getByTestId("overview-figure-members-change")).toHaveTextContent("3 more than 30 days ago");
+    expect(api.memberStatistics, "both member figures share one read").toHaveBeenCalledTimes(1);
+  });
+
+  it("given no period before or no bookable court time, when the overview opens, then no figure claims a change", async () => {
+    // given
+    vi.mocked(api.utilisationStatistics).mockImplementation((period) => Promise.resolve(utilisationOf(null, 0.5, period!)));
+    vi.mocked(api.bookingStatistics).mockImplementation((period) => Promise.resolve(bookingsOf(7, undefined, period!)));
+    vi.mocked(api.memberStatistics).mockImplementation((period) => Promise.resolve(membersOf(
+      { members: 0, joins: 0, activeMembers: 0, activeShare: null }, undefined, period!)));
+
+    // when
+    show();
+
+    // then
+    const utilisation = await loadedFigure("utilisation");
+    expect(within(utilisation).getByTestId("overview-figure-utilisation-value")).toHaveTextContent("–");
+    expect(within(await loadedFigure("bookings")).getByTestId("overview-figure-bookings-value")).toHaveTextContent("7");
+    const active = await loadedFigure("active");
+    expect(within(active).getByTestId("overview-figure-active-value")).toHaveTextContent("0");
+    expect(within(active).queryByTestId("overview-figure-active-detail"), "a share of no members is not a figure").not.toBeInTheDocument();
+    for (const figure of ["utilisation", "bookings", "active", "members"]) {
+      expect(screen.queryByTestId(`overview-figure-${figure}-change`), `${figure} has nothing to compare with`).not.toBeInTheDocument();
+    }
+  });
+
+  it("given a Friday, when the overview opens, then each figure reads its period and links to the statistics for it", async () => {
+    // when
+    show();
+
+    // then
+    expect(await loadedFigure("utilisation")).toHaveAttribute("href", "/admin/utilisation?from=2026-09-19&to=2026-09-25");
+    expect(await loadedFigure("bookings"), "this week is the whole ISO week, so the week before is its equal")
+      .toHaveAttribute("href", "/admin/utilisation?from=2026-09-21&to=2026-09-27");
+    expect(await loadedFigure("active")).toHaveAttribute("href", "/admin/utilisation?from=2026-08-27&to=2026-09-25");
+    expect(screen.getByTestId("overview-figure-members")).toHaveAttribute("href", "/admin/utilisation?from=2026-08-27&to=2026-09-25");
+    expect(api.utilisationStatistics).toHaveBeenCalledWith({ from: "2026-09-19", to: "2026-09-25" });
+    expect(api.bookingStatistics).toHaveBeenCalledWith({ from: "2026-09-21", to: "2026-09-27" });
+    expect(api.memberStatistics).toHaveBeenCalledWith({ from: "2026-08-27", to: "2026-09-25" });
+  });
+
+  it("given the first days of a month, when the overview opens, then the periods reach back into the month before", async () => {
+    // when
+    show(() => new Date("2026-10-02T10:00:00Z"));
+
+    // then
+    expect(await loadedFigure("utilisation")).toHaveAttribute("href", "/admin/utilisation?from=2026-09-26&to=2026-10-02");
+    expect(api.utilisationStatistics).toHaveBeenCalledWith({ from: "2026-09-26", to: "2026-10-02" });
+    expect(api.bookingStatistics).toHaveBeenCalledWith({ from: "2026-09-28", to: "2026-10-04" });
+    expect(api.memberStatistics).toHaveBeenCalledWith({ from: "2026-09-03", to: "2026-10-02" });
+  });
+
+  it("given the club's Monday has begun while UTC's Sunday has not ended, when the overview opens, then the figures read the club's new week", async () => {
+    // when
+    show(() => new Date("2026-09-27T22:30:00Z"));
+
+    // then
+    expect(await loadedFigure("bookings")).toHaveAttribute("href", "/admin/utilisation?from=2026-09-28&to=2026-10-04");
+    expect(api.bookingStatistics).toHaveBeenCalledWith({ from: "2026-09-28", to: "2026-10-04" });
+    expect(api.utilisationStatistics).toHaveBeenCalledWith({ from: "2026-09-22", to: "2026-09-28" });
+    expect(api.memberStatistics).toHaveBeenCalledWith({ from: "2026-08-30", to: "2026-09-28" });
+  });
+
+  it("given the member figures cannot be read, when the overview opens, then only they report it and a retry repeats only their read", async () => {
+    // given
+    vi.mocked(api.memberStatistics).mockRejectedValueOnce(new Error("offline for a moment"));
+    vi.mocked(api.audit).mockResolvedValue({ entries: [courtAdded] });
+    show();
+    const active = await screen.findByTestId("overview-figure-active");
+    expect(await within(active).findByTestId("load-failure")).toHaveTextContent(i18n.t("error.generic"));
+    expect(within(screen.getByTestId("overview-figure-members")).getByTestId("load-failure")).toBeInTheDocument();
+    expect(within(await loadedFigure("utilisation")).getByTestId("overview-figure-utilisation-value")).toHaveTextContent("50%");
+    expect(within(await loadedFigure("bookings")).getByTestId("overview-figure-bookings-value")).toHaveTextContent("10");
+    expect(await within(screen.getByTestId("overview-changes")).findByTestId("overview-changes-entry"),
+      "a failed figure leaves the cards readable").toBeInTheDocument();
+
+    // when
+    await userEvent.click(within(active).getByTestId("retry-load"));
+
+    // then
+    expect(await screen.findByTestId("overview-figure-active-value")).toHaveTextContent("30");
+    expect(screen.queryByTestId("load-failure")).not.toBeInTheDocument();
+    expect(api.memberStatistics).toHaveBeenCalledTimes(2);
+    expect(api.utilisationStatistics, "the retry reads only what failed").toHaveBeenCalledTimes(1);
+    expect(api.bookingStatistics).toHaveBeenCalledTimes(1);
+    expect(api.audit).toHaveBeenCalledTimes(1);
+  });
+
+  it("given German, when the overview opens, then the figures and their change read in German", async () => {
+    // given
+    await i18n.changeLanguage("de");
+    vi.mocked(api.bookingStatistics).mockImplementation((period) => Promise.resolve(bookingsOf(12, 11, period!)));
+
+    // when
+    show();
+
+    // then
+    const bookings = await loadedFigure("bookings");
+    expect(bookings).toHaveTextContent("Buchungen diese Woche");
+    expect(within(bookings).getByTestId("overview-figure-bookings-change")).toHaveTextContent("1 mehr als letzte Woche");
+    expect(within(await loadedFigure("utilisation")).getByTestId("overview-figure-utilisation-change"))
+      .toHaveTextContent("Wie in den 7 Tagen davor");
   });
 
   it("given bookings today, when the overview opens, then it counts them and names the ones still to come", async () => {

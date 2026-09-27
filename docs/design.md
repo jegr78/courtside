@@ -332,6 +332,16 @@ for five entries, fails on its own and links to that page with the matching filt
 checklist leads the overview unfolded while a required step is open and folds to one line once all
 of them are complete. `/admin/setup` shows it in full.
 
+Four key figures sit between the setup checklist and those parts: utilisation of the seven
+club-local days ending today, confirmed bookings of the current ISO week from Monday to Sunday,
+active members of the thirty days ending today with their share of current members, and current
+members with the joins of those thirty days. The week includes bookings already made for its
+remaining days and is compared with the whole week before. Each figure shows its change against the
+statistics read's preceding period of equal length, in percentage points for utilisation, and none
+when that period or its value is missing. Each links to `/admin/utilisation` with its period in
+`from` and `to`. The overview sends one read per statistics section, the two member figures share
+theirs, and a failed read takes down only the figures built on it.
+
 Statistics answer four reads under `/api/admin/statistics`: utilisation, bookings, members and
 messages. Each takes a period of club-local dates in the years 0001 to 9999 spanning at most
 36,525 days, defaults to the last full calendar month, answers aggregates only and repeats its figures for the

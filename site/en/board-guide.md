@@ -28,10 +28,16 @@ Administration opens on the *Overview*. It shows today's bookings and the ones s
 people without a password of their own, refused or failed messages and the latest changes. Each
 part leads to the page where you continue, already filtered.
 
+Above them, four key figures show utilisation of the last 7 days, bookings this week, active
+members of the last 30 days with their share of all members, and members in total with the joins of
+the last 30 days. Each says how it changed against the period of equal length before it. This week
+runs from Monday to Sunday and already counts bookings made for the days still ahead, so early in
+the week it trails the whole week before. Selecting a figure opens the statistics for its period.
+
 While a required setup step is still open, setup sits unfolded at the top. Once all of them are
 done, the overview sums setup up in one line. Selecting it unfolds the steps again.
 
-![The overview with today's bookings, accounts without a password of their own, messages and changes.](../screenshots/en/admin-overview.png)
+![The overview with key figures, today's bookings, accounts without a password of their own, messages and changes.](../screenshots/en/admin-overview.png)
 
 ## Saving changes
 

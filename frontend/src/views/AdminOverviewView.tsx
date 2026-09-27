@@ -1,15 +1,16 @@
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, type Allocation, type AuditPage, type CredentialState, type MessagePage, type PublicCourt,
-  type RosterPage } from "../api/client";
+  type RosterPage, type StatisticsPeriodQuery } from "../api/client";
 import { actorLabel, auditMessage } from "../audit/auditText";
 import { allocationLabel } from "../booking/allocationLabel";
 import { useClubConfiguration } from "../club/registry";
 import { LoadFailure } from "../components/LoadFailure";
 import { useRetry } from "../failures/useRetry";
 import { useReportedFailure } from "../failures/useReportedFailure";
-import { dateInTimeZoneValue, formatBookingTimeRange, formatDateTime } from "../time/clubZone";
+import { addDays, dateInTimeZone, dateInTimeZoneValue, formatBookingTimeRange, formatDate, formatDateTime,
+  startOfWeek } from "../time/clubZone";
 import { SetupProgress, SetupSteps } from "./setup/SetupChecklist";
 import { REQUIRED_STEPS, useSetupSteps } from "./setup/useSetupSteps";
 
@@ -54,6 +55,111 @@ function Card<T>({ testId, title, link, read, children }: {
       ? read.error ? <LoadFailure message={read.error} retry={read.retry} /> : <p role="status">{t("status.loading")}</p>
       : children(read.value)}
     <Link data-testid={`${testId}-link`} to={link.to} className="justify-self-start font-semibold underline">{link.label}</Link>
+  </section>;
+}
+
+type Trend = "up" | "down" | "unchanged";
+
+interface Figure {
+  value: string;
+  detail?: string;
+  change?: { trend: Trend; count: number };
+}
+
+function changeBetween(current: number, previous: number | null | undefined): Figure["change"] {
+  if (previous === null || previous === undefined) return undefined;
+  const difference = current - previous;
+  return { trend: difference > 0 ? "up" : difference < 0 ? "down" : "unchanged", count: Math.abs(difference) };
+}
+
+function periodEndingOn(today: Date, days: number): StatisticsPeriodQuery {
+  return { from: formatDate(addDays(today, 1 - days)), to: formatDate(today) };
+}
+
+function KeyFigure({ name, period, read, figure }: {
+  name: string;
+  period: StatisticsPeriodQuery;
+  read: { error?: string; retry: () => void; loaded: boolean };
+  figure?: Figure;
+}) {
+  const { t } = useTranslation();
+  const testId = `overview-figure-${name}`;
+  const label = <span className="text-muted text-sm font-semibold">{t(`admin.overview.figures.${name}.label`)}</span>;
+  const tile = "surface-raised grid content-start gap-1 rounded-xl border p-4";
+  if (!read.loaded || !figure) {
+    return <div data-testid={testId} className={tile}>
+      {label}
+      {read.error ? <LoadFailure message={read.error} retry={read.retry} /> : <p role="status">{t("status.loading")}</p>}
+    </div>;
+  }
+  const { value, detail, change } = figure;
+  return <Link data-testid={testId} to={`/admin/utilisation?${new URLSearchParams(period).toString()}`}
+    className={`${tile} focus-ring hover:border-(--club-primary)`}>
+    {label}
+    <span data-testid={`${testId}-value`} className="text-3xl font-bold tabular-nums">{value}</span>
+    {detail && <span data-testid={`${testId}-detail`} className="text-sm">{detail}</span>}
+    {change && <span data-testid={`${testId}-change`} data-trend={change.trend} className="text-muted text-sm">
+      {change.trend !== "unchanged" && <span aria-hidden="true">{change.trend === "up" ? "▲ " : "▼ "}</span>}
+      {t(`admin.overview.figures.${name}.${change.trend}`, { count: change.count })}
+    </span>}
+  </Link>;
+}
+
+function KeyFigures({ clock }: { clock: () => Date }) {
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage ?? i18n.language;
+  const { club, error: clubError, load: loadClub } = useClubConfiguration();
+  const timeZone = club?.timeZone;
+  const periods = useMemo(() => {
+    if (!timeZone) return undefined;
+    const today = dateInTimeZone(clock(), timeZone);
+    const monday = startOfWeek(today);
+    return {
+      week: { from: formatDate(monday), to: formatDate(addDays(monday, 6)) },
+      sevenDays: periodEndingOn(today, 7),
+      thirtyDays: periodEndingOn(today, 30)
+    };
+  }, [clock, timeZone]);
+  const utilisation = useRead(useMemo(() => periods && (() => api.utilisationStatistics(periods.sevenDays)), [periods]));
+  const bookings = useRead(useMemo(() => periods && (() => api.bookingStatistics(periods.week)), [periods]));
+  const members = useRead(useMemo(() => periods && (() => api.memberStatistics(periods.thirtyDays)), [periods]));
+  if (!periods) {
+    return clubError ? <LoadFailure message={clubError} retry={loadClub} /> : <p role="status">{t("status.loading")}</p>;
+  }
+
+  const count = new Intl.NumberFormat(language);
+  const percent = new Intl.NumberFormat(language, { style: "percent", maximumFractionDigits: 0 });
+  const points = (share: number | null | undefined) => share === null || share === undefined ? share : Math.round(share * 100);
+  const state = <T,>(read: { value?: T; error?: string; retry: () => void }) =>
+    ({ loaded: read.value !== undefined, error: read.error, retry: read.retry });
+
+  const occupancy = utilisation.value?.totals.occupancy;
+  const current = members.value?.figures;
+  const previous = members.value?.previous?.figures;
+  return <section aria-labelledby="overview-figures-heading" data-testid="overview-figures" className="grid gap-3">
+    <h2 id="overview-figures-heading" className="sr-only">{t("admin.overview.figures.title")}</h2>
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <KeyFigure name="utilisation" period={periods.sevenDays} read={state(utilisation)} figure={utilisation.value && {
+        value: occupancy === null || occupancy === undefined ? "–" : percent.format(occupancy),
+        change: occupancy === null || occupancy === undefined ? undefined
+          : changeBetween(points(occupancy)!, points(utilisation.value.previous?.totals.occupancy))
+      }} />
+      <KeyFigure name="bookings" period={periods.week} read={state(bookings)} figure={bookings.value && {
+        value: count.format(bookings.value.figures.confirmed),
+        change: changeBetween(bookings.value.figures.confirmed, bookings.value.previous?.figures.confirmed)
+      }} />
+      <KeyFigure name="active" period={periods.thirtyDays} read={state(members)} figure={current && {
+        value: count.format(current.activeMembers),
+        detail: current.activeShare === null ? undefined
+          : t("admin.overview.figures.active.detail", { share: percent.format(current.activeShare) }),
+        change: changeBetween(current.activeMembers, previous?.activeMembers)
+      }} />
+      <KeyFigure name="members" period={periods.thirtyDays} read={state(members)} figure={current && {
+        value: count.format(current.members),
+        detail: t("admin.overview.figures.members.detail", { count: current.joins }),
+        change: changeBetween(current.members, previous?.members)
+      }} />
+    </div>
   </section>;
 }
 
@@ -212,6 +318,7 @@ export function AdminOverviewView({ clock = systemClock }: { clock?: () => Date 
       <p className="text-muted">{t("admin.overview.description")}</p>
     </div>
     <SetupSection />
+    <KeyFigures clock={clock} />
     <div className="grid gap-4 md:grid-cols-2">
       <TodayCard clock={clock} />
       <CredentialsCard />

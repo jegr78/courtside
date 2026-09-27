@@ -30,11 +30,18 @@ anstehen, die Personen ohne eigenes Passwort, abgelehnte oder fehlgeschlagene Na
 letzten Änderungen. Jeder Teil führt zu der Seite, auf der du weiterarbeitest, schon passend
 gefiltert.
 
+Darüber stehen vier Kennzahlen: die Auslastung der letzten 7 Tage, die Buchungen dieser Woche, die
+aktiven Mitglieder der letzten 30 Tage mit ihrem Anteil an allen Mitgliedern und die Mitglieder
+insgesamt mit den Eintritten der letzten 30 Tage. Jede zeigt, wie sie sich gegenüber dem gleich
+langen Zeitraum davor verändert hat. Diese Woche reicht von Montag bis Sonntag und zählt auch schon
+gebuchte Termine der kommenden Tage mit. Früh in der Woche liegt sie deshalb meist unter der ganzen
+Vorwoche. Ein Klick auf eine Kennzahl öffnet die Statistik für ihren Zeitraum.
+
 Solange ein erforderlicher Schritt der Einrichtung offen ist, steht die Einrichtung aufgeklappt
 ganz oben. Sind alle erledigt, fasst die Übersicht sie in einer Zeile zusammen. Ein Klick darauf
 klappt die Schritte wieder auf.
 
-![Die Übersicht mit den heutigen Buchungen, Konten ohne eigenes Passwort, Nachrichten und Änderungen.](screenshots/de/admin-overview.png)
+![Die Übersicht mit den Kennzahlen, den heutigen Buchungen, Konten ohne eigenes Passwort, Nachrichten und Änderungen.](screenshots/de/admin-overview.png)
 
 ## Änderungen speichern
 
