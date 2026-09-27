@@ -119,7 +119,7 @@ export function AccountSecurityView({ passwordChanged, signedOut }: {
         <p>{t("accountSecurity.reauthenticate")}</p>
         {reauthenticationFailure && <Alert>{reauthenticationFailure}</Alert>}
         <TextField id="reauthentication-password" name="reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
-        <div><Button variant="primary" disabled={pending} type="submit">{t("accountSecurity.continue")}</Button></div>
+        <div><Button variant="primary" disabled={pending} type="submit" data-testid="reauthentication-submit">{t("accountSecurity.continue")}</Button></div>
       </form>
     </Modal>}
     <form className="grid gap-4" onSubmit={(event) => void changePassword(event)}>

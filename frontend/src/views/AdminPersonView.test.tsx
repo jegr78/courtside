@@ -209,7 +209,7 @@ describe("AdminPersonView", () => {
     await userEvent.click(screen.getByTestId("save-person"));
     const dialog = await screen.findByRole("dialog");
     await userEvent.type(input("admin-reauthentication-password"), "admin-password");
-    await userEvent.click(within(dialog).getByRole("button"));
+    await userEvent.click(within(dialog).getByTestId("admin-reauthentication-submit"));
 
     // then
     await waitFor(() => expect(roles).toHaveBeenCalledTimes(2));
@@ -247,7 +247,7 @@ describe("AdminPersonView", () => {
     await userEvent.click(screen.getByTestId("save-person"));
     const dialog = await screen.findByRole("dialog");
     await userEvent.type(input("admin-reauthentication-password"), "admin-password");
-    await userEvent.click(within(dialog).getByRole("button"));
+    await userEvent.click(within(dialog).getByTestId("admin-reauthentication-submit"));
 
     // then
     await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
@@ -283,7 +283,7 @@ describe("AdminPersonView", () => {
     for (let proof = 0; proof < 2; proof += 1) {
       const dialog = await screen.findByRole("dialog");
       await userEvent.type(input("admin-reauthentication-password"), "admin-password");
-      await userEvent.click(within(dialog).getByRole("button"));
+      await userEvent.click(within(dialog).getByTestId("admin-reauthentication-submit"));
       await waitFor(() => expect(roles).toHaveBeenCalledTimes(proof + 1));
     }
 
@@ -337,7 +337,7 @@ describe("AdminPersonView", () => {
 
     // when
     await userEvent.type(input("admin-reauthentication-password"), "wrong-password");
-    await userEvent.click(within(dialog).getByRole("button"));
+    await userEvent.click(within(dialog).getByTestId("admin-reauthentication-submit"));
 
     // then
     expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
@@ -359,7 +359,7 @@ describe("AdminPersonView", () => {
 
     // when
     await userEvent.type(input("admin-reauthentication-password"), "admin-password");
-    await userEvent.click(within(dialog).getByRole("button"));
+    await userEvent.click(within(dialog).getByTestId("admin-reauthentication-submit"));
 
     // then
     expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
@@ -383,7 +383,7 @@ describe("AdminPersonView", () => {
     await userEvent.click(screen.getByTestId("end-account-sessions"));
     const dialog = await screen.findByRole("dialog");
     await userEvent.type(input("admin-reauthentication-password"), "admin-password");
-    await userEvent.click(within(dialog).getByRole("button"));
+    await userEvent.click(within(dialog).getByTestId("admin-reauthentication-submit"));
 
     // then
     await waitFor(() => expect(end).toHaveBeenCalledTimes(2));
