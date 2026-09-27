@@ -24,6 +24,9 @@ it("given a password field, when its visibility control is activated twice, then
   expect(control).toHaveAttribute("aria-pressed", "true");
   expect(control).toHaveAttribute("aria-controls", "password");
   expect(field).toHaveValue("secret-entry");
+  expect(field, "a revealed password is not sent to a spelling service").toHaveAttribute("spellcheck", "false");
+  expect(field, "a revealed password is not rewritten").toHaveAttribute("autocorrect", "off");
+  expect(field).toHaveAttribute("autocapitalize", "none");
 
   // when
   await userEvent.click(control);

@@ -29,6 +29,9 @@ function PasswordField({ label, id, className = "", ...props }: Omit<TextFieldPr
         type={isVisible ? "text" : "password"}
         className={`form-control w-full rounded-lg border py-3 pr-12 pl-3 ${className}`}
         {...props}
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="none"
       />
       <button
         type="button"
