@@ -138,7 +138,8 @@ past bookings and reports. Courtside notifies members whose future bookings are 
 4. Save the week with the bar at the bottom.
 
 Courtside does not save a day when either time is missing. Members cannot book outside the opening
-hours. If you shorten opening hours later, Courtside notifies members with affected bookings.
+hours. If you shorten opening hours later, Courtside notifies members with affected bookings. Those
+bookings stay and remain visible in the court plan.
 
 ![Opening hours for every weekday and the control for applying the same times.](../screenshots/en/opening-hours.png)
 
