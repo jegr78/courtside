@@ -74,6 +74,7 @@ const en: Record<keyof typeof de, string> = {
   "password.title": "Replace one-time password",
   "password.description": "Choose a permanent password before using Courtside.",
   "password.new": "New password",
+  "password.show": "Show password",
   "password.confirm": "Confirm new password",
   "password.submit": "Save password",
   "password.mismatch": "The passwords do not match.",

@@ -406,7 +406,11 @@ test("initial password change is operable using only the keyboard", async ({ pag
   // when
   await tabToTestId(page, "new-password", tabKey);
   await page.keyboard.type("permanent-password");
-  await page.keyboard.press(tabKey);
+  await tabToTestId(page, "new-password-visibility", tabKey);
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("new-password")).toHaveAttribute("type", "text");
+  await expect(page.getByTestId("new-password")).toHaveValue("permanent-password");
+  await tabToTestId(page, "confirm-password", tabKey);
   await page.keyboard.type("permanent-password");
   await tabToTestId(page, "password-submit", tabKey);
   await page.keyboard.press("Enter");
