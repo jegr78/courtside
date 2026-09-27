@@ -35,8 +35,8 @@ it("given a password field, when its visibility control is activated twice, then
 
 it("given a password field in a form, when its visibility control is activated, then the form is not submitted", async () => {
   // given
-  const submit = vi.fn((event: SubmitEvent) => event.preventDefault());
-  render(<form onSubmit={(event) => submit(event.nativeEvent as SubmitEvent)}>
+  const submit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault());
+  render(<form onSubmit={submit}>
     <TextField id="password" label="Password" data-testid="password" type="password" />
   </form>);
 
