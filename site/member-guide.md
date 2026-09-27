@@ -94,6 +94,8 @@ stammt. Dabei verlassen nur die ersten fünf Zeichen eines Prüfwerts die Instan
 das Passwort nicht. Ist die Prüfung nicht erreichbar, speichert Courtside das Passwort nicht.
 Versuche es später erneut.
 
+Das Auge in einem Passwortfeld zeigt, was du getippt hast. Ein zweiter Klick verdeckt es wieder.
+
 Ist das Einmalpasswort bereits abgelaufen, fordere über die Anmeldeseite einen Code an. Mit diesem
 Code kannst du selbst ein neues Passwort setzen.
 

@@ -79,7 +79,7 @@ describe("AccountSecurityView", () => {
     expect(dialog).toContainElement(password);
     expect(password).toHaveFocus();
     await userEvent.type(password, "correct-password");
-    await userEvent.click(within(dialog).getByRole("button"));
+    await userEvent.click(within(dialog).getByTestId("reauthentication-submit"));
 
     // then
     await waitFor(() => expect(end).toHaveBeenCalledTimes(2));
@@ -104,7 +104,7 @@ describe("AccountSecurityView", () => {
 
     // when
     await userEvent.type(input("reauthentication-password"), "wrong-password");
-    await userEvent.click(within(dialog).getByRole("button"));
+    await userEvent.click(within(dialog).getByTestId("reauthentication-submit"));
 
     // then
     expect(await within(dialog).findByRole("alert")).toBeInTheDocument();

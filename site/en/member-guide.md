@@ -92,6 +92,8 @@ Courtside asks a public service whether the password appears in a known data bre
 five characters of a checksum leave the instance. The service does not receive your password. If
 the check is unavailable, Courtside does not save the password. Try again later.
 
+The eye in a password field shows what you typed. Selecting it again masks it.
+
 If the one-time password has expired, request a code from the sign-in page. You can use that code
 to set a new password yourself.
 

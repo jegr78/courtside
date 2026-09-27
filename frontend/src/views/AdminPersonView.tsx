@@ -291,7 +291,7 @@ export function AdminPersonView() {
             <p>{t("accountSecurity.reauthenticate")}</p>
             {reauthenticationFailure && <Alert>{reauthenticationFailure}</Alert>}
             <TextField id="admin-reauthentication-password" name="admin-reauthentication-password" type="password" autoComplete="current-password" required label={t("auth.password")} />
-            <Button variant="primary" disabled={pending} type="submit">{t("accountSecurity.continue")}</Button>
+            <Button variant="primary" disabled={pending} type="submit" data-testid="admin-reauthentication-submit">{t("accountSecurity.continue")}</Button>
           </form>
         </Modal>}
         <PersonSection disabled={pending} person={draft.person ?? storedPerson(entry)} changed={(person) => edit({ person })} />
