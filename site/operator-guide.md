@@ -45,12 +45,15 @@ eine Recovery Unit, prüfe sie mit `restore-check` und entferne die Bootstrap-We
 ```sh
 /srv/courtside/current/courtside backup --retain 7
 /srv/courtside/current/courtside restore-check --recovery <Recovery-Verzeichnis>
-/srv/courtside/current/courtside update --archive <neues Archiv> --yes
+candidate=/srv/courtside/candidate/courtside-deployment-<Version>
+"$candidate/courtside" --directory /srv/courtside update --archive "$candidate" --yes
 ```
 
 Ein Update erstellt zuerst eine Recovery Unit. Es verspricht kein automatisches Datenbank-Downgrade,
-falls eine neue Migration bereits gelaufen ist. Bewahre die vorherige Release-Version auf und prüfe
-die Wiederherstellung regelmäßig auf einem leeren PostgreSQL-17-Ziel.
+falls eine neue Anwendungsmigration bereits gelaufen ist. Beim gebündelten Wechsel von PostgreSQL 17
+auf 18 stellt der Launcher den Dump dagegen in einem neuen Volume wieder her und aktiviert bei einem
+fehlgeschlagenen Zielstart automatisch das unangetastete PostgreSQL-17-Volume. Bewahre die vorherige
+Release-Version auf und prüfe die Wiederherstellung regelmäßig auf einem leeren PostgreSQL-18-Ziel.
 
 Für Abnahmetests stellt jeder Nightly-Lauf, der ein neues Image baut und qualifiziert, 14 Tage lang
 das Artefakt `nightly-deployment-archive` bereit. Lade es aus einem erfolgreichen Lauf auf `main`.

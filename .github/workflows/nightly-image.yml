@@ -287,6 +287,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.select.outputs.commit }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
 
@@ -314,6 +315,15 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upgrade an installed PostgreSQL 17 nightly through the shipped launcher
+        if: matrix.architecture == 'amd64'
+        run: |
+          candidate=$(find "$RUNNER_TEMP/courtside-deployment" \
+            -name manifest.json -type f -print -quit)
+          test -n "$candidate"
+          node tools/installed-upgrade-smoke.mjs --candidate "${candidate%/manifest.json}" \
+            --confirm installed-postgresql-upgrade
 
       - name: Validate the deployment model
         env:
@@ -386,7 +396,9 @@ jobs:
         if: always()
         with:
           name: nightly-image-qualification-${{ matrix.architecture }}
-          path: build/uat-smoke
+          path: |
+            build/uat-smoke
+            build/installed-database-upgrade
           retention-days: 14
           if-no-files-found: error
 

@@ -149,6 +149,7 @@ export function inspectDeploymentArchive({ archive, destination, expectedImage, 
 const renderEnvironment = {
   COURTSIDE_SOURCE_URL: "https://example.org/courtside",
   COURTSIDE_DOMAIN: "courts.example.org",
+  COURTSIDE_DATABASE_VOLUME: "courtside-qualification-db",
   POSTGRES_PASSWORD: "qualification-placeholder",
   COURTSIDE_MAIL_DOMAIN: "courts.example.org",
   COURTSIDE_MAIL_HOSTNAME: "mail.courts.example.org",

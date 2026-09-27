@@ -12,6 +12,7 @@ const deploy = fileURLToPath(new URL("../deploy/", import.meta.url));
 const resolver = join(deploy, "recipe.sh");
 
 const common = {
+  COURTSIDE_DATABASE_VOLUME: "courtside_db-pg18",
   COURTSIDE_IMAGE_DIGEST: "a".repeat(64),
   COURTSIDE_SOURCE_URL: "https://example.org/courtside",
 };

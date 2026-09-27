@@ -68,3 +68,22 @@ test("given main or nightly qualification, when the image is exercised, then a c
   assert.match(nightly, /--recipes standard,full-self-hosted,existing-infrastructure,funnel/);
   assert.match(nightly, /architecture: amd64[\s\S]+architecture: arm64/);
 });
+
+test("given release-relevant deployment qualification, when PostgreSQL changes major, then the installed nightly upgrade blocks publication", () => {
+  // given
+  const workflows = [source("../.github/workflows/release.yml"),
+    source("../.github/workflows/nightly-image.yml")];
+
+  // when / then
+  for (const workflow of workflows) {
+    const qualification = workflow.match(/\n  qualify:\n([\s\S]+?)\n  (?:mail|publish):/)?.[1] ?? "";
+    assert.match(qualification,
+      /uses: actions\/checkout@[a-f0-9]{40}[\s\S]+?fetch-depth: 0/);
+    assert.match(qualification,
+      /name: Upgrade an installed PostgreSQL 17 nightly through the shipped launcher/);
+    assert.match(qualification, /if: matrix\.architecture == 'amd64'/);
+    assert.match(qualification,
+      /node tools\/installed-upgrade-smoke\.mjs[\s\S]+--confirm installed-postgresql-upgrade/);
+    assert.match(qualification, /build\/installed-database-upgrade/);
+  }
+});

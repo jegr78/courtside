@@ -203,6 +203,7 @@ test("given an inspected candidate, when its selected recipes are rendered, then
   assert.deepEqual(calls[0].args, ["/tmp/courtside-deployment-0.1.0/recipe.sh", "files", "standard"]);
   assert.ok(calls[1].args.includes("/tmp/courtside-deployment-0.1.0/compose.yaml"));
   assert.ok(calls[1].args.includes("/tmp/courtside-deployment-0.1.0/compose.smtp-relay.yaml"));
+  assert.equal(calls[1].options.env.COURTSIDE_DATABASE_VOLUME, "courtside-qualification-db");
   assert.equal(calls[1].options.env.COURTSIDE_IMAGE_DIGEST, "b".repeat(64));
 });
 

@@ -25,8 +25,12 @@ sha256sum_path=""
 shasum_path=""
 env_path=""
 curl_path=""
+declare -a docker_command=()
 restore_cleanup_active=false
 declare -a restore_compose=()
+database_upgrade_cleanup_active=false
+declare -a database_upgrade_compose=()
+database_target_volume_cleanup=""
 mail_restart_required=false
 declare -a mail_restart_compose=()
 
@@ -87,6 +91,13 @@ cleanup() {
   local result=$?
   if [ "$restore_cleanup_active" = true ] && [ "${#restore_compose[@]}" -gt 0 ]; then
     "${restore_compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  fi
+  if [ "$database_upgrade_cleanup_active" = true ] \
+    && [ "${#database_upgrade_compose[@]}" -gt 0 ]; then
+    "${database_upgrade_compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  fi
+  if [ -n "$database_target_volume_cleanup" ] && [ "${#docker_command[@]}" -gt 0 ]; then
+    "${docker_command[@]}" volume rm "$database_target_volume_cleanup" >/dev/null 2>&1 || true
   fi
   if [ "$mail_restart_required" = true ] && [ "${#mail_restart_compose[@]}" -gt 0 ]; then
     if "${mail_restart_compose[@]}" up -d --wait mail >/dev/null 2>&1; then
@@ -575,7 +586,7 @@ docker_environment_line() {
 }
 
 write_initial_environment() {
-  local destination=$1 postgres_password bootstrap_password
+  local destination=$1 postgres_password bootstrap_password database_major
   postgres_password=$(random_secret)
   bootstrap_password=$(< "$installation_directory/secrets/bootstrap-admin-password")
   umask 077
@@ -608,6 +619,10 @@ write_initial_environment() {
       environment_line COURTSIDE_DATABASE_PASSWORD "$COURTSIDE_DATABASE_PASSWORD"
     else
       environment_line POSTGRES_PASSWORD "$postgres_password"
+      database_major=$(release_postgres_major "$script_directory")
+      if [ "$database_major" = 18 ]; then
+        environment_line COURTSIDE_DATABASE_VOLUME "${answer_project}_db-pg18"
+      fi
     fi
     if [ "$answer_recipe" = full-self-hosted ]; then
       environment_line COURTSIDE_MAIL_HOSTNAME "mail.$answer_domain"
@@ -962,11 +977,34 @@ verify_recovery_unit() {
 
 postgres_image() {
   local image
-  image=$(sed -n 's/^[[:space:]]*image: \(postgres:18-alpine@sha256:[0-9a-f]\{64\}\)$/\1/p' \
+  image=$(sed -n 's/^[[:space:]]*image: \(postgres:[0-9][0-9]*-alpine@sha256:[0-9a-f]*\)$/\1/p' \
     "$installation_directory/current/compose.yaml" | head -n 1)
-  [[ "$image" =~ ^postgres:18-alpine@sha256:[0-9a-f]{64}$ ]] \
-    || refuse "the installed release has no pinned PostgreSQL 18 image"
+  [[ "$image" =~ ^postgres:(17|18)-alpine@sha256:[0-9a-f]{64}$ ]] \
+    || refuse "the installed release has no supported pinned PostgreSQL image"
   printf '%s' "$image"
+}
+
+release_postgres_major() {
+  local release_root=$1 require_explicit_volume=${2:-false} image major mount
+  image=$(sed -n 's/^[[:space:]]*image: \(postgres:[0-9][0-9]*-alpine@sha256:[0-9a-f]*\)$/\1/p' \
+    "$release_root/compose.yaml" | head -n 1)
+  [[ "$image" =~ ^postgres:(17|18)-alpine@sha256:[0-9a-f]{64}$ ]] \
+    || refuse "$release_root has no supported pinned PostgreSQL image"
+  major=${BASH_REMATCH[1]}
+  mount=$(sed -n 's/^[[:space:]]*- db:\(\/var\/lib\/postgresql[^[:space:]]*\)$/\1/p' \
+    "$release_root/compose.yaml" | head -n 1)
+  if [ "$major" = 17 ]; then
+    [ "$mount" = /var/lib/postgresql/data ] \
+      || refuse "$release_root does not use the supported PostgreSQL 17 data layout"
+  else
+    [ "$mount" = /var/lib/postgresql ] \
+      || refuse "$release_root does not use the supported PostgreSQL 18 data layout"
+    if [ "$require_explicit_volume" = true ]; then
+      grep -q '^    name: ${COURTSIDE_DATABASE_VOLUME:' "$release_root/compose.yaml" \
+        || refuse "$release_root does not bind PostgreSQL 18 to an explicit database volume"
+    fi
+  fi
+  printf '%s' "$major"
 }
 
 database_backup() {
@@ -1625,13 +1663,24 @@ version_is_newer() {
 }
 
 write_updated_environment() {
-  local destination=$1 digest=$2 line
+  local destination=$1 digest=$2 database_volume=${3:-} line found_database_volume=false
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       COURTSIDE_IMAGE_DIGEST=*) environment_line COURTSIDE_IMAGE_DIGEST "$digest" ;;
+      COURTSIDE_DATABASE_VOLUME=*)
+        found_database_volume=true
+        if [ -n "$database_volume" ]; then
+          environment_line COURTSIDE_DATABASE_VOLUME "$database_volume"
+        else
+          printf '%s\n' "$line"
+        fi
+        ;;
       *) printf '%s\n' "$line" ;;
     esac
   done < "$installation_directory/config/.env" > "$destination"
+  if [ -n "$database_volume" ] && [ "$found_database_volume" = false ]; then
+    environment_line COURTSIDE_DATABASE_VOLUME "$database_volume" >> "$destination"
+  fi
   chmod 600 "$destination"
 }
 
@@ -1660,9 +1709,128 @@ command_update_check() {
   fi
 }
 
+prepare_database_major_update() {
+  local archive=$1 source_major target_major safe_release target_database_image upgrade_database_image
+  database_major_update=false
+  target_database_volume=""
+  source_major=$(release_postgres_major "$installation_directory/current")
+  target_major=$(release_postgres_major "$archive" true)
+  if [ "$source_major" = "$target_major" ]; then
+    if [ "$target_major" = 18 ] && [ "$config_recipe" != existing-infrastructure ]; then
+      target_database_volume=$(environment_value \
+        "$installation_directory/config/.env" COURTSIDE_DATABASE_VOLUME)
+      [ -n "$target_database_volume" ] || target_database_volume="${config_project}_db"
+    fi
+    return 0
+  fi
+  [ "$source_major:$target_major" = 17:18 ] \
+    || refuse "unsupported bundled PostgreSQL major update $source_major to $target_major"
+  [ "$config_recipe" != existing-infrastructure ] \
+    || refuse "database major update is unavailable for an external database"
+  [ "$config_recovery_material" = included ] \
+    || refuse "database major update requires recovery material to be included"
+  ! contains_word "${config_overlays//,/ }" custom-image \
+    || refuse "database major update is unavailable with a custom image"
+  [ ! -f "$installation_directory/config/local.override.yaml" ] \
+    || refuse "database major update is unavailable with a local override"
+  [ -f "$archive/compose.database-upgrade.yaml" ] \
+    || refuse "database major update archive has no isolated restore definition"
+  target_database_image=$(sed -n \
+    's/^[[:space:]]*image: \(postgres:18-alpine@sha256:[0-9a-f]*\)$/\1/p' \
+    "$archive/compose.yaml" | head -n 1)
+  upgrade_database_image=$(sed -n \
+    's/^[[:space:]]*image: \(postgres:18-alpine@sha256:[0-9a-f]*\)$/\1/p' \
+    "$archive/compose.database-upgrade.yaml" | head -n 1)
+  [ "$upgrade_database_image" = "$target_database_image" ] \
+    || refuse "database major update does not use the target release PostgreSQL image"
+  safe_release=${manifest_version//[^A-Za-z0-9_.-]/-}
+  target_database_volume="${config_project}_db-pg18-$safe_release"
+  [ "${#target_database_volume}" -le 255 ] \
+    || refuse "database migration target volume name is too long"
+  database_major_update=true
+}
+
+restore_database_major_target() {
+  local archive=$1 runtime environment_file project output table_count failure=""
+  project="$config_project-database-upgrade-$$"
+  if "${docker_command[@]}" volume inspect "$target_database_volume" >/dev/null 2>&1; then
+    refuse "database migration target $target_database_volume already exists and requires operator inspection"
+  fi
+  output=$("${docker_command[@]}" compose ls --format json)
+  [[ "$output" != *'"Name":"'"$config_project"'-database-upgrade-'* ]] \
+    || refuse "a stale database migration project exists and requires operator inspection"
+  runtime=$(mktemp -d "$installation_directory/.database-upgrade.partial.XXXXXX")
+  temporary_path=$runtime
+  chmod 700 "$runtime"
+  environment_file="$runtime/environment"
+  {
+    environment_line POSTGRES_PASSWORD \
+      "$(environment_value "$installation_directory/config/.env" POSTGRES_PASSWORD)"
+    environment_line COURTSIDE_DATABASE_VOLUME "$target_database_volume"
+  } > "$environment_file"
+  database_upgrade_compose=("${docker_command[@]}" compose --project-name "$project" \
+    --project-directory "$archive" --env-file "$environment_file" \
+    -f "$archive/compose.database-upgrade.yaml")
+  database_upgrade_cleanup_active=true
+  if ! "${database_upgrade_compose[@]}" up -d --wait db; then
+    failure="PostgreSQL 18 did not become healthy"
+  else
+    table_count=$("${database_upgrade_compose[@]}" exec -T db psql -U courtside -d courtside -tAc \
+      "select count(*) from pg_tables where schemaname = 'public'") \
+      || failure="the empty-target check failed"
+    table_count=${table_count//[[:space:]]/}
+    [ -n "$failure" ] || [ "$table_count" = 0 ] \
+      || failure="the PostgreSQL 18 migration target was not empty"
+  fi
+  if [ -z "$failure" ] && ! "${database_upgrade_compose[@]}" exec -T db \
+    pg_restore --no-owner --single-transaction --exit-on-error -U courtside -d courtside \
+    < "$created_recovery/database.dump"; then
+    failure="the PostgreSQL dump could not be restored transactionally"
+  fi
+  if [ -n "$failure" ]; then
+    if "${database_upgrade_compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1; then
+      database_upgrade_cleanup_active=false
+    fi
+  elif ! "${database_upgrade_compose[@]}" down --remove-orphans; then
+    failure="the isolated PostgreSQL 18 target could not be stopped"
+  else
+    database_upgrade_cleanup_active=false
+    database_target_volume_cleanup=$target_database_volume
+  fi
+  if [ "$database_upgrade_cleanup_active" = false ]; then
+    chmod -R u+w "$runtime"
+    rm -rf -- "$runtime"
+    temporary_path=""
+  fi
+  [ -z "$failure" ] \
+    || refuse "PostgreSQL 18 migration failed before release selection: $failure; release $config_release remains selected"
+}
+
+rollback_database_major_update() {
+  local installed_release=$1 failed_release=$2 transaction
+  "${compose[@]}" down --remove-orphans >/dev/null 2>&1 || true
+  transaction=$(mktemp -d "$installation_directory/.transaction.partial.XXXXXX")
+  temporary_path=$transaction
+  chmod 700 "$transaction"
+  cp "$created_recovery/configuration/.env" "$transaction/.env"
+  cp "$created_recovery/configuration/installation.conf" "$transaction/installation.conf"
+  printf '%s\n' "$installed_release" > "$transaction/current-release"
+  chmod 600 "$transaction/.env" "$transaction/installation.conf" "$transaction/current-release"
+  mv "$transaction" "$installation_directory/.courtside-transaction"
+  temporary_path=""
+  apply_configuration_transaction
+  compose_command
+  if ! "${compose[@]}" up -d --wait; then
+    refuse "release $failed_release failed and automatic rollback could not restore release $installed_release; recovery unit $created_recovery is ready"
+  fi
+  "${docker_command[@]}" volume rm "$target_database_volume" >/dev/null 2>&1 || true
+  database_target_volume_cleanup=""
+  refuse "release $failed_release did not become healthy; restored release $installed_release with its original PostgreSQL 17 volume"
+}
+
 command_update() {
   local archive="" confirmed=false installed_release target_release target_revision target_image target_digest
-  local target_manifest_sha transaction old_compose
+  local target_manifest_sha transaction old_compose database_major_update target_database_volume
   while [ $# -gt 0 ]; do
     case "$1" in
       --archive) [ $# -ge 2 ] || refuse "--archive needs a directory"; archive=$2; shift 2 ;;
@@ -1685,6 +1853,7 @@ command_update() {
   target_digest=$manifest_digest
   target_manifest_sha=$manifest_sha256
   [ -f "$archive/README.md" ] || refuse "release archive has no upgrade notes"
+  prepare_database_major_update "$archive"
   printf 'Plan: update %s to exact release %s in %s\n' "$installed_release" "$target_release" "$installation_directory"
   printf 'Upgrade notes: %s/README.md\n' "$archive"
   confirm "$confirmed"
@@ -1697,6 +1866,9 @@ command_update() {
   publish_release "$archive"
   if ! "${docker_command[@]}" image pull "$target_image"; then
     refuse "update pull failed; recovery unit $created_recovery is ready and database rollback was not attempted"
+  fi
+  if [ "$database_major_update" = true ]; then
+    restore_database_major_target "$installation_directory/releases/$target_release"
   fi
   compose_command
   old_compose=("${compose[@]}")
@@ -1711,14 +1883,18 @@ command_update() {
   transaction=$(mktemp -d "$installation_directory/.transaction.partial.XXXXXX")
   temporary_path=$transaction
   chmod 700 "$transaction"
-  write_updated_environment "$transaction/.env" "$target_digest"
+  write_updated_environment "$transaction/.env" "$target_digest" "$target_database_volume"
   write_installation_configuration "$transaction/installation.conf"
   printf '%s\n' "$target_release" > "$transaction/current-release"
   chmod 600 "$transaction/current-release"
   mv "$transaction" "$installation_directory/.courtside-transaction"
   temporary_path=""
+  database_target_volume_cleanup=""
   apply_configuration_transaction
   if ! compose_command || ! "${compose[@]}" up -d --wait; then
+    if [ "$database_major_update" = true ]; then
+      rollback_database_major_update "$installed_release" "$target_release"
+    fi
     refuse "release $target_release did not become healthy; recovery unit $created_recovery is ready and database rollback was not attempted"
   fi
   printf 'Updated from %s to %s after recovery unit %s\n' \
@@ -2456,7 +2632,7 @@ command_diagnose() {
 }
 
 command_uninstall() {
-  local keep_data=false destroy=false confirmed=false confirmation="" expected volumes entry parent
+  local keep_data=false destroy=false confirmed=false confirmation="" expected volumes remaining volume entry parent
   while [ $# -gt 0 ]; do
     case "$1" in
       --keep-data) keep_data=true; shift ;;
@@ -2494,6 +2670,15 @@ command_uninstall() {
     esac
   done < <(find "$installation_directory" -mindepth 1 -maxdepth 1 -print0)
   "${compose[@]}" down --volumes --remove-orphans
+  remaining=$("${docker_command[@]}" volume ls \
+    --filter "label=com.docker.compose.project=$config_project" --format '{{.Name}}')
+  while IFS= read -r volume; do
+    [ -n "$volume" ] || continue
+    [[ "$volume" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] \
+      || refuse "destructive removal found an unsafe project volume name"
+    "${docker_command[@]}" volume rm "$volume" \
+      || refuse "destructive removal could not remove project volume $volume"
+  done <<< "$remaining"
   owns_lock=false
   for entry in .courtside-installation .courtside.lock releases config secrets backups current; do
     if [ -e "$installation_directory/$entry" ] || [ -L "$installation_directory/$entry" ]; then
