@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  ApplicationLifecycle,
   applicationResourceCommand,
   applicationResourceUsage,
   containerResourceUsage,
   ResourceTimelineRecorder,
-  sharedMemoryUsage
+  sharedMemoryUsage,
+  tickObservations
 } from "./resource-timeline";
 
 describe("journey resource timeline", () => {
@@ -19,6 +21,85 @@ describe("journey resource timeline", () => {
       sharedMemoryUsageBytes: 0, processId: 1234 });
     expect(sharedMemoryUsage("Filesystem 1024-blocks Used Available Capacity Mounted on\nshm 65536 512 65024 1% /dev/shm"))
       .toBe(524_288);
+  });
+
+  it("given a stop that begins while the host reads its processes, when observing the application, then the tick keeps no application sample", async () => {
+    // given
+    const lifecycle = new ApplicationLifecycle();
+    const application = { pid: 4224, exitCode: null };
+
+    // when
+    const observed = await lifecycle.observe(application, () => {
+      lifecycle.stopping();
+      return Promise.resolve("4224 1 264.0 0");
+    }, "kibibytes");
+
+    // then
+    expect(observed, "a process the harness is stopping says nothing about a running application").toBeUndefined();
+  });
+
+  it("given a stop already under way, when a tick begins before the process has exited, then the tick keeps no application sample", async () => {
+    // given
+    const lifecycle = new ApplicationLifecycle();
+    const application = { pid: 4224, exitCode: null };
+    lifecycle.stopping();
+
+    // when
+    const observed = await lifecycle.observe(application, () => Promise.resolve("4224 1 264.0 0"), "kibibytes");
+
+    // then
+    expect(observed, "the exit the harness asked for may not have reached Node yet").toBeUndefined();
+  });
+
+  it("given the application started again after a stop, when a tick observes it, then its reading is recorded", async () => {
+    // given
+    const lifecycle = new ApplicationLifecycle();
+    lifecycle.stopping();
+    lifecycle.running();
+
+    // when
+    const observed = await lifecycle.observe({ pid: 4703, exitCode: null }, () => Promise.resolve("4703 1 3.0 1024"),
+      "kibibytes");
+
+    // then
+    expect(observed, "a finished restart measures the new process again").toMatchObject({ processId: 4703 });
+  });
+
+  it("given an application that has already exited, when observing it, then the host is not asked", async () => {
+    // given
+    const lifecycle = new ApplicationLifecycle();
+    const read = vi.fn(() => Promise.resolve("4224 1 1.0 1024"));
+
+    // when
+    const observed = await lifecycle.observe({ pid: 4224, exitCode: 143 }, read, "kibibytes");
+
+    // then
+    expect(observed).toBeUndefined();
+    expect(read, "an exited process has no usage to read").not.toHaveBeenCalled();
+  });
+
+  it("given a running application, when observing it, then its reading is recorded as the host reports it", async () => {
+    // given
+    const lifecycle = new ApplicationLifecycle();
+    const application = { pid: 1234, exitCode: null };
+
+    // when
+    const observed = await lifecycle.observe(application, () => Promise.resolve("1234 1 2.50 262144"), "kibibytes");
+
+    // then
+    expect(observed).toMatchObject({ processId: 1234, memoryUsageBytes: 268_435_456 });
+    await expect(lifecycle.observe(application, () => Promise.resolve("1234 1 2.50 0"), "kibibytes"),
+      "a zero reading outside a stop reaches the timeline, which rejects it").resolves.toMatchObject({ memoryUsageBytes: 0 });
+  });
+
+  it("given a tick without any observation, when collecting it, then no sample is recorded", () => {
+    // given
+    const proxy = { target: "proxy" as const, containerId: "a".repeat(64), memoryUsageBytes: 1, cpuPercent: 0, pids: 1,
+      sharedMemoryUsageBytes: 0 };
+
+    // when / then
+    expect(tickObservations([undefined, proxy]), "the other targets stay when the application is skipped").toEqual([proxy]);
+    expect(tickObservations([undefined]), "a tick with nothing observed is not a sample").toBeUndefined();
   });
 
   it("given a supported host, when selecting process telemetry, then it uses a fixed platform command", () => {

@@ -94,6 +94,36 @@ export function applicationResourceUsage(output: string, processId: number,
   };
 }
 
+export class ApplicationLifecycle {
+  private stops = 0;
+  private isStopping = false;
+
+  stopping(): void {
+    this.stops += 1;
+    this.isStopping = true;
+  }
+
+  running(): void {
+    this.isStopping = false;
+  }
+
+  async observe(application: { pid?: number; exitCode: number | null }, read: () => Promise<string>,
+    memoryUnit: ApplicationResourceCommand["memoryUnit"]): Promise<ResourceObservation | undefined> {
+    const processId = application.pid;
+    if (processId === undefined || application.exitCode !== null || this.isStopping) return undefined;
+    const stops = this.stops;
+    const output = await read();
+    // A stop that began while the host listed its processes may have caught the process exiting.
+    if (stops !== this.stops || application.exitCode !== null) return undefined;
+    return { target: "application", ...applicationResourceUsage(output, processId, memoryUnit) };
+  }
+}
+
+export function tickObservations(observations: Array<ResourceObservation | undefined>): ResourceObservation[] | undefined {
+  const observed = observations.filter((observation) => observation !== undefined);
+  return observed.length > 0 ? observed : undefined;
+}
+
 export function sharedMemoryUsage(output: string): number {
   const lines = output.trim().split("\n");
   const fields = lines.at(-1)?.trim().split(/\s+/);
