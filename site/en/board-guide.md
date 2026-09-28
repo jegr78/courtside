@@ -143,13 +143,22 @@ past bookings and reports. Courtside notifies members whose future bookings are 
 1. Enter an opening and closing time for every open weekday.
 2. Mark days without play as closed.
 3. Use *Apply the same times* to copy one period to several days.
-4. Save the week with the bar at the bottom.
+4. Under *Applies from*, choose the first day the week governs. It is today by default.
+5. Save the week with the bar at the bottom.
+
+A day in the future schedules the week in advance, such as winter hours from 1 November. Until
+then the current hours stay. Past weeks always keep the hours they had. *Weeks* lists the week in
+force and every scheduled one. You can edit a scheduled week, move it to another day or remove it.
+You do not remove the week in force; you replace it from a day with a new one.
+
+*Closed* is the wrong tool for a temporary closure, such as a court renovation. Block the courts
+with a booking card for closures instead.
 
 Courtside does not save a day when either time is missing. Members cannot book outside the opening
 hours. If you shorten opening hours later, Courtside notifies members with affected bookings. Those
 bookings stay and remain visible in the court plan.
 
-![Opening hours for every weekday and the control for applying the same times.](../screenshots/en/opening-hours.png)
+![Winter hours from 2 November, scheduled beside the week in force and open for editing.](../screenshots/en/opening-hours.png)
 
 ## Facility → Booking cards
 

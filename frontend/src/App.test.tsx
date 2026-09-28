@@ -370,7 +370,7 @@ describe("AppRoutes", () => {
   ])("given an admin session, when opening %s, then %s is the page", async (address, view) => {
     // given
     vi.spyOn(api, "adminCourts").mockReturnValue(new Promise<never>(() => undefined));
-    vi.spyOn(api, "adminOpeningHours").mockReturnValue(new Promise<never>(() => undefined));
+    vi.spyOn(api, "adminOpeningSchedule").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "adminBookingCards").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "adminParticipantCards").mockReturnValue(new Promise<never>(() => undefined));
     vi.spyOn(api, "config").mockReturnValue(new Promise<never>(() => undefined));
@@ -398,7 +398,7 @@ describe("AppRoutes", () => {
       defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Pacific/Auckland"
     });
     vi.spyOn(api, "adminCourts").mockResolvedValue([{ id: "court-1", number: 1, name: "Centre Court", active: true }]);
-    vi.spyOn(api, "adminOpeningHours").mockResolvedValue([{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }]);
+    vi.spyOn(api, "adminOpeningSchedule").mockResolvedValue([{ id: "week-1", effectiveFrom: null, days: [{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }] }]);
     render(<RoutedShell initialEntries={["/admin/facility/courts"]}><AppRoutes session={{
       authenticated: true,
       username: "admin",
