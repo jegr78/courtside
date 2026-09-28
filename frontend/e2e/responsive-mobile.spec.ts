@@ -543,3 +543,38 @@ test("a vertical gesture over the phone plan scrolls the page rather than a nest
     return navigationBounds && planBounds ? planBounds.y - (navigationBounds.y + navigationBounds.height) : -1;
   }).toBeGreaterThanOrEqual(-1);
 });
+
+test("a booking on a day the club has since closed stays in the phone plan", async ({ page }) => {
+  // given
+  const week = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+  await page.route("**/api/public/booking-grid", async (route) => route.fulfill({ json: {
+    timeZone: "Europe/Berlin",
+    slotMinutes: 30,
+    openingHours: week.map((dayOfWeek) => ({ dayOfWeek, opensAt: null, closesAt: null }))
+  } }));
+  await page.route("**/api/bookings?*", async (route) => {
+    const date = new URL(route.request().url()).searchParams.get("date");
+    await route.fulfill({ json: [{
+      bookingId: "33333333-3333-3333-3333-333333333333",
+      courtId: "dddddddd-0000-0000-0000-000000000001",
+      startsAt: `${date}T18:00:00+02:00`,
+      endsAt: `${date}T19:00:00+02:00`,
+      cardLabel: "Member booking",
+      cardColor: "#176b55",
+      ownBooking: false,
+      showGenericOccupancy: true,
+      participantCount: 2
+    }] });
+  });
+
+  // when
+  await signIn(page, "doe.jane");
+
+  // then
+  await expect(page.getByTestId("day-closed-notice")).toBeVisible();
+  await expect(page.getByTestId("allocation")).toBeVisible();
+  await expect(page.locator('[data-testid^="slot-row-"][data-state="outside"]').first()).toBeVisible();
+  await expect(page.getByTestId("outside-slot").first()).toBeVisible();
+  await expect(page.getByTestId("free-slot"), "a closed day offers nothing to book").toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+});
