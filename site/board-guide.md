@@ -170,7 +170,7 @@ sind keine Buchungen möglich. Wenn du Öffnungszeiten später verkürzt, benach
 die Mitglieder mit betroffenen Buchungen. Diese Buchungen bleiben bestehen und im Platzplan
 sichtbar.
 
-![Die geltende und die geplanten Wochen, der erste Tag der Woche und die Öffnungszeiten für alle Wochentage.](screenshots/de/opening-hours.png)
+![Winterzeiten ab dem 2. November, geplant neben der geltenden Woche und zum Bearbeiten geöffnet.](screenshots/de/opening-hours.png)
 
 ## Anlage → Buchungskarten
 

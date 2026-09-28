@@ -158,7 +158,7 @@ Courtside does not save a day when either time is missing. Members cannot book o
 hours. If you shorten opening hours later, Courtside notifies members with affected bookings. Those
 bookings stay and remain visible in the court plan.
 
-![The week in force and the scheduled weeks, the first day of the week and the hours for every weekday.](../screenshots/en/opening-hours.png)
+![Winter hours from 2 November, scheduled beside the week in force and open for editing.](../screenshots/en/opening-hours.png)
 
 ## Facility → Booking cards
 

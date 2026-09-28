@@ -143,9 +143,19 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.getByTestId("admin-courts-link").click();
     await expect(page.getByTestId("create-court")).toBeVisible();
   },
+  // Winter hours scheduled ahead, so the guide shows the week list and a week that has not started.
   "opening-hours": async (page) => {
     await page.getByTestId("admin-opening-hours-link").click();
     await expect(page.getByTestId("hours-open-MONDAY")).toBeEnabled();
+    await page.getByTestId("opening-hours-effective-from").fill("2026-11-02");
+    for (const day of ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]) {
+      await page.getByTestId(`hours-close-${day}`).fill("20:00");
+    }
+    await page.getByTestId("save-opening-hours").click();
+    await expect(page.getByTestId("opening-week-2026-11-02")).toBeVisible();
+    await page.reload();
+    await page.getByTestId("edit-opening-week-2026-11-02").click();
+    await expect(page.getByTestId("hours-close-MONDAY")).toHaveValue("20:00");
   },
   "booking-card": async (page) => {
     await page.getByTestId("admin-booking-cards-link").click();
