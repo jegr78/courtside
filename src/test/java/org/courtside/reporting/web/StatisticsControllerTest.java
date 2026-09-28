@@ -221,6 +221,23 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenHoursReplacedMidWeek_whenReadingThatWeek_thenOpenTimeFollowsTheHoursInForceEachDay() throws Exception {
+        // given
+        openEveryDay(LocalTime.of(8, 0), LocalTime.of(12, 0));
+        facility.createCourt(1, "Centre");
+        jdbc.sql("INSERT INTO opening_hours_version (id, effective_from) VALUES (?, DATE '2026-05-07')")
+                .param(UUID.randomUUID()).update();
+
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/utilisation")
+                        .param("from", "2026-05-04").param("to", "2026-05-10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totals.openMinutes").value(3 * 240))
+                .andExpect(jsonPath(hour(1, 8) + ".openMinutes").value(60))
+                .andExpect(jsonPath(hour(4, 8) + ".openMinutes").value(0));
+    }
+
+    @Test
     void givenAWindowOpeningInTheRepeatedHour_whenReadingThatDay_thenOpenAndBookedTimeAgree() throws Exception {
         // given
         openEveryDay(LocalTime.of(2, 30), LocalTime.of(5, 0));

@@ -169,6 +169,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE a.status = 'CONFIRMED'
               AND a.starts_at >= :from
+              AND a.starts_at < :until
               AND date_part('isodow', timezone(:zone, a.starts_at)) = :isoDayOfWeek
               AND (:closed = true OR CAST(timezone(:zone, a.starts_at) AS time) < :opensAt
                    OR CAST(timezone(:zone, a.ends_at) AS time) > :closesAt)
@@ -179,6 +180,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
                 WHERE cb.id = :cursor
                   AND ca.status = 'CONFIRMED'
                   AND ca.starts_at >= :from
+                  AND ca.starts_at < :until
                   AND date_part('isodow', timezone(:zone, ca.starts_at)) = :isoDayOfWeek
                   AND (:closed = true OR CAST(timezone(:zone, ca.starts_at) AS time) < :opensAt
                        OR CAST(timezone(:zone, ca.ends_at) AS time) > :closesAt)
@@ -187,6 +189,7 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
             ORDER BY MIN(a.starts_at), b.id
             """, nativeQuery = true)
     List<UUID> findImpactBookingIdsByOpeningHours(@Param("from") Instant from,
+                                                  @Param("until") Instant until,
                                                   @Param("zone") String zone,
                                                   @Param("isoDayOfWeek") int isoDayOfWeek,
                                                   @Param("closed") boolean closed,
@@ -201,11 +204,13 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
             JOIN court_allocation a ON a.booking_id = b.id
             WHERE a.status = 'CONFIRMED'
               AND a.starts_at >= :from
+              AND a.starts_at < :until
               AND date_part('isodow', timezone(:zone, a.starts_at)) = :isoDayOfWeek
               AND (:closed = true OR CAST(timezone(:zone, a.starts_at) AS time) < :opensAt
                    OR CAST(timezone(:zone, a.ends_at) AS time) > :closesAt)
             """, nativeQuery = true)
     long countImpactBookingsByOpeningHours(@Param("from") Instant from,
+                                            @Param("until") Instant until,
                                             @Param("zone") String zone,
                                             @Param("isoDayOfWeek") int isoDayOfWeek,
                                             @Param("closed") boolean closed,

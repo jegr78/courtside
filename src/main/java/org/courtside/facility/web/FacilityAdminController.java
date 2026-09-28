@@ -6,9 +6,11 @@ import org.courtside.api.ApiActiveRequest;
 import org.courtside.api.ApiCourt;
 import org.courtside.api.ApiCourtRequest;
 import org.courtside.api.ApiOpeningHours;
+import org.courtside.api.ApiOpeningWeek;
 import org.courtside.api.ApiSetWeeklyOpeningHoursRequest;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
+import org.courtside.facility.OpeningWeek;
 import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.shared.WireTypes;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -73,8 +77,28 @@ class FacilityAdminController implements AdminCourtsApi, AdminOpeningHoursApi {
                 .orElseGet(List::of).stream()
                 .map(FacilityAdminController::toWeekday)
                 .toList();
-        return ResponseEntity.ok(facility.setWeeklyOpeningHours(week).stream()
-                .map(hours -> toResponse(hours.dayOfWeek(), hours.opensAt(), hours.closesAt()))
+        OpeningWeek stored = facility.scheduleOpeningHours(request.getEffectiveFrom(), week);
+        return ResponseEntity.ok(toResponse(stored).getDays());
+    }
+
+    @Override
+    public ResponseEntity<List<ApiOpeningWeek>> listOpeningScheduleForAdmin() {
+        return ResponseEntity.ok(facility.openingSchedule().inForceFrom(facility.today()).stream()
+                .map(FacilityAdminController::toResponse)
+                .toList());
+    }
+
+    @Override
+    public ResponseEntity<Void> removeScheduledOpeningHours(LocalDate effectiveFrom) {
+        facility.removeScheduledOpeningHours(effectiveFrom);
+        return ResponseEntity.noContent().build();
+    }
+
+    static ApiOpeningWeek toResponse(OpeningWeek week) {
+        return new ApiOpeningWeek(week.id(), week.effectiveFrom(), Arrays.stream(DayOfWeek.values())
+                .map(day -> week.windowOn(day)
+                        .map(window -> toResponse(day, window.opensAt(), window.closesAt()))
+                        .orElseGet(() -> toResponse(day, null, null)))
                 .toList());
     }
 

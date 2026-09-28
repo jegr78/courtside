@@ -17,6 +17,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.time.OffsetDateTime;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.util.UUID;
 import javax.imageio.ImageIO;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -452,8 +453,9 @@ class ConfigControllerTest extends AbstractIntegrationTest {
             throws Exception {
         // given
         jdbc.sql("""
-                INSERT INTO opening_hours (id, day_of_week, opens_at, closes_at)
-                VALUES ('eeeeeeee-0000-0000-0000-000000000001', 1, '08:30', '20:30')
+                INSERT INTO opening_hours (id, version_id, day_of_week, opens_at, closes_at)
+                VALUES ('eeeeeeee-0000-0000-0000-000000000001', 'eeeeeeee-0000-0000-0000-000000000100',
+                        1, '08:30', '20:30')
                 """).update();
 
         // when / then
@@ -463,6 +465,50 @@ class ConfigControllerTest extends AbstractIntegrationTest {
                         .with(csrf()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:slot-duration-conflict"))
+                .andExpect(jsonPath("$.violations[0].code").value("config.slotMinutes.openingHoursConflict"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenOnlyAReplacedWeekOutsideTheNewGrid_whenChangingTheSlotDuration_thenItIsAccepted()
+            throws Exception {
+        // given
+        jdbc.sql("""
+                INSERT INTO opening_hours (id, version_id, day_of_week, opens_at, closes_at)
+                VALUES ('eeeeeeee-0000-0000-0000-000000000001', 'eeeeeeee-0000-0000-0000-000000000100',
+                        1, '08:30', '20:30')
+                """).update();
+        jdbc.sql("INSERT INTO opening_hours_version (id, effective_from) VALUES (?, DATE '2026-05-01')")
+                .param(UUID.fromString("eeeeeeee-0000-0000-0000-000000000101")).update();
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30", "\"slotMinutes\": 60"))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slotMinutes").value(60));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAScheduledWeekOutsideTheNewGrid_whenChangingTheSlotDuration_thenItIsRejected()
+            throws Exception {
+        // given
+        UUID november = UUID.fromString("eeeeeeee-0000-0000-0000-000000000101");
+        jdbc.sql("INSERT INTO opening_hours_version (id, effective_from) VALUES (?, DATE '2026-11-01')")
+                .param(november).update();
+        jdbc.sql("""
+                INSERT INTO opening_hours (id, version_id, day_of_week, opens_at, closes_at)
+                VALUES ('eeeeeeee-0000-0000-0000-000000000001', ?, 1, '08:30', '20:30')
+                """).param(november).update();
+
+        // when / then
+        mockMvc.perform(put("/api/admin/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configJson("Example Tennis Club").replace("\"slotMinutes\": 30", "\"slotMinutes\": 60"))
+                        .with(csrf()))
+                .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.violations[0].code").value("config.slotMinutes.openingHoursConflict"));
     }
 

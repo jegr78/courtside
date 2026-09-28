@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
@@ -151,8 +152,9 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         assertThat(closed).hasSize(1);
         assertThat(closed.getFirst().payload()).containsEntry("dayOfWeek", DayOfWeek.SATURDAY.getValue());
         audit.assertEventCounts(hours.getId(), FacilityEvent.class,
-                Map.of(FacilityEvent.OpeningHoursSet.TYPE, 1L,
-                FacilityEvent.OpeningHoursClosed.TYPE, 1L));
+                Map.of(FacilityEvent.OpeningHoursSet.TYPE, 1L));
+        audit.assertEventCounts(hours.getVersionId(), FacilityEvent.class,
+                Map.of(FacilityEvent.OpeningHoursClosed.TYPE, 1L));
     }
 
     @Test
@@ -199,6 +201,45 @@ class FacilityAuditTest extends AbstractIntegrationTest {
         assertThat(closed).hasSize(1);
         assertThat(closed.getFirst().payload())
                 .containsEntry("dayOfWeek", DayOfWeek.SATURDAY.getValue());
+    }
+
+    @Test
+    void givenAWeekScheduledForNovember_whenItNarrowsADay_thenTheLogNamesTheDaysItGoverns() {
+        // given
+        facility.scheduleOpeningHours(LocalDate.of(2027, 3, 1),
+                week(DayOfWeek.SATURDAY, LocalTime.of(8, 0), LocalTime.of(22, 0)));
+        facility.setOpeningHours(DayOfWeek.SATURDAY, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+
+        // when
+        facility.scheduleOpeningHours(LocalDate.of(2026, 11, 1),
+                week(DayOfWeek.SATURDAY, LocalTime.of(10, 0), LocalTime.of(18, 0)));
+
+        // then
+        assertThat(setFrom("2026-11-01")).singleElement().satisfies(payload -> assertThat(payload)
+                .containsEntry("opensAt", "10:00:00")
+                .containsEntry("until", "2027-03-01"));
+    }
+
+    @Test
+    void givenAScheduledWeek_whenItIsRemoved_thenTheLogCarriesTheRestoredHoursForItsDays() {
+        // given
+        facility.setOpeningHours(DayOfWeek.SATURDAY, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+        facility.scheduleOpeningHours(LocalDate.of(2026, 11, 1),
+                week(DayOfWeek.SATURDAY, LocalTime.of(7, 0), LocalTime.of(23, 0)));
+
+        // when
+        facility.removeScheduledOpeningHours(LocalDate.of(2026, 11, 1));
+
+        // then
+        assertThat(setFrom("2026-11-01")).extracting(payload -> payload.get("opensAt"))
+                .as("the scheduled window, then the restored one").containsExactlyInAnyOrder("07:00:00", "08:00:00");
+    }
+
+    private List<Map<String, Object>> setFrom(String effectiveFrom) {
+        return audit.eventsOfType(FacilityEvent.OpeningHoursSet.TYPE).stream()
+                .map(RecordedEvent::payload)
+                .filter(payload -> effectiveFrom.equals(payload.get("effectiveFrom")))
+                .toList();
     }
 
     private static List<WeeklyOpeningHours> week(DayOfWeek open, LocalTime opensAt, LocalTime closesAt) {

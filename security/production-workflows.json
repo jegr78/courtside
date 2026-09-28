@@ -254,7 +254,9 @@
         "changeMembershipType",
         "setMembershipTypeActive",
         "listOpeningHoursForAdmin",
-        "setWeeklyOpeningHours"
+        "setWeeklyOpeningHours",
+        "listOpeningScheduleForAdmin",
+        "removeScheduledOpeningHours"
       ],
       "backgroundEntryPoints": [
         "ClosureAnnouncements#on(CardEvent.BookingCardAvailabilityChanged)",
@@ -269,7 +271,7 @@
       "stateTransitions": [
         "Administrators create and correct configuration records.",
         "Active flags retire and restore resources without deleting history.",
-        "Opening-hour changes replace the weekly schedule."
+        "Opening-hour changes schedule a weekly version from today or a later day; earlier days keep the hours they had, and a version not yet in force can be removed."
       ],
       "alternatePaths": [
         "Impact endpoints let the board inspect affected future bookings before a restrictive change.",
@@ -285,7 +287,8 @@
         "src/main/java/org/courtside/member/MemberService.java"
       ],
       "evidence": [
-        "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenAFutureBooking_whenChangingTheTimeZone_thenItIsRejected"
+        "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenAFutureBooking_whenChangingTheTimeZone_thenItIsRejected",
+        "src/test/java/org/courtside/facility/FacilityServiceTest.java#givenAWeekScheduledForNovember_whenReadingBeforeAndAfterIt_thenEachDayKeepsItsOwnHours"
       ]
     },
     {

@@ -478,12 +478,34 @@ components:
 
     BookingGrid:
       type: object
-      required: [timeZone, slotMinutes, openingHours]
+      required: [timeZone, slotMinutes, openingHours, openingWeeks]
       properties:
         timeZone: { type: string, example: Europe/Berlin }
         slotMinutes: { type: integer, minimum: 5, maximum: 120, multipleOf: 5 }
         openingHours:
           type: array
+          description: The week in force today, one entry per weekday.
+          items: { $ref: "#/components/schemas/OpeningHours" }
+        openingWeeks:
+          type: array
+          description: |
+            Every version of the weekly hours in the order they take effect. A day is governed by
+            the last version that has started on it, so a past week keeps the hours it had.
+          items: { $ref: "#/components/schemas/OpeningWeek" }
+
+    OpeningWeek:
+      type: object
+      required: [id, effectiveFrom, days]
+      properties:
+        id: { type: string, format: uuid }
+        effectiveFrom:
+          type: [string, "null"]
+          format: date
+          description: The first day in the club's time zone this week governs; null since the beginning.
+        days:
+          type: array
+          minItems: 7
+          maxItems: 7
           items: { $ref: "#/components/schemas/OpeningHours" }
 
     SetWeeklyOpeningHoursRequest:
@@ -494,6 +516,12 @@ components:
         one button is a save that can half-succeed.
       required: [days]
       properties:
+        effectiveFrom:
+          type: [string, "null"]
+          format: date
+          description: |
+            The first day in the club's time zone the week governs, today when omitted. It cannot
+            lie in the past; a week already starting on that day is replaced.
         days:
           type: array
           minItems: 7
@@ -2208,8 +2236,8 @@ components:
           format: int64
           minimum: 0
           description: |
-            Minutes the facility was open in the period, from the weekly opening hours as they are
-            configured now. Each day's window is read as wall-clock time in `timeZone`, so a day
+            Minutes the facility was open in the period, from the opening hours in force on each
+            day. Each day's window is read as wall-clock time in `timeZone`, so a day
             that changes to or from daylight saving time counts the minutes that actually elapsed.
             The same for every court: the product keeps no dated court availability.
         courts:
@@ -2242,7 +2270,7 @@ components:
           format: int64
           minimum: 0
           description: |
-            Minutes the facility was open, from the current weekly opening hours read as wall-clock
+            Minutes the facility was open, from the opening hours in force on each day read as wall-clock
             time in the club time zone; a day that changes to or from daylight saving time counts
             the minutes that elapsed.
         courtCount:
@@ -6244,7 +6272,7 @@ paths:
     get:
       tags: [admin-opening-hours]
       operationId: listOpeningHoursForAdmin
-      summary: Opening hours for every weekday, including the closed ones.
+      summary: The opening hours in force today for every weekday, including the closed ones.
       responses:
         "200":
           description: One entry per weekday.
@@ -6260,9 +6288,10 @@ paths:
     put:
       tags: [admin-opening-hours]
       operationId: setWeeklyOpeningHours
-      summary: Set the whole week at once.
+      summary: Set the whole week at once, from today or from a later day.
       description: |
         Applied in one transaction: either every weekday in the body is stored or none of them is.
+        The week takes effect on `effectiveFrom`; the days before it keep the hours they had.
         To open the courts early for a tournament, change that day's window rather than booking
         around it — the window binds everyone, including an admin.
 
@@ -6292,6 +6321,54 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+
+  /api/admin/opening-hours/schedule:
+    get:
+      tags: [admin-opening-hours]
+      operationId: listOpeningScheduleForAdmin
+      summary: The week in force today followed by every week scheduled after it.
+      responses:
+        "200":
+          description: The weeks in the order they take effect.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/OpeningWeek" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/admin/opening-hours/schedule/{effectiveFrom}:
+    delete:
+      tags: [admin-opening-hours]
+      operationId: removeScheduledOpeningHours
+      summary: Remove a week that has not taken effect yet.
+      description: |
+        The week before it governs those days again. A week already in force is not removed; a new
+        week replaces it from a later day.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - name: effectiveFrom
+          in: path
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "204":
+          description: The week is removed.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 
   /api/admin/config:
     get:
@@ -6547,12 +6624,18 @@ paths:
       operationId: openingHoursImpact
       summary: Which bookings a new window for this weekday would put outside it.
       description: |
-        Both times or neither. Omitting both asks what closing the day entirely would affect.
+        Both times or neither. Omitting both asks what closing the day entirely would affect. Only
+        bookings from `effectiveFrom` up to the next scheduled week count, because that week
+        governs the days after it.
       parameters:
         - name: day
           in: path
           required: true
           schema: { $ref: "#/components/schemas/DayOfWeek" }
+        - name: effectiveFrom
+          in: query
+          required: false
+          schema: { type: string, format: date }
         - name: opensAt
           in: query
           required: false
@@ -6639,8 +6722,8 @@ paths:
       operationId: readUtilisationStatistics
       summary: How full the courts were in a period, and when.
       description: |
-        Open time comes from the weekly opening hours as they are configured now, because the
-        product keeps no dated opening hours and no dated court availability. For the same reason a
+        Open time comes from the opening hours in force on each day of the period. Court
+        availability is not dated, so a
         court counts towards capacity when it is active now or when it held a confirmed allocation
         in the scope being computed: the period for the totals and the hours of the week, the
         bucket for each progression entry. Only confirmed allocations count, and only their minutes inside open

@@ -378,8 +378,8 @@ The **Records** area has five views.
   are totals and name nobody.
   * Utilisation shows occupancy, booked and closed time, the progression week by week or month by
     month, a table by weekday and hour, and the figures per court and per booking card. Occupancy
-    is booked time divided by open time without closures. It uses the opening hours as they are
-    configured today. Time played outside the opening hours does not count.
+    is booked time divided by open time without closures. Each day uses the opening hours in force
+    on it. Time played outside the opening hours does not count.
   * Booking behaviour shows confirmed and cancelled bookings, the cancellation rate, series and
     single bookings, guests and the slot fillers used.
   * Members shows the members at the end of the period, joins, leavings, active members, membership

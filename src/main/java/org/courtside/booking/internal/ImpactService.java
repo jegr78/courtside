@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import org.courtside.config.ClubTimeZone;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -80,44 +82,61 @@ public class ImpactService {
         return pageOf(retiringCardBookingIds(cardId, from, cursor, limit), limit);
     }
 
-    public Impact ofClosingWeekday(DayOfWeek day, UUID cursor, int limit) {
-        return ofClosingWeekday(day, clock.instant(), cursor, limit);
+    /** Bookings the week starting on {@code effectiveFrom}, today when null, would leave closed on {@code day}. */
+    public Impact ofClosingWeekday(DayOfWeek day, LocalDate effectiveFrom, UUID cursor, int limit) {
+        Period period = scheduledPeriod(effectiveFrom);
+        return openingHoursImpact(day, true, LocalTime.MIN, LocalTime.MAX, period, cursor, limit);
     }
 
-    Impact ofClosingWeekday(DayOfWeek day, Instant from, UUID cursor, int limit) {
-        return openingHoursImpact(day, true, LocalTime.MIN, LocalTime.MAX, from, cursor, limit);
+    ImpactPage pageOfClosingWeekday(DayOfWeek day, Period period, UUID cursor, int limit) {
+        return openingHoursPage(day, true, LocalTime.MIN, LocalTime.MAX, period, cursor, limit);
     }
 
-    ImpactPage pageOfClosingWeekday(DayOfWeek day, Instant from, UUID cursor, int limit) {
-        return openingHoursPage(day, true, LocalTime.MIN, LocalTime.MAX, from, cursor, limit);
-    }
-
-    public Impact ofOpeningHours(DayOfWeek day, OpeningWindow window, UUID cursor, int limit) {
-        return ofOpeningHours(day, window, clock.instant(), cursor, limit);
-    }
-
-    Impact ofOpeningHours(DayOfWeek day, OpeningWindow window, Instant from, UUID cursor, int limit) {
+    /** Bookings a window starting on {@code effectiveFrom}, today when null, would no longer cover. */
+    public Impact ofOpeningHours(DayOfWeek day, OpeningWindow window, LocalDate effectiveFrom,
+                                 UUID cursor, int limit) {
         OpeningWindow required = OpeningWindow.required(window);
-        return openingHoursImpact(day, false, required.opensAt(), required.closesAt(), from, cursor, limit);
+        Period period = scheduledPeriod(effectiveFrom);
+        return openingHoursImpact(day, false, required.opensAt(), required.closesAt(), period, cursor, limit);
     }
 
-    ImpactPage pageOfOpeningHours(DayOfWeek day, OpeningWindow window, Instant from, UUID cursor, int limit) {
+    ImpactPage pageOfOpeningHours(DayOfWeek day, OpeningWindow window, Period period, UUID cursor, int limit) {
         OpeningWindow required = OpeningWindow.required(window);
-        return openingHoursPage(day, false, required.opensAt(), required.closesAt(), from, cursor, limit);
+        return openingHoursPage(day, false, required.opensAt(), required.closesAt(), period, cursor, limit);
+    }
+
+    /** The instants from {@code from} up to {@code until} over which one version of the hours governs. */
+    record Period(Instant from, Instant until) {
+
+        private static final Instant OPEN_END = Instant.parse("9999-12-31T00:00:00Z");
+
+        static Period of(Instant now, LocalDate effectiveFrom, LocalDate until, ZoneId zone) {
+            Instant start = effectiveFrom == null ? now : effectiveFrom.atStartOfDay(zone).toInstant();
+            Instant end = until == null ? OPEN_END : until.atStartOfDay(zone).toInstant();
+            Instant from = start.isAfter(now) ? start : now;
+            // A start beyond the open end governs nothing, and PostgreSQL cannot hold every Java date.
+            return new Period(from.isAfter(end) ? end : from, end);
+        }
+    }
+
+    private Period scheduledPeriod(LocalDate effectiveFrom) {
+        LocalDate start = effectiveFrom == null ? facility.today() : effectiveFrom;
+        return Period.of(clock.instant(), start,
+                facility.openingSchedule().nextChangeAfter(start).orElse(null), timeZone.zoneId());
     }
 
     private Impact openingHoursImpact(DayOfWeek day, boolean closed, LocalTime opensAt, LocalTime closesAt,
-                                      Instant from, UUID cursor, int limit) {
+                                      Period period, UUID cursor, int limit) {
         List<UUID> bookingIds = openingHoursBookingIds(
-                day, closed, opensAt, closesAt, from, cursor, limit);
+                day, closed, opensAt, closesAt, period, cursor, limit);
         long affectedCount = allocations.countImpactBookingsByOpeningHours(
-                from, timeZone.id(), day.getValue(), closed, opensAt, closesAt);
+                period.from(), period.until(), timeZone.id(), day.getValue(), closed, opensAt, closesAt);
         return impactOf(bookingIds, affectedCount, limit);
     }
 
     private ImpactPage openingHoursPage(DayOfWeek day, boolean closed, LocalTime opensAt,
-                                        LocalTime closesAt, Instant from, UUID cursor, int limit) {
-        return pageOf(openingHoursBookingIds(day, closed, opensAt, closesAt, from, cursor, limit), limit);
+                                        LocalTime closesAt, Period period, UUID cursor, int limit) {
+        return pageOf(openingHoursBookingIds(day, closed, opensAt, closesAt, period, cursor, limit), limit);
     }
 
     private List<UUID> deactivatingBookingIds(UUID courtId, Instant from, UUID cursor, int limit) {
@@ -137,10 +156,10 @@ public class ImpactService {
     }
 
     private List<UUID> openingHoursBookingIds(DayOfWeek day, boolean closed, LocalTime opensAt,
-                                              LocalTime closesAt, Instant from, UUID cursor, int limit) {
+                                              LocalTime closesAt, Period period, UUID cursor, int limit) {
         validateLimit(limit);
         return allocations.findImpactBookingIdsByOpeningHours(
-                from, timeZone.id(), day.getValue(), closed, opensAt, closesAt,
+                period.from(), period.until(), timeZone.id(), day.getValue(), closed, opensAt, closesAt,
                 cursor == null, cursorOrFirstPage(cursor), page(limit));
     }
 

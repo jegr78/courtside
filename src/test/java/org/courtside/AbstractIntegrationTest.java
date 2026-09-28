@@ -28,6 +28,7 @@ public abstract class AbstractIntegrationTest {
             "booking_card_managing_role",
             "club_config",
             "membership_type",
+            "opening_hours_version",
             "participant_card",
             "rule_definition",
             "rule_set");

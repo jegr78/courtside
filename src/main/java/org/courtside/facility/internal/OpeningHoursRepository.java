@@ -9,9 +9,9 @@ import java.util.UUID;
 
 public interface OpeningHoursRepository extends JpaRepository<OpeningHours, UUID> {
 
-    Optional<OpeningHours> findByDayOfWeek(int dayOfWeek);
+    Optional<OpeningHours> findByVersionIdAndDayOfWeek(UUID versionId, int dayOfWeek);
 
-    List<OpeningHours> findAllByOrderByDayOfWeekAsc();
+    List<OpeningHours> findByVersionId(UUID versionId);
 
-    void deleteByDayOfWeek(int dayOfWeek);
+    void deleteByVersionIdAndDayOfWeek(UUID versionId, int dayOfWeek);
 }

@@ -122,6 +122,23 @@ class FacilityUtilisationControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenHoursReplacedMidWeek_whenReportingThatWeek_thenEachDayCountsTheHoursInForceOnIt()
+            throws Exception {
+        // given
+        openEveryDay(LocalTime.of(8, 0), LocalTime.of(12, 0));
+        facility.createCourt(1, "Centre");
+        jdbc.sql("INSERT INTO opening_hours_version (id, effective_from) VALUES (?, DATE '2026-05-07')")
+                .param(UUID.randomUUID()).update();
+
+        // when / then
+        mockMvc.perform(get("/api/admin/reports/facility-utilisation")
+                        .param("from", "2026-05-04")
+                        .param("to", "2026-05-10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.openMinutes").value(3 * 240));
+    }
+
+    @Test
     void givenWindowsAcrossTheSpringChange_whenReportingMarch_thenOpenMinutesAreTheElapsedOnes()
             throws Exception {
         // given

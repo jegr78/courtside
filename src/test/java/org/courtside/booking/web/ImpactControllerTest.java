@@ -23,9 +23,11 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -204,6 +206,25 @@ class ImpactControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.affectedCount").value(1))
                 .andExpect(jsonPath("$.bookings[0].bookingId").value(lateBookingId.toString()));
+    }
+
+    @Test
+    void givenAWeekScheduledAfterAnother_whenPreviewingClosingTuesdayFromNovember_thenOnlyTheDaysItWouldGovernCount()
+            throws Exception {
+        // given
+        UUID court = facilityFixture.createCourt(1, null);
+        setStandardOpeningHours();
+        facilityFixture.scheduleOpeningHours(LocalDate.of(2027, 3, 1), Map.of(
+                DayOfWeek.TUESDAY, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+        insertBooking(court, "2026-10-27T10:00:00Z", "2026-10-27T11:00:00Z", "CONFIRMED");
+        UUID governed = insertBooking(court, "2026-11-03T10:00:00Z", "2026-11-03T11:00:00Z", "CONFIRMED");
+        insertBooking(court, "2027-03-02T10:00:00Z", "2027-03-02T11:00:00Z", "CONFIRMED");
+
+        // when / then
+        mockMvc.perform(get("/api/admin/impact/opening-hours/TUESDAY").param("effectiveFrom", "2026-11-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.affectedCount").value(1))
+                .andExpect(jsonPath("$.bookings[0].bookingId").value(governed.toString()));
     }
 
     @Test

@@ -7,5 +7,7 @@
   "getCourt": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getBookingCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
   "getParticipantCard": "The admin list already answers with every field of every one of these, active or not, so a second call would fetch what the page is already holding.",
-  "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding."
+  "getRuleSet": "The admin list already answers with every field of every rule set, active or not, so a second call would fetch what the page is already holding.",
+  "listOpeningScheduleForAdmin": "The opening-hours page does not yet list or remove scheduled weeks; until it does, a board schedules a week through the API alone.",
+  "removeScheduledOpeningHours": "The opening-hours page does not yet list or remove scheduled weeks; until it does, a board schedules a week through the API alone."
 }

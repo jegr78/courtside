@@ -1,7 +1,6 @@
 package org.courtside.facility;
 
 import org.courtside.facility.internal.CourtRepository;
-import org.courtside.facility.internal.OpeningHoursRepository;
 import org.courtside.facility.internal.WeeklyOpeningHours;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.shared.OpeningWindow;
@@ -9,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
@@ -20,14 +20,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FacilityServiceTest extends AbstractIntegrationTest {
 
+    private static final OpeningWindow EIGHT_TO_TWENTY_TWO = new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0));
+    private static final OpeningWindow TEN_TO_SIX = new OpeningWindow(LocalTime.of(10, 0), LocalTime.of(18, 0));
+    private static final LocalDate TODAY = LocalDate.of(2026, 5, 12);
+    private static final LocalDate A_MONDAY_IN_JUNE = LocalDate.of(2026, 6, 1);
+    private static final LocalDate NOVEMBER_FIRST = LocalDate.of(2026, 11, 1);
+
     @Autowired
     private FacilityService facilityService;
 
     @Autowired
     private CourtRepository courtRepository;
-
-    @Autowired
-    private OpeningHoursRepository openingHoursRepository;
 
     @Test
     void givenActiveAndInactiveCourts_whenListingActiveCourts_thenOnlyActiveOnesInNumberOrder() {
@@ -47,28 +50,125 @@ class FacilityServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenConfiguredOpeningHours_whenLookingUpThatWeekday_thenHoursAreReturned() {
+    void givenOpeningHoursSetForAWeekday_whenReadingThatDay_thenTheWindowIsReturned() {
         // given
-        openingHoursRepository.save(
-                new OpeningHours(DayOfWeek.MONDAY, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+        facilityService.setOpeningHours(DayOfWeek.MONDAY, EIGHT_TO_TWENTY_TWO);
 
         // when
-        var result = facilityService.openingHoursFor(DayOfWeek.MONDAY);
+        var result = facilityService.openingSchedule().windowOn(A_MONDAY_IN_JUNE);
 
         // then
-        assertThat(result).hasValueSatisfying(hours -> {
-            assertThat(hours.getOpensAt()).isEqualTo(LocalTime.of(8, 0));
-            assertThat(hours.getClosesAt()).isEqualTo(LocalTime.of(22, 0));
-        });
+        assertThat(result).contains(EIGHT_TO_TWENTY_TWO);
     }
 
     @Test
-    void givenNoOpeningHoursForAWeekday_whenLookingItUp_thenEmptyIsReturned() {
+    void givenNoOpeningHoursForAWeekday_whenReadingThatDay_thenItIsClosed() {
         // when
-        var result = facilityService.openingHoursFor(DayOfWeek.SUNDAY);
+        var result = facilityService.openingSchedule().windowOn(A_MONDAY_IN_JUNE.plusDays(6));
 
         // then
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void givenAWeekScheduledForNovember_whenReadingBeforeAndAfterIt_thenEachDayKeepsItsOwnHours() {
+        // given
+        facilityService.setOpeningHours(DayOfWeek.MONDAY, EIGHT_TO_TWENTY_TWO);
+
+        // when
+        facilityService.scheduleOpeningHours(NOVEMBER_FIRST, week(Map.of(DayOfWeek.MONDAY, TEN_TO_SIX)));
+
+        // then
+        OpeningSchedule schedule = facilityService.openingSchedule();
+        assertThat(schedule.windowOn(LocalDate.of(2026, 10, 26))).as("the last October Monday").contains(EIGHT_TO_TWENTY_TWO);
+        assertThat(schedule.windowOn(LocalDate.of(2026, 11, 2))).as("the first November Monday").contains(TEN_TO_SIX);
+        assertThat(facilityService.weeklyOpeningHours().getFirst().opensAt())
+                .as("today still reads the week in force today").isEqualTo(LocalTime.of(8, 0));
+    }
+
+    @Test
+    void givenHoursInForceSinceTheBeginning_whenAWeekIsSavedToday_thenEarlierWeeksKeepTheirHours() {
+        // given
+        facilityService.setOpeningHours(DayOfWeek.MONDAY, EIGHT_TO_TWENTY_TWO);
+
+        // when
+        facilityService.setWeeklyOpeningHours(week(Map.of()));
+
+        // then
+        OpeningSchedule schedule = facilityService.openingSchedule();
+        assertThat(schedule.windowOn(LocalDate.of(2026, 5, 11))).as("yesterday's Monday").contains(EIGHT_TO_TWENTY_TWO);
+        assertThat(schedule.windowOn(LocalDate.of(2026, 5, 18))).as("next Monday").isEmpty();
+        assertThat(schedule.weeks()).extracting(OpeningWeek::effectiveFrom).containsExactly(null, TODAY);
+    }
+
+    @Test
+    void givenADayInThePast_whenSchedulingAWeekFromIt_thenItIsRefusedWithTheDayItMayStart() {
+        // when / then
+        assertThatThrownBy(() -> facilityService.scheduleOpeningHours(TODAY.minusDays(1), week(Map.of())))
+                .isInstanceOfSatisfying(OpeningHoursStartRejectedException.class, failure -> {
+                    assertThat(failure.getCode()).isEqualTo("facility.openingHours.effectiveInPast");
+                    assertThat(failure.getParams()).containsEntry("today", TODAY.toString());
+                });
+        assertThat(facilityService.openingSchedule().weeks()).extracting(OpeningWeek::effectiveFrom)
+                .as("nothing was scheduled").containsExactly((LocalDate) null);
+    }
+
+    @Test
+    void givenADayBeyondTheCalendar_whenSchedulingAWeekFromIt_thenItIsRefusedWithTheLatestDay() {
+        // when / then
+        assertThatThrownBy(() -> facilityService.scheduleOpeningHours(LocalDate.of(10_000, 1, 1), week(Map.of())))
+                .isInstanceOfSatisfying(OpeningHoursStartRejectedException.class, failure -> {
+                    assertThat(failure.getCode()).isEqualTo("facility.openingHours.effectiveTooLate");
+                    assertThat(failure.getParams()).containsEntry("latest", "9999-12-31");
+                });
+    }
+
+    @Test
+    void givenAScheduledWeek_whenAnotherWeekIsSavedForTheSameDay_thenItReplacesTheScheduledOne() {
+        // given
+        facilityService.scheduleOpeningHours(NOVEMBER_FIRST, week(Map.of(DayOfWeek.MONDAY, TEN_TO_SIX)));
+
+        // when
+        facilityService.scheduleOpeningHours(NOVEMBER_FIRST, week(Map.of(DayOfWeek.TUESDAY, TEN_TO_SIX)));
+
+        // then
+        OpeningSchedule schedule = facilityService.openingSchedule();
+        assertThat(schedule.weeks()).extracting(OpeningWeek::effectiveFrom).containsExactly(null, NOVEMBER_FIRST);
+        assertThat(schedule.windowOn(LocalDate.of(2026, 11, 2))).as("the corrected week closes Mondays").isEmpty();
+        assertThat(schedule.windowOn(LocalDate.of(2026, 11, 3))).contains(TEN_TO_SIX);
+    }
+
+    @Test
+    void givenAScheduledWeek_whenItIsRemoved_thenTheWeekBeforeItGovernsItsDaysAgain() {
+        // given
+        facilityService.setOpeningHours(DayOfWeek.MONDAY, EIGHT_TO_TWENTY_TWO);
+        facilityService.scheduleOpeningHours(NOVEMBER_FIRST, week(Map.of(DayOfWeek.MONDAY, TEN_TO_SIX)));
+
+        // when
+        facilityService.removeScheduledOpeningHours(NOVEMBER_FIRST);
+
+        // then
+        assertThat(facilityService.openingSchedule().windowOn(LocalDate.of(2026, 11, 2))).contains(EIGHT_TO_TWENTY_TWO);
+    }
+
+    @Test
+    void givenTheWeekInForceToday_whenRemovingIt_thenItIsRefusedAsInForce() {
+        // given
+        facilityService.setWeeklyOpeningHours(week(Map.of(DayOfWeek.MONDAY, EIGHT_TO_TWENTY_TWO)));
+
+        // when / then
+        assertThatThrownBy(() -> facilityService.removeScheduledOpeningHours(TODAY))
+                .isInstanceOfSatisfying(OpeningHoursVersionInForceException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.openingHours.versionInForce"));
+        assertThat(facilityService.openingSchedule().weeks()).hasSize(2);
+    }
+
+    @Test
+    void givenNoWeekStartingOnADay_whenRemovingIt_thenItIsNotFound() {
+        // when / then
+        assertThatThrownBy(() -> facilityService.removeScheduledOpeningHours(NOVEMBER_FIRST))
+                .isInstanceOfSatisfying(OpeningHoursVersionNotFoundException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("facility.openingHours.versionNotFound"));
     }
 
     @Test
@@ -87,7 +187,7 @@ class FacilityServiceTest extends AbstractIntegrationTest {
     void givenAStoredMonday_whenAWeekWithAMisalignedDayIsSaved_thenMondayKeepsItsWindow() {
         // given
         facilityService.setOpeningHours(DayOfWeek.MONDAY,
-                new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+                EIGHT_TO_TWENTY_TWO);
         List<WeeklyOpeningHours> week = week(Map.of(
                 DayOfWeek.MONDAY, new OpeningWindow(LocalTime.of(9, 0), LocalTime.of(21, 0)),
                 DayOfWeek.SATURDAY, new OpeningWindow(LocalTime.of(8, 15), LocalTime.of(20, 15))));
@@ -95,9 +195,7 @@ class FacilityServiceTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> facilityService.setWeeklyOpeningHours(week))
                 .isInstanceOf(WeeklyOpeningHoursRejectedException.class);
-        assertThat(facilityService.openingHoursFor(DayOfWeek.MONDAY))
-                .hasValueSatisfying(hours ->
-                        assertThat(hours.getOpensAt()).isEqualTo(LocalTime.of(8, 0)));
+        assertThat(facilityService.openingSchedule().windowOn(A_MONDAY_IN_JUNE)).contains(EIGHT_TO_TWENTY_TWO);
     }
 
     @Test

@@ -8,8 +8,6 @@ import org.courtside.card.ParticipantCard;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
-import org.courtside.facility.OpeningHours;
-import org.courtside.shared.OpeningWindow;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -305,10 +303,7 @@ class BookingStatisticsService implements BookingStatistics {
     }
 
     private OpenTimeCalendar calendar() {
-        Map<DayOfWeek, OpeningWindow> week = facility.allOpeningHours().stream()
-                .collect(Collectors.toMap(OpeningHours::getDayOfWeek,
-                        hours -> new OpeningWindow(hours.getOpensAt(), hours.getClosesAt())));
-        return new OpenTimeCalendar(week, clubTimeZone.zoneId());
+        return new OpenTimeCalendar(facility.openingSchedule(), clubTimeZone.zoneId());
     }
 
     private static UtilisationTotals totals(long openMinutes, int courtCount, List<Fact> facts,

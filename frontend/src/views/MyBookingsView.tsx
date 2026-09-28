@@ -11,7 +11,7 @@ import { CancelDialog, MoveDialog } from "./AppointmentDialogs";
 
 function offlineBookingGrid(): BookingGrid {
   return {
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", slotMinutes: 30, openingHours: []
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", slotMinutes: 30, openingWeeks: [], openingHours: []
   };
 }
 

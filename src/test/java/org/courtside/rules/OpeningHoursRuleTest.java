@@ -3,6 +3,7 @@ package org.courtside.rules;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.shared.OpeningWindow;
+import org.courtside.rules.internal.BookingRule;
 import org.courtside.rules.internal.OpeningHoursRule;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,7 +13,9 @@ import org.springframework.context.annotation.Import;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -104,6 +107,23 @@ class OpeningHoursRuleTest extends AbstractIntegrationTest {
 
         // then
         assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void givenWinterHoursFromNovember_whenOneBatchChecksATuesdayOnEitherSide_thenEachUsesTheWeekInForceOnIt() {
+        // given
+        facilityFixture.scheduleOpeningHours(LocalDate.of(2026, 11, 1),
+                Map.of(DayOfWeek.TUESDAY, new OpeningWindow(LocalTime.of(10, 0), LocalTime.of(18, 0))));
+        BookingRule.Prepared batch = rule.prepare();
+
+        // when
+        var october = batch.check(contextFor("2026-10-27T19:00:00+01:00", "2026-10-27T20:00:00+01:00"));
+        var november = batch.check(contextFor("2026-11-03T19:00:00+01:00", "2026-11-03T20:00:00+01:00"));
+
+        // then
+        assertThat(october).as("October still has the summer window until 22:00").isEmpty();
+        assertThat(november).extracting(RuleViolation::code)
+                .as("the winter week closes at 18:00").containsExactly("booking.rule.openingHours.outside");
     }
 
     private RuleContext contextFor(String start, String end) {
