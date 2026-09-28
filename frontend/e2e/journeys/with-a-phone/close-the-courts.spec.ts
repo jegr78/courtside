@@ -17,6 +17,6 @@ test("given a groundskeeper standing on a waterlogged court, when they close it 
     // then
     await expect(page.getByTestId("booking-dialog")).not.toBeVisible();
     await expect(stillFree).toHaveCount(0);
-    await activate(page.getByTestId("my-bookings-link"));
+    await activate(page.getByTestId("administration-link"));
     await expect(page.getByTestId("managed-appointments-title")).toBeVisible();
   });

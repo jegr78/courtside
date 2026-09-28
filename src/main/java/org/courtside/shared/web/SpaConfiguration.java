@@ -18,6 +18,7 @@ class SpaConfiguration implements WebMvcConfigurer {
         registry.addViewController("/my-messages").setViewName("forward:/index.html");
         registry.addViewController("/account/security").setViewName("forward:/index.html");
         registry.addViewController("/admin").setViewName("forward:/index.html");
+        registry.addViewController("/admin/appointments").setViewName("forward:/index.html");
         registry.addViewController("/admin/setup").setViewName("forward:/index.html");
         registry.addViewController("/admin/configuration").setViewName("forward:/index.html");
         registry.addViewController("/admin/deadlines").setViewName("forward:/index.html");

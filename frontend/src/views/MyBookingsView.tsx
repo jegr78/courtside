@@ -11,7 +11,7 @@ import { formatBookingPeriod, formatDateTime } from "../time/clubZone";
 import { SeriesForm } from "./SeriesForm";
 import { violationMessage } from "../api/problem-message";
 
-type Appointment = PersonalBooking | ManagedAppointment;
+export type Appointment = PersonalBooking | ManagedAppointment;
 
 function offlineBookingGrid(): BookingGrid {
   return {
@@ -120,7 +120,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
     if (!managedNextCursor) return;
     setLoadingMore(true);
     try {
-      const page = await api.managedAppointments(managedNextCursor);
+      const page = await api.managedAppointments({ cursor: managedNextCursor });
       setManaged((current) => [...current, ...page.items]);
       setManagedNextCursor(page.nextCursor ?? undefined);
       clear();
@@ -286,7 +286,7 @@ function ScopeFields({ scope, changed, t }: { scope: CancelScope; changed: (scop
   </fieldset>;
 }
 
-function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, closed, completed }: { booking: Appointment; seriesBookings: Appointment[]; hasMoreBookings: boolean; timeZone: string; closed: () => void; completed: () => Promise<void> }) {
+export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, closed, completed }: { booking: Appointment; seriesBookings: Appointment[]; hasMoreBookings: boolean; timeZone: string; closed: () => void; completed: () => Promise<void> }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<CancelScope>("THIS");
   const { message: error, report } = useReportedFailure();
@@ -311,7 +311,7 @@ function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, clos
   </div></Modal>;
 }
 
-function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, closed, completed }: { booking: Appointment; courts: PublicCourt[]; timeZone: string; maxBookingMinutes?: number; closed: () => void; completed: () => Promise<void> }) {
+export function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, closed, completed }: { booking: Appointment; courts: PublicCourt[]; timeZone: string; maxBookingMinutes?: number; closed: () => void; completed: () => Promise<void> }) {
   const { t, i18n } = useTranslation();
   const [scope, setScope] = useState<CancelScope>("THIS");
   const [startTime, setStartTime] = useState("");
@@ -346,7 +346,7 @@ function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, closed, comp
   </div></Modal>;
 }
 
-function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }: { bookingId: string; locale: string; timeZone: string; closed: () => void }) {
+export function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }: { bookingId: string; locale: string; timeZone: string; closed: () => void }) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<ManagedAppointmentDetail>();
   const { message: error, report } = useReportedFailure();

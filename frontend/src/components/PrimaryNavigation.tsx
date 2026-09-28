@@ -11,13 +11,13 @@ interface Destination {
   visible: (session: SessionStatus) => boolean;
 }
 
-const isAdmin = (session: SessionStatus) => session.roles.includes("ADMIN");
+const managesAppointments = (session: SessionStatus) => session.roles.some((role) => role !== "MEMBER");
 
 const destinations: Destination[] = [
   { to: "/", testId: "court-plan-link", label: "nav.courts", compactLabel: "nav.courtsCompact", icon: "courts", visible: () => true },
   { to: "/my-bookings", testId: "my-bookings-link", label: "nav.myBookings", compactLabel: "nav.myBookingsCompact", icon: "bookings", visible: (session) => session.authenticated },
   { to: "/my-messages", testId: "my-messages-link", label: "nav.myMessages", compactLabel: "nav.myMessagesCompact", icon: "messages", visible: (session) => session.authenticated },
-  { to: "/admin", testId: "administration-link", label: "nav.administration", compactLabel: "nav.administrationCompact", icon: "administration", visible: isAdmin }
+  { to: "/admin", testId: "administration-link", label: "nav.administration", compactLabel: "nav.administrationCompact", icon: "administration", visible: managesAppointments }
 ];
 
 function isCurrent(destination: Destination, pathname: string): boolean {

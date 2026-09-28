@@ -155,7 +155,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/openapi.yaml", "/api/source").permitAll()
                         .requestMatchers("/", "/courts", "/login", "/initial-password", "/my-bookings",
                                 "/my-messages", "/account/security", "/account-recovery",
-                                "/admin", "/admin/setup",
+                                "/admin", "/admin/appointments", "/admin/setup",
                                 "/admin/configuration", "/admin/deadlines", "/admin/rule-sets",
                                 "/admin/facility",
                                 "/admin/facility/courts", "/admin/facility/opening-hours",

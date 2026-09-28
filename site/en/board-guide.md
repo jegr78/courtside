@@ -5,9 +5,9 @@ menu names appear in *italics*. Each club chooses its own opening hours, deadlin
 
 ## Who sees the administration
 
-Only enabled accounts with the **Administrator** role can open the administration. These accounts
-see *Administration* in the main navigation. Other accounts cannot enter by typing the address
-directly.
+Enabled accounts with the **Administrator** role can open the complete administration. Accounts
+with another club role only see the *Club appointments* covered by that role. Member-only accounts
+cannot enter by typing the address directly.
 
 The sidebar leads to the overview at the top and divides administration below it into four areas:
 
@@ -21,6 +21,14 @@ The sidebar leads to the overview at the top and divides administration below it
 The same sidebar returns you to the court plan.
 
 ![The administration navigation with four areas and the link to the court plan.](../screenshots/en/admin-navigation.png)
+
+### Club appointments
+
+*Club appointments* initially shows at most 20 upcoming appointments, nearest first. Switch to
+*History* for past and cancelled appointments. You can filter by court or booking type and load
+further matches page by page. Loaded occurrences of one series start grouped and collapsed.
+*Details* remains directly available; *Cancel* sits under *Actions*. Create a new series at the top
+of the page.
 
 ## The overview
 

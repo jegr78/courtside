@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -23,23 +24,29 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class ManagedAppointmentQuery {
 
-    private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_PAGE_SIZE = 20;
 
     private final BookingRepository bookings;
     private final BookingAccessControl accessControl;
     private final CardService cards;
     private final PersonRepository persons;
+    private final Clock clock;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public Page list(Set<Role> roles, UUID cursor, int limit) {
+    public Page list(Set<Role> roles, View view, UUID courtId, UUID cardId, UUID cursor, int limit) {
         validatePageLimit(limit);
         Set<Role> managementRoles = accessControl.managementRoles(roles);
         if (!roles.contains(Role.ADMIN) && managementRoles.isEmpty()) {
             return new Page(List.of(), null);
         }
-        List<UUID> ids = bookings.findManagedBookingIds(
-                managementRoles, roles.contains(Role.ADMIN), cursor,
-                PageRequest.of(0, Math.addExact(limit, 1)));
+        List<UUID> ids = switch (view) {
+            case UPCOMING -> bookings.findUpcomingManagedBookingIds(
+                    managementRoles, roles.contains(Role.ADMIN), clock.instant(), courtId, cardId,
+                    cursor, PageRequest.of(0, Math.addExact(limit, 1)));
+            case HISTORY -> bookings.findManagedBookingHistoryIds(
+                    managementRoles, roles.contains(Role.ADMIN), clock.instant(), courtId, cardId,
+                    cursor, PageRequest.of(0, Math.addExact(limit, 1)));
+        };
         CursorPage.Result<Booking> page = CursorPage.of(ids, limit, bookings::findAllByIdIn, Booking::getId);
         return new Page(page.items(), page.nextCursor());
     }
@@ -88,5 +95,10 @@ public class ManagedAppointmentQuery {
     }
 
     public record Participant(String kind, String displayName) {
+    }
+
+    public enum View {
+        UPCOMING,
+        HISTORY
     }
 }

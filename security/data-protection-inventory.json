@@ -62,9 +62,19 @@
       "class": "identifier"
     },
     {
+      "name": "cardId",
+      "in": "query",
+      "class": "identifier"
+    },
+    {
       "name": "closesAt",
       "in": "query",
       "class": "neutral"
+    },
+    {
+      "name": "courtId",
+      "in": "query",
+      "class": "identifier"
     },
     {
       "name": "cursor",
@@ -143,6 +153,11 @@
     },
     {
       "name": "unsettled",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "view",
       "in": "query",
       "class": "neutral"
     },

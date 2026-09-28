@@ -7,6 +7,7 @@ import { PrimaryNavigation } from "./PrimaryNavigation";
 const anonymous: SessionStatus = { authenticated: false, roles: [], passwordChangeRequired: false };
 const member: SessionStatus = { authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false };
 const administrator: SessionStatus = { authenticated: true, roles: ["ADMIN"], passwordChangeRequired: false };
+const trainer: SessionStatus = { authenticated: true, roles: ["MEMBER", "TRAINER"], passwordChangeRequired: false };
 
 const adminDestinations = [
   "admin-configuration-link", "admin-deadlines-link", "admin-rule-sets-link", "admin-courts-link", "admin-opening-hours-link",
@@ -84,6 +85,11 @@ describe("PrimaryNavigation", () => {
     show(member);
     expect(screen.getByTestId("my-bookings-link")).toBeInTheDocument();
     expect(screen.queryByTestId("administration-link")).not.toBeInTheDocument();
+  });
+
+  it("given a trainer, when rendered, then the appointment workspace is reachable through administration", () => {
+    show(trainer);
+    expect(screen.getByTestId("administration-link")).toHaveAttribute("href", "/admin");
   });
 
   // The destinations themselves live in the administration's own navigation, not in this bar.

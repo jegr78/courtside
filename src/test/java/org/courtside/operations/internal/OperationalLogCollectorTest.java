@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,7 +36,7 @@ class OperationalLogCollectorTest {
 
             sender.send(new DatagramPacket(payload, payload.length,
                     InetAddress.getLoopbackAddress(), receiver.getLocalPort()));
-            receiving.join(2_000);
+            receiving.join();
 
             assertThat(receiving.isAlive()).isFalse();
             assertThat(Files.readString(directory.resolve("operational.log")))
@@ -55,7 +56,7 @@ class OperationalLogCollectorTest {
 
             sender.send(new DatagramPacket(payload, payload.length,
                     InetAddress.getLoopbackAddress(), receiver.getLocalPort()));
-            receiving.join(2_000);
+            receiving.join();
 
             assertThat(store.status().dropped()).isOne();
             assertThat(directory.resolve("operational.log")).doesNotExist();
@@ -173,20 +174,20 @@ class OperationalLogCollectorTest {
             port = candidate.getLocalPort();
         }
         AtomicReference<Throwable> failure = new AtomicReference<>();
+        CompletableFuture<Void> listening = new CompletableFuture<>();
         Thread collector = Thread.ofPlatform().start(() -> {
             try {
                 OperationalLogCollector.run(Map.of(
                         "COURTSIDE_OPERATIONAL_LOG_PATH", directory.toString(),
                         "COURTSIDE_OPERATIONAL_LOG_PORT", Integer.toString(port),
-                        "COURTSIDE_OPERATIONAL_LOG_FILE_SIZE", "4096"));
+                        "COURTSIDE_OPERATIONAL_LOG_FILE_SIZE", "4096"),
+                        () -> listening.complete(null));
             } catch (Throwable exception) {
                 failure.set(exception);
+                listening.completeExceptionally(exception);
             }
         });
-        for (int attempt = 0; attempt < 100
-                && !Files.exists(directory.resolve(OperationalLogStore.STATUS_FILE)); attempt++) {
-            Thread.sleep(10);
-        }
+        listening.join();
 
         collector.interrupt();
         try (DatagramSocket sender = new DatagramSocket()) {
@@ -195,7 +196,7 @@ class OperationalLogCollectorTest {
             sender.send(new DatagramPacket(payload, payload.length,
                     InetAddress.getLoopbackAddress(), port));
         }
-        collector.join(2_000);
+        collector.join();
 
         assertThat(collector.isAlive()).isFalse();
         assertThat(failure.get()).isNull();

@@ -211,11 +211,11 @@ Managed listings and details contain only bookings whose card names one of the a
 
 Attributes: `booking-card`, `managing-role`, `administrator-override`.
 
-Production: `src/main/java/org/courtside/booking/BookingRepository.java#findManagedBookingIds`, `src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#list`, `src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#get`, `src/main/java/org/courtside/booking/web/BookingController.java#listManagedAppointments`, `src/main/java/org/courtside/booking/web/BookingController.java#getManagedAppointment`.
+Production: `src/main/java/org/courtside/booking/BookingRepository.java#findUpcomingManagedBookingIds`, `src/main/java/org/courtside/booking/BookingRepository.java#findManagedBookingHistoryIds`, `src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#list`, `src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#get`, `src/main/java/org/courtside/booking/web/BookingController.java#listManagedAppointments`, `src/main/java/org/courtside/booking/web/BookingController.java#getManagedAppointment`.
 
 Positive tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOfficerAppointment_whenListingManagedAppointments_thenBothResponsibleRolesSeeIt`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenACardManagedByTrainers_whenATrainerOpensAnAppointmentOnIt_thenTheParticipantsAreShown`.
 
-Negative tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOfficerAppointment_whenAnOrdinaryMemberListsManagedAppointments_thenNothingIsDisclosed`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenACardBookableByMembersAndTrainers_whenATrainerOpensAMemberAppointment_thenItIsRefused`.
+Negative tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOfficerAppointment_whenAnOrdinaryMemberListsManagedAppointments_thenNothingIsDisclosed`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOfficerAppointmentInHistory_whenAnUnrelatedTrainerListsIt_thenNothingIsDisclosed`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenACardBookableByMembersAndTrainers_whenATrainerOpensAMemberAppointment_thenItIsRefused`.
 
 ### Series ownership and management
 

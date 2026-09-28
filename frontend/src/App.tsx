@@ -45,6 +45,8 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const administrative = pathname === "/admin" || pathname.startsWith("/admin/");
+  const administrator = session.roles.includes("ADMIN");
+  const managesAppointments = session.roles.some((role) => role !== "MEMBER");
 
   if (session.passwordChangeRequired) {
     return <Routes>
@@ -76,9 +78,9 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
         signedOut={() => signedOut?.()} />
       : <Navigate to="/login" replace />} />
     {/* The role is asked once for the whole surface rather than once per destination. */}
-    <Route path="/admin/*" element={session.roles.includes("ADMIN")
+    <Route path="/admin/*" element={managesAppointments
       ? <Suspense fallback={<p role="status">{t("status.loading")}</p>}>
-        <AdminRoutes configurationChanged={(changed) => configurationChanged?.(changed)} />
+        <AdminRoutes administrator={administrator} configurationChanged={(changed) => configurationChanged?.(changed)} />
       </Suspense>
       : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />

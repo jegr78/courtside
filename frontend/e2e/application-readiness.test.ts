@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { awaitReadiness, readinessBudget, type ReadinessWorld } from "./application-readiness";
+import { awaitReadiness, type ReadinessWorld } from "./application-readiness";
 
 function world(answers: boolean[], overrides: Partial<ReadinessWorld> = {}): {
   world: ReadinessWorld;
@@ -38,15 +38,16 @@ describe("awaitReadiness", () => {
     expect(paused()).toEqual([500, 500, 500]);
   });
 
-  it("given a server that never becomes ready, when the wait gives up, then it waited a full minute", async () => {
-    // given
-    const { world: silent, paused } = world([]);
+  it("given a live server that starts after the former minute boundary, when readiness arrives, then it keeps waiting", async () => {
+    // given — the outer gate owns the deadline; this helper owns only readiness and process exit
+    const { world: slow, paused } = world([...Array<boolean>(121).fill(false), true]);
 
-    // when / then
-    await expect(awaitReadiness(silent, "http://localhost:1"))
-      .rejects.toThrow("did not become ready on http://localhost:1 within 60 seconds");
-    expect(paused()).toHaveLength(readinessBudget.attempts);
-    expect(spent(paused())).toBe(60_000);
+    // when
+    await awaitReadiness(slow, "http://localhost:1");
+
+    // then
+    expect(paused()).toHaveLength(121);
+    expect(spent(paused())).toBe(60_500);
   });
 
   it("given the application stops while starting, when the wait notices, then it names the exit code", async () => {

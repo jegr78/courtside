@@ -142,7 +142,8 @@ for (const locale of ["de", "en"]) {
     await page.goto("/");
     await selectPreference(page, "#locale-preference", locale);
     await signIn(page, "sport.major");
-    await page.getByTestId("my-bookings-link").click();
+    await page.getByTestId("administration-link").click();
+    await expect(page.getByTestId("managed-appointments-page")).toBeVisible();
 
     // when
     await page.getByTestId("new-series").click();

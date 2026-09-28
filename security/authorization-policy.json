@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-24",
+  "reviewedAt": "2026-09-28",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "973f32d5dacb05aab2d9478b1c1b3c602d6cb50260bae4990cc0784d54768c7b",
+  "openApiFieldInventorySha256": "8644fdb66d8c28f520ac0f939e6f19d7aac3217e5b4f9eb7ab70fb82c6fd6498",
   "protectedFieldInventorySha256": "4f16eed4229be447f36a68cbd5c82d5b9f5afb3c6dbad61dcad6c242025d9bad",
-  "productionAuthorizationSha256": "adc8326a0c1089f63473c4f58403dd8f4c25c42dd29335fb7e1820eaa594e3f6",
+  "productionAuthorizationSha256": "b3ca1140bbf0e10db7cb6fc82377d23ddaecf726f66f83503aed6704cd862d7c",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -800,6 +800,7 @@
     "getManagedAppointment:response:FieldError.params",
     "getManagedAppointment:response:FieldError.params.*",
     "getManagedAppointment:response:ManagedAppointment.cardColor",
+    "getManagedAppointment:response:ManagedAppointment.cardId",
     "getManagedAppointment:response:ManagedAppointment.cardLabel",
     "getManagedAppointment:response:ManagedAppointment.courtIds",
     "getManagedAppointment:response:ManagedAppointment.endsAt",
@@ -1002,13 +1003,17 @@
     "listImportSources:response:Violation.code",
     "listImportSources:response:Violation.params",
     "listImportSources:response:Violation.params.*",
+    "listManagedAppointments:parameter:$parameter.query.cardId",
+    "listManagedAppointments:parameter:$parameter.query.courtId",
     "listManagedAppointments:parameter:$parameter.query.cursor",
     "listManagedAppointments:parameter:$parameter.query.limit",
+    "listManagedAppointments:parameter:$parameter.query.view",
     "listManagedAppointments:response:FieldError.code",
     "listManagedAppointments:response:FieldError.field",
     "listManagedAppointments:response:FieldError.params",
     "listManagedAppointments:response:FieldError.params.*",
     "listManagedAppointments:response:ManagedAppointment.cardColor",
+    "listManagedAppointments:response:ManagedAppointment.cardId",
     "listManagedAppointments:response:ManagedAppointment.cardLabel",
     "listManagedAppointments:response:ManagedAppointment.courtIds",
     "listManagedAppointments:response:ManagedAppointment.endsAt",
@@ -2774,7 +2779,8 @@
         "administrator-override"
       ],
       "productionPaths": [
-        "src/main/java/org/courtside/booking/BookingRepository.java#findManagedBookingIds",
+        "src/main/java/org/courtside/booking/BookingRepository.java#findUpcomingManagedBookingIds",
+        "src/main/java/org/courtside/booking/BookingRepository.java#findManagedBookingHistoryIds",
         "src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#list",
         "src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#get",
         "src/main/java/org/courtside/booking/web/BookingController.java#listManagedAppointments",
@@ -2786,6 +2792,7 @@
       ],
       "negativeTests": [
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOfficerAppointment_whenAnOrdinaryMemberListsManagedAppointments_thenNothingIsDisclosed",
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOfficerAppointmentInHistory_whenAnUnrelatedTrainerListsIt_thenNothingIsDisclosed",
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenACardBookableByMembersAndTrainers_whenATrainerOpensAMemberAppointment_thenItIsRefused"
       ]
     },

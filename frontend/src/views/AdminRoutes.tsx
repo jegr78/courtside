@@ -13,6 +13,7 @@ import { AdminOverviewView } from "./AdminOverviewView";
 import { AdminPersonView } from "./AdminPersonView";
 import { AdminRosterView } from "./AdminRosterView";
 import { AdminSetupView } from "./AdminSetupView";
+import { AdminManagedAppointmentsView } from "./AdminManagedAppointmentsView";
 import { AdminDeadlinesView } from "./configuration/AdminDeadlinesView";
 import { AdminRuleSetsView } from "./configuration/AdminRuleSetsView";
 import { AdminBookingCardView } from "./facility/AdminBookingCardView";
@@ -21,12 +22,15 @@ import { AdminCourtsView } from "./facility/AdminCourtsView";
 import { AdminOpeningHoursView } from "./facility/AdminOpeningHoursView";
 import { AdminSlotFillersView } from "./facility/AdminSlotFillersView";
 
-export default function AdminRoutes({ configurationChanged }: {
+export default function AdminRoutes({ configurationChanged, administrator }: {
   configurationChanged: (config: ClubConfig) => void;
+  administrator: boolean;
 }) {
   return <Routes>
-    <Route element={<AdminShell />}>
-      <Route index element={<AdminOverviewView />} />
+    <Route element={<AdminShell administrator={administrator} />}>
+      <Route index element={administrator ? <AdminOverviewView /> : <Navigate to="/admin/appointments" replace />} />
+      <Route path="appointments" element={<AdminManagedAppointmentsView />} />
+      {administrator && <>
       <Route path="setup" element={<AdminSetupView />} />
       <Route path="configuration" element={<AdminConfigurationView configurationChanged={configurationChanged} />} />
       <Route path="deadlines" element={<AdminDeadlinesView configurationChanged={configurationChanged} />} />
@@ -48,7 +52,8 @@ export default function AdminRoutes({ configurationChanged }: {
       <Route path="audit" element={<AdminAuditView />} />
       <Route path="messages" element={<AdminMessagesView />} />
       <Route path="operational-logs" element={<AdminOperationalLogsView />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      </>}
+      <Route path="*" element={<Navigate to={administrator ? "/" : "/admin/appointments"} replace />} />
     </Route>
   </Routes>;
 }

@@ -172,7 +172,7 @@ it("given no appointments or participations, when loaded, then every empty secti
   );
   expect(screen.getByTestId("past-bookings").tagName, "nothing to fold stays a line").toBe("P");
   expect(screen.getByTestId("managed-bookings")).toHaveTextContent(
-    "Appointments covered by your club role appear here. Create an appointment series below or wait for a matching booking."
+    "Appointments covered by your club role appear here. Create an appointment series above or wait for a matching booking."
   );
   expect(screen.getByTestId("participations")).toHaveTextContent(
     "Bookings where another member names you as a player appear here. Ask the booking member to add you."
@@ -212,6 +212,7 @@ it("given an officer, when managed appointments load, then they are separated fr
   // given
   vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [{
     id: "55555555-5555-5555-5555-555555555555",
+    cardId: "44444444-4444-4444-4444-444444444444",
     courtIds: ["33333333-3333-3333-3333-333333333333"],
     startsAt: "2026-08-12T18:00:00Z",
     endsAt: "2026-08-12T19:00:00Z",
@@ -237,6 +238,7 @@ it("given a managed appointment, when opening details, then its internal data is
   const bookingId = "55555555-5555-5555-5555-555555555555";
   vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [{
     id: bookingId,
+    cardId: "44444444-4444-4444-4444-444444444444",
     courtIds: ["33333333-3333-3333-3333-333333333333"],
     startsAt: "2026-08-12T18:00:00Z",
     endsAt: "2026-08-12T19:00:00Z",
@@ -247,6 +249,7 @@ it("given a managed appointment, when opening details, then its internal data is
   }] });
   vi.spyOn(api, "managedAppointment").mockResolvedValue({
     id: bookingId,
+    cardId: "44444444-4444-4444-4444-444444444444",
     courtIds: ["33333333-3333-3333-3333-333333333333"],
     startsAt: "2026-08-12T18:00:00Z",
     endsAt: "2026-08-12T19:00:00Z",
@@ -274,6 +277,7 @@ it("given a cancelled managed appointment, when listed, then its details remain 
   const bookingId = "55555555-5555-5555-5555-555555555555";
   vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [{
     id: bookingId,
+    cardId: "44444444-4444-4444-4444-444444444444",
     courtIds: ["33333333-3333-3333-3333-333333333333"],
     startsAt: "2026-08-12T18:00:00Z",
     endsAt: "2026-08-12T19:00:00Z",
@@ -284,6 +288,7 @@ it("given a cancelled managed appointment, when listed, then its details remain 
   }] });
   vi.spyOn(api, "managedAppointment").mockResolvedValue({
     id: bookingId,
+    cardId: "44444444-4444-4444-4444-444444444444",
     courtIds: ["33333333-3333-3333-3333-333333333333"],
     startsAt: "2026-08-12T18:00:00Z",
     endsAt: "2026-08-12T19:00:00Z",

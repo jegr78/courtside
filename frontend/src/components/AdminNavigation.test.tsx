@@ -43,6 +43,18 @@ describe("AdminNavigation", () => {
     expect(within(records).getByTestId("admin-audit-link")).toBeInTheDocument();
     expect(within(records).getByTestId("admin-messages-link")).toBeInTheDocument();
     expect(within(records).getByTestId("admin-operational-logs-link")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-appointments-link")).toHaveAttribute("href", "/admin/appointments");
+  });
+
+  it("given an appointment manager without administration rights, when navigation is read, then only club appointments and the court plan are offered", () => {
+    // when
+    render(<MemoryRouter initialEntries={["/admin/appointments"]}><AdminNavigation administrator={false} /></MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("admin-appointments-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("court-plan-link")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-overview-link")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-group-club")).not.toBeInTheDocument();
   });
 
   it("given the administration, when the navigation is read, then the court plan is the way back", () => {

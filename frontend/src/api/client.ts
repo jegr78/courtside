@@ -97,6 +97,7 @@ export type ParticipationPage = components["schemas"]["ParticipationPage"];
 export type ManagedAppointment = components["schemas"]["ManagedAppointment"];
 export type ManagedAppointmentPage = components["schemas"]["ManagedAppointmentPage"];
 export type ManagedAppointmentDetail = components["schemas"]["ManagedAppointmentDetail"];
+export type ManagedAppointmentView = components["schemas"]["ManagedAppointmentView"];
 export type CancelScope = components["schemas"]["CancelScope"];
 export type MoveRequest = components["schemas"]["MoveRequest"];
 export type MovePreview = components["schemas"]["MovePreview"];
@@ -546,8 +547,16 @@ export const api = {
   withdrawParticipation: (bookingId: string) => request<void>(
     `/api/my/participations/${bookingId}`, { method: "DELETE" }
   ),
-  managedAppointments: (cursor?: string, limit = 50) => request<ManagedAppointmentPage>(
-    `/api/managed/bookings?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  managedAppointments: (options: {
+    view?: ManagedAppointmentView; courtId?: string; cardId?: string; cursor?: string; limit?: number;
+  } = {}) => request<ManagedAppointmentPage>(
+    `/api/managed/bookings?${new URLSearchParams({
+      view: options.view ?? "UPCOMING",
+      limit: String(options.limit ?? 20),
+      ...(options.courtId ? { courtId: options.courtId } : {}),
+      ...(options.cardId ? { cardId: options.cardId } : {}),
+      ...(options.cursor ? { cursor: options.cursor } : {})
+    })}`
   ),
   managedAppointment: (bookingId: string) => request<ManagedAppointmentDetail>(
     `/api/managed/bookings/${bookingId}`

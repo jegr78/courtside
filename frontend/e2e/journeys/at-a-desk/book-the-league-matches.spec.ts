@@ -20,7 +20,7 @@ test("given a sport director with the season's fixtures, when they put the home 
     }
 
     // then
-    await activate(page.getByTestId("my-bookings-link"));
+    await activate(page.getByTestId("administration-link"));
     await expect(page.getByTestId("managed-appointments-title")).toBeVisible();
     await expect(page.getByTestId("managed-bookings").getByTestId("managed-cancel")).not.toHaveCount(0);
   });

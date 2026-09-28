@@ -1,12 +1,15 @@
 import { expect, test } from "./fixtures";
 
-async function signIn(page: import("@playwright/test").Page, username: string) {
+async function signIn(page: import("@playwright/test").Page, username: string, openManagement = true) {
   await page.goto("/login");
   await page.getByTestId("username").fill(username);
   await page.getByTestId("password").fill("temporary-password");
   await page.getByTestId("login-submit").click();
   await expect(page.getByTestId("court-plan-view")).toBeVisible();
-  await page.getByTestId("my-bookings-link").click();
+  if (openManagement) {
+    await page.getByTestId("administration-link").click();
+    await expect(page.getByTestId("managed-appointments-page")).toBeVisible();
+  }
 }
 
 test("sport and youth directors find the same managed league match", async ({ page }) => {
@@ -15,10 +18,7 @@ test("sport and youth directors find the same managed league match", async ({ pa
     await signIn(page, username);
 
     // when / then
-    await expect(page.getByTestId("managed-appointments-title")).toBeVisible();
-    const leagueMatch = page.locator("article").filter({
-      has: page.locator('[data-booking-id="70000000-0000-0000-0000-000000000004"]')
-    });
+    const leagueMatch = page.getByTestId("booking-70000000-0000-0000-0000-000000000004");
     await expect(leagueMatch).toBeVisible();
     await leagueMatch.getByTestId("managed-details").click();
     await expect(page.getByTestId("managed-note")).toContainText("Prepare score sheets");
@@ -35,15 +35,17 @@ test("an authorized officer cancels a managed appointment through the browser", 
   // given
   await signIn(page, "sport.major");
   const bookingId = "70000000-0000-0000-0000-000000000006";
-  const cancel = page.locator(`[data-testid="managed-cancel"][data-booking-id="${bookingId}"]`);
+  const appointment = page.getByTestId(`booking-${bookingId}`);
 
   // when
-  await cancel.click();
+  await appointment.getByTestId("managed-actions").click();
+  await appointment.getByTestId("managed-cancel").click();
   await page.getByTestId("confirm-cancellation").click();
 
   // then
-  await expect(cancel).not.toBeVisible();
-  await expect(page.getByTestId(`booking-${bookingId}`)).toHaveAttribute("data-status", "CANCELLED");
+  await expect(appointment).not.toBeVisible();
+  await page.getByTestId("managed-view-HISTORY").click();
+  await expect(page.getByTestId(`booking-${bookingId}`)).toBeVisible();
 });
 
 test("an officer sees only the appointments the card's managing roles cover", async ({ page }) => {
@@ -51,17 +53,17 @@ test("an officer sees only the appointments the card's managing roles cover", as
   await signIn(page, "keeper.roe");
 
   // when / then
-  await expect(page.getByTestId("managed-appointments-title")).toBeVisible();
   await expect(page.getByTestId("booking-70000000-0000-0000-0000-000000000005")).toBeVisible();
   await expect(page.getByTestId("booking-70000000-0000-0000-0000-000000000004")).toHaveCount(0);
 });
 
 test("an ordinary member has no managed-appointments area", async ({ page }) => {
   // when
-  await signIn(page, "doe.jane");
+  await signIn(page, "doe.jane", false);
 
   // then
-  await expect(page.getByTestId("managed-appointments-title")).toHaveCount(0);
+  await expect(page.getByTestId("administration-link")).toHaveCount(0);
+  await expect(page.getByTestId("managed-appointments-page")).toHaveCount(0);
 });
 
 test("an officer creates a weekly series and finds its appointments in the managed list", async ({ page }) => {
@@ -86,8 +88,10 @@ test("an officer creates a weekly series and finds its appointments in the manag
   // then — the appointments are in the list the officer manages, without a reload
   expect(bookingIds).toHaveLength(3);
   await expect(page.getByTestId("series-created")).toBeVisible();
-  const managedList = page.getByTestId("managed-bookings");
+  const series = page.locator('[data-testid^="managed-series-"]')
+    .filter({ has: page.getByTestId(`booking-${bookingIds[0]}`) });
+  await series.getByTestId("managed-series-summary").click();
   for (const bookingId of bookingIds) {
-    await expect(managedList.getByTestId(`booking-${bookingId}`)).toBeVisible();
+    await expect(page.getByTestId(`booking-${bookingId}`)).toBeVisible();
   }
 });
