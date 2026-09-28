@@ -14,7 +14,9 @@ Woche, auf einem schmalen Bildschirm einen Tag.
 4. Lies in der Legende, ob ein Zeitraum **Frei**, **Belegt**, **Deine Buchung**,
    **Nicht verfügbar** oder **Vergangen** ist.
 
-An geschlossenen Tagen zeigt Courtside kein Raster. Bei fremden Buchungen siehst du entweder die
+An geschlossenen Tagen zeigt Courtside kein Raster. Liegt eine Buchung außerhalb der Öffnungszeiten,
+etwa weil der Verein sie später geändert hat, bleibt sie im Plan sichtbar. Die übrigen Plätze in
+diesen Zeilen stehen auf *Geschlossen*. Bei fremden Buchungen siehst du entweder die
 Buchungsart oder den neutralen Text *Belegt*. Das stellt der Verein für jede Buchungsart ein. Die
 Anzahl der Teilnehmenden ist öffentlich, ihre Namen sind es nicht. Namen siehst du nur bei deinen
 eigenen Buchungen.

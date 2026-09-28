@@ -14,7 +14,9 @@ A narrow screen shows one day.
 4. Use the legend to identify **Available**, **Occupied**, **Your booking**, **Unavailable** and
    **Past** periods.
 
-Courtside does not show a grid on days when the club is closed. Another member's booking displays
+Courtside does not show a grid on days when the club is closed. A booking outside the opening
+hours, for example after the club changed them, stays visible in the plan. The other courts in its
+rows read *Closed*. Another member's booking displays
 either its booking type or the neutral label *Occupied*. The club chooses this for each booking
 type. The number of participants is public, but their names are not. You only see names on your
 own bookings.

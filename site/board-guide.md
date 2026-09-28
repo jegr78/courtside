@@ -148,7 +148,8 @@ Mitglieder mit betroffenen zukünftigen Buchungen.
 
 Courtside speichert keinen Tag, bei dem eine der beiden Zeiten fehlt. Außerhalb der Öffnungszeiten
 sind keine Buchungen möglich. Wenn du Öffnungszeiten später verkürzt, benachrichtigt Courtside
-die Mitglieder mit betroffenen Buchungen.
+die Mitglieder mit betroffenen Buchungen. Diese Buchungen bleiben bestehen und im Platzplan
+sichtbar.
 
 ![Die Öffnungszeiten für alle Wochentage und die Funktion zum Übernehmen gleicher Zeiten.](screenshots/de/opening-hours.png)
 

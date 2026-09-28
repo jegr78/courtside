@@ -671,6 +671,7 @@ const en: Record<keyof typeof de, string> = {
   "week.noCourtOpen": "The club has no court open for booking at the moment.",
   "week.closed": "The facility is closed on this day.",
   "week.available": "Available",
+  "week.outside": "Closed",
   "week.past": "Past",
   "week.pastLabel": "{{court}} at {{time}} is in the past",
   "week.now": "Return to current time",
