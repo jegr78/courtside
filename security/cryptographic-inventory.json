@@ -564,7 +564,7 @@
       "revocation": "Replace the affected service credential and restart its consumers; finalize-bootstrap removes the initial administrator credential after it has been replaced.",
       "recovery": "Restore the owner-only configuration and secret backup. If no backup exists, replace the affected credential through that service's recovery procedure rather than attempting to derive it.",
       "retirement": "Remove the credential with the installation after any retained data has been migrated or destroyed.",
-      "evidence": "tools/deployment-cli.test.mjs",
+      "evidence": "tools/deployment-cli-install.test.mjs",
       "detects": [
         "openssl"
       ],

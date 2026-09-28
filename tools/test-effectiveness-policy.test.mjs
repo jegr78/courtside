@@ -42,7 +42,7 @@ test("given hosted frontend builds have outer deadlines, when the runner is slow
   // given / when / then
   assert.match(workflowJob(build, "frontend"), /timeout-minutes: 30/);
   assert.match(workflowJob(release, "build"), /timeout-minutes: 45/);
-  assert.match(workflowJob(restore, "restore"), /timeout-minutes: 45/);
+  assert.match(workflowJob(restore, "restore"), /timeout-minutes: 110/);
   assert.match(vite, /testTimeout: 0/);
   assert.match(vite, /hookTimeout: 0/);
 });

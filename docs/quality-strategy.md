@@ -48,6 +48,8 @@ Tests are placed at the lowest level that can prove the risk. Database guarantee
 
 A timeout or unavailable required tool makes a gate incomplete, not successful. Budgets are reviewed when their representative workload changes; tests are not silently removed to meet a budget.
 
+A workflow job's `timeout-minutes` is set from measurement: at least twice the longest recent successful run, rounded up to five minutes.
+
 ## Evidence rules
 
 - Evidence names the commit or immutable image digest, environment, dataset and tool version needed to interpret it.
