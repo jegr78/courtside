@@ -74,9 +74,11 @@ describe("AdminManagedAppointmentsView", () => {
     show();
 
     // then
-    expect(await screen.findByTestId("managed-series-series-1")).toBeInTheDocument();
+    const series = await screen.findByTestId("managed-series-series-1");
     expect(screen.getByTestId("load-failure")).toBeInTheDocument();
     expect(api.managedAppointments).toHaveBeenCalledOnce();
+    expect(within(series).getAllByTestId("managed-details")[0]).toBeDisabled();
+    expect(within(series).queryByTestId("managed-actions")).not.toBeInTheDocument();
   });
 
   it("given a confirmed occurrence, when its row is opened, then details are direct and cancellation stays secondary", async () => {
@@ -105,11 +107,14 @@ describe("AdminManagedAppointmentsView", () => {
 
     // when
     await userEvent.click(summaries[0]);
-    await userEvent.click(summaries[1]);
+    summaries[1].focus();
+    await userEvent.keyboard("{Enter}");
 
     // then
-    expect(menus[0]).not.toHaveAttribute("open");
-    expect(menus[1]).toHaveAttribute("open");
+    await waitFor(() => {
+      expect(menus[0]).not.toHaveAttribute("open");
+      expect(menus[1]).toHaveAttribute("open");
+    });
 
     // when
     await userEvent.keyboard("{Escape}");
