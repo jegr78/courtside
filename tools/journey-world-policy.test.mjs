@@ -60,8 +60,8 @@ test("given several browser projects, when Playwright runs them, then one global
 test("given hosted browser jobs have an outer deadline, when the runner is slow, then Playwright adds no wall-clock deadline", () => {
   // given / when / then
   assert.match(workflowJob(buildWorkflow, "browser_visual"), /^    timeout-minutes: 15$/m);
-  assert.match(workflowJob(buildWorkflow, "browser"), /^    timeout-minutes: 20$/m);
-  assert.match(workflowJob(releaseWorkflow, "browser"), /^    timeout-minutes: 30$/m);
+  assert.match(workflowJob(buildWorkflow, "browser"), /^    timeout-minutes: 30$/m);
+  assert.match(workflowJob(releaseWorkflow, "browser"), /^    timeout-minutes: 50$/m);
   assert.match(workflowJob(stabilityWorkflow, "browser-order"), /^    timeout-minutes: 40$/m);
   assert.match(workflowJob(stabilityWorkflow, "browser-compatibility"), /^    timeout-minutes: 30$/m);
   assert.match(playwright, /\n  timeout: 0,/);
