@@ -164,4 +164,5 @@ networks:
 
 volumes:
   db:
+    name: ${COURTSIDE_DATABASE_VOLUME:?set COURTSIDE_DATABASE_VOLUME in .env}
   operational-logs:

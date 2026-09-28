@@ -70,6 +70,7 @@ const settings = {
   COURTSIDE_DATABASE_URL: "jdbc:postgresql://database.example.org:5432/courtside",
   COURTSIDE_DATABASE_USERNAME: "courtside",
   COURTSIDE_DATABASE_PASSWORD: "placeholder",
+  COURTSIDE_DATABASE_VOLUME: "courtside-test-db",
   COURTSIDE_ACCEPTANCE_MAIL_CERTIFICATES: "/srv/courtside-acceptance-mail",
   COURTSIDE_ACCEPTANCE_MAIL_USER: "1000:1000",
   COURTSIDE_DB_TLS_AUTHORITY: "/srv/courtside/database-authority",

@@ -43,7 +43,12 @@ anything. It separates read-only releases from mutable configuration, secrets an
 unattended install, use the answer-file example in the selected recipe guide and pass secrets only
 through the process environment.
 
-After installation, always use the installed launcher:
+For bundled PostgreSQL, the launcher writes `COURTSIDE_DATABASE_VOLUME` itself. The explicit name
+keeps a PostgreSQL 18 cluster bound to the volume the launcher created or migrated; operators do not
+set or change it independently.
+
+After installation, use the installed launcher for ordinary lifecycle commands. Updates use the
+launcher from the verified candidate archive as the operations handbook describes:
 
 ```sh
 /srv/courtside/current/courtside doctor

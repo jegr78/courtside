@@ -44,12 +44,15 @@ unit, exercise it with `restore-check` and remove the bootstrap values with
 ```sh
 /srv/courtside/current/courtside backup --retain 7
 /srv/courtside/current/courtside restore-check --recovery <recovery directory>
-/srv/courtside/current/courtside update --archive <new archive> --yes
+candidate=/srv/courtside/candidate/courtside-deployment-<version>
+"$candidate/courtside" --directory /srv/courtside update --archive "$candidate" --yes
 ```
 
 An update creates a recovery unit first. It does not promise an automatic database downgrade after
-a newer migration has run. Retain the previous release and regularly test recovery against an empty
-PostgreSQL 18 target.
+a newer application migration has run. For the bundled PostgreSQL 17 to 18 transition, the launcher
+instead restores the dump into a new volume and automatically reactivates the untouched PostgreSQL
+17 volume when target startup fails. Retain the previous release and regularly test recovery against
+an empty PostgreSQL 18 target.
 
 For acceptance testing, each nightly run that builds and qualifies a new image retains
 `nightly-deployment-archive` for 14 days. Download it from a successful `main` run. Its

@@ -68,8 +68,10 @@ recipe. Its recovery units bind a validated
 PostgreSQL dump to that release, image, configuration, local material and checksum inventory;
 restore checks use the locally trusted immutable release model, an empty PostgreSQL 18 target and
 the matching application image, with cleanup recorded before the target starts. Exact-release
-updates create a recovery unit before pulling or migrating, never start an older application after
-a newer schema may have run and never claim an automatic database rollback. The manifest carries
+updates create a recovery unit before pulling or migrating. A bundled PostgreSQL 17 to 18 update
+restores into an isolated named volume and can reactivate the old application and untouched old
+volume if target startup fails. Ordinary application schema migrations never start an older
+application afterward and never claim an automatic database rollback. The manifest carries
 a checksum per file and the release page carries one for the archive. Installing from it needs no
 clone of this repository or application runtime. The official recipes compose the fixed GHCR
 repository and SHA-256 algorithm with that manifest digest, so they cannot run a moving tag. An
