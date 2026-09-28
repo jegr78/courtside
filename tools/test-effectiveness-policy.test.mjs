@@ -10,6 +10,8 @@ const release = readFileSync(new URL("../.github/workflows/release.yml", import.
 const restore = readFileSync(new URL("../.github/workflows/backup-restore-smoke.yml", import.meta.url), "utf8");
 const mutation = readFileSync(new URL("../.github/workflows/mutation-testing.yml", import.meta.url), "utf8");
 const criticalCoverage = JSON.parse(readFileSync(new URL("../quality/critical-coverage.json", import.meta.url)));
+const operationalLogCollectorTest = readFileSync(new URL(
+  "../src/test/java/org/courtside/operations/internal/OperationalLogCollectorTest.java", import.meta.url), "utf8");
 
 function workflowJob(workflow, name) {
   const match = workflow.match(new RegExp(`(?:^|\\n)  ${name}:\\n(?:(?!\\n  [a-zA-Z0-9_-]+:\\n)[\\s\\S])*`));
@@ -45,6 +47,17 @@ test("given hosted frontend builds have outer deadlines, when the runner is slow
   assert.match(workflowJob(restore, "restore"), /timeout-minutes: 110/);
   assert.match(vite, /testTimeout: 0/);
   assert.match(vite, /hookTimeout: 0/);
+});
+
+test("given the operational log collector runs concurrently, when tests coordinate with it, then readiness is event-driven", () => {
+  const interruptedRun = operationalLogCollectorTest.slice(
+    operationalLogCollectorTest.indexOf("givenARealCollectorRun_whenInterrupted"),
+    operationalLogCollectorTest.indexOf("givenTheHeartbeatCannotBeWritten"));
+
+  assert.match(interruptedRun, /CompletableFuture<Void> listening/);
+  assert.match(interruptedRun, /listening\.join\(\)/);
+  assert.doesNotMatch(interruptedRun, /Thread\.sleep|attempt|\.join\(\s*\d/);
+  assert.doesNotMatch(operationalLogCollectorTest, /\.join\(\s*\d/);
 });
 
 test("given measured coverage baselines, when verification runs, then coverage cannot fall below its recorded floors", () => {

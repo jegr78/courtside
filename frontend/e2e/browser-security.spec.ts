@@ -460,7 +460,7 @@ test("stored text projections remain inert on administrative and managed views",
   await expect(page.getByTestId("source-choice-99000000-0000-0000-0000-000000000001")).toHaveText(payload);
   await page.getByTestId("source-choice-99000000-0000-0000-0000-000000000001").click();
   await expect(page.getByTestId(`reference-${payload}`)).toContainText("Projection");
-  await page.goto("/my-bookings");
+  await page.goto("/admin/appointments");
   const appointment = page.getByTestId("booking-70000000-0000-0000-0000-000000000004");
   await appointment.getByTestId("managed-details").click();
   await expect(page.getByTestId("managed-card-label")).toHaveText(payload);

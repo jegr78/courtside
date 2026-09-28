@@ -500,6 +500,84 @@ class BookingControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenUpcomingAndCancelledAppointments_whenListingManagedAppointments_thenTheNearestConfirmedWorkComesFirst()
+            throws Exception {
+        // given
+        String later = createManagedBooking(courtId, TRAINING_CARD,
+                "2026-05-13T18:00:00+02:00", "2026-05-13T19:00:00+02:00");
+        String cancelled = createManagedBooking(courtId, TRAINING_CARD,
+                "2026-05-13T20:00:00+02:00", "2026-05-13T21:00:00+02:00");
+        String nearer = createManagedBooking(courtId, TRAINING_CARD,
+                "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00");
+        mockMvc.perform(delete("/api/bookings/{id}", cancelled)
+                        .with(user("trainer.john").roles("TRAINER"))
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings")
+                        .with(user("sport.major").roles("SPORT_DIRECTOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].id").value(nearer))
+                .andExpect(jsonPath("$.items[1].id").value(later));
+    }
+
+    @Test
+    void givenEndedAndCancelledAppointments_whenListingManagedHistory_thenOnlyHistoryComesNewestFirst()
+            throws Exception {
+        // given
+        String ended = createManagedBooking(courtId, TRAINING_CARD,
+                "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00");
+        jdbc.sql("""
+                UPDATE court_allocation
+                SET starts_at = '2026-05-12T07:00:00Z', ends_at = '2026-05-12T08:00:00Z'
+                WHERE booking_id = :bookingId
+                """).param("bookingId", UUID.fromString(ended)).update();
+        String cancelled = createManagedBooking(courtId, TRAINING_CARD,
+                "2026-05-13T18:00:00+02:00", "2026-05-13T19:00:00+02:00");
+        createManagedBooking(courtId, TRAINING_CARD,
+                "2026-05-14T18:00:00+02:00", "2026-05-14T19:00:00+02:00");
+        mockMvc.perform(delete("/api/bookings/{id}", cancelled)
+                        .with(user("trainer.john").roles("TRAINER"))
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings")
+                        .param("view", "HISTORY")
+                        .with(user("sport.major").roles("SPORT_DIRECTOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].id").value(cancelled))
+                .andExpect(jsonPath("$.items[1].id").value(ended));
+    }
+
+    @Test
+    void givenSeveralManagedAppointments_whenFilteringByCourtAndCard_thenUnrelatedWorkIsNotReturned()
+            throws Exception {
+        // given
+        BookingCard otherCard = cards.createCard("Team meeting", "#34584A", Set.of(Role.TRAINER),
+                Set.of(Role.SPORT_DIRECTOR), new short[] { }, false, true, true);
+        String expected = createManagedBooking(courtId, TRAINING_CARD,
+                "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00");
+        createManagedBooking(secondCourtId, TRAINING_CARD,
+                "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00");
+        createManagedBooking(courtId, otherCard.getId(),
+                "2026-05-13T18:00:00+02:00", "2026-05-13T19:00:00+02:00");
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings")
+                        .param("courtId", courtId.toString())
+                        .param("cardId", TRAINING_CARD.toString())
+                        .with(user("sport.major").roles("SPORT_DIRECTOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(expected))
+                .andExpect(jsonPath("$.items[0].cardId").value(TRAINING_CARD.toString()));
+    }
+
+    @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
     void givenAnOfficerAppointment_whenAnOrdinaryMemberListsManagedAppointments_thenNothingIsDisclosed()
             throws Exception {
@@ -513,6 +591,27 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
         // when / then
         mockMvc.perform(get("/api/managed/bookings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty());
+    }
+
+    @Test
+    void givenAnOfficerAppointmentInHistory_whenAnUnrelatedTrainerListsIt_thenNothingIsDisclosed()
+            throws Exception {
+        // given
+        BookingCard sportDirectorCard = cards.createCard("Team preparation", "#34584A",
+                Set.of(Role.TRAINER), Set.of(Role.SPORT_DIRECTOR), new short[] { }, false, true, true);
+        String bookingId = createManagedBooking(courtId, sportDirectorCard.getId(),
+                "2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00");
+        mockMvc.perform(delete("/api/bookings/{id}", bookingId)
+                        .with(user("trainer.john").roles("TRAINER"))
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // when / then
+        mockMvc.perform(get("/api/managed/bookings")
+                        .param("view", "HISTORY")
+                        .with(user("trainer.john").roles("TRAINER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isEmpty());
     }
@@ -1126,6 +1225,24 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 }
                 """.formatted(courtId, TRAINING_CARD,
                         note == null ? "" : ",\n  \"note\": \"" + note + "\"");
+    }
+
+    private String createManagedBooking(UUID court, UUID card, String startsAt, String endsAt)
+            throws Exception {
+        return JsonPath.read(mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "courtIds": ["%s"],
+                                  "cardId": "%s",
+                                  "startsAt": "%s",
+                                  "endsAt": "%s"
+                                }
+                                """.formatted(court, card, startsAt, endsAt))
+                        .with(user("trainer.john").roles("TRAINER"))
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.id");
     }
 
     private UUID bookingOf(String username) throws Exception {

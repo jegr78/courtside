@@ -22,6 +22,7 @@ interface Group {
 }
 
 const overview: Destination = { to: "/admin", testId: "admin-overview-link", label: "nav.adminOverview" };
+const appointments: Destination = { to: "/admin/appointments", testId: "admin-appointments-link", label: "nav.adminAppointments" };
 
 const groups: Group[] = [
   {
@@ -73,12 +74,12 @@ function isCurrent(destination: Destination, pathname: string): boolean {
 }
 
 function currentLabel(pathname: string): string | undefined {
-  return [overview, ...groups.flatMap((group) => group.destinations)]
+  return [overview, appointments, ...groups.flatMap((group) => group.destinations)]
     .find((destination) => isCurrent(destination, pathname))
     ?.label;
 }
 
-export function AdminNavigation() {
+export function AdminNavigation({ administrator = true }: { administrator?: boolean }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const current = currentLabel(pathname);
@@ -135,8 +136,9 @@ export function AdminNavigation() {
       <Link data-testid="court-plan-link" to="/" className="focus-ring rounded-lg font-semibold underline-offset-4">
         {t("nav.courts")}
       </Link>
-      <NavigationLink destination={overview} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />
-      {groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2 lg:gap-1">
+      <NavigationLink destination={appointments} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />
+      {administrator && <NavigationLink destination={overview} pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />}
+      {administrator && groups.map((group) => <div key={group.testId} data-testid={group.testId} role="group" aria-labelledby={`${group.testId}-heading`} className="grid gap-2 lg:gap-1">
         <p id={`${group.testId}-heading`} className="text-muted text-xs font-bold tracking-wide uppercase">{t(group.heading)}</p>
         {group.destinations.map((destination) => <NavigationLink key={destination.testId} destination={destination}
           pathname={pathname} chosen={() => { if (!laidOpen) setUnfolded(false); }} />)}
@@ -152,6 +154,6 @@ function NavigationLink({ destination, pathname, chosen }: { destination: Destin
     data-testid={destination.testId}
     aria-current={isCurrent(destination, pathname) ? "page" : undefined}
     onClick={chosen}
-    className="focus-ring rounded-lg px-3 py-2 font-semibold lg:py-1 aria-[current]:bg-(--cs-raised)"
+    className="focus-ring rounded-lg px-3 py-2 font-semibold lg:py-0.5 aria-[current]:bg-(--cs-raised)"
   >{t(destination.label)}</Link>;
 }

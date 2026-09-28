@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -33,6 +34,9 @@ class CursorPredicateTest {
     // a visibility boundary — naming it here is what keeps this check honest about the difference.
     private static final Set<String> NOT_A_VISIBILITY_BOUNDARY = Set.of("firstPage");
 
+    private static final Map<String, Set<String>> NOT_A_VISIBILITY_BOUNDARY_BY_QUERY = Map.of(
+            "findUpcomingManagedBookingIds", Set.of("now"));
+
     @Test
     void everyPagedQueryResolvesItsCursorUnderTheConditionsItSelectsRowsUnder() {
         // when
@@ -41,6 +45,10 @@ class CursorPredicateTest {
         for (Method query : paged) {
             String clause = cursorClauseOf(query);
             for (String parameter : visibilityParametersOf(query)) {
+                if (NOT_A_VISIBILITY_BOUNDARY_BY_QUERY.getOrDefault(query.getName(), Set.of())
+                        .contains(parameter)) {
+                    continue;
+                }
                 if (!clause.contains(":" + parameter)) {
                     unguarded.add(query.getName() + " resolves its cursor without :" + parameter);
                 }

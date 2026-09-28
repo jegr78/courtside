@@ -198,7 +198,7 @@ bestehen und Courtside nennt dir die geltende Frist.
 
 ## Serientermine
 
-Konten mit einer zusätzlichen Rolle können unter *Meine Buchungen* Serien anlegen. Eine Serie legt
+Konten mit einer zusätzlichen Rolle können unter *Verwaltung → Vereinstermine* Serien anlegen. Eine Serie legt
 gewöhnliche Buchungen nach einem Plan an. Du bestimmst den ersten Termin, die Uhrzeit, Dauer,
 Wochentage, den Abstand in Wochen und das Ende der Serie.
 

@@ -43,6 +43,10 @@ public final class OperationalLogCollector {
     }
 
     public static void run(Map<String, String> environment) {
+        run(environment, null);
+    }
+
+    static void run(Map<String, String> environment, Runnable onListening) {
         Configuration configuration = Configuration.from(environment);
         try (DatagramSocket socket = new DatagramSocket(new InetSocketAddress("0.0.0.0", configuration.port()))) {
             socket.setSoTimeout(HEARTBEAT_INTERVAL_MILLIS);
@@ -50,8 +54,10 @@ public final class OperationalLogCollector {
                     configuration.directory(), configuration.maxFileBytes(), configuration.maxFiles());
             OperationalLogCollector collector = new OperationalLogCollector(socket, new OperationalLogParser(), store);
             System.out.printf("Operational log collector listening on UDP port %d%n", configuration.port());
+            Runnable readiness = onListening;
             while (!Thread.currentThread().isInterrupted()) {
-                collector.receiveOne();
+                collector.receiveOne(readiness);
+                readiness = null;
             }
         } catch (IOException exception) {
             throw new IllegalStateException("Operational log collector stopped", exception);
@@ -59,9 +65,16 @@ public final class OperationalLogCollector {
     }
 
     void receiveOne() {
+        receiveOne(null);
+    }
+
+    private void receiveOne(Runnable beforeReceive) {
         byte[] buffer = new byte[OperationalLogParser.MAX_DATAGRAM_BYTES + 1];
         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
         try {
+            if (beforeReceive != null) {
+                beforeReceive.run();
+            }
             socket.receive(packet);
             if (!admit()) {
                 store.dropped();

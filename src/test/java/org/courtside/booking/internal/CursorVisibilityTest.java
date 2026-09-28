@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -42,7 +43,7 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
     private static final Instant THREE_PM = Instant.parse("2026-05-13T15:00:00Z");
     private static final Instant SIX_PM = Instant.parse("2026-05-13T16:00:00Z");
     private static final Instant SEVEN_PM = Instant.parse("2026-05-13T17:00:00Z");
-    private static final int PAGE_LIMIT = 50;
+    private static final int PAGE_LIMIT = 20;
 
     @Autowired
     private BookingService bookings;
@@ -61,6 +62,9 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
 
     @Autowired
     private IdentityTestFixture identity;
+
+    @Autowired
+    private JdbcClient jdbc;
 
     private UUID firstCourt;
     private UUID secondCourt;
@@ -242,17 +246,62 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
         // given
         BookingCard unmanaged = cards.createCard("Court maintenance", "#34584A",
                 Set.of(Role.TRAINER), Set.of(), new short[] { }, false, true, true);
-        UUID earlier = bookedOnCard(unmanaged, firstCourt, TWO_PM, THREE_PM);
-        UUID cursor = bookedOnCard(unmanaged, secondCourt, SIX_PM, SEVEN_PM);
+        UUID cursor = bookedOnCard(unmanaged, firstCourt, TWO_PM, THREE_PM);
+        UUID later = bookedOnCard(unmanaged, secondCourt, SIX_PM, SEVEN_PM);
 
         // when
-        List<UUID> page = idsOf(managed.list(Set.of(Role.ADMIN), cursor, PAGE_LIMIT).bookings());
+        List<UUID> page = idsOf(managed.list(Set.of(Role.ADMIN), ManagedAppointmentQuery.View.UPCOMING,
+                null, null, cursor, PAGE_LIMIT).bookings());
 
         // then
         assertThat(page)
                 .as("an administrator sees every appointment, so no cursor is outside their"
                         + " visibility and the page after it must still be served")
-                .containsExactly(earlier);
+                .containsExactly(later);
+    }
+
+    @Test
+    void givenAFirstManagedPage_whenItsCursorIsCancelledBeforeTheNextPage_thenPagingContinues() {
+        // given
+        BookingCard card = trainerCard("Fitness session");
+        UUID cursor = bookedOnCard(card, firstCourt, TWO_PM, THREE_PM);
+        UUID later = bookedOnCard(card, secondCourt, SIX_PM, SEVEN_PM);
+        ManagedAppointmentQuery.Page first = managed.list(Set.of(Role.TRAINER),
+                ManagedAppointmentQuery.View.UPCOMING, null, null, null, 1);
+        assertThat(idsOf(first.bookings())).containsExactly(cursor);
+        bookings.cancel(cursor, janeAccountId, Set.of(Role.TRAINER));
+
+        // when
+        List<UUID> page = managedPageFor(first.nextCursor());
+
+        // then
+        assertThat(page)
+                .as("the cursor remains an ordering anchor after its appointment leaves upcoming")
+                .containsExactly(later);
+    }
+
+    @Test
+    void givenAFirstManagedPage_whenItsCursorEndsBeforeTheNextPage_thenPagingContinues() {
+        // given
+        BookingCard card = trainerCard("Fitness session");
+        UUID cursor = bookedOnCard(card, firstCourt, TWO_PM, THREE_PM);
+        UUID later = bookedOnCard(card, secondCourt, SIX_PM, SEVEN_PM);
+        ManagedAppointmentQuery.Page first = managed.list(Set.of(Role.TRAINER),
+                ManagedAppointmentQuery.View.UPCOMING, null, null, null, 1);
+        assertThat(idsOf(first.bookings())).containsExactly(cursor);
+        jdbc.sql("""
+                UPDATE court_allocation
+                SET starts_at = '2026-05-12T07:00:00Z', ends_at = '2026-05-12T08:00:00Z'
+                WHERE booking_id = :bookingId
+                """).param("bookingId", cursor).update();
+
+        // when
+        List<UUID> page = managedPageFor(first.nextCursor());
+
+        // then
+        assertThat(page)
+                .as("the cursor remains an ordering anchor after its appointment leaves upcoming")
+                .containsExactly(later);
     }
 
     @Test
@@ -288,14 +337,15 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
         List<UUID> walked = new ArrayList<>();
         UUID cursor = null;
         for (int page = 0; page < 3; page += 1) {
-            ManagedAppointmentQuery.Page current = managed.list(Set.of(Role.TRAINER), cursor, 1);
+            ManagedAppointmentQuery.Page current = managed.list(Set.of(Role.TRAINER),
+                    ManagedAppointmentQuery.View.UPCOMING, null, null, cursor, 1);
             walked.addAll(idsOf(current.bookings()));
             cursor = current.nextCursor();
         }
 
         // then
         assertThat(walked).containsExactlyInAnyOrder(earlier, onOneCourt, onTheOther);
-        assertThat(walked.getLast()).isEqualTo(earlier);
+        assertThat(walked.getFirst()).isEqualTo(earlier);
         assertThat(cursor).isNull();
     }
 
@@ -333,7 +383,8 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
     }
 
     private List<UUID> managedPageFor(UUID cursor) {
-        return idsOf(managed.list(Set.of(Role.TRAINER), cursor, PAGE_LIMIT).bookings());
+        return idsOf(managed.list(Set.of(Role.TRAINER), ManagedAppointmentQuery.View.UPCOMING,
+                null, null, cursor, PAGE_LIMIT).bookings());
     }
 
     private static List<UUID> idsOf(List<Booking> found) {

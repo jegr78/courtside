@@ -143,10 +143,64 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                 SELECT c.id FROM BookingCard c JOIN c.managingRoles role
                 WHERE c.id = b.cardId AND role IN :roles
             ))
+              AND b.status = org.courtside.booking.BookingStatus.CONFIRMED
+              AND (SELECT max(a.endsAt) FROM CourtAllocation a WHERE a.booking = b) >= :now
+              AND (:courtId IS NULL OR EXISTS (
+                    SELECT selectedCourt.id FROM CourtAllocation selectedCourt
+                    WHERE selectedCourt.booking = b AND selectedCourt.courtId = :courtId
+              ))
+              AND (:cardId IS NULL OR b.cardId = :cardId)
+              AND (:cursor IS NULL
+                OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b), b.id)
+                    > ((SELECT min(ca.startsAt) FROM CourtAllocation ca
+                        WHERE ca.booking.id = :cursor
+                          AND (:courtId IS NULL OR EXISTS (
+                                SELECT cursorCourt.id FROM CourtAllocation cursorCourt
+                                WHERE cursorCourt.booking = ca.booking
+                                  AND cursorCourt.courtId = :courtId
+                          ))
+                          AND (:cardId IS NULL OR ca.booking.cardId = :cardId)
+                          AND (:administrator = true OR EXISTS (
+                            SELECT cc.id FROM BookingCard cc JOIN cc.managingRoles cursorRole
+                            WHERE cc.id = ca.booking.cardId AND cursorRole IN :roles
+                          ))), :cursor))
+            ORDER BY (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b) ASC,
+                     b.id ASC
+            """)
+    List<UUID> findUpcomingManagedBookingIds(@Param("roles") Set<Role> roles,
+                                             @Param("administrator") boolean administrator,
+                                             @Param("now") Instant now,
+                                             @Param("courtId") UUID courtId,
+                                             @Param("cardId") UUID cardId,
+                                             @Param("cursor") UUID cursor,
+                                             Pageable pageable);
+
+    @Query("""
+            SELECT b.id FROM Booking b
+            WHERE (:administrator = true OR EXISTS (
+                SELECT c.id FROM BookingCard c JOIN c.managingRoles role
+                WHERE c.id = b.cardId AND role IN :roles
+            ))
+              AND (b.status = org.courtside.booking.BookingStatus.CANCELLED
+                   OR (SELECT max(a.endsAt) FROM CourtAllocation a WHERE a.booking = b) < :now)
+              AND (:courtId IS NULL OR EXISTS (
+                    SELECT selectedCourt.id FROM CourtAllocation selectedCourt
+                    WHERE selectedCourt.booking = b AND selectedCourt.courtId = :courtId
+              ))
+              AND (:cardId IS NULL OR b.cardId = :cardId)
               AND (:cursor IS NULL
                 OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b), b.id)
                     < ((SELECT min(ca.startsAt) FROM CourtAllocation ca
                         WHERE ca.booking.id = :cursor
+                          AND (ca.booking.status = org.courtside.booking.BookingStatus.CANCELLED
+                               OR (SELECT max(cursorEnd.endsAt) FROM CourtAllocation cursorEnd
+                                   WHERE cursorEnd.booking = ca.booking) < :now)
+                          AND (:courtId IS NULL OR EXISTS (
+                                SELECT cursorCourt.id FROM CourtAllocation cursorCourt
+                                WHERE cursorCourt.booking = ca.booking
+                                  AND cursorCourt.courtId = :courtId
+                          ))
+                          AND (:cardId IS NULL OR ca.booking.cardId = :cardId)
                           AND (:administrator = true OR EXISTS (
                             SELECT cc.id FROM BookingCard cc JOIN cc.managingRoles cursorRole
                             WHERE cc.id = ca.booking.cardId AND cursorRole IN :roles
@@ -154,10 +208,13 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             ORDER BY (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b) DESC,
                      b.id DESC
             """)
-    List<UUID> findManagedBookingIds(@Param("roles") Set<Role> roles,
-                                     @Param("administrator") boolean administrator,
-                                     @Param("cursor") UUID cursor,
-                                     Pageable pageable);
+    List<UUID> findManagedBookingHistoryIds(@Param("roles") Set<Role> roles,
+                                            @Param("administrator") boolean administrator,
+                                            @Param("now") Instant now,
+                                            @Param("courtId") UUID courtId,
+                                            @Param("cardId") UUID cardId,
+                                            @Param("cursor") UUID cursor,
+                                            Pageable pageable);
 
     @Query("""
             SELECT b.id FROM Booking b

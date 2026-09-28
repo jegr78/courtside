@@ -196,7 +196,7 @@ remains and Courtside tells you which deadline applied.
 
 ## Series
 
-Accounts with an additional role can create a series under *My bookings*. A series creates normal
+Accounts with an additional role can create a series under *Administration → Club appointments*. A series creates normal
 bookings from a schedule. You set the first date, time, duration, weekdays, interval in weeks and
 the end of the series.
 

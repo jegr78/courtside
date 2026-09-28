@@ -6,6 +6,6 @@ export function MyBookingsPage({ session, offline = false }: { session: SessionS
   const { t } = useTranslation();
   return <section data-testid="my-bookings-page" className="surface-panel w-full max-w-7xl self-start rounded-2xl border p-4 shadow-[0_20px_50px_var(--cs-shadow)] sm:p-8">
     {session.displayName && <p className="text-muted">{t("home.welcome", { name: session.displayName })}</p>}
-    <MyBookingsView showManaged={session.roles.some((role) => role !== "MEMBER")} offline={offline} />
+    <MyBookingsView offline={offline} />
   </section>;
 }

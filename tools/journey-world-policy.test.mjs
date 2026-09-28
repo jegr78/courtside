@@ -8,8 +8,14 @@ const fixtures = readFileSync(new URL("../frontend/e2e/fixtures.ts", import.meta
 const playwright = readFileSync(new URL("../frontend/playwright.config.ts", import.meta.url), "utf8");
 const pwaLifecycle = readFileSync(new URL("../frontend/e2e/pwa-lifecycle.spec.ts", import.meta.url), "utf8");
 const processCommand = readFileSync(new URL("../frontend/e2e/process-command.ts", import.meta.url), "utf8");
+const applicationReadiness = readFileSync(new URL(
+  "../frontend/e2e/application-readiness.ts", import.meta.url), "utf8");
 const webkitReliability = readFileSync(new URL("./webkit-reliability.mjs", import.meta.url), "utf8");
 const resourceObservation = readFileSync(new URL("./browser-resource-observation.mjs", import.meta.url), "utf8");
+const buildWorkflow = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
+const releaseWorkflow = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
+const stabilityWorkflow = readFileSync(new URL(
+  "../.github/workflows/test-stability.yml", import.meta.url), "utf8");
 const bookingReminders = readFileSync(new URL(
   "../src/main/java/org/courtside/booking/internal/BookingReminders.java", import.meta.url), "utf8");
 const bookingReminderSchedule = readFileSync(new URL(
@@ -31,6 +37,15 @@ const passwordResetTokenService = readFileSync(new URL(
 const sessionCleanupCadence = readFileSync(new URL(
   "../src/main/java/org/courtside/identity/internal/SessionCleanupCadence.java", import.meta.url), "utf8");
 
+function workflowJob(workflow, name) {
+  const marker = `\n  ${name}:\n`;
+  const start = workflow.indexOf(marker);
+  assert.notEqual(start, -1, `workflow has no ${name} job`);
+  const body = workflow.slice(start + marker.length);
+  const nextJob = /^  [a-zA-Z0-9_-]+:\s*$/m.exec(body);
+  return nextJob === null ? body : body.slice(0, nextJob.index);
+}
+
 test("given several browser projects, when Playwright runs them, then one global journey world serves every worker", () => {
   assert.match(setup, /const service = await startJourneyService\(\)/);
   assert.doesNotMatch(setup, /for \(const browserName of browserNames\)/);
@@ -44,6 +59,11 @@ test("given several browser projects, when Playwright runs them, then one global
 
 test("given hosted browser jobs have an outer deadline, when the runner is slow, then Playwright adds no wall-clock deadline", () => {
   // given / when / then
+  assert.match(workflowJob(buildWorkflow, "browser_visual"), /^    timeout-minutes: 15$/m);
+  assert.match(workflowJob(buildWorkflow, "browser"), /^    timeout-minutes: 30$/m);
+  assert.match(workflowJob(releaseWorkflow, "browser"), /^    timeout-minutes: 50$/m);
+  assert.match(workflowJob(stabilityWorkflow, "browser-order"), /^    timeout-minutes: 40$/m);
+  assert.match(workflowJob(stabilityWorkflow, "browser-compatibility"), /^    timeout-minutes: 30$/m);
   assert.match(playwright, /\n  timeout: 0,/);
   assert.match(playwright, /expect: \{ timeout: 0,/);
   assert.match(playwright, /actionTimeout: 0/);
@@ -61,6 +81,8 @@ test("given release-critical journey commands, when the runner is slow, then onl
   // when / then
   assert.doesNotMatch(setup, /executeFile/);
   assert.doesNotMatch(processCommand, /\btimeout\b/);
+  assert.match(applicationReadiness, /for \(;;\)/);
+  assert.doesNotMatch(applicationReadiness, /ATTEMPTS|readinessBudget|Date\.now|setTimeout/);
   assert.doesNotMatch(serviceWorkerHandshake, /setTimeout/);
   assert.match(dockerPrerequisite, /execute = runProcessToCompletion/);
   assert.doesNotMatch(dockerPrerequisite, /deadlineMs|terminationGraceMs/);

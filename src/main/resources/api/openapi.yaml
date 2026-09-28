@@ -1850,10 +1850,11 @@ components:
 
     ManagedAppointment:
       type: object
-      required: [id, courtIds, startsAt, endsAt, cardLabel, cardColor, status, participantCount]
+      required: [id, cardId, courtIds, startsAt, endsAt, cardLabel, cardColor, status, participantCount]
       properties:
         id: { type: string, format: uuid }
         seriesId: { type: [string, "null"], format: uuid }
+        cardId: { type: string, format: uuid }
         courtIds:
           type: array
           minItems: 1
@@ -1864,6 +1865,10 @@ components:
         cardColor: { type: string }
         status: { $ref: "#/components/schemas/BookingStatus" }
         participantCount: { type: integer, minimum: 0 }
+
+    ManagedAppointmentView:
+      type: string
+      enum: [UPCOMING, HISTORY]
 
     ManagedAppointmentPage:
       type: object
@@ -4037,6 +4042,20 @@ paths:
         Uses each booking card's current allowed roles. Cards without role restrictions do not
         expose appointments to unrelated accounts. Administrators may manage every appointment.
       parameters:
+        - name: view
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ManagedAppointmentView"
+            default: UPCOMING
+        - name: courtId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: cardId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
         - name: cursor
           in: query
           required: false
@@ -4049,7 +4068,7 @@ paths:
         - name: limit
           in: query
           required: false
-          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+          schema: { type: integer, minimum: 1, maximum: 20, default: 20 }
       responses:
         "200":
           description: Appointments visible through the caller's current management roles.

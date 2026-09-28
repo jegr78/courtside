@@ -326,7 +326,7 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
     void whenAManagedPageIsAskedForWithALimitBeyondTheBound_thenItIsAFieldErrorOnLimit()
             throws Exception {
         // when / then
-        mockMvc.perform(get("/api/managed/bookings").param("limit", "101"))
+        mockMvc.perform(get("/api/managed/bookings").param("limit", "21"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type").value(VALIDATION_FAILED))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("limit"))

@@ -92,7 +92,9 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await page.evaluate(() => window.scrollTo(0, 0));
   },
   "series-form": async (page) => {
-    await page.getByTestId("my-bookings-link").click();
+    await page.getByTestId("administration-link").click();
+    await expect(page.getByTestId("managed-appointments-page")).toBeVisible();
+    await expect(page.getByTestId("new-series")).toBeVisible();
     await page.getByTestId("new-series").click();
     await expect(page.getByTestId("preview-series")).toBeVisible();
   },

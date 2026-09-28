@@ -6,9 +6,10 @@ bestimmt jeder Verein selbst.
 
 ## Wer die Verwaltung sieht
 
-Nur aktive Konten mit der Rolle **Administrator** können die Verwaltung öffnen. Für diese Konten
-erscheint *Verwaltung* in der Hauptnavigation. Andere Konten erhalten auch über eine direkt
-eingegebene Adresse keinen Zugriff.
+Aktive Konten mit der Rolle **Administrator** können die vollständige Verwaltung öffnen. Konten
+mit einer zusätzlichen Vereinsrolle sehen dort ausschließlich die *Vereinstermine*, für die ihre
+Rolle zuständig ist. Reine Mitgliedskonten erhalten auch über eine direkt eingegebene Adresse
+keinen Zugriff.
 
 Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter in vier Bereiche:
 
@@ -22,6 +23,14 @@ Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter i
 Über dieselbe Leiste kehrst du zum Platzplan zurück.
 
 ![Die Verwaltungsnavigation mit den vier Bereichen und dem Link zum Platzplan.](screenshots/de/admin-navigation.png)
+
+### Vereinstermine
+
+Unter *Vereinstermine* stehen zunächst höchstens 20 anstehende Termine, der nächste zuerst. Mit
+*Verlauf* wechselst du zu vergangenen und stornierten Terminen. Filtere bei Bedarf nach Platz oder
+Buchungsart und lade weitere Treffer seitenweise nach. Geladene Termine derselben Serie sind
+eingeklappt zusammengefasst. *Details* bleibt direkt erreichbar; *Stornieren* liegt unter
+*Aktionen*. Neue Serien legst du am Anfang der Seite an.
 
 ## Die Übersicht
 

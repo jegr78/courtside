@@ -14,6 +14,7 @@ import org.courtside.api.ApiPublicCourt;
 import org.courtside.api.ApiManagedAppointment;
 import org.courtside.api.ApiManagedAppointmentDetail;
 import org.courtside.api.ApiManagedAppointmentPage;
+import org.courtside.api.ApiManagedAppointmentView;
 import org.courtside.api.ApiManagedParticipant;
 import org.courtside.api.ApiManagedParticipantKind;
 import org.courtside.api.BookingsApi;
@@ -215,9 +216,11 @@ class BookingController implements BookingsApi {
     }
 
     @Override
-    public ResponseEntity<ApiManagedAppointmentPage> listManagedAppointments(UUID cursor, Integer limit) {
+    public ResponseEntity<ApiManagedAppointmentPage> listManagedAppointments(
+            ApiManagedAppointmentView view, UUID courtId, UUID cardId, UUID cursor, Integer limit) {
         UserAccount account = currentUser.requireAccount();
-        ManagedAppointmentQuery.Page page = managedAppointments.list(account.getRoles(), cursor, limit);
+        ManagedAppointmentQuery.Page page = managedAppointments.list(account.getRoles(),
+                ManagedAppointmentQuery.View.valueOf(view.getValue()), courtId, cardId, cursor, limit);
         Map<UUID, BookingCard> cardsById = cards.allCards().stream()
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));
         Map<UUID, Long> participantCounts = bookings.participantCountsFor(
@@ -241,7 +244,8 @@ class BookingController implements BookingsApi {
                 .map(this::toManagedParticipant)
                 .toList();
         return ResponseEntity.ok(new ApiManagedAppointmentDetail(
-                booking.getId(), booking.getAllocations().stream().map(CourtAllocation::getCourtId).toList(),
+                booking.getId(), booking.getCardId(),
+                booking.getAllocations().stream().map(CourtAllocation::getCourtId).toList(),
                 WireTypes.toOffsetDateTime(allocation.getStartsAt()),
                 WireTypes.toOffsetDateTime(allocation.getEndsAt()), card.getLabel(), card.getColor(),
                 ApiBookingStatus.fromValue(booking.getStatus().name()), participants.size(), participants)
@@ -258,7 +262,8 @@ class BookingController implements BookingsApi {
             throw new IllegalStateException("A booking references an unknown card");
         }
         return new ApiManagedAppointment(
-                booking.getId(), booking.getAllocations().stream().map(CourtAllocation::getCourtId).toList(),
+                booking.getId(), booking.getCardId(),
+                booking.getAllocations().stream().map(CourtAllocation::getCourtId).toList(),
                 WireTypes.toOffsetDateTime(allocation.getStartsAt()),
                 WireTypes.toOffsetDateTime(allocation.getEndsAt()), card.getLabel(), card.getColor(),
                 ApiBookingStatus.fromValue(booking.getStatus().name()), Math.toIntExact(participantCount))
