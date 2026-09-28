@@ -18,6 +18,7 @@ import {
   formatDate, formatTime, isPastSlot, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes,
   weekDays, zonedDateTime
 } from "../time/clubZone";
+import { hoursOn } from "../time/openingHours";
 import { violationMessage } from "../api/problem-message";
 
 interface WeekViewProps {
@@ -41,8 +42,6 @@ interface LegendCard {
   label: string;
   color: string;
 }
-
-const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 const systemClock = () => new Date();
 
 export function WeekView({ today, clock = systemClock, canBook = true,
@@ -597,7 +596,7 @@ function scrollToStart(plan: HTMLDivElement | null) {
 }
 
 function slotsFor(day: Date, grid: BookingGrid): string[] {
-  const hours = grid.openingHours.find((entry) => entry.dayOfWeek === dayNames[day.getDay()]);
+  const hours = hoursOn(grid, formatDate(day));
   if (!hours?.opensAt || !hours.closesAt) {
     return [];
   }
@@ -609,7 +608,7 @@ function slotsFor(day: Date, grid: BookingGrid): string[] {
   }).filter((time) => isValidZonedDateTime(formatDate(day), time, grid.timeZone));
 }
 
-// Hours are not dated, so a booking may lie where today's hours no longer open; the plan still shows it.
+// A booking may lie where the hours in force that day do not open; the plan still shows it.
 function slotsOutsideHours(date: string, open: string[], allocations: Allocation[], grid: BookingGrid): string[] {
   const step = grid.slotMinutes;
   const origin = open.length > 0 ? timeToMinutes(open[0]) % step : 0;

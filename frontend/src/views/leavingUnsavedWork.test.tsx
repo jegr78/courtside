@@ -113,7 +113,7 @@ describe("leaving an administrative page with unsaved work", () => {
     vi.spyOn(api, "rules").mockResolvedValue([{ ruleType: "ADVANCE_WINDOW", params: { maxDays: 7 } }]);
     vi.spyOn(api, "membershipTypes").mockResolvedValue([adults]);
     vi.spyOn(api, "roster").mockResolvedValue({ entries: [], nextCursor: null, matching: 0 });
-    vi.spyOn(api, "adminOpeningHours").mockResolvedValue([{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }]);
+    vi.spyOn(api, "adminOpeningSchedule").mockResolvedValue([{ id: "week-1", effectiveFrom: null, days: [{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }] }]);
     vi.spyOn(api, "adminCourts").mockResolvedValue([{ id: "court-1", number: 1, name: "Centre Court", active: true }]);
     vi.spyOn(api, "adminBookingCards").mockResolvedValue([{
       id: "card-1", label: "Member booking", color: "#b85c38", allowedRoles: ["MEMBER"], managingRoles: [],

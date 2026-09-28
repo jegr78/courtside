@@ -14,6 +14,7 @@ export type RuleDefinition = components["schemas"]["RuleDefinition"];
 export type AdminCourt = components["schemas"]["Court"];
 export type CourtRequest = components["schemas"]["CourtRequest"];
 export type OpeningHours = components["schemas"]["OpeningHours"];
+export type OpeningWeek = components["schemas"]["OpeningWeek"];
 export type DayOfWeek = components["schemas"]["DayOfWeek"];
 export type BookingCard = components["schemas"]["BookingCard"];
 export type BookingCardRequest = components["schemas"]["BookingCardRequest"];
@@ -308,8 +309,9 @@ export const api = {
   ),
   courtImpact: (courtId: string) => request<Impact>(`/api/admin/impact/courts/${courtId}`),
   bookingCardImpact: (cardId: string) => request<Impact>(`/api/admin/impact/booking-cards/${cardId}`),
-  openingHoursImpact: (day: DayOfWeek, opensAt?: string, closesAt?: string) => request<Impact>(
+  openingHoursImpact: (day: DayOfWeek, effectiveFrom: string, opensAt?: string, closesAt?: string) => request<Impact>(
     `/api/admin/impact/opening-hours/${day}?${new URLSearchParams({
+      effectiveFrom,
       ...(opensAt ? { opensAt } : {}),
       ...(closesAt ? { closesAt } : {})
     }).toString()}`
@@ -325,10 +327,14 @@ export const api = {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
   adminOpeningHours: () => request<OpeningHours[]>("/api/admin/opening-hours"),
-  setAdminWeeklyOpeningHours: (days: OpeningHours[]) => request<OpeningHours[]>(
+  setAdminWeeklyOpeningHours: (effectiveFrom: string, days: OpeningHours[]) => request<OpeningHours[]>(
     "/api/admin/opening-hours", {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days })
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ effectiveFrom, days })
     }
+  ),
+  adminOpeningSchedule: () => request<OpeningWeek[]>("/api/admin/opening-hours/schedule"),
+  removeScheduledOpeningHours: (effectiveFrom: string) => request<void>(
+    `/api/admin/opening-hours/schedule/${effectiveFrom}`, { method: "DELETE" }
   ),
   adminBookingCards: () => request<BookingCard[]>("/api/admin/booking-cards"),
   createAdminBookingCard: (card: BookingCardRequest) => request<BookingCard>("/api/admin/booking-cards", {

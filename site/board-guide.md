@@ -153,14 +153,24 @@ Mitglieder mit betroffenen zukünftigen Buchungen.
 1. Trage für jeden geöffneten Wochentag eine Öffnungs- und eine Schließzeit ein.
 2. Markiere Tage ohne Spielbetrieb als geschlossen.
 3. Nutze *Gleiche Zeiten übernehmen*, um ein Zeitfenster auf mehrere Tage anzuwenden.
-4. Speichere die Woche mit der Leiste am unteren Rand.
+4. Wähle unter *Gilt ab* den ersten Tag, für den die Woche gilt. Vorbelegt ist heute.
+5. Speichere die Woche mit der Leiste am unteren Rand.
+
+Liegt der Tag in der Zukunft, plant Courtside die Woche im Voraus, etwa Winterzeiten ab dem
+1. November. Bis dahin gelten die bisherigen Zeiten. Vergangene Wochen behalten immer die Zeiten,
+die an ihnen galten. Unter *Wochen* stehen die geltende Woche und alle geplanten. Eine geplante
+Woche kannst du bearbeiten, auf einen anderen Tag verschieben oder entfernen. Die geltende Woche
+entfernst du nicht, du ersetzt sie ab einem Tag durch eine neue.
+
+Für eine vorübergehende Schließung, etwa eine Platzsanierung, ist *Geschlossen* das falsche
+Werkzeug. Sperre die Plätze dafür mit einer Buchungskarte für Sperrungen.
 
 Courtside speichert keinen Tag, bei dem eine der beiden Zeiten fehlt. Außerhalb der Öffnungszeiten
 sind keine Buchungen möglich. Wenn du Öffnungszeiten später verkürzt, benachrichtigt Courtside
 die Mitglieder mit betroffenen Buchungen. Diese Buchungen bleiben bestehen und im Platzplan
 sichtbar.
 
-![Die Öffnungszeiten für alle Wochentage und die Funktion zum Übernehmen gleicher Zeiten.](screenshots/de/opening-hours.png)
+![Die geltende und die geplanten Wochen, der erste Tag der Woche und die Öffnungszeiten für alle Wochentage.](screenshots/de/opening-hours.png)
 
 ## Anlage → Buchungskarten
 

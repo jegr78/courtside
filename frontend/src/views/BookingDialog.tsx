@@ -8,6 +8,7 @@ import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { bookingTimeSlot, formatBookingPeriod, zonedDateTime } from "../time/clubZone";
+import { hoursOn } from "../time/openingHours";
 import { PERSON_SEARCH_DEBOUNCE_MS, PERSON_SEARCH_MIN_LENGTH } from "../person-search";
 
 export interface BookingSelection {
@@ -229,7 +230,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
 
 function availableDurations(selection: BookingSelection, grid: BookingGrid, courtIds: string[], allocations: Allocation[], maxBookingMinutes?: number): number[] {
   const start = bookingTimeSlot(selection.date, selection.slot, grid.timeZone, grid.slotMinutes).startsAt;
-  const openingHours = grid.openingHours.find((window) => window.dayOfWeek === dayOfWeek(selection.date));
+  const openingHours = hoursOn(grid, selection.date);
   const closesAt = openingHours?.closesAt
     ? zonedDateTime(selection.date, openingHours.closesAt.slice(0, 5), grid.timeZone)
     : new Date(Date.parse(start) + grid.slotMinutes * 60_000).toISOString();
@@ -247,11 +248,6 @@ function availableDurations(selection: BookingSelection, grid: BookingGrid, cour
     durations.push(minutes);
   }
   return durations;
-}
-
-function dayOfWeek(date: string): string {
-  const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
-  return days[new Date(`${date}T12:00:00Z`).getUTCDay()];
 }
 
 function FieldViolations({ id, violations }: { id: string; violations: Array<{ field: string; code: string; message: string }> }) {

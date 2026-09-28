@@ -797,6 +797,30 @@ it("given opening hours cross a spring-forward gap, when choosing a duration, th
   expect(duration).not.toContainHTML('value="120"');
 });
 
+it("given hours scheduled from tomorrow, when choosing a duration tomorrow, then that day's closing bounds the choices", async () => {
+  // given
+  const today = openingHoursWith({});
+  const later = openingHoursWith({ TUESDAY: ["08:00:00", "09:00:00"] });
+  vi.mocked(api.bookingGrid).mockResolvedValue({
+    ...today,
+    openingWeeks: [
+      { id: "aaaaaaaa-0000-0000-0000-000000000001", effectiveFrom: null, days: today.openingHours },
+      { id: "aaaaaaaa-0000-0000-0000-000000000002", effectiveFrom: "2026-08-11", days: later.openingHours }
+    ]
+  });
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await screen.findByTestId("day-selector-2026-08-11"));
+
+  // when
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+
+  // then
+  const duration = screen.getByTestId("booking-duration");
+  expect(duration).toContainHTML('value="60"');
+  expect(duration, "the scheduled week closes at nine").not.toContainHTML('value="90"');
+});
+
 it("given an own booking is opened for cancellation, when the dialog appears, then it names the complete period", async () => {
   // given
   vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
@@ -1424,6 +1448,30 @@ function openingHoursWith(overrides: Partial<Record<string, [string | null, stri
     })
   };
 }
+
+it("given hours scheduled from next week, when moving to that week, then its days show the scheduled hours", async () => {
+  // given
+  const today = openingHoursWith({});
+  const later = openingHoursWith({ MONDAY: ["10:00:00", "18:00:00"] });
+  vi.spyOn(api, "bookingGrid").mockResolvedValue({
+    ...today,
+    openingWeeks: [
+      { id: "aaaaaaaa-0000-0000-0000-000000000001", effectiveFrom: null, days: today.openingHours },
+      { id: "aaaaaaaa-0000-0000-0000-000000000002", effectiveFrom: "2026-08-17", days: later.openingHours }
+    ]
+  });
+  render(<WeekView today={clubInstant("07:00")} />);
+  await waitFor(() => expect(screen.getAllByTestId(/^slot-row-/)[0], "this week keeps the hours in force").toHaveAttribute("data-slot", "08:00"));
+
+  // when
+  await userEvent.click(screen.getByTestId("week-next"));
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("day-selector-2026-08-17")).toHaveAttribute("aria-pressed", "true"));
+  const rows = screen.getAllByTestId(/^slot-row-/).map((row) => row.dataset.slot);
+  expect(rows[0], "the scheduled week opens later").toBe("10:00");
+  expect(rows.at(-1), "the scheduled week closes earlier").toBe("17:30");
+});
 
 it("given a closed day that still carries a booking, when showing it, then the booking stands in rows outside the opening hours", async () => {
   // given
