@@ -370,6 +370,7 @@ describe("AdminOpeningHoursView", () => {
     // then
     expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue("10:00");
     expect(screen.getByTestId("opening-hours-effective-from")).toHaveValue(later(7));
+    expect(screen.queryByTestId("opening-hours-replaces"), "a week does not replace itself").toBeNull();
     expect(screen.getByTestId("opening-week-beginning")).toHaveTextContent("In force");
     expect(screen.getByTestId(`remove-opening-week-${later(7)}`), "each button names its week").toHaveAccessibleDescription(/^Scheduled from/);
   });
