@@ -38,6 +38,7 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "bookingGrid").mockResolvedValue({
       timeZone: "Europe/Berlin",
       slotMinutes: 30,
+      openingWeeks: [],
       openingHours: []
     });
     vi.spyOn(api, "courts").mockResolvedValue([]);
@@ -61,6 +62,7 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "bookingGrid").mockResolvedValue({
       timeZone: "Europe/Berlin",
       slotMinutes: 30,
+      openingWeeks: [],
       openingHours: []
     });
     vi.spyOn(api, "courts").mockResolvedValue([]);
@@ -124,6 +126,7 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "bookingGrid").mockResolvedValue({
       timeZone: "Europe/Berlin",
       slotMinutes: 30,
+      openingWeeks: [],
       openingHours: []
     });
     vi.spyOn(api, "courts").mockResolvedValue([]);
@@ -289,7 +292,7 @@ describe("AppRoutes", () => {
     vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [] });
     vi.spyOn(api, "courts").mockResolvedValue([]);
     vi.spyOn(api, "bookingCards").mockResolvedValue([]);
-    vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingHours: [] });
+    vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingHours: [] });
     vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [] });
 
     // when
@@ -553,7 +556,7 @@ describe("App build identity", () => {
       sourceUrl: "https://github.com/jegr78/courtside"
     });
     vi.spyOn(api, "bookingGrid").mockResolvedValue({
-      timeZone: "Europe/Berlin", slotMinutes: 30, openingHours: []
+      timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingHours: []
     });
     vi.spyOn(api, "courts").mockResolvedValue([]);
     vi.spyOn(api, "logout").mockResolvedValue();
@@ -601,7 +604,7 @@ describe("App build identity", () => {
     vi.spyOn(api, "session").mockReturnValue(new Promise<SessionStatus>((resolve) => { publishSession = resolve; }));
     vi.spyOn(api, "config").mockResolvedValue(club);
     vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
-    vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingHours: [] });
+    vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingHours: [] });
     vi.spyOn(api, "courts").mockResolvedValue([]);
     render(<RoutedShell><App /></RoutedShell>);
     await userEvent.click(await screen.findByTestId("preferences-menu"));

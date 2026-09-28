@@ -319,9 +319,18 @@ whenever the club configuration arrives or changes, so the status bar follows a 
 release. `lang` and the texts of the description and the two shortcuts, to the court plan and to the
 member's own bookings, follow the club's default language.
 
-Grid changes are refused when active or future bookings or opening hours no longer align. Time-zone
-changes are refused while a confirmed booking has not ended. These writes serialize with booking
-and opening-hours changes through the club configuration row.
+Opening hours are versions of one weekly template, each taking effect on a date in the club's time
+zone. The seeded version has governed since the beginning; a change creates or replaces the version
+starting on the chosen day, today or later, so the days before it keep the hours they had. A
+version that has not started yet can be removed, and the one before it governs its days again. The
+court plan, the opening-hours rule, utilisation statistics and the impact preview each read the
+version in force on the day they evaluate. Members whose bookings a change leaves outside the hours
+are told about the bookings from that day up to the next scheduled version.
+
+Grid changes are refused when active or future bookings, or the opening hours in force today or
+scheduled after it, no longer align. Time-zone changes are refused while a confirmed booking has not
+ended. These writes serialize with booking and opening-hours changes through the club configuration
+row.
 
 The setup checklist derives progress from current configuration, facilities, membership types and
 roster state. It stores no checklist flags and shows a failed state request instead of partial
@@ -352,8 +361,8 @@ club-local date of the earliest allocation of any booking and today's date, so "
 period between them. Each read runs its statements under a 30-second statement timeout and answers
 `503` with `urn:courtside:error:statement-timeout` when it runs out.
 
-- Utilisation counts confirmed allocations inside open time. Open time comes from today's weekly
-  opening hours, because neither hours nor court availability are dated. A court counts towards
+- Utilisation counts confirmed allocations inside open time. Open time comes from the opening hours
+  in force on each day. Court availability is not dated, so a court counts towards
   capacity when it is active now or held a confirmed allocation in the scope computed: the period
   for the totals and the weekday and hour grid, each bucket for the progression. Allocations under the shipped "court closed" card are closures: they are reported
   separately and taken out of the bookable time, so occupancy is booked time divided by open time

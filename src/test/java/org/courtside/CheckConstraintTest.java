@@ -88,8 +88,8 @@ class CheckConstraintTest extends AbstractIntegrationTest {
     void whenInsertingOpeningHoursWithAnOutOfRangeDayOfWeek_thenItIsRejected() {
         // when / then
         assertThatThrownBy(() -> jdbc.sql("""
-                        INSERT INTO opening_hours (id, day_of_week, opens_at, closes_at)
-                        VALUES (?, 8, '08:00', '22:00')
+                        INSERT INTO opening_hours (id, version_id, day_of_week, opens_at, closes_at)
+                        VALUES (?, 'eeeeeeee-0000-0000-0000-000000000100', 8, '08:00', '22:00')
                         """)
                         .params(UUID.randomUUID())
                         .update())

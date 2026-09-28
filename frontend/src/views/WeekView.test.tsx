@@ -35,6 +35,7 @@ beforeEach(async () => {
   vi.spyOn(api, "bookingGrid").mockResolvedValue({
     timeZone: "Europe/Berlin",
     slotMinutes: 30,
+    openingWeeks: [],
     openingHours: [
       { dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" },
       { dayOfWeek: "TUESDAY", opensAt: "08:00:00", closesAt: "22:00:00" },
@@ -152,6 +153,7 @@ it("given short booking slots, when rendering the plan, then rows retain their u
   vi.mocked(api.bookingGrid).mockResolvedValue({
     timeZone: "Europe/Berlin",
     slotMinutes: 15,
+    openingWeeks: [],
     openingHours: [{ dayOfWeek: "MONDAY", opensAt: "08:00:00", closesAt: "22:00:00" }]
   });
 
@@ -614,6 +616,7 @@ it("given the browser and club have different dates, when loading, then the club
   vi.mocked(api.bookingGrid).mockResolvedValue({
     timeZone: "Pacific/Auckland",
     slotMinutes: 30,
+    openingWeeks: [],
     openingHours: [{ dayOfWeek: "TUESDAY", opensAt: "08:00:00", closesAt: "22:00:00" }]
   });
 
@@ -779,6 +782,7 @@ it("given opening hours cross a spring-forward gap, when choosing a duration, th
   vi.mocked(api.bookingGrid).mockResolvedValue({
     timeZone: "Europe/Berlin",
     slotMinutes: 30,
+    openingWeeks: [],
     openingHours: [{ dayOfWeek: "SUNDAY", opensAt: "01:00:00", closesAt: "04:00:00" }]
   });
   vi.mocked(api.allocations).mockResolvedValue([]);
@@ -1413,6 +1417,7 @@ function openingHoursWith(overrides: Partial<Record<string, [string | null, stri
   return {
     timeZone: "Europe/Berlin",
     slotMinutes: 30,
+    openingWeeks: [],
     openingHours: days.map((dayOfWeek) => {
       const [opensAt, closesAt] = overrides[dayOfWeek] ?? ["08:00:00", "22:00:00"];
       return { dayOfWeek, opensAt, closesAt };

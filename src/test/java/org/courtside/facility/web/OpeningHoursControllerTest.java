@@ -14,6 +14,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -52,7 +53,10 @@ class OpeningHoursControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.timeZone").value("Europe/Berlin"))
                 .andExpect(jsonPath("$.slotMinutes").value(30))
-                .andExpect(jsonPath("$.openingHours.length()").value(7));
+                .andExpect(jsonPath("$.openingHours.length()").value(7))
+                .andExpect(jsonPath("$.openingWeeks.length()").value(1))
+                .andExpect(jsonPath("$.openingWeeks[0].effectiveFrom").value(nullValue()))
+                .andExpect(jsonPath("$.openingWeeks[0].days.length()").value(7));
     }
 
     @Test

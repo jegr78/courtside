@@ -1,17 +1,15 @@
 package org.courtside.rules.internal;
 
 import org.courtside.facility.FacilityService;
-import org.courtside.facility.OpeningHours;
+import org.courtside.facility.OpeningSchedule;
 import org.courtside.rules.RuleContext;
 import org.courtside.rules.RuleViolation;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.shared.OpeningWindow;
 import org.springframework.stereotype.Component;
 
-import java.time.DayOfWeek;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,30 +32,27 @@ public class OpeningHoursRule implements BookingRule {
 
     @Override
     public List<RuleViolation> check(RuleContext context) {
-        return check(context, facility.openingHoursFor(
-                context.slot().start().atZone(timeZone.zoneId()).getDayOfWeek()));
+        return check(context, facility.openingSchedule());
     }
 
     @Override
     public Prepared prepare() {
-        Map<DayOfWeek, Optional<OpeningHours>> hoursByDay = new HashMap<>();
-        return context -> {
-            DayOfWeek day = context.slot().start().atZone(timeZone.zoneId()).getDayOfWeek();
-            return check(context, hoursByDay.computeIfAbsent(day, facility::openingHoursFor));
-        };
+        OpeningSchedule schedule = facility.openingSchedule();
+        return context -> check(context, schedule);
     }
 
-    private List<RuleViolation> check(RuleContext context, Optional<OpeningHours> hours) {
+    private List<RuleViolation> check(RuleContext context, OpeningSchedule schedule) {
         ZoneId zone = timeZone.zoneId();
         ZonedDateTime start = context.slot().start().atZone(zone);
         ZonedDateTime end = context.slot().end().atZone(zone);
+        Optional<OpeningWindow> hours = schedule.windowOn(start.toLocalDate());
 
         if (hours.isEmpty()) {
             return List.of(new RuleViolation("booking.rule.openingHours.closed",
                     Map.of("day", start.getDayOfWeek().name())));
         }
 
-        OpeningWindow window = new OpeningWindow(hours.get().getOpensAt(), hours.get().getClosesAt());
+        OpeningWindow window = hours.get();
         if (!start.toLocalDate().equals(end.toLocalDate())
                 || !window.covers(start.toLocalTime(), end.toLocalTime())) {
             return List.of(new RuleViolation("booking.rule.openingHours.outside",

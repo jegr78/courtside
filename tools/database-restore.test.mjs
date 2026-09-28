@@ -98,7 +98,8 @@ test("given application-written state, when it is restored, then representative 
   // when / then
   assert.deepEqual(applicationStateTables, [
     "booking", "booking_card", "club_config", "court", "court_allocation", "domain_event", "event_publication",
-    "message_record", "opening_hours", "person", "spring_session", "user_account", "user_account_role"
+    "message_record", "opening_hours", "opening_hours_version", "person", "spring_session", "user_account",
+    "user_account_role"
   ]);
   assert.match(runner, /application-before\.json/);
   assert.match(runner, /application-after\.json/);

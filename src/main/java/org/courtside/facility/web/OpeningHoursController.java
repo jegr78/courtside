@@ -34,7 +34,8 @@ class OpeningHoursController implements OpeningHoursApi {
     @Override
     public ResponseEntity<ApiBookingGrid> getBookingGrid() {
         return ResponseEntity.ok(new ApiBookingGrid(
-                timeZone.id(), bookingGridSettings.slotMinutes(), openingHours()));
+                timeZone.id(), bookingGridSettings.slotMinutes(), openingHours(),
+                facility.openingSchedule().weeks().stream().map(FacilityAdminController::toResponse).toList()));
     }
 
     private List<ApiOpeningHours> openingHours() {

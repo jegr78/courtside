@@ -51,11 +51,16 @@ a check the application ran first.
 | Table | Holds | References |
 |---|---|---|
 | `court` | A court: its number, an optional name, whether it is active | None |
-| `opening_hours` | When the facility opens and closes, one row per weekday | None |
+| `opening_hours_version` | One version of the weekly opening hours and the day it takes effect | None |
+| `opening_hours` | When the facility opens and closes on one weekday of one version | `opening_hours_version` |
 
 `court.number` is unique and positive, and `active` is what takes a court out of service without
-losing it. `opening_hours` carries one row per `day_of_week`, numbered the way `java.time.DayOfWeek`
-numbers them, 1 is Monday, with `closes_at` after `opens_at`.
+losing it. A version's `effective_from` is a date in the club's time zone and unique; the one
+version without it has governed since the beginning, and a partial unique index keeps it the only
+one. A day is governed by the latest version that has started on it. `opening_hours` carries at most
+one row per version and `day_of_week`, numbered the way `java.time.DayOfWeek` numbers them, 1 is
+Monday, with `closes_at` after `opens_at`; a weekday without a row is closed in that version.
+Deleting a version deletes its rows.
 
 ## Cards
 
@@ -238,7 +243,8 @@ attributes, and the configured cleanup schedule removes expired rows.
 
 A database that has just been migrated is not empty. Flyway seeds a facility a club can start from:
 
-- one `court`, number 1, and opening hours of 08:00 to 22:00 on all seven days
+- one `court`, number 1, and one opening-hours version since the beginning with 08:00 to 22:00 on
+  all seven days
 - four booking cards: **Member booking** (two or four players, guests allowed, counts against
   limits), **Training**, **League match** and **Court closed**
 - two participant cards: **Ball machine**, which fills one slot, and **Looking for a partner**,

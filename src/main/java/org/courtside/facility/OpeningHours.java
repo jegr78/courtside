@@ -22,6 +22,10 @@ public class OpeningHours {
     @Getter
     private UUID id;
 
+    @Column(name = "version_id", nullable = false)
+    @Getter
+    private UUID versionId;
+
     @Column(name = "day_of_week", nullable = false)
     private int dayOfWeek;
 
@@ -33,8 +37,9 @@ public class OpeningHours {
     @Getter
     private LocalTime closesAt;
 
-    public OpeningHours(DayOfWeek dayOfWeek, OpeningWindow window) {
+    public OpeningHours(UUID versionId, DayOfWeek dayOfWeek, OpeningWindow window) {
         this.id = UUID.randomUUID();
+        this.versionId = versionId;
         this.dayOfWeek = dayOfWeek.getValue();
         this.opensAt = window.opensAt();
         this.closesAt = window.closesAt();

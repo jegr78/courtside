@@ -164,7 +164,7 @@ describe("AdminStatisticsView", () => {
     expect(screen.getByTestId("statistics-closed-change")).toHaveAttribute("data-direction", "none");
     expect(screen.getByTestId("statistics-closed-change")).toHaveTextContent("Unchanged against the period before");
     expect(screen.getByTestId("statistics-booking-count-value")).toHaveTextContent("12");
-    expect(screen.getByTestId("statistics-open-note")).toHaveTextContent("opening hours as they are configured today");
+    expect(screen.getByTestId("statistics-open-note")).toHaveTextContent("opening hours in force on that day");
   });
 
   it("given figures that fell, rose from nothing or stayed, when the other sections show, then the direction and the unit follow each figure", async () => {

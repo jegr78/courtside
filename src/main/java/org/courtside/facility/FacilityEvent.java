@@ -2,7 +2,9 @@ package org.courtside.facility;
 
 import org.courtside.shared.DomainEventRecord;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -62,7 +64,9 @@ public sealed interface FacilityEvent extends DomainEventRecord {
 
     }
 
-    record OpeningHoursSet(UUID openingHoursId, int dayOfWeek, LocalTime opensAt, LocalTime closesAt)
+    /** From {@code effectiveFrom} until the day before {@code until}; a null bound is open. */
+    record OpeningHoursSet(UUID openingHoursId, int dayOfWeek, LocalTime opensAt, LocalTime closesAt,
+                           UUID versionId, @Nullable LocalDate effectiveFrom, @Nullable LocalDate until)
             implements FacilityEvent {
 
         static final String TYPE = "facility.openingHours.set";
@@ -79,7 +83,10 @@ public sealed interface FacilityEvent extends DomainEventRecord {
 
     }
 
-    record OpeningHoursClosed(UUID openingHoursId, int dayOfWeek) implements FacilityEvent {
+    /** From {@code effectiveFrom} until the day before {@code until}; a null bound is open. */
+    record OpeningHoursClosed(@Nullable UUID openingHoursId, int dayOfWeek, UUID versionId,
+                              @Nullable LocalDate effectiveFrom, @Nullable LocalDate until)
+            implements FacilityEvent {
 
         static final String TYPE = "facility.openingHours.closed";
 
@@ -90,7 +97,7 @@ public sealed interface FacilityEvent extends DomainEventRecord {
 
         @Override
         public UUID subjectId() {
-            return openingHoursId;
+            return versionId;
         }
 
     }

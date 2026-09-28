@@ -29,6 +29,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -276,6 +278,99 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAWeekFromNovember_whenSavingIt_thenTheScheduleListsTodaysWeekFollowedByNovember()
+            throws Exception {
+        // when
+        mockMvc.perform(saveWeek("2026-11-01", open(DayOfWeek.MONDAY, "10:00", "18:00")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].opensAt").value("10:00:00"));
+
+        // then
+        mockMvc.perform(get("/api/admin/opening-hours/schedule"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].effectiveFrom").value(nullValue()))
+                .andExpect(jsonPath("$[1].effectiveFrom").value("2026-11-01"))
+                .andExpect(jsonPath("$[1].days[0].opensAt").value("10:00:00"))
+                .andExpect(jsonPath("$[1].days[1].opensAt").doesNotExist());
+        mockMvc.perform(get("/api/admin/opening-hours"))
+                .andExpect(jsonPath("$[0].opensAt").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenYesterday_whenSavingAWeekFromIt_thenItIsRejectedAsStartingInThePast() throws Exception {
+        // when / then
+        mockMvc.perform(saveWeek("2026-05-11", open(DayOfWeek.MONDAY, "10:00", "18:00")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:opening-hours-start-rejected"))
+                .andExpect(jsonPath("$.violations[0].code").value("facility.openingHours.effectiveInPast"))
+                .andExpect(jsonPath("$.violations[0].params.today").value("2026-05-12"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAYearBeyondFourDigits_whenPreviewingOrSavingAWeekFromIt_thenNeitherFailsOnTheDatabase() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/impact/opening-hours/MONDAY").param("effectiveFrom", "+300000-01-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.affectedCount").value(0));
+        mockMvc.perform(saveWeek("+9999999-01-01", open(DayOfWeek.MONDAY, "10:00", "18:00")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:opening-hours-start-rejected"))
+                .andExpect(jsonPath("$.violations[0].code").value("facility.openingHours.effectiveTooLate"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAScheduledWeek_whenRemovingIt_thenOnlyTodaysWeekRemains() throws Exception {
+        // given
+        mockMvc.perform(saveWeek("2026-11-01", open(DayOfWeek.MONDAY, "10:00", "18:00")))
+                .andExpect(status().isOk());
+
+        // when
+        mockMvc.perform(delete("/api/admin/opening-hours/schedule/2026-11-01").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // then
+        mockMvc.perform(get("/api/admin/opening-hours/schedule"))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].effectiveFrom").value(nullValue()));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenTheWeekInForceToday_whenRemovingIt_thenItIsRefusedAsInForce() throws Exception {
+        // given
+        mockMvc.perform(saveWeek(open(DayOfWeek.MONDAY, "08:00", "22:00"))).andExpect(status().isOk());
+
+        // when / then
+        mockMvc.perform(delete("/api/admin/opening-hours/schedule/2026-05-12").with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:opening-hours-version-in-force"))
+                .andExpect(jsonPath("$.violations[0].code").value("facility.openingHours.versionInForce"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenNoWeekStartingOnADay_whenRemovingIt_thenItIsNotFound() throws Exception {
+        // when / then
+        mockMvc.perform(delete("/api/admin/opening-hours/schedule/2026-11-01").with(csrf()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:opening-hours-version-not-found"))
+                .andExpect(jsonPath("$.violations[0].code").value("facility.openingHours.versionNotFound"));
+    }
+
+    @Test
+    @WithMockUser(username = "member", roles = "MEMBER")
+    void givenAMember_whenRemovingAScheduledWeek_thenItIsForbidden() throws Exception {
+        // when / then
+        mockMvc.perform(delete("/api/admin/opening-hours/schedule/2026-11-01").with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
     private static Map<DayOfWeek, String[]> open(DayOfWeek day, String opensAt, String closesAt) {
         Map<DayOfWeek, String[]> week = new LinkedHashMap<>();
         week.put(day, new String[]{opensAt, closesAt});
@@ -284,6 +379,11 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
 
     private static org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder saveWeek(
             Map<DayOfWeek, String[]> open) {
+        return saveWeek(null, open);
+    }
+
+    private static org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder saveWeek(
+            String effectiveFrom, Map<DayOfWeek, String[]> open) {
         List<String> days = new ArrayList<>();
         for (DayOfWeek day : DayOfWeek.values()) {
             String[] window = open.get(day);
@@ -292,7 +392,9 @@ class OpeningHoursAdminControllerTest extends AbstractIntegrationTest {
         }
         return put("/api/admin/opening-hours")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"days\": [%s]}".formatted(String.join(",", days)))
+                .content("{%s\"days\": [%s]}".formatted(
+                        effectiveFrom == null ? "" : "\"effectiveFrom\": \"%s\", ".formatted(effectiveFrom),
+                        String.join(",", days)))
                 .with(csrf());
     }
 

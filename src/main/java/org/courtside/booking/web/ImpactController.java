@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
 
@@ -32,12 +33,12 @@ class ImpactController implements AdminImpactApi {
     }
 
     @Override
-    public ResponseEntity<ApiImpact> openingHoursImpact(
-            ApiDayOfWeek day, LocalTime opensAt, LocalTime closesAt, UUID cursor, Integer limit) {
+    public ResponseEntity<ApiImpact> openingHoursImpact(ApiDayOfWeek day, LocalDate effectiveFrom,
+            LocalTime opensAt, LocalTime closesAt, UUID cursor, Integer limit) {
         DayOfWeek weekday = WireTypes.toDayOfWeek(day);
         return ResponseEntity.ok(toResponse(OpeningWindow.ofNullable(opensAt, closesAt)
-                .map(window -> impact.ofOpeningHours(weekday, window, cursor, limit))
-                .orElseGet(() -> impact.ofClosingWeekday(weekday, cursor, limit))));
+                .map(window -> impact.ofOpeningHours(weekday, window, effectiveFrom, cursor, limit))
+                .orElseGet(() -> impact.ofClosingWeekday(weekday, effectiveFrom, cursor, limit))));
     }
 
     private static ApiImpact toResponse(ImpactService.Impact impact) {

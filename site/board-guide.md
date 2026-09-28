@@ -395,9 +395,8 @@ Unter **Nachweise** findest du fünf Ansichten.
   Zeitraum davor. Alle Zahlen sind Summen und nennen niemanden.
   * Die Auslastung zeigt Belegung, gebuchte und gesperrte Zeit, den Verlauf je Woche oder Monat,
     eine Tabelle nach Wochentag und Uhrzeit und die Werte je Platz und je Buchungskarte. Belegung
-    ist gebuchte Zeit geteilt durch die Öffnungszeit ohne Sperrungen. Sie rechnet mit den
-    Öffnungszeiten, wie sie heute eingestellt sind. Spielzeit außerhalb der Öffnungszeiten zählt
-    nicht.
+    ist gebuchte Zeit geteilt durch die Öffnungszeit ohne Sperrungen. Jeder Tag rechnet mit den
+    Öffnungszeiten, die an ihm galten. Spielzeit außerhalb der Öffnungszeiten zählt nicht.
   * Das Buchungsverhalten zeigt bestätigte und stornierte Buchungen, die Stornoquote, Serien und
     Einzelbuchungen, Gäste und genutzte Platzfüller.
   * Bei den Mitgliedern stehen Bestand am Ende des Zeitraums, Eintritte, Austritte, aktive Mitglieder,

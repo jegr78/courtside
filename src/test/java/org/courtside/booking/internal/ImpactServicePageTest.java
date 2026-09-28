@@ -52,7 +52,7 @@ class ImpactServicePageTest extends AbstractIntegrationTest {
 
         // when
         ImpactService.ImpactPage page = impact.pageOfOpeningHours(
-                DayOfWeek.MONDAY, WINDOW, FROM, null, 100);
+                DayOfWeek.MONDAY, WINDOW, new ImpactService.Period(FROM, FROM.plusSeconds(86_400)), null, 100);
 
         // then
         assertThat(page.bookings()).isEmpty();
@@ -67,11 +67,13 @@ class ImpactServicePageTest extends AbstractIntegrationTest {
 
         // when
         ImpactService.Impact preview = impact.ofOpeningHours(
-                DayOfWeek.MONDAY, WINDOW, FROM, null, 100);
+                DayOfWeek.MONDAY, WINDOW, null, null, 100);
 
         // then
         assertThat(preview.affectedCount()).isZero();
         assertThat(preview.bookings()).isEmpty();
-        assertThat(statistics.getQueryExecutionCount()).isEqualTo(2);
+        assertThat(statistics.getQueryExecutionCount())
+                .as("the schedule's two reads, the booking ids and the count")
+                .isEqualTo(4);
     }
 }

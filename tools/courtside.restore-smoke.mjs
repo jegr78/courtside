@@ -17,7 +17,8 @@ export const columnsAddedSinceTheFixture = [
 ];
 export const applicationStateTables = [
   "booking", "booking_card", "club_config", "court", "court_allocation", "domain_event", "event_publication",
-  "message_record", "opening_hours", "person", "spring_session", "user_account", "user_account_role"
+  "message_record", "opening_hours", "opening_hours_version", "person", "spring_session", "user_account",
+  "user_account_role"
 ];
 
 function seedWithLaterColumns(fixture) {
@@ -209,6 +210,8 @@ function applicationEvidence(project, environment) {
       'message_record', jsonb_build_object('rows', (SELECT count(*) FROM message_record),
         'highestSequence', (SELECT max(queued_seq) FROM message_record)),
       'opening_hours', jsonb_build_object('rows', (SELECT count(*) FROM opening_hours)),
+      'opening_hours_version', jsonb_build_object('rows', (SELECT count(*) FROM opening_hours_version),
+        'starts', (SELECT jsonb_agg(effective_from ORDER BY effective_from NULLS FIRST) FROM opening_hours_version)),
       'person', jsonb_build_object('rows', (SELECT count(*) FROM person)),
       'spring_session', jsonb_build_object('rows', (SELECT count(*) FROM spring_session),
         'principals', (SELECT jsonb_agg(principal_name ORDER BY principal_name) FROM spring_session)),

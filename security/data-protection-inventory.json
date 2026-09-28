@@ -32,6 +32,11 @@
       "class": "neutral"
     },
     {
+      "name": "effectiveFrom",
+      "in": "path",
+      "class": "neutral"
+    },
+    {
       "name": "id",
       "in": "path",
       "class": "identifier"
@@ -83,6 +88,11 @@
     },
     {
       "name": "date",
+      "in": "query",
+      "class": "neutral"
+    },
+    {
+      "name": "effectiveFrom",
       "in": "query",
       "class": "neutral"
     },
@@ -1107,6 +1117,20 @@
         "lifecycle": "club-configuration"
       },
       "opens_at": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "version_id": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      }
+    },
+    "opening_hours_version": {
+      "effective_from": {
+        "level": "operational",
+        "lifecycle": "club-configuration"
+      },
+      "id": {
         "level": "operational",
         "lifecycle": "club-configuration"
       }

@@ -3,21 +3,20 @@ package org.courtside.booking.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.FacilityService;
-import org.courtside.facility.OpeningHours;
+import org.courtside.facility.OpeningSchedule;
+import org.courtside.shared.OpeningWindow;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -51,16 +50,15 @@ public class FacilityUtilisationService {
     }
 
     private List<OpenInterval> openTime(ReportingPeriod period, ZoneId zone) {
-        Map<DayOfWeek, OpeningHours> week = facility.allOpeningHours().stream()
-                .collect(Collectors.toMap(OpeningHours::getDayOfWeek, Function.identity()));
+        OpeningSchedule schedule = facility.openingSchedule();
         List<OpenInterval> intervals = new ArrayList<>();
         for (LocalDate date = period.from(); !date.isAfter(period.to()); date = date.plusDays(1)) {
-            OpeningHours hours = week.get(date.getDayOfWeek());
-            if (hours == null) {
+            Optional<OpeningWindow> hours = schedule.windowOn(date);
+            if (hours.isEmpty()) {
                 continue;
             }
-            Instant opensAt = date.atTime(hours.getOpensAt()).atZone(zone).toInstant();
-            Instant closesAt = date.atTime(hours.getClosesAt()).atZone(zone).toInstant();
+            Instant opensAt = date.atTime(hours.get().opensAt()).atZone(zone).toInstant();
+            Instant closesAt = date.atTime(hours.get().closesAt()).atZone(zone).toInstant();
             // A window inside a daylight-saving gap resolves to an empty or inverted interval.
             if (closesAt.isAfter(opensAt)) {
                 intervals.add(new OpenInterval(opensAt, closesAt));
