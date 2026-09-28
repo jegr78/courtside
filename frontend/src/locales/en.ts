@@ -443,6 +443,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.facility.effectiveFromHint": "Today by default. A later day schedules the hours in advance; the days before it keep the hours in force.",
   "admin.facility.effectiveFromScheduledHint": "These hours have not taken effect yet. A different day moves them there.",
   "admin.facility.effectiveFromMissing": "Choose the day the hours apply from.",
+  "admin.facility.replacesWeek": "Saving replaces the week scheduled from {{date}}.",
   "series.new": "Create a series",
   "series.courts": "Courts",
   "series.courtsHint": "Several courts are possible; each appointment then occupies all of them.",

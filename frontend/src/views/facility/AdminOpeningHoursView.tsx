@@ -20,7 +20,7 @@ const MARK = "opening-hours";
 const FORM = "opening-hours-form";
 
 export function AdminOpeningHoursView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { club, error: clubError } = useClubConfiguration();
   const [weeks, setWeeks] = useState<OpeningWeek[]>();
   const [selected, setSelected] = useState(0);
@@ -83,9 +83,11 @@ export function AdminOpeningHoursView() {
       return Promise.resolve();
     }
     const moved = selected > 0 && draft.effectiveFrom !== confirmed.effectiveFrom ? confirmed.effectiveFrom : undefined;
+    // An untouched first day on the week in force means today by the server's clock, not this browser's.
+    const effectiveFrom = selected === 0 && draft.effectiveFrom === confirmed.effectiveFrom ? undefined : draft.effectiveFrom;
     return save(MARK, async () => {
       try {
-        await api.setAdminWeeklyOpeningHours(draft.effectiveFrom, draft.days.map(toRequest));
+        await api.setAdminWeeklyOpeningHours(effectiveFrom, draft.days.map(toRequest));
       } catch (failure) {
         setRejected(rejectedDays(failure, t));
         throw failure;
@@ -113,6 +115,7 @@ export function AdminOpeningHoursView() {
   }
 
   const unsaved = differs({ draft }, { draft: confirmed });
+  const replaced = weeks?.find((week, index) => index !== selected && week.effectiveFrom === draft?.effectiveFrom);
   const saving = pending.size > 0;
   return <FacilityPage testId="admin-opening-hours-view" title={t("admin.facility.openingHours")} error={error ?? clubError} success={success}>
     {weeks !== undefined && draft !== undefined && club !== undefined && today !== undefined && <div className="grid gap-4">
@@ -126,6 +129,9 @@ export function AdminOpeningHoursView() {
           <p data-testid="opening-hours-effective-from-hint" className="text-sm text-[var(--cs-muted)]">
             {t(selected === 0 ? "admin.facility.effectiveFromHint" : "admin.facility.effectiveFromScheduledHint")}
           </p>
+          {replaced?.effectiveFrom && <p data-testid="opening-hours-replaces" className="text-sm font-medium">
+            {t("admin.facility.replacesWeek", { date: formatDay(replaced.effectiveFrom, i18n.language) })}
+          </p>}
         </article>
         <ApplyToDays disabled={saving} apply={applyTo} />
         <div className="grid gap-3 lg:grid-cols-2">

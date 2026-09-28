@@ -327,7 +327,7 @@ export const api = {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active })
   }),
   adminOpeningHours: () => request<OpeningHours[]>("/api/admin/opening-hours"),
-  setAdminWeeklyOpeningHours: (effectiveFrom: string, days: OpeningHours[]) => request<OpeningHours[]>(
+  setAdminWeeklyOpeningHours: (effectiveFrom: string | undefined, days: OpeningHours[]) => request<OpeningHours[]>(
     "/api/admin/opening-hours", {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ effectiveFrom, days })
     }

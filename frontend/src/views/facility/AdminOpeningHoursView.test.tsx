@@ -76,7 +76,7 @@ describe("AdminOpeningHoursView", () => {
 
     // then
     expect(saveWeek).toHaveBeenCalledTimes(1);
-    expect(saveWeek).toHaveBeenCalledWith(today, week({
+    expect(saveWeek).toHaveBeenCalledWith(undefined, week({
       MONDAY: ["09:00", "22:00"], TUESDAY: ["10:00", "20:00"]
     }));
   });
@@ -127,7 +127,7 @@ describe("AdminOpeningHoursView", () => {
     await user.click(screen.getByTestId("save-opening-hours"));
 
     // then
-    expect(saveWeek, "the week applies from today unless another day is chosen").toHaveBeenCalledWith(today, week({}));
+    expect(saveWeek, "an untouched first day leaves today to the server's clock").toHaveBeenCalledWith(undefined, week({}));
   });
 
   it("given a day the server rejects, when the week is saved, then the message lands on that day", async () => {
@@ -465,6 +465,55 @@ describe("AdminOpeningHoursView", () => {
     // then
     expect(screen.getByTestId(`edit-opening-week-${later(7)}`)).toBeDisabled();
     expect(screen.getByTestId(`remove-opening-week-${later(7)}`)).toBeDisabled();
+  });
+
+  it("given a first day another scheduled week starts on, when it is chosen, then the page names the week it replaces", async () => {
+    // given
+    vi.mocked(api.adminOpeningSchedule).mockResolvedValue([
+      inForce(week({ MONDAY: ["08:00:00", "22:00:00"] })),
+      scheduled(later(7), week({}))
+    ]);
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("hours-open-MONDAY");
+    expect(screen.queryByTestId("opening-hours-replaces"), "a free day replaces nothing").toBeNull();
+
+    // when
+    await user.clear(screen.getByTestId("opening-hours-effective-from"));
+    await user.type(screen.getByTestId("opening-hours-effective-from"), later(7));
+
+    // then
+    expect(screen.getByTestId("opening-hours-replaces")).toHaveTextContent(/^Saving replaces the week scheduled from/);
+  });
+
+  it("given a first day chosen explicitly, when the week is saved, then that day travels with it", async () => {
+    // given
+    const saveWeek = vi.spyOn(api, "setAdminWeeklyOpeningHours").mockResolvedValue(week({}));
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("hours-closed-MONDAY");
+
+    // when
+    await user.clear(screen.getByTestId("opening-hours-effective-from"));
+    await user.type(screen.getByTestId("opening-hours-effective-from"), later(3));
+    await user.click(screen.getByTestId("hours-closed-MONDAY"));
+    await user.click(screen.getByTestId("save-opening-hours"));
+
+    // then
+    expect(saveWeek).toHaveBeenCalledWith(later(3), week({}));
+  });
+
+  it("given a week in force since a dated change, when the view loads, then it says since when", async () => {
+    // given
+    vi.mocked(api.adminOpeningSchedule).mockResolvedValue([
+      { ...inForce(week({ MONDAY: ["08:00:00", "22:00:00"] })), effectiveFrom: "2026-03-02" }
+    ]);
+
+    // when
+    show();
+
+    // then
+    expect(await screen.findByTestId("opening-week-2026-03-02")).toHaveTextContent("In force since Mar 2, 2026");
   });
 
   it("given opening hours cannot load, when opening the view, then the failure replaces the loading state", async () => {

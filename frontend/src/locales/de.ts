@@ -441,6 +441,7 @@ const de = {
   "admin.facility.effectiveFromHint": "Standard ist heute. Ein späterer Tag plant die Zeiten im Voraus, die Tage davor behalten die geltenden Zeiten.",
   "admin.facility.effectiveFromScheduledHint": "Diese Zeiten gelten noch nicht. Ein anderer Tag verschiebt sie dorthin.",
   "admin.facility.effectiveFromMissing": "Wähle den Tag, ab dem die Zeiten gelten.",
+  "admin.facility.replacesWeek": "Speichern ersetzt die Woche, die ab {{date}} geplant ist.",
   "series.new": "Serie anlegen",
   "series.courts": "Plätze",
   "series.courtsHint": "Mehrere Plätze sind möglich; jeder Termin belegt dann alle ausgewählten.",
