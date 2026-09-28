@@ -25,11 +25,12 @@ import { browserExitState, BrowserLifecycleRecorder, browserResourceUsage } from
 import { completeCleanup } from "./resource-cleanup";
 import { runJourneyProcess } from "./process-command";
 import {
+  ApplicationLifecycle,
   applicationResourceCommand,
-  applicationResourceUsage,
   containerResourceUsage,
   ResourceTimelineRecorder,
   sharedMemoryUsage,
+  tickObservations,
   type ResourceObservation,
   type ResourceTarget
 } from "./resource-timeline";
@@ -594,6 +595,7 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
   const browserLifecycle = new BrowserLifecycleRecorder();
   const browserLifecyclePath = resolve("test-results", "browser-lifecycle.json");
   const resourceTimeline = new ResourceTimelineRecorder(1_000);
+  const applicationLifecycle = new ApplicationLifecycle();
   const resourceTimelinePath = resolve("test-results", "resource-timeline.json");
   const resourceEnvironmentPath = resolve("test-results", "resource-environment.json");
   mkdirSync(resolve("test-results"), { recursive: true });
@@ -634,19 +636,20 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
     };
   };
   const retainResourceSample = async (): Promise<void> => {
-    const observations: Array<Promise<ResourceObservation>> = [];
+    const observations: Array<Promise<ResourceObservation | undefined>> = [];
     if (application?.pid) {
       const telemetry = applicationResourceCommand(process.platform, application.pid);
-      observations.push(runJourneyProcess(telemetry.command, telemetry.args)
-        .then((stdout) => ({ target: "application",
-          ...applicationResourceUsage(stdout, application!.pid!, telemetry.memoryUnit) })));
+      observations.push(applicationLifecycle.observe(application,
+        () => runJourneyProcess(telemetry.command, telemetry.args), telemetry.memoryUnit));
     }
     if (clubProxy) observations.push(containerObservation("proxy", clubProxy));
     if (postgres) observations.push(containerObservation("postgres", postgres));
     const browser = browserServers.values().next().value?.container;
     if (browser) observations.push(containerObservation("browser", browser, true));
     if (observations.length === 0) return;
-    resourceTimeline.append(await Promise.all(observations), new Date().toISOString());
+    const observed = tickObservations(await Promise.all(observations));
+    if (!observed) return;
+    resourceTimeline.append(observed, new Date().toISOString());
     writeFileSync(resourceTimelinePath, `${JSON.stringify(resourceTimeline.evidence(), null, 2)}\n`, { mode: 0o600 });
   };
   const resourceSampling = new ResourceSampling(retainResourceSample, 1_000);
@@ -790,11 +793,13 @@ export async function startJourneyService(): Promise<StartedJourneyService> {
           if (process.env.COURTSIDE_VERBOSE_TEST_LOGS === "true") process.stdout.write(chunk);
         });
       }
+      applicationLifecycle.running();
       await waitForApplication(application, baseURL);
     };
     const stopApplication = async () => {
       if (!application || application.exitCode !== null) return;
       const stopped = once(application, "exit");
+      applicationLifecycle.stopping();
       application.kill();
       await stopped;
     };
