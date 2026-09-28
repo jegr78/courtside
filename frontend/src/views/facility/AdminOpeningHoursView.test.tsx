@@ -371,6 +371,7 @@ describe("AdminOpeningHoursView", () => {
     expect(screen.getByTestId("hours-open-MONDAY")).toHaveValue("10:00");
     expect(screen.getByTestId("opening-hours-effective-from")).toHaveValue(later(7));
     expect(screen.getByTestId("opening-week-beginning")).toHaveTextContent("In force");
+    expect(screen.getByTestId(`remove-opening-week-${later(7)}`), "each button names its week").toHaveAccessibleDescription(/^Scheduled from/);
   });
 
   it("given an upcoming week, when it is removed, then the week is asked to go and the list no longer holds it", async () => {

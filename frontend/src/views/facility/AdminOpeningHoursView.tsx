@@ -161,14 +161,14 @@ function OpeningWeeks({ weeks, selected, disabled, choose, remove }: {
       {weeks.map((week, index) => {
         const key = week.effectiveFrom ?? "beginning";
         return <li key={week.id} data-testid={`opening-week-${key}`} className="flex flex-wrap items-center gap-3">
-          <span className="font-medium">{index === 0
+          <span id={`opening-week-label-${key}`} className="font-medium">{index === 0
             ? week.effectiveFrom
               ? t("admin.facility.inForceSince", { date: formatDay(week.effectiveFrom, i18n.language) })
               : t("admin.facility.inForceFromTheBeginning")
             : t("admin.facility.scheduledFrom", { date: formatDay(week.effectiveFrom ?? "", i18n.language) })}</span>
-          <Button variant="secondary" type="button" data-testid={`edit-opening-week-${key}`} aria-pressed={index === selected}
+          <Button variant="secondary" type="button" data-testid={`edit-opening-week-${key}`} aria-describedby={`opening-week-label-${key}`} aria-pressed={index === selected}
                   disabled={disabled} onClick={() => choose(index)}>{t("admin.facility.editWeek")}</Button>
-          {index > 0 && week.effectiveFrom && <Button variant="secondary" type="button" data-testid={`remove-opening-week-${key}`}
+          {index > 0 && week.effectiveFrom && <Button variant="secondary" type="button" data-testid={`remove-opening-week-${key}`} aria-describedby={`opening-week-label-${key}`}
                   disabled={disabled} onClick={() => remove(week.effectiveFrom!)}>{t("admin.facility.removeWeek")}</Button>}
         </li>;
       })}
