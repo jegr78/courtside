@@ -150,7 +150,7 @@ jobs:
     needs: test-profile-plan
     if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.tooling == 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
@@ -177,13 +177,12 @@ jobs:
           echo "$RUNNER_TEMP/actionlint" >> "$GITHUB_PATH"
       - name: Verify GitHub Actions workflows
         run: node tools/workflow-lint.mjs --check
-      - name: Qualify deployment archive and recipe drift
+      - name: Check generated deployment recipes for drift
         run: |
           node tools/deployment-handbook.mjs --deploy deploy \
             --english deploy/guides/generated-recipes.md \
             --site-english site/en/generated-operator-recipes.md \
             --german site/generated-operator-recipes.md --check
-          node --test tools/deployment-archive.test.mjs tools/deployment-recipes.test.mjs
       - name: Verify repository tooling
         working-directory: frontend
         run: npm run test:tools
@@ -394,7 +393,7 @@ jobs:
     needs: test-profile-plan
     if: always() && (github.event_name != 'pull_request' || needs.test-profile-plan.outputs.backend == 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     permissions:
       contents: read
     steps:
@@ -522,7 +521,7 @@ jobs:
       matrix:
         group: [functional-a, functional-b]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:

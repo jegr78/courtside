@@ -10,12 +10,22 @@ function source(path) {
 test("given a deployment pull request, when CI plans tooling, then archive, handbook and recipe drift block it", () => {
   // given
   const build = source("../.github/workflows/build.yml");
+  const toolingStart = build.indexOf("\n  tooling:");
+  const toolingEnd = build.indexOf("\n  clock-shift:");
+  assert.ok(toolingStart >= 0 && toolingEnd > toolingStart, "the build workflow must keep its tooling job");
+  const tooling = build.slice(toolingStart, toolingEnd);
+  const manifest = JSON.parse(source("../ci/tool-profile-manifest.json"));
+  const toolTests = manifest.entries.filter((entry) => entry.test).map((entry) => entry.path);
 
   // when / then
-  assert.match(build, /name: Qualify deployment archive and recipe drift/);
-  assert.match(build, /node tools\/deployment-handbook\.mjs[\s\S]+--check/);
-  assert.match(build, /--site-english site\/en\/generated-operator-recipes\.md/);
-  assert.match(build, /node --test[\s\S]+deployment-archive\.test\.mjs[\s\S]+deployment-recipes\.test\.mjs/);
+  assert.match(tooling, /name: Check generated deployment recipes for drift/);
+  assert.match(tooling, /node tools\/deployment-handbook\.mjs[\s\S]+--check/);
+  assert.match(tooling, /--site-english site\/en\/generated-operator-recipes\.md/);
+  assert.match(tooling, /run: npm run test:tools/);
+  for (const path of ["tools/deployment-archive.test.mjs", "tools/deployment-recipes.test.mjs"]) {
+    assert.ok(toolTests.includes(path), `${path} must run with the repository tooling`);
+  }
+  assert.doesNotMatch(tooling, /node --test/, "the tooling job runs each tool test once, through test:tools");
 });
 
 test("given a release candidate archive, when release qualification starts, then every recipe reads that exact archive", () => {
