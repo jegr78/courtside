@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type BookingGrid, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail, type ManagedAppointmentPage, type MovePreview, type MoveRequest, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
+import { api, type BookingGrid, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
 import { Button } from "../components/Button";
-import { Modal } from "../components/Modal";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { formatBookingPeriod, formatDateTime } from "../time/clubZone";
-import { SeriesForm } from "./SeriesForm";
-import { violationMessage } from "../api/problem-message";
-
-export type Appointment = PersonalBooking | ManagedAppointment;
+import { CancelDialog, MoveDialog } from "./AppointmentDialogs";
 
 function offlineBookingGrid(): BookingGrid {
   return {
@@ -19,28 +15,25 @@ function offlineBookingGrid(): BookingGrid {
   };
 }
 
-export function MyBookingsView({ now, showManaged = false, offline = false }: {
-  now?: Date; showManaged?: boolean; offline?: boolean;
+export function MyBookingsView({ now, offline = false }: {
+  now?: Date; offline?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const [reference] = useState(() => now ?? new Date());
   const [bookings, setBookings] = useState<PersonalBooking[]>([]);
-  const [managed, setManaged] = useState<ManagedAppointment[]>([]);
   const [participations, setParticipations] = useState<Participation[]>([]);
   const [courts, setCourts] = useState<PublicCourt[]>([]);
   const [grid, setGrid] = useState<BookingGrid | undefined>(() => offline ? offlineBookingGrid() : undefined);
   const [refreshedAt, setRefreshedAt] = useState<string>();
   const [maxBookingMinutes, setMaxBookingMinutes] = useState<number>();
   const [nextCursor, setNextCursor] = useState<string>();
-  const [managedNextCursor, setManagedNextCursor] = useState<string>();
   const [participationsNextCursor, setParticipationsNextCursor] = useState<string>();
   const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [managedReady, setManagedReady] = useState(false);
   const { message: error, report, clear } = useReportedFailure();
   const { message: loadError, report: reportLoad, clear: clearLoad } = useReportedFailure();
   const [success, setSuccess] = useState<string>();
-  const [action, setAction] = useState<{ kind: "cancel" | "move" | "detail"; booking: Appointment; managed: boolean }>();
+  const [action, setAction] = useState<{ kind: "cancel" | "move"; booking: PersonalBooking }>();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,24 +49,20 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
         clearLoad();
         return;
       }
-      const [managedPage, participationPage, availableCourts, bookingGrid] = await Promise.all([
-        showManaged ? api.managedAppointments() : Promise.resolve<ManagedAppointmentPage>({ items: [] }),
+      const [participationPage, availableCourts, bookingGrid] = await Promise.all([
         api.participations(), api.courts(), api.bookingGrid()
       ]);
-      setManaged(managedPage.items);
       setParticipations(participationPage.items);
       setParticipationsNextCursor(participationPage.nextCursor ?? undefined);
-      setManagedNextCursor(managedPage.nextCursor ?? undefined);
       setCourts(availableCourts);
       setGrid(bookingGrid);
-      setManagedReady(true);
       clearLoad();
     } catch (failure) {
       reportLoad(failure);
     } finally {
       setLoading(false);
     }
-  }, [clearLoad, offline, reportLoad, showManaged]);
+  }, [clearLoad, offline, reportLoad]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -116,21 +105,6 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
     }
   }
 
-  async function loadMoreManaged() {
-    if (!managedNextCursor) return;
-    setLoadingMore(true);
-    try {
-      const page = await api.managedAppointments({ cursor: managedNextCursor });
-      setManaged((current) => [...current, ...page.items]);
-      setManagedNextCursor(page.nextCursor ?? undefined);
-      clear();
-    } catch (failure) {
-      report(failure);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
-
   const sections = useMemo(() => ({
     upcoming: bookings
       .filter((booking) => booking.status === "CONFIRMED" && new Date(booking.endsAt) >= reference)
@@ -141,7 +115,7 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
   }), [bookings, reference]);
 
   const courtNames = new Map(courts.map((court) => [court.id, court.name ?? t("court.number", { number: court.number })]));
-  const chooseAction = (chosen: { kind: "cancel" | "move" | "detail"; booking: Appointment; managed: boolean }) => {
+  const chooseAction = (chosen: { kind: "cancel" | "move"; booking: PersonalBooking }) => {
     setSuccess(undefined);
     setAction(chosen);
   };
@@ -164,17 +138,9 @@ export function MyBookingsView({ now, showManaged = false, offline = false }: {
         </details>}
     </div>}
     {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
-    {!offline && showManaged && managedReady && grid && <section className="border-structural mt-10 border-t pt-8" aria-labelledby="managed-appointments-title">
-      <h2 id="managed-appointments-title" data-testid="managed-appointments-title" className="text-2xl font-bold">{t("managedAppointments.title")}</h2>
-      <p className="text-muted mt-2">{t("managedAppointments.description")}</p>
-      <div className="mt-4"><BookingSection testId="managed-bookings" title={t("managedAppointments.appointments")} empty={t("managedAppointments.empty")} bookings={managed} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable managed action={chooseAction} t={t} /></div>
-      {managedNextCursor && <Button variant="secondary" className="mt-6" disabled={loadingMore} onClick={() => void loadMoreManaged()}>{t("managedAppointments.loadMore")}</Button>}
-      <SeriesForm timeZone={grid.timeZone} courts={courts} created={async () => { await load(); setSuccess(t("series.createdSuccess")); }} reportError={(failure) => { setSuccess(undefined); report(failure); }} />
-    </section>}
     {!offline && !loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
-    {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={(action.managed ? managed : bookings).filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={(action.managed ? managedNextCursor : nextCursor) !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
+    {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={bookings.filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} maxBookingMinutes={maxBookingMinutes} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.moved")); }} />}
-    {grid && action?.kind === "detail" && <ManagedAppointmentDialog bookingId={action.booking.id} locale={i18n.language} timeZone={grid.timeZone} closed={() => setAction(undefined)} />}
   </section>;
 }
 
@@ -228,9 +194,9 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
 
 type Translate = ReturnType<typeof useTranslation>["t"];
 
-function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, managed = false, action, t }: {
-  testId: string; title?: string; titleHidden?: boolean; empty: string; bookings: Appointment[]; courtNames: Map<string, string>;
-  locale: string; timeZone: string; actionable?: boolean; managed?: boolean; action: (value: { kind: "cancel" | "move" | "detail"; booking: Appointment; managed: boolean }) => void; t: Translate;
+function BookingSection({ testId, title, titleHidden = false, empty, bookings, courtNames, locale, timeZone, actionable = false, action, t }: {
+  testId: string; title?: string; titleHidden?: boolean; empty: string; bookings: PersonalBooking[]; courtNames: Map<string, string>;
+  locale: string; timeZone: string; actionable?: boolean; action: (value: { kind: "cancel" | "move"; booking: PersonalBooking }) => void; t: Translate;
 }) {
   const groups = groupBookings(bookings);
   return <section data-testid={testId}>
@@ -248,12 +214,10 @@ function BookingSection({ testId, title, titleHidden = false, empty, bookings, c
             {group.series && <span data-testid="series-marker" className="rounded-full border px-2 font-semibold">{t("myBookings.series")}</span>}
           </span>
           {booking.status === "CANCELLED" && <span>{t("myBookings.cancelled")}</span>}
-          {managed && "participantCount" in booking && <span>{t("managedAppointments.participants", { count: booking.participantCount })}</span>}
           {actionable && <div className="flex flex-wrap gap-2 pt-1">
-            {managed && <Button variant="secondary" data-testid="managed-details" className="px-3 py-2" onClick={() => action({ kind: "detail", booking, managed })}>{t("managedAppointments.details")}</Button>}
             {booking.status === "CONFIRMED" && <>
-              <Button variant="destructive" aria-label={bookingActionName("myBookings.cancelAccessible", booking, courtNames, locale, timeZone, t)} data-testid={managed ? "managed-cancel" : "personal-cancel"} data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking, managed })}>{t("myBookings.cancel")}</Button>
-              {booking.seriesId && <Button variant="secondary" aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "move", booking, managed })}>{t("myBookings.move")}</Button>}
+              <Button variant="destructive" aria-label={bookingActionName("myBookings.cancelAccessible", booking, courtNames, locale, timeZone, t)} data-testid="personal-cancel" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "cancel", booking })}>{t("myBookings.cancel")}</Button>
+              {booking.seriesId && <Button variant="secondary" aria-label={bookingActionName("myBookings.moveAccessible", booking, courtNames, locale, timeZone, t)} data-testid="move-booking" data-booking-id={booking.id} className="px-3 py-2" onClick={() => action({ kind: "move", booking })}>{t("myBookings.move")}</Button>}
             </>}
           </div>}
         </li>)}</ul>
@@ -261,7 +225,7 @@ function BookingSection({ testId, title, titleHidden = false, empty, bookings, c
   </section>;
 }
 
-function bookingActionName(key: string, booking: Appointment, courtNames: Map<string, string>, locale: string, timeZone: string, t: Translate) {
+function bookingActionName(key: string, booking: PersonalBooking, courtNames: Map<string, string>, locale: string, timeZone: string, t: Translate) {
   return t(key, {
     label: booking.cardLabel,
     period: formatBookingPeriod(booking.startsAt, booking.endsAt, locale, timeZone),
@@ -269,117 +233,11 @@ function bookingActionName(key: string, booking: Appointment, courtNames: Map<st
   });
 }
 
-function groupBookings(bookings: Appointment[]) {
-  const groups = new Map<string, Appointment[]>();
+function groupBookings(bookings: PersonalBooking[]) {
+  const groups = new Map<string, PersonalBooking[]>();
   for (const booking of bookings) {
     const key = booking.seriesId ?? booking.id;
     groups.set(key, [...(groups.get(key) ?? []), booking]);
   }
   return [...groups].map(([key, entries]) => ({ key, series: entries[0].seriesId !== null && entries[0].seriesId !== undefined, bookings: entries }));
-}
-
-function ScopeFields({ scope, changed, t }: { scope: CancelScope; changed: (scope: CancelScope) => void; t: Translate }) {
-  return <fieldset className="grid gap-2"><legend className="font-semibold">{t("myBookings.scope")}</legend>
-    {(["THIS", "THIS_AND_FOLLOWING", "WHOLE_SERIES"] as CancelScope[]).map((value) => <label key={value} className="flex gap-2">
-      <input data-testid={`scope-${value}`} type="radio" name="scope" checked={scope === value} onChange={() => changed(value)} />{t(`myBookings.scope.${value}`)}
-    </label>)}
-  </fieldset>;
-}
-
-export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZone, closed, completed }: { booking: Appointment; seriesBookings: Appointment[]; hasMoreBookings: boolean; timeZone: string; closed: () => void; completed: () => Promise<void> }) {
-  const { t, i18n } = useTranslation();
-  const [scope, setScope] = useState<CancelScope>("THIS");
-  const { message: error, report } = useReportedFailure();
-  async function submit() {
-    try {
-      if (booking.seriesId) await api.cancelSeries(booking.seriesId, booking.id, scope);
-      else await api.cancelBooking(booking.id);
-      await completed();
-    } catch (failure) { report(failure); }
-  }
-  const affected = scope === "THIS" ? [booking] : scope === "WHOLE_SERIES"
-    ? seriesBookings
-    : seriesBookings.filter((candidate) => new Date(candidate.startsAt) >= new Date(booking.startsAt));
-  return <Modal labelledBy="cancel-personal-title" closed={closed}><div className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
-    <h2 id="cancel-personal-title" className="text-xl font-bold">{t("booking.cancelTitle")}</h2>
-    {booking.seriesId && <ScopeFields scope={scope} changed={setScope} t={t} />}
-    <p className="font-semibold">{t("myBookings.affected", { count: affected.length })}</p>
-    <ul className="list-disc pl-5">{affected.map((candidate) => <li key={candidate.id}>{formatBookingPeriod(candidate.startsAt, candidate.endsAt, i18n.language, timeZone)}</li>)}</ul>
-    {hasMoreBookings && scope !== "THIS" && <p data-testid="incomplete-series-warning">{t("myBookings.affectedIncomplete")}</p>}
-    {error && <Alert>{error}</Alert>}
-    <div className="flex gap-2"><Button variant="destructive-confirm" data-testid="confirm-cancellation" onClick={() => void submit()}>{t("booking.cancelConfirm")}</Button><Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
-  </div></Modal>;
-}
-
-export function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, closed, completed }: { booking: Appointment; courts: PublicCourt[]; timeZone: string; maxBookingMinutes?: number; closed: () => void; completed: () => Promise<void> }) {
-  const { t, i18n } = useTranslation();
-  const [scope, setScope] = useState<CancelScope>("THIS");
-  const [startTime, setStartTime] = useState("");
-  const [duration, setDuration] = useState("");
-  const [courtIds, setCourtIds] = useState<string[]>(booking.courtIds);
-  const [preview, setPreview] = useState<MovePreview>();
-  const { message: error, report, clear } = useReportedFailure();
-  const request: MoveRequest = {
-    fromBookingId: booking.id, scope,
-    ...(startTime ? { newStartTime: startTime } : {}),
-    ...(duration ? { newDurationMinutes: Number(duration) } : {}),
-    ...(courtIds.join() !== booking.courtIds.join() ? { newCourtIds: courtIds } : {})
-  };
-  const courtNames = new Map(courts.map((court) => [court.id, court.name ?? t("court.number", { number: court.number })]));
-  async function previewMove() {
-    try { setPreview(await api.previewSeriesMove(booking.seriesId!, request)); clear(); }
-    catch (failure) { report(failure); }
-  }
-  async function move() {
-    try { await api.moveSeries(booking.seriesId!, request); await completed(); }
-    catch (failure) { report(failure); }
-  }
-  return <Modal labelledBy="move-personal-title" closed={closed}><div data-testid="move-dialog" className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
-    <h2 id="move-personal-title" className="text-xl font-bold">{t("myBookings.moveTitle")}</h2>
-    <ScopeFields scope={scope} changed={(value) => { setScope(value); setPreview(undefined); }} t={t} />
-    <label className="grid gap-1 font-semibold">{t("myBookings.newStartTime")}<input data-testid="move-start-time" type="time" value={startTime} onChange={(event) => { setStartTime(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
-    <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input data-testid="move-duration" type="number" min="1" max={maxBookingMinutes} value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
-    <fieldset><legend className="font-semibold">{t("booking.courts")}</legend>{courts.map((court) => <label key={court.id} className="flex gap-2"><input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => { setCourtIds((ids) => event.target.checked ? [...ids, court.id] : ids.filter((id) => id !== court.id)); setPreview(undefined); }} />{court.name ?? t("court.number", { number: court.number })}</label>)}</fieldset>
-    {error && <Alert>{error}</Alert>}
-    {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatBookingPeriod(move.fromStartsAt, move.fromEndsAt, i18n.language, timeZone)} → {formatBookingPeriod(move.toStartsAt, move.toEndsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
-    <div className="flex gap-2">{preview ? <Button variant="primary" data-testid="confirm-move" disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button variant="secondary" data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
-  </div></Modal>;
-}
-
-export function ManagedAppointmentDialog({ bookingId, locale, timeZone, closed }: { bookingId: string; locale: string; timeZone: string; closed: () => void }) {
-  const { t } = useTranslation();
-  const [detail, setDetail] = useState<ManagedAppointmentDetail>();
-  const { message: error, report } = useReportedFailure();
-
-  useEffect(() => {
-    let active = true;
-    void api.managedAppointment(bookingId)
-      .then((appointment) => { if (active) setDetail(appointment); })
-      .catch((failure) => { if (active) report(failure); });
-    return () => { active = false; };
-  }, [bookingId, report]);
-
-  return <Modal labelledBy="managed-appointment-detail-title" closed={closed}><div className="surface-panel grid w-full max-w-lg gap-4 rounded-2xl border p-6">
-    <h2 id="managed-appointment-detail-title" className="text-xl font-bold">{t("managedAppointments.detailTitle")}</h2>
-    {error && <Alert>{error}</Alert>}
-    {!detail && !error && <p aria-live="polite">{t("status.loading")}</p>}
-    {detail && <>
-      <p data-testid="managed-card-label" className="font-semibold">{detail.cardLabel}</p>
-      <span data-testid="managed-period">{formatBookingPeriod(detail.startsAt, detail.endsAt, locale, timeZone)}</span>
-      <section data-testid="managed-note"><h3 className="font-semibold">{t("managedAppointments.note")}</h3><p>{detail.note || t("managedAppointments.noNote")}</p></section>
-      <section data-testid="managed-participants"><h3 className="font-semibold">{t("managedAppointments.participantDetails")}</h3>
-        {detail.participants.length === 0 ? <p>{t("managedAppointments.noParticipants")}</p> : <ul className="list-disc pl-5">{detail.participants.map((participant, index) => <li key={`${participant.kind}-${index}`}>{participant.displayName} · {t(`managedAppointments.kind.${participant.kind}`)}</li>)}</ul>}
-      </section>
-    </>}
-    <div><Button variant="secondary" data-testid="close-managed-appointment" onClick={closed}>{t("booking.close")}</Button></div>
-  </div></Modal>;
-}
-
-function MoveReasons({ move, courtNames, t }: { move: MovePreview["moves"][number]; courtNames: Map<string, string>; t: Translate }) {
-  const names = (ids: string[]) => ids.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ");
-  return <ul className="list-disc pl-5">
-    {move.violations.map((violation) => <li data-code={violation.code} key={`${move.bookingId}-${violation.code}`}>{violationMessage(violation.code, violation.params, t)}</li>)}
-    {move.blockedCourtIds.length > 0 && <li data-testid="occupied-courts">{t("myBookings.occupiedCourts", { courts: names(move.blockedCourtIds) })}</li>}
-    {move.unbookableCourtIds.length > 0 && <li data-testid="unavailable-courts">{t("myBookings.unavailableCourts", { courts: names(move.unbookableCourtIds) })}</li>}
-  </ul>;
 }

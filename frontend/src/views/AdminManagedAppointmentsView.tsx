@@ -9,7 +9,7 @@ import { LoadFailure } from "../components/LoadFailure";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { formatBookingPeriod } from "../time/clubZone";
-import { CancelDialog, ManagedAppointmentDialog, MoveDialog } from "./MyBookingsView";
+import { CancelDialog, ManagedAppointmentDialog, MoveDialog } from "./AppointmentDialogs";
 import { SeriesForm } from "./SeriesForm";
 
 const PAGE_SIZE = 20;
@@ -33,22 +33,19 @@ export function AdminManagedAppointmentsView() {
   const [success, setSuccess] = useState<string>();
   const loadVersion = useRef(0);
   const { message: error, report, clear } = useReportedFailure();
+  const { message: referenceError, report: reportReference, clear: clearReference } = useReportedFailure();
 
   const load = useCallback(async () => {
     const version = ++loadVersion.current;
     setLoading(true);
     setLoadingMore(false);
     try {
-      const [page, availableCourts, availableCards, bookingGrid] = await Promise.all([
-        api.managedAppointments({ view, courtId: courtId || undefined, cardId: cardId || undefined, limit: PAGE_SIZE }),
-        api.courts(), api.bookingCards(), api.bookingGrid()
-      ]);
+      const page = await api.managedAppointments({
+        view, courtId: courtId || undefined, cardId: cardId || undefined, limit: PAGE_SIZE
+      });
       if (version !== loadVersion.current) return;
       setAppointments(page.items);
       setNextCursor(page.nextCursor ?? undefined);
-      setCourts(availableCourts);
-      setCards(availableCards);
-      setGrid(bookingGrid);
       clear();
     } catch (failure) {
       if (version === loadVersion.current) report(failure);
@@ -57,7 +54,22 @@ export function AdminManagedAppointmentsView() {
     }
   }, [cardId, clear, courtId, report, view]);
 
+  const loadReferenceData = useCallback(async () => {
+    try {
+      const [availableCourts, availableCards, bookingGrid] = await Promise.all([
+        api.courts(), api.bookingCards(), api.bookingGrid()
+      ]);
+      setCourts(availableCourts);
+      setCards(availableCards);
+      setGrid(bookingGrid);
+      clearReference();
+    } catch (failure) {
+      reportReference(failure);
+    }
+  }, [clearReference, reportReference]);
+
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadReferenceData(); }, [loadReferenceData]);
   useEffect(() => {
     void api.bookingEligibility()
       .then((eligibility) => setMaxBookingMinutes(eligibility.maxBookingMinutes ?? undefined))
@@ -87,6 +99,7 @@ export function AdminManagedAppointmentsView() {
     court.id, court.name ?? t("court.number", { number: court.number })
   ])), [courts, t]);
   const groups = useMemo(() => groupAppointments(appointments), [appointments]);
+  const timeZone = grid?.timeZone ?? "UTC";
 
   return <section data-testid="managed-appointments-page" aria-labelledby="managed-appointments-title" className="min-w-0">
     <div>
@@ -125,6 +138,7 @@ export function AdminManagedAppointmentsView() {
     </div>
 
     {error && <div className="mt-4"><LoadFailure message={error} retry={() => { clear(); void load(); }} /></div>}
+    {referenceError && <div className="mt-4"><LoadFailure message={referenceError} retry={() => { clearReference(); void loadReferenceData(); }} /></div>}
     {success && <div className="mt-4"><SuccessFeedback>{success}</SuccessFeedback></div>}
     {loading ? <p className="mt-6" role="status">{t("status.loading")}</p>
       : groups.length === 0 ? <p className="text-muted mt-6">{t("managedAppointments.empty")}</p>
@@ -135,21 +149,21 @@ export function AdminManagedAppointmentsView() {
               {t("managedAppointments.seriesSummary", { label: group.items[0].cardLabel, count: group.items.length })}
             </summary>
             <ul className="divide-y border-t pl-4 sm:pl-8">{group.items.map((appointment) => <AppointmentRow key={appointment.id}
-              appointment={appointment} courtNames={courtNames} locale={i18n.language} timeZone={grid!.timeZone}
+              appointment={appointment} courtNames={courtNames} locale={i18n.language} timeZone={timeZone}
               showDetail={setDetail} cancel={setCancelling} move={setMoving} t={t} />)}</ul>
           </details>
           : <ul key={group.key}><AppointmentRow appointment={group.items[0]} courtNames={courtNames}
-            locale={i18n.language} timeZone={grid!.timeZone} showDetail={setDetail} cancel={setCancelling} move={setMoving} t={t} /></ul>)}
+            locale={i18n.language} timeZone={timeZone} showDetail={setDetail} cancel={setCancelling} move={setMoving} t={t} /></ul>)}
       </div>}
 
     {nextCursor && <Button data-testid="managed-load-more" variant="secondary" className="mt-5" disabled={loadingMore}
       onClick={() => void loadMore()}>{t("managedAppointments.loadMore")}</Button>}
-    {grid && detail && <ManagedAppointmentDialog bookingId={detail.id} locale={i18n.language} timeZone={grid.timeZone} closed={() => setDetail(undefined)} />}
-    {grid && cancelling && <CancelDialog booking={cancelling}
+    {detail && <ManagedAppointmentDialog bookingId={detail.id} locale={i18n.language} timeZone={timeZone} closed={() => setDetail(undefined)} />}
+    {cancelling && <CancelDialog booking={cancelling}
       seriesBookings={appointments.filter((appointment) => appointment.seriesId === cancelling.seriesId && appointment.status === "CONFIRMED")}
-      hasMoreBookings={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setCancelling(undefined)}
+      hasMoreBookings={nextCursor !== undefined} timeZone={timeZone} closed={() => setCancelling(undefined)}
       completed={async () => { setCancelling(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
-    {grid && moving && <MoveDialog booking={moving} courts={courts} timeZone={grid.timeZone}
+    {moving && <MoveDialog booking={moving} courts={courts} timeZone={timeZone}
       maxBookingMinutes={maxBookingMinutes} closed={() => setMoving(undefined)}
       completed={async () => { setMoving(undefined); await load(); setSuccess(t("booking.moved")); }} />}
   </section>;
@@ -162,6 +176,27 @@ function AppointmentRow({ appointment, courtNames, locale, timeZone, showDetail,
   showDetail: (appointment: ManagedAppointment) => void; cancel: (appointment: ManagedAppointment) => void;
   move: (appointment: ManagedAppointment) => void; t: Translate;
 }) {
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actions = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!actions.current?.contains(event.target as Node)) setActionsOpen(false);
+    };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setActionsOpen(false);
+      actions.current?.querySelector<HTMLElement>("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeWithEscape);
+    };
+  }, [actionsOpen]);
+
   return <li data-testid={`booking-${appointment.id}`} data-managed-appointment={appointment.id} data-status={appointment.status} className="grid gap-2 px-2 py-3 md:grid-cols-[minmax(13rem,1.5fr)_minmax(9rem,1fr)_auto] md:items-center">
     <div className="grid">
       <span className="font-semibold">{formatBookingPeriod(appointment.startsAt, appointment.endsAt, locale, timeZone)}</span>
@@ -175,12 +210,13 @@ function AppointmentRow({ appointment, courtNames, locale, timeZone, showDetail,
     </div>
     <div className="flex flex-wrap items-center gap-3">
       <Button variant="secondary" data-testid="managed-details" className="px-3 py-2" onClick={() => showDetail(appointment)}>{t("managedAppointments.details")}</Button>
-      {appointment.status === "CONFIRMED" && <details className="relative">
-        <summary data-testid="managed-actions" className="focus-ring cursor-pointer rounded-lg px-2 py-2 font-semibold">{t("managedAppointments.actions")}</summary>
+      {appointment.status === "CONFIRMED" && <details ref={actions} open={actionsOpen} className="relative">
+        <summary data-testid="managed-actions" aria-expanded={actionsOpen} className="focus-ring cursor-pointer rounded-lg px-2 py-2 font-semibold"
+          onClick={(event) => { event.preventDefault(); setActionsOpen((open) => !open); }}>{t("managedAppointments.actions")}</summary>
         <div className="surface-raised absolute right-0 z-10 mt-1 rounded-lg border p-2 shadow-lg">
           <div className="grid gap-2">
-            <Button variant="destructive" data-testid="managed-cancel" data-booking-id={appointment.id} className="whitespace-nowrap px-3 py-2" onClick={() => cancel(appointment)}>{t("myBookings.cancel")}</Button>
-            {appointment.seriesId && <Button variant="secondary" data-testid="move-booking" data-booking-id={appointment.id} className="whitespace-nowrap px-3 py-2" onClick={() => move(appointment)}>{t("myBookings.move")}</Button>}
+            <Button variant="destructive" data-testid="managed-cancel" data-booking-id={appointment.id} className="whitespace-nowrap px-3 py-2" onClick={() => { setActionsOpen(false); cancel(appointment); }}>{t("myBookings.cancel")}</Button>
+            {appointment.seriesId && <Button variant="secondary" data-testid="move-booking" data-booking-id={appointment.id} className="whitespace-nowrap px-3 py-2" onClick={() => { setActionsOpen(false); move(appointment); }}>{t("myBookings.move")}</Button>}
           </div>
         </div>
       </details>}

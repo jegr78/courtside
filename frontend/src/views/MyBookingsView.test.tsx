@@ -155,13 +155,12 @@ it("given nobody recorded this member as a co-player, when loaded, then that cos
   expect(screen.queryByTestId("participations-title"), "an empty list needs no heading of its own").not.toBeInTheDocument();
 });
 
-it("given no appointments or participations, when loaded, then every empty section names its next step", async () => {
+it("given no bookings or participations, when loaded, then every empty section names its next step", async () => {
   // given
   vi.mocked(api.personalBookings).mockResolvedValue({ items: [] });
-  vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [] });
 
   // when
-  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
 
   // then
   expect(await screen.findByTestId("upcoming-bookings")).toHaveTextContent(
@@ -171,9 +170,6 @@ it("given no appointments or participations, when loaded, then every empty secti
     "Your completed and cancelled bookings appear here after their date has passed."
   );
   expect(screen.getByTestId("past-bookings").tagName, "nothing to fold stays a line").toBe("P");
-  expect(screen.getByTestId("managed-bookings")).toHaveTextContent(
-    "Appointments covered by your club role appear here. Create an appointment series above or wait for a matching booking."
-  );
   expect(screen.getByTestId("participations")).toHaveTextContent(
     "Bookings where another member names you as a player appear here. Ask the booking member to add you."
   );
@@ -206,107 +202,6 @@ it("given loaded bookings, when translations rebind, then the data remains mount
   expect(cancel).toHaveFocus();
   expect(screen.getByTestId("personal-cancel")).toBe(cancel);
   expect(api.personalBookings).toHaveBeenCalledTimes(loadsBeforeTranslationChange);
-});
-
-it("given an officer, when managed appointments load, then they are separated from personal bookings", async () => {
-  // given
-  vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [{
-    id: "55555555-5555-5555-5555-555555555555",
-    cardId: "44444444-4444-4444-4444-444444444444",
-    courtIds: ["33333333-3333-3333-3333-333333333333"],
-    startsAt: "2026-08-12T18:00:00Z",
-    endsAt: "2026-08-12T19:00:00Z",
-    cardLabel: "League match",
-    cardColor: "#3A4A5C",
-    status: "CONFIRMED",
-    participantCount: 0
-  }] });
-
-  // when
-  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
-
-  // then
-  const title = await screen.findByTestId("managed-appointments-title");
-  expect(title).toHaveRole("heading");
-  expect(title).toHaveTextContent("Managed appointments");
-  expect(screen.getByTestId("booking-55555555-5555-5555-5555-555555555555")).toHaveTextContent("League match");
-  expect(screen.getByTestId("booking-55555555-5555-5555-5555-555555555555")).toHaveTextContent("0 participants");
-});
-
-it("given a managed appointment, when opening details, then its internal data is loaded on demand", async () => {
-  // given
-  const bookingId = "55555555-5555-5555-5555-555555555555";
-  vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [{
-    id: bookingId,
-    cardId: "44444444-4444-4444-4444-444444444444",
-    courtIds: ["33333333-3333-3333-3333-333333333333"],
-    startsAt: "2026-08-12T18:00:00Z",
-    endsAt: "2026-08-12T19:00:00Z",
-    cardLabel: "League match",
-    cardColor: "#3A4A5C",
-    status: "CONFIRMED",
-    participantCount: 1
-  }] });
-  vi.spyOn(api, "managedAppointment").mockResolvedValue({
-    id: bookingId,
-    cardId: "44444444-4444-4444-4444-444444444444",
-    courtIds: ["33333333-3333-3333-3333-333333333333"],
-    startsAt: "2026-08-12T18:00:00Z",
-    endsAt: "2026-08-12T19:00:00Z",
-    cardLabel: "League match",
-    cardColor: "#3A4A5C",
-    status: "CONFIRMED",
-    participantCount: 1,
-    note: "Prepare score sheets",
-    participants: [{ kind: "MEMBER", displayName: "Jane Doe" }]
-  });
-  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
-
-  // when
-  await userEvent.click(await screen.findByTestId("managed-details"));
-
-  // then
-  expect(await screen.findByTestId("managed-note")).toHaveTextContent("Prepare score sheets");
-  expect(screen.getByTestId("managed-period")).toHaveTextContent("Aug 12, 2026, 8:00 PM – 9:00 PM");
-  expect(screen.getByTestId("managed-participants")).toHaveTextContent("Jane Doe · Member");
-  expect(api.managedAppointment).toHaveBeenCalledWith(bookingId);
-});
-
-it("given a cancelled managed appointment, when listed, then its details remain available", async () => {
-  // given
-  const bookingId = "55555555-5555-5555-5555-555555555555";
-  vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [{
-    id: bookingId,
-    cardId: "44444444-4444-4444-4444-444444444444",
-    courtIds: ["33333333-3333-3333-3333-333333333333"],
-    startsAt: "2026-08-12T18:00:00Z",
-    endsAt: "2026-08-12T19:00:00Z",
-    cardLabel: "League match",
-    cardColor: "#3A4A5C",
-    status: "CANCELLED",
-    participantCount: 0
-  }] });
-  vi.spyOn(api, "managedAppointment").mockResolvedValue({
-    id: bookingId,
-    cardId: "44444444-4444-4444-4444-444444444444",
-    courtIds: ["33333333-3333-3333-3333-333333333333"],
-    startsAt: "2026-08-12T18:00:00Z",
-    endsAt: "2026-08-12T19:00:00Z",
-    cardLabel: "League match",
-    cardColor: "#3A4A5C",
-    status: "CANCELLED",
-    participantCount: 0,
-    note: "Retain for the audit trail",
-    participants: []
-  });
-  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
-
-  // when
-  await userEvent.click(await screen.findByTestId("managed-details"));
-
-  // then
-  expect(await screen.findByTestId("managed-note")).toHaveTextContent("Retain for the audit trail");
-  expect(screen.queryByTestId("managed-cancel")).not.toBeInTheDocument();
 });
 
 it("given another page exists, when loading more, then its bookings are appended", async () => {
@@ -572,73 +467,6 @@ it("given an ordinary member, when their bookings are read, then no series can b
 
   // then — creating a series belongs to the managed section, which an ordinary member has none of
   expect(screen.queryByTestId("new-series")).not.toBeInTheDocument();
-});
-
-it("given a manager, when the managed section is read, then a series can be started there", async () => {
-  // given
-  vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [] });
-
-  // when
-  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
-
-  // then
-  expect(await screen.findByTestId("new-series")).toBeInTheDocument();
-});
-
-it("given the managed list is still loading, when personal bookings arrive first, then no replaceable series opener is interactive", async () => {
-  // given
-  let releaseManaged: () => void = () => undefined;
-  const managedAppointments = vi.spyOn(api, "managedAppointments").mockImplementation(() => new Promise((resolve) => {
-    releaseManaged = () => resolve({ items: [] });
-  }));
-
-  // when
-  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
-  await waitFor(() => expect(managedAppointments).toHaveBeenCalledOnce());
-
-  // then
-  expect(screen.queryByTestId("new-series")).not.toBeInTheDocument();
-  releaseManaged();
-  expect(await screen.findByTestId("new-series")).toBeInTheDocument();
-});
-
-it("given a series that was just created, when the managed list reloads, then its result stays on screen", async () => {
-  // given
-  let releaseReload: () => void = () => undefined;
-  vi.spyOn(api, "managedAppointments")
-    .mockResolvedValueOnce({ items: [] })
-    .mockImplementationOnce(() => new Promise((resolve) => {
-      releaseReload = () => resolve({ items: [] });
-    }));
-  vi.spyOn(api, "bookingCards").mockResolvedValue([
-    { id: "card-1", label: "League match", color: "#3a4a5c", allowedPlayerCounts: [], guestAllowed: false }
-  ]);
-  vi.spyOn(api, "previewSeries").mockResolvedValue({
-    creatableCount: 1, truncatedByHorizon: false, horizonLimit: null,
-    occurrences: [{
-      startsAt: "2026-09-07T16:00:00Z", endsAt: "2026-09-07T17:00:00Z",
-      blockedCourtIds: [], violations: [], creatable: true
-    }]
-  });
-  vi.spyOn(api, "createSeries")
-    .mockResolvedValue({ seriesId: "series-1", bookingIds: ["booking-1"], skipped: ["2026-09-14T16:00:00Z"] });
-  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} showManaged />);
-  await userEvent.click(await screen.findByTestId("new-series"));
-  await userEvent.selectOptions(await screen.findByTestId("series-courts"), ["33333333-3333-3333-3333-333333333333"]);
-  await userEvent.selectOptions(screen.getByTestId("series-card"), ["card-1"]);
-  await userEvent.type(screen.getByTestId("series-starts-on"), "2026-09-07");
-  await userEvent.type(screen.getByTestId("series-start-time"), "18:00");
-  await userEvent.click(screen.getByTestId("series-weekday-MONDAY"));
-  await userEvent.click(screen.getByTestId("preview-series"));
-
-  // when — creating reloads the list this section holds
-  await userEvent.click(await screen.findByTestId("confirm-series"));
-
-  // then — a reload that takes the run's own result off the screen with it hides what was skipped
-  expect(await screen.findByTestId("series-created")).toBeInTheDocument();
-  expect(screen.getByTestId("series-skipped")).toBeInTheDocument();
-  releaseReload();
-  await waitFor(() => expect(screen.getByTestId("series-created")).toBeInTheDocument());
 });
 
 it("given a rule set bounds the booking duration, when moving a booking, then the duration field carries that ceiling", async () => {

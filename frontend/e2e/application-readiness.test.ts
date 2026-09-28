@@ -28,7 +28,7 @@ function spent(pauses: number[]): number {
 
 describe("awaitReadiness", () => {
   it("given a server that answers before it is ready, when it starts slowly, then the wait keeps its budget", async () => {
-    // given — a starting Courtside answers its own health endpoint with 503
+    // given
     const { world: answering, paused } = world([false, false, false, true]);
 
     // when
@@ -39,7 +39,7 @@ describe("awaitReadiness", () => {
   });
 
   it("given a live server that starts after the former minute boundary, when readiness arrives, then it keeps waiting", async () => {
-    // given — the outer gate owns the deadline; this helper owns only readiness and process exit
+    // given
     const { world: slow, paused } = world([...Array<boolean>(121).fill(false), true]);
 
     // when
@@ -59,7 +59,7 @@ describe("awaitReadiness", () => {
   });
 
   it("given the application is killed while starting, when the wait notices, then it names the signal", async () => {
-    // given — an out-of-memory kill leaves no exit code at all
+    // given
     const { world: killed, paused } = world([], { signalCode: () => "SIGKILL" });
 
     // when / then
