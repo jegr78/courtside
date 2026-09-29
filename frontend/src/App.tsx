@@ -258,8 +258,8 @@ export function App() {
       <BuildIdentity source={source} />
       <a data-testid="footer-documentation" className="underline hover:no-underline"
          href={club?.documentationUrl || DEFAULT_DOCUMENTATION_URL} target="_blank" rel="noopener noreferrer">{t("footer.documentation")}</a>
-      {club?.imprintUrl && <a data-testid="footer-imprint" className="underline hover:no-underline" href={club.imprintUrl}>{t("footer.imprint")}</a>}
-      {club?.privacyUrl && <a data-testid="footer-privacy" className="underline hover:no-underline" href={club.privacyUrl}>{t("footer.privacy")}</a>}
+      {club?.imprintUrl && <a data-testid="footer-imprint" className="underline hover:no-underline" href={club.imprintUrl} target="_blank" rel="noopener noreferrer">{t("footer.imprint")}</a>}
+      {club?.privacyUrl && <a data-testid="footer-privacy" className="underline hover:no-underline" href={club.privacyUrl} target="_blank" rel="noopener noreferrer">{t("footer.privacy")}</a>}
     </footer>
   </div>;
 }
