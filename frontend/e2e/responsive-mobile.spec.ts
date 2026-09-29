@@ -819,5 +819,5 @@ test("every page keeps its text legible and its controls on screen at phone widt
   const missed = pages.filter((route) => !route.redirect && ![...landed].some((path) => routePattern(route.path).test(path)));
   expect.soft(unresolved, "a parameter route whose list page links to no instance").toEqual([]);
   expect.soft(missed.map((route) => route.path), "a page the guard never reached").toEqual([]);
-  expect(findings, "text below 10px or a control beyond the phone's edge").toEqual([]);
+  expect([...new Set(findings)], "text below 10px or a control beyond the phone's edge").toEqual([]);
 });
