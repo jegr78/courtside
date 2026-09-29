@@ -3,7 +3,11 @@
 ## 0.1.0 (2026-09-14)
 
 
+
 ### Notable changes
+
+* bundled PostgreSQL 18 deployments bind the generated COURTSIDE_DATABASE_VOLUME explicitly.
+* the reference deployment requires PostgreSQL 18, and the database volume is mounted at /var/lib/postgresql. A data directory written by PostgreSQL 17 does not start under the new image; no release has been published with PostgreSQL 17.
 
 * a club that points COURTSIDE_MAIL_RELAY_HOST at a relay whose certificate this instance cannot verify must now set COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE=true itself. Until it does, every handover over that hop fails: a message is attempted four times across about a minute and is then settled FAILED with its reason, and the event behind it is replayed only when the instance restarts — which writes a second row and issues a fresh credential, because the first exists only as a hash.
 * load a renewed mail certificate into the running server ([#779](https://github.com/jegr78/courtside/issues/779))
@@ -12,6 +16,34 @@
 * **api:** validation codes in fieldErrors entries change for missing, blank, non-positive and unknown-enum values, and field names now carry array indices. The problem type, the status and the fieldErrors shape are unchanged.
 
 ### Features
+
+* add administrator operational logs ([#1075](https://github.com/jegr78/courtside/issues/1075)) ([4176c4e](https://github.com/jegr78/courtside/commit/4176c4ea68cae015b6ba7889f609a8f9c8f391b6))
+* add configurable documentation link ([#1096](https://github.com/jegr78/courtside/issues/1096)) ([c154310](https://github.com/jegr78/courtside/commit/c1543108817fb908fddc793cd63fc11fd785d52f))
+* add managed appointment workspace ([#1181](https://github.com/jegr78/courtside/issues/1181)) ([fde6b99](https://github.com/jegr78/courtside/commit/fde6b99d39e7638c8208453fc81e2522c9f220e3))
+* commit every administration page with one save bar ([#1141](https://github.com/jegr78/courtside/issues/1141)) ([c71925d](https://github.com/jegr78/courtside/commit/c71925d079e92cc73faeacde091be111fe3dbbe1))
+* filter the administrative change log ([08d7c35](https://github.com/jegr78/courtside/commit/08d7c3577e08ede71ee143bd234a38219853bd42))
+* give notices a warning and an informational tone ([#1109](https://github.com/jegr78/courtside/issues/1109)) ([8636ea0](https://github.com/jegr78/courtside/commit/8636ea03e534f9c3419cd1715dd888d7aa5854bb))
+* keep personal bookings available offline ([#1069](https://github.com/jegr78/courtside/issues/1069)) ([bf7d14a](https://github.com/jegr78/courtside/commit/bf7d14aaa7a8a393219cea6e795b1cad50097c0e))
+* keep personal bookings available offline ([#1106](https://github.com/jegr78/courtside/issues/1106)) ([bf7d14a](https://github.com/jegr78/courtside/commit/bf7d14aaa7a8a393219cea6e795b1cad50097c0e))
+* let a board filter the change log by picking a kind of change ([#1108](https://github.com/jegr78/courtside/issues/1108)) ([d756ab6](https://github.com/jegr78/courtside/commit/d756ab6b13bf66a8f43022395aac1d2f82693736))
+* let a password field show what was typed ([#1167](https://github.com/jegr78/courtside/issues/1167)) ([13c250f](https://github.com/jegr78/courtside/commit/13c250f4ac447b59f973472375397b1e1810643f))
+* let an installed app carry the club's name, colour and mark ([#1127](https://github.com/jegr78/courtside/issues/1127)) ([53be794](https://github.com/jegr78/courtside/commit/53be7940d5f93ed99f6b15853b4afaa16fb19708))
+* let the board plan opening hours ahead and read the plan by date ([#1183](https://github.com/jegr78/courtside/issues/1183)) ([96f7413](https://github.com/jegr78/courtside/commit/96f741301e09de96a4ec5584ebcbda2aca85bd5d))
+* make the admin roster role-aware and pageable ([#1036](https://github.com/jegr78/courtside/issues/1036)) ([4fa3026](https://github.com/jegr78/courtside/commit/4fa30260b0c28aa81b6d63ff96953cc5fd841295))
+* make the administrative change log searchable ([#1059](https://github.com/jegr78/courtside/issues/1059)) ([08d7c35](https://github.com/jegr78/courtside/commit/08d7c3577e08ede71ee143bd234a38219853bd42))
+* open administration on what the club needs today ([#1154](https://github.com/jegr78/courtside/issues/1154)) ([36499fd](https://github.com/jegr78/courtside/commit/36499fd9bedbfbb30378fc4a371d438e5234b061))
+* record when an account last signed in ([#1160](https://github.com/jegr78/courtside/issues/1160)) ([35976fc](https://github.com/jegr78/courtside/commit/35976fc3ebda4fc5c67bdd983ad988a5c5f1ffc8))
+* schedule opening hours from a chosen day and read them by date ([#1182](https://github.com/jegr78/courtside/issues/1182)) ([2e2c7a7](https://github.com/jegr78/courtside/commit/2e2c7a7d268e43b74772797020e6f09e3b39225f))
+* seed installed UAT booking history ([#1170](https://github.com/jegr78/courtside/issues/1170)) ([3ceb212](https://github.com/jegr78/courtside/commit/3ceb21280a898a620968f44adfdcc184c1c71616))
+* seed persistent UAT booking history ([#1168](https://github.com/jegr78/courtside/issues/1168)) ([0f5e835](https://github.com/jegr78/courtside/commit/0f5e83519cecf66546826463d6abbe735afa180b))
+* serve the board's statistics for any period ([#1162](https://github.com/jegr78/courtside/issues/1162)) ([c5da7f7](https://github.com/jegr78/courtside/commit/c5da7f7af3e3515afe3a5c75c43f4a8469b7d15a))
+* show membership types at a glance ([#1111](https://github.com/jegr78/courtside/issues/1111)) ([bdcb1c2](https://github.com/jegr78/courtside/commit/bdcb1c289468dfb68e40b5d4d2a60021a0c680fa))
+* show on the roster who can sign in, filter on it and count the matches ([#1119](https://github.com/jegr78/courtside/issues/1119)) ([ead4e90](https://github.com/jegr78/courtside/commit/ead4e905e98da4ead52c714a07100209ff448739))
+* show the board's key figures on the administration overview ([#1164](https://github.com/jegr78/courtside/issues/1164)) ([8daf8be](https://github.com/jegr78/courtside/commit/8daf8be244f7c7f2f7b7e21fbeae30d3be87521a))
+* show which booking rules no rule set can change ([#1038](https://github.com/jegr78/courtside/issues/1038)) ([3440de6](https://github.com/jegr78/courtside/commit/3440de673a567ce067c809ca9c17760fd1f8f66d))
+* split the club configuration into a profile, deadlines and booking rules ([#1131](https://github.com/jegr78/courtside/issues/1131)) ([5623539](https://github.com/jegr78/courtside/commit/562353941ac2bc89908be014bf477c22e0db915f))
+* tell a board when a booking card's colour leaves its label hard to read ([#1114](https://github.com/jegr78/courtside/issues/1114)) ([b277476](https://github.com/jegr78/courtside/commit/b2774765abe77326fb28a3cfd905434bffa8cc6b))
+* turn the utilisation page into the board's statistics page ([#1163](https://github.com/jegr78/courtside/issues/1163)) ([42f1090](https://github.com/jegr78/courtside/commit/42f10908484fdf44a95fd66456ec5726849b4563))
 
 * add deployment lifecycle CLI ([#1024](https://github.com/jegr78/courtside/issues/1024)) ([9a43efe](https://github.com/jegr78/courtside/commit/9a43efed3b9f8312c555f3b13183188fcca17d61))
 * bind deployment images to explicit trust sources ([#1023](https://github.com/jegr78/courtside/issues/1023)) ([d4fb928](https://github.com/jegr78/courtside/commit/d4fb9285cb9a0eb1c45138e6fa6641ec98bc595a))
@@ -148,6 +180,36 @@
 * write to a member in the language they read ([#447](https://github.com/jegr78/courtside/issues/447)) ([596ce57](https://github.com/jegr78/courtside/commit/596ce576320ebf65ae3727d3e5059afdac42c5ef))
 
 ### Bug fixes
+
+* bind message colours to chosen appearance ([#1100](https://github.com/jegr78/courtside/issues/1100)) ([0f80165](https://github.com/jegr78/courtside/commit/0f80165bd07ab99cddad7b22ec4186ad31926c02))
+* clear saved account role changes ([#1056](https://github.com/jegr78/courtside/issues/1056)) ([6b41ee4](https://github.com/jegr78/courtside/commit/6b41ee4c4f0713378eeb38104b87845325591801))
+* compact the phone week navigation ([#1103](https://github.com/jegr78/courtside/issues/1103)) ([03f8c15](https://github.com/jegr78/courtside/commit/03f8c15c1cfe252287628dd3ddff9b6b9e054e2d))
+* count a documentation target as club configuration ([#1097](https://github.com/jegr78/courtside/issues/1097)) ([296e2a2](https://github.com/jegr78/courtside/commit/296e2a286120ac8c8c37122a54b6e0b5008ebddf))
+* describe court-plan availability ([#1068](https://github.com/jegr78/courtside/issues/1068)) ([#1104](https://github.com/jegr78/courtside/issues/1104)) ([de64e91](https://github.com/jegr78/courtside/commit/de64e9198509d7fe77176e4b0f06a8ff2840385f))
+* describe the PWA reload action ([#1054](https://github.com/jegr78/courtside/issues/1054)) ([976df37](https://github.com/jegr78/courtside/commit/976df37f2a3388afad2e04da4dec291cf5cf6e82))
+* draw checkboxes, the setup progress, the file trigger and the card colour from the palette ([#1120](https://github.com/jegr78/courtside/issues/1120)) ([6d9f91b](https://github.com/jegr78/courtside/commit/6d9f91b14e501fed16b04db2fe0902b84e66822a))
+* drop an application resource sample the harness caught while stopping it ([#1179](https://github.com/jegr78/courtside/issues/1179)) ([ecd1fd9](https://github.com/jegr78/courtside/commit/ecd1fd9ca100dd88ebcc46e4b9e8fa5c5a604c23))
+* enlarge free slot touch targets ([#1099](https://github.com/jegr78/courtside/issues/1099)) ([74738a8](https://github.com/jegr78/courtside/commit/74738a88d1299c240d1f81ea70662e0aaa67bf14))
+* fetch published release history without gh ([#1029](https://github.com/jegr78/courtside/issues/1029)) ([a4335e7](https://github.com/jegr78/courtside/commit/a4335e744fb581d22d6674405c54362521eb865e))
+* give CI jobs measured time budgets and run the deployment CLI tests in parallel ([#1180](https://github.com/jegr78/courtside/issues/1180)) ([b9b5615](https://github.com/jegr78/courtside/commit/b9b5615603bd6e9809796e034be9acae4a7690fb)), closes [#1178](https://github.com/jegr78/courtside/issues/1178) [#1105](https://github.com/jegr78/courtside/issues/1105) [#1121](https://github.com/jegr78/courtside/issues/1121)
+* keep account menu inside phone viewport ([#1098](https://github.com/jegr78/courtside/issues/1098)) ([ded8327](https://github.com/jegr78/courtside/commit/ded83272041c1213a011e3e3e72061268ced1d97))
+* keep phone navigation destinations reachable ([#1092](https://github.com/jegr78/courtside/issues/1092)) ([1c5c166](https://github.com/jegr78/courtside/commit/1c5c166461d522a84557002797bf56bf3f5479d4))
+* lead my bookings with the next one and name each booking by when and where ([#1128](https://github.com/jegr78/courtside/issues/1128)) ([66ee752](https://github.com/jegr78/courtside/commit/66ee75277863fdbe8a562c0ee17689b0ad791b0b))
+* let a destructive action rest quietly and keep the full weight for its confirmation ([#1115](https://github.com/jegr78/courtside/issues/1115)) ([45a87a7](https://github.com/jegr78/courtside/commit/45a87a757f6f4586f3bfc15b70645fda9c27c62a))
+* let a disabled button look disabled ([#1107](https://github.com/jegr78/courtside/issues/1107)) ([a250e43](https://github.com/jegr78/courtside/commit/a250e43a667940e238f413e6e27fca56226fe6b5))
+* let a failed page load be tried again without reloading the browser ([#1118](https://github.com/jegr78/courtside/issues/1118)) ([b6a81f5](https://github.com/jegr78/courtside/commit/b6a81f5aa483785c119cc535119eeca270985db2))
+* let a UAT reset answer for an environment that never existed ([#1035](https://github.com/jegr78/courtside/issues/1035)) ([e11deb3](https://github.com/jegr78/courtside/commit/e11deb322768d5bf0d872b058872ba4280eab876))
+* let the booking dialog state the length bound before the member submits ([#1122](https://github.com/jegr78/courtside/issues/1122)) ([d16919f](https://github.com/jegr78/courtside/commit/d16919fe072576ab355aa5709277bb2d0e70a521))
+* make the court plan describe availability ([#1068](https://github.com/jegr78/courtside/issues/1068)) ([de64e91](https://github.com/jegr78/courtside/commit/de64e9198509d7fe77176e4b0f06a8ff2840385f))
+* make the folded administration menu look and act like a menu ([#1113](https://github.com/jegr78/courtside/issues/1113)) ([f4481ee](https://github.com/jegr78/courtside/commit/f4481ee1711e213cfd287447b28fa547d707db52))
+* measure facility utilisation against the hours the facility was open ([#1124](https://github.com/jegr78/courtside/issues/1124)) ([e292b18](https://github.com/jegr78/courtside/commit/e292b18600be180008cd190d166ade433f8edbef))
+* migrate installed PostgreSQL data across major updates ([#1174](https://github.com/jegr78/courtside/issues/1174)) ([0810b24](https://github.com/jegr78/courtside/commit/0810b243e4557e4c755e0bd13f8d794c633d60d6))
+* name what a refusal means and tell an unknown reason from a failure ([#1116](https://github.com/jegr78/courtside/issues/1116)) ([bf3e9a9](https://github.com/jegr78/courtside/commit/bf3e9a9ec7e53541dc00a4879b149cedf5d5de3c))
+* raise control and focus contrast ([#1101](https://github.com/jegr78/courtside/issues/1101)) ([5643717](https://github.com/jegr78/courtside/commit/564371736777b09f3ae0ce9cb5846790427888a6))
+* remove false deadlines from release verification ([#1112](https://github.com/jegr78/courtside/issues/1112)) ([5d226d7](https://github.com/jegr78/courtside/commit/5d226d78394d45d0e49f14480852ece0bf0fc4d6))
+* remove false WebKit stability deadlines ([#1129](https://github.com/jegr78/courtside/issues/1129)) ([83d710a](https://github.com/jegr78/courtside/commit/83d710a8a9ed24fe76c204ab8094498eff2851f8))
+* show bookings in the court plan when they fall outside the opening hours ([#1177](https://github.com/jegr78/courtside/issues/1177)) ([ede7626](https://github.com/jegr78/courtside/commit/ede76262c439f9bf7f7a8424baafa7bd6be3b11f))
+* show the current member destination ([#1102](https://github.com/jegr78/courtside/issues/1102)) ([0e64354](https://github.com/jegr78/courtside/commit/0e6435421fe146841b4e00b3c3bcdbf74837e9a6))
 
 * build the local image from the jar this build packaged ([#1001](https://github.com/jegr78/courtside/issues/1001)) ([bbdca60](https://github.com/jegr78/courtside/commit/bbdca60f1aef4288311508eb756918806d7cb582))
 * harden deployment acceptance paths ([3010f55](https://github.com/jegr78/courtside/commit/3010f552825bfea1825c1f641ae864bfaa10a610)), closes [#991](https://github.com/jegr78/courtside/issues/991)
@@ -337,11 +399,17 @@
 
 ### Performance
 
+* keep administration and the second language out of a member's first load ([#1130](https://github.com/jegr78/courtside/issues/1130)) ([3fee530](https://github.com/jegr78/courtside/commit/3fee5305c4f2e9a0502135566578b76f98bd25e8))
+
 * bound booking series rule queries ([#316](https://github.com/jegr78/courtside/issues/316)) ([e96323e](https://github.com/jegr78/courtside/commit/e96323e31c7d35f81049728ae3c69583fcab8396))
 * load the club time zone without its logo ([#710](https://github.com/jegr78/courtside/issues/710)) ([0cbe52a](https://github.com/jegr78/courtside/commit/0cbe52a340aadad41184e1f3c1762d36489984bc))
 * resolve series move memberships once per batch ([#711](https://github.com/jegr78/courtside/issues/711)) ([8614451](https://github.com/jegr78/courtside/commit/8614451315b5cd24382dab52e2fc6e8375aa0631))
 
 ### Documentation
+
+* drop instruction lines the build files and code already state ([e4600d8](https://github.com/jegr78/courtside/commit/e4600d88c7a3c10e6be1c814f72d36fb29eaa577))
+* make synthetic mail certificate path teardown-safe ([#1032](https://github.com/jegr78/courtside/issues/1032)) ([e3c47a5](https://github.com/jegr78/courtside/commit/e3c47a573ffd1d4aa15c0ecdd2f8486f06790b99))
+* publish a reproducible roster import example ([#1040](https://github.com/jegr78/courtside/issues/1040)) ([1bad4df](https://github.com/jegr78/courtside/commit/1bad4df6e777c2e1bd4c4e2b521bad55f3f4ae31))
 
 * capture each guide in a browser that speaks its language ([#979](https://github.com/jegr78/courtside/issues/979)) ([e1fe7d1](https://github.com/jegr78/courtside/commit/e1fe7d154a5e0a23f3778c1f68ddd5e1211184c3))
 * make design specification current ([fd6c036](https://github.com/jegr78/courtside/commit/fd6c036bf9c25cc773e0965cbeb63c4f9cf8761e))
@@ -391,6 +459,11 @@
 * stop the assessment from filing an issue for every unprovable control ([#910](https://github.com/jegr78/courtside/issues/910)) ([8740314](https://github.com/jegr78/courtside/commit/87403146786f632a5c7006fa0de871bb65978cf7))
 
 ### Build and dependencies
+
+* **deps:** bump frontend, Maven, deploy and workflow dependencies ([#1058](https://github.com/jegr78/courtside/issues/1058)) ([9bceeda](https://github.com/jegr78/courtside/commit/9bceedab115946a4db33fe2b42cfdfd42a836dd6))
+* **deps:** consolidate deployment updates ([#1153](https://github.com/jegr78/courtside/issues/1153)) ([f26bfc0](https://github.com/jegr78/courtside/commit/f26bfc080c2be1698f272c8eabeaccf0821a0de4))
+* **deps:** consolidate frontend updates ([#1152](https://github.com/jegr78/courtside/issues/1152)) ([f4a09c1](https://github.com/jegr78/courtside/commit/f4a09c16cea9e4a4ce77da1ed403fc430a5d404c))
+* run the bundled database on PostgreSQL 18 and refresh the deployment images ([#1161](https://github.com/jegr78/courtside/issues/1161)) ([231738b](https://github.com/jegr78/courtside/commit/231738bdaa996e582c0ee88138cddf0946bd7877))
 
 * adopt Node.js 26 toolchain ([#282](https://github.com/jegr78/courtside/issues/282)) ([b14599a](https://github.com/jegr78/courtside/commit/b14599a7e967c5e1a41e1ca2f707bc446dba2885))
 * **deps-dev:** Bump @axe-core/playwright from 4.10.2 to 4.13.0 in /frontend ([#273](https://github.com/jegr78/courtside/issues/273)) ([4cb418e](https://github.com/jegr78/courtside/commit/4cb418eb3d289519dfe0ea3339653fe693f3ca7e))
