@@ -647,3 +647,51 @@ test("a booking on a day the club has since closed stays in the phone plan", asy
   await expect(page.getByTestId("free-slot"), "a closed day offers nothing to book").toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 });
+
+async function expectInsideViewport(locator: import("@playwright/test").Locator, name: string) {
+  const width = await locator.page().evaluate(() => document.documentElement.clientWidth);
+  const box = await locator.boundingBox();
+  expect(box, `${name} is rendered`).not.toBeNull();
+  expect([box!.x >= 0, box!.x + box!.width <= width], `${name} lies inside the ${width} px viewport`).toEqual([true, true]);
+}
+
+test("courts and slot fillers show each entry's name, status and actions on a phone", async ({ page }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  await expect(page.getByTestId("administration-link")).toBeVisible();
+
+  // when
+  await page.goto("/admin/facility/courts");
+
+  // then
+  const court = page.locator('[data-testid^="court-row-"]').first();
+  await expect(court).toBeVisible();
+  const courtId = (await court.getAttribute("data-testid"))!.replace("court-row-", "");
+  expect(await court.evaluate((element) => getComputedStyle(element).display), "a court is a card on a phone").toBe("grid");
+  await expect(court.getByTestId("court-label-name")).toBeVisible();
+  await expect(page.getByRole("table").getByRole("columnheader"), "the card keeps its column headers for a screen reader").toHaveCount(4);
+  await expect(court.getByRole("cell")).toHaveCount(4);
+  await expectInsideViewport(page.getByTestId(`edit-court-number-${courtId}`), "the court number");
+  await expectInsideViewport(page.getByTestId(`edit-court-name-${courtId}`), "the court name");
+  await expectInsideViewport(page.getByTestId(`court-status-${courtId}`), "the court status");
+  await expectInsideViewport(page.getByTestId(`toggle-court-${courtId}`), "the court's deactivate action");
+  await expectInsideViewport(page.getByTestId(`court-impact-${courtId}`), "the court's impact question");
+  await expectNoHorizontalOverflow(page);
+
+  // when
+  await page.goto("/admin/facility/slot-fillers");
+
+  // then
+  const row = page.locator('[data-testid^="participant-card-row-"]').first();
+  await expect(row).toBeVisible();
+  const filler = (await row.getAttribute("data-testid"))!.replace("participant-card-row-", "");
+  expect(await row.evaluate((element) => getComputedStyle(element).display), "a slot filler is a card on a phone").toBe("grid");
+  await expect(row.getByTestId("participant-card-label-owned")).toBeVisible();
+  await expect(page.getByRole("table").getByRole("columnheader"), "the card keeps its column headers for a screen reader").toHaveCount(3);
+  await expect(row.getByRole("cell")).toHaveCount(3);
+  await expectInsideViewport(page.getByTestId(`edit-participant-card-label-${filler}`), "the slot filler's label");
+  await expectInsideViewport(page.getByTestId(`edit-participant-card-capacity-${filler}`), "the slot filler's count");
+  await expectInsideViewport(page.getByTestId(`participant-card-status-${filler}`), "the slot filler's status");
+  await expectInsideViewport(page.getByTestId(`toggle-participant-card-${filler}`), "the slot filler's deactivate action");
+  await expectNoHorizontalOverflow(page);
+});
