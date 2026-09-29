@@ -718,8 +718,10 @@ async function concretePath(page: Page, path: string): Promise<string | undefine
   await page.goto(path.slice(0, path.indexOf("/:")));
   await page.waitForLoadState("networkidle");
   const pattern = routePattern(path);
-  const hrefs = await page.locator("a[href]").evaluateAll((links) => links.map((link) => new URL((link as HTMLAnchorElement).href).pathname));
-  return hrefs.find((href) => pattern.test(href));
+  const instance = async () => (await page.locator("a[href]").evaluateAll((links) =>
+    links.map((link) => new URL((link as HTMLAnchorElement).href).pathname))).find((href) => pattern.test(href));
+  await expect.poll(instance, { timeout: 15_000 }).toBeDefined().catch(() => undefined);
+  return instance();
 }
 
 async function phoneLegibility(page: Page): Promise<string[]> {
@@ -730,8 +732,19 @@ async function phoneLegibility(page: Page): Promise<string[]> {
       const text = (element.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
       return `<${element.tagName.toLowerCase()}${testId ? ` data-testid="${testId}"` : ""}> "${text}"`;
     };
+    // A clipping ancestor such as sr-only hides a control, a scrolling one only moves it.
+    const clippedAway = (element: Element) => {
+      let { left, right, top, bottom } = element.getBoundingClientRect();
+      for (let current = element.parentElement; current; current = current.parentElement) {
+        const style = getComputedStyle(current);
+        if (!/hidden|clip/.test(style.overflowX + style.overflowY)) continue;
+        const clip = current.getBoundingClientRect();
+        [left, right, top, bottom] = [Math.max(left, clip.left), Math.min(right, clip.right), Math.max(top, clip.top), Math.min(bottom, clip.bottom)];
+      }
+      return right - left <= 1 || bottom - top <= 1;
+    };
     const shown = (element: Element) => element.checkVisibility({ opacityProperty: true, visibilityProperty: true })
-      && element.getClientRects().length > 0;
+      && element.getClientRects().length > 0 && !clippedAway(element);
     const carousel = (element: Element) => {
       for (let current = element.parentElement; current; current = current.parentElement) {
         const style = getComputedStyle(current);
@@ -771,7 +784,8 @@ async function become(page: Page, persona: Persona) {
   await page.context().clearCookies();
   if (persona === "signed out") return;
   await signIn(page, persona);
-  await expect(page.getByTestId(persona === "bootstrap-admin" ? "initial-password-view" : "preferences-menu")).toBeVisible();
+  const signedIn = { "doe.jane": "my-bookings-link", "configuration-admin": "administration-link", "bootstrap-admin": "initial-password-view" };
+  await expect(page.getByTestId(signedIn[persona])).toBeVisible();
 }
 
 test("every page keeps its text legible and its controls on screen at phone width", async ({ page }) => {
@@ -803,7 +817,7 @@ test("every page keeps its text legible and its controls on screen at phone widt
 
   // then
   const missed = pages.filter((route) => !route.redirect && ![...landed].some((path) => routePattern(route.path).test(path)));
-  expect(unresolved, "a parameter route whose list page links to no instance").toEqual([]);
-  expect(missed.map((route) => route.path), "a page the guard never reached").toEqual([]);
+  expect.soft(unresolved, "a parameter route whose list page links to no instance").toEqual([]);
+  expect.soft(missed.map((route) => route.path), "a page the guard never reached").toEqual([]);
   expect(findings, "text below 10px or a control beyond the phone's edge").toEqual([]);
 });
