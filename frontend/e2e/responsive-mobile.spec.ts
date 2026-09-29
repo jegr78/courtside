@@ -669,6 +669,8 @@ test("courts and slot fillers show each entry's name, status and actions on a ph
   const courtId = (await court.getAttribute("data-testid"))!.replace("court-row-", "");
   expect(await court.evaluate((element) => getComputedStyle(element).display), "a court is a card on a phone").toBe("grid");
   await expect(court.getByTestId("court-label-name")).toBeVisible();
+  await expect(page.getByRole("table").getByRole("columnheader"), "the card keeps its column headers for a screen reader").toHaveCount(4);
+  await expect(court.getByRole("cell")).toHaveCount(4);
   await expectInsideViewport(page.getByTestId(`edit-court-number-${courtId}`), "the court number");
   await expectInsideViewport(page.getByTestId(`edit-court-name-${courtId}`), "the court name");
   await expectInsideViewport(page.getByTestId(`court-status-${courtId}`), "the court status");
@@ -685,6 +687,8 @@ test("courts and slot fillers show each entry's name, status and actions on a ph
   const filler = (await row.getAttribute("data-testid"))!.replace("participant-card-row-", "");
   expect(await row.evaluate((element) => getComputedStyle(element).display), "a slot filler is a card on a phone").toBe("grid");
   await expect(row.getByTestId("participant-card-label-owned")).toBeVisible();
+  await expect(page.getByRole("table").getByRole("columnheader"), "the card keeps its column headers for a screen reader").toHaveCount(3);
+  await expect(row.getByRole("cell")).toHaveCount(3);
   await expectInsideViewport(page.getByTestId(`edit-participant-card-label-${filler}`), "the slot filler's label");
   await expectInsideViewport(page.getByTestId(`edit-participant-card-capacity-${filler}`), "the slot filler's count");
   await expectInsideViewport(page.getByTestId(`participant-card-status-${filler}`), "the slot filler's status");
