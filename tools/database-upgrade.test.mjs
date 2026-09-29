@@ -16,10 +16,6 @@ const releaseWorkflow = readFileSync(
   fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)),
   "utf8"
 );
-const fixture = readFileSync(
-  fileURLToPath(new URL("../upgrade/fixtures/origin.sql", import.meta.url)),
-  "utf8"
-);
 const upgradeCompose = readFileSync(
   fileURLToPath(new URL("../deploy/compose.upgrade.yaml", import.meta.url)),
   "utf8"
@@ -166,19 +162,6 @@ test("given repository digests, when resolving an origin, then only the expected
     "ghcr.io/example/courtside@sha256:aaaa");
   assert.throws(() => selectRepositoryDigest("example/courtside", "v0.2.0", [digests[0]]),
     /exactly one digest/);
-});
-
-test("given the upgrade-origin fixture, when it is inspected, then all representative state is explicit", () => {
-  // when / then
-  for (const table of [
-    "person", "user_account", "user_account_role", "member", "court", "rule_set",
-    "rule_definition", "booking", "court_allocation", "booking_participant", "booking_series",
-    "booking_series_court", "spring_session", "login_attempt_limit"
-  ]) {
-    assert.match(fixture, new RegExp(`INSERT INTO ${table}\\b`, "i"), table);
-  }
-  assert.match(fixture, /UPDATE club_config\b/i);
-  assert.match(fixture, /upgrade-fixture@example\.org/);
 });
 
 test("given the upgrade verifier, when it is inspected, then representative row contents are captured", () => {

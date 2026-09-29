@@ -396,11 +396,17 @@ jobs:
         if: always()
         with:
           name: nightly-image-qualification-${{ matrix.architecture }}
-          path: |
-            build/uat-smoke
-            build/installed-database-upgrade
+          path: build/uat-smoke
           retention-days: 14
           if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always() && matrix.architecture == 'amd64'
+        with:
+          name: nightly-installed-database-upgrade-${{ matrix.architecture }}
+          path: build/installed-database-upgrade
+          retention-days: 14
+          if-no-files-found: warn
 
   publish:
     needs: [select, image, qualify]

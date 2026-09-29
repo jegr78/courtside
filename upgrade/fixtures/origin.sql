@@ -69,7 +69,10 @@ INSERT INTO spring_session
     (primary_id, session_id, creation_time, last_access_time, max_inactive_interval, expiry_time, principal_name)
 VALUES ('upgrade-fixture-primary', 'upgrade-fixture-session',
         (extract(epoch FROM now()) * 1000)::bigint, (extract(epoch FROM now()) * 1000)::bigint,
-        86400, (extract(epoch FROM now() + interval '1 day') * 1000)::bigint, 'upgrade-member');
+        86400, (extract(epoch FROM now() + interval '1 day') * 1000)::bigint, 'upgrade-member'),
+       ('upgrade-fixture-idle', 'upgrade-fixture-idle-session',
+        (extract(epoch FROM now()) * 1000)::bigint, (extract(epoch FROM now()) * 1000)::bigint,
+        86400, (extract(epoch FROM now() + interval '1 day') * 1000)::bigint, 'upgrade-fixture-nobody');
 
 INSERT INTO domain_event (id, event_type, subject_id, actor_account_id, occurred_at, payload)
 VALUES ('7a000000-0000-0000-0000-000000000001', 'UPGRADE_PROOF',
@@ -78,7 +81,7 @@ VALUES ('7a000000-0000-0000-0000-000000000001', 'UPGRADE_PROOF',
         '{"proof":"upgrade-fixture"}');
 
 INSERT INTO spring_session_attributes (session_primary_id, attribute_name, attribute_bytes)
-VALUES ('upgrade-fixture-primary', 'upgrade-fixture-attribute', '\x00'::bytea);
+VALUES ('upgrade-fixture-idle', 'upgrade-fixture-attribute', '\x00'::bytea);
 
 INSERT INTO credential_issue_limit (account_id, issued_count, window_started_at)
 VALUES ('72000000-0000-0000-0000-000000000001', 1, '2025-01-01T00:00:00Z');

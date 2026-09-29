@@ -65,8 +65,8 @@ changes the firewall or prunes Docker globally. It leaves the installation runni
 removal remains an explicit operator action through the installed lifecycle CLI.
 
 This does not replace the release gate. A release stamps its version, runs its complete build,
-active assessment, restore check and the upgrade check from every origin it has, and publishes a different digest under versioned
-tags. The nightly image is an acceptance artifact for the current code. The release workflow still
+active assessment, restore check and the upgrade check from every origin it has, and publishes a
+different digest under versioned tags. The nightly image is an acceptance artifact for the current code. The release workflow still
 proves the tagged code and image itself.
 
 If the selected revision already labels the published `nightly` image, the workflow skips package,
@@ -280,6 +280,12 @@ turning development-time breaking markers into upgrade instructions.
 What no automation covers is the upgrade path itself. `upgrade` executes the origins it resolved
 from the published release history, so a release that breaks one of those is refused, but only
 those.
+
+`upgrade` reads `upgrade/fixtures/origin.sql` and `upgrade/verify.sql` from the origin's tag, loads
+the fixture into the origin and compares what the origin's query saw with what the candidate's query
+sees after migrating. Every key `verify.sql` reports is therefore a contract with every later
+release: a key may be added, but one renamed, dropped or given a different meaning reads as lost
+data and refuses the next release until the change is explained in the upgrade proof.
 
 ## Candidates
 
