@@ -16,7 +16,8 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
     "admin-overview", "admin-setup", "admin-configuration", "admin-deadlines", "admin-deadlines-unsaved", "admin-rule-sets", "admin-courts", "admin-opening-hours", "admin-booking-cards",
     "admin-booking-card",
     "admin-slot-fillers", "admin-roster", "admin-membership-types",
-    "admin-import", "admin-export", "admin-utilisation", "admin-audit", "admin-messages"
+    "admin-import", "admin-export", "admin-utilisation", "admin-audit", "admin-messages",
+    "phone-public-court-plan", "phone-court-plan", "phone-personal-bookings"
   ];
   for (const surface of principalSurfaces) {
     assert.match(visual, new RegExp(`\\"${surface}\\.png\\"`));

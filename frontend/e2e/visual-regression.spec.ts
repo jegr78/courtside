@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { type Locator, type Page } from "@playwright/test";
-import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectPreference, test } from "./fixtures";
+import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectJourneyDate, selectPreference, test } from "./fixtures";
 
 // Locale, theme, viewport and timezone are fixed here; the renderer is fixed by the project,
 // which draws in the pinned image rather than in whatever browser the host provides.
@@ -72,6 +72,31 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   // then
   await stableScreenshot(page.getByTestId("move-dialog"), "series-preview.png",
     page.getByTestId("move-preview").locator("li p"));
+});
+
+test("the phone court plan and personal bookings match their reviewed baselines", async ({ page, journeyService }) => {
+  // given
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.getByTestId("public-club-name")).toBeVisible();
+  await selectJourneyDate(page, journeyService.visualDate);
+
+  // then
+  await phoneScreenshot(page.getByTestId("court-plan-view"), "phone-public-court-plan.png", dynamicDates(page));
+
+  // when
+  await signIn(page, "doe.jane");
+  await selectJourneyDate(page, journeyService.visualDate);
+
+  // then
+  await phoneScreenshot(page.getByTestId("court-plan-view"), "phone-court-plan.png", dynamicDates(page));
+
+  // when
+  await page.getByTestId("my-bookings-link").click();
+  await expect(page.getByTestId("upcoming-bookings")).toBeVisible();
+
+  // then
+  await phoneScreenshot(page.getByTestId("my-bookings-page"), "phone-personal-bookings.png", page.locator("time"));
 });
 
 test("stable administration surfaces match their reviewed baselines", async ({ page, journeyService }) => {
@@ -251,6 +276,14 @@ async function selectVisualDate(page: Page, date: string): Promise<void> {
 
 function dynamicDates(page: Page): Locator {
   return page.locator('[data-testid^="day-selector-"], time');
+}
+
+// The bar is fixed to the viewport, so a stitched capture would draw it wherever scrolling left it.
+async function phoneScreenshot(surface: Locator, name: string, mask: Locator): Promise<void> {
+  const bar = surface.page().getByTestId("primary-navigation-bar");
+  await bar.evaluateAll((elements) => elements.forEach((element) => { (element as HTMLElement).style.visibility = "hidden"; }));
+  await stableScreenshot(surface, name, mask);
+  await bar.evaluateAll((elements) => elements.forEach((element) => { (element as HTMLElement).style.visibility = ""; }));
 }
 
 async function stableScreenshot(surface: Locator, name: string, mask?: Locator): Promise<void> {
