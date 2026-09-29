@@ -1,19 +1,7 @@
 # Changelog
 
-## [0.1.0-rc.4](https://github.com/jegr78/courtside/compare/v0.1.0-rc.3...v0.1.0-rc.4) (2026-09-29)
-
-
-### Bug fixes
-
-* align the footer links and open them in a new tab ([#1208](https://github.com/jegr78/courtside/issues/1208)) ([d4d7ba8](https://github.com/jegr78/courtside/commit/d4d7ba8130b71931370ba0e0c08f3085c6900f8a))
-* keep the booking dialog's actions on screen while a phone browser shows its bar ([#1210](https://github.com/jegr78/courtside/issues/1210)) ([c2463ae](https://github.com/jegr78/courtside/commit/c2463ae90679f87aabcb5977a14a66c602280529))
-* let the release candidate pass its mail, security and upgrade gates ([#1185](https://github.com/jegr78/courtside/issues/1185)) ([22db508](https://github.com/jegr78/courtside/commit/22db5080905e10af412e090e3ad9ef36cd4c368e))
-* open every new page at its top ([#1201](https://github.com/jegr78/courtside/issues/1201)) ([9b177e6](https://github.com/jegr78/courtside/commit/9b177e621a41bf618a3c5ef8f5019a3eaa25abf1))
-* raise jackson-databind past three deserialization advisories ([#1200](https://github.com/jegr78/courtside/issues/1200)) ([160a0f5](https://github.com/jegr78/courtside/commit/160a0f53817e2ad7dcf3394039f2e2335a5b2481))
-* show courts and slot fillers as cards on a phone ([#1206](https://github.com/jegr78/courtside/issues/1206)) ([db303de](https://github.com/jegr78/courtside/commit/db303deac9590caefc70e46814541f5e9dcb7a4a))
-* show times, one column per court and booking labels in the phone court plan ([#1203](https://github.com/jegr78/courtside/issues/1203)) ([bc5e8cd](https://github.com/jegr78/courtside/commit/bc5e8cd549fe96d1ac0a07e94d2b5e74b61e48cb))
-
 ## 0.1.0 (2026-09-14)
+
 
 
 
@@ -193,6 +181,14 @@
 * write to a member in the language they read ([#447](https://github.com/jegr78/courtside/issues/447)) ([596ce57](https://github.com/jegr78/courtside/commit/596ce576320ebf65ae3727d3e5059afdac42c5ef))
 
 ### Bug fixes
+
+* align the footer links and open them in a new tab ([#1208](https://github.com/jegr78/courtside/issues/1208)) ([d4d7ba8](https://github.com/jegr78/courtside/commit/d4d7ba8130b71931370ba0e0c08f3085c6900f8a))
+* keep the booking dialog's actions on screen while a phone browser shows its bar ([#1210](https://github.com/jegr78/courtside/issues/1210)) ([c2463ae](https://github.com/jegr78/courtside/commit/c2463ae90679f87aabcb5977a14a66c602280529))
+* let the release candidate pass its mail, security and upgrade gates ([#1185](https://github.com/jegr78/courtside/issues/1185)) ([22db508](https://github.com/jegr78/courtside/commit/22db5080905e10af412e090e3ad9ef36cd4c368e))
+* open every new page at its top ([#1201](https://github.com/jegr78/courtside/issues/1201)) ([9b177e6](https://github.com/jegr78/courtside/commit/9b177e621a41bf618a3c5ef8f5019a3eaa25abf1))
+* raise jackson-databind past three deserialization advisories ([#1200](https://github.com/jegr78/courtside/issues/1200)) ([160a0f5](https://github.com/jegr78/courtside/commit/160a0f53817e2ad7dcf3394039f2e2335a5b2481))
+* show courts and slot fillers as cards on a phone ([#1206](https://github.com/jegr78/courtside/issues/1206)) ([db303de](https://github.com/jegr78/courtside/commit/db303deac9590caefc70e46814541f5e9dcb7a4a))
+* show times, one column per court and booking labels in the phone court plan ([#1203](https://github.com/jegr78/courtside/issues/1203)) ([bc5e8cd](https://github.com/jegr78/courtside/commit/bc5e8cd549fe96d1ac0a07e94d2b5e74b61e48cb))
 
 * bind message colours to chosen appearance ([#1100](https://github.com/jegr78/courtside/issues/1100)) ([0f80165](https://github.com/jegr78/courtside/commit/0f80165bd07ab99cddad7b22ec4186ad31926c02))
 * clear saved account role changes ([#1056](https://github.com/jegr78/courtside/issues/1056)) ([6b41ee4](https://github.com/jegr78/courtside/commit/6b41ee4c4f0713378eeb38104b87845325591801))
@@ -541,3 +537,4 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
+
