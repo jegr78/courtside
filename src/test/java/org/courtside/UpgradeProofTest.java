@@ -29,7 +29,10 @@ class UpgradeProofTest extends AbstractIntegrationTest {
             "allocations", "participants", "series", "sessions", "loginLimits",
             "idempotencyRecords", "configuration", "personRows", "accountRows", "roleRows",
             "memberRows", "courtRows", "ruleSetRows", "ruleRows", "bookingRows", "allocationRows",
-            "participantRows", "seriesRows", "seriesCourtRows", "sessionRows", "loginLimitRows");
+            "participantRows", "seriesRows", "seriesCourtRows", "sessionRows", "loginLimitRows",
+            "fixtureAuditEvents", "fixtureMessageRecords", "fixtureMessageOptouts", "fixtureEventPublications",
+            "fixtureImportSources", "fixtureImportMappings", "fixtureImportTypeMappings",
+            "fixtureImportOwnedFields", "fixtureImportReferences", "fixtureImportPreviews", "fixtureImportRuns");
 
     @Autowired
     private JdbcClient jdbc;

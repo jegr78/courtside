@@ -76,10 +76,9 @@ export function selectUpgradeOrigins(candidateTag, tags) {
     .sort(precedence).map((version) => version.tag);
   const released_ = [patch?.tag, minor?.tag, released.length === 0 ? precedingMajor?.tag : null]
     .filter(Boolean);
-  // Until a release exists, the pre-release schema is the only database a club can hold, and a
-  // candidate preceding the first release does not make that upgrade any less real.
-  const from = released_.length === 0 ? ["pre-release-v17", ...candidates] : [...released_, ...candidates];
-  return [...new Set(from)];
+  // Before the first release no schema is frozen, so nothing is an upgrade origin.
+  if (released_.length === 0) return [];
+  return [...new Set([...released_, ...candidates])];
 }
 
 // A tag whose run never reached publish names no image; resolving an origin from it would pull
@@ -174,7 +173,8 @@ async function waitForDatabase(project, environment, sql, expected, label) {
   throw new Error(`Database did not expose ${label}`);
 }
 
-async function proveInterruptedStartup(project, originEnvironment, candidateEnvironment, before, originVersion, build, password) {
+async function proveInterruptedStartup(project, originEnvironment, candidateEnvironment, verification, before, originVersion,
+  build, password) {
   compose(project, originEnvironment, ["stop", "app"]);
   const lockHolder = spawn("docker", ["compose", "-p", project, "-f", composeFile,
     "exec", "-T", "-e", "PGAPPNAME=upgrade-lock-holder", "db", "psql", "-v", "ON_ERROR_STOP=1",
@@ -196,14 +196,15 @@ async function proveInterruptedStartup(project, originEnvironment, candidateEnvi
     const version = scalar(project, candidateEnvironment,
       "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1");
     const afterInterruption = psql(project, candidateEnvironment, ["-At", "-f", "/dev/stdin"], {
-      input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
+      input: verification
     }).stdout.trim();
     assert.equal(version, originVersion, "interrupted startup changed the schema version");
     assert.equal(afterInterruption, before, "interrupted startup changed fixture data");
     psql(project, originEnvironment, ["-c", `
       CREATE TABLE upgrade_session_snapshot AS TABLE spring_session;
       CREATE TABLE upgrade_session_attribute_snapshot AS TABLE spring_session_attributes;
-      CREATE TABLE upgrade_login_limit_snapshot AS TABLE login_attempt_limit`]);
+      CREATE TABLE upgrade_login_limit_snapshot AS TABLE login_attempt_limit;
+      CREATE TABLE upgrade_sign_in_snapshot AS SELECT id, last_login_at FROM user_account`]);
     compose(project, originEnvironment, ["up", "-d", "--wait", "--force-recreate", "app"]);
     await verifyApplication(password, publishedPort(project, originEnvironment), false);
     compose(project, originEnvironment, ["stop", "app"]);
@@ -213,9 +214,11 @@ async function proveInterruptedStartup(project, originEnvironment, candidateEnvi
       INSERT INTO spring_session_attributes SELECT * FROM upgrade_session_attribute_snapshot;
       TRUNCATE login_attempt_limit;
       INSERT INTO login_attempt_limit SELECT * FROM upgrade_login_limit_snapshot;
-      DROP TABLE upgrade_session_snapshot, upgrade_session_attribute_snapshot, upgrade_login_limit_snapshot`]);
+      UPDATE user_account a SET last_login_at = s.last_login_at FROM upgrade_sign_in_snapshot s WHERE a.id = s.id;
+      DROP TABLE upgrade_session_snapshot, upgrade_session_attribute_snapshot, upgrade_login_limit_snapshot,
+        upgrade_sign_in_snapshot`]);
     const afterRecoveryProof = psql(project, originEnvironment, ["-At", "-f", "/dev/stdin"], {
-      input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
+      input: verification
     }).stdout.trim();
     assert.equal(afterRecoveryProof, before, "origin usability proof changed fixture data");
     writeFileSync(join(build, "interrupted-startup.json"),
@@ -285,16 +288,14 @@ async function verifyApplication(password, port, isWriteRequired = true) {
   assert.equal(created.statusCode, 201, created.body);
 }
 
-function fixtureFor(origin, build) {
-  const destination = join(build, "fixture.sql");
-  if (origin === "pre-release-v17") {
-    writeFileSync(destination, readFileSync(join(root, "upgrade", "fixtures", "pre-release-v17.sql")));
-  } else {
-    const fixture = run("git", ["show", `${origin}:upgrade/fixtures/pre-release-v17.sql`]);
-    if (fixture.status !== 0) throw new Error(`Release ${origin} does not own an upgrade fixture`);
-    writeFileSync(destination, fixture.stdout);
-  }
-  return destination;
+export const originFixture = "upgrade/fixtures/origin.sql";
+export const originVerification = "upgrade/verify.sql";
+
+function fromOrigin(origin, path, destination) {
+  const content = run("git", ["show", `${origin}:${path}`], { allowFailure: true });
+  if (content.status !== 0) throw new Error(`Release ${origin} does not own ${path}: ${content.stderr}`);
+  writeFileSync(destination, content.stdout);
+  return content.stdout;
 }
 
 async function executeUpgrade() {
@@ -312,47 +313,38 @@ async function executeUpgrade() {
   const build = join(root, "build", "database-upgrade", suffix, runId);
   const password = newBootstrapPassword();
   mkdirSync(build, { recursive: true });
-  const fixture = fixtureFor(origin, build);
+  const fixture = fromOrigin(origin, originFixture, join(build, "fixture.sql"));
+  const verification = fromOrigin(origin, originVerification, join(build, "origin-verify.sql"));
   const baseEnvironment = { COURTSIDE_UPGRADE_ADMIN_PASSWORD: password };
-  let originImage = candidate;
-  if (origin !== "pre-release-v17") {
-    const repository = process.env.GITHUB_REPOSITORY;
-    if (!repository) throw new Error("GITHUB_REPOSITORY is required for a published upgrade origin");
-    const originTag = `ghcr.io/${repository}:${origin.slice(1)}`;
-    run("docker", ["pull", originTag], { inherit: true });
-    const digests = JSON.parse(run("docker", ["image", "inspect", "--format", "{{json .RepoDigests}}", originTag]).stdout);
-    originImage = selectRepositoryDigest(repository, origin, digests);
-  }
+  const repository = process.env.GITHUB_REPOSITORY;
+  if (!repository) throw new Error("GITHUB_REPOSITORY is required for a published upgrade origin");
+  const originTag = `ghcr.io/${repository}:${origin.slice(1)}`;
+  run("docker", ["pull", originTag], { inherit: true });
+  const digests = JSON.parse(run("docker", ["image", "inspect", "--format", "{{json .RepoDigests}}", originTag]).stdout);
+  const originImage = selectRepositoryDigest(repository, origin, digests);
   writeFileSync(join(build, "origin-image.txt"), `${originImage}\n`);
-  const originEnvironment = {
-    ...baseEnvironment,
-    COURTSIDE_UPGRADE_IMAGE: originImage,
-    COURTSIDE_UPGRADE_FLYWAY_TARGET: origin === "pre-release-v17" ? "17" : "latest",
-    COURTSIDE_UPGRADE_DDL_MODE: origin === "pre-release-v17" ? "none" : "validate"
-  };
-  const candidateEnvironment = {
-    ...baseEnvironment, COURTSIDE_UPGRADE_IMAGE: candidate, COURTSIDE_UPGRADE_FLYWAY_TARGET: "latest",
-    COURTSIDE_UPGRADE_DDL_MODE: "validate"
-  };
+  const originEnvironment = { ...baseEnvironment, COURTSIDE_UPGRADE_IMAGE: originImage };
+  const candidateEnvironment = { ...baseEnvironment, COURTSIDE_UPGRADE_IMAGE: candidate };
 
   try {
     compose(project, originEnvironment, ["down", "--volumes", "--remove-orphans"], { allowFailure: true });
     compose(project, originEnvironment, ["up", "-d", "--wait"]);
     psql(project, originEnvironment, ["-f", "/dev/stdin"], {
       environment: originEnvironment,
-      input: readFileSync(fixture, "utf8")
+      input: fixture
     });
     const before = psql(project, originEnvironment, ["-At", "-f", "/dev/stdin"], {
-      input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
+      input: verification
     }).stdout.trim();
     writeFileSync(join(build, "before.json"), `${before}\n`);
     const originVersion = scalar(project, originEnvironment,
       "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1");
 
-    await proveInterruptedStartup(project, originEnvironment, candidateEnvironment, before, originVersion, build, password);
+    await proveInterruptedStartup(project, originEnvironment, candidateEnvironment, verification, before, originVersion,
+      build, password);
     compose(project, candidateEnvironment, ["up", "-d", "--wait", "--force-recreate", "app"]);
     const after = psql(project, candidateEnvironment, ["-At", "-f", "/dev/stdin"], {
-      input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
+      input: readFileSync(join(root, originVerification), "utf8")
     }).stdout.trim();
     writeFileSync(join(build, "after.json"), `${after}\n`);
     assert.deepEqual(unexplainedChanges(JSON.parse(before), JSON.parse(after)), [],
@@ -360,18 +352,6 @@ async function executeUpgrade() {
     const version = psql(project, candidateEnvironment,
       ["-Atc", "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1"]).stdout.trim();
     writeFileSync(join(build, "migration-version.txt"), `${version}\n`);
-    const transformation = scalar(project, candidateEnvironment, `SELECT count(*) FROM (
-      ((SELECT booking_card_id, role FROM booking_card_managing_role)
-       EXCEPT
-       (SELECT booking_card_id, role FROM booking_card_allowed_role WHERE role <> 'MEMBER'))
-      UNION ALL
-      ((SELECT booking_card_id, role FROM booking_card_allowed_role WHERE role <> 'MEMBER')
-       EXCEPT
-       (SELECT booking_card_id, role FROM booking_card_managing_role))
-    ) unexpected`);
-    assert.equal(transformation, "0", "booking-card managing roles differ from the explicit migration transform");
-    writeFileSync(join(build, "expected-transformations.json"),
-      `${JSON.stringify({ bookingCardManagingRolesDerivedFromAllowedNonMemberRoles: true }, null, 2)}\n`);
     await verifyApplication(password, publishedPort(project, candidateEnvironment));
 
     const overlap = psql(project, candidateEnvironment, ["-c", `INSERT INTO court_allocation

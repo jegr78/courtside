@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
@@ -7,15 +7,13 @@ import {
   publishedTags,
   previousReleaseTag,
   selectUpgradeOrigins,
-  unexplainedChanges
+  unexplainedChanges,
+  originFixture,
+  originVerification
 } from "./courtside.upgrade-smoke.mjs";
 
 const releaseWorkflow = readFileSync(
   fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)),
-  "utf8"
-);
-const fixture = readFileSync(
-  fileURLToPath(new URL("../upgrade/fixtures/pre-release-v17.sql", import.meta.url)),
   "utf8"
 );
 const upgradeCompose = readFileSync(
@@ -77,13 +75,13 @@ test("given candidates of another line, when selecting upgrade origins, then the
 
 test("given candidates numbered past nine, when ordering them, then ten follows nine rather than one", () => {
   // given
-  const tags = ["v0.3.0-rc.2", "v0.3.0-rc.10", "v0.3.0-rc"];
+  const tags = ["v0.2.1", "v0.3.0-rc.2", "v0.3.0-rc.10", "v0.3.0-rc"];
 
   // when
   const origins = selectUpgradeOrigins("v0.3.0", tags);
 
   // then
-  assert.deepEqual(origins, ["pre-release-v17", "v0.3.0-rc", "v0.3.0-rc.2", "v0.3.0-rc.10"]);
+  assert.deepEqual(origins, ["v0.2.1", "v0.3.0-rc", "v0.3.0-rc.2", "v0.3.0-rc.10"]);
 });
 
 test("given several patches in the current line, when selecting origins, then patch and previous minor differ", () => {
@@ -101,31 +99,19 @@ test("given several patches in the current line, when selecting origins, then pa
 // as two origins that only differ in how they were written.
 test("given a version written with a leading zero, when selecting upgrade origins, then it is not one", () => {
   // when / then
-  assert.deepEqual(selectUpgradeOrigins("v0.3.0", ["v0.3.0-rc.01", "v0.3.0-rc.1"]),
-    ["pre-release-v17", "v0.3.0-rc.1"]);
+  assert.deepEqual(selectUpgradeOrigins("v0.3.0", ["v0.2.1", "v0.3.0-rc.01", "v0.3.0-rc.1"]),
+    ["v0.2.1", "v0.3.0-rc.1"]);
   assert.throws(() => selectUpgradeOrigins("v01.2.3", []), /not a semantic version/);
   assert.throws(() => selectUpgradeOrigins("v0.3.0-rc.01", []), /not a semantic version/);
 });
 
-test("given no published origin, when selecting upgrade origins, then the pre-release fixture is used", () => {
-  // when / then
-  assert.deepEqual(selectUpgradeOrigins("v0.1.0", []), ["pre-release-v17"]);
-});
-
-// Before the first release the pre-release schema is the only database a club can hold, and a
-// candidate preceding it does not make that upgrade any less real.
-test("given only candidates before the first release, when selecting origins, then the pre-release schema stays one",
+test("given only candidates before the first release, when selecting origins, then nothing is an upgrade origin",
   () => {
     // when / then
-    assert.deepEqual(selectUpgradeOrigins("v0.1.0", ["v0.1.0-rc.1"]),
-      ["pre-release-v17", "v0.1.0-rc.1"]);
-    assert.deepEqual(selectUpgradeOrigins("v0.1.0", []), ["pre-release-v17"]);
-  });
-
-test("given only a candidate of another line, when selecting origins, then the pre-release schema is the origin",
-  () => {
-    // when / then
-    assert.deepEqual(selectUpgradeOrigins("v0.3.0", ["v0.2.2-rc.1"]), ["pre-release-v17"]);
+    assert.deepEqual(selectUpgradeOrigins("v0.1.0", []), []);
+    assert.deepEqual(selectUpgradeOrigins("v0.1.0", ["v0.1.0-rc.1", "v0.1.0-rc.2"]), [],
+      "a candidate schema is not frozen before the first release");
+    assert.deepEqual(selectUpgradeOrigins("v0.1.0-rc.4", ["v0.1.0-rc.3"]), []);
   });
 
 test("given the first release of a major, when selecting origins, then the preceding major remains covered",
@@ -176,19 +162,6 @@ test("given repository digests, when resolving an origin, then only the expected
     "ghcr.io/example/courtside@sha256:aaaa");
   assert.throws(() => selectRepositoryDigest("example/courtside", "v0.2.0", [digests[0]]),
     /exactly one digest/);
-});
-
-test("given the pre-release fixture, when it is inspected, then all representative state is explicit", () => {
-  // when / then
-  for (const table of [
-    "person", "user_account", "user_account_role", "member", "court", "rule_set",
-    "rule_definition", "booking", "court_allocation", "booking_participant", "booking_series",
-    "booking_series_court", "spring_session", "login_attempt_limit"
-  ]) {
-    assert.match(fixture, new RegExp(`INSERT INTO ${table}\\b`, "i"), table);
-  }
-  assert.match(fixture, /UPDATE club_config\b/i);
-  assert.match(fixture, /upgrade-fixture@example\.org/);
 });
 
 test("given the upgrade verifier, when it is inspected, then representative row contents are captured", () => {
@@ -335,4 +308,13 @@ test("given a proof that gains a whole entry, when comparing it, then the additi
 
   // when / then
   assert.deepEqual(unexplainedChanges(before, after), []);
+});
+
+test("given the files a later release reads from this tag, when the tree is inspected, then both exist", () => {
+  // when
+  const missing = [originFixture, originVerification]
+    .filter((path) => !existsSync(fileURLToPath(new URL(`../${path}`, import.meta.url))));
+
+  // then
+  assert.deepEqual(missing, [], "a later upgrade proof reads these paths from this release's tag");
 });

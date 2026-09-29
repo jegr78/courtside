@@ -69,6 +69,23 @@ SELECT jsonb_build_object(
     'sessions', (SELECT count(*) FROM spring_session),
     'loginLimits', (SELECT count(*) FROM login_attempt_limit),
     'idempotencyRecords', (SELECT count(*) FROM booking WHERE idempotency_key IS NOT NULL),
+    'fixtureAuditEvents', (SELECT count(*) FROM domain_event WHERE id = '7a000000-0000-0000-0000-000000000001'),
+    'fixtureMessageRecords', (SELECT count(*) FROM message_record WHERE id = '7b000000-0000-0000-0000-000000000001'),
+    'fixtureMessageOptouts', (SELECT count(*) FROM message_optout
+        WHERE user_account_id = '72000000-0000-0000-0000-000000000001'),
+    'fixtureEventPublications', (SELECT count(*) FROM event_publication
+        WHERE id = '7c000000-0000-0000-0000-000000000001'),
+    'fixtureImportSources', (SELECT count(*) FROM import_source WHERE id = '7d000000-0000-0000-0000-000000000001'),
+    'fixtureImportMappings', (SELECT count(*) FROM import_column_mapping
+        WHERE source_id = '7d000000-0000-0000-0000-000000000001'),
+    'fixtureImportTypeMappings', (SELECT count(*) FROM import_type_mapping
+        WHERE source_id = '7d000000-0000-0000-0000-000000000001'),
+    'fixtureImportOwnedFields', (SELECT count(*) FROM import_owned_field
+        WHERE source_id = '7d000000-0000-0000-0000-000000000001'),
+    'fixtureImportReferences', (SELECT count(*) FROM import_external_reference
+        WHERE id = '7e000000-0000-0000-0000-000000000001'),
+    'fixtureImportPreviews', (SELECT count(*) FROM import_preview WHERE id = '7e000000-0000-0000-0000-000000000002'),
+    'fixtureImportRuns', (SELECT count(*) FROM import_run WHERE id = '7e000000-0000-0000-0000-000000000003'),
     'configuration', (SELECT row_data FROM redacted WHERE name = 'configuration'),
     'personRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'personRows'),
     'accountRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'accountRows'),

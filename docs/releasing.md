@@ -65,8 +65,8 @@ changes the firewall or prunes Docker globally. It leaves the installation runni
 removal remains an explicit operator action through the installed lifecycle CLI.
 
 This does not replace the release gate. A release stamps its version, runs its complete build,
-active assessment, upgrade and restore checks, and publishes a different digest under versioned
-tags. The nightly image is an acceptance artifact for the current code. The release workflow still
+active assessment, restore check and the upgrade check from every origin it has, and publishes a
+different digest under versioned tags. The nightly image is an acceptance artifact for the current code. The release workflow still
 proves the tagged code and image itself.
 
 If the selected revision already labels the published `nightly` image, the workflow skips package,
@@ -281,6 +281,13 @@ What no automation covers is the upgrade path itself. `upgrade` executes the ori
 from the published release history, so a release that breaks one of those is refused, but only
 those.
 
+`upgrade` reads `upgrade/fixtures/origin.sql` and `upgrade/verify.sql` from the origin's tag, loads
+the fixture into the origin and compares what the origin's query saw with what the candidate's query
+sees after migrating. Every key `verify.sql` reports is therefore a contract with every later
+release: a key may be added, but one renamed, dropped or given a different meaning reads as lost
+data and refuses the next release until the change is explained in the upgrade proof.
+`UpgradeProofTest` pins the list, so a key change is a deliberate edit rather than a side effect.
+
 ## Candidates
 
 A tag may carry a prerelease suffix, `v0.3.0-alpha.1`, `v0.3.0-rc.1`, and it travels the same
@@ -297,7 +304,8 @@ the release it is a candidate for upgrades from it, and so does every later cand
 release. Candidates of another line are not origins: a club is expected to reach a candidate's
 release before following the next one. A candidate whose run never reached `publish` is not an
 origin either, it named no image, and the release reads its history from what was published rather
-than from the tags that happen to exist.
+than from the tags that happen to exist. Candidates of the first release are no origins at all:
+until a release exists no schema is frozen, so `upgrade` is skipped and `publish` runs without it.
 
 A version is read as semantic versioning defines it. Build metadata (`v0.3.0+build.1`) is refused
 rather than interpreted, because nothing here has a use for it and a release that guessed would be

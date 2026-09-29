@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -292,3 +292,70 @@ test("given the version the build stamps, when the tag is read, then nothing is 
     assert.match(workflow, /\n  build:\n    needs: nightly-evidence/);
     assert.match(workflow, /\n  browser:\n    needs: nightly-evidence/);
   });
+
+const releaseJobs = yaml.load(workflow).jobs;
+
+function stepsOf(job) {
+  return releaseJobs[job].steps ?? [];
+}
+
+test("given a candidate archive, when any release job inspects it, then the booking-seed digest is bound as well", () => {
+  // given
+  const inspections = Object.keys(releaseJobs).flatMap((job) => stepsOf(job)
+    .filter((step) => step.run?.includes("--inspect-archive"))
+    .map((step) => ({ job, step })));
+
+  // then
+  assert.ok(inspections.some(({ job }) => job === "mail"), "the mail job inspects the archive");
+  for (const { job, step } of inspections) {
+    assert.match(step.run, /--booking-seed-image "\$BOOKING_SEED_IMAGE"/, `${job} passes the booking-seed image`);
+    assert.equal(step.env?.BOOKING_SEED_IMAGE,
+      "ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}",
+      `${job} binds the booking-seed digest`);
+  }
+});
+
+function matcher(glob) {
+  const literal = glob.split("*").map((part) => part.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(`^${literal.join(".*")}$`);
+}
+
+test("given an artifact another release job downloads, when it is uploaded, then it has one root directory", () => {
+  // given
+  const uploads = new Map(Object.keys(releaseJobs).flatMap((job) => stepsOf(job)
+    .filter((step) => step.uses?.startsWith("actions/upload-artifact@"))
+    .map((step) => [step.with.name, step.with.path])));
+  const downloaded = Object.keys(releaseJobs).flatMap((job) => stepsOf(job)
+    .filter((step) => step.uses?.startsWith("actions/download-artifact@"))
+    .map((step) => step.with.name ?? step.with.pattern));
+
+  // then
+  for (const [name, path] of uploads) {
+    const uploaded = matcher(name.replaceAll(/\$\{\{[^}]+\}\}/g, "*"));
+    if (!downloaded.some((pattern) => uploaded.test(pattern) || matcher(pattern).test(name))) continue;
+    const roots = new Set(String(path).split("\n").map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("!"))
+      .map((line) => (/\.[a-z]+$/.test(line) ? dirname(line) : line)));
+    assert.equal(roots.size, 1, `${name} keeps the layout its consumers read`);
+  }
+});
+
+test("given the amd64 qualification, when the active assessment reads it, then the qualification file is where it looks", () => {
+  // given
+  const download = stepsOf("active-security").find((step) => step.with?.name === "image-qualification-amd64");
+  const assessment = stepsOf("active-security").find((step) => String(step.run).includes("security-run"));
+
+  // then
+  assert.equal(download.with.path, "build/uat-smoke");
+  assert.match(assessment.run, /--qualification build\/uat-smoke\/qualification\.json/);
+  assert.equal(stepsOf("qualify").find((step) => step.with?.name === "image-qualification-${{ matrix.architecture }}")
+    .with.path.trim(), "build/uat-smoke", "the qualification artifact is rooted at build/uat-smoke");
+});
+
+test("given no upgrade origin, when a first release runs, then the upgrade job is skipped and publish still runs", () => {
+  // then
+  assert.equal(releaseJobs.upgrade.if, "needs.build.outputs.upgrade-origins != '[]'");
+  assert.ok(releaseJobs.publish.needs.includes("upgrade"), "publish still waits for any upgrade that runs");
+  assert.equal(releaseJobs.publish.if, "${{ !cancelled() && !failure() }}",
+    "a skipped upgrade does not skip publish, a failed one stops it");
+});
