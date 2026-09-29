@@ -173,7 +173,8 @@ async function waitForDatabase(project, environment, sql, expected, label) {
   throw new Error(`Database did not expose ${label}`);
 }
 
-async function proveInterruptedStartup(project, originEnvironment, candidateEnvironment, before, originVersion, build, password) {
+async function proveInterruptedStartup(project, originEnvironment, candidateEnvironment, verification, before, originVersion,
+  build, password) {
   compose(project, originEnvironment, ["stop", "app"]);
   const lockHolder = spawn("docker", ["compose", "-p", project, "-f", composeFile,
     "exec", "-T", "-e", "PGAPPNAME=upgrade-lock-holder", "db", "psql", "-v", "ON_ERROR_STOP=1",
@@ -195,7 +196,7 @@ async function proveInterruptedStartup(project, originEnvironment, candidateEnvi
     const version = scalar(project, candidateEnvironment,
       "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1");
     const afterInterruption = psql(project, candidateEnvironment, ["-At", "-f", "/dev/stdin"], {
-      input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
+      input: verification
     }).stdout.trim();
     assert.equal(version, originVersion, "interrupted startup changed the schema version");
     assert.equal(afterInterruption, before, "interrupted startup changed fixture data");
@@ -217,7 +218,7 @@ async function proveInterruptedStartup(project, originEnvironment, candidateEnvi
       DROP TABLE upgrade_session_snapshot, upgrade_session_attribute_snapshot, upgrade_login_limit_snapshot,
         upgrade_sign_in_snapshot`]);
     const afterRecoveryProof = psql(project, originEnvironment, ["-At", "-f", "/dev/stdin"], {
-      input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
+      input: verification
     }).stdout.trim();
     assert.equal(afterRecoveryProof, before, "origin usability proof changed fixture data");
     writeFileSync(join(build, "interrupted-startup.json"),
@@ -287,12 +288,14 @@ async function verifyApplication(password, port, isWriteRequired = true) {
   assert.equal(created.statusCode, 201, created.body);
 }
 
-function fixtureFor(origin, build) {
-  const destination = join(build, "fixture.sql");
-  const fixture = run("git", ["show", `${origin}:upgrade/fixtures/origin.sql`]);
-  if (fixture.status !== 0) throw new Error(`Release ${origin} does not own an upgrade fixture`);
-  writeFileSync(destination, fixture.stdout);
-  return destination;
+export const originFixture = "upgrade/fixtures/origin.sql";
+export const originVerification = "upgrade/verify.sql";
+
+function fromOrigin(origin, path, destination) {
+  const content = run("git", ["show", `${origin}:${path}`], { allowFailure: true });
+  if (content.status !== 0) throw new Error(`Release ${origin} does not own ${path}`);
+  writeFileSync(destination, content.stdout);
+  return content.stdout;
 }
 
 async function executeUpgrade() {
@@ -310,7 +313,8 @@ async function executeUpgrade() {
   const build = join(root, "build", "database-upgrade", suffix, runId);
   const password = newBootstrapPassword();
   mkdirSync(build, { recursive: true });
-  const fixture = fixtureFor(origin, build);
+  const fixture = fromOrigin(origin, originFixture, join(build, "fixture.sql"));
+  const verification = fromOrigin(origin, originVerification, join(build, "origin-verify.sql"));
   const baseEnvironment = { COURTSIDE_UPGRADE_ADMIN_PASSWORD: password };
   const repository = process.env.GITHUB_REPOSITORY;
   if (!repository) throw new Error("GITHUB_REPOSITORY is required for a published upgrade origin");
@@ -327,19 +331,20 @@ async function executeUpgrade() {
     compose(project, originEnvironment, ["up", "-d", "--wait"]);
     psql(project, originEnvironment, ["-f", "/dev/stdin"], {
       environment: originEnvironment,
-      input: readFileSync(fixture, "utf8")
+      input: fixture
     });
     const before = psql(project, originEnvironment, ["-At", "-f", "/dev/stdin"], {
-      input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
+      input: verification
     }).stdout.trim();
     writeFileSync(join(build, "before.json"), `${before}\n`);
     const originVersion = scalar(project, originEnvironment,
       "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1");
 
-    await proveInterruptedStartup(project, originEnvironment, candidateEnvironment, before, originVersion, build, password);
+    await proveInterruptedStartup(project, originEnvironment, candidateEnvironment, verification, before, originVersion,
+      build, password);
     compose(project, candidateEnvironment, ["up", "-d", "--wait", "--force-recreate", "app"]);
     const after = psql(project, candidateEnvironment, ["-At", "-f", "/dev/stdin"], {
-      input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
+      input: readFileSync(join(root, originVerification), "utf8")
     }).stdout.trim();
     writeFileSync(join(build, "after.json"), `${after}\n`);
     assert.deepEqual(unexplainedChanges(JSON.parse(before), JSON.parse(after)), [],

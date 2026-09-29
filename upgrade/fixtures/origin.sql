@@ -77,6 +77,69 @@ VALUES ('7a000000-0000-0000-0000-000000000001', 'UPGRADE_PROOF',
         '72000000-0000-0000-0000-000000000001', '2025-01-01T00:00:00Z',
         '{"proof":"upgrade-fixture"}');
 
+INSERT INTO spring_session_attributes (session_primary_id, attribute_name, attribute_bytes)
+VALUES ('upgrade-fixture-primary', 'upgrade-fixture-attribute', '\x00'::bytea);
+
+INSERT INTO credential_issue_limit (account_id, issued_count, window_started_at)
+VALUES ('72000000-0000-0000-0000-000000000001', 1, '2025-01-01T00:00:00Z');
+
+INSERT INTO password_reset_mail_limit (account_id, mailed_count, window_started_at)
+VALUES ('72000000-0000-0000-0000-000000000001', 1, '2025-01-01T00:00:00Z');
+
+INSERT INTO password_reset_token
+    (account_id, code_hash, address_hash, security_epoch, created_at, expires_at)
+VALUES ('72000000-0000-0000-0000-000000000001', repeat('c', 64), repeat('d', 64), 0,
+        '2025-01-01T00:00:00Z', '2025-01-01T00:15:00Z');
+
+INSERT INTO message_optout (user_account_id, kind, created_at)
+VALUES ('72000000-0000-0000-0000-000000000001', 'BOOKING_REMINDER', '2025-01-01T00:00:00Z');
+
+INSERT INTO message_record (id, account_id, kind, state, message_id, queued_at, settled_at)
+VALUES ('7b000000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001',
+        'BOOKING_CONFIRMED', 'HANDED_OVER', '<upgrade-fixture@example.org>',
+        '2025-01-01T00:00:00Z', '2025-01-01T00:00:05Z');
+
+INSERT INTO event_publication
+    (id, listener_id, event_type, serialized_event, publication_date, completion_date, status,
+     completion_attempts)
+VALUES ('7c000000-0000-0000-0000-000000000001', 'upgrade-fixture-listener', 'upgrade.fixture.Event', '{}',
+        '2025-01-01T00:00:00Z', '2025-01-01T00:00:01Z', 'COMPLETED', 1);
+
+INSERT INTO import_source
+    (id, source_key, display_name, separator, encoding, default_membership_type_id,
+     removal_warning_percent, created_at)
+VALUES ('7d000000-0000-0000-0000-000000000001', 'upgrade-roster', 'Upgrade roster', ';', 'UTF-8',
+        'cccccccc-0000-0000-0000-000000000001', 10, '2025-01-01T00:00:00Z');
+
+INSERT INTO import_column_mapping (source_id, column_header, canonical_field) VALUES
+    ('7d000000-0000-0000-0000-000000000001', 'Number', 'EXTERNAL_ID'),
+    ('7d000000-0000-0000-0000-000000000001', 'Email', 'EMAIL');
+
+INSERT INTO import_type_mapping (source_id, source_value, membership_type_id)
+VALUES ('7d000000-0000-0000-0000-000000000001', 'Adult', 'cccccccc-0000-0000-0000-000000000001');
+
+INSERT INTO import_owned_field (source_id, canonical_field)
+VALUES ('7d000000-0000-0000-0000-000000000001', 'EMAIL');
+
+INSERT INTO import_external_reference (id, source_id, external_id, person_id, linked_at)
+VALUES ('7e000000-0000-0000-0000-000000000001', '7d000000-0000-0000-0000-000000000001', 'M-1',
+        '71000000-0000-0000-0000-000000000001', '2025-01-01T00:00:00Z');
+
+INSERT INTO import_preview
+    (id, source_id, mode, file_name, file_hash, row_count, removal_count, removal_percent,
+     removal_warning_pct, created_at, created_by_account_id, expires_at, superseded_at)
+VALUES ('7e000000-0000-0000-0000-000000000002', '7d000000-0000-0000-0000-000000000001', 'UPDATE_ONLY',
+        'roster.csv', repeat('e', 64), 1, 0, 0, 10, '2025-01-01T00:00:00Z',
+        '72000000-0000-0000-0000-000000000001', '2025-01-01T01:00:00Z', '2025-01-01T00:30:00Z');
+
+INSERT INTO import_run
+    (id, source_id, preview_id, mode, file_hash, created_count, corrected_count, ended_count,
+     accounts_disabled_count, roles_removed_count, row_error_count, removals_confirmed, executed_at,
+     executed_by_account_id, accounts_created_count)
+VALUES ('7e000000-0000-0000-0000-000000000003', '7d000000-0000-0000-0000-000000000001',
+        '7e000000-0000-0000-0000-000000000002', 'UPDATE_ONLY', repeat('e', 64), 0, 1, 0, 0, 0, 0, false,
+        '2025-01-01T00:20:00Z', '72000000-0000-0000-0000-000000000001', 0);
+
 UPDATE club_config
 SET club_name = 'Example Tennis Club', primary_color = '#123456', accent_color = '#ABCDEF',
     default_locale = 'en', slot_minutes = 15, time_zone = 'Europe/London';

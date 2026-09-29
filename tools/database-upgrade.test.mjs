@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
@@ -7,7 +7,9 @@ import {
   publishedTags,
   previousReleaseTag,
   selectUpgradeOrigins,
-  unexplainedChanges
+  unexplainedChanges,
+  originFixture,
+  originVerification
 } from "./courtside.upgrade-smoke.mjs";
 
 const releaseWorkflow = readFileSync(
@@ -166,7 +168,7 @@ test("given repository digests, when resolving an origin, then only the expected
     /exactly one digest/);
 });
 
-test("given the pre-release fixture, when it is inspected, then all representative state is explicit", () => {
+test("given the upgrade-origin fixture, when it is inspected, then all representative state is explicit", () => {
   // when / then
   for (const table of [
     "person", "user_account", "user_account_role", "member", "court", "rule_set",
@@ -325,7 +327,11 @@ test("given a proof that gains a whole entry, when comparing it, then the additi
   assert.deepEqual(unexplainedChanges(before, after), []);
 });
 
-test("given the fixture a release ships, when a later release upgrades from it, then it reads that same path from the tag", () => {
+test("given the files a later release reads from this tag, when the tree is inspected, then both exist", () => {
+  // when
+  const missing = [originFixture, originVerification]
+    .filter((path) => !existsSync(fileURLToPath(new URL(`../${path}`, import.meta.url))));
+
   // then
-  assert.match(upgradeRunner, /`\$\{origin\}:upgrade\/fixtures\/origin\.sql`/);
+  assert.deepEqual(missing, [], "a later upgrade proof reads these paths from this release's tag");
 });
