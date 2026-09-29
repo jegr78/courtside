@@ -443,6 +443,10 @@ test("the phone reaches the whole week before the first bookable row", async ({ 
   expect(await dayList.evaluate((element) => element.scrollWidth)).toBeGreaterThan(
     await dayList.evaluate((element) => element.clientWidth)
   );
+  const dayWidth = await navigation.locator('[data-testid^="day-selector-"]').first()
+    .evaluate((day) => day.getBoundingClientRect().width);
+  expect(await dayList.evaluate((element) => element.clientWidth), "the return to now leaves room for two days")
+    .toBeGreaterThanOrEqual(2 * dayWidth);
   const currentDay = navigation.locator('[data-testid^="day-selector-"][aria-pressed="true"]');
   const currentDayId = await currentDay.getAttribute("data-testid");
   expect(currentDayId).not.toBeNull();

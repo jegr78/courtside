@@ -689,6 +689,7 @@ const de = {
   "week.past": "Vergangen",
   "week.pastLabel": "{{court}} um {{time}} Uhr liegt in der Vergangenheit",
   "week.now": "Zur aktuellen Zeit",
+  "week.nowShort": "Jetzt",
   "week.currentTime": "Aktuelle Zeit {{time}}",
   "week.legend": "Legende zum Platzplan",
   "week.occupied": "Belegt",
