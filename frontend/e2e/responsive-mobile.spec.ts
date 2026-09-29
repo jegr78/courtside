@@ -251,13 +251,15 @@ test("member and administration surfaces remain usable on a touch viewport", asy
 
   // then — the destinations are folded behind one control at this width, and the control says
   // which one is open rather than leaving that to a marker nobody can see while it is folded
+  await expect.poll(() => page.evaluate(() => window.scrollY), { message: "a new page opens at its top" }).toBe(0);
   await expect(page.getByTestId("admin-menu")).toBeVisible();
   await expect(page.getByTestId("admin-courts-link")).not.toBeVisible();
   await expectAdministrationOverview(page);
   await expectNoHorizontalOverflow(page);
 
   // when
-  const pageTop = async () => (await page.getByTestId("admin-overview-view").boundingBox())!.y;
+  const pageTop = async () => (await page.getByTestId("admin-overview-view").boundingBox())!.y
+    + await page.evaluate(() => window.scrollY);
   const before = await pageTop();
   await page.getByTestId("admin-menu").tap();
 
