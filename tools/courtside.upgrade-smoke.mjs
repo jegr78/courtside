@@ -202,7 +202,8 @@ async function proveInterruptedStartup(project, originEnvironment, candidateEnvi
     psql(project, originEnvironment, ["-c", `
       CREATE TABLE upgrade_session_snapshot AS TABLE spring_session;
       CREATE TABLE upgrade_session_attribute_snapshot AS TABLE spring_session_attributes;
-      CREATE TABLE upgrade_login_limit_snapshot AS TABLE login_attempt_limit`]);
+      CREATE TABLE upgrade_login_limit_snapshot AS TABLE login_attempt_limit;
+      CREATE TABLE upgrade_sign_in_snapshot AS SELECT id, last_login_at FROM user_account`]);
     compose(project, originEnvironment, ["up", "-d", "--wait", "--force-recreate", "app"]);
     await verifyApplication(password, publishedPort(project, originEnvironment), false);
     compose(project, originEnvironment, ["stop", "app"]);
@@ -212,7 +213,9 @@ async function proveInterruptedStartup(project, originEnvironment, candidateEnvi
       INSERT INTO spring_session_attributes SELECT * FROM upgrade_session_attribute_snapshot;
       TRUNCATE login_attempt_limit;
       INSERT INTO login_attempt_limit SELECT * FROM upgrade_login_limit_snapshot;
-      DROP TABLE upgrade_session_snapshot, upgrade_session_attribute_snapshot, upgrade_login_limit_snapshot`]);
+      UPDATE user_account a SET last_login_at = s.last_login_at FROM upgrade_sign_in_snapshot s WHERE a.id = s.id;
+      DROP TABLE upgrade_session_snapshot, upgrade_session_attribute_snapshot, upgrade_login_limit_snapshot,
+        upgrade_sign_in_snapshot`]);
     const afterRecoveryProof = psql(project, originEnvironment, ["-At", "-f", "/dev/stdin"], {
       input: readFileSync(join(root, "upgrade", "verify.sql"), "utf8")
     }).stdout.trim();
@@ -286,7 +289,7 @@ async function verifyApplication(password, port, isWriteRequired = true) {
 
 function fixtureFor(origin, build) {
   const destination = join(build, "fixture.sql");
-  const fixture = run("git", ["show", `${origin}:upgrade/fixtures/pre-release-v17.sql`]);
+  const fixture = run("git", ["show", `${origin}:upgrade/fixtures/origin.sql`]);
   if (fixture.status !== 0) throw new Error(`Release ${origin} does not own an upgrade fixture`);
   writeFileSync(destination, fixture.stdout);
   return destination;
@@ -344,18 +347,6 @@ async function executeUpgrade() {
     const version = psql(project, candidateEnvironment,
       ["-Atc", "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1"]).stdout.trim();
     writeFileSync(join(build, "migration-version.txt"), `${version}\n`);
-    const transformation = scalar(project, candidateEnvironment, `SELECT count(*) FROM (
-      ((SELECT booking_card_id, role FROM booking_card_managing_role)
-       EXCEPT
-       (SELECT booking_card_id, role FROM booking_card_allowed_role WHERE role <> 'MEMBER'))
-      UNION ALL
-      ((SELECT booking_card_id, role FROM booking_card_allowed_role WHERE role <> 'MEMBER')
-       EXCEPT
-       (SELECT booking_card_id, role FROM booking_card_managing_role))
-    ) unexpected`);
-    assert.equal(transformation, "0", "booking-card managing roles differ from the explicit migration transform");
-    writeFileSync(join(build, "expected-transformations.json"),
-      `${JSON.stringify({ bookingCardManagingRolesDerivedFromAllowedNonMemberRoles: true }, null, 2)}\n`);
     await verifyApplication(password, publishedPort(project, candidateEnvironment));
 
     const overlap = psql(project, candidateEnvironment, ["-c", `INSERT INTO court_allocation

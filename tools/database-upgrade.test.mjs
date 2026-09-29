@@ -15,7 +15,7 @@ const releaseWorkflow = readFileSync(
   "utf8"
 );
 const fixture = readFileSync(
-  fileURLToPath(new URL("../upgrade/fixtures/pre-release-v17.sql", import.meta.url)),
+  fileURLToPath(new URL("../upgrade/fixtures/origin.sql", import.meta.url)),
   "utf8"
 );
 const upgradeCompose = readFileSync(
@@ -323,4 +323,9 @@ test("given a proof that gains a whole entry, when comparing it, then the additi
 
   // when / then
   assert.deepEqual(unexplainedChanges(before, after), []);
+});
+
+test("given the fixture a release ships, when a later release upgrades from it, then it reads that same path from the tag", () => {
+  // then
+  assert.match(upgradeRunner, /`\$\{origin\}:upgrade\/fixtures\/origin\.sql`/);
 });

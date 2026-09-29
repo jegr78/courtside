@@ -126,31 +126,6 @@ database_username=
   return path;
 }
 
-function installedFixture(root) {
-  const path = join(root, "installed-fixture.sql");
-  const fixture = readFileSync(join(repository, "upgrade", "fixtures", "pre-release-v17.sql"), "utf8")
-    .replace("INSERT INTO member (id, person_id, membership_type_id) VALUES",
-      "INSERT INTO member (id, person_id, membership_type_id, started_on) VALUES")
-    .replace("     'cccccccc-0000-0000-0000-000000000001'),",
-      "     'cccccccc-0000-0000-0000-000000000001', '2024-01-01'),")
-    .replace("     'cccccccc-0000-0000-0000-000000000002');",
-      "     'cccccccc-0000-0000-0000-000000000002', '2024-01-01');")
-    .replace("1735689600000, 1735689600000,\n        1800, (extract(epoch FROM now() + interval '30 minutes')",
-      "(extract(epoch FROM now()) * 1000)::bigint, (extract(epoch FROM now()) * 1000)::bigint,\n"
-        + "        86400, (extract(epoch FROM now() + interval '1 day')")
-    .replace("\nCOMMIT;\n", `
-INSERT INTO domain_event (id, event_type, subject_id, actor_account_id, occurred_at, payload)
-VALUES ('7a000000-0000-0000-0000-000000000001', 'UPGRADE_PROOF',
-        '71000000-0000-0000-0000-000000000001',
-        '72000000-0000-0000-0000-000000000001', '2025-01-01T00:00:00Z',
-        '{"proof":"installed-postgresql-upgrade"}');
-
-COMMIT;
-`);
-  writeFileSync(path, fixture);
-  return path;
-}
-
 function writeEvidence(build, before, after, candidate) {
   mkdirSync(build, { recursive: true });
   writeFileSync(join(build, "before.json"), `${before}\n`);
@@ -185,7 +160,7 @@ function execute() {
       "--answers", answerFile(scratch, project), "--yes"]);
     assert.match(initialized.stdout, /Installed/);
     run(join(installation, "current", "courtside"), ["--directory", installation, "up"]);
-    psql(oldRelease, installation, project, installedFixture(scratch));
+    psql(oldRelease, installation, project, join(repository, "upgrade", "fixtures", "origin.sql"));
     const snapshot = psql(oldRelease, installation, project, join(repository, "upgrade", "verify.sql"));
     const auditSql = "SELECT to_jsonb(e)::text FROM domain_event e WHERE id = "
       + "'7a000000-0000-0000-0000-000000000001';";

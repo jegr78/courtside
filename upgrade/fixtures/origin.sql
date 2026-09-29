@@ -17,11 +17,11 @@ INSERT INTO user_account_role (user_account_id, role) VALUES
     ('72000000-0000-0000-0000-000000000001', 'MEMBER'),
     ('72000000-0000-0000-0000-000000000001', 'TRAINER');
 
-INSERT INTO member (id, person_id, membership_type_id) VALUES
+INSERT INTO member (id, person_id, membership_type_id, started_on) VALUES
     ('73000000-0000-0000-0000-000000000001', '71000000-0000-0000-0000-000000000001',
-     'cccccccc-0000-0000-0000-000000000001'),
+     'cccccccc-0000-0000-0000-000000000001', '2024-01-01'),
     ('73000000-0000-0000-0000-000000000002', '71000000-0000-0000-0000-000000000002',
-     'cccccccc-0000-0000-0000-000000000002');
+     'cccccccc-0000-0000-0000-000000000002', '2024-01-01');
 
 INSERT INTO rule_set (id, name, active)
 VALUES ('74000000-0000-0000-0000-000000000001', 'Upgrade rules', true);
@@ -67,8 +67,15 @@ VALUES ('GLOBAL', repeat('b', 64), 1, '2025-01-01T00:00:00Z', NULL);
 
 INSERT INTO spring_session
     (primary_id, session_id, creation_time, last_access_time, max_inactive_interval, expiry_time, principal_name)
-VALUES ('upgrade-fixture-primary', 'upgrade-fixture-session', 1735689600000, 1735689600000,
-        1800, (extract(epoch FROM now() + interval '30 minutes') * 1000)::bigint, 'upgrade-member');
+VALUES ('upgrade-fixture-primary', 'upgrade-fixture-session',
+        (extract(epoch FROM now()) * 1000)::bigint, (extract(epoch FROM now()) * 1000)::bigint,
+        86400, (extract(epoch FROM now() + interval '1 day') * 1000)::bigint, 'upgrade-member');
+
+INSERT INTO domain_event (id, event_type, subject_id, actor_account_id, occurred_at, payload)
+VALUES ('7a000000-0000-0000-0000-000000000001', 'UPGRADE_PROOF',
+        '71000000-0000-0000-0000-000000000001',
+        '72000000-0000-0000-0000-000000000001', '2025-01-01T00:00:00Z',
+        '{"proof":"upgrade-fixture"}');
 
 UPDATE club_config
 SET club_name = 'Example Tennis Club', primary_color = '#123456', accent_color = '#ABCDEF',

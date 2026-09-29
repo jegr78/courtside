@@ -12,22 +12,11 @@ import {
 } from "./mail-relay-certificate.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
-export const columnsAddedSinceTheFixture = [
-  { table: "member", column: "started_on", value: "DATE '2026-01-01'" }
-];
 export const applicationStateTables = [
   "booking", "booking_card", "club_config", "court", "court_allocation", "domain_event", "event_publication",
   "message_record", "opening_hours", "opening_hours_version", "person", "spring_session", "user_account",
   "user_account_role"
 ];
-
-function seedWithLaterColumns(fixture) {
-  const lend = columnsAddedSinceTheFixture
-    .map(({ table, column, value }) => `ALTER TABLE ${table} ALTER COLUMN ${column} SET DEFAULT ${value};`);
-  const withdraw = columnsAddedSinceTheFixture
-    .map(({ table, column }) => `ALTER TABLE ${table} ALTER COLUMN ${column} DROP DEFAULT;`);
-  return [...lend, fixture, ...withdraw].join("\n");
-}
 
 const composeFile = join(root, "deploy", "compose.restore.yaml");
 
@@ -415,8 +404,7 @@ async function execute() {
     compose(project, environment, ["down", "--volumes", "--remove-orphans"]);
     compose(project, environment, ["up", "-d", "--wait"]);
     psql(project, environment, ["-f", "/dev/stdin"], {
-      input: seedWithLaterColumns(
-        readFileSync(join(root, "upgrade", "fixtures", "pre-release-v17.sql"), "utf8"))
+      input: readFileSync(join(root, "upgrade", "fixtures", "origin.sql"), "utf8")
     });
     const before = databaseEvidence(project, environment);
     writeFileSync(join(build, "before.json"), `${JSON.stringify(before, null, 2)}\n`);
