@@ -1,4 +1,5 @@
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
+import { PageScroll } from "./navigation/PageScroll";
 import { App } from "./App";
 import { ClubConfigurationProvider } from "./club/ClubConfigurationProvider";
 import { ApplicationErrorView } from "./views/ApplicationErrorView";
@@ -7,7 +8,7 @@ import { ApplicationErrorView } from "./views/ApplicationErrorView";
 // navigation blocking, which react-router refuses to provide under BrowserRouter.
 export const appRoute: RouteObject = {
   path: "*",
-  element: <ClubConfigurationProvider><App /></ClubConfigurationProvider>,
+  element: <><PageScroll /><ClubConfigurationProvider><App /></ClubConfigurationProvider></>,
   errorElement: <ApplicationErrorView />
 };
 

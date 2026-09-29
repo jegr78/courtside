@@ -53,6 +53,11 @@ const BOUNDARIES = {
     classification: "reloads the document once a newer worker took over, and reads nothing off the location",
     test: "src/navigation/recoverStaleDocument.test.ts#given a newer version waiting, when recovering, then it takes over before the one reload"
   },
+  "src/navigation/PageScroll.tsx useLocation": {
+    value: "the path the address carries",
+    classification: "compared with the path shown before, and only decides whether the page starts at its top",
+    test: "src/router.test.tsx#given the application's route, when another destination opens, then the page is scrolled to its top"
+  },
   "src/navigation/useFragmentTarget.ts useLocation": {
     value: "the fragment the address carries",
     classification: "compared with one known target id, and moves the focus nowhere else",

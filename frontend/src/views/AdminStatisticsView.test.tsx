@@ -1,10 +1,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, RouterProvider, useLocation, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, type BookingStatistics, type MemberStatistics, type MessageStatistics,
   type StatisticsRange, type UtilisationStatistics } from "../api/client";
 import i18n from "../i18n";
+import { PageScroll } from "../navigation/PageScroll";
 import { AdminStatisticsView } from "./AdminStatisticsView";
 
 const period = { from: "2026-02-01", to: "2026-02-28", timeZone: "Europe/Zurich" };
@@ -368,6 +369,24 @@ describe("AdminStatisticsView", () => {
       expect(screen.getByTestId("utilisation-from")).toHaveValue(from);
       expect(screen.getByTestId("utilisation-to")).toHaveValue(to);
     }
+  });
+
+  it("given the figures of one period, when a board picks another period, then the page is not scrolled", async () => {
+    // given
+    reads();
+    const scrolled = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    render(<RouterProvider router={createMemoryRouter(
+      [{ path: "*", element: <><PageScroll /><AdminStatisticsView /></> }],
+      { initialEntries: ["/admin/utilisation"] })} />);
+    await loaded();
+    scrolled.mockClear();
+
+    // when
+    await userEvent.click(screen.getByTestId("statistics-choice-3m"));
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("statistics-choice-3m")).toHaveAttribute("aria-pressed", "true"));
+    expect(scrolled, "choosing a period keeps the board on the figures it was reading").not.toHaveBeenCalled();
   });
 
   it("given a period in the address, when the page opens, then every section reads it and the matching quick choice is pressed", async () => {
