@@ -65,7 +65,7 @@ changes the firewall or prunes Docker globally. It leaves the installation runni
 removal remains an explicit operator action through the installed lifecycle CLI.
 
 This does not replace the release gate. A release stamps its version, runs its complete build,
-active assessment, upgrade and restore checks, and publishes a different digest under versioned
+active assessment, restore check and the upgrade check from every origin it has, and publishes a different digest under versioned
 tags. The nightly image is an acceptance artifact for the current code. The release workflow still
 proves the tagged code and image itself.
 
