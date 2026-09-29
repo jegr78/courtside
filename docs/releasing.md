@@ -286,6 +286,7 @@ the fixture into the origin and compares what the origin's query saw with what t
 sees after migrating. Every key `verify.sql` reports is therefore a contract with every later
 release: a key may be added, but one renamed, dropped or given a different meaning reads as lost
 data and refuses the next release until the change is explained in the upgrade proof.
+`UpgradeProofTest` pins the list, so a key change is a deliberate edit rather than a side effect.
 
 ## Candidates
 
