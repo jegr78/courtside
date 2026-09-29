@@ -19,6 +19,14 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
   expect(overflow).toEqual([]);
 }
 
+function renderedTextWidth(element: import("@playwright/test").Locator): Promise<number> {
+  return element.evaluate((node) => {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    return range.getBoundingClientRect().width;
+  });
+}
+
 async function signIn(page: import("@playwright/test").Page, username: string) {
   await page.goto("/login");
   await page.getByTestId("username").fill(username);
@@ -428,11 +436,17 @@ test("the phone reaches the whole week before the first bookable row", async ({ 
   // then — one compact strip owns week changes, day choices, and the return to now
   await expect(navigation.locator('[data-testid^="day-selector-"]')).toHaveCount(7);
   await expect(navigation.getByTestId("mobile-week-previous")).toBeVisible();
-  await expect(navigation.getByTestId("mobile-current-time")).toBeVisible();
+  await expect(navigation.getByTestId("mobile-current-time"), "the return to now needs no swipe")
+    .toBeInViewport({ ratio: 1 });
   await expect(navigation.getByTestId("mobile-week-next")).toBeVisible();
-  expect(await navigation.evaluate((element) => element.scrollWidth)).toBeGreaterThan(
-    await navigation.evaluate((element) => element.clientWidth)
+  const dayList = navigation.getByTestId("mobile-week-days");
+  expect(await dayList.evaluate((element) => element.scrollWidth)).toBeGreaterThan(
+    await dayList.evaluate((element) => element.clientWidth)
   );
+  const dayWidth = await navigation.locator('[data-testid^="day-selector-"]').first()
+    .evaluate((day) => day.getBoundingClientRect().width);
+  expect(await dayList.evaluate((element) => element.clientWidth), "the return to now leaves room for two days")
+    .toBeGreaterThanOrEqual(2 * dayWidth);
   const currentDay = navigation.locator('[data-testid^="day-selector-"][aria-pressed="true"]');
   const currentDayId = await currentDay.getAttribute("data-testid");
   expect(currentDayId).not.toBeNull();
@@ -450,6 +464,8 @@ test("the phone reaches the whole week before the first bookable row", async ({ 
 
   // then
   await expect(lastDay).toHaveAttribute("aria-pressed", "true");
+  await expect(navigation.getByTestId("mobile-current-time"), "the return to now stays put while the days scroll")
+    .toBeInViewport({ ratio: 1 });
 
   // when
   await navigation.getByTestId("mobile-current-time").click();
@@ -493,6 +509,56 @@ test("the court plan describes its served cards, remaining room, and elapsed row
   expect(Number(await freeCount.getAttribute("data-free-count"))).toBeGreaterThan(0);
   await expect(page.getByTestId("slot-row-08:00")).toHaveAttribute("data-state", "past");
   await expect(page.getByTestId("slot-row-12:00")).toHaveAttribute("data-state", "remaining");
+});
+
+test("given elapsed rows on a phone, when the plan loads, then every row names its time beside one column per court", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  // when
+  await signIn(page, "doe.jane");
+  await expect(page.getByTestId("slot-row-08:00")).toHaveAttribute("data-state", "past");
+
+  // then
+  for (const heading of await page.locator('[data-testid^="slot-heading-"]').all()) {
+    expect(await renderedTextWidth(heading), `${await heading.getAttribute("data-testid")} shows its time`)
+      .toBeGreaterThan(0);
+  }
+  const rowDecorations = await page.locator('[data-testid^="slot-row-"]').evaluateAll((rows) => rows
+    .map((row) => [getComputedStyle(row, "::before").content, getComputedStyle(row, "::after").content])
+    .filter((contents) => contents.some((content) => content !== "none")));
+  expect(rowDecorations, "a row renders no box of its own beside its cells").toEqual([]);
+  const edges = await page.getByTestId("day-plan-table").evaluate((table) => ({
+    table: table.getBoundingClientRect().right,
+    lastCourt: [...table.querySelectorAll('[data-testid^="court-heading-"]')].at(-1)!.getBoundingClientRect().right
+  }));
+  expect(edges.lastCourt, "the last court's column ends where the table ends").toBeCloseTo(edges.table, 0);
+  const elapsedSlot = page.locator('[data-testid="free-slot"][data-state="past"]').first();
+  expect(await elapsedSlot.evaluate((slot) => getComputedStyle(slot, "::after").content),
+    "an elapsed slot is marked by its hatching, not by a dash").toBe("none");
+});
+
+test("given bookings on a phone, when the plan scrolls past the navigation, then the courts stay named and bookings keep their label", async ({ page, journeyService }) => {
+  // given
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, "doe.jane");
+  await selectJourneyDate(page, journeyService.visualDate);
+  const allocation = page.getByTestId("allocation").first();
+  await expect(allocation).toBeVisible();
+
+  // then
+  expect(await renderedTextWidth(allocation.locator("span").first()), "a booking names what occupies the court")
+    .toBeGreaterThan(0);
+
+  // when
+  await page.locator('[data-testid^="slot-row-"]').last().scrollIntoViewIfNeeded();
+
+  // then
+  const heading = page.getByTestId("court-heading-1");
+  await expect.poll(() => heading.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return element.contains(document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2));
+  }), "the court heading stays uncovered while the plan scrolls").toBe(true);
 });
 
 test("the phone plan shows every court's availability at once", async ({ page, journeyService }) => {

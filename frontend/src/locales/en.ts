@@ -691,6 +691,7 @@ const en: Record<keyof typeof de, string> = {
   "week.past": "Past",
   "week.pastLabel": "{{court}} at {{time}} is in the past",
   "week.now": "Return to current time",
+  "week.nowShort": "Now",
   "week.currentTime": "Current time {{time}}",
   "week.legend": "Court plan legend",
   "week.occupied": "Occupied",

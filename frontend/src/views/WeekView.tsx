@@ -62,6 +62,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const [drag, setDrag] = useState<{ courtId: string; anchor: string; head: string }>();
   const [cancellation, setCancellation] = useState<Allocation>();
   const planRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   const dayNavigationRef = useRef<HTMLElement>(null);
   const eligibilityRequest = useRef(0);
   const shownDate = useRef<string>(undefined);
@@ -238,6 +239,16 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   }, [selectedDate, isToday]);
 
   useEffect(() => {
+    const navigation = dayNavigationRef.current;
+    const section = sectionRef.current;
+    if (!navigation || !section || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() =>
+      section.style.setProperty("--week-navigation-height", `${navigation.offsetHeight}px`));
+    observer.observe(navigation);
+    return () => observer.disconnect();
+  }, [hasCourts]);
+
+  useEffect(() => {
     const activeDay = selectedDate
       ? dayNavigationRef.current?.querySelector(`[data-testid="day-selector-${selectedDate}"]`)
       : undefined;
@@ -246,7 +257,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     }
   }, [renderedWeekStart, selectedDate]);
 
-  return <section aria-labelledby="occupancy-heading" className="mt-8">
+  return <section ref={sectionRef} aria-labelledby="occupancy-heading" className="mt-8">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 id="occupancy-heading" data-testid="occupancy-heading" className="text-2xl font-bold">{t("week.title")}</h2>
@@ -265,35 +276,37 @@ export function WeekView({ today, clock = systemClock, canBook = true,
 
     {data && hasCourts && <nav ref={dayNavigationRef} data-testid="mobile-week-navigation" className="week-day-navigation mt-5"
       aria-label={t("week.chooseDate")}>
-      <Button variant="secondary" type="button" data-testid="mobile-week-previous"
-        className="mobile-week-control shrink-0 px-3" onClick={() => setWeekOffset((offset) => offset - 1)}
-        aria-label={t("week.previous")}>‹</Button>
-      {days.map((day) => {
-        const date = formatDate(day);
-        const count = remainingFreeSlots(day, data, currentInstant);
-        const freeCount = t("week.freeCount", { count });
-        return <button
-          key={date}
-          type="button"
-          data-testid={`day-selector-${date}`}
-          aria-label={`${formatDayLong(day, language)}, ${freeCount}`}
-          aria-pressed={selectedDate === date}
-          className="week-day-option border-structural rounded-xl border px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/15"
-          onClick={() => setSelectedDate(date)}
-        >
-          <span className="block text-sm font-semibold">{formatWeekday(day, language)}</span>
-          <span className="text-muted font-value text-sm">{formatDayMonth(day, language)}</span>
-          <span data-testid={`day-free-count-${date}`} data-free-count={count}
-            className="text-muted mt-1 block text-xs">{freeCount}</span>
-        </button>;
-      })}
+      <div data-testid="mobile-week-days" className="week-day-list">
+        <Button variant="secondary" type="button" data-testid="mobile-week-previous"
+          className="mobile-week-control shrink-0 px-3" onClick={() => setWeekOffset((offset) => offset - 1)}
+          aria-label={t("week.previous")}>‹</Button>
+        {days.map((day) => {
+          const date = formatDate(day);
+          const count = remainingFreeSlots(day, data, currentInstant);
+          const freeCount = t("week.freeCount", { count });
+          return <button
+            key={date}
+            type="button"
+            data-testid={`day-selector-${date}`}
+            aria-label={`${formatDayLong(day, language)}, ${freeCount}`}
+            aria-pressed={selectedDate === date}
+            className="week-day-option border-structural rounded-xl border px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/15"
+            onClick={() => setSelectedDate(date)}
+          >
+            <span className="block text-sm font-semibold">{formatWeekday(day, language)}</span>
+            <span className="text-muted font-value text-sm">{formatDayMonth(day, language)}</span>
+            <span data-testid={`day-free-count-${date}`} data-free-count={count}
+              className="text-muted mt-1 block text-xs">{freeCount}</span>
+          </button>;
+        })}
+        <Button variant="secondary" type="button" data-testid="mobile-week-next"
+          className="mobile-week-control shrink-0 px-3" onClick={() => setWeekOffset((offset) => offset + 1)}
+          aria-label={t("week.next")}>›</Button>
+      </div>
       <Button variant="secondary" type="button" data-testid="mobile-current-time" className="mobile-week-control shrink-0"
         onClick={() => isToday
           ? scrollToSlot(planRef.current, currentSlot)
-          : selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.now")}</Button>
-      <Button variant="secondary" type="button" data-testid="mobile-week-next"
-        className="mobile-week-control shrink-0 px-3" onClick={() => setWeekOffset((offset) => offset + 1)}
-        aria-label={t("week.next")}>›</Button>
+          : selectDate(dateInTimeZoneValue(currentInstant, data.grid.timeZone))}>{t("week.nowShort")}</Button>
     </nav>}
 
     {offline && <Alert tone="warning" testId="court-plan-offline">{t("week.offline")}</Alert>}
@@ -512,7 +525,7 @@ function renderCell(
     const startedBeforeVisibleSlot = Date.parse(allocation.startsAt) < visibleSlotStartsAt;
     const label = allocationLabel(allocation, t);
     const period = formatBookingTimeRange(allocation.startsAt, allocation.endsAt, locale, timeZone);
-    const className = "h-full w-full rounded-md px-3 py-2 text-left font-semibold";
+    const className = "day-plan-allocation h-full w-full rounded-md px-3 py-2 text-left font-semibold";
     const state = allocation.ownBooking ? "own" : allocation.showGenericOccupancy ? "occupied" : "card";
     const style = allocation.ownBooking
       ? { backgroundColor: "var(--cs-ball)", color: "var(--cs-shade)" }
