@@ -116,6 +116,7 @@ test("the booking dialog keeps its actions on screen while the browser bar cover
   await page.getByTestId("booking-more-summary").tap();
 
   // when
+  // Emulation keeps 100vh equal to the visible height, so the overlay shrinks the way a shown browser bar shrinks it.
   await page.getByTestId("modal-overlay").evaluate((overlay) => { overlay.style.bottom = "110px"; });
 
   // then
