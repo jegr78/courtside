@@ -137,6 +137,12 @@ function CourtsideMark({ testId = "courtside-mark", className = "h-10 w-10" }: {
   </svg>;
 }
 
+function FooterLink({ testId, href, label }: { testId: string; href: string; label: string }) {
+  const { t } = useTranslation();
+  return <a data-testid={testId} className="underline hover:no-underline" href={href} target="_blank"
+    rel="noopener noreferrer">{label} <span className="sr-only">{t("footer.opensInNewTab")}</span></a>;
+}
+
 export function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -256,10 +262,10 @@ export function App() {
         {t("app.name")}
       </span>
       <BuildIdentity source={source} />
-      <a data-testid="footer-documentation" className="underline hover:no-underline"
-         href={club?.documentationUrl || DEFAULT_DOCUMENTATION_URL} target="_blank" rel="noopener noreferrer">{t("footer.documentation")}</a>
-      {club?.imprintUrl && <a data-testid="footer-imprint" className="underline hover:no-underline" href={club.imprintUrl} target="_blank" rel="noopener noreferrer">{t("footer.imprint")}</a>}
-      {club?.privacyUrl && <a data-testid="footer-privacy" className="underline hover:no-underline" href={club.privacyUrl} target="_blank" rel="noopener noreferrer">{t("footer.privacy")}</a>}
+      <FooterLink testId="footer-documentation" href={club?.documentationUrl || DEFAULT_DOCUMENTATION_URL}
+        label={t("footer.documentation")} />
+      {club?.imprintUrl && <FooterLink testId="footer-imprint" href={club.imprintUrl} label={t("footer.imprint")} />}
+      {club?.privacyUrl && <FooterLink testId="footer-privacy" href={club.privacyUrl} label={t("footer.privacy")} />}
     </footer>
   </div>;
 }

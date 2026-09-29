@@ -1073,6 +1073,7 @@ const de = {
   "footer.imprint": "Impressum",
   "footer.privacy": "Datenschutz",
   "footer.documentation": "Dokumentation",
+  "footer.opensInNewTab": "(öffnet in einem neuen Tab)",
   "nav.adminMessages": "Nachrichtenprotokoll",
   "myMessages.title": "Benachrichtigungen",
   "myMessages.description": "Hier entscheidest du, was der Verein dir schickt. Abgewählt heißt: Diese Nachricht bekommst du nicht mehr, alle anderen weiterhin.",
