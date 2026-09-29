@@ -82,9 +82,10 @@ SELECT jsonb_build_object(
         WHERE source_id = '7d000000-0000-0000-0000-000000000001'),
     'fixtureImportOwnedFields', (SELECT count(*) FROM import_owned_field
         WHERE source_id = '7d000000-0000-0000-0000-000000000001'),
-    'fixtureImportRecords', (SELECT count(*) FROM import_external_reference WHERE id::text LIKE '7e000000-%')
-        + (SELECT count(*) FROM import_preview WHERE id::text LIKE '7e000000-%')
-        + (SELECT count(*) FROM import_run WHERE id::text LIKE '7e000000-%'),
+    'fixtureImportReferences', (SELECT count(*) FROM import_external_reference
+        WHERE id = '7e000000-0000-0000-0000-000000000001'),
+    'fixtureImportPreviews', (SELECT count(*) FROM import_preview WHERE id = '7e000000-0000-0000-0000-000000000002'),
+    'fixtureImportRuns', (SELECT count(*) FROM import_run WHERE id = '7e000000-0000-0000-0000-000000000003'),
     'configuration', (SELECT row_data FROM redacted WHERE name = 'configuration'),
     'personRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'personRows'),
     'accountRows', (SELECT jsonb_agg(row_data ORDER BY sort_key) FROM redacted WHERE name = 'accountRows'),

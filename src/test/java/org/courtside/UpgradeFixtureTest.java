@@ -77,11 +77,11 @@ class UpgradeFixtureTest {
             assertThat(evidence.path("ruleSetRows").size()).as("fixture rule sets").isEqualTo(1);
             for (String key : List.of("fixtureAuditEvents", "fixtureMessageRecords", "fixtureMessageOptouts",
                     "fixtureEventPublications", "fixtureImportSources", "fixtureImportTypeMappings",
-                    "fixtureImportOwnedFields")) {
+                    "fixtureImportOwnedFields", "fixtureImportReferences", "fixtureImportPreviews",
+                    "fixtureImportRuns")) {
                 assertThat(evidence.path(key).asInt()).as(key).isEqualTo(1);
             }
             assertThat(evidence.path("fixtureImportMappings").asInt()).as("fixture import mappings").isEqualTo(2);
-            assertThat(evidence.path("fixtureImportRecords").asInt()).as("fixture import records").isEqualTo(3);
             assertThat(evidence.path("configuration").path("club_name").asText())
                     .isEqualTo("Example Tennis Club");
         }
@@ -96,6 +96,7 @@ class UpgradeFixtureTest {
             while (metadata.next()) {
                 tables.add(metadata.getString("TABLE_NAME"));
             }
+            assertThat(tables).as("the migrated tables are read from the public schema").contains("booking", "member");
 
             // when
             List<String> empty = new ArrayList<>();

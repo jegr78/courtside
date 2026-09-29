@@ -293,7 +293,7 @@ export const originVerification = "upgrade/verify.sql";
 
 function fromOrigin(origin, path, destination) {
   const content = run("git", ["show", `${origin}:${path}`], { allowFailure: true });
-  if (content.status !== 0) throw new Error(`Release ${origin} does not own ${path}`);
+  if (content.status !== 0) throw new Error(`Release ${origin} does not own ${path}: ${content.stderr}`);
   writeFileSync(destination, content.stdout);
   return content.stdout;
 }

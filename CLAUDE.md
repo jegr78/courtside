@@ -141,15 +141,14 @@ fails on the missing `BuildProperties` bean.
   actor produces. Pin the generator's real output as a case — `tools/prerelease-changelog.test.mjs`
   runs release-please's own heading over this repository's own changelog — rather than a shape
   chosen by hand, which is what every one of those three had.
-* **A test input a consumer has to patch is a stale input.** When a fixture, seed or recorded sample
-  no longer fits what reads it, correct it at its source and add the check that would have caught
-  the drift. Rewriting it at runtime, lending it defaults or matching around it makes one run green
-  and hides the cause from every later one. `upgrade/fixtures/origin.sql` is the case in point:
-  `UpgradeFixtureTest` loads it onto the latest schema and requires a row in every table, so a
-  migration that no longer fits it fails in its own pull request.
-* **A gate that never ran protects nothing.** A release or scheduled job that was skipped, or added
-  without ever executing, is exercised once through its dispatch path or its local entry point
-  before anything relies on it. A skipped job is not a green one.
+* **A test input a consumer has to patch is a stale input.** When a fixture no longer fits what reads
+  it, correct it at its source and add the check that would have caught the drift. Patching it at
+  runtime makes one run green and hides the cause from every later one. `upgrade/fixtures/origin.sql`
+  is the case in point: `UpgradeFixtureTest` loads it onto the latest schema and requires a row in
+  every table, so a migration that no longer fits it fails in its own pull request.
+* **A gate that never ran protects nothing.** A skipped job is not a green one. A release job that
+  has never executed is treated like the scheduled workflows in the Git Workflow section: run its
+  local entry point or its dispatch path before anything relies on it.
 * **Cross-module test setup uses test fixtures.** A module exposes intent-revealing fixture
   operations from `src/test/java/org/courtside/<module>/testfixture`, and consuming integration
   tests register the required fixture explicitly with `@Import`. Fixtures return identifiers or
