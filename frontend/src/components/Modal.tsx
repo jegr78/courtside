@@ -31,10 +31,11 @@ export function Modal({ labelledBy, closed, children }: { labelledBy: string; cl
 
   return <div
     role="presentation"
-    className="fixed inset-0 z-20 grid place-items-center bg-(--cs-overlay) p-4"
+    data-testid="modal-overlay"
+    className="fixed inset-0 z-20 flex items-center justify-center bg-(--cs-overlay) p-4"
     onMouseDown={(event) => { if (event.target === event.currentTarget) closed(); }}
   >
-    <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={labelledBy} onKeyDown={handleKeyDown} className="grid max-h-full w-full place-items-center">
+    <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={labelledBy} onKeyDown={handleKeyDown} className="flex max-h-full w-full flex-col items-center">
       {children}
     </div>
   </div>;

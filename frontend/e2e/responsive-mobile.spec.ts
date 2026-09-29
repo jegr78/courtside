@@ -100,6 +100,42 @@ test("administrator and member destinations fit the narrow phone bar", async ({ 
   await expectPrimaryNavigationFits(page, ["Court plan", "My bookings", "Notifications"]);
 });
 
+async function boundsWithinOverlay(page: Page, testId: string) {
+  return page.getByTestId(testId).evaluate((element) => {
+    const overlay = element.closest("[data-testid='modal-overlay']")!.getBoundingClientRect();
+    const bounds = element.getBoundingClientRect();
+    return { top: bounds.top, bottom: bounds.bottom, overlayTop: overlay.top, overlayBottom: overlay.bottom };
+  });
+}
+
+test("the booking dialog keeps its actions on screen while the browser bar covers part of the viewport", async ({ page, journeyService }) => {
+  // given
+  await signIn(page, "doe.jane");
+  await selectJourneyDate(page, journeyService.visualDate);
+  await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]:visible').tap();
+  await page.getByTestId("booking-more-summary").tap();
+
+  // when
+  // Emulation keeps 100vh equal to the visible height, so the overlay shrinks the way a shown browser bar shrinks it.
+  await page.getByTestId("modal-overlay").evaluate((overlay) => { overlay.style.bottom = "110px"; });
+
+  // then
+  const dialog = await boundsWithinOverlay(page, "booking-dialog");
+  expect(dialog.top, "the dialog starts inside the area the browser still shows").toBeGreaterThanOrEqual(dialog.overlayTop);
+  expect(dialog.bottom, "the dialog ends inside the area the browser still shows").toBeLessThanOrEqual(dialog.overlayBottom);
+  const submit = await boundsWithinOverlay(page, "booking-submit");
+  expect(submit.bottom, "the book button lies fully above the covered part").toBeLessThanOrEqual(submit.overlayBottom);
+
+  // when
+  await page.getByTestId("booking-note").scrollIntoViewIfNeeded();
+
+  // then
+  const note = await boundsWithinOverlay(page, "booking-note");
+  const actions = await boundsWithinOverlay(page, "booking-submit");
+  expect(note.bottom, "the note scrolls into view above the actions instead of being cut off").toBeLessThanOrEqual(actions.top);
+  expect(actions, "the actions stay in place while the form scrolls").toEqual(submit);
+});
+
 test("the account menu stays inside the narrowest supported viewport", async ({ page }) => {
   // given
   await page.setViewportSize({ width: 320, height: 720 });
