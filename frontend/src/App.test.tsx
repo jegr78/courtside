@@ -887,6 +887,8 @@ describe("App build identity", () => {
     expect(screen.getByTestId("footer-documentation"))
       .toHaveAttribute("href", "https://jegr78.github.io/courtside/");
     expect(screen.getByTestId("footer-documentation")).toHaveTextContent("Documentation");
+    expect(screen.getByTestId("footer-documentation")).toHaveAttribute("target", "_blank");
+    expect(screen.getByTestId("footer-documentation")).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("given a club documentation override, when the shell loads, then the footer uses it", async () => {

@@ -250,14 +250,14 @@ export function App() {
         : <p role="status">{t("status.loading")}</p>}
       </div>
     </main>
-    <footer className="text-muted flex flex-wrap justify-center gap-x-5 gap-y-2 px-5 pt-4 pb-[max(6rem,calc(4rem+env(safe-area-inset-bottom)))] text-sm sm:pb-4">
+    <footer className="text-muted flex flex-wrap items-center justify-center gap-x-5 gap-y-2 px-5 pt-4 pb-[max(6rem,calc(4rem+env(safe-area-inset-bottom)))] text-sm sm:pb-4">
       <span data-testid="footer-product-identity" className="flex items-center gap-2 font-semibold">
         <CourtsideMark testId="footer-product-mark" className="h-6 w-6" />
         {t("app.name")}
       </span>
       <BuildIdentity source={source} />
       <a data-testid="footer-documentation" className="underline hover:no-underline"
-         href={club?.documentationUrl || DEFAULT_DOCUMENTATION_URL}>{t("footer.documentation")}</a>
+         href={club?.documentationUrl || DEFAULT_DOCUMENTATION_URL} target="_blank" rel="noopener noreferrer">{t("footer.documentation")}</a>
       {club?.imprintUrl && <a data-testid="footer-imprint" className="underline hover:no-underline" href={club.imprintUrl}>{t("footer.imprint")}</a>}
       {club?.privacyUrl && <a data-testid="footer-privacy" className="underline hover:no-underline" href={club.privacyUrl}>{t("footer.privacy")}</a>}
     </footer>
