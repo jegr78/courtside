@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { type Page } from "@playwright/test";
+import { declaredRoutes, routePattern, type DeclaredRoute } from "./declared-routes";
 import { expect, expectAdministrationOverview, selectJourneyDate, test } from "./fixtures";
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
@@ -694,4 +698,112 @@ test("courts and slot fillers show each entry's name, status and actions on a ph
   await expectInsideViewport(page.getByTestId(`participant-card-status-${filler}`), "the slot filler's status");
   await expectInsideViewport(page.getByTestId(`toggle-participant-card-${filler}`), "the slot filler's deactivate action");
   await expectNoHorizontalOverflow(page);
+});
+
+type Persona = "signed out" | "doe.jane" | "configuration-admin" | "bootstrap-admin";
+
+function routerPages(): DeclaredRoute[] {
+  const read = (file: string) => readFileSync(resolve(import.meta.dirname, "../src", file), "utf8");
+  return [...declaredRoutes(read("App.tsx")), ...declaredRoutes(read("views/AdminRoutes.tsx"), "/admin")];
+}
+
+// The one page a session only reaches while its password still has to be changed.
+function personas(path: string): Persona[] {
+  if (path === "/initial-password") return ["bootstrap-admin"];
+  return path.startsWith("/admin") ? ["configuration-admin"] : ["signed out", "doe.jane"];
+}
+
+async function concretePath(page: Page, path: string): Promise<string | undefined> {
+  if (!path.includes("/:")) return path;
+  await page.goto(path.slice(0, path.indexOf("/:")));
+  await page.waitForLoadState("networkidle");
+  const pattern = routePattern(path);
+  const hrefs = await page.locator("a[href]").evaluateAll((links) => links.map((link) => new URL((link as HTMLAnchorElement).href).pathname));
+  return hrefs.find((href) => pattern.test(href));
+}
+
+async function phoneLegibility(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    const describe = (element: Element) => {
+      const testId = element.getAttribute("data-testid");
+      const text = (element.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
+      return `<${element.tagName.toLowerCase()}${testId ? ` data-testid="${testId}"` : ""}> "${text}"`;
+    };
+    const shown = (element: Element) => element.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+      && element.getClientRects().length > 0;
+    const carousel = (element: Element) => {
+      for (let current = element.parentElement; current; current = current.parentElement) {
+        const style = getComputedStyle(current);
+        if (/auto|scroll/.test(style.overflowX) && style.scrollSnapType !== "none") return current;
+      }
+      return undefined;
+    };
+    const inside = (bounds: DOMRect) => bounds.left >= -0.5 && bounds.right <= width + 0.5;
+    const findings: string[] = [];
+    for (const element of document.body.querySelectorAll("*")) {
+      const ownText = [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent!.trim() !== "");
+      if (!ownText || !shown(element) || element.closest(".day-plan-slot")) continue;
+      const size = parseFloat(getComputedStyle(element).fontSize);
+      if (size < 10) findings.push(`${describe(element)} renders its text at ${size}px`);
+    }
+    const carousels = new Map<Element, DOMRect[]>();
+    for (const control of document.body.querySelectorAll("a[href], button, input:not([type='hidden']), select, textarea, summary")) {
+      const bounds = control.getBoundingClientRect();
+      if (!shown(control) || bounds.width <= 1 || bounds.height <= 1) continue;
+      const scroller = carousel(control);
+      if (scroller) {
+        carousels.set(scroller, [...carousels.get(scroller) ?? [], bounds]);
+      } else if (!inside(bounds)) {
+        findings.push(`${describe(control)} spans ${Math.round(bounds.left)}..${Math.round(bounds.right)} of a ${width}px viewport`);
+      }
+    }
+    for (const [scroller, controls] of carousels) {
+      if (!inside(scroller.getBoundingClientRect()) || !controls.some(inside)) {
+        findings.push(`${describe(scroller)} scrolls sideways without a control fully in view`);
+      }
+    }
+    return findings;
+  });
+}
+
+async function become(page: Page, persona: Persona) {
+  await page.context().clearCookies();
+  if (persona === "signed out") return;
+  await signIn(page, persona);
+  await expect(page.getByTestId(persona === "bootstrap-admin" ? "initial-password-view" : "preferences-menu")).toBeVisible();
+}
+
+test("every page keeps its text legible and its controls on screen at phone width", async ({ page }) => {
+  // given
+  const pages = routerPages();
+  const visits = (["signed out", "doe.jane", "configuration-admin", "bootstrap-admin"] as Persona[])
+    .map((persona) => ({ persona, paths: pages.filter((route) => personas(route.path).includes(persona)).map((route) => route.path) }));
+  const landed = new Set<string>();
+  const findings: string[] = [];
+  const unresolved: string[] = [];
+
+  // when
+  for (const { persona, paths } of visits) {
+    await become(page, persona);
+    for (const path of paths) {
+      const concrete = await concretePath(page, path);
+      if (concrete === undefined) {
+        unresolved.push(`${path} as ${persona}`);
+        continue;
+      }
+      await page.goto(concrete);
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => document.fonts.ready);
+      const at = new URL(page.url()).pathname;
+      landed.add(at);
+      findings.push(...(await phoneLegibility(page)).map((finding) => `${at} as ${persona}: ${finding}`));
+    }
+  }
+
+  // then
+  const missed = pages.filter((route) => !route.redirect && ![...landed].some((path) => routePattern(route.path).test(path)));
+  expect(unresolved, "a parameter route whose list page links to no instance").toEqual([]);
+  expect(missed.map((route) => route.path), "a page the guard never reached").toEqual([]);
+  expect(findings, "text below 10px or a control beyond the phone's edge").toEqual([]);
 });
