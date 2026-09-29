@@ -585,11 +585,17 @@ jobs:
         if: always()
         with:
           name: image-qualification-${{ matrix.architecture }}
-          path: |
-            build/uat-smoke
-            build/installed-database-upgrade
+          path: build/uat-smoke
           retention-days: 14
           if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always() && matrix.architecture == 'amd64'
+        with:
+          name: installed-database-upgrade-${{ matrix.architecture }}
+          path: build/installed-database-upgrade
+          retention-days: 14
+          if-no-files-found: warn
 
   mail:
     needs: [archive, image]
@@ -610,6 +616,7 @@ jobs:
       - name: Bind the Stalwart journey to the candidate archive
         env:
           IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          BOOKING_SEED_IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}
         run: |
           mkdir -p build/deployment-mail
           archive=$(find "$GITHUB_WORKSPACE/build/deployment-archive" -maxdepth 1 \
@@ -617,7 +624,7 @@ jobs:
           test -n "$archive"
           node tools/deployment-qualification.mjs --inspect-archive \
             --archive "$archive" --destination "$RUNNER_TEMP/courtside-mail-deployment" \
-            --image "$IMAGE" --recipes full-self-hosted \
+            --image "$IMAGE" --booking-seed-image "$BOOKING_SEED_IMAGE" --recipes full-self-hosted \
             --output build/deployment-mail/archive.json
       - id: journey
         name: Exercise controlled Stalwart DNS, TLS and SMTP peers
