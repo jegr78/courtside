@@ -839,6 +839,12 @@ describe("App build identity", () => {
     expect(await screen.findByTestId("footer-privacy"))
       .toHaveAttribute("href", "https://example-tennis-club.example/privacy");
     expect(screen.getByTestId("footer-imprint")).toHaveAttribute("href", "/imprint");
+    for (const link of [screen.getByTestId("footer-imprint"), screen.getByTestId("footer-privacy")]) {
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    }
+    expect(screen.getByTestId("footer-imprint")).toHaveAccessibleName("Legal notice (opens in a new tab)");
+    expect(screen.getByTestId("footer-privacy")).toHaveAccessibleName("Privacy policy (opens in a new tab)");
   });
 
   it("given no privacy policy link, when the shell loads, then the footer offers no empty target", async () => {
@@ -887,6 +893,9 @@ describe("App build identity", () => {
     expect(screen.getByTestId("footer-documentation"))
       .toHaveAttribute("href", "https://jegr78.github.io/courtside/");
     expect(screen.getByTestId("footer-documentation")).toHaveTextContent("Documentation");
+    expect(screen.getByTestId("footer-documentation")).toHaveAttribute("target", "_blank");
+    expect(screen.getByTestId("footer-documentation")).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.getByTestId("footer-documentation")).toHaveAccessibleName("Documentation (opens in a new tab)");
   });
 
   it("given a club documentation override, when the shell loads, then the footer uses it", async () => {

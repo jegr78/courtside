@@ -241,6 +241,28 @@ test("the application shell identifies the exact running build", async ({ page }
   }
 });
 
+test("the footer centres its links on the build identity beside them", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.getByTestId("build-identity")).toBeVisible();
+
+  // when — a stretched flex item keeps its box centred while its text rides at the top, so read the text
+  const centres = await page.evaluate(() => ["footer-product-identity", "build-identity", "footer-documentation"]
+    .map((testId) => {
+      const item = document.querySelector(`[data-testid="${testId}"]`)!;
+      const range = document.createRange();
+      range.selectNodeContents(document.createTreeWalker(item, NodeFilter.SHOW_TEXT).nextNode()!);
+      const text = range.getBoundingClientRect();
+      return text.top + text.height / 2;
+    }));
+
+  // then
+  for (const centre of centres) {
+    expect(Math.abs(centre - centres[1]), "a footer item sits off the row's vertical centre").toBeLessThanOrEqual(1);
+  }
+});
+
 test("the bootstrap admin can replace the initial password and continue with setup", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByTestId("login-view")).toBeVisible();

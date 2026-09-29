@@ -1075,6 +1075,7 @@ const en: Record<keyof typeof de, string> = {
   "footer.imprint": "Legal notice",
   "footer.privacy": "Privacy policy",
   "footer.documentation": "Documentation",
+  "footer.opensInNewTab": "(opens in a new tab)",
   "nav.adminMessages": "Message log",
   "myMessages.title": "Notifications",
   "myMessages.description": "Choose what the club sends you. Unchecked means you no longer get that message; everything else keeps arriving.",
