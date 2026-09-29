@@ -315,6 +315,11 @@ test("given a candidate archive, when any release job inspects it, then the book
   }
 });
 
+function matcher(glob) {
+  const literal = glob.split("*").map((part) => part.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(`^${literal.join(".*")}$`);
+}
+
 test("given an artifact another release job downloads, when it is uploaded, then it has one root directory", () => {
   // given
   const uploads = new Map(Object.keys(releaseJobs).flatMap((job) => stepsOf(job)
@@ -326,8 +331,8 @@ test("given an artifact another release job downloads, when it is uploaded, then
 
   // then
   for (const [name, path] of uploads) {
-    const glob = new RegExp(`^${name.replaceAll(/\$\{\{[^}]+\}\}/g, ".+")}$`);
-    if (!downloaded.some((pattern) => glob.test(pattern) || new RegExp(`^${pattern.replace("*", ".*")}$`).test(name))) continue;
+    const uploaded = matcher(name.replaceAll(/\$\{\{[^}]+\}\}/g, "*"));
+    if (!downloaded.some((pattern) => uploaded.test(pattern) || matcher(pattern).test(name))) continue;
     const roots = new Set(String(path).split("\n").map((line) => line.trim())
       .filter((line) => line && !line.startsWith("!"))
       .map((line) => (/\.[a-z]+$/.test(line) ? dirname(line) : line)));
