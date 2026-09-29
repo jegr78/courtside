@@ -164,7 +164,7 @@
           "environment": "Chromium plus supported matrix, including a WebKit and a Chromium phone viewport on every frontend change",
           "syntheticData": "Deterministic visual dataset", "evidenceType": "Semantic assertions and reviewed pixel baselines",
           "owner": "Frontend",
-          "openGap": "Broad locale, theme and viewport captures remain diagnostic; seven principal surfaces have blocking stable baselines, rendered in a pinned browser image."
+          "openGap": "Broad locale, theme and viewport captures remain diagnostic; the principal surfaces have blocking stable baselines, three of them at phone width, rendered in a pinned browser image."
         }
       ]
     },
