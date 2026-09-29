@@ -134,7 +134,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   }, [eligibility, eligibilityError]);
 
   const hasCourts = (data?.courts.length ?? 0) > 0;
-  const showsDayNavigation = Boolean(data) && hasCourts;
   const days = data?.days ?? [];
   const renderedWeekStart = days[0] ? formatDate(days[0]) : undefined;
   const selectedDay = days.find((day) => formatDate(day) === selectedDate);
@@ -247,7 +246,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       section.style.setProperty("--week-navigation-height", `${navigation.offsetHeight}px`));
     observer.observe(navigation);
     return () => observer.disconnect();
-  }, [showsDayNavigation]);
+  }, [hasCourts]);
 
   useEffect(() => {
     const activeDay = selectedDate
@@ -275,7 +274,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       </div>}
     </div>
 
-    {data && showsDayNavigation && <nav ref={dayNavigationRef} data-testid="mobile-week-navigation" className="week-day-navigation mt-5"
+    {data && hasCourts && <nav ref={dayNavigationRef} data-testid="mobile-week-navigation" className="week-day-navigation mt-5"
       aria-label={t("week.chooseDate")}>
       <div data-testid="mobile-week-days" className="week-day-list">
         <Button variant="secondary" type="button" data-testid="mobile-week-previous"
