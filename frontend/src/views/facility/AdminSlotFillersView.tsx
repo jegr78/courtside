@@ -115,17 +115,17 @@ export function AdminSlotFillersView() {
       <ParticipantCardCreateForm disabled={pending.has("filler:new")} create={create} />
       <form id={FORM} noValidate onSubmit={(event) => void saveFillers(event)} className="grid gap-3">
         <h2 className="text-2xl font-bold">{t("admin.facility.allParticipantCards")}</h2>
-        <div className="overflow-x-auto"><table className="w-full border-collapse text-left">
-          <thead><tr>
+        <table className="block w-full border-collapse text-left lg:table">
+          <thead className="sr-only lg:not-sr-only"><tr>
             <th className="border-b p-2">{t("admin.facility.label")}</th>
             <th className="border-b p-2">{t("admin.facility.owned")}</th>
             <th className="border-b p-2">{t("admin.facility.columnStatus")}</th>
           </tr></thead>
-          <tbody>{fillers.map((card) => <ParticipantCardRow key={card.id} card={card}
+          <tbody className="grid gap-3 lg:table-row-group">{fillers.map((card) => <ParticipantCardRow key={card.id} card={card}
             entry={entries[card.id] ?? stored(card)} refused={refused.has(card.id)}
             disabled={saving || pending.has(`filler:${card.id}`)}
             entered={(changed) => enter(card, changed)} toggle={toggle} />)}</tbody>
-        </table></div>
+        </table>
         <SaveBar id={MARK} subject={t("admin.facility.participantCards")} saveTestId="save-slot-fillers" form={FORM}
                  unsaved={edited.length > 0} pending={saving} discard={discard} />
       </form>
@@ -136,22 +136,29 @@ export function AdminSlotFillersView() {
 function ParticipantCardRow({ card, entry, refused, disabled, entered, toggle }: { card: ParticipantCard; entry: FillerEntry; refused: boolean; disabled: boolean; entered: (changed: Partial<FillerEntry>) => void; toggle: (card: ParticipantCard) => Promise<void> }) {
   const { t } = useTranslation();
   const field = "form-control min-h-11 rounded-lg border px-3 py-2";
-  return <tr data-testid={`participant-card-row-${card.id}`}>
-    <td className="border-b p-2 align-top">
-      <input data-testid={`edit-participant-card-label-${card.id}`} className={`${field} w-56`} maxLength={MAX_LABEL}
+  const cell = "grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-3 lg:table-cell lg:border-b lg:p-2 lg:align-top";
+  const label = "font-medium lg:hidden";
+  return <tr data-testid={`participant-card-row-${card.id}`} className="grid gap-3 rounded-xl border p-4 lg:table-row lg:rounded-none lg:border-0 lg:p-0">
+    <td className={cell}>
+      <span aria-hidden="true" data-testid="participant-card-label-label" className={label}>{t("admin.facility.label")}</span>
+      <input data-testid={`edit-participant-card-label-${card.id}`} className={`${field} w-full min-w-0 lg:w-56`} maxLength={MAX_LABEL}
              aria-label={t("admin.facility.editParticipantCardLabel")} aria-invalid={(refused && !validLabel(entry)) || undefined}
              disabled={disabled} value={entry.label} onChange={(event) => entered({ label: event.target.value })} />
     </td>
-    <td className="border-b p-2 align-top">
+    <td className={cell}>
+      <span aria-hidden="true" data-testid="participant-card-label-owned" className={label}>{t("admin.facility.owned")}</span>
       <input data-testid={`edit-participant-card-capacity-${card.id}`} className={`${field} w-28`} type="number" min={1} max={99}
              aria-label={t("admin.facility.editParticipantCardCapacity")} aria-invalid={(refused && !validCapacity(entry)) || undefined}
              placeholder={t("admin.facility.unlimited")}
              disabled={disabled} value={entry.capacity} onChange={(event) => entered({ capacity: event.target.value })} />
     </td>
-    <td className="border-b p-2 align-top"><span className="flex flex-wrap items-center gap-3">
-      <span data-testid={`participant-card-status-${card.id}`}>{t(card.active ? "admin.facility.statusActive" : "admin.facility.statusInactive")}</span>
-      <Button variant={card.active ? "destructive" : "primary"} disabled={disabled} data-testid={`toggle-participant-card-${card.id}`} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
-    </span></td>
+    <td className={cell}>
+      <span aria-hidden="true" data-testid="participant-card-label-status" className={label}>{t("admin.facility.columnStatus")}</span>
+      <span className="flex min-w-0 flex-wrap items-center gap-3">
+        <span data-testid={`participant-card-status-${card.id}`}>{t(card.active ? "admin.facility.statusActive" : "admin.facility.statusInactive")}</span>
+        <Button variant={card.active ? "destructive" : "primary"} disabled={disabled} data-testid={`toggle-participant-card-${card.id}`} type="button" onClick={() => void toggle(card)}>{t(card.active ? "admin.deactivate" : "admin.activate")}</Button>
+      </span>
+    </td>
   </tr>;
 }
 
