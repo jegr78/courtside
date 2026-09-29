@@ -298,8 +298,9 @@ jobs:
             "$PUBLISHED_TAGS")
           echo "origins=$origins" >> "$GITHUB_OUTPUT"
           printf '\n## Supported database upgrade origins\n\n' >> build/release-body.md
-          node -e 'for (const origin of JSON.parse(process.argv[1])) console.log("- " + origin)' "$origins" \
-            >> build/release-body.md
+          node -e 'const origins = JSON.parse(process.argv[1]);
+            if (origins.length === 0) console.log("None; this is the first release.");
+            for (const origin of origins) console.log("- " + origin)' "$origins" >> build/release-body.md
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -778,6 +779,7 @@ jobs:
 
   upgrade:
     needs: [build, image]
+    if: needs.build.outputs.upgrade-origins != '[]'
     strategy:
       fail-fast: false
       matrix:
@@ -855,6 +857,7 @@ jobs:
 
   publish:
     needs: [archive, build, browser, image, qualify, mail, security-record, upgrade, restore]
+    if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:

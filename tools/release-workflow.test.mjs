@@ -346,3 +346,11 @@ test("given the amd64 qualification, when the active assessment reads it, then t
   assert.equal(stepsOf("qualify").find((step) => step.with?.name === "image-qualification-${{ matrix.architecture }}")
     .with.path.trim(), "build/uat-smoke", "the qualification artifact is rooted at build/uat-smoke");
 });
+
+test("given no upgrade origin, when a first release runs, then the upgrade job is skipped and publish still runs", () => {
+  // then
+  assert.equal(releaseJobs.upgrade.if, "needs.build.outputs.upgrade-origins != '[]'");
+  assert.ok(releaseJobs.publish.needs.includes("upgrade"), "publish still waits for any upgrade that runs");
+  assert.equal(releaseJobs.publish.if, "${{ !cancelled() && !failure() }}",
+    "a skipped upgrade does not skip publish, a failed one stops it");
+});

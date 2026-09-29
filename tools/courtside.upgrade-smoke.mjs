@@ -76,10 +76,9 @@ export function selectUpgradeOrigins(candidateTag, tags) {
     .sort(precedence).map((version) => version.tag);
   const released_ = [patch?.tag, minor?.tag, released.length === 0 ? precedingMajor?.tag : null]
     .filter(Boolean);
-  // Until a release exists, the pre-release schema is the only database a club can hold, and a
-  // candidate preceding the first release does not make that upgrade any less real.
-  const from = released_.length === 0 ? ["pre-release-v17", ...candidates] : [...released_, ...candidates];
-  return [...new Set(from)];
+  // Before the first release no schema is frozen, so nothing is an upgrade origin.
+  if (released_.length === 0) return [];
+  return [...new Set([...released_, ...candidates])];
 }
 
 // A tag whose run never reached publish names no image; resolving an origin from it would pull
@@ -287,13 +286,9 @@ async function verifyApplication(password, port, isWriteRequired = true) {
 
 function fixtureFor(origin, build) {
   const destination = join(build, "fixture.sql");
-  if (origin === "pre-release-v17") {
-    writeFileSync(destination, readFileSync(join(root, "upgrade", "fixtures", "pre-release-v17.sql")));
-  } else {
-    const fixture = run("git", ["show", `${origin}:upgrade/fixtures/pre-release-v17.sql`]);
-    if (fixture.status !== 0) throw new Error(`Release ${origin} does not own an upgrade fixture`);
-    writeFileSync(destination, fixture.stdout);
-  }
+  const fixture = run("git", ["show", `${origin}:upgrade/fixtures/pre-release-v17.sql`]);
+  if (fixture.status !== 0) throw new Error(`Release ${origin} does not own an upgrade fixture`);
+  writeFileSync(destination, fixture.stdout);
   return destination;
 }
 
@@ -314,26 +309,15 @@ async function executeUpgrade() {
   mkdirSync(build, { recursive: true });
   const fixture = fixtureFor(origin, build);
   const baseEnvironment = { COURTSIDE_UPGRADE_ADMIN_PASSWORD: password };
-  let originImage = candidate;
-  if (origin !== "pre-release-v17") {
-    const repository = process.env.GITHUB_REPOSITORY;
-    if (!repository) throw new Error("GITHUB_REPOSITORY is required for a published upgrade origin");
-    const originTag = `ghcr.io/${repository}:${origin.slice(1)}`;
-    run("docker", ["pull", originTag], { inherit: true });
-    const digests = JSON.parse(run("docker", ["image", "inspect", "--format", "{{json .RepoDigests}}", originTag]).stdout);
-    originImage = selectRepositoryDigest(repository, origin, digests);
-  }
+  const repository = process.env.GITHUB_REPOSITORY;
+  if (!repository) throw new Error("GITHUB_REPOSITORY is required for a published upgrade origin");
+  const originTag = `ghcr.io/${repository}:${origin.slice(1)}`;
+  run("docker", ["pull", originTag], { inherit: true });
+  const digests = JSON.parse(run("docker", ["image", "inspect", "--format", "{{json .RepoDigests}}", originTag]).stdout);
+  const originImage = selectRepositoryDigest(repository, origin, digests);
   writeFileSync(join(build, "origin-image.txt"), `${originImage}\n`);
-  const originEnvironment = {
-    ...baseEnvironment,
-    COURTSIDE_UPGRADE_IMAGE: originImage,
-    COURTSIDE_UPGRADE_FLYWAY_TARGET: origin === "pre-release-v17" ? "17" : "latest",
-    COURTSIDE_UPGRADE_DDL_MODE: origin === "pre-release-v17" ? "none" : "validate"
-  };
-  const candidateEnvironment = {
-    ...baseEnvironment, COURTSIDE_UPGRADE_IMAGE: candidate, COURTSIDE_UPGRADE_FLYWAY_TARGET: "latest",
-    COURTSIDE_UPGRADE_DDL_MODE: "validate"
-  };
+  const originEnvironment = { ...baseEnvironment, COURTSIDE_UPGRADE_IMAGE: originImage };
+  const candidateEnvironment = { ...baseEnvironment, COURTSIDE_UPGRADE_IMAGE: candidate };
 
   try {
     compose(project, originEnvironment, ["down", "--volumes", "--remove-orphans"], { allowFailure: true });

@@ -77,13 +77,13 @@ test("given candidates of another line, when selecting upgrade origins, then the
 
 test("given candidates numbered past nine, when ordering them, then ten follows nine rather than one", () => {
   // given
-  const tags = ["v0.3.0-rc.2", "v0.3.0-rc.10", "v0.3.0-rc"];
+  const tags = ["v0.2.1", "v0.3.0-rc.2", "v0.3.0-rc.10", "v0.3.0-rc"];
 
   // when
   const origins = selectUpgradeOrigins("v0.3.0", tags);
 
   // then
-  assert.deepEqual(origins, ["pre-release-v17", "v0.3.0-rc", "v0.3.0-rc.2", "v0.3.0-rc.10"]);
+  assert.deepEqual(origins, ["v0.2.1", "v0.3.0-rc", "v0.3.0-rc.2", "v0.3.0-rc.10"]);
 });
 
 test("given several patches in the current line, when selecting origins, then patch and previous minor differ", () => {
@@ -101,31 +101,19 @@ test("given several patches in the current line, when selecting origins, then pa
 // as two origins that only differ in how they were written.
 test("given a version written with a leading zero, when selecting upgrade origins, then it is not one", () => {
   // when / then
-  assert.deepEqual(selectUpgradeOrigins("v0.3.0", ["v0.3.0-rc.01", "v0.3.0-rc.1"]),
-    ["pre-release-v17", "v0.3.0-rc.1"]);
+  assert.deepEqual(selectUpgradeOrigins("v0.3.0", ["v0.2.1", "v0.3.0-rc.01", "v0.3.0-rc.1"]),
+    ["v0.2.1", "v0.3.0-rc.1"]);
   assert.throws(() => selectUpgradeOrigins("v01.2.3", []), /not a semantic version/);
   assert.throws(() => selectUpgradeOrigins("v0.3.0-rc.01", []), /not a semantic version/);
 });
 
-test("given no published origin, when selecting upgrade origins, then the pre-release fixture is used", () => {
-  // when / then
-  assert.deepEqual(selectUpgradeOrigins("v0.1.0", []), ["pre-release-v17"]);
-});
-
-// Before the first release the pre-release schema is the only database a club can hold, and a
-// candidate preceding it does not make that upgrade any less real.
-test("given only candidates before the first release, when selecting origins, then the pre-release schema stays one",
+test("given only candidates before the first release, when selecting origins, then nothing is an upgrade origin",
   () => {
     // when / then
-    assert.deepEqual(selectUpgradeOrigins("v0.1.0", ["v0.1.0-rc.1"]),
-      ["pre-release-v17", "v0.1.0-rc.1"]);
-    assert.deepEqual(selectUpgradeOrigins("v0.1.0", []), ["pre-release-v17"]);
-  });
-
-test("given only a candidate of another line, when selecting origins, then the pre-release schema is the origin",
-  () => {
-    // when / then
-    assert.deepEqual(selectUpgradeOrigins("v0.3.0", ["v0.2.2-rc.1"]), ["pre-release-v17"]);
+    assert.deepEqual(selectUpgradeOrigins("v0.1.0", []), []);
+    assert.deepEqual(selectUpgradeOrigins("v0.1.0", ["v0.1.0-rc.1", "v0.1.0-rc.2"]), [],
+      "a candidate schema is not frozen before the first release");
+    assert.deepEqual(selectUpgradeOrigins("v0.1.0-rc.4", ["v0.1.0-rc.3"]), []);
   });
 
 test("given the first release of a major, when selecting origins, then the preceding major remains covered",

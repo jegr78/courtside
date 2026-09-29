@@ -297,7 +297,8 @@ the release it is a candidate for upgrades from it, and so does every later cand
 release. Candidates of another line are not origins: a club is expected to reach a candidate's
 release before following the next one. A candidate whose run never reached `publish` is not an
 origin either, it named no image, and the release reads its history from what was published rather
-than from the tags that happen to exist.
+than from the tags that happen to exist. Candidates of the first release are no origins at all:
+until a release exists no schema is frozen, so `upgrade` is skipped and `publish` runs without it.
 
 A version is read as semantic versioning defines it. Build metadata (`v0.3.0+build.1`) is refused
 rather than interpreted, because nothing here has a use for it and a release that guessed would be
