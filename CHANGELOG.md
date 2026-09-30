@@ -5,6 +5,7 @@
 
 
 
+
 ### Notable changes
 
 * bundled PostgreSQL 18 deployments bind the generated COURTSIDE_DATABASE_VOLUME explicitly.
@@ -468,6 +469,8 @@
 * stop the assessment from filing an issue for every unprovable control ([#910](https://github.com/jegr78/courtside/issues/910)) ([8740314](https://github.com/jegr78/courtside/commit/87403146786f632a5c7006fa0de871bb65978cf7))
 
 ### Build and dependencies
+
+* **deps:** bump brace-expansion in /frontend ([#1211](https://github.com/jegr78/courtside/issues/1211)) ([fc53d00](https://github.com/jegr78/courtside/commit/fc53d003fba6d4c8b2f86716bc31691bda56ab28))
 
 * **deps:** bump frontend, Maven, deploy and workflow dependencies ([#1058](https://github.com/jegr78/courtside/issues/1058)) ([9bceeda](https://github.com/jegr78/courtside/commit/9bceedab115946a4db33fe2b42cfdfd42a836dd6))
 * **deps:** consolidate deployment updates ([#1153](https://github.com/jegr78/courtside/issues/1153)) ([f26bfc0](https://github.com/jegr78/courtside/commit/f26bfc080c2be1698f272c8eabeaccf0821a0de4))
