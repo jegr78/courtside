@@ -123,6 +123,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:concurrent-modification",
             "urn:courtside:error:constraint-violation",
             "urn:courtside:error:database-lock-unavailable",
+            "urn:courtside:error:empty-parameter",
             "urn:courtside:error:statement-timeout",
             "urn:courtside:error:internal-error",
             "urn:courtside:error:malformed-request-body",
@@ -135,6 +136,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:payload-too-large",
             "urn:courtside:error:request-rejected",
             "urn:courtside:error:unauthenticated",
+            "urn:courtside:error:undeclared-parameter",
             "urn:courtside:error:unmapped-path",
             "urn:courtside:error:unsupported-media-type",
             "urn:courtside:error:validation-failed");

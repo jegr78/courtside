@@ -1953,10 +1953,10 @@ components:
           type: boolean
           description: Whether member-facing views use a neutral booked label instead of the card label.
         participantLastNames:
-          type: array
+          type: [array, "null"]
           description: |
-            Present only for the authenticated viewer's own member booking. Contains the last
-            names of other member participants in entry order. The viewer and guests are omitted.
+            Null unless the booking is the authenticated viewer's own member booking. Contains the
+            last names of other member participants in entry order. The viewer and guests are omitted.
           items: { type: string }
         bookedByName:
           type: [string, "null"]

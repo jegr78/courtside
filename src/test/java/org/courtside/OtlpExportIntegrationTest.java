@@ -76,7 +76,7 @@ class OtlpExportIntegrationTest extends AbstractIntegrationTest {
                 HttpResponse.BodyHandlers.discarding());
 
         // then
-        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.statusCode()).as("an undeclared query parameter is refused").isEqualTo(400);
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
                 assertThat(COLLECTOR.paths()).contains("/v1/traces", "/v1/metrics"));
         assertThat(COLLECTOR.authorizations()).containsOnly("Bearer test-token");
@@ -95,7 +95,7 @@ class OtlpExportIntegrationTest extends AbstractIntegrationTest {
             meters.counter("courtside.export.refusal.test").increment();
             HttpResponse<Void> response = HttpClient.newHttpClient().send(
                     HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + applicationPort
-                            + "/api/public/courts?export-refusal=true")).build(),
+                            + "/api/public/courts")).build(),
                     HttpResponse.BodyHandlers.discarding());
 
             // then
@@ -117,14 +117,14 @@ class OtlpExportIntegrationTest extends AbstractIntegrationTest {
         try {
             // when
             meters.counter("courtside.export.timeout.test").increment();
-            HttpResponse<Void> response = request("export-timeout");
+            HttpResponse<Void> response = request();
 
             // then
             assertThat(response.statusCode()).isEqualTo(200);
             await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
                     assertThat(COLLECTOR.stalledResponses()).isGreaterThan(stalledBefore));
             int successesAfterStall = COLLECTOR.successfulResponses("/v1/traces");
-            assertThat(request("export-after-timeout").statusCode()).isEqualTo(200);
+            assertThat(request().statusCode()).isEqualTo(200);
             await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
                     assertThat(COLLECTOR.successfulResponses("/v1/traces"))
                             .isGreaterThan(successesAfterStall));
@@ -133,10 +133,10 @@ class OtlpExportIntegrationTest extends AbstractIntegrationTest {
         }
     }
 
-    private HttpResponse<Void> request(String probe) throws IOException, InterruptedException {
+    private HttpResponse<Void> request() throws IOException, InterruptedException {
         return HttpClient.newHttpClient().send(
                 HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + applicationPort
-                        + "/api/public/courts?" + probe + "=true")).build(),
+                        + "/api/public/courts")).build(),
                 HttpResponse.BodyHandlers.discarding());
     }
 

@@ -350,6 +350,39 @@ class SharedExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(EmptyParameterException.class)
+    ProblemDetail handleEmptyParameter(EmptyParameterException exception) {
+        refusedByValidation();
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "A request parameter was sent without a value");
+        problem.setType(URI.create("urn:courtside:error:empty-parameter"));
+        problem.setTitle("Empty parameter");
+        problem.setProperty("violations", List.of(Map.of(
+                "code", "request.emptyParameter",
+                "params", Map.of("parameter", exception.getParameterName()))));
+        logAnswered(problem, List.of(exception.getParameterName()));
+        return problem;
+    }
+
+    @ExceptionHandler(UndeclaredParameterException.class)
+    ProblemDetail handleUndeclaredParameter(UndeclaredParameterException exception) {
+        refusedByValidation();
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "The request states a parameter this operation does not declare");
+        problem.setType(URI.create("urn:courtside:error:undeclared-parameter"));
+        problem.setTitle("Undeclared parameter");
+        String name = exception.getParameterName();
+        if (!A_NAME_THIS_API_DEFINES.matcher(name).matches()) {
+            logAnswered(problem, List.of());
+            return problem;
+        }
+        problem.setProperty("violations", List.of(Map.of(
+                "code", "request.undeclaredParameter",
+                "params", Map.of("parameter", name))));
+        logAnswered(problem, List.of(name));
+        return problem;
+    }
+
     private static Map<String, Object> toMap(FieldError error) {
         if (!error.contains(ConstraintViolation.class)) {
             // A Validator's rejection carries its own code.

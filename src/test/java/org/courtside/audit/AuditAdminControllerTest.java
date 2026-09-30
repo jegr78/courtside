@@ -107,6 +107,14 @@ class AuditAdminControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenTheLogIsListed_thenItNeverReportsAnIncompleteSearch() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/audit").with(user(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.searchIncomplete").value(false));
+    }
+
+    @Test
     void givenSearchCriteria_whenTheLogIsSearched_thenSubjectActorEventAndTimeAreFilteredFromTheBody()
             throws Exception {
         // given

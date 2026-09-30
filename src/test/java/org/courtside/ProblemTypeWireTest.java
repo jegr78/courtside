@@ -411,6 +411,94 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnEmptyOptionalDate_whenReadingStatistics_thenTheResponseNamesItInParams() throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(get("/api/admin/statistics/utilisation?from="));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:empty-parameter");
+        result.andExpect(jsonPath("$.violations[0].code").value("request.emptyParameter"))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("from"));
+    }
+
+    @Test
+    void givenAnEmptyOptionalEnumeration_whenFetchingTheAppIcon_thenTheDefaultDoesNotStandInForIt() throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(get("/api/public/config/icon?size=180&purpose="));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:empty-parameter");
+        result.andExpect(jsonPath("$.violations[0].params.parameter").value("purpose"));
+    }
+
+    @Test
+    void givenAnUndeclaredQueryParameter_whenReadingStatistics_thenTheResponseNamesItInParams() throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(get("/api/admin/statistics/utilisation?unknown=1"));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:undeclared-parameter");
+        result.andExpect(jsonPath("$.violations[0].code").value("request.undeclaredParameter"))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("unknown"));
+    }
+
+    @Test
+    void givenAnUndeclaredQueryParameter_whenFetchingTheAppIcon_thenItIsRefused() throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(
+                get("/api/public/config/icon?size=180&x-schemathesis-unknown-property=42"));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:undeclared-parameter");
+    }
+
+    @Test
+    void givenAnUndeclaredParameterNameThatIsNotQuotable_whenRequesting_thenTheResponseDoesNotEchoIt()
+            throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(get("/api/admin/statistics/utilisation?%3Cb%3Ex%3C%2Fb%3E=1"));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:undeclared-parameter");
+        result.andExpect(jsonPath("$.violations").doesNotExist());
+    }
+
+    @Test
+    void givenAParameterNameWithAMalformedEscape_whenRequesting_thenItIsRefusedAsUndeclared() throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(get("/api/admin/statistics/utilisation").with(request -> {
+            request.setQueryString("%zz=1");
+            return request;
+        }));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:undeclared-parameter");
+    }
+
+    @Test
+    void givenDeclaredParameters_whenReadingStatistics_thenTheRequestIsServed() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/utilisation?from=2026-05-04&to=2026-05-10"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void givenAnEmptyRequiredParameter_whenRequesting_thenItIsStillReportedMissing() throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(get("/api/bookings?date="));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:missing-parameter");
+        result.andExpect(jsonPath("$.violations[0].params.parameter").value("date"));
+    }
+
+    @Test
+    void givenOmittedOptionalParameters_whenReadingStatistics_thenTheRequestIsServed() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/utilisation")).andExpect(status().isOk());
+    }
+
+    @Test
     void givenAMissingRequiredParameter_whenRequesting_thenTheResponseNamesItInParams() throws Exception {
         // given / when
         ResultActions result = mockMvc.perform(get("/api/bookings"));
