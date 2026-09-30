@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { EventEmitter } from "node:events";
+import { EventEmitter, once } from "node:events";
+import { createServer } from "node:http";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,7 +18,7 @@ import {
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfComposePlan, perfResetPlan,
   writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
-  funnelPerformanceRunPlan, validateFunnelTarget, validatePerformanceResult,
+  funnelPerformanceRunPlan, localRequest, validateFunnelTarget, validatePerformanceResult,
   redactUatDiagnostics, resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference,
   uatSmokeEnvironment, repositoryFromRemote, uatBookingSeedCandidate, uatBookingSeedPlans,
   validateNode, validatePublicAddress
@@ -1593,3 +1594,43 @@ test("given build information without a version, when the packaged application i
   assert.throws(() => packagedApplicationJar(["courtside-0.1.0-rc.1.jar"], "build.artifact=courtside\n"),
     /no build version/);
 });
+
+async function slowServer(delayMilliseconds) {
+  const server = createServer((request, response) => {
+    setTimeout(() => response.end("ready"), delayMilliseconds);
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  return server;
+}
+
+test("given an answer that takes longer than a second, when a smoke asks for it, then it waits for the answer",
+  async () => {
+    // given
+    const server = await slowServer(1500);
+
+    try {
+      // when
+      const response = await localRequest({ secure: false, port: server.address().port, path: "/api/session" });
+
+      // then
+      assert.equal(response.body, "ready", "a request doing real work was cut off by a clock");
+    } finally {
+      server.close();
+    }
+  });
+
+test("given a readiness probe, when the target does not answer within its deadline, then the probe gives up",
+  async () => {
+    // given
+    const server = await slowServer(1500);
+
+    try {
+      // when / then
+      await assert.rejects(localRequest({ secure: false, port: server.address().port, path: "/api/source",
+        probeDeadlineMilliseconds: 200 }), /Request timed out/);
+    } finally {
+      server.closeAllConnections();
+      server.close();
+    }
+  });
