@@ -520,8 +520,9 @@ relay whose certificate the container cannot validate; the
 [`operations guide`](../deploy/guides/operations.md) states what that permits. Other recipes use an
 operator-selected relay.
 
-GitHub Actions are pinned by commit. Dependabot reports updates. Build and release scan source and
-images with Trivy. Release and nightly images are signed and carry SBOM and provenance attestations.
+GitHub Actions are pinned by commit. Dependabot reports updates. The image build applies the base
+distribution's published package updates, so a security fix does not wait for the next rebuild of the
+digest-pinned base image. Build and release scan source and images with Trivy. Release and nightly images are signed and carry SBOM and provenance attestations.
 Assessment profiles combine contract, authorization, browser, OpenAPI fuzz and bounded scanner
 checks. Public evidence excludes credentials, cookies, bodies and exploit details.
 
