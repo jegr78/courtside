@@ -377,15 +377,14 @@ jobs:
         working-directory: frontend
         run: |
           mkdir -p ../build/security
-          ./node/node ./node/node_modules/npm/bin/npm-cli.js run audit:security -- \
-            --output ../build/security/npm.json
+          npm run audit:security -- --output ../build/security/npm.json
       - name: Enforce the release npm policy
         env:
           SOURCE_COMMIT: ${{ inputs.source-commit }}
         run: >
           node tools/security-findings.mjs
           --npm build/security/npm.json
-          --npm-version "$(frontend/node/node frontend/node/node_modules/npm/bin/npm-cli.js --version)"
+          --npm-version "$(npm --version)"
           --exceptions security/exceptions.json
           --assessment-policy not-applicable
           --scope scheduled-npm-audit

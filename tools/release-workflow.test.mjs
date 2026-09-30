@@ -371,3 +371,21 @@ test("given no upgrade origin, when a first release runs, then the upgrade job i
   assert.equal(releaseJobs.publish.if, "${{ !cancelled() && !failure() }}",
     "a skipped upgrade does not skip publish, a failed one stops it");
 });
+
+test("given a job that runs the Maven-pinned node, when it starts, then an earlier step installed it", () => {
+  // given
+  const installs = /mvnw[^\n]*(?:\binstall-node-and-npm\b|\b(?:package|verify|install)\b)/;
+  const offenders = readdirSync(fileURLToPath(new URL(WORKFLOWS, import.meta.url)))
+    .filter((file) => file.endsWith(".yml"))
+    .flatMap((file) => Object.entries(yaml.load(sourceOf(`${WORKFLOWS}/${file}`)).jobs ?? {})
+      .flatMap(([job, { steps = [] }]) => {
+        const runs = steps.map((step) => String(step.run ?? "").replace(/\\\n\s*/g, " "));
+        const firstUse = runs.findIndex((run) => /(?:^|[\s"(])(?:\.\/|frontend\/)node\/node\b/.test(run));
+        const firstInstall = runs.findIndex((run) => installs.test(run));
+        return firstUse >= 0 && (firstInstall < 0 || firstInstall > firstUse) ? [`${file}:${job}`] : [];
+      }));
+
+  // then
+  assert.deepEqual(offenders, [],
+    "these jobs call frontend/node/node, which only a Maven build or install-node-and-npm puts there");
+});
