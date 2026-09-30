@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-rc.6](https://github.com/jegr78/courtside/compare/v0.1.0-rc.5...v0.1.0-rc.6) (2026-09-30)
+
+
+### Bug fixes
+
+* apply the base distribution's security updates when building the image ([#1213](https://github.com/jegr78/courtside/issues/1213)) ([2a3b6f7](https://github.com/jegr78/courtside/commit/2a3b6f75880d8dfefd760f519b93563ee97c4e91))
+
 ## 0.1.0 (2026-09-14)
 
 
@@ -540,4 +547,3 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
-
