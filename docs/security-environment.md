@@ -115,8 +115,9 @@ The emergency stop is local and immediate. The current prerequisite checks it be
 node tools/courtside.mjs security-stop run-0001
 ```
 
-Scheduled safe assessments and release-active assessments are defined in
-[`security-assessment.yml`](../.github/workflows/security-assessment.yml) and
-[`release.yml`](../.github/workflows/release.yml). Destructive execution is never scheduled and has
+Scheduled safe assessments are defined in
+[`security-assessment.yml`](../.github/workflows/security-assessment.yml). The active assessment a
+release requires is defined in [`release-gates.yml`](../.github/workflows/release-gates.yml), which
+both the release and the nightly `build` call. Destructive execution is never scheduled and has
 no remote workflow. Run it through the local CLI with the exact digest, source commit and
 confirmation shown by `security-plan`.

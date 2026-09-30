@@ -26,6 +26,12 @@ on:
       booking-seed-digest:
         value: ${{ jobs.image.outputs.booking-seed-digest }}
   workflow_dispatch:
+    inputs:
+      security-base-run-id:
+        description: A build run of this branch whose release-build summary lets the release gates run
+        required: false
+        type: string
+        default: ''
 
 concurrency:
   group: container-registry-${{ github.repository }}
@@ -428,6 +434,28 @@ jobs:
           path: build/installed-database-upgrade
           retention-days: 14
           if-no-files-found: warn
+
+  release-gates:
+    needs: [select, image, qualify]
+    if: github.event_name == 'workflow_dispatch' && inputs.security-base-run-id != ''
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    uses: ./.github/workflows/release-gates.yml
+    with:
+      image-digest: ${{ needs.image.outputs.digest }}
+      booking-seed-digest: ${{ needs.image.outputs.booking-seed-digest }}
+      source-commit: ${{ needs.select.outputs.commit }}
+      run-label: rehearsal
+      archive-artifact: nightly-deployment-archive
+      archive-version: ${{ needs.select.outputs.version }}
+      archive-ref: ${{ github.ref }}
+      archive-workflow: nightly-image.yml
+      qualification-artifact-prefix: nightly-image-qualification-
+      fixtures-artifact: nightly-assessment-fixtures
+      security-base-artifact: nightly-release-security-base
+      security-base-run-id: ${{ inputs.security-base-run-id }}
 
   publish:
     needs: [select, image, qualify]

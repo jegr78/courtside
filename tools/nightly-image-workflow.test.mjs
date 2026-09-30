@@ -82,6 +82,30 @@ test("given a complete build, when it finishes, then it calls the image workflow
   assert.equal(workflow.concurrency["cancel-in-progress"], false);
 });
 
+test("given a branch dispatch with a security base, when the image is qualified, then it rehearses the nightly's gates",
+  () => {
+    // given
+    const buildWorkflow = yaml.load(readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"));
+    const nightlyCall = buildWorkflow.jobs["release-gates"].with;
+    const dispatchCall = workflow.jobs["release-gates"];
+    const shared = ["archive-artifact", "archive-workflow", "qualification-artifact-prefix", "fixtures-artifact",
+      "security-base-artifact"];
+
+    // when / then
+    assert.equal(dispatchCall.uses, "./.github/workflows/release-gates.yml");
+    assert.deepEqual(dispatchCall.needs, ["select", "image", "qualify"]);
+    assert.equal(dispatchCall.if,
+      "github.event_name == 'workflow_dispatch' && inputs.security-base-run-id != ''");
+    assert.equal(workflow.on.workflow_dispatch.inputs["security-base-run-id"].default, "");
+    assert.equal(workflow.on.workflow_call.inputs["security-base-run-id"], undefined,
+      "a nightly build call would otherwise rehearse twice");
+    assert.equal(dispatchCall.with["security-base-run-id"], "${{ inputs.security-base-run-id }}");
+    assert.equal(dispatchCall.with["image-digest"], "${{ needs.image.outputs.digest }}");
+    for (const input of shared) {
+      assert.equal(dispatchCall.with[input], nightlyCall[input], `the branch rehearsal differs from the night in ${input}`);
+    }
+  });
+
 test("given nightly cleanup and release publication, when registry access is scheduled, then writes cannot overlap", () => {
   // when / then
   for (const jobName of ["image", "publish"]) {
