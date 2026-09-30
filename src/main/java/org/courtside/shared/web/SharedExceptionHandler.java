@@ -364,6 +364,22 @@ class SharedExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(UndeclaredParameterException.class)
+    ProblemDetail handleUndeclaredParameter(UndeclaredParameterException exception) {
+        refusedByValidation();
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "The request states a parameter this operation does not declare");
+        problem.setType(URI.create("urn:courtside:error:undeclared-parameter"));
+        problem.setTitle("Undeclared parameter");
+        String name = exception.getParameterName();
+        boolean quotable = A_NAME_THIS_API_DEFINES.matcher(name).matches();
+        problem.setProperty("violations", List.of(Map.of(
+                "code", "request.undeclaredParameter",
+                "params", quotable ? Map.of("parameter", name) : Map.of())));
+        logAnswered(problem, quotable ? List.of(name) : List.of());
+        return problem;
+    }
+
     private static Map<String, Object> toMap(FieldError error) {
         if (!error.contains(ConstraintViolation.class)) {
             // A Validator's rejection carries its own code.

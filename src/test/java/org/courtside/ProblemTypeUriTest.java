@@ -136,6 +136,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:payload-too-large",
             "urn:courtside:error:request-rejected",
             "urn:courtside:error:unauthenticated",
+            "urn:courtside:error:undeclared-parameter",
             "urn:courtside:error:unmapped-path",
             "urn:courtside:error:unsupported-media-type",
             "urn:courtside:error:validation-failed");

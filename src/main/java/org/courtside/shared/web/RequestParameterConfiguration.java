@@ -9,10 +9,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @RequiredArgsConstructor
 class RequestParameterConfiguration implements WebMvcConfigurer {
 
+    private final RefusesUndeclaredParameters refusesUndeclaredParameters;
     private final RefusesEmptyParameters refusesEmptyParameters;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(refusesUndeclaredParameters);
         registry.addInterceptor(refusesEmptyParameters);
     }
 }
