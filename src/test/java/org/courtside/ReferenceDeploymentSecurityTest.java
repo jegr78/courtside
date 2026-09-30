@@ -148,6 +148,18 @@ public class ReferenceDeploymentSecurityTest {
     }
 
     @Test
+    void whenReadingTheImageBuild_thenPublishedDistributionSecurityUpdatesAreApplied() throws IOException {
+        // when
+        String dockerfile = Files.readString(Path.of("Dockerfile"));
+
+        // then
+        assertThat(dockerfile)
+                .as("the image upgrades the base distribution's packages after refreshing the index")
+                .containsPattern("(?s)apt-get update\\s*\\\\\\s*&& apt-get upgrade -y --no-install-recommends\\b"
+                        + ".*rm -rf /var/lib/apt/lists/\\*");
+    }
+
+    @Test
     void givenTheProductionImage_whenReadingItsCopyBoundary_thenSourceControlMetadataCannotEnterIt()
             throws IOException {
         // when
