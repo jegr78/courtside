@@ -372,11 +372,14 @@ class SharedExceptionHandler {
         problem.setType(URI.create("urn:courtside:error:undeclared-parameter"));
         problem.setTitle("Undeclared parameter");
         String name = exception.getParameterName();
-        boolean quotable = A_NAME_THIS_API_DEFINES.matcher(name).matches();
+        if (!A_NAME_THIS_API_DEFINES.matcher(name).matches()) {
+            logAnswered(problem, List.of());
+            return problem;
+        }
         problem.setProperty("violations", List.of(Map.of(
                 "code", "request.undeclaredParameter",
-                "params", quotable ? Map.of("parameter", name) : Map.of())));
-        logAnswered(problem, quotable ? List.of(name) : List.of());
+                "params", Map.of("parameter", name))));
+        logAnswered(problem, List.of(name));
         return problem;
     }
 

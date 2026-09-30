@@ -121,6 +121,20 @@ class ImportPreviewAdminControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenAnEmptyEncodingField_whenPreviewing_thenTheSourcesOwnEncodingIsUsed() throws Exception {
+        // when / then
+        mockMvc.perform(multipart("/api/admin/import/sources/{sourceId}/previews", source)
+                        .file(new MockMultipartFile("file", "roster.csv", "text/csv",
+                                THREE_ROWS.getBytes(StandardCharsets.UTF_8)))
+                        .param("mode", "FULL_SNAPSHOT")
+                        .param("encoding", "")
+                        .with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.rowCount").value(3));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
     void givenTheSameFileTwice_whenPreviewing_thenBothPreviewsCarryTheSameHashAndTheOlderIsSuperseded()
             throws Exception {
         // given

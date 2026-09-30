@@ -144,14 +144,16 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             Map.entry("org/courtside/shared/web/RejectsRepeatedParameters.java",
                     new Boundary("nothing of the request itself: it asks the reading below for a"
                             + " repeated name and reports one", List.of())),
+            Map.entry("org/courtside/shared/web/QueryString.java",
+                    new Boundary("the names and values of the query string, decoded without failing on a"
+                            + " malformed escape, for the two refusals below", List.of("getQueryString"))),
             Map.entry("org/courtside/shared/web/RefusesEmptyParameters.java",
-                    new Boundary("the values of the optional parameters a handler declares, so that"
-                            + " one stated without a value is refused instead of taking its default",
-                            List.of("getParameterValues"))),
+                    new Boundary("nothing of the request itself beyond its dispatch: it refuses a declared"
+                            + " optional query parameter stated without a value", List.of("getDispatcherType"))),
             Map.entry("org/courtside/shared/web/RefusesUndeclaredParameters.java",
-                    new Boundary("the names in the query string, compared with the parameters the"
-                            + " handler declares, so that a name the operation does not state is"
-                            + " refused instead of ignored", List.of("getDispatcherType", "getMethod", "getQueryString"))),
+                    new Boundary("the dispatch and method of the request, so that a query parameter the"
+                            + " handler does not declare is refused instead of ignored",
+                            List.of("getDispatcherType", "getMethod"))),
             Map.entry("org/courtside/shared/web/RejectsRepeatedParts.java",
                     new Boundary("the names of a multipart body's parts, read where the parts are"
                             + " already admitted, so that a part stating a name twice is refused"

@@ -460,7 +460,19 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
 
         // then
         assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:undeclared-parameter");
-        result.andExpect(jsonPath("$.violations[0].params.parameter").doesNotExist());
+        result.andExpect(jsonPath("$.violations").doesNotExist());
+    }
+
+    @Test
+    void givenAParameterNameWithAMalformedEscape_whenRequesting_thenItIsRefusedAsUndeclared() throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(get("/api/admin/statistics/utilisation").with(request -> {
+            request.setQueryString("%zz=1");
+            return request;
+        }));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:undeclared-parameter");
     }
 
     @Test
