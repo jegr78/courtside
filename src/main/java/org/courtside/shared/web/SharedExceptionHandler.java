@@ -350,6 +350,20 @@ class SharedExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(EmptyParameterException.class)
+    ProblemDetail handleEmptyParameter(EmptyParameterException exception) {
+        refusedByValidation();
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "A request parameter was sent without a value");
+        problem.setType(URI.create("urn:courtside:error:empty-parameter"));
+        problem.setTitle("Empty parameter");
+        problem.setProperty("violations", List.of(Map.of(
+                "code", "request.emptyParameter",
+                "params", Map.of("parameter", exception.getParameterName()))));
+        logAnswered(problem, List.of(exception.getParameterName()));
+        return problem;
+    }
+
     private static Map<String, Object> toMap(FieldError error) {
         if (!error.contains(ConstraintViolation.class)) {
             // A Validator's rejection carries its own code.

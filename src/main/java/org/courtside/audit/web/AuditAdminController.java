@@ -39,7 +39,7 @@ class AuditAdminController implements AdminAuditApi {
     }
 
     private static ResponseEntity<ApiAuditPage> response(CursorPage.Result<AuditService.AuditEntry> page) {
-        return ResponseEntity.ok(page(page.items(), page.nextCursor()));
+        return ResponseEntity.ok(page(page.items(), page.nextCursor()).searchIncomplete(false));
     }
 
     private static ApiAuditPage page(List<AuditService.AuditEntry> entries, UUID nextCursor) {

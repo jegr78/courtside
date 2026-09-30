@@ -411,6 +411,43 @@ class ProblemTypeWireTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnEmptyOptionalDate_whenReadingStatistics_thenTheResponseNamesItInParams() throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(get("/api/admin/statistics/utilisation?from="));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:empty-parameter");
+        result.andExpect(jsonPath("$.violations[0].code").value("request.emptyParameter"))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("from"));
+    }
+
+    @Test
+    void givenAnEmptyOptionalEnumeration_whenFetchingTheAppIcon_thenTheDefaultDoesNotStandInForIt() throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(get("/api/public/config/icon?size=180&purpose="));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:empty-parameter");
+        result.andExpect(jsonPath("$.violations[0].params.parameter").value("purpose"));
+    }
+
+    @Test
+    void givenAnEmptyRequiredParameter_whenRequesting_thenItIsStillReportedMissing() throws Exception {
+        // given / when
+        ResultActions result = mockMvc.perform(get("/api/bookings?date="));
+
+        // then
+        assertProblem(result, HttpStatus.BAD_REQUEST, "urn:courtside:error:missing-parameter");
+        result.andExpect(jsonPath("$.violations[0].params.parameter").value("date"));
+    }
+
+    @Test
+    void givenOmittedOptionalParameters_whenReadingStatistics_thenTheRequestIsServed() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/admin/statistics/utilisation")).andExpect(status().isOk());
+    }
+
+    @Test
     void givenAMissingRequiredParameter_whenRequesting_thenTheResponseNamesItInParams() throws Exception {
         // given / when
         ResultActions result = mockMvc.perform(get("/api/bookings"));

@@ -123,6 +123,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:concurrent-modification",
             "urn:courtside:error:constraint-violation",
             "urn:courtside:error:database-lock-unavailable",
+            "urn:courtside:error:empty-parameter",
             "urn:courtside:error:statement-timeout",
             "urn:courtside:error:internal-error",
             "urn:courtside:error:malformed-request-body",
