@@ -81,7 +81,7 @@ jobs:
           IMAGE: ghcr.io/${{ github.repository }}
           REQUESTED_COMMIT: ${{ inputs.commit }}
           REQUESTED_PUBLISH: ${{ inputs.publish }}
-          REQUESTED_REBUILD: ${{ inputs.rebuild }}
+          REQUESTED_REBUILD: ${{ inputs.rebuild || inputs.security-base-run-id != '' }}
           REQUESTED_VERIFICATION_RUN: ${{ inputs.verification_run }}
         run: |
           set -euo pipefail

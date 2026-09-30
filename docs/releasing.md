@@ -48,7 +48,8 @@ rehearse the gates.
 
 A change to the gates is rehearsed before it merges. Dispatch `build` on the branch, then dispatch
 `nightly image` on the same branch with that build's run id as `security-base-run-id`; the image
-workflow qualifies the branch head and calls `release-gates.yml` with it.
+workflow rebuilds and qualifies the branch head, even one that already carries a published image, and
+calls `release-gates.yml` with it.
 
 Three steps need a real version tag and therefore run for the first time in a release: signing with
 the `release.yml` identity, the version tags on the registry, and writing the GitHub release. The
@@ -91,7 +92,7 @@ proves the tagged code and image itself.
 
 If the selected revision already labels the published `nightly` image, the workflow skips package,
 image and qualification work and runs retention only, unless its caller asks it to rebuild, as a
-scheduled or dispatched `build` does. Otherwise it publishes `nightly` and one
+scheduled or dispatched `build` and a rehearsal dispatch do. Otherwise it publishes `nightly` and one
 dated tag only after SBOM and provenance attestations, signing, and verification have succeeded.
 The registry keeps the newest seven dated nightlies, every published version and the complete
 manifest closure each retained digest needs. A candidate-only digest follows the 14-day release

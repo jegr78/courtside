@@ -88,6 +88,7 @@ test("given a branch dispatch with a security base, when the image is qualified,
     const buildWorkflow = yaml.load(readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"));
     const nightlyCall = buildWorkflow.jobs["release-gates"].with;
     const dispatchCall = workflow.jobs["release-gates"];
+    const selection = workflow.jobs.select.steps.find((step) => step.id === "selection");
     const shared = ["archive-artifact", "archive-workflow", "qualification-artifact-prefix", "fixtures-artifact",
       "security-base-artifact"];
 
@@ -101,6 +102,8 @@ test("given a branch dispatch with a security base, when the image is qualified,
       "a nightly build call would otherwise rehearse twice");
     assert.equal(dispatchCall.with["security-base-run-id"], "${{ inputs.security-base-run-id }}");
     assert.equal(dispatchCall.with["image-digest"], "${{ needs.image.outputs.digest }}");
+    assert.equal(selection.env.REQUESTED_REBUILD, "${{ inputs.rebuild || inputs.security-base-run-id != '' }}",
+      "a rehearsal on an already published revision would skip the image and every gate");
     for (const input of shared) {
       assert.equal(dispatchCall.with[input], nightlyCall[input], `the branch rehearsal differs from the night in ${input}`);
     }
