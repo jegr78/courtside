@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-rc.5](https://github.com/jegr78/courtside/compare/v0.1.0-rc.4...v0.1.0-rc.5) (2026-09-30)
+
+
+### Build and dependencies
+
+* **deps:** bump brace-expansion in /frontend ([#1211](https://github.com/jegr78/courtside/issues/1211)) ([fc53d00](https://github.com/jegr78/courtside/commit/fc53d003fba6d4c8b2f86716bc31691bda56ab28))
+
 ## 0.1.0 (2026-09-14)
 
 
@@ -537,4 +544,3 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
-
