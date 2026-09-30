@@ -457,17 +457,21 @@ test("given the release workflow, when it publishes, then it attaches the archiv
   const workflow = readFileSync(resolve(deploy, "../.github/workflows/release.yml"), "utf8");
   const archive = workflow.slice(workflow.indexOf("\n  archive:"), workflow.indexOf("\n  qualify:"));
   const publish = workflow.slice(workflow.indexOf("\n  publish:"));
+  const gates = readFileSync(resolve(deploy, "../.github/workflows/release-gates.yml"), "utf8");
+  const reproduction = gates.slice(gates.indexOf("\n  archive-reproducibility:"), gates.indexOf("\n  mail:"));
 
   // then
   assert.match(archive, /git status --porcelain --ignored -- deploy\//,
     "archive packs a deploy/ it never checked against the tagged commit");
   assert.match(publish, /name: deployment-archive/,
     "publish does not download the archive that was built once");
-  assert.match(publish, /--output build\/rebuilt\n/, "publish does not rebuild the archive apart from it");
-  assert.match(publish, /cmp "build\/courtside-deployment-\$version\.zip" "build\/rebuilt\/courtside-deployment-/,
-    "publish does not compare the archive it publishes with one built from the tagged tree");
-  assert.ok(publish.indexOf("cmp \"build/") < publish.indexOf("docker/login-action"),
-    "the archive is compared only after the release has written to the registry");
+  assert.match(reproduction, /--output build\/rebuilt\n/, "the gates do not rebuild the archive apart from it");
+  assert.match(reproduction,
+    /cmp "build\/archive-under-test\/courtside-deployment-\$VERSION\.zip" \\\n\s+"build\/rebuilt\/courtside-deployment-/,
+    "the gates do not compare the archive to publish with one built from the tagged tree");
+  assert.match(workflow, /archive-artifact: deployment-archive\n/, "the gates compare another archive");
+  assert.match(publish, /needs: \[[^\]]*\bgates\b[^\]]*\]/,
+    "publish may write to the registry before the archive was compared");
   assert.match(publish, /files: \|[\s\S]*\n {12}build\/courtside-deployment-\*\n/,
     "the release page does not carry the archive that was downloaded");
   assert.match(publish, /attest-build-provenance[\s\S]*subject-path: build\/courtside-deployment-\*\.zip/,

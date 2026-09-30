@@ -1502,7 +1502,8 @@ async function shareUat() {
 
 async function isUatShareReady() {
   try {
-    const response = await localRequest({ secure: false, port: 8083, path: "/api/source" });
+    const response = await localRequest({ secure: false, port: 8083, path: "/api/source",
+      probeDeadlineMilliseconds: 1000 });
     return response.statusCode === 200;
   } catch {
     return false;
@@ -2158,7 +2159,7 @@ async function readHealth(url, plan) {
       if (!ca) return "unavailable";
       const target = new URL(url);
       const response = await localRequest({
-        secure: true, port: Number(target.port), path: target.pathname, ca
+        secure: true, port: Number(target.port), path: target.pathname, ca, probeDeadlineMilliseconds: 1000
       });
       if (response.statusCode < 200 || response.statusCode >= 300) return `HTTP ${response.statusCode}`;
       return parseJson(response.body).status ?? "unknown";
@@ -2177,7 +2178,8 @@ function readPerformanceHealth(plan) {
   return parseJson(result.stdout).status ?? "unknown";
 }
 
-export function localRequest({ secure, port, path, method = "GET", headers = {}, body, ca, servername }) {
+export function localRequest({ secure, port, path, method = "GET", headers = {}, body, ca, servername,
+  probeDeadlineMilliseconds }) {
   return new Promise((resolveResponse, rejectResponse) => {
     const request = (secure ? httpsRequest : httpRequest)({
       hostname: "127.0.0.1", port, path, method, headers: { Host: `localhost:${port}`, ...headers },
@@ -2192,7 +2194,9 @@ export function localRequest({ secure, port, path, method = "GET", headers = {},
         statusCode: response.statusCode ?? 0, headers: response.headers, body: responseBody, certificatePin
       }));
     });
-    request.setTimeout(1000, () => request.destroy(new Error("Request timed out")));
+    if (probeDeadlineMilliseconds) {
+      request.setTimeout(probeDeadlineMilliseconds, () => request.destroy(new Error("Request timed out")));
+    }
     request.once("error", rejectResponse);
     if (body) request.write(body);
     request.end();

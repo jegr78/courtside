@@ -35,6 +35,27 @@ runs the same reference deployment smoke, Trivy scan and `release-image-amd64` o
 there is still no version tag to spend. The scheduled failure tracker records it as part of the
 failed scheduled build.
 
+## What the nightly rehearses
+
+A release confirms what the night before already proved; it does not discover it. A scheduled or
+dispatched `build` rebuilds the nightly image even when the revision already carries one, so the
+digest the rehearsal binds is qualified in the same run, and then calls `release-gates.yml` with it.
+That is the workflow the release's `gates` job calls, with the same jobs and commands:
+`archive-reproducibility`, `mail`, `active-security`, `security-record`, `restore` and `npm-audit`.
+The scheduled `security` job runs the release-build policy with npm audit evidence and the same
+command line as the release's `build` job. A push to `main` builds and qualifies its image but does not
+rehearse the gates.
+
+A change to the gates is rehearsed before it merges. Dispatch `build` on the branch, then dispatch
+`nightly image` on the same branch with that build's run id as `security-base-run-id`; the image
+workflow rebuilds and qualifies the branch head, even one that already carries a published image, and
+calls `release-gates.yml` with it.
+
+Three steps need a real version tag and therefore run for the first time in a release: signing with
+the `release.yml` identity, the version tags on the registry, and writing the GitHub release. The
+nightly `publish` exercises the same attestation, signing and verification tools under its own
+identity.
+
 The image workflow also accepts a direct dispatch from a pull-request branch. That dispatch builds
 and qualifies the real multi-architecture candidate from the selected branch head, but cannot sign,
 publish or apply retention. Its evidence counts only while its commit equals the current pull-request
@@ -70,7 +91,8 @@ different digest under versioned tags. The nightly image is an acceptance artifa
 proves the tagged code and image itself.
 
 If the selected revision already labels the published `nightly` image, the workflow skips package,
-image and qualification work and runs retention only. Otherwise it publishes `nightly` and one
+image and qualification work and runs retention only, unless its caller asks it to rebuild, as a
+scheduled or dispatched `build` and a rehearsal dispatch do. Otherwise it publishes `nightly` and one
 dated tag only after SBOM and provenance attestations, signing, and verification have succeeded.
 The registry keeps the newest seven dated nightlies, every published version and the complete
 manifest closure each retained digest needs. A candidate-only digest follows the 14-day release
@@ -158,14 +180,14 @@ covers all five. Without this a tag naming a candidate nobody cut, such as `v0.1
 repository records `0.1.0-rc.2`, would build, sign and publish under that name, because its release
 line exists and nothing else ever consults the repository's own record.
 
-**A nightly must already have verified an ancestor of this commit.** The release looks for a
+**A nightly must already have rehearsed an ancestor of this commit.** The release looks for a
 scheduled or manually dispatched `build` run on `main` that succeeded on its *first* attempt, whose
-head commit is an ancestor of the tag, and whose coupled evidence says both the complete build and
-the nightly-image workflow succeeded (`releaseReadiness: complete`). Build-only evidence from
-before that coupling does not count, nor does a run that went green on its second attempt. Note what
-this does and does not establish:
-some ancestor was verified in full and produced or revalidated the nightly image, not necessarily
-the tagged commit. What verifies the tagged commit is the release's own `build` job.
+head commit is an ancestor of the tag, and whose `coupled-nightly-rehearsal-v2` evidence says the
+complete build, the nightly-image workflow and the release gates all succeeded
+(`releaseReadiness: complete`). Evidence written before the gates were rehearsed does not count, nor
+does a run that went green on its second attempt. Note what this does and does not establish: some
+ancestor passed every gate the release runs, not necessarily the tagged commit. What verifies the
+tagged commit is the release's own `build` job and its own call of the same gates.
 
 **No tracker-written `nightly` failure issue may be open.** The check counts open issues carrying
 the `nightly` label whose title starts with `[nightly] ` and whose body holds the tracker's
@@ -202,16 +224,13 @@ Permission failures and malformed evidence still stop the build.
 
 | Job | What it establishes |
 |---|---|
-| `nightly-evidence` | A first-attempt build on `main` and its coupled nightly-image workflow completed for an ancestor of the tag, and no tracker-written nightly failure remains open |
+| `nightly-evidence` | A first-attempt build on `main`, its nightly-image workflow and its release-gate rehearsal completed for an ancestor of the tag, and no tracker-written nightly failure remains open |
 | `build` | Dependency-remediation deadlines hold, the version is stamped, backend, frontend, tooling and artifact tests pass on the tagged commit, CodeQL analyses the sources, npm audit evidence is captured, and the release-build security policy holds |
 | `browser` | The packaged tagged source passes the complete Chromium and WebKit browser matrix; it runs beside `build` so browser duration cannot consume the security-analysis budget |
 | `image` | One multi-architecture image is built and pushed as `release-candidate-<sha>` |
 | `qualify` | The exact deployment archive is checked against that digest and all four recipes, then the digest is brought up through the reference deployment on `amd64` and `arm64` and checked against the candidate-image policy |
-| `mail` | The archive's self-hosted-mail recipe is bound to the candidate digest and exercised against controlled DNS, TLS and SMTP peers |
-| `active-security` | The running candidate is exercised by the scanners of the `active` profile. The `destructive` profile, resource abuse, does not run here |
+| `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the tagged tree and requires the same bytes. `npm-audit` holds the release npm policy |
 | `upgrade` | The database upgrade path from each resolved origin is executed against the candidate |
-| `restore` | A backup taken from the candidate is restored into it |
-| `security-record` | The build, image, qualify and active-security evidence is collected into one file. `upgrade` and `restore` are not in it |
 | `archive` | `tools/deployment-archive.mjs` packs the reference deployment for that digest into `courtside-deployment-<version>.zip` |
 | `publish` | The qualified manifest is tagged, signed with cosign, given an SBOM and a provenance attestation, and the GitHub release is written |
 
@@ -220,8 +239,8 @@ publication, so the digest a club pulls is the digest that was brought up twice.
 
 The release page carries the OpenAPI document, the security record and the deployment archive with
 its checksum. `archive` builds those bytes once and `publish` attaches the artifact it downloads, so
-what a club unpacks is what was attested. Before anything reaches the registry, `publish` builds
-the archive again from the tagged tree and requires the same bytes. The contents are derived rather
+what a club unpacks is what was attested. Before anything reaches the registry, `gates` builds
+the archive again from the tagged tree and requires the same bytes, and `publish` waits for it. The contents are derived rather
 than listed by hand: every Compose file the shipped resolver can emit, every file those Compose
 files name, the recipes, the configuration example, the recipe and operations guides and the container
 contract, together with the standalone Bash lifecycle launcher. `tools/deployment-archive.test.mjs`

@@ -58,14 +58,56 @@ test("given a complete build, when it finishes, then it calls the image workflow
   assert.equal(image.with.commit, "${{ github.sha }}");
   assert.equal(image.with.verification_run, "${{ github.run_id }}");
   assert.equal(image.with.publish, "${{ github.ref == 'refs/heads/main' }}");
+  assert.equal(image.with.rebuild, "${{ github.event_name != 'push' }}",
+    "a night rebuilds the image so its release gates bind a digest qualified in the same run");
+  const gates = buildWorkflow.jobs["release-gates"];
+  assert.equal(gates.needs, "nightly-image");
+  assert.equal(gates.uses, "./.github/workflows/release-gates.yml");
+  assert.match(String(gates.if), /needs\.nightly-image\.result == 'success'/);
+  assert.match(String(gates.if), /github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch'/);
+  assert.doesNotMatch(String(gates.if), /'push'/, "a push to main does not spend a release rehearsal");
+  assert.equal(gates.with["image-digest"], "${{ needs.nightly-image.outputs.digest }}");
+  assert.equal(gates.with["booking-seed-digest"], "${{ needs.nightly-image.outputs.booking-seed-digest }}");
+  assert.equal(gates.with["source-commit"], "${{ needs.nightly-image.outputs.commit }}");
+  assert.equal(gates.with["archive-version"], "${{ needs.nightly-image.outputs.version }}");
+  assert.equal(gates.with["archive-workflow"], "nightly-image.yml");
+  assert.equal(workflow.on.workflow_call.outputs.digest.value, "${{ jobs.image.outputs.digest }}");
+  assert.equal(workflow.on.workflow_call.outputs.commit.value, "${{ jobs.select.outputs.commit }}");
   const evidence = buildWorkflow.jobs["nightly-release-evidence"];
-  assert.deepEqual(evidence.needs, ["build", "nightly-image"]);
+  assert.deepEqual(evidence.needs, ["build", "nightly-image", "release-gates"]);
   assert.match(String(evidence.if), /github\.event_name == 'schedule'/);
   assert.match(String(evidence.if), /github\.event_name == 'workflow_dispatch'/);
   assert.match(String(evidence.if), /github\.ref == 'refs\/heads\/main'/);
   assert.equal(workflow.concurrency.group, "container-registry-${{ github.repository }}");
   assert.equal(workflow.concurrency["cancel-in-progress"], false);
 });
+
+test("given a branch dispatch with a security base, when the image is qualified, then it rehearses the nightly's gates",
+  () => {
+    // given
+    const buildWorkflow = yaml.load(readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"));
+    const nightlyCall = buildWorkflow.jobs["release-gates"].with;
+    const dispatchCall = workflow.jobs["release-gates"];
+    const selection = workflow.jobs.select.steps.find((step) => step.id === "selection");
+    const shared = ["archive-artifact", "archive-workflow", "qualification-artifact-prefix", "fixtures-artifact",
+      "security-base-artifact"];
+
+    // when / then
+    assert.equal(dispatchCall.uses, "./.github/workflows/release-gates.yml");
+    assert.deepEqual(dispatchCall.needs, ["select", "image", "qualify"]);
+    assert.equal(dispatchCall.if,
+      "github.event_name == 'workflow_dispatch' && inputs.security-base-run-id != ''");
+    assert.equal(workflow.on.workflow_dispatch.inputs["security-base-run-id"].default, "");
+    assert.equal(workflow.on.workflow_call.inputs["security-base-run-id"], undefined,
+      "a nightly build call would otherwise rehearse twice");
+    assert.equal(dispatchCall.with["security-base-run-id"], "${{ inputs.security-base-run-id }}");
+    assert.equal(dispatchCall.with["image-digest"], "${{ needs.image.outputs.digest }}");
+    assert.equal(selection.env.REQUESTED_REBUILD, "${{ inputs.rebuild || inputs.security-base-run-id != '' }}",
+      "a rehearsal on an already published revision would skip the image and every gate");
+    for (const input of shared) {
+      assert.equal(dispatchCall.with[input], nightlyCall[input], `the branch rehearsal differs from the night in ${input}`);
+    }
+  });
 
 test("given nightly cleanup and release publication, when registry access is scheduled, then writes cannot overlap", () => {
   // when / then
@@ -78,7 +120,8 @@ test("given nightly cleanup and release publication, when registry access is sch
 test("given the current nightly already carries a revision, when selection finishes, then image work is skipped", () => {
   // when / then
   assert.match(source, /docker image inspect[\s\S]+org\.opencontainers\.image\.revision/);
-  assert.match(source, /if \[\[ "\$published_revision" = "\$commit" \]\]/);
+  assert.match(source, /if \[\[ "\$published_revision" = "\$commit" && "\$REQUESTED_REBUILD" != true \]\]/);
+  assert.equal(workflow.on.workflow_call.inputs.rebuild.default, false, "only a caller that asks rebuilds");
   for (const job of ["package", "image", "archive", "qualify"]) {
     assert.match(String(workflow.jobs[job].if), /needs\.select\.outputs\.build == 'true'/,
       `${job} does not obey the no-change selection`);

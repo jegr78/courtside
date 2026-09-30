@@ -717,9 +717,30 @@ jobs:
           --scope required-build
           --subject ${{ github.sha }}
           --output build/security/summary.json
+      - name: Capture npm audit evidence
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        working-directory: frontend
+        run: >
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js run audit:security --
+          --output ../build/security/npm.json
+      - name: Enforce release-build security policy
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: >
+          frontend/node/node tools/security-findings.mjs
+          --npm build/security/npm.json
+          --trivy build/security/trivy-runtime.json
+          --trivy build/security/trivy-source.json
+          --codeql build/security/codeql
+          --npm-version "$(frontend/node/node frontend/node/node_modules/npm/bin/npm-cli.js --version)"
+          --trivy-version "$(trivy --version | awk 'NR == 1 { print $2 }')"
+          --exceptions security/exceptions.json
+          --assessment-policy not-applicable
+          --scope release-build
+          --subject ${{ github.sha }}
+          --output build/security/release-build.json
       - name: Remove raw security reports
         if: always()
-        run: rm -rf build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql build/security/runtime
+        run: rm -rf build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql build/security/runtime build/security/npm.json
       - name: Upload security evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -730,6 +751,14 @@ jobs:
             build/security-update.md
           if-no-files-found: warn
           retention-days: 14
+      - name: Upload the release-build security summary
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: nightly-release-security-base
+          path: build/security/release-build.json
+          retention-days: 14
+          if-no-files-found: error
 
   build:
     if: always()
@@ -934,9 +963,30 @@ jobs:
       commit: ${{ github.sha }}
       verification_run: ${{ github.run_id }}
       publish: ${{ github.ref == 'refs/heads/main' }}
+      rebuild: ${{ github.event_name != 'push' }}
+  release-gates:
+    needs: nightly-image
+    if: ${{ always() && needs.nightly-image.result == 'success' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    uses: ./.github/workflows/release-gates.yml
+    with:
+      image-digest: ${{ needs.nightly-image.outputs.digest }}
+      booking-seed-digest: ${{ needs.nightly-image.outputs.booking-seed-digest }}
+      source-commit: ${{ needs.nightly-image.outputs.commit }}
+      run-label: nightly
+      archive-artifact: nightly-deployment-archive
+      archive-version: ${{ needs.nightly-image.outputs.version }}
+      archive-ref: ${{ github.ref }}
+      archive-workflow: nightly-image.yml
+      qualification-artifact-prefix: nightly-image-qualification-
+      fixtures-artifact: nightly-assessment-fixtures
+      security-base-artifact: nightly-release-security-base
 
   nightly-release-evidence:
-    needs: [build, nightly-image]
+    needs: [build, nightly-image, release-gates]
     if: ${{ always() && (github.event_name == 'schedule' || ((github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -947,6 +997,7 @@ jobs:
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           NIGHTLY_IMAGE_RESULT: ${{ needs.nightly-image.result }}
+          RELEASE_GATES_RESULT: ${{ needs.release-gates.result }}
         run: |
           mkdir -p build/nightly-release
           jq -n \
@@ -955,11 +1006,13 @@ jobs:
             --argjson attempt "${{ github.run_attempt }}" \
             --arg build "$BUILD_RESULT" \
             --arg nightlyImage "$NIGHTLY_IMAGE_RESULT" \
-            '{schemaVersion: 1, contract: "coupled-nightly-image-v1", commit: $commit,
+            --arg releaseGates "$RELEASE_GATES_RESULT" \
+            '{schemaVersion: 1, contract: "coupled-nightly-rehearsal-v2", commit: $commit,
               runId: $runId, attempt: $attempt, firstAttempt: ($attempt == 1),
-              jobs: {build: $build, nightlyImage: $nightlyImage},
+              jobs: {build: $build, nightlyImage: $nightlyImage, releaseGates: $releaseGates},
               releaseReadiness: (if $attempt == 1 and $build == "success" and $nightlyImage == "success"
-                then "complete" else "incomplete" end)}' > build/nightly-release/evidence.json
+                and $releaseGates == "success" then "complete" else "incomplete" end)}' \
+            > build/nightly-release/evidence.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: nightly-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}

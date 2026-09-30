@@ -187,6 +187,13 @@
       ]
     },
     {
+      "path": ".github/workflows/release-gates.yml",
+      "profiles": [
+        "full"
+      ],
+      "validators": []
+    },
+    {
       "path": ".github/workflows/release-plan-sync.yml",
       "profiles": [
         "tooling"
