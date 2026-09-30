@@ -6,6 +6,7 @@
 
 
 
+
 ### Notable changes
 
 * bundled PostgreSQL 18 deployments bind the generated COURTSIDE_DATABASE_VOLUME explicitly.
@@ -182,6 +183,8 @@
 * write to a member in the language they read ([#447](https://github.com/jegr78/courtside/issues/447)) ([596ce57](https://github.com/jegr78/courtside/commit/596ce576320ebf65ae3727d3e5059afdac42c5ef))
 
 ### Bug fixes
+
+* apply the base distribution's security updates when building the image ([#1213](https://github.com/jegr78/courtside/issues/1213)) ([2a3b6f7](https://github.com/jegr78/courtside/commit/2a3b6f75880d8dfefd760f519b93563ee97c4e91))
 
 * align the footer links and open them in a new tab ([#1208](https://github.com/jegr78/courtside/issues/1208)) ([d4d7ba8](https://github.com/jegr78/courtside/commit/d4d7ba8130b71931370ba0e0c08f3085c6900f8a))
 * keep the booking dialog's actions on screen while a phone browser shows its bar ([#1210](https://github.com/jegr78/courtside/issues/1210)) ([c2463ae](https://github.com/jegr78/courtside/commit/c2463ae90679f87aabcb5977a14a66c602280529))
