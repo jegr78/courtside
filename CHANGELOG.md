@@ -1,13 +1,7 @@
 # Changelog
 
-## [0.1.0-rc.5](https://github.com/jegr78/courtside/compare/v0.1.0-rc.4...v0.1.0-rc.5) (2026-09-30)
-
-
-### Build and dependencies
-
-* **deps:** bump brace-expansion in /frontend ([#1211](https://github.com/jegr78/courtside/issues/1211)) ([fc53d00](https://github.com/jegr78/courtside/commit/fc53d003fba6d4c8b2f86716bc31691bda56ab28))
-
 ## 0.1.0 (2026-09-14)
+
 
 
 
@@ -476,6 +470,8 @@
 
 ### Build and dependencies
 
+* **deps:** bump brace-expansion in /frontend ([#1211](https://github.com/jegr78/courtside/issues/1211)) ([fc53d00](https://github.com/jegr78/courtside/commit/fc53d003fba6d4c8b2f86716bc31691bda56ab28))
+
 * **deps:** bump frontend, Maven, deploy and workflow dependencies ([#1058](https://github.com/jegr78/courtside/issues/1058)) ([9bceeda](https://github.com/jegr78/courtside/commit/9bceedab115946a4db33fe2b42cfdfd42a836dd6))
 * **deps:** consolidate deployment updates ([#1153](https://github.com/jegr78/courtside/issues/1153)) ([f26bfc0](https://github.com/jegr78/courtside/commit/f26bfc080c2be1698f272c8eabeaccf0821a0de4))
 * **deps:** consolidate frontend updates ([#1152](https://github.com/jegr78/courtside/issues/1152)) ([f4a09c1](https://github.com/jegr78/courtside/commit/f4a09c16cea9e4a4ce77da1ed403fc430a5d404c))
@@ -544,3 +540,4 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
+
