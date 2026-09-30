@@ -151,7 +151,7 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
             Map.entry("org/courtside/shared/web/RefusesUndeclaredParameters.java",
                     new Boundary("the names in the query string, compared with the parameters the"
                             + " handler declares, so that a name the operation does not state is"
-                            + " refused instead of ignored", List.of("getDispatcherType", "getQueryString"))),
+                            + " refused instead of ignored", List.of("getDispatcherType", "getMethod", "getQueryString"))),
             Map.entry("org/courtside/shared/web/RejectsRepeatedParts.java",
                     new Boundary("the names of a multipart body's parts, read where the parts are"
                             + " already admitted, so that a part stating a name twice is refused"

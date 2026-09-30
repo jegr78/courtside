@@ -4,6 +4,7 @@ import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.method.HandlerMethod;
@@ -14,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 
+// An OPTIONS request is answered by Spring's own handler, which declares none of the operation's parameters.
 @Component
 class RefusesUndeclaredParameters implements HandlerInterceptor {
 
@@ -21,7 +23,7 @@ class RefusesUndeclaredParameters implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         String query = request.getQueryString();
         if (query == null || query.isEmpty() || request.getDispatcherType() != DispatcherType.REQUEST
-                || !(handler instanceof HandlerMethod method)) {
+                || HttpMethod.OPTIONS.matches(request.getMethod()) || !(handler instanceof HandlerMethod method)) {
             return true;
         }
         Set<String> declared = declaredNames(method);

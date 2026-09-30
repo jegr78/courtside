@@ -261,7 +261,8 @@ carries a message for every declared type, and a violation code it does not know
 refusal it cannot name rather than as a general failure.
 
 The API refuses unknown JSON fields, duplicate keys, repeated scalar parameters and incompatible
-JSON types. Framework, filter, connector and unmapped-path failures use the same problem format even
+JSON types. It also refuses a query parameter the operation does not declare and an optional one
+sent without a value, which Spring would otherwise read as absent and replace with its default. Framework, filter, connector and unmapped-path failures use the same problem format even
 when no controller runs. Invalid HTTP framing is rejected at Caddy and the application connector.
 
 ### Court plan and privacy
