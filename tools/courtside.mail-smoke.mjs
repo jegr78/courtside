@@ -3,7 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { connect as connectTls } from "node:tls";
 import { createConnection } from "node:net";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -324,6 +324,16 @@ function occurrencesInside(service, digest) {
     { allowFailure: true });
   return output.split("\n").filter((line) => line.startsWith(digest)).length;
 }
+
+function keepServerLogs() {
+  const directory = process.env.COURTSIDE_MAIL_SMOKE_LOGS;
+  if (!directory) return;
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "compose.log"),
+    compose(["logs", "--no-color", "--timestamps"], { allowFailure: true }));
+  console.log(`Kept the failed run's server logs in ${join(directory, "compose.log")}`);
+}
+
 async function main() {
   try {
     console.log(`Bringing up the shipped mail server as ${project}`);
@@ -678,6 +688,9 @@ async function main() {
       () => health("mail-reload") === "healthy" && health("mail-certificate") === "healthy");
 
     console.log("The shipped mail server, configured only from the shipped plans, delivered a message.");
+  } catch (error) {
+    keepServerLogs();
+    throw error;
   } finally {
     compose(["down", "-v", "--remove-orphans"], { allowFailure: true });
     rmSync(runtime, { recursive: true, force: true });
