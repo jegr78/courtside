@@ -47,12 +47,14 @@ test("given a release candidate archive, when release qualification starts, then
 test("given the self-hosted mail recipe, when a release is cut, then its controlled Stalwart journey blocks publication", () => {
   // given
   const release = source("../.github/workflows/release.yml");
+  const gates = source("../.github/workflows/release-gates.yml");
 
   // when / then
-  assert.match(release, /\n  mail:\n    needs: \[archive, image\]/);
-  assert.match(release, /node tools\/courtside\.mail-smoke\.mjs/);
-  assert.match(release,
-    /needs: \[archive, build, browser, image, qualify, mail, security-record, upgrade, restore\]/);
+  assert.match(gates, /\n  mail:\n    runs-on: ubuntu-latest/);
+  assert.match(gates, /node tools\/courtside\.mail-smoke\.mjs/);
+  assert.match(release, /\n  gates:\n    needs: \[build, image, archive, qualify\]/);
+  assert.match(release, /archive-artifact: deployment-archive/);
+  assert.match(release, /needs: \[archive, build, browser, image, qualify, gates, upgrade\]/);
 });
 
 test("given main or nightly qualification, when the image is exercised, then a candidate archive is inspected on both architectures", () => {

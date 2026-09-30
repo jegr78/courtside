@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 const commitPattern = /^[a-f0-9]{40}$/;
 const evidenceFields = ["attempt", "commit", "contract", "firstAttempt", "jobs", "releaseReadiness", "runId",
   "schemaVersion"];
-const jobFields = ["build", "nightlyImage"];
+const jobFields = ["build", "nightlyImage", "releaseGates"];
 
 function hasExactly(value, fields) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -21,12 +21,13 @@ function completeEvidence(evidence) {
   return hasExactly(evidence, evidenceFields)
     && hasExactly(evidence.jobs, jobFields)
     && evidence.schemaVersion === 1
-    && evidence.contract === "coupled-nightly-image-v1"
+    && evidence.contract === "coupled-nightly-rehearsal-v2"
     && evidence.attempt === 1
     && evidence.firstAttempt === true
     && evidence.releaseReadiness === "complete"
     && evidence.jobs.build === "success"
-    && evidence.jobs.nightlyImage === "success";
+    && evidence.jobs.nightlyImage === "success"
+    && evidence.jobs.releaseGates === "success";
 }
 
 export function validateNightlyReleaseEvidence(evidence, expected) {

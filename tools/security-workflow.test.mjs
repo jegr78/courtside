@@ -9,6 +9,7 @@ const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const build = readFileSync(join(repository, ".github/workflows/build.yml"), "utf8");
 const codeql = readFileSync(join(repository, ".github/codeql/codeql-config.yml"), "utf8");
 const release = readFileSync(join(repository, ".github/workflows/release.yml"), "utf8");
+const gates = readFileSync(join(repository, ".github/workflows/release-gates.yml"), "utf8");
 const scheduled = readFileSync(join(repository, ".github/workflows/security-assessment.yml"), "utf8");
 const policy = readFileSync(join(repository, "docs/security-scanning.md"), "utf8");
 const assessment = readFileSync(join(repository, "docs/security-assessment.md"), "utf8");
@@ -52,17 +53,34 @@ test("given every job that starts a security target, when it runs, then the fixt
   // given
   const starters = jobsStartingASecurityTarget();
 
+  const workflows = allWorkflows();
+  const fixtureUploads = new Set(workflows.flatMap(({ jobs }) => Object.values(jobs).flatMap((job) =>
+    (job.steps ?? []).filter((step) => (step.uses ?? "").startsWith("actions/upload-artifact@")
+      && String(step.with?.path).trim() === "target/fixtures-classes").map((step) => step.with.name))));
+  const callersOf = (file) => workflows.flatMap(({ jobs }) => Object.values(jobs)
+    .filter((job) => job.uses === `./.github/workflows/${file}`));
+
   // when
-  const unsupplied = starters.filter(({ job }) => !(buildsWithMaven(job)
+  const unsupplied = starters.filter(({ file, job }) => !(buildsWithMaven(job)
     || commandLines(job).some((line) => line.includes("courtside.uat-smoke.mjs"))
     || (job.steps ?? []).some((step) =>
-      (step.uses ?? "").startsWith("actions/download-artifact@") && step.with?.name === "assessment-fixtures")));
+      (step.uses ?? "").startsWith("actions/download-artifact@") && step.with?.name === "assessment-fixtures")
+    || ((job.steps ?? []).some((step) => (step.uses ?? "").startsWith("actions/download-artifact@")
+      && step.with?.name === "${{ inputs.fixtures-artifact }}" && step.with?.path === "target/fixtures-classes")
+      && callersOf(file).length > 0
+      && callersOf(file).every((caller) => fixtureUploads.has(caller.with?.["fixtures-artifact"])))));
 
   // then
   assert.ok(starters.length >= 2, "no workflow starts a security target");
   assert.deepEqual(unsupplied.map(({ file, name }) => `${file}:${name}`), []);
   assert.match(release, /name: assessment-fixtures\n\s+path: target\/fixtures-classes/);
 });
+
+function allWorkflows() {
+  const directory = join(repository, ".github/workflows");
+  return readdirSync(directory).filter((file) => file.endsWith(".yml"))
+    .map((file) => ({ file, jobs: yaml.load(readFileSync(join(directory, file), "utf8")).jobs ?? {} }));
+}
 
 const LIFECYCLE_GOALS = ["prepare-package", "package", "verify", "install"];
 
@@ -514,14 +532,33 @@ test("given a job that only needs the artefact, when it builds one, then the sui
 
 test("given a release candidate, when publishing it, then its exact digest passes the active gate first", () => {
   // when / then
-  assert.match(release, /\n  active-security:\n    needs: \[image, qualify\]/);
-  assert.match(release, /security-run "\$RUN_ID" active/);
-  assert.match(release,
+  assert.match(release, /\n  gates:\n    needs: \[build, image, archive, qualify\]/);
+  assert.match(release, /image-digest: \$\{\{ needs\.image\.outputs\.digest \}\}/);
+  assert.match(release, /\n  publish:\n    needs: \[[^\]]*\bgates\b[^\]]*\]/);
+  assert.match(gates, /IMAGE: ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ inputs\.image-digest \}\}/);
+  assert.match(gates, /security-run "\$RUN_ID" active/);
+  assert.match(gates,
     /set -o pipefail[\s\S]{0,120}?node tools\/security-image-inventory\.mjs active \| xargs -n1 docker pull/);
-  assert.match(release, /--authorize "authorize-active-\$RUN_ID"/);
-  assert.match(release, /--subject "\$\{IMAGE##\*@\}"/);
-  assert.match(release, /--assessment-gate build\/security-input\/active-security-summary\.json/);
-  assert.match(release, /security-record:\n    needs: \[build, image, qualify, active-security\]/);
+  assert.match(gates, /--authorize "authorize-active-\$RUN_ID"/);
+  assert.match(gates, /--subject "\$\{IMAGE##\*@\}"/);
+  assert.match(gates, /--assessment-gate build\/security-input\/active-security-summary\.json/);
+  assert.match(gates, /security-record:\n    needs: active-security/);
+});
+
+test("given the release-build policy, when a night rehearses it, then it runs the release's exact command", () => {
+  // given
+  const policyStep = (source, job) => yaml.load(source).jobs[job].steps
+    .find((step) => /--scope release-build/.test(step.run ?? ""));
+  const argumentsOf = (step) => step.run.replace(/^(frontend\/node\/node|node) /, "")
+    .replace(/\s+/g, " ").replace("--subject ${{ github.sha }}", "--subject <commit>").trim();
+  const nightly = policyStep(build, "security");
+  const released = policyStep(release, "build");
+
+  // when / then
+  assert.ok(nightly && released, "a release-build policy step is missing");
+  assert.equal(argumentsOf(nightly), argumentsOf(released),
+    "the night rehearses a release-build policy the release does not run");
+  assert.equal(String(nightly.if), "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'");
 });
 
 test("given destructive assessment capability, when exposing it manually, then only the local CLI and exact confirmation can execute it", () => {
@@ -534,15 +571,16 @@ test("given destructive assessment capability, when exposing it manually, then o
 test("given security evidence, when workflows retain it, then only normalized reports become artifacts", () => {
   // when / then
   assert.match(scheduled, /umask 077/);
-  assert.match(release, /umask 077/);
+  assert.match(gates, /umask 077/);
   assert.match(build, /build\/security\/summary\.json/);
   assert.doesNotMatch(build, /path: build\/security\s*$/m);
   assert.match(build, /rm -rf build\/security\/trivy-runtime\.json build\/security\/trivy-source\.json build\/security\/codeql/);
   assert.match(release, /build\/uat-smoke\/security-summary-/);
   assert.match(release, /rm -f build\/uat-smoke\/trivy-/);
   assert.match(release, /npm-cli\.js run audit:security/);
-  assert.match(release, /release-security-record/);
-  assert.match(release, /--summary build\/security-input\/release-build\.json/);
+  assert.match(gates, /release-security-record/);
+  assert.match(release, /name: release-security-record-input/);
+  assert.match(gates, /--summary build\/security-input\/release-build\.json/);
   assert.match(release, /--assessment-policy not-applicable/g);
   assert.match(release, /--trivy build\/security\/trivy-source\.json/);
   assert.match(release, /--codeql build\/security\/codeql/);

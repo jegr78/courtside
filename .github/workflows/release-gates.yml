@@ -1,0 +1,393 @@
+name: release gates
+
+on:
+  workflow_call:
+    inputs:
+      image-digest:
+        required: true
+        type: string
+      booking-seed-digest:
+        required: true
+        type: string
+      source-commit:
+        required: true
+        type: string
+      run-label:
+        required: true
+        type: string
+      archive-artifact:
+        required: true
+        type: string
+      archive-version:
+        required: true
+        type: string
+      archive-ref:
+        required: true
+        type: string
+      archive-workflow:
+        required: true
+        type: string
+      qualification-artifact-prefix:
+        required: true
+        type: string
+      fixtures-artifact:
+        required: true
+        type: string
+      security-base-artifact:
+        required: true
+        type: string
+      artifacts-run-id:
+        required: false
+        type: string
+        default: ''
+      security-base-run-id:
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      image-digest:
+        required: true
+        type: string
+      booking-seed-digest:
+        required: true
+        type: string
+      source-commit:
+        required: true
+        type: string
+      run-label:
+        required: true
+        type: string
+      archive-artifact:
+        required: true
+        type: string
+      archive-version:
+        required: true
+        type: string
+      archive-ref:
+        required: true
+        type: string
+      archive-workflow:
+        required: true
+        type: string
+      qualification-artifact-prefix:
+        required: true
+        type: string
+      fixtures-artifact:
+        required: true
+        type: string
+      security-base-artifact:
+        required: true
+        type: string
+      artifacts-run-id:
+        required: true
+        type: string
+      security-base-run-id:
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  archive-reproducibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.archive-artifact }}
+          path: build/archive-under-test
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Rebuild the deployment archive and compare it with the one to publish
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
+          BOOKING_SEED_IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.booking-seed-digest }}
+          VERSION: ${{ inputs.archive-version }}
+          ARCHIVE_REF: ${{ inputs.archive-ref }}
+          ARCHIVE_WORKFLOW: ${{ inputs.archive-workflow }}
+          SOURCE_COMMIT: ${{ inputs.source-commit }}
+        run: |
+          test -z "$(git status --porcelain --ignored -- deploy/)"
+          mkdir -p build/rebuilt
+          node tools/deployment-archive.mjs --version "$VERSION" --revision "$SOURCE_COMMIT" \
+            --image "$IMAGE" --booking-seed-image "$BOOKING_SEED_IMAGE" \
+            --repository "$GITHUB_REPOSITORY" --workflow "$ARCHIVE_WORKFLOW" \
+            --ref "$ARCHIVE_REF" --output build/rebuilt
+          cmp "build/archive-under-test/courtside-deployment-$VERSION.zip" \
+            "build/rebuilt/courtside-deployment-$VERSION.zip"
+          ( cd build/archive-under-test && sha256sum -c "courtside-deployment-$VERSION.zip.sha256" )
+
+  mail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.archive-artifact }}
+          path: build/deployment-archive
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Bind the Stalwart journey to the candidate archive
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
+          BOOKING_SEED_IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.booking-seed-digest }}
+        run: |
+          mkdir -p build/deployment-mail
+          archive=$(find "$GITHUB_WORKSPACE/build/deployment-archive" -maxdepth 1 \
+            -name 'courtside-deployment-*.zip' -print -quit)
+          test -n "$archive"
+          node tools/deployment-qualification.mjs --inspect-archive \
+            --archive "$archive" --destination "$RUNNER_TEMP/courtside-mail-deployment" \
+            --image "$IMAGE" --booking-seed-image "$BOOKING_SEED_IMAGE" --recipes full-self-hosted \
+            --output build/deployment-mail/archive.json
+      - id: journey
+        name: Exercise controlled Stalwart DNS, TLS and SMTP peers
+        continue-on-error: true
+        run: node tools/courtside.mail-smoke.mjs
+      - name: Record the Stalwart result
+        if: always()
+        env:
+          JOURNEY_OUTCOME: ${{ steps.journey.outcome }}
+          IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
+        run: |
+          jq -n \
+            --arg image "$IMAGE" \
+            --arg architecture "${{ runner.arch }}" \
+            --arg docker "$(docker version --format '{{.Server.Version}}')" \
+            --arg compose "$(docker compose version --short)" \
+            --arg journey "$JOURNEY_OUTCOME" \
+            '{schemaVersion: 1, recipe: "full-self-hosted", image: $image,
+              platform: {os: "ubuntu-latest", architecture: $architecture},
+              tools: {docker: $docker, compose: $compose},
+              results: [{id: "stalwart-controlled-peers", ownership: "courtside",
+                outcome: (if $journey == "success" then "passed" else "failed" end)}],
+              outcome: (if $journey == "success" then "passed" else "failed" end)}' \
+            > build/deployment-mail/result.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: deployment-mail-qualification
+          path: build/deployment-mail
+          retention-days: 14
+          if-no-files-found: error
+      - name: Enforce the Stalwart journey
+        if: always()
+        env:
+          JOURNEY_OUTCOME: ${{ steps.journey.outcome }}
+        run: test "$JOURNEY_OUTCOME" = success
+
+  active-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    env:
+      RUN_ID: ${{ inputs.run-label }}-${{ github.run_id }}-${{ github.run_attempt }}
+      IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.qualification-artifact-prefix }}amd64
+          path: build/uat-smoke
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.fixtures-artifact }}
+          path: target/fixtures-classes
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Start the digest-bound security target
+        run: |
+          set -o pipefail
+          docker pull "$IMAGE"
+          node tools/security-image-inventory.mjs active | xargs -n1 docker pull
+          node tools/courtside.mjs security "$RUN_ID" "$IMAGE"
+      - name: Execute the required active assessment
+        run: >
+          node tools/courtside.mjs security-run "$RUN_ID" active
+          --qualification build/uat-smoke/qualification.json
+          --authorize "authorize-active-$RUN_ID"
+      - name: Capture the immutable first-attempt manifest
+        if: always()
+        run: |
+          umask 077
+          mkdir -p build/security-gate
+          node tools/courtside.mjs security-report "$RUN_ID" --attempt 1 > build/security-gate/manifest.json
+      - name: Enforce the release assessment gate
+        if: always()
+        env:
+          SOURCE_COMMIT: ${{ inputs.source-commit }}
+        run: >
+          node tools/security-assessment-gate.mjs
+          --manifest build/security-gate/manifest.json
+          --profile active
+          --subject "${IMAGE##*@}"
+          --source-commit "$SOURCE_COMMIT"
+          --output build/security-gate/active-security-summary.json
+      - name: Remove the disposable security target
+        if: always()
+        run: node tools/courtside.mjs security-cleanup "$RUN_ID"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: release-active-security
+          path: |
+            build/security-gate/manifest.json
+            build/security-gate/active-security-summary.json
+          retention-days: 14
+          if-no-files-found: error
+
+  security-record:
+    needs: active-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.security-base-artifact }}
+          path: build/security-input
+          run-id: ${{ inputs.security-base-run-id || github.run_id }}
+          github-token: ${{ github.token }}
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: ${{ inputs.qualification-artifact-prefix }}*
+          path: build/security-input
+          merge-multiple: true
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-active-security
+          path: build/security-input
+
+      - name: Assemble the release security record
+        env:
+          IMAGE_DIGEST: ${{ inputs.image-digest }}
+          SOURCE_COMMIT: ${{ inputs.source-commit }}
+        run: >
+          node tools/security-findings.mjs
+          --summary build/security-input/release-build.json
+          --summary build/security-input/security-summary-amd64.json
+          --summary build/security-input/security-summary-arm64.json
+          --assessment-gate build/security-input/active-security-summary.json
+          --scope release
+          --subject "$IMAGE_DIGEST"
+          --source-subject "$SOURCE_COMMIT"
+          --output build/security-record.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-security-record-input
+          path: build/security-record.json
+          retention-days: 14
+          if-no-files-found: error
+
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    env:
+      COURTSIDE_RESTORE_IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-commit }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/tool-dependencies
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prove backup and restore
+        run: node tools/courtside.restore-smoke.mjs --confirm courtside-restore
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: database-restore
+          path: |
+            build/database-restore
+            !build/database-restore/**/*.dump
+            !build/database-restore/**/*.sql
+            !build/database-restore/**/*.sql.gz
+            !build/database-restore/**/*.backup
+          retention-days: 14
+          if-no-files-found: error
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+      - name: Capture npm audit evidence
+        working-directory: frontend
+        run: |
+          mkdir -p ../build/security
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js run audit:security -- \
+            --output ../build/security/npm.json
+      - name: Enforce the release npm policy
+        env:
+          SOURCE_COMMIT: ${{ inputs.source-commit }}
+        run: >
+          node tools/security-findings.mjs
+          --npm build/security/npm.json
+          --npm-version "$(frontend/node/node frontend/node/node_modules/npm/bin/npm-cli.js --version)"
+          --exceptions security/exceptions.json
+          --assessment-policy not-applicable
+          --scope scheduled-npm-audit
+          --subject "$SOURCE_COMMIT"
+          --output build/security/npm-summary.json

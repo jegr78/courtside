@@ -15,6 +15,10 @@ const workflow = readFileSync(
   "utf8"
 );
 const pom = readFileSync(fileURLToPath(new URL("../pom.xml", import.meta.url)), "utf8");
+const gatesWorkflow = readFileSync(
+  fileURLToPath(new URL("../.github/workflows/release-gates.yml", import.meta.url)),
+  "utf8"
+);
 
 test("given a release image, when publishing it, then the same digest is qualified on every architecture first", () => {
   // when / then
@@ -25,9 +29,9 @@ test("given a release image, when publishing it, then the same digest is qualifi
   assert.match(workflow, /architecture: arm64[\s\S]+runs-on: ubuntu-24\.04-arm/);
   assert.match(workflow, /COURTSIDE_UAT_VERSION: release-candidate-\$\{\{ github\.sha \}\}@\$\{\{ needs\.image\.outputs\.digest \}\}/);
   assert.match(workflow, /node tools\/courtside\.uat-smoke\.mjs --confirm courtside-uat/);
-  assert.match(workflow, /\n  security-record:\n    needs: \[build, image, qualify, active-security\]/);
-  assert.match(workflow,
-    /\n  publish:\n    needs: \[archive, build, browser, image, qualify, mail, security-record, upgrade, restore\]/);
+  assert.match(workflow, /\n  gates:\n    needs: \[build, image, archive, qualify\]/);
+  assert.match(gatesWorkflow, /\n  security-record:\n    needs: active-security/);
+  assert.match(workflow, /\n  publish:\n    needs: \[archive, build, browser, image, qualify, gates, upgrade\]/);
 });
 
 test("given a release build, when acceptance fixtures are published, then a separate digest-bound image enters the archive", () => {
@@ -132,7 +136,7 @@ test("given a tag, when the release runs, then it demands a nightly that verifie
   assert.match(gate, /--commit "\$head" --run-id "\$id"/);
   assert.ok(gate.indexOf("gh run download") < gate.indexOf("node tools/nightly-release-evidence.mjs"));
   assert.ok(gate.indexOf("node tools/nightly-release-evidence.mjs") < gate.indexOf('verified="$id"'));
-  assert.match(gate, /no green first-attempt build with a completed coupled nightly-image run verified a commit this tag builds on/);
+  assert.match(gate, /no green first-attempt build with a completed nightly release rehearsal verified a commit this tag builds on/);
   assert.match(gate, /actions: read/);
 });
 
@@ -294,6 +298,7 @@ test("given the version the build stamps, when the tag is read, then nothing is 
   });
 
 const releaseJobs = yaml.load(workflow).jobs;
+const gateJobs = yaml.load(gatesWorkflow).jobs;
 
 function stepsOf(job) {
   return releaseJobs[job].steps ?? [];
@@ -301,17 +306,21 @@ function stepsOf(job) {
 
 test("given a candidate archive, when any release job inspects it, then the booking-seed digest is bound as well", () => {
   // given
-  const inspections = Object.keys(releaseJobs).flatMap((job) => stepsOf(job)
+  const inspectionsOf = (jobs, workflowName) => Object.entries(jobs).flatMap(([job, { steps = [] }]) => steps
     .filter((step) => step.run?.includes("--inspect-archive"))
-    .map((step) => ({ job, step })));
+    .map((step) => ({ job: `${workflowName}:${job}`, step })));
+  const inspections = [...inspectionsOf(releaseJobs, "release"), ...inspectionsOf(gateJobs, "release-gates")];
+  const boundDigest = {
+    release: "ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}",
+    "release-gates": "ghcr.io/${{ github.repository }}@${{ inputs.booking-seed-digest }}"
+  };
 
   // then
-  assert.ok(inspections.some(({ job }) => job === "mail"), "the mail job inspects the archive");
+  assert.ok(inspections.some(({ job }) => job === "release-gates:mail"), "the mail gate inspects the archive");
+  assert.equal(releaseJobs.gates.with["booking-seed-digest"], "${{ needs.image.outputs.booking-seed-digest }}");
   for (const { job, step } of inspections) {
     assert.match(step.run, /--booking-seed-image "\$BOOKING_SEED_IMAGE"/, `${job} passes the booking-seed image`);
-    assert.equal(step.env?.BOOKING_SEED_IMAGE,
-      "ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}",
-      `${job} binds the booking-seed digest`);
+    assert.equal(step.env?.BOOKING_SEED_IMAGE, boundDigest[job.split(":")[0]], `${job} binds the booking-seed digest`);
   }
 });
 
@@ -342,10 +351,13 @@ test("given an artifact another release job downloads, when it is uploaded, then
 
 test("given the amd64 qualification, when the active assessment reads it, then the qualification file is where it looks", () => {
   // given
-  const download = stepsOf("active-security").find((step) => step.with?.name === "image-qualification-amd64");
-  const assessment = stepsOf("active-security").find((step) => String(step.run).includes("security-run"));
+  const activeSteps = gateJobs["active-security"].steps;
+  const download = activeSteps.find((step) =>
+    step.with?.name === "${{ inputs.qualification-artifact-prefix }}amd64");
+  const assessment = activeSteps.find((step) => String(step.run).includes("security-run"));
 
   // then
+  assert.equal(releaseJobs.gates.with["qualification-artifact-prefix"], "image-qualification-");
   assert.equal(download.with.path, "build/uat-smoke");
   assert.match(assessment.run, /--qualification build\/uat-smoke\/qualification\.json/);
   assert.equal(stepsOf("qualify").find((step) => step.with?.name === "image-qualification-${{ matrix.architecture }}")

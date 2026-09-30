@@ -244,8 +244,10 @@ immutable revision and the evidence artifact used for the judgment.
 Manual dispatch may select `active` for a focused retest or `baseline` for paired safe and active
 evidence. A baseline builds, qualifies and starts one immutable image, records safe as attempt 1 and
 continues with active as attempt 2 only after the safe attempt produced complete passive evidence.
-Both manifests are gated against the same image, commit and target identity. The schedule always selects `safe`; active traffic is
-never introduced by changing a default or cron expression.
+Both manifests are gated against the same image, commit and target identity. The weekly schedule of
+this workflow selects `safe`. The `active` profile runs every night through the release gates the
+scheduled `build` rehearses, against the nightly digest in a disposable loopback environment, exactly
+as the release runs it. Destructive traffic never runs on a schedule.
 
 The assessment publishes its normalized records, the manifests and the gate summaries, and
 nothing else. It used to seal the underlying evidence directory into a CMS envelope addressed to a

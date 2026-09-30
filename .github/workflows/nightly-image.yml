@@ -12,6 +12,19 @@ on:
       publish:
         required: true
         type: boolean
+      rebuild:
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      commit:
+        value: ${{ jobs.select.outputs.commit }}
+      version:
+        value: ${{ jobs.select.outputs.version }}
+      digest:
+        value: ${{ jobs.image.outputs.digest }}
+      booking-seed-digest:
+        value: ${{ jobs.image.outputs.booking-seed-digest }}
   workflow_dispatch:
 
 concurrency:
@@ -62,6 +75,7 @@ jobs:
           IMAGE: ghcr.io/${{ github.repository }}
           REQUESTED_COMMIT: ${{ inputs.commit }}
           REQUESTED_PUBLISH: ${{ inputs.publish }}
+          REQUESTED_REBUILD: ${{ inputs.rebuild }}
           REQUESTED_VERIFICATION_RUN: ${{ inputs.verification_run }}
         run: |
           set -euo pipefail
@@ -96,7 +110,7 @@ jobs:
             fi
           fi
           build=true
-          if [[ "$published_revision" = "$commit" ]]; then
+          if [[ "$published_revision" = "$commit" && "$REQUESTED_REBUILD" != true ]]; then
             build=false
           fi
           base_version=$(git show "$commit:frontend/package.json" | jq -r '.version | split("-")[0]')
@@ -172,6 +186,13 @@ jobs:
         with:
           name: nightly-image-input
           path: build
+          retention-days: 1
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: nightly-assessment-fixtures
+          path: target/fixtures-classes
           retention-days: 1
           if-no-files-found: error
 
