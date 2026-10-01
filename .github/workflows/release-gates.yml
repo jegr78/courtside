@@ -44,6 +44,10 @@ on:
         required: false
         type: string
         default: ''
+      upgrade-origins:
+        required: false
+        type: string
+        default: nightly
   workflow_dispatch:
     inputs:
       image-digest:
@@ -85,6 +89,10 @@ on:
       security-base-run-id:
         required: true
         type: string
+      upgrade-origins:
+        required: false
+        type: string
+        default: nightly
 
 permissions: {}
 
@@ -323,6 +331,81 @@ jobs:
         with:
           name: release-security-record-input
           path: build/security-record.json
+          retention-days: 14
+          if-no-files-found: error
+
+  upgrade-origins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      origins: ${{ steps.resolve.outputs.origins }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+      - id: resolve
+        name: Resolve the database upgrade origins
+        env:
+          REQUESTED: ${{ inputs.upgrade-origins }}
+          SOURCE_COMMIT: ${{ inputs.source-commit }}
+        shell: bash
+        run: |
+          if [ "$REQUESTED" = nightly ]; then
+            token=$(curl -fsS "https://ghcr.io/token?scope=repository:$GITHUB_REPOSITORY:pull" | jq -r .token)
+            tags=$(curl -fsS -H "Authorization: Bearer $token" \
+              "https://ghcr.io/v2/$GITHUB_REPOSITORY/tags/list?n=10000" | jq -c .tags)
+            origins=$(node tools/courtside.upgrade-smoke.mjs --nightly-origins "$GITHUB_REPOSITORY" "$tags" \
+              "$SOURCE_COMMIT")
+            test "$origins" != '[]'
+          else
+            origins="$REQUESTED"
+          fi
+          echo "origins=$origins" >> "$GITHUB_OUTPUT"
+
+  upgrade:
+    needs: upgrade-origins
+    if: needs.upgrade-origins.outputs.origins != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        origin: ${{ fromJSON(needs.upgrade-origins.outputs.origins) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    env:
+      COURTSIDE_UPGRADE_CANDIDATE_IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
+      COURTSIDE_UPGRADE_ORIGIN: ${{ matrix.origin.ref }}
+      COURTSIDE_UPGRADE_ORIGIN_IMAGE: ${{ matrix.origin.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/tool-dependencies
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prove the database upgrade path
+        run: node tools/courtside.upgrade-smoke.mjs --confirm courtside-upgrade
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: ${{ inputs.run-label }}-database-upgrade-${{ matrix.origin.ref }}
+          path: build/database-upgrade
           retention-days: 14
           if-no-files-found: error
 

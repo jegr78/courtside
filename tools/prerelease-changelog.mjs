@@ -34,7 +34,7 @@ function mergeSections(candidateBody, cumulativeBody, releaseLine) {
     .map((section) => releaseLine === "0.1.0" && /BREAKING CHANGES/i.test(section.name)
       ? { ...section, name: "Notable changes" }
       : section);
-  const cumulative = sectionsOf(cumulativeBody, "cumulative release history");
+  const cumulative = cumulativeBody.trim() ? sectionsOf(cumulativeBody, "cumulative release history") : [];
   const merged = new Map(cumulative.map((section) => [section.name, { ...section }]));
 
   for (const section of candidate) {
@@ -56,35 +56,55 @@ function mergeSections(candidateBody, cumulativeBody, releaseLine) {
     .join("\n\n");
 }
 
+function releaseDate(heading) {
+  return /\((\d{4}-\d{2}-\d{2})\)\s*$/.exec(heading[0])?.[1];
+}
+
+function lineHeading(line, date) {
+  return date ? `## ${line} (${date})` : `## ${line}`;
+}
+
 export function normalizePrereleaseChangelog(changelog) {
   const headings = [...changelog.matchAll(RELEASE_HEADING)];
-  const candidates = headings.filter((heading) => heading[1].includes("-"));
-  if (candidates.length === 0) {
+  const newest = headings[0];
+  if (!newest) {
     return changelog;
   }
-  if (candidates.length !== 1 || candidates[0] !== headings[0]) {
+  const releaseLine = newest[1].split("-")[0];
+  const candidates = headings.filter((heading) => heading[1].includes("-"));
+  const graduation = newest[1] === releaseLine && headings[1]?.[1] === releaseLine;
+  if (candidates.length === 0 && !graduation) {
+    return changelog;
+  }
+  if (candidates.length > 1 || (candidates.length === 1 && candidates[0] !== newest)) {
     throw new Error("changelog must contain exactly one generated candidate as its newest release");
   }
 
-  const candidate = candidates[0];
-  const releaseLine = candidate[1].split("-")[0];
-  const cumulative = headings.filter((heading) => heading[1] === releaseLine);
+  const delta = newest;
+  const deltaEnd = delta.index + delta[0].length;
+  const cumulative = headings.slice(1).filter((heading) => heading[1] === releaseLine);
+  if (cumulative.length === 0) {
+    const followingRelease = headings[1];
+    const body = mergeSections(changelog.slice(deltaEnd, followingRelease?.index), "", releaseLine);
+    const suffix = changelog.slice(followingRelease?.index ?? changelog.length);
+    return `${changelog.slice(0, delta.index)}${lineHeading(releaseLine, releaseDate(delta))}\n\n${body}\n\n${suffix}`;
+  }
   if (cumulative.length !== 1) {
-    throw new Error(`candidate ${candidate[1]} needs exactly one matching cumulative heading ${releaseLine}`);
+    throw new Error(`${delta[1]} needs exactly one matching cumulative heading ${releaseLine}`);
   }
   if (headings[1] !== cumulative[0]) {
     throw new Error("candidate delta must be directly followed by its cumulative release line");
   }
 
-  const candidateEnd = candidate.index + candidate[0].length;
   const cumulativeEnd = cumulative[0].index + cumulative[0][0].length;
   const followingRelease = headings.find((heading) => heading.index > cumulative[0].index);
-  const candidateBody = changelog.slice(candidateEnd, cumulative[0].index);
+  const deltaBody = changelog.slice(deltaEnd, cumulative[0].index);
   const cumulativeBody = changelog.slice(cumulativeEnd, followingRelease?.index);
-  const mergedBody = mergeSections(candidateBody, cumulativeBody, releaseLine);
+  const mergedBody = mergeSections(deltaBody, cumulativeBody, releaseLine);
   const suffix = changelog.slice(followingRelease?.index ?? changelog.length);
+  const heading = graduation ? lineHeading(releaseLine, releaseDate(delta)) : cumulative[0][0];
 
-  return `${changelog.slice(0, candidate.index)}${cumulative[0][0]}\n\n${mergedBody}\n\n${suffix}`;
+  return `${changelog.slice(0, delta.index)}${heading}\n\n${mergedBody}\n\n${suffix}`;
 }
 
 function parseArguments(arguments_) {

@@ -97,6 +97,28 @@ export function previousReleaseTag(candidateTag, tags) {
   return released[0]?.tag ?? null;
 }
 
+export function releaseUpgradeOrigins(repository, tags) {
+  return tags.map((tag) => ({ ref: tag, image: `ghcr.io/${repository}:${tag.slice(1)}` }));
+}
+
+export function nightlyUpgradeOrigins(repository, tags, history) {
+  const origin = tags
+    .filter((tag) => /^nightly-\d{8}-[0-9a-f]{7,40}$/.test(tag))
+    .map((tag) => ({ ref: tag.split("-").at(-1), image: `ghcr.io/${repository}:${tag}` }))
+    .filter((candidate) => history.unchangedSince(candidate.ref))
+    .sort((left, right) => history.committedAt(left.ref) - history.committedAt(right.ref))[0];
+  return origin ? [origin] : [];
+}
+
+// Flyway refuses a database whose applied migration changed, which a correction before the first release may do.
+export function gitHistory(candidate, cwd = root) {
+  return {
+    committedAt: (ref) => Number(run("git", ["show", "-s", "--format=%ct", ref], { cwd }).stdout.trim()),
+    unchangedSince: (ref) => run("git", ["diff", "--quiet", "--diff-filter=MDR", ref, candidate, "--",
+      "src/main/resources/db/migration", originVerification], { allowFailure: true, cwd }).status === 0
+  };
+}
+
 export function selectRepositoryDigest(repository, originTag, repoDigests) {
   const prefix = `ghcr.io/${repository}@sha256:`;
   const matches = repoDigests.filter((digest) => digest.startsWith(prefix));
@@ -130,7 +152,7 @@ function changesUnder(before, after, path) {
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
-    cwd: root,
+    cwd: options.cwd ?? root,
     encoding: "utf8",
     env: options.environment ?? process.env,
     input: options.input,
@@ -318,7 +340,8 @@ async function executeUpgrade() {
   const baseEnvironment = { COURTSIDE_UPGRADE_ADMIN_PASSWORD: password };
   const repository = process.env.GITHUB_REPOSITORY;
   if (!repository) throw new Error("GITHUB_REPOSITORY is required for a published upgrade origin");
-  const originTag = `ghcr.io/${repository}:${origin.slice(1)}`;
+  const originTag = process.env.COURTSIDE_UPGRADE_ORIGIN_IMAGE;
+  if (!originTag) throw new Error("COURTSIDE_UPGRADE_ORIGIN_IMAGE is required for an upgrade origin");
   run("docker", ["pull", originTag], { inherit: true });
   const digests = JSON.parse(run("docker", ["image", "inspect", "--format", "{{json .RepoDigests}}", originTag]).stdout);
   const originImage = selectRepositoryDigest(repository, origin, digests);
@@ -379,6 +402,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.stdout.write(`${JSON.stringify(selectUpgradeOrigins(process.argv[3], tags))}\n`);
   } else if (process.argv[2] === "--published-tags") {
     process.stdout.write(`${JSON.stringify(publishedTags(JSON.parse(process.argv[3])))}\n`);
+  } else if (process.argv[2] === "--release-origins") {
+    process.stdout.write(`${JSON.stringify(releaseUpgradeOrigins(process.argv[3], JSON.parse(process.argv[4])))}\n`);
+  } else if (process.argv[2] === "--nightly-origins") {
+    process.stdout.write(`${JSON.stringify(nightlyUpgradeOrigins(process.argv[3], JSON.parse(process.argv[4]),
+      gitHistory(process.argv[5])))}\n`);
   } else if (process.argv[2] === "--previous-release") {
     process.stdout.write(`${previousReleaseTag(process.argv[3], JSON.parse(process.argv[4])) ?? ""}\n`);
   } else {

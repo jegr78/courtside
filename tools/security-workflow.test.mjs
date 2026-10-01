@@ -600,3 +600,54 @@ test("given a scanner finding, when it is triaged, then exceptions are precise, 
   assert.match(release, /node tools\/security-findings\.mjs/);
   assert.match(policy, /scan scope/);
 });
+
+test("given the release's supply-chain verification, when the nightly publishes, then it runs the same "
+  + "verifications with the same output options", () => {
+  // given
+  const nightly = yaml.load(readFileSync(join(repository, ".github/workflows/nightly-image.yml"), "utf8"));
+  const releaseWorkflow = yaml.load(release);
+  const step = (job, name) => job.steps.find((candidate) => candidate.name === name).run;
+  const verifications = (run) => run.split(/\n(?=\s*(?:cosign|gh|node|jq|docker) )/)
+    .filter((command) => /^\s*(?:cosign verify|gh attestation verify "oci:)/.test(command))
+    .filter((command) => !command.includes("--bundle-from-oci"))
+    .map((command) => [command.match(/^\s*(cosign verify|gh attestation verify)/)[1],
+      command.includes("BOOKING_SEED_IMAGE") ? "booking seed" : "image",
+      (command.match(/--predicate-type \S+/) ?? [""])[0], (command.match(/--output json|--format json/) ?? ["none"])[0]]);
+
+  // when
+  const releaseChecks = verifications(step(releaseWorkflow.jobs.publish, "Verify release supply-chain evidence"));
+  const nightlyChecks = verifications(step(nightly.jobs.publish, "Verify nightly supply-chain evidence"));
+
+  // then
+  assert.equal(releaseChecks.length, 6, "the release verifies a signature, a provenance and an SBOM attestation per image");
+  assert.deepEqual(nightlyChecks, releaseChecks, "the release would run a verification the night never ran");
+});
+
+test("given the release trusts the verifiers' exit codes, when it verifies, then every call pins identity, "
+  + "source and digest", () => {
+  // given
+  const verify = yaml.load(release).jobs.publish.steps.find((step) => step.name === "Verify release supply-chain evidence");
+  const commands = verify.run.split(/\n(?=\s*(?:cosign|gh|node) )/);
+  const cosign = commands.filter((command) => command.startsWith("cosign verify"));
+  const attestations = commands.filter((command) => command.startsWith("gh attestation verify"));
+
+  // when / then
+  assert.equal(cosign.length, 2, "both images carry a signature");
+  assert.equal(attestations.length, 5, "provenance and SBOM for both images, and the archive's provenance");
+  for (const command of cosign) {
+    assert.match(command, /--certificate-identity "https:\/\/github\.com\/\$GITHUB_REPOSITORY\/\.github\/workflows\/release\.yml@\$GITHUB_REF"/,
+      "without the identity any repository's signature would pass");
+    assert.match(command, /--certificate-oidc-issuer https:\/\/token\.actions\.githubusercontent\.com/);
+  }
+  for (const command of attestations) {
+    for (const flag of [/--repo "\$GITHUB_REPOSITORY"/, /--signer-workflow "\$GITHUB_REPOSITORY\/\.github\/workflows\/release\.yml"/,
+      /--source-ref "\$GITHUB_REF"/, /--source-digest "\$GITHUB_SHA"/]) {
+      assert.match(command, flag, `an attestation verified without ${flag} proves less than the release records`);
+    }
+    if (command.includes("oci://")) assert.match(command, /--predicate-type https:\/\/\S+/);
+  }
+  for (const image of ["IMAGE", "BOOKING_SEED_IMAGE"]) {
+    assert.match(verify.env[image], /@\$\{\{ needs\.image\.outputs\.(?:booking-seed-)?digest \}\}$/,
+      "a tag instead of a digest would verify whatever the tag points to now");
+  }
+});

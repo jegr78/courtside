@@ -93,14 +93,12 @@ test("given an already cumulative changelog, when normalization repeats, then it
 
 test("given ambiguous generated history, when normalization runs, then it fails closed", () => {
   // given
-  const missingCore = "# Changelog\n\n## 0.1.0-rc.2\n\n### Features\n\n* delta\n";
   const twoCandidates = "# Changelog\n\n## 0.1.0-rc.3\n\n### Features\n\n* latest\n"
     + "\n## 0.1.0-rc.2\n\n### Features\n\n* earlier\n\n## 0.1.0\n\n### Features\n\n* base\n";
   const duplicateSections = "# Changelog\n\n## 0.1.0-rc.2\n\n### Features\n\n* one"
     + "\n\n### Features\n\n* two\n\n## 0.1.0\n\n### Features\n\n* base\n";
 
   // when / then
-  assert.throws(() => normalizePrereleaseChangelog(missingCore), /matching cumulative heading/);
   assert.throws(() => normalizePrereleaseChangelog(twoCandidates), /exactly one generated candidate/);
   assert.throws(() => normalizePrereleaseChangelog(duplicateSections), /duplicate section headings/);
 });
@@ -145,4 +143,66 @@ test("given this repository's own changelog, when release-please prepends a cand
   assert.match(notes, /^## 0\.1\.0 \(/);
   assert.match(notes, /preserve cumulative release-line history/);
   assert.match(notes, /Missing from the generated entries/);
+});
+
+// Written by release-please 17.6.0's DefaultChangelogNotes with this repository's changelog sections.
+const GENERATED_GRADUATION = `## [0.1.0](https://github.com/jegr78/courtside/compare/v0.1.0-rc.8...v0.1.0) (2026-10-01)
+
+
+### Bug fixes
+
+* preserve cumulative release-line history ([#982](https://github.com/jegr78/courtside/issues/982)) ([6b183ca](https://github.com/jegr78/courtside/commit/6b183ca8d701161ad6b5974df2d99eb1d1f183e9))
+
+
+### Documentation
+
+* capture each guide in a browser that speaks its language ([#979](https://github.com/jegr78/courtside/issues/979)) ([e1fe7d1](https://github.com/jegr78/courtside/commit/e1fe7d154a5e0a23f3778c1f68ddd5e1211184c3))
+
+`;
+const GENERATED_NEW_LINE = `## [0.2.0-rc.1](https://github.com/jegr78/courtside/compare/v0.1.0...v0.2.0-rc.1) (2026-10-01)
+
+
+### Bug fixes
+
+* preserve cumulative release-line history ([#982](https://github.com/jegr78/courtside/issues/982)) ([6b183ca](https://github.com/jegr78/courtside/commit/6b183ca8d701161ad6b5974df2d99eb1d1f183e9))
+
+
+### Documentation
+
+* capture each guide in a browser that speaks its language ([#979](https://github.com/jegr78/courtside/issues/979)) ([e1fe7d1](https://github.com/jegr78/courtside/commit/e1fe7d154a5e0a23f3778c1f68ddd5e1211184c3))
+
+`;
+
+test("given this repository's changelog, when release-please graduates the line to 0.1.0, then one release line "
+  + "remains and carries the release date", () => {
+  // given
+  const changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  const generated = changelog.replace("## 0.1.0 (", `${GENERATED_GRADUATION}## 0.1.0 (`);
+  assert.equal([...generated.matchAll(/^## .*0\.1\.0/gm)].length, 2, "release-please adds a second 0.1.0 heading");
+
+  // when
+  const normalized = normalizePrereleaseChangelog(generated);
+
+  // then
+  assert.equal([...normalized.matchAll(/^## .*0\.1\.0/gm)].length, 1, "a release body needs exactly one line");
+  assert.match(normalized, /^## 0\.1\.0 \(2026-10-01\)$/m, "the stable release is dated when it was released");
+  assert.match(normalized, /### Bug fixes\n\n\* preserve cumulative release-line history/);
+  assert.match(cumulativeReleaseNotes(normalized, "v0.1.0"), /^## 0\.1\.0 \(2026-10-01\)/);
+});
+
+test("given a released 0.1.0, when release-please opens the 0.2.0 line with its first candidate, then the line "
+  + "gets its own cumulative section", () => {
+  // given
+  const released = "# Changelog\n\n## 0.1.0 (2026-10-01)\n\n### Features\n\n* base\n";
+  const generated = released.replace("## 0.1.0 (", `${GENERATED_NEW_LINE}## 0.1.0 (`);
+
+  // when
+  const normalized = normalizePrereleaseChangelog(generated);
+
+  // then
+  assert.match(normalized, /^## 0\.2\.0 \(2026-10-01\)\n\n### Bug fixes\n\n\* preserve cumulative/m);
+  assert.doesNotMatch(normalized, /0\.2\.0-rc\.1/, "the candidate heading is folded, not kept");
+  assert.match(normalized, /^## 0\.1\.0 \(2026-10-01\)\n\n### Features\n\n\* base$/m, "the released line is untouched");
+  assert.match(cumulativeReleaseNotes(normalized, "v0.2.0-rc.1"), /^## 0\.2\.0 \(2026-10-01\)/);
+  assert.equal(normalizePrereleaseChangelog(normalized), normalized, "a second run changes nothing");
 });

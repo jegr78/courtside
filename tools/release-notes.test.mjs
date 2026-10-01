@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { cumulativeReleaseNotes } from "./release-notes.mjs";
+import { RELEASE_NOTES_LIMIT, cumulativeReleaseNotes } from "./release-notes.mjs";
 
 test("given a release candidate tag, when notes are selected, then the complete stable release line is returned", () => {
   // given
@@ -54,4 +54,23 @@ test("given an invalid tag or malformed changelog, when notes are selected, then
   // when / then
   assert.throws(() => cumulativeReleaseNotes("# Changelog\n", "0.1.0"), /tag is invalid/);
   assert.throws(() => cumulativeReleaseNotes("# Changelog\n\n## 0.1.0\n", "v0.1.0+local"), /tag is invalid/);
+});
+
+test("given this repository's changelog, when its release line is cut, then GitHub can still store the body", () => {
+  // given
+  const changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+
+  // when
+  const notes = cumulativeReleaseNotes(changelog, "v0.1.0");
+
+  // then
+  assert.ok(notes.length <= RELEASE_NOTES_LIMIT, `the 0.1.0 notes have ${notes.length} characters`);
+});
+
+test("given a release line longer than GitHub stores, when its notes are cut, then the build refuses it", () => {
+  // given
+  const changelog = `# Changelog\n\n## 0.2.0\n\n### Features\n\n${"* entry\n".repeat(20000)}`;
+
+  // when / then
+  assert.throws(() => cumulativeReleaseNotes(changelog, "v0.2.0"), /GitHub accepts a release body of 125000/);
 });
