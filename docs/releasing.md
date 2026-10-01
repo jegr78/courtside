@@ -41,7 +41,9 @@ A release confirms what the night before already proved; it does not discover it
 dispatched `build` rebuilds the nightly image even when the revision already carries one, so the
 digest the rehearsal binds is qualified in the same run, and then calls `release-gates.yml` with it.
 That is the workflow the release's `gates` job calls, with the same jobs and commands:
-`archive-reproducibility`, `mail`, `active-security`, `security-record`, `restore` and `npm-audit`.
+`archive-reproducibility`, `mail`, `active-security`, `security-record`, `restore`, `npm-audit` and
+`upgrade`. At night `upgrade` starts from the oldest dated nightly the registry still holds; a release
+passes the published versions it upgrades from instead.
 The scheduled `security` job runs the release-build policy with npm audit evidence and the same
 command line as the release's `build` job. A push to `main` builds and qualifies its image but does not
 rehearse the gates.
@@ -53,8 +55,11 @@ calls `release-gates.yml` with it.
 
 Three steps need a real version tag and therefore run for the first time in a release: signing with
 the `release.yml` identity, the version tags on the registry, and writing the GitHub release. The
-nightly `publish` exercises the same attestation, signing and verification tools under its own
-identity.
+nightly `publish` runs the same signing, attestation and verification commands with the same output
+options under its own identity, and tags its image with the same `imagetools` command. The release
+keeps what `cosign verify` and `gh attestation verify` print as proof digests in the security record
+and does not parse it: their exit codes are the verification, so a new output format of either tool
+cannot stop a release.
 
 The image workflow also accepts a direct dispatch from a pull-request branch. That dispatch builds
 and qualifies the real multi-architecture candidate from the selected branch head, but cannot sign,
@@ -142,8 +147,9 @@ Candidates are opened and closed with one line of configuration, not with a hand
 
 Every candidate is a checkpoint on the same release line. Release Please proposes the changes
 since the preceding candidate; the release-please workflow then folds those entries into the single
-`## <major>.<minor>.<patch>` section on its pull-request branch. The normalizer refuses multiple
-candidate deltas, a missing cumulative heading and duplicate sections instead of guessing. The
+`## <major>.<minor>.<patch>` section on its pull-request branch. The first candidate of a new line
+opens that section, and graduating to the release folds the last delta into it and dates it with the
+release. The normalizer refuses multiple candidate deltas and duplicate sections instead of guessing. The
 release workflow independently rejects a missing or split section and uses that complete section
 for both candidate and stable GitHub release notes.
 
@@ -229,10 +235,10 @@ Permission failures and malformed evidence still stop the build.
 | `browser` | The packaged tagged source passes the complete Chromium and WebKit browser matrix; it runs beside `build` so browser duration cannot consume the security-analysis budget |
 | `image` | One multi-architecture image is built and pushed as `release-candidate-<sha>` |
 | `qualify` | The exact deployment archive is checked against that digest and all four recipes, then the digest is brought up through the reference deployment on `amd64` and `arm64` and checked against the candidate-image policy |
-| `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the tagged tree and requires the same bytes. `npm-audit` holds the release npm policy |
-| `upgrade` | The database upgrade path from each resolved origin is executed against the candidate |
+| `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the tagged tree and requires the same bytes. `npm-audit` holds the release npm policy `upgrade` migrates a database from each resolved origin into the candidate; the first release has none |
 | `archive` | `tools/deployment-archive.mjs` packs the reference deployment for that digest into `courtside-deployment-<version>.zip` |
-| `publish` | The qualified manifest is tagged, signed with cosign, given an SBOM and a provenance attestation, and the GitHub release is written |
+| `publish` | The qualified manifest is signed with cosign and given an SBOM and a provenance attestation; the draft release receives its assets, the version tags are pushed, and only then is the release made visible |
+| `plan-sync` | The release plan's status comment is synchronized with the release just published |
 
 `publish` retags the manifest that `qualify` proved. Nothing is rebuilt between qualification and
 publication, so the digest a club pulls is the digest that was brought up twice.
@@ -260,7 +266,8 @@ It stops at the job that refused, and nothing is published under a version tag: 
 merge created is still a draft and stays one. What stays behind is the `release-candidate-<sha>`
 image, unsigned and unqualified, in a public registry. Nightly retention removes a candidate-only
 digest after 14 days; a published version that shares the digest keeps it. No version tag resolves
-to a failed candidate.
+to a failed candidate. `publish` itself uploads the release assets to the draft before it pushes a
+version tag, and makes the release visible last.
 
 **The tag stays where it is.** A tag that once named a commit and later names another is the one
 thing a consumer cannot detect, and by the time a run has started, the tag has been observed. Fix
@@ -296,11 +303,12 @@ helps nobody at 22:00.
 The first public release has no upgrade origin, so its release body says that directly instead of
 turning development-time breaking markers into upgrade instructions.
 
-What no automation covers is the upgrade path itself. `upgrade` executes the origins it resolved
-from the published release history, so a release that breaks one of those is refused, but only
-those.
+What no automation covers is the upgrade path itself. The `upgrade` gate executes the origins the
+release resolved from the published release history, so a release that breaks one of those is
+refused, but only those. The same job runs every night from the oldest retained dated nightly, so the
+mechanics are proven before the first release that has an origin needs them.
 
-`upgrade` reads `upgrade/fixtures/origin.sql` and `upgrade/verify.sql` from the origin's tag, loads
+`upgrade` reads `upgrade/fixtures/origin.sql` and `upgrade/verify.sql` from the origin's tag or commit, loads
 the fixture into the origin and compares what the origin's query saw with what the candidate's query
 sees after migrating. Every key `verify.sql` reports is therefore a contract with every later
 release: a key may be added, but one renamed, dropped or given a different meaning reads as lost
@@ -324,7 +332,8 @@ release. Candidates of another line are not origins: a club is expected to reach
 release before following the next one. A candidate whose run never reached `publish` is not an
 origin either, it named no image, and the release reads its history from what was published rather
 than from the tags that happen to exist. Candidates of the first release are no origins at all:
-until a release exists no schema is frozen, so `upgrade` is skipped and `publish` runs without it.
+until a release exists no schema is frozen, so the release's `upgrade` gate has no origin and is
+skipped.
 
 A version is read as semantic versioning defines it. Build metadata (`v0.3.0+build.1`) is refused
 rather than interpreted, because nothing here has a use for it and a release that guessed would be

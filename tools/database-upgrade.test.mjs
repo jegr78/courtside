@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 import {
   selectRepositoryDigest,
   publishedTags,
+  nightlyUpgradeOrigins,
   previousReleaseTag,
+  releaseUpgradeOrigins,
   selectUpgradeOrigins,
   unexplainedChanges,
   originFixture,
@@ -14,6 +16,10 @@ import {
 
 const releaseWorkflow = readFileSync(
   fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)),
+  "utf8"
+);
+const gatesWorkflow = readFileSync(
+  fileURLToPath(new URL("../.github/workflows/release-gates.yml", import.meta.url)),
   "utf8"
 );
 const upgradeCompose = readFileSync(
@@ -240,10 +246,13 @@ test("given an interrupted candidate, when the origin is recovered, then usabili
 test("given a release candidate, when release qualification runs, then every supported database origin blocks publication", () => {
   // when / then
   assert.match(releaseWorkflow, /id: upgrade-origins/);
-  assert.match(releaseWorkflow, /node tools\/courtside\.upgrade-smoke\.mjs --confirm courtside-upgrade/);
-  assert.match(releaseWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_IMAGE:[^\n]+needs\.image\.outputs\.digest/);
+  assert.match(releaseWorkflow, /--release-origins "\$GITHUB_REPOSITORY"/);
+  assert.match(releaseWorkflow, /upgrade-origins: \$\{\{ needs\.build\.outputs\.upgrade-origins \}\}/);
+  assert.match(gatesWorkflow, /node tools\/courtside\.upgrade-smoke\.mjs --confirm courtside-upgrade/);
+  assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_IMAGE:[^\n]+inputs\.image-digest/);
+  assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_ORIGIN_IMAGE: \$\{\{ matrix\.origin\.image \}\}/);
   assert.match(releaseWorkflow, /Supported database upgrade origins/);
-  assert.match(releaseWorkflow, /needs: \[archive, build, browser, image, qualify, gates, upgrade\]/);
+  assert.match(releaseWorkflow, /needs: \[archive, build, browser, image, qualify, gates\]/);
 });
 
 test("given a migration that adds a column, when comparing the proof, then the new column is not a change", () => {
@@ -317,3 +326,26 @@ test("given the files a later release reads from this tag, when the tree is insp
   // then
   assert.deepEqual(missing, [], "a later upgrade proof reads these paths from this release's tag");
 });
+
+test("given published releases, when the release names its upgrade origins, then each is checked out and pulled "
+  + "by its version", () => {
+  // when / then
+  assert.deepEqual(releaseUpgradeOrigins("example/courtside", ["v0.1.0", "v0.2.3"]), [
+    { ref: "v0.1.0", image: "ghcr.io/example/courtside:0.1.0" },
+    { ref: "v0.2.3", image: "ghcr.io/example/courtside:0.2.3" }
+  ]);
+  assert.deepEqual(releaseUpgradeOrigins("example/courtside", []), []);
+});
+
+test("given the retained dated nightlies, when the night rehearses an upgrade, then it starts from the oldest one",
+  () => {
+    // given
+    const tags = ["nightly", "nightly-20261001-91740c9", "release-candidate-5c0a946e", "nightly-20260924-2a3b6f7",
+      "booking-seed-nightly-20260920-0000000", "nightly-20260930-7e6adcc", "0.1.0"];
+
+    // when / then
+    assert.deepEqual(nightlyUpgradeOrigins("example/courtside", tags),
+      [{ ref: "2a3b6f7", image: "ghcr.io/example/courtside:nightly-20260924-2a3b6f7" }]);
+    assert.deepEqual(nightlyUpgradeOrigins("example/courtside", ["nightly", "release-candidate-5c0a946e"]), [],
+      "without a dated nightly there is nothing to upgrade from");
+  });

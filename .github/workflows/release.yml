@@ -300,7 +300,8 @@ jobs:
         run: |
           origins=$(node tools/courtside.upgrade-smoke.mjs --origins "$GITHUB_REF_NAME" \
             "$PUBLISHED_TAGS")
-          echo "origins=$origins" >> "$GITHUB_OUTPUT"
+          echo "origins=$(node tools/courtside.upgrade-smoke.mjs --release-origins "$GITHUB_REPOSITORY" \
+            "$origins")" >> "$GITHUB_OUTPUT"
           printf '\n## Supported database upgrade origins\n\n' >> build/release-body.md
           node -e 'const origins = JSON.parse(process.argv[1]);
             if (origins.length === 0) console.log("None; no stable release precedes this one.");
@@ -310,7 +311,7 @@ jobs:
         with:
           name: image-input
           path: build
-          retention-days: 1
+          retention-days: 14
 
       # The assessment seeds from an image built on the candidate, and this job is the only one that
       # compiles the fixture classes that image adds.
@@ -621,49 +622,10 @@ jobs:
       qualification-artifact-prefix: image-qualification-
       fixtures-artifact: assessment-fixtures
       security-base-artifact: release-security-base
-
-  upgrade:
-    needs: [build, image]
-    if: needs.build.outputs.upgrade-origins != '[]'
-    strategy:
-      fail-fast: false
-      matrix:
-        origin: ${{ fromJSON(needs.build.outputs.upgrade-origins) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      packages: read
-    env:
-      COURTSIDE_UPGRADE_CANDIDATE_IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
-      COURTSIDE_UPGRADE_ORIGIN: ${{ matrix.origin }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: ./.github/actions/tool-dependencies
-
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Prove the database upgrade path
-        run: node tools/courtside.upgrade-smoke.mjs --confirm courtside-upgrade
-
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: always()
-        with:
-          name: database-upgrade-${{ matrix.origin }}
-          path: build/database-upgrade
-          retention-days: 14
-          if-no-files-found: error
+      upgrade-origins: ${{ needs.build.outputs.upgrade-origins }}
 
   publish:
-    needs: [archive, build, browser, image, qualify, gates, upgrade]
+    needs: [archive, build, browser, image, qualify, gates]
     if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -814,6 +776,16 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        with:
+          body_path: build/release-body.md
+          draft: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            src/main/resources/api/openapi.yaml
+            build/security-record.json
+            build/courtside-deployment-*
+
       - name: Publish release tags without rebuilding
         env:
           IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
@@ -827,11 +799,14 @@ jobs:
             --tag "ghcr.io/${{ github.repository }}:booking-seed-${GITHUB_REF_NAME#v}" \
             "$BOOKING_SEED_IMAGE"
 
-      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
-        with:
-          body_path: build/release-body.md
-          prerelease: ${{ contains(github.ref_name, '-') }}
-          files: |
-            src/main/resources/api/openapi.yaml
-            build/security-record.json
-            build/courtside-deployment-*
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
+
+  plan-sync:
+    needs: publish
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/release-plan-sync.yml

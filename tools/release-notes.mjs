@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
+export const RELEASE_NOTES_LIMIT = 120000;
 const TAG_PATTERN = /^v(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/;
 const HEADING_PATTERN = /^##\s+\[?(\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?)\]?(?:\(|\s|$)/gm;
 
@@ -29,6 +30,10 @@ export function cumulativeReleaseNotes(changelog, tag) {
   const notes = changelog.slice(start, followingHeading?.index).trimEnd();
   if (line === "0.1.0" && /^### .*BREAKING CHANGES/m.test(notes)) {
     throw new Error("the initial 0.1.0 release must not claim breaking changes");
+  }
+  if (notes.length > RELEASE_NOTES_LIMIT) {
+    throw new Error(`the ${line} release notes have ${notes.length} characters; GitHub accepts a release body of `
+      + `125000 and the build appends its upgrade sections`);
   }
   return `${notes}\n`;
 }

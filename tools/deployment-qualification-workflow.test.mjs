@@ -54,7 +54,7 @@ test("given the self-hosted mail recipe, when a release is cut, then its control
   assert.match(gates, /node tools\/courtside\.mail-smoke\.mjs/);
   assert.match(release, /\n  gates:\n    needs: \[build, image, archive, qualify\]/);
   assert.match(release, /archive-artifact: deployment-archive/);
-  assert.match(release, /needs: \[archive, build, browser, image, qualify, gates, upgrade\]/);
+  assert.match(release, /needs: \[archive, build, browser, image, qualify, gates\]/);
 });
 
 test("given main or nightly qualification, when the image is exercised, then a candidate archive is inspected on both architectures", () => {

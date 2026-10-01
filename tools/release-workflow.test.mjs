@@ -31,7 +31,7 @@ test("given a release image, when publishing it, then the same digest is qualifi
   assert.match(workflow, /node tools\/courtside\.uat-smoke\.mjs --confirm courtside-uat/);
   assert.match(workflow, /\n  gates:\n    needs: \[build, image, archive, qualify\]/);
   assert.match(gatesWorkflow, /\n  security-record:\n    needs: active-security/);
-  assert.match(workflow, /\n  publish:\n    needs: \[archive, build, browser, image, qualify, gates, upgrade\]/);
+  assert.match(workflow, /\n  publish:\n    needs: \[archive, build, browser, image, qualify, gates\]/);
 });
 
 test("given a release build, when acceptance fixtures are published, then a separate digest-bound image enters the archive", () => {
@@ -119,7 +119,11 @@ test("given a qualified manifest, when publishing it, then tags and signatures a
   assert.match(publish, /node tools\/security-supply-chain\.mjs/);
   assert.ok(publish.indexOf("cosign sign") < publish.indexOf("docker buildx imagetools create"));
   assert.ok(publish.indexOf("security-supply-chain.mjs") < publish.indexOf("docker buildx imagetools create"));
-  assert.ok(publish.indexOf("docker buildx imagetools create") < publish.indexOf("softprops/action-gh-release"));
+  assert.ok(publish.indexOf("softprops/action-gh-release") < publish.indexOf("docker buildx imagetools create"),
+    "a release whose assets fail to upload must not leave version tags behind");
+  assert.match(publish, /softprops\/action-gh-release[^\n]*\n\s+with:\n\s+body_path: build\/release-body\.md\n\s+draft: true/);
+  assert.ok(publish.indexOf("docker buildx imagetools create") < publish.indexOf("--draft=false"),
+    "the release becomes visible only after its image tags exist");
 });
 
 test("given a tag, when the release runs, then it demands a nightly that verified the commit", () => {
@@ -366,8 +370,9 @@ test("given the amd64 qualification, when the active assessment reads it, then t
 
 test("given no upgrade origin, when a first release runs, then the upgrade job is skipped and publish still runs", () => {
   // then
-  assert.equal(releaseJobs.upgrade.if, "needs.build.outputs.upgrade-origins != '[]'");
-  assert.ok(releaseJobs.publish.needs.includes("upgrade"), "publish still waits for any upgrade that runs");
+  assert.equal(releaseJobs.gates.with["upgrade-origins"], "${{ needs.build.outputs.upgrade-origins }}",
+    "the release proves its own origins with the job the night runs");
+  assert.ok(releaseJobs.publish.needs.includes("gates"), "publish still waits for any upgrade that runs");
   assert.equal(releaseJobs.publish.if, "${{ !cancelled() && !failure() }}",
     "a skipped upgrade does not skip publish, a failed one stops it");
 });
@@ -389,3 +394,29 @@ test("given a job that runs the Maven-pinned node, when it starts, then an earli
   assert.deepEqual(offenders, [],
     "these jobs call frontend/node/node, which only a Maven build or install-node-and-npm puts there");
 });
+
+test("given no release passes upgrade origins, when the gates run at night, then they upgrade from the oldest "
+  + "retained nightly", () => {
+  // given
+  const gates = yaml.load(gatesWorkflow);
+  const call = (gates.on ?? gates[true]).workflow_call.inputs["upgrade-origins"];
+  const resolve = gates.jobs["upgrade-origins"].steps.find((step) => step.id === "resolve").run;
+
+  // when / then
+  assert.equal(call.default, "nightly", "build.yml and the branch rehearsal pass no origins and must still rehearse");
+  assert.match(resolve, /--nightly-origins "\$GITHUB_REPOSITORY"/);
+  assert.match(resolve, /test "\$origins" != '\[\]'/, "a night that found no origin must not pass silently");
+  assert.deepEqual(gates.jobs.upgrade.needs, "upgrade-origins");
+});
+
+test("given a published release, when it finishes, then the release plan is synchronized by the release itself",
+  () => {
+    // given
+    const jobs = yaml.load(workflow).jobs;
+
+    // when / then
+    assert.equal(jobs["plan-sync"].uses, "./.github/workflows/release-plan-sync.yml",
+      "a release published with the workflow token triggers no release event");
+    assert.equal(jobs["plan-sync"].needs, "publish");
+    assert.equal(jobs["plan-sync"].permissions.issues, "write");
+  });

@@ -60,7 +60,7 @@ test("given a release candidate, when release qualification runs, then restore b
   assert.match(gates, /!build\/database-restore\/\*\*\/\*\.sql/);
   assert.match(release, /\n  gates:\n[\s\S]+?uses: \.\/\.github\/workflows\/release-gates\.yml/);
   assert.match(release, /image-digest: \$\{\{ needs\.image\.outputs\.digest \}\}/);
-  assert.match(release, /needs: \[archive, build, browser, image, qualify, gates, upgrade\]/);
+  assert.match(release, /needs: \[archive, build, browser, image, qualify, gates\]/);
 });
 
 test("given the recurring restore workflow, when it runs, then evidence is retained", () => {

@@ -201,9 +201,11 @@ test("given a draft the pipeline has to publish, when the release is written, th
 
     // when / then
     assert.ok(publish, "nothing writes the GitHub release, so the draft would stand for ever");
-    assert.equal(publish.with.draft, undefined,
-      "setting it at all keeps the release a draft; omitting it is what publishes the one"
-      + " release-please created");
+    const steps = workflow.jobs.publish.steps;
+    const visible = steps.findIndex((step) => /gh release edit "\$GITHUB_REF_NAME"[^\n]*--draft=false/.test(step.run ?? ""));
+    assert.equal(publish.with.draft, true, "the assets reach the release while it is still a draft");
+    assert.ok(visible > steps.indexOf(publish), "a later step must publish the draft, or it stands for ever");
+    assert.equal(visible, steps.length - 1, "the release becomes visible only once everything before it passed");
     assert.equal(publish.with.prerelease, "${{ contains(github.ref_name, '-') }}",
       "a candidate is marked here rather than by release-please, which knows only the strategy");
   });
