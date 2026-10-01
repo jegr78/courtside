@@ -8,6 +8,7 @@
 
 
 
+
 ### Notable changes
 
 * bundled PostgreSQL 18 deployments bind the generated COURTSIDE_DATABASE_VOLUME explicitly.
@@ -186,6 +187,8 @@
 * write to a member in the language they read ([#447](https://github.com/jegr78/courtside/issues/447)) ([596ce57](https://github.com/jegr78/courtside/commit/596ce576320ebf65ae3727d3e5059afdac42c5ef))
 
 ### Bug fixes
+
+* run every release step before a release depends on it ([#1220](https://github.com/jegr78/courtside/issues/1220)) ([580ea2e](https://github.com/jegr78/courtside/commit/580ea2e73e0b3653295950d1ef1dae7532aee148))
 
 * keep API requests and responses inside the published contract ([#1215](https://github.com/jegr78/courtside/issues/1215)) ([ecab9ec](https://github.com/jegr78/courtside/commit/ecab9ecd4ab454c90c11a1e8810735a6b96cac29))
 * keep the mail server's logs when the mail smoke fails ([#1219](https://github.com/jegr78/courtside/issues/1219)) ([91740c9](https://github.com/jegr78/courtside/commit/91740c903a21e44553a4ea912e92e9f39f11e4b5))
