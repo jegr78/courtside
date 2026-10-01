@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly configuration_schema=1
-readonly usage="usage: courtside [--directory <path>] <init|reconfigure|backup|restore-check|update|update-check|adopt|rotate-secret|mail-check|seed-bookings|doctor|up|status|finalize-bootstrap|diagnose|uninstall> [options]"
+readonly usage="usage: courtside [--directory <path>] <init|reconfigure|backup|prune|restore-check|update|update-check|adopt|rotate-secret|mail-check|seed-bookings|doctor|up|status|finalize-bootstrap|diagnose|uninstall> [options]"
 script_path=${BASH_SOURCE[0]}
 case "$script_path" in
   */*) script_parent=${script_path%/*} ;;
@@ -1075,11 +1075,13 @@ backup_mail_stores() {
 }
 
 prune_recovery_units() {
-  local retain=$1 path candidate
+  local retain=$1 dry_run=${2:-false} path candidate
   local units=()
-  while IFS= read -r path; do units+=("$path"); done \
-    < <(printf '%s\n' "$installation_directory"/backups/recovery-* | sort)
-  [ "${units[0]:-}" != "$installation_directory/backups/recovery-*" ] || return 0
+  for path in "$installation_directory"/backups/recovery-*; do
+    [[ "${path##*/}" =~ ^recovery-[0-9]{8}T[0-9]{6}Z-[0-9A-Za-z.+-]+-[0-9]+$ ]] && [ -d "$path" ] \
+      && [ ! -L "$path" ] && units+=("$path")
+  done
+  [ "${#units[@]}" -gt 0 ] || return 0
   while [ "${#units[@]}" -gt "$retain" ]; do
     candidate=${units[0]}
     verify_recovery_unit "$candidate"
@@ -1087,14 +1089,75 @@ prune_recovery_units() {
       "$installation_directory"/backups/recovery-*) ;;
       *) refuse "retention resolved outside the configured backup directory" ;;
     esac
-    chmod -R u+w "$candidate"
-    rm -rf -- "$candidate"
+    if [ "$dry_run" = true ]; then
+      printf 'Would remove recovery unit %s\n' "$candidate"
+    else
+      chmod -R u+w "$candidate"
+      rm -rf -- "$candidate"
+      [ "${command:-}" != prune ] || printf 'Removed recovery unit %s\n' "$candidate"
+    fi
+    pruned=$((pruned + 1))
+    dropped_recovery_units="$dropped_recovery_units $candidate "
     units=("${units[@]:1}")
   done
 }
 
+prune_releases() {
+  local dry_run=$1 path release previous=""
+  local needed=" $config_release "
+  for path in "$installation_directory"/backups/recovery-*; do
+    [ -d "$path" ] && [ ! -L "$path" ] && [ -f "$path/recovery.conf" ] || continue
+    [[ "$dropped_recovery_units" != *" $path "* ]] || continue
+    release=$(recovery_value "$path/recovery.conf" release)
+    [[ "$release" =~ ^[0-9A-Za-z.+-]+$ ]] && needed="$needed$release "
+  done
+  for path in "$installation_directory"/releases/*; do
+    is_installed_release "$path" && [ "${path##*/}" != "$config_release" ] || continue
+    [ -z "$previous" ] || [ "$path" -nt "$previous" ] && previous=$path
+  done
+  [ -z "$previous" ] || needed="$needed${previous##*/} "
+  for path in "$installation_directory"/releases/*; do
+    is_installed_release "$path" || continue
+    release=${path##*/}
+    [[ "$needed" != *" $release "* ]] || continue
+    if [ "$dry_run" = true ]; then
+      printf 'Would remove release %s\n' "$release"
+    else
+      chmod -R u+w "$path"
+      rm -rf -- "$path"
+      printf 'Removed release %s\n' "$release"
+    fi
+    pruned=$((pruned + 1))
+  done
+}
+
+is_installed_release() {
+  [[ "${1##*/}" =~ ^[0-9A-Za-z.+-]+$ ]] && [ -d "$1" ] && [ ! -L "$1" ] && [ -f "$1/manifest.json" ]
+}
+
+command_prune() {
+  local retain=7 dry_run=false
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --retain) [ $# -ge 2 ] || refuse "--retain needs a count"; retain=$2; shift 2 ;;
+      --dry-run) dry_run=true; shift ;;
+      *) refuse "unknown prune option $1" ;;
+    esac
+  done
+  [[ "$retain" =~ ^[1-9][0-9]*$ ]] || refuse "prune retention must be a positive count"
+  acquire_lock
+  load_configuration
+  [ "$(readlink "$installation_directory/current")" = "releases/$config_release" ] \
+    || refuse "$installation_directory/current does not select releases/$config_release"
+  pruned=0
+  dropped_recovery_units=""
+  prune_recovery_units "$retain" "$dry_run"
+  prune_releases "$dry_run"
+  [ "$pruned" -gt 0 ] || printf 'Nothing to remove\n'
+}
+
 create_backup() {
-  local retain=$1 staging final timestamp path effective_image image_trust=official
+  local retain=$1 pruned=0 dropped_recovery_units="" staging final timestamp path effective_image image_trust=official
   load_configuration
   compose_command
   mkdir -p "$installation_directory/backups"
@@ -2724,6 +2787,7 @@ case "$command" in
   init) command_init "$@" ;;
   reconfigure) command_reconfigure "$@" ;;
   backup) command_backup "$@" ;;
+  prune) command_prune "$@" ;;
   restore-check) command_restore_check "$@" ;;
   update) command_update "$@" ;;
   update-check) command_update_check "$@" ;;
