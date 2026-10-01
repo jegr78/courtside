@@ -1077,9 +1077,11 @@ backup_mail_stores() {
 prune_recovery_units() {
   local retain=$1 dry_run=${2:-false} path candidate
   local units=()
-  while IFS= read -r path; do units+=("$path"); done \
-    < <(printf '%s\n' "$installation_directory"/backups/recovery-* | sort)
-  [ "${units[0]:-}" != "$installation_directory/backups/recovery-*" ] || return 0
+  for path in "$installation_directory"/backups/recovery-*; do
+    [[ "${path##*/}" =~ ^recovery-[0-9]{8}T[0-9]{6}Z-[0-9A-Za-z.+-]+-[0-9]+$ ]] && [ -d "$path" ] \
+      && [ ! -L "$path" ] && units+=("$path")
+  done
+  [ "${#units[@]}" -gt 0 ] || return 0
   while [ "${#units[@]}" -gt "$retain" ]; do
     candidate=${units[0]}
     verify_recovery_unit "$candidate"
@@ -1095,30 +1097,42 @@ prune_recovery_units() {
       [ "${command:-}" != prune ] || printf 'Removed recovery unit %s\n' "$candidate"
     fi
     pruned=$((pruned + 1))
+    dropped_recovery_units="$dropped_recovery_units $candidate "
     units=("${units[@]:1}")
   done
-  kept_recovery_units=("${units[@]}")
 }
 
 prune_releases() {
-  local dry_run=$1 release_path release unit
+  local dry_run=$1 path release previous=""
   local needed=" $config_release "
-  for unit in ${kept_recovery_units[@]+"${kept_recovery_units[@]}"}; do
-    needed="$needed$(recovery_value "$unit/recovery.conf" release) "
+  for path in "$installation_directory"/backups/recovery-*; do
+    [ -d "$path" ] && [ ! -L "$path" ] && [ -f "$path/recovery.conf" ] || continue
+    [[ "$dropped_recovery_units" != *" $path "* ]] || continue
+    release=$(recovery_value "$path/recovery.conf" release)
+    [[ "$release" =~ ^[0-9A-Za-z.+-]+$ ]] && needed="$needed$release "
   done
-  for release_path in "$installation_directory"/releases/*; do
-    [ -d "$release_path" ] && [ ! -L "$release_path" ] || continue
-    release=${release_path##*/}
+  for path in "$installation_directory"/releases/*; do
+    is_installed_release "$path" && [ "${path##*/}" != "$config_release" ] || continue
+    [ -z "$previous" ] || [ "$path" -nt "$previous" ] && previous=$path
+  done
+  [ -z "$previous" ] || needed="$needed${previous##*/} "
+  for path in "$installation_directory"/releases/*; do
+    is_installed_release "$path" || continue
+    release=${path##*/}
     [[ "$needed" != *" $release "* ]] || continue
     if [ "$dry_run" = true ]; then
       printf 'Would remove release %s\n' "$release"
     else
-      chmod -R u+w "$release_path"
-      rm -rf -- "$release_path"
+      chmod -R u+w "$path"
+      rm -rf -- "$path"
       printf 'Removed release %s\n' "$release"
     fi
     pruned=$((pruned + 1))
   done
+}
+
+is_installed_release() {
+  [[ "${1##*/}" =~ ^[0-9A-Za-z.+-]+$ ]] && [ -d "$1" ] && [ ! -L "$1" ] && [ -f "$1/manifest.json" ]
 }
 
 command_prune() {
@@ -1135,15 +1149,15 @@ command_prune() {
   load_configuration
   [ "$(readlink "$installation_directory/current")" = "releases/$config_release" ] \
     || refuse "$installation_directory/current does not select releases/$config_release"
-  kept_recovery_units=()
   pruned=0
+  dropped_recovery_units=""
   prune_recovery_units "$retain" "$dry_run"
   prune_releases "$dry_run"
   [ "$pruned" -gt 0 ] || printf 'Nothing to remove\n'
 }
 
 create_backup() {
-  local retain=$1 pruned=0 staging final timestamp path effective_image image_trust=official
+  local retain=$1 pruned=0 dropped_recovery_units="" staging final timestamp path effective_image image_trust=official
   load_configuration
   compose_command
   mkdir -p "$installation_directory/backups"

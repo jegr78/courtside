@@ -55,10 +55,10 @@ auf 18 stellt der Launcher den Dump dagegen in einem neuen Volume wieder her und
 fehlgeschlagenen Zielstart automatisch das unangetastete PostgreSQL-17-Volume. Bewahre die vorherige
 Release-Version auf und prüfe die Wiederherstellung regelmäßig auf einem leeren PostgreSQL-18-Ziel.
 
-Alte Releases und Recovery Units räumt `prune` auf. Es behält die neuesten Recovery Units (sieben,
-wenn `--retain` nichts anderes sagt), das laufende Release und jedes Release, das eine behaltene
-Recovery Unit zum Prüfen braucht. Nach einem Update ist das die vorherige Version. `--dry-run`
-zeigt vorher, was wegfiele:
+Alte Releases und Recovery Units räumt `prune` auf. Es behält die neuesten Recovery Units, sieben,
+wenn `--retain` nichts anderes sagt. Eine Recovery Unit, die du selbst kopiert oder umbenannt hast,
+lässt es stehen. Es behält das laufende Release, die Version vor dem letzten Update und jedes Release,
+das eine verbleibende Recovery Unit zum Prüfen braucht. `--dry-run` zeigt vorher, was wegfiele:
 
 ```sh
 /srv/courtside/current/courtside prune --retain 3 --dry-run

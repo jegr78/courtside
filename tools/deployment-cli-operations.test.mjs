@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, utimesSync,
-  writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync,
+  utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -528,5 +528,91 @@ test("given a retention that is not a positive count, when prune starts, then it
       assert.match(result.stderr, /prune retention must be a positive count/);
     }
     assert.deepEqual(readdirSync(join(context.target, "releases")).sort(), ["0.1.0", "0.1.1", "0.1.2"]);
+    assert.equal(readdirSync(join(context.target, "backups")).filter((name) => name.startsWith("recovery-")).length, 2);
+  });
+});
+
+test("given an operator's own copy and a stray file beside the recovery units, when prune keeps one unit, then "
+  + "neither counts against retention and the release the copy restores stays", () => {
+  fixture((context) => {
+    // given
+    const units = updatedTwice(context);
+    const backups = join(context.target, "backups");
+    cpSync(join(backups, units[0]), join(backups, "recovery-keep-before-pg18"), { recursive: true });
+    writeFileSync(join(backups, "recovery-notes"), "operator notes\n");
+
+    // when
+    const result = run(context.archive, context.target, ["prune", "--retain", "1"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readdirSync(backups).sort(), [units[1], "recovery-keep-before-pg18", "recovery-notes"].sort(),
+      "a name prune did not write is the operator's, and sorting it as newest would delete the real newest unit");
+    assert.deepEqual(readdirSync(join(context.target, "releases")).sort(), ["0.1.0", "0.1.1", "0.1.2"],
+      "the copy still restores 0.1.0");
+  });
+});
+
+test("given backups that rotated away the update's unit, when prune runs, then the release the last update "
+  + "replaced stays beside the current one", () => {
+  fixture((context) => {
+    // given
+    updatedTwice(context);
+    for (const [release, seconds] of [["0.1.0", 1000], ["0.1.1", 2000], ["0.1.2", 3000]]) {
+      utimesSync(join(context.target, "releases", release), seconds, seconds);
+    }
+    for (let backup = 0; backup < 2; backup += 1) {
+      const result = run(context.archive, context.target, ["backup", "--retain", "1"], context.environment);
+      assert.equal(result.status, 0, result.stderr);
+    }
+
+    // when
+    const result = run(context.archive, context.target, ["prune", "--retain", "1"], context.environment);
+
+    // then
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readdirSync(join(context.target, "releases")).sort(), ["0.1.1", "0.1.2"],
+      "going back to the previous release, or to its PostgreSQL volume, needs that release installed");
+  });
+});
+
+test("given entries in releases that are not installed releases, when prune runs, then it leaves them alone",
+  () => {
+    fixture((context) => {
+      // given
+      updatedTwice(context);
+      const releases = join(context.target, "releases");
+      chmodSync(releases, 0o700);
+      mkdirSync(join(releases, "operator notes"));
+      mkdirSync(join(releases, "0.0.9"));
+      symlinkSync(join(context.root), join(releases, "0.0.8"));
+
+      // when
+      const result = run(context.archive, context.target, ["prune", "--retain", "1"], context.environment);
+
+      // then
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(readdirSync(releases).sort(), ["0.0.8", "0.0.9", "0.1.1", "0.1.2", "operator notes"],
+        "only a directory with a release name and a manifest is a release prune may remove");
+      assert.ok(existsSync(context.root), "a link's target is never touched");
+    });
+  });
+
+test("given current selecting another release than the configuration names, when prune starts, then it removes "
+  + "nothing", () => {
+  fixture((context) => {
+    // given
+    updatedTwice(context);
+    rmSync(join(context.target, "current"));
+    symlinkSync("releases/0.1.0", join(context.target, "current"));
+
+    // when
+    const result = run(context.archive, context.target, ["prune", "--retain", "1"], context.environment);
+
+    // then
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /current does not select releases\/0\.1\.2/);
+    assert.deepEqual(readdirSync(join(context.target, "releases")).sort(), ["0.1.0", "0.1.1", "0.1.2"]);
+    assert.equal(readdirSync(join(context.target, "backups")).filter((name) => name.startsWith("recovery-")).length, 2);
   });
 });
