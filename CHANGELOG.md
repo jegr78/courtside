@@ -7,6 +7,7 @@
 
 
 
+
 ### Notable changes
 
 * bundled PostgreSQL 18 deployments bind the generated COURTSIDE_DATABASE_VOLUME explicitly.
@@ -19,6 +20,8 @@
 * **api:** validation codes in fieldErrors entries change for missing, blank, non-positive and unknown-enum values, and field names now carry array indices. The problem type, the status and the fieldErrors shape are unchanged.
 
 ### Features
+
+* rehearse every release gate nightly and require the rehearsal ([#1217](https://github.com/jegr78/courtside/issues/1217)) ([7e6adcc](https://github.com/jegr78/courtside/commit/7e6adccf11cae02dfbfd327e552f942779fac721))
 
 * add administrator operational logs ([#1075](https://github.com/jegr78/courtside/issues/1075)) ([4176c4e](https://github.com/jegr78/courtside/commit/4176c4ea68cae015b6ba7889f609a8f9c8f391b6))
 * add configurable documentation link ([#1096](https://github.com/jegr78/courtside/issues/1096)) ([c154310](https://github.com/jegr78/courtside/commit/c1543108817fb908fddc793cd63fc11fd785d52f))
@@ -183,6 +186,9 @@
 * write to a member in the language they read ([#447](https://github.com/jegr78/courtside/issues/447)) ([596ce57](https://github.com/jegr78/courtside/commit/596ce576320ebf65ae3727d3e5059afdac42c5ef))
 
 ### Bug fixes
+
+* keep API requests and responses inside the published contract ([#1215](https://github.com/jegr78/courtside/issues/1215)) ([ecab9ec](https://github.com/jegr78/courtside/commit/ecab9ecd4ab454c90c11a1e8810735a6b96cac29))
+* keep the mail server's logs when the mail smoke fails ([#1219](https://github.com/jegr78/courtside/issues/1219)) ([91740c9](https://github.com/jegr78/courtside/commit/91740c903a21e44553a4ea912e92e9f39f11e4b5))
 
 * apply the base distribution's security updates when building the image ([#1213](https://github.com/jegr78/courtside/issues/1213)) ([2a3b6f7](https://github.com/jegr78/courtside/commit/2a3b6f75880d8dfefd760f519b93563ee97c4e91))
 
