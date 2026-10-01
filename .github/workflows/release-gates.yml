@@ -353,6 +353,7 @@ jobs:
         env:
           REQUESTED: ${{ inputs.upgrade-origins }}
           SOURCE_COMMIT: ${{ inputs.source-commit }}
+        shell: bash
         run: |
           if [ "$REQUESTED" = nightly ]; then
             token=$(curl -fsS "https://ghcr.io/token?scope=repository:$GITHUB_REPOSITORY:pull" | jq -r .token)

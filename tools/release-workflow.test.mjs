@@ -407,6 +407,8 @@ test("given no release passes upgrade origins, when the gates run at night, then
   assert.match(resolve, /--nightly-origins "\$GITHUB_REPOSITORY"/);
   assert.match(resolve, /test "\$origins" != '\[\]'/, "a night that found no origin must not pass silently");
   assert.deepEqual(gates.jobs.upgrade.needs, "upgrade-origins");
+  assert.equal(gates.jobs["upgrade-origins"].steps.find((step) => step.id === "resolve").shell, "bash",
+    "GitHub adds pipefail only to an explicit bash shell, so a failed registry request would read as bad JSON");
 });
 
 test("given a published release, when it finishes, then the release plan is synchronized by the release itself",

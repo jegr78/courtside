@@ -622,3 +622,32 @@ test("given the release's supply-chain verification, when the nightly publishes,
   assert.equal(releaseChecks.length, 6, "the release verifies a signature, a provenance and an SBOM attestation per image");
   assert.deepEqual(nightlyChecks, releaseChecks, "the release would run a verification the night never ran");
 });
+
+test("given the release trusts the verifiers' exit codes, when it verifies, then every call pins identity, "
+  + "source and digest", () => {
+  // given
+  const verify = yaml.load(release).jobs.publish.steps.find((step) => step.name === "Verify release supply-chain evidence");
+  const commands = verify.run.split(/\n(?=\s*(?:cosign|gh|node) )/);
+  const cosign = commands.filter((command) => command.startsWith("cosign verify"));
+  const attestations = commands.filter((command) => command.startsWith("gh attestation verify"));
+
+  // when / then
+  assert.equal(cosign.length, 2, "both images carry a signature");
+  assert.equal(attestations.length, 5, "provenance and SBOM for both images, and the archive's provenance");
+  for (const command of cosign) {
+    assert.match(command, /--certificate-identity "https:\/\/github\.com\/\$GITHUB_REPOSITORY\/\.github\/workflows\/release\.yml@\$GITHUB_REF"/,
+      "without the identity any repository's signature would pass");
+    assert.match(command, /--certificate-oidc-issuer https:\/\/token\.actions\.githubusercontent\.com/);
+  }
+  for (const command of attestations) {
+    for (const flag of [/--repo "\$GITHUB_REPOSITORY"/, /--signer-workflow "\$GITHUB_REPOSITORY\/\.github\/workflows\/release\.yml"/,
+      /--source-ref "\$GITHUB_REF"/, /--source-digest "\$GITHUB_SHA"/]) {
+      assert.match(command, flag, `an attestation verified without ${flag} proves less than the release records`);
+    }
+    if (command.includes("oci://")) assert.match(command, /--predicate-type https:\/\/\S+/);
+  }
+  for (const image of ["IMAGE", "BOOKING_SEED_IMAGE"]) {
+    assert.match(verify.env[image], /@\$\{\{ needs\.image\.outputs\.(?:booking-seed-)?digest \}\}$/,
+      "a tag instead of a digest would verify whatever the tag points to now");
+  }
+});

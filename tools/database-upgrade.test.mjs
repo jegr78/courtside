@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   selectRepositoryDigest,
   publishedTags,
+  gitHistory,
   nightlyUpgradeOrigins,
   previousReleaseTag,
   releaseUpgradeOrigins,
@@ -352,3 +356,42 @@ test("given the retained dated nightlies, when the night rehearses an upgrade, t
     assert.deepEqual(nightlyUpgradeOrigins("example/courtside", ["nightly"], history), [],
       "without a dated nightly there is nothing to upgrade from");
   });
+
+test("given a history where a shipped migration was corrected, when git is asked, then only origins before an "
+  + "addition qualify and commit time orders them", () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-upgrade-history-"));
+  const git = (args, date = "2026-09-01T00:00:00Z") => execFileSync("git", args, { cwd: directory, encoding: "utf8",
+    env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date, GIT_AUTHOR_NAME: "Jane Doe",
+      GIT_AUTHOR_EMAIL: "jane@example.org", GIT_COMMITTER_NAME: "Jane Doe", GIT_COMMITTER_EMAIL: "jane@example.org" }
+  }).trim();
+  const commit = (path, content, date) => {
+    mkdirSync(join(directory, path, ".."), { recursive: true });
+    writeFileSync(join(directory, path), content);
+    git(["add", "."], date);
+    git(["commit", "-q", "-m", path], date);
+    return git(["rev-parse", "--short", "HEAD"]);
+  };
+  const migration = "src/main/resources/db/migration";
+
+  try {
+    git(["init", "-q"]);
+    const first = commit(`${migration}/V1__base.sql`, "create table a();", "2026-09-01T00:00:00Z");
+    const added = commit(`${migration}/V2__more.sql`, "create table b();", "2026-09-02T00:00:00Z");
+    const verified = commit("upgrade/verify.sql", "select 1;", "2026-09-03T00:00:00Z");
+    const corrected = commit(`${migration}/V1__base.sql`, "create table a(id int);", "2026-09-04T00:00:00Z");
+
+    // when
+    const beforeCorrection = gitHistory(verified, directory);
+    const afterCorrection = gitHistory(corrected, directory);
+
+    // then
+    assert.ok(beforeCorrection.unchangedSince(first), "a migration added later does not disqualify an origin");
+    assert.ok(beforeCorrection.committedAt(first) < beforeCorrection.committedAt(added));
+    assert.ok(!afterCorrection.unchangedSince(added), "Flyway would refuse V1's changed checksum");
+    assert.ok(afterCorrection.unchangedSince(corrected));
+    assert.ok(!afterCorrection.unchangedSince("0000000"), "a commit this checkout lacks is never an origin");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
