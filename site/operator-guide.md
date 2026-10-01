@@ -55,6 +55,16 @@ auf 18 stellt der Launcher den Dump dagegen in einem neuen Volume wieder her und
 fehlgeschlagenen Zielstart automatisch das unangetastete PostgreSQL-17-Volume. Bewahre die vorherige
 Release-Version auf und prüfe die Wiederherstellung regelmäßig auf einem leeren PostgreSQL-18-Ziel.
 
+Alte Releases und Recovery Units räumt `prune` auf. Es behält die neuesten Recovery Units (sieben,
+wenn `--retain` nichts anderes sagt), das laufende Release und jedes Release, das eine behaltene
+Recovery Unit zum Prüfen braucht. Nach einem Update ist das die vorherige Version. `--dry-run`
+zeigt vorher, was wegfiele:
+
+```sh
+/srv/courtside/current/courtside prune --retain 3 --dry-run
+/srv/courtside/current/courtside prune --retain 3
+```
+
 Für Abnahmetests stellt jeder Nightly-Lauf, der ein neues Image baut und qualifiziert, 14 Tage lang
 das Artefakt `nightly-deployment-archive` bereit. Lade es aus einem erfolgreichen Lauf auf `main`.
 Seine Version `<Release-Kern>-nightly.<Lauf-ID>` kann der Launcher eindeutig mit späteren Nightlies

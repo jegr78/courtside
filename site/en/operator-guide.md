@@ -54,6 +54,15 @@ instead restores the dump into a new volume and automatically reactivates the un
 17 volume when target startup fails. Retain the previous release and regularly test recovery against
 an empty PostgreSQL 18 target.
 
+`prune` removes old releases and recovery units. It keeps the newest recovery units (seven unless
+`--retain` says otherwise), the current release and every release a kept recovery unit needs to be
+checked, which after an update is the previous version. `--dry-run` shows first what would go:
+
+```sh
+/srv/courtside/current/courtside prune --retain 3 --dry-run
+/srv/courtside/current/courtside prune --retain 3
+```
+
 For acceptance testing, each nightly run that builds and qualifies a new image retains
 `nightly-deployment-archive` for 14 days. Download it from a successful `main` run. Its
 `<release-core>-nightly.<run-id>` version gives the launcher an unambiguous order for later

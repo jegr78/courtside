@@ -121,6 +121,17 @@ values:
 ```
 
 `finalize-bootstrap` refuses until a checksummed recovery unit for the current release exists.
+
+Every update installs its release next to the previous ones and keeps them. `prune` removes what is
+no longer needed: recovery units beyond the newest `--retain` (seven by default, as for `backup`),
+and every release that is neither current nor named by a recovery unit it keeps. `restore-check`
+trusts only the installed release a unit names, so such a release stays until its last unit goes.
+`--dry-run` lists what would be removed without removing it:
+
+```sh
+/srv/courtside/current/courtside prune --retain 3 --dry-run
+/srv/courtside/current/courtside prune --retain 3
+```
 `uninstall --keep-data --yes` removes containers without requesting Compose volume deletion and
 leaves the installation files in place. Destructive removal first prints the exact project, path
 and project-labelled volumes. It accepts only `uninstall --destroy --confirm 'delete <project> at
