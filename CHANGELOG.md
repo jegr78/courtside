@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-rc.8](https://github.com/jegr78/courtside/compare/v0.1.0-rc.7...v0.1.0-rc.8) (2026-10-01)
+
+
+### Bug fixes
+
+* run every release step before a release depends on it ([#1220](https://github.com/jegr78/courtside/issues/1220)) ([580ea2e](https://github.com/jegr78/courtside/commit/580ea2e73e0b3653295950d1ef1dae7532aee148))
+
 ## 0.1.0 (2026-09-14)
 
 
@@ -549,4 +556,3 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
-
