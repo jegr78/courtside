@@ -162,6 +162,8 @@ jobs:
         name: Exercise controlled Stalwart DNS, TLS and SMTP peers
         continue-on-error: true
         run: node tools/courtside.mail-smoke.mjs
+        env:
+          COURTSIDE_MAIL_SMOKE_LOGS: build/deployment-mail/server-logs
       - name: Record the Stalwart result
         if: always()
         env:

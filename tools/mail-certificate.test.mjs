@@ -284,3 +284,21 @@ test("given the setup check, when it reads the mail hostname's public record, th
       "an alias answers for every container sharing its network, so this check would read the mail "
       + "container's address as the host's A record and report its reverse name as missing");
   });
+
+test("given a failed mail smoke, when its workflow finishes, then the server logs survive the teardown",
+  () => {
+    // given
+    const gates = readFileSync(fileURLToPath(new URL("../.github/workflows/release-gates.yml",
+      import.meta.url)), "utf8");
+    const kept = smoke.indexOf("keepServerLogs();\n    throw error;");
+    const teardown = smoke.indexOf('compose(["down", "-v", "--remove-orphans"]');
+
+    // when / then
+    assert.ok(kept > 0 && kept < teardown, "the logs are gone once compose removes the containers");
+    assert.match(gates, /run: node tools\/courtside\.mail-smoke\.mjs\n\s+env:\n\s+COURTSIDE_MAIL_SMOKE_LOGS: build\/deployment-mail\/server-logs/,
+      "the release gate uploads build/deployment-mail and nothing else");
+    assert.match(mailWorkflow, /COURTSIDE_MAIL_SMOKE_LOGS: build\/mail-smoke/,
+      "the scheduled smoke must name where its logs go");
+    assert.match(mailWorkflow, /if: failure\(\)\n\s+uses: actions\/upload-artifact@[a-f0-9]{40}[^\n]*\n\s+with:\n\s+name: mail-smoke-logs\n\s+path: build\/mail-smoke/,
+      "the scheduled smoke keeps no artifact otherwise");
+  });
