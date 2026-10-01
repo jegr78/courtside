@@ -101,9 +101,22 @@ export function releaseUpgradeOrigins(repository, tags) {
   return tags.map((tag) => ({ ref: tag, image: `ghcr.io/${repository}:${tag.slice(1)}` }));
 }
 
-export function nightlyUpgradeOrigins(repository, tags) {
-  const oldest = tags.filter((tag) => /^nightly-\d{8}-[0-9a-f]{7,40}$/.test(tag)).sort()[0];
-  return oldest ? [{ ref: oldest.split("-").at(-1), image: `ghcr.io/${repository}:${oldest}` }] : [];
+export function nightlyUpgradeOrigins(repository, tags, history) {
+  const origin = tags
+    .filter((tag) => /^nightly-\d{8}-[0-9a-f]{7,40}$/.test(tag))
+    .map((tag) => ({ ref: tag.split("-").at(-1), image: `ghcr.io/${repository}:${tag}` }))
+    .filter((candidate) => history.unchangedSince(candidate.ref))
+    .sort((left, right) => history.committedAt(left.ref) - history.committedAt(right.ref))[0];
+  return origin ? [origin] : [];
+}
+
+// Flyway refuses a database whose applied migration changed, which a correction before the first release may do.
+function gitHistory(candidate) {
+  return {
+    committedAt: (ref) => Number(run("git", ["show", "-s", "--format=%ct", ref]).stdout.trim()),
+    unchangedSince: (ref) => run("git", ["diff", "--quiet", "--diff-filter=MDR", ref, candidate, "--",
+      "src/main/resources/db/migration", originVerification], { allowFailure: true }).status === 0
+  };
 }
 
 export function selectRepositoryDigest(repository, originTag, repoDigests) {
@@ -392,7 +405,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } else if (process.argv[2] === "--release-origins") {
     process.stdout.write(`${JSON.stringify(releaseUpgradeOrigins(process.argv[3], JSON.parse(process.argv[4])))}\n`);
   } else if (process.argv[2] === "--nightly-origins") {
-    process.stdout.write(`${JSON.stringify(nightlyUpgradeOrigins(process.argv[3], JSON.parse(process.argv[4])))}\n`);
+    process.stdout.write(`${JSON.stringify(nightlyUpgradeOrigins(process.argv[3], JSON.parse(process.argv[4]),
+      gitHistory(process.argv[5])))}\n`);
   } else if (process.argv[2] === "--previous-release") {
     process.stdout.write(`${previousReleaseTag(process.argv[3], JSON.parse(process.argv[4])) ?? ""}\n`);
   } else {

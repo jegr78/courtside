@@ -42,8 +42,10 @@ dispatched `build` rebuilds the nightly image even when the revision already car
 digest the rehearsal binds is qualified in the same run, and then calls `release-gates.yml` with it.
 That is the workflow the release's `gates` job calls, with the same jobs and commands:
 `archive-reproducibility`, `mail`, `active-security`, `security-record`, `restore`, `npm-audit` and
-`upgrade`. At night `upgrade` starts from the oldest dated nightly the registry still holds; a release
-passes the published versions it upgrades from instead.
+`upgrade`. At night `upgrade` starts from the earliest retained dated nightly whose migrations and
+`upgrade/verify.sql` the candidate still carries unchanged, because Flyway refuses a database whose
+applied migration was corrected in place; a release passes the published versions it upgrades from
+instead.
 The scheduled `security` job runs the release-build policy with npm audit evidence and the same
 command line as the release's `build` job. A push to `main` builds and qualifies its image but does not
 rehearse the gates.
@@ -53,8 +55,9 @@ A change to the gates is rehearsed before it merges. Dispatch `build` on the bra
 workflow rebuilds and qualifies the branch head, even one that already carries a published image, and
 calls `release-gates.yml` with it.
 
-Three steps need a real version tag and therefore run for the first time in a release: signing with
-the `release.yml` identity, the version tags on the registry, and writing the GitHub release. The
+Four steps need a real version and therefore run for the first time in a release: signing with
+the `release.yml` identity, the version tags on the registry, making the GitHub release visible, and,
+from the release after 0.1.0 on, an `upgrade` whose origin is a version tag rather than a nightly. The
 nightly `publish` runs the same signing, attestation and verification commands with the same output
 options under its own identity, and tags its image with the same `imagetools` command. The release
 keeps what `cosign verify` and `gh attestation verify` print as proof digests in the security record
@@ -235,7 +238,7 @@ Permission failures and malformed evidence still stop the build.
 | `browser` | The packaged tagged source passes the complete Chromium and WebKit browser matrix; it runs beside `build` so browser duration cannot consume the security-analysis budget |
 | `image` | One multi-architecture image is built and pushed as `release-candidate-<sha>` |
 | `qualify` | The exact deployment archive is checked against that digest and all four recipes, then the digest is brought up through the reference deployment on `amd64` and `arm64` and checked against the candidate-image policy |
-| `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the tagged tree and requires the same bytes. `npm-audit` holds the release npm policy `upgrade` migrates a database from each resolved origin into the candidate; the first release has none |
+| `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the tagged tree and requires the same bytes. `npm-audit` holds the release npm policy. `upgrade` migrates a database from each resolved origin into the candidate; the first release has none |
 | `archive` | `tools/deployment-archive.mjs` packs the reference deployment for that digest into `courtside-deployment-<version>.zip` |
 | `publish` | The qualified manifest is signed with cosign and given an SBOM and a provenance attestation; the draft release receives its assets, the version tags are pushed, and only then is the release made visible |
 | `plan-sync` | The release plan's status comment is synchronized with the release just published |
@@ -303,10 +306,10 @@ helps nobody at 22:00.
 The first public release has no upgrade origin, so its release body says that directly instead of
 turning development-time breaking markers into upgrade instructions.
 
-What no automation covers is the upgrade path itself. The `upgrade` gate executes the origins the
-release resolved from the published release history, so a release that breaks one of those is
-refused, but only those. The same job runs every night from the oldest retained dated nightly, so the
-mechanics are proven before the first release that has an origin needs them.
+The `upgrade` gate executes the origins the release resolved from the published release history, so
+a release that breaks one of those is refused, but only those. The same job runs every night from a
+retained dated nightly, so its mechanics are proven before the first release that has an origin needs
+them.
 
 `upgrade` reads `upgrade/fixtures/origin.sql` and `upgrade/verify.sql` from the origin's tag or commit, loads
 the fixture into the origin and compares what the origin's query saw with what the candidate's query

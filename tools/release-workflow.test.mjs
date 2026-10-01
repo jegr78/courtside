@@ -395,8 +395,8 @@ test("given a job that runs the Maven-pinned node, when it starts, then an earli
     "these jobs call frontend/node/node, which only a Maven build or install-node-and-npm puts there");
 });
 
-test("given no release passes upgrade origins, when the gates run at night, then they upgrade from the oldest "
-  + "retained nightly", () => {
+test("given no release passes upgrade origins, when the gates run at night, then they upgrade from a retained "
+  + "nightly", () => {
   // given
   const gates = yaml.load(gatesWorkflow);
   const call = (gates.on ?? gates[true]).workflow_call.inputs["upgrade-origins"];

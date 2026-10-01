@@ -345,18 +345,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.source-commit }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
       - id: resolve
         name: Resolve the database upgrade origins
         env:
           REQUESTED: ${{ inputs.upgrade-origins }}
+          SOURCE_COMMIT: ${{ inputs.source-commit }}
         run: |
           if [ "$REQUESTED" = nightly ]; then
             token=$(curl -fsS "https://ghcr.io/token?scope=repository:$GITHUB_REPOSITORY:pull" | jq -r .token)
             tags=$(curl -fsS -H "Authorization: Bearer $token" \
               "https://ghcr.io/v2/$GITHUB_REPOSITORY/tags/list?n=10000" | jq -c .tags)
-            origins=$(node tools/courtside.upgrade-smoke.mjs --nightly-origins "$GITHUB_REPOSITORY" "$tags")
+            origins=$(node tools/courtside.upgrade-smoke.mjs --nightly-origins "$GITHUB_REPOSITORY" "$tags" \
+              "$SOURCE_COMMIT")
             test "$origins" != '[]'
           else
             origins="$REQUESTED"

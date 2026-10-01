@@ -337,15 +337,18 @@ test("given published releases, when the release names its upgrade origins, then
   assert.deepEqual(releaseUpgradeOrigins("example/courtside", []), []);
 });
 
-test("given the retained dated nightlies, when the night rehearses an upgrade, then it starts from the oldest one",
-  () => {
+test("given the retained dated nightlies, when the night rehearses an upgrade, then it starts from the earliest "
+  + "one whose shipped migrations the candidate still carries unchanged", () => {
     // given
-    const tags = ["nightly", "nightly-20261001-91740c9", "release-candidate-5c0a946e", "nightly-20260924-2a3b6f7",
-      "booking-seed-nightly-20260920-0000000", "nightly-20260930-7e6adcc", "0.1.0"];
+    const tags = ["nightly", "nightly-20261001-91740c9", "release-candidate-5c0a946e", "nightly-20260930-2a3b6f7",
+      "booking-seed-nightly-20260920-0000000", "nightly-20260930-7e6adcc", "nightly-20260929-aaaaaaa", "0.1.0"];
+    const committedAt = { "91740c9": 40, "2a3b6f7": 20, "7e6adcc": 10, aaaaaaa: 5 };
+    const history = { committedAt: (ref) => committedAt[ref], unchangedSince: (ref) => ref !== "aaaaaaa" };
 
     // when / then
-    assert.deepEqual(nightlyUpgradeOrigins("example/courtside", tags),
-      [{ ref: "2a3b6f7", image: "ghcr.io/example/courtside:nightly-20260924-2a3b6f7" }]);
-    assert.deepEqual(nightlyUpgradeOrigins("example/courtside", ["nightly", "release-candidate-5c0a946e"]), [],
+    assert.deepEqual(nightlyUpgradeOrigins("example/courtside", tags, history),
+      [{ ref: "7e6adcc", image: "ghcr.io/example/courtside:nightly-20260930-7e6adcc" }],
+      "a migration corrected in place since aaaaaaa would fail Flyway's checksum, and 7e6adcc precedes 2a3b6f7");
+    assert.deepEqual(nightlyUpgradeOrigins("example/courtside", ["nightly"], history), [],
       "without a dated nightly there is nothing to upgrade from");
   });
