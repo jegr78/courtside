@@ -568,15 +568,17 @@ jobs:
           cosign verify \
             --certificate-identity "https://github.com/$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml@refs/heads/main" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            "$IMAGE" > /dev/null
+            --output json "$IMAGE" > build/signature-verification.json
           gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
             --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
-            --predicate-type https://slsa.dev/provenance/v1 > /dev/null
+            --predicate-type https://slsa.dev/provenance/v1 --format json \
+            > build/provenance-verification.json
           gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \
             --source-ref refs/heads/main --source-digest "$GITHUB_SHA" \
-            --predicate-type https://spdx.dev/Document/v2.3 > /dev/null
+            --predicate-type https://spdx.dev/Document/v2.3 --format json \
+            > build/sbom-verification.json
           gh attestation verify "oci://$IMAGE" --repo "$GITHUB_REPOSITORY" \
             --bundle-from-oci \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/nightly-image.yml" \

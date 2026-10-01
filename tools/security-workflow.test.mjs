@@ -600,3 +600,24 @@ test("given a scanner finding, when it is triaged, then exceptions are precise, 
   assert.match(release, /node tools\/security-findings\.mjs/);
   assert.match(policy, /scan scope/);
 });
+
+test("given the release's supply-chain verification, when the nightly publishes, then it runs the same "
+  + "verifications with the same output options", () => {
+  // given
+  const nightly = yaml.load(readFileSync(join(repository, ".github/workflows/nightly-image.yml"), "utf8"));
+  const releaseWorkflow = yaml.load(release);
+  const step = (job, name) => job.steps.find((candidate) => candidate.name === name).run;
+  const verifications = (run) => run.split(/\n(?=\s*(?:cosign|gh|node|jq|docker) )/)
+    .filter((command) => /^\s*(?:cosign verify|gh attestation verify)[\s\S]*"(?:oci:\/\/)?\$IMAGE"/.test(command))
+    .filter((command) => !command.includes("--bundle-from-oci"))
+    .map((command) => [command.match(/^\s*(cosign verify|gh attestation verify)/)[1],
+      (command.match(/--predicate-type \S+/) ?? [""])[0], (command.match(/--output json|--format json/) ?? ["none"])[0]]);
+
+  // when
+  const releaseChecks = verifications(step(releaseWorkflow.jobs.publish, "Verify release supply-chain evidence"));
+  const nightlyChecks = verifications(step(nightly.jobs.publish, "Verify nightly supply-chain evidence"));
+
+  // then
+  assert.equal(releaseChecks.length, 3, "the release verifies a signature, a provenance and an SBOM attestation");
+  assert.deepEqual(nightlyChecks, releaseChecks, "the release would run a verification the night never ran");
+});
