@@ -3,6 +3,7 @@ package org.courtside.booking.web;
 import com.jayway.jsonpath.JsonPath;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.SqlStatementCounter;
+import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.booking.BookingRepository;
 import org.courtside.booking.BookingStatus;
@@ -53,7 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, MemberTestFixture.class,
-        RulesTestFixture.class})
+        RulesTestFixture.class, ConfigTestFixture.class})
 class BookingControllerTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_BOOKING_CARD =
@@ -67,6 +68,9 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingRepository bookings;
+
+    @Autowired
+    private ConfigTestFixture configuration;
 
     @Autowired
     private JdbcClient jdbc;
@@ -417,6 +421,18 @@ class BookingControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.courts[*].id", Matchers.hasItem(courtId.toString())))
                 .andExpect(jsonPath("$.courts[*].name", Matchers.containsInAnyOrder("Court 1", "Court 2")))
                 .andExpect(jsonPath("$.nextCursor").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenANamedClub_whenListingPersonalBookings_thenThePageCarriesTheClubsName() throws Exception {
+        // given
+        configuration.nameTheClub("Example Tennis Club");
+
+        // when / then
+        mockMvc.perform(get("/api/my/bookings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clubName").value("Example Tennis Club"));
     }
 
     @Test
