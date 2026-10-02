@@ -31,11 +31,12 @@ therefore be added without changing scenario behavior or threshold definitions.
 | `baseline` | Detect normal-load regressions on defined resources. | 50 VUs for 10 minutes. |
 | `peak` | Exercise the expected booking-window peak. | 100 VUs for 15 minutes. |
 | `stress` | Find the capacity boundary and observe degradation. | Staged to 200 VUs over 22 minutes. |
+| `contention` | Qualify one shared-slot booking winner and typed conflicts. | 20 preauthenticated VUs, one attempt each, at most 2 minutes including setup. |
 | `soak` | Detect leaks and pool exhaustion. | 50 VUs for 2 hours on a fresh environment. |
 | `browser` | Measure PWA journeys and Web Vitals. | At most 5 browser VUs for 10 minutes. |
 | `funnel-smoke` | Verify the public transport and PWA path without load. | Read-only, at most 2 VUs for 2 minutes. |
 
-Only `smoke` is suitable for routine automation. Baseline, peak, stress, soak, and browser runs are
+Only `smoke` is suitable for routine automation. Baseline, peak, stress, contention, soak, and browser runs are
 manual until a dedicated runner provides stable resources. The Funnel profile is always manual and
 requires an operator to supervise `uat share` separately.
 
@@ -65,6 +66,25 @@ it is not a transport failure. Reports include p50, p90, p95, p99, throughput, i
 counts, technical error rate, server-error count, threshold results, and optional conflict and Web
 Vitals metrics.
 
+Protocol raw summaries and remote-write series also expose `login_attempt_failures`,
+`login_success_duration`, `login_time_to_authenticated`, and `login_authenticated_users`.
+The attempt-failure rate uses login POSTs as its denominator, not all requests. Success duration
+covers only accepted login POSTs. Time to authentication includes session setup, retries, retry
+pauses, and the successful session refresh. It is emitted once per authenticated VU; users who
+never finish authentication have no completion-time sample. The existing `login_duration` metric
+and its threshold still include every login POST attempt.
+
+`contention` authenticates members sequentially in setup, then starts one booking attempt per VU
+against the same court and slot. The winner holds the booking for five seconds before cancellation.
+Qualification requires exactly 20 attempts, one creation, 19 typed court-unavailable conflicts, one
+successful cancellation, and the configured technical-error and booking-latency thresholds.
+An unrelated `409`, multiple winners, no winner, or failed cleanup fails the run. Setup refuses
+non-PERFORMANCE markers before authentication. Interrupted runs can leave a synthetic booking;
+inspect and clear that slot in the disposable environment before retrying.
+Record whether contention ran directly after startup or after other traffic. Cold and warm runs
+can differ materially. Preserve a cold-run latency failure rather than treating a later warm pass
+as proof that the same budget was met after startup.
+
 Initial budgets are p95 500 ms and p99 1,000 ms for read-only APIs, p95 750 ms for login, and p95
 1,000 ms plus p99 2,000 ms for booking. Technical errors remain below one percent and unexpected
 server errors remain zero. Browser results use p75 budgets of 2,500 ms LCP, 200 ms INP, and 0.1 CLS.
@@ -76,6 +96,10 @@ do not fail on absolute latency budgets because runner variation is not a produc
 
 Reference runs constrain the application to 2 CPUs and 1,024 MiB, PostgreSQL to 2 CPUs and 2,048
 MiB, and Caddy to 0.5 CPU and 256 MiB. Observability services run outside those application budgets.
+Prometheus is limited to 1 CPU and 2,048 MiB, with memory plus swap capped at the same size.
+Grafana is limited to 0.5 CPU and 512 MiB; the PostgreSQL exporter to 0.25 CPU and 128 MiB.
+These collectors and the load generator still compete for host resources. Changing their budgets
+during a run prevents treating the profiles as directly comparable regression references.
 A result also records the contract version and digest, application version, commit, k6 version,
 operating system, architecture, runner processor count and memory, profile, verified environment
 marker, target, start time, duration,
@@ -147,6 +171,25 @@ Grafana is provisioned with the read-only Courtside performance dashboard at
 `http://127.0.0.1:3000`. It correlates application latency and throughput, JVM and GC state, Hikari,
 PostgreSQL, and optional k6 time series. Both local observability UIs are loopback-only and Grafana
 allows anonymous viewing solely within that boundary; it has no editable dashboards or login form.
+Its root filesystem stays read-only, with a writable 256 MiB `/tmp` tmpfs for plugin installation.
+The Prometheus datasource plugin is installed synchronously at startup, with automatic plugin
+updates disabled. Startup therefore requires access to the plugin distribution service when the
+plugin is not already installed in the Grafana volume.
+
+When interpreting a successful run, inspect login failures separately from the overall request
+error rate. Read-heavy traffic can hide substantial authentication retries, and login request
+latency does not measure the elapsed time until authentication succeeds. A shared source address
+also exercises per-address protection rather than independent client arrivals. Do not relax login
+protection or enlarge the database pool based on the aggregate pass alone.
+
+Protocol request labels and check names group booking IDs under `/api/bookings/:id`; dated booking
+reads share `GET /api/bookings`. Raw URL, per-VU and per-iteration system tags are disabled, while
+method, status, name, group and check tags remain available. This bounds series growth from booking
+IDs and dates, without changing the actual request URLs or accepting failed requests. Existing
+series remain until retention or an explicit disposable telemetry reset removes them.
+Inspect retained series and collector memory when using remote write. A larger Prometheus budget
+is not proof that a long soak will fit. Likewise, a ramp reaching 200 VUs is not a sustained 200-VU
+test, and a report with no booking conflicts does not qualify concurrent booking contention.
 
 The ordinary HTTPS endpoint does not expose Actuator. UAT, its Funnel ingress, and the production
 reference deployment do not enable Prometheus or the exporter. Database and exporter credentials
@@ -164,6 +207,7 @@ Protocol runs use the pinned official k6 image and write a self-contained `repor
 
 ```text
 node tools/courtside.mjs perf-run smoke
+node tools/courtside.mjs perf-run contention --confirm courtside-perf --remote-write
 node tools/courtside.mjs perf-run baseline --confirm courtside-perf
 node tools/courtside.mjs perf-run peak --confirm courtside-perf
 node tools/courtside.mjs perf-run stress --confirm courtside-perf

@@ -61,7 +61,7 @@
       "additionalProperties": false,
       "required": ["name", "workload", "target", "environment", "startedAt", "durationSeconds"],
       "properties": {
-        "name": { "type": "string", "enum": ["smoke", "baseline", "peak", "stress", "soak", "browser", "funnel-smoke"] },
+        "name": { "type": "string", "enum": ["smoke", "baseline", "peak", "stress", "contention", "soak", "browser", "funnel-smoke"] },
         "workload": { "type": "string", "minLength": 1 },
         "target": { "type": "string", "enum": ["application", "system", "funnel"] },
         "environment": { "type": "string", "enum": ["PERFORMANCE", "UAT"] },
@@ -142,6 +142,8 @@
         "readOnlyApi": { "type": "boolean" },
         "login": { "type": "boolean" },
         "booking": { "type": "boolean" },
+        "contention": { "type": "boolean" },
+        "cleanup": { "type": "boolean" },
         "webVitals": { "type": "boolean" },
         "browserErrors": { "type": "boolean" },
         "browserJourney": { "type": "boolean" }
@@ -166,6 +168,9 @@
         "unexpectedServerErrors": { "type": "integer", "minimum": 0 },
         "bookingConflicts": { "type": "integer", "minimum": 0 },
         "bookingConflictRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "contentionAttempts": { "type": "integer", "minimum": 0 },
+        "bookingCreations": { "type": "integer", "minimum": 0 },
+        "bookingCancellations": { "type": "integer", "minimum": 0 },
         "browserErrors": { "type": "integer", "minimum": 0 },
         "browserJourneyMilliseconds": { "type": "number", "minimum": 0 },
         "webVitals": {
@@ -241,6 +246,32 @@
           "thresholds": { "type": "object", "required": ["readOnlyApi", "login", "booking"] },
           "metrics": { "type": "object", "required": ["bookingConflicts", "bookingConflictRate"] }
         }
+      }
+    },
+    {
+      "if": { "properties": { "profile": { "type": "object", "properties": { "name": { "const": "contention" } } } } },
+      "then": {
+        "properties": {
+          "profile": { "type": "object", "properties": { "durationSeconds": { "type": "integer", "maximum": 120 } } },
+          "load": {
+            "type": "object", "required": ["virtualUsers"],
+            "properties": { "readShare": { "const": 0 }, "writeShare": { "const": 1 }, "virtualUsers": { "type": "integer", "maximum": 20 }, "stages": false }
+          },
+          "thresholds": { "type": "object", "required": ["contention", "cleanup"] },
+          "metrics": { "type": "object", "required": ["contentionAttempts", "bookingCreations", "bookingConflicts", "bookingConflictRate", "bookingCancellations"] }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "thresholds": { "type": "object", "properties": { "contention": { "const": true } } } } },
+            "then": { "properties": { "metrics": { "type": "object", "properties": {
+              "contentionAttempts": { "const": 20 }, "bookingCreations": { "const": 1 }, "bookingConflicts": { "const": 19 }
+            } } } }
+          },
+          {
+            "if": { "properties": { "thresholds": { "type": "object", "properties": { "cleanup": { "const": true } } } } },
+            "then": { "properties": { "metrics": { "type": "object", "properties": { "bookingCancellations": { "const": 1 } } } } }
+          }
+        ]
       }
     }
   ],

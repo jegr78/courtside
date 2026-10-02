@@ -66,6 +66,20 @@
         "maximumDuration": "22m"
       }
     },
+    "contention": {
+      "kind": "protocol",
+      "workload": "reference",
+      "virtualUsers": 20,
+      "duration": "2m",
+      "setupTimeout": "30s",
+      "scenarioDuration": "1m",
+      "bookingHoldSeconds": 5,
+      "manual": true,
+      "limits": {
+        "maximumVirtualUsers": 20,
+        "maximumDuration": "2m"
+      }
+    },
     "soak": {
       "kind": "protocol",
       "workload": "reference",

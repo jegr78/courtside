@@ -15,12 +15,17 @@ const unexpectedServerErrors = new Counter("unexpected_server_errors");
 const technicalErrors = new Rate("technical_errors");
 const readLatency = new Trend("read_only_api_duration", true);
 const loginLatency = new Trend("login_duration", true);
+const loginAttemptFailures = new Rate("login_attempt_failures");
+const loginSuccessLatency = new Trend("login_success_duration", true);
+const loginTimeToAuthenticated = new Trend("login_time_to_authenticated", true);
+const loginAuthenticatedUsers = new Counter("login_authenticated_users");
 const bookingLatency = new Trend("booking_duration", true);
 const contentionLatency = new Trend("booking_contention_duration", true);
 const cancellationLatency = new Trend("cancellation_duration", true);
 
 export const options = {
   noCookiesReset: true,
+  systemTags: ["proto", "status", "method", "name", "group", "check", "error_code", "tls_version", "scenario", "expected_response"],
   ...(profile.stages ? { stages: profile.stages } : { vus: profile.virtualUsers, duration: profile.duration }),
   thresholds: {
     technical_errors: [contract.thresholds.technicalErrorRate],
@@ -40,6 +45,7 @@ export const options = {
 };
 
 let authenticated = false;
+let authenticationStartedAt;
 let csrf;
 let bookingCardId;
 let courtIds;
@@ -62,7 +68,8 @@ function record(response, expectedStatuses, metric) {
   const serverError = response.status >= 500;
   unexpectedServerErrors.add(serverError ? 1 : 0);
   technicalErrors.add(!expected || serverError);
-  const requestPath = response.request.url.replace(target, "").split("?")[0];
+  const requestPath = response.request.url.replace(target, "").split("?")[0]
+    .replace(/^\/api\/bookings\/[^/]+$/, "/api/bookings/:id");
   const requestKey = `${response.request.method} ${requestPath}`;
   check(response, { [`${requestKey} status ${expectedStatuses.join(" or ")}`]: () => expected });
   if (!expected && !reportedFailures[requestKey]) {
@@ -74,6 +81,7 @@ function record(response, expectedStatuses, metric) {
 
 function authenticate() {
   if (authenticated) return;
+  authenticationStartedAt ??= Date.now();
   group("login", () => {
     const initial = http.get(`${target}/api/session`, { tags: { journey: "login-setup" } });
     record(initial, [200]);
@@ -85,10 +93,17 @@ function authenticate() {
     });
     record(response, [200], loginLatency);
     authenticated = response.status === 200;
+    loginAttemptFailures.add(!authenticated);
     if (authenticated) {
+      loginSuccessLatency.add(response.timings.duration);
       const refreshed = http.get(`${target}/api/session`, { tags: { journey: "login-setup" } });
-      record(refreshed, [200]);
+      if (!record(refreshed, [200])) {
+        authenticated = false;
+        return;
+      }
       csrfToken(refreshed);
+      loginTimeToAuthenticated.add(Date.now() - authenticationStartedAt);
+      loginAuthenticatedUsers.add(1);
     }
   });
 }
@@ -98,7 +113,7 @@ function readJourneys() {
     record(http.get(`${target}/api/public/config`, { tags: { journey: "read" } }), [200], readLatency);
     record(http.get(`${target}/api/public/booking-grid`, { tags: { journey: "read" } }), [200], readLatency);
     const date = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
-    record(http.get(`${target}/api/bookings?date=${date}`, { tags: { journey: "read" } }), [200], readLatency);
+    record(http.get(`${target}/api/bookings?date=${date}`, { tags: { journey: "read", name: "GET /api/bookings" } }), [200], readLatency);
   });
 }
 
@@ -158,7 +173,7 @@ function writeJourney() {
     if (!record(response, [201])) return;
     const bookingId = response.json().id;
     const cancellation = http.del(`${target}/api/bookings/${bookingId}`, null, {
-      headers: { "X-XSRF-TOKEN": csrfToken() }, tags: { journey: "cancellation" }
+      headers: { "X-XSRF-TOKEN": csrfToken() }, tags: { journey: "cancellation", name: "DELETE /api/bookings/:id" }
     });
     record(cancellation, [204], cancellationLatency);
   });

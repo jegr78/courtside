@@ -62,7 +62,7 @@ test("given the reference application, when measuring login capacity, then the c
 test("given supported performance profiles, when reading their execution limits, then every run is bounded", () => {
   // given
   const contract = readJson(contractPath);
-  const expectedProfiles = ["smoke", "baseline", "peak", "stress", "soak", "browser", "funnel-smoke"];
+  const expectedProfiles = ["smoke", "baseline", "peak", "stress", "contention", "soak", "browser", "funnel-smoke"];
 
   // when / then
   assert.deepEqual(Object.keys(contract.profiles), expectedProfiles);
