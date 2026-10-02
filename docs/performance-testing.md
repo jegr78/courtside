@@ -136,6 +136,19 @@ container-identity checks remain in the ignored `build/validation-evidence` dire
 performance worktree and `build/performance/follow-up` on the runner. UAT identities, start times
 and health stayed unchanged; the disposable stack was stopped after each run.
 
+The complete packaged image subsequently measured 936 ms p95, then failed at 1,012 ms on its
+second cold restart. A JFR diagnostic found approximately 78 ms query-plan and class-loading
+monitor waits in the account-scoped idempotency lookup. Startup now executes that unchanged
+repository lookup once in a read-only transaction with a sentinel account and key, discarding
+the result. It writes no booking and caches no mutable rule or booking value. Database failure
+prevents readiness. Real PostgreSQL tests verify the read-only transaction and failure path.
+
+The first diagnostic run with lookup preparation still failed at 1,054 ms. Five subsequent
+independent restarts measured p95 of 811, 705, 955, 812 and 845 ms, with p99 of 826, 753, 1,033,
+827 and 919 ms. All five passed the unchanged outcome, latency and cleanup gates. These runs
+used a one-class overlay on the complete image; qualification of a newly packaged image remains
+separate. Failures remain part of the evidence rather than being replaced by warm repeats.
+
 Initial budgets are p95 500 ms and p99 1,000 ms for read-only APIs, p95 750 ms for login, and p95
 1,000 ms plus p99 2,000 ms for booking. Technical errors remain below one percent and unexpected
 server errors remain zero. Browser results use p75 budgets of 2,500 ms LCP, 200 ms INP, and 0.1 CLS.
