@@ -851,6 +851,28 @@ async function become(page: Page, persona: Persona) {
   await expect(page.getByTestId(signedIn[persona])).toBeVisible();
 }
 
+test("given the narrowest supported phone, when a member opens each of their pages, then none scrolls sideways", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 320, height: 640 });
+  await become(page, "doe.jane");
+  const paths = routerPages().filter((route) => !route.redirect && !/[:*]/.test(route.path)
+    && personas(route.path).includes("doe.jane")).map((route) => route.path);
+  const overflowing: string[] = [];
+
+  // when
+  for (const path of paths) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => document.fonts.ready);
+    const excess = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (excess > 0) overflowing.push(`${new URL(page.url()).pathname} by ${excess}px`);
+  }
+
+  // then
+  expect(paths.length, "the sweep reached member pages").toBeGreaterThan(3);
+  expect(overflowing, "a member page wider than a 320 px screen").toEqual([]);
+});
+
 test("every page keeps its text legible and its controls on screen at phone width", async ({ page }) => {
   // given
   const pages = routerPages();
