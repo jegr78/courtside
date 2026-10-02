@@ -512,3 +512,18 @@ it("given a cancelled booking still ahead and one already past, when loaded, the
   expect(ahead, "the member keeps a record of what they cancelled").toHaveTextContent(i18n.t("myBookings.cancelled"));
   expect(within(ahead).queryAllByRole("button"), "a cancelled booking offers nothing to cancel or move").toEqual([]);
 });
+
+it("given a move dialog, when the preview arrives, then the confirm action is a new button rather than the disabled preview one recoloured", async () => {
+  // given
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("move-booking"));
+  await userEvent.type(screen.getByTestId("move-start-time"), "19:00");
+  const previewButton = screen.getByTestId("preview-move");
+
+  // when
+  await userEvent.click(previewButton);
+
+  // then
+  const confirm = await screen.findByTestId("confirm-move");
+  expect(confirm, "a reused button fades from the preview button's colours and fails contrast while it does").not.toBe(previewButton);
+});
