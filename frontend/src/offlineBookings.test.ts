@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import {
-  clearPersonalBookingsOfflineData, offlineClubName, offlineMemberSession, PERSONAL_BOOKINGS_CACHE, PERSONAL_BOOKINGS_CONTROL_CACHE
+  clearPersonalBookingsOfflineData, offlineMemberSession, offlineMemberState, PERSONAL_BOOKINGS_CACHE, PERSONAL_BOOKINGS_CONTROL_CACHE
 } from "./offlineBookings";
 
 afterEach(() => {
@@ -186,7 +186,7 @@ it("given a recent personal-booking response, when the app reads it offline, the
   cachedPage({ refreshedAt: "2026-09-23T12:00:00Z", clubName: "Example Tennis Club" });
 
   // when
-  const clubName = await offlineClubName();
+  const clubName = (await offlineMemberState())?.clubName;
 
   // then
   expect(clubName, "the cached page is the one response an offline launch may read").toBe("Example Tennis Club");
@@ -203,7 +203,7 @@ it.each([
   cachedPage(page);
 
   // when
-  const clubName = await offlineClubName();
+  const clubName = (await offlineMemberState())?.clubName;
 
   // then
   expect(clubName).toBeUndefined();

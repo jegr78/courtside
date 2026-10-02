@@ -18,9 +18,9 @@ self-contained and the header can still name the club. The PWA journey inspects 
 authenticated activity and offline reloads. A German and an English offline launch must keep that
 member's bookings readable with the response's `refreshedAt` instant as the visible refresh time, keep
 the club's name in the header, raise no build-identity alarm, state that the court plan cannot be
-refreshed, and reconnect without mixed assets. Successful login, logout and a server-observed expired session (`401`) clear the personal
-cache; logout plus Back
-and Forward must not reveal an authenticated view.
+refreshed, and reconnect without mixed assets. Successful login, logout and a server-observed
+expired session (`401`) clear the personal cache; logout plus Back and Forward must not reveal an
+authenticated view.
 
 The Chromium security journey stores a harmless inert markup payload in every current text shape
 that reaches the rendered PWA: club and court names, booking and participant-card labels, rule-set

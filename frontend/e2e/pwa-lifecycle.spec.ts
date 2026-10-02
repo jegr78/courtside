@@ -53,8 +53,9 @@ async function expectAnonymousSurface(page: import("@playwright/test").Page) {
 }
 
 for (const locale of ["de", "en"] as const) {
-  test(`the installed ${locale} shell keeps personal bookings readable during an offline launch`, async ({ context, page }) => {
+  test(`the installed ${locale} shell keeps personal bookings readable during an offline launch`, async ({ context, page, journeyService }) => {
     // given
+    await journeyService.executeSql("UPDATE club_config SET club_name = 'Example Tennis Club'");
     await install(page);
     await selectPreference(page, "#locale-preference", locale);
     await page.goto("/login");
@@ -66,7 +67,7 @@ for (const locale of ["de", "en"] as const) {
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();
     await expect(page.locator('[data-testid^="booking-"]').first()).toBeVisible();
     await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings"]);
-    const clubName = await page.getByTestId("club-brand-name").textContent();
+    await expect(page.getByTestId("club-brand-name")).toHaveText("Example Tennis Club");
     const cachedContract = await cachedPersonalBookingContract(page);
     expect(cachedContract?.requestPath).toBe("/api/my/bookings?limit=50");
     expect(cachedContract?.cachedGeneration).toBe(cachedContract?.currentGeneration);
@@ -81,9 +82,9 @@ for (const locale of ["de", "en"] as const) {
     expect(offlineContract?.requestPath).toBe("/api/my/bookings?limit=50");
     expect(offlineContract?.cachedAt).toBeGreaterThan(0);
     expect(offlineContract?.cachedGeneration).toBe(offlineContract?.currentGeneration);
-    expect(offlineContract?.clubName, "the cached bookings carry the name the shell showed online").toBe(clubName);
+    expect(offlineContract?.clubName, "the cached bookings carry the club's name").toBe("Example Tennis Club");
     await expect(page.getByTestId("offline-status")).toBeVisible();
-    await expect(page.getByTestId("club-brand-name")).toHaveText(clubName ?? "");
+    await expect(page.getByTestId("club-brand-name"), "offline, the header still names the club").toHaveText("Example Tennis Club");
     await identityRefused;
     await expect(page.getByTestId("environment-warning"), "being offline is not a fault of the build").toHaveCount(0);
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();

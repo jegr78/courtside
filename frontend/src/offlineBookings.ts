@@ -12,15 +12,20 @@ interface OfflinePage {
   clubName?: string;
 }
 
-export async function offlineMemberSession(): Promise<SessionStatus | undefined> {
-  return await offlinePage()
-    ? { authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false }
-    : undefined;
+export interface OfflineMemberState {
+  session: SessionStatus;
+  clubName?: string;
 }
 
-export async function offlineClubName(): Promise<string | undefined> {
-  const clubName = (await offlinePage())?.clubName;
-  return typeof clubName === "string" && clubName.trim() ? clubName : undefined;
+export async function offlineMemberState(): Promise<OfflineMemberState | undefined> {
+  const page = await offlinePage();
+  if (!page) return undefined;
+  const clubName = typeof page.clubName === "string" && page.clubName.trim() ? page.clubName : undefined;
+  return { session: { authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false }, clubName };
+}
+
+export async function offlineMemberSession(): Promise<SessionStatus | undefined> {
+  return (await offlineMemberState())?.session;
 }
 
 async function offlinePage(): Promise<OfflinePage | undefined> {
@@ -45,9 +50,7 @@ async function offlinePage(): Promise<OfflinePage | undefined> {
     await caches.delete(PERSONAL_BOOKINGS_CACHE).catch(() => false);
     return undefined;
   }
-  const page = await cached.clone().json()
-    .then((body: OfflinePage) => body)
-    .catch(() => undefined);
+  const page = await (cached.clone().json() as Promise<OfflinePage>).catch(() => undefined);
   const age = page?.refreshedAt ? Date.now() - Date.parse(page.refreshedAt) : Number.NaN;
   const freshEnough = Number.isFinite(age) && age >= 0 && age <= 7 * 24 * 60 * 60 * 1_000;
   if (!freshEnough) {
