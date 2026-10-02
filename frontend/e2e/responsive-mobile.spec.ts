@@ -733,6 +733,7 @@ for (const width of [820, 1024]) {
     // when
     await page.goto("/admin/facility/booking-cards");
     await expect(page.getByTestId("new-card-role-GROUNDSKEEPER")).toBeVisible();
+    await expect(page.locator("html"), "English carries the longest role names").toHaveAttribute("lang", "en");
     await page.evaluate(() => document.fonts.ready);
 
     // then
