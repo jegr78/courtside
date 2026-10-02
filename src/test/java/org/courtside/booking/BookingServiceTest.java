@@ -1,5 +1,9 @@
 package org.courtside.booking;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.AbstractIntegrationTest;
@@ -14,6 +18,7 @@ import org.courtside.rules.RuleViolation;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -104,6 +109,33 @@ class BookingServiceTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> bookingService.create(command(SEVEN_PM, EIGHT_PM)))
                 .isInstanceOf(CourtUnavailableException.class);
         assertThat(counter("courtside.bookings.conflicts")).isEqualTo(conflictsBefore + 1);
+    }
+
+    @Test
+    void givenAnExistingBooking_whenAnOverlappingOneIsRefused_thenTheDatabaseLoggerWarnsAboutNothing() {
+        // given
+        bookingService.create(command(SIX_PM, EIGHT_PM));
+        Logger jdbcErrors = (Logger) LoggerFactory.getLogger("org.hibernate.orm.jdbc.error");
+        ListAppender<ILoggingEvent> recorded = new ListAppender<>();
+        Level testProfileLevel = jdbcErrors.getLevel();
+        jdbcErrors.setLevel(Level.WARN);
+        recorded.start();
+        jdbcErrors.addAppender(recorded);
+
+        // when
+        try {
+            assertThatThrownBy(() -> bookingService.create(command(SEVEN_PM, EIGHT_PM)))
+                    .isInstanceOf(CourtUnavailableException.class);
+        } finally {
+            jdbcErrors.detachAppender(recorded);
+            jdbcErrors.setLevel(testProfileLevel);
+        }
+
+        // then
+        assertThat(recorded.list)
+                .as("a conflict answered with 409 is not a database problem for the operator")
+                .filteredOn(event -> event.getLevel().isGreaterOrEqual(Level.INFO))
+                .isEmpty();
     }
 
     @Test
