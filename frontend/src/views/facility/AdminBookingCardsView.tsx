@@ -80,7 +80,7 @@ function CardCreateForm({ disabled, form, counts, setCounts, color, setColor, cr
   const { t } = useTranslation();
   return <form noValidate {...form} onSubmit={(event) => void create(event)} className="grid gap-4 rounded-xl border p-4">
     <h2 className="font-bold">{t("admin.facility.newCard")}</h2>
-    <div className="grid items-start gap-4 md:grid-cols-3">
+    <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
       <TextField disabled={disabled} data-testid="new-card-label" name="label" label={t("admin.facility.label")} />
       <div className="grid content-start gap-4">
         <CardColorField testId="new-card-color" disabled={disabled} name="color" value={color} changed={setColor} />
