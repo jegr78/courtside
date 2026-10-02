@@ -19,6 +19,7 @@ final class OperationalLogParser {
     private static final Pattern PRIORITY_AND_VERSION = Pattern.compile("^<(\\d{1,3})>1$");
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final Clock clock;
+    private final PostgresqlSeverity databaseSeverity = new PostgresqlSeverity();
 
     OperationalLogParser() {
         this(Clock.systemUTC());
@@ -65,7 +66,7 @@ final class OperationalLogParser {
         String message = rawMessage;
         String traceId = null;
         if (source == OperationalLogSource.DATABASE) {
-            severity = OperationalLogSeverity.fromPostgresqlLine(rawMessage, envelopeSeverity);
+            severity = databaseSeverity.of(rawMessage, envelopeSeverity);
         }
         if (source == OperationalLogSource.APPLICATION && rawMessage.startsWith("{")) {
             try {

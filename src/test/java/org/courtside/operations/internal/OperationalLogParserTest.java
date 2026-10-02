@@ -54,26 +54,69 @@ class OperationalLogParserTest {
     })
     void givenADatabaseLineOnStandardError_whenParsing_thenPostgresqlsOwnLevelDecides(
             String level, String text, OperationalLogSeverity expected) {
-        OperationalLogRecord record = parse("<11>1 2026-09-19T14:01:00Z host courtside-database 42 - - "
-                + "2026-09-19 14:01:00.123 UTC [57] " + level + ":  " + text);
+        // given
+        String payload = database("2026-09-19 14:01:00.123 UTC [57] " + level + ":  " + text);
 
+        // when
+        OperationalLogRecord record = parse(payload);
+
+        // then
         assertThat(record.severity()).as("the level PostgreSQL wrote, not the stream it wrote to").isEqualTo(expected);
     }
 
-    @Test
-    void givenADatabaseDetailLine_whenParsing_thenTheEnvelopeSeverityStands() {
-        OperationalLogRecord record = parse("<11>1 2026-09-19T14:01:00Z host courtside-database 42 - - "
-                + "2026-09-19 14:01:00.123 UTC [57] STATEMENT:  select 1");
+    @ParameterizedTest
+    @CsvSource({
+            "LOG, DETAIL, INFO",
+            "WARNING, HINT, WARN",
+            "ERROR, STATEMENT, ERROR"
+    })
+    void givenAContinuationOfTheSameProcess_whenParsing_thenItTakesTheLevelOfTheMessageItBelongsTo(
+            String level, String continuation, OperationalLogSeverity expected) {
+        // given
+        parse(database("2026-09-19 14:01:00.123 UTC [57] " + level + ":  the message"));
 
-        assertThat(record.severity()).isEqualTo(OperationalLogSeverity.ERROR);
+        // when
+        OperationalLogRecord record = parse(database("2026-09-19 14:01:00.123 UTC [57] " + continuation + ":  more"));
+
+        // then
+        assertThat(record.severity()).as("a continuation line is part of the message before it").isEqualTo(expected);
     }
 
     @Test
-    void givenAnApplicationLineThatLooksLikePostgresql_whenParsing_thenOnlyTheEnvelopeDecides() {
-        OperationalLogRecord record = parse("<11>1 2026-09-19T14:01:00Z host courtside-proxy 42 - - "
-                + "2026-09-19 14:01:00.123 UTC [57] LOG:  upstream reset");
+    void givenAContinuationOfAnotherProcess_whenParsing_thenTheEnvelopeSeverityStands() {
+        // given
+        parse(database("2026-09-19 14:01:00.123 UTC [57] LOG:  the message"));
 
-        assertThat(record.severity()).isEqualTo(OperationalLogSeverity.ERROR);
+        // when
+        OperationalLogRecord record = parse(database("2026-09-19 14:01:00.123 UTC [58] DETAIL:  more"));
+
+        // then
+        assertThat(record.severity()).as("nothing is known about process 58").isEqualTo(OperationalLogSeverity.ERROR);
+    }
+
+    @Test
+    void givenAnIndentedLineAfterALogMessage_whenParsing_thenItContinuesThatMessage() {
+        // given
+        parse(database("2026-09-19 14:01:00.123 UTC [57] LOG:  automatic vacuum of table \"courtside.booking\""));
+
+        // when
+        OperationalLogRecord record = parse(database("\tpages: 0 removed, 12 remain"));
+
+        // then
+        assertThat(record.severity()).as("Docker splits a multi-line message into one record per line").isEqualTo(OperationalLogSeverity.INFO);
+    }
+
+    @Test
+    void givenAnotherSourcesLineThatLooksLikePostgresql_whenParsing_thenOnlyTheEnvelopeDecides() {
+        // given
+        String payload = "<11>1 2026-09-19T14:01:00Z host courtside-proxy 42 - - "
+                + "2026-09-19 14:01:00.123 UTC [57] LOG:  upstream reset";
+
+        // when
+        OperationalLogRecord record = parse(payload);
+
+        // then
+        assertThat(record.severity()).as("only the database writes PostgreSQL's prefix").isEqualTo(OperationalLogSeverity.ERROR);
     }
 
     @Test
@@ -195,6 +238,10 @@ class OperationalLogParserTest {
                 .isEqualTo(OperationalLogSeverity.DEBUG);
         assertThat(OperationalLogSeverity.fromText("custom", OperationalLogSeverity.UNKNOWN))
                 .isEqualTo(OperationalLogSeverity.UNKNOWN);
+    }
+
+    private static String database(String message) {
+        return "<11>1 2026-09-19T14:01:00Z host courtside-database 42 - - " + message;
     }
 
     private OperationalLogRecord parse(String payload) {
