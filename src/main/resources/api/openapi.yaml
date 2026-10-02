@@ -1845,6 +1845,9 @@ components:
           type: array
           description: Court labels needed to render this page without another request.
           items: { $ref: "#/components/schemas/PublicCourt" }
+        clubName:
+          type: string
+          description: The club's display name, so an installed app opened offline can still say whose it is.
 
     Participation:
       type: object

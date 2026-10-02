@@ -433,6 +433,97 @@ describe("App build identity", () => {
     await i18n.changeLanguage("en");
   });
 
+  it("given a member's cached bookings, when the app opens offline, then the header names the club they came from", async () => {
+    // given
+    const request = new Request("http://localhost/api/my/bookings?limit=50");
+    const generation = "generation-1";
+    vi.stubGlobal("caches", {
+      delete: vi.fn().mockResolvedValue(true),
+      open: vi.fn().mockImplementation((name: string) => Promise.resolve(name === "courtside-personal-bookings" ? {
+        keys: () => Promise.resolve([request]), match: () => Promise.resolve({
+          headers: new Headers({ "x-courtside-cache-generation": generation }),
+          clone: () => ({ json: () => Promise.resolve({ refreshedAt: new Date().toISOString(), clubName: "Example Tennis Club" }) })
+        })
+      } : {
+        match: () => Promise.resolve(new Response(generation)),
+        delete: () => Promise.resolve(true),
+        put: () => Promise.resolve()
+      }))
+    });
+    vi.spyOn(api, "session").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+
+    // when
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("offline-status")).toBeVisible();
+    await waitFor(() => expect(screen.getByTestId("club-brand-name"), "the cached bookings carry the club's name")
+      .toHaveTextContent("Example Tennis Club"));
+  });
+
+  it("given offline restoration is pending, when the session is invalidated, then the cached club name does not return either", async () => {
+    // given
+    const generation = "generation-1";
+    const request = new Request("http://localhost/api/my/bookings?limit=50");
+    let resolveCached!: (response: Response) => void;
+    const cached = new Promise<Response>((resolve) => { resolveCached = resolve; });
+    const matchBooking = vi.fn().mockReturnValue(cached);
+    const readGeneration = vi.fn().mockResolvedValue(generation);
+    const matchControl = vi.fn().mockResolvedValue({ text: readGeneration });
+    vi.stubGlobal("caches", {
+      delete: vi.fn().mockResolvedValue(true),
+      open: vi.fn().mockImplementation((name: string) => Promise.resolve(name === "courtside-personal-bookings" ? {
+        keys: () => Promise.resolve([request]), match: matchBooking
+      } : { match: matchControl, delete: () => Promise.resolve(true), put: () => Promise.resolve() }))
+    });
+    vi.spyOn(api, "session").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+    await waitFor(() => expect(matchBooking).toHaveBeenCalledOnce());
+
+    // when
+    window.dispatchEvent(new Event("courtside:unauthenticated"));
+    resolveCached(new Response(JSON.stringify({ refreshedAt: new Date().toISOString(), clubName: "Example Tennis Club" }), {
+      headers: { "content-type": "application/json", "x-courtside-cache-generation": generation }
+    }));
+
+    // then
+    expect(await screen.findByTestId("login-view")).toBeInTheDocument();
+    await waitFor(() => expect(readGeneration, "the restore has read the generation a second time").toHaveBeenCalledTimes(2));
+    await act(async () => { await new Promise((settled) => setTimeout(settled)); });
+    expect(screen.getByTestId("club-brand-name"), "a name read for an invalidated session is not shown").toHaveTextContent("Courtside");
+  });
+
+  it("given an offline launch showing the cached club name, when the network returns, then the club's current name replaces it", async () => {
+    // given
+    const request = new Request("http://localhost/api/my/bookings?limit=50");
+    const generation = "generation-1";
+    vi.stubGlobal("caches", {
+      delete: vi.fn().mockResolvedValue(true),
+      open: vi.fn().mockImplementation((name: string) => Promise.resolve(name === "courtside-personal-bookings" ? {
+        keys: () => Promise.resolve([request]), match: () => Promise.resolve({
+          headers: new Headers({ "x-courtside-cache-generation": generation }),
+          clone: () => ({ json: () => Promise.resolve({ refreshedAt: new Date().toISOString(), clubName: "Example Racket Club" }) })
+        })
+      } : { match: () => Promise.resolve(new Response(generation)), delete: () => Promise.resolve(true), put: () => Promise.resolve() }))
+    });
+    vi.spyOn(api, "session").mockRejectedValueOnce(new Error("offline")).mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockRejectedValueOnce(new Error("offline")).mockResolvedValue(club);
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+    await waitFor(() => expect(screen.getByTestId("club-brand-name")).toHaveTextContent("Example Racket Club"));
+
+    // when
+    act(() => { window.dispatchEvent(new Event("online")); });
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("club-brand-name"), "the club may have been renamed since the cache was written")
+      .toHaveTextContent("Example Tennis Club"));
+  });
+
   it("given a cached member view, when the session endpoint reports anonymous, then a later offline launch stays anonymous", async () => {
     // given
     let cached = true;

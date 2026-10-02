@@ -32,6 +32,7 @@ import org.courtside.booking.internal.ManagedAppointmentQuery;
 import org.courtside.booking.internal.AllocationVisibilityService.AllocationVisibility;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
+import org.courtside.config.ClubIdentity;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.CurrentUser;
@@ -68,6 +69,7 @@ class BookingController implements BookingsApi {
     private final ParticipationService participations;
     private final BookingRuleGate ruleGate;
     private final FacilityService facility;
+    private final ClubIdentity club;
     private final Clock clock;
 
     BookingController(BookingService bookings,
@@ -80,6 +82,7 @@ class BookingController implements BookingsApi {
                       ParticipationService participations,
                       BookingRuleGate ruleGate,
                       FacilityService facility,
+                      ClubIdentity club,
                       Clock clock) {
         this.bookings = bookings;
         this.cards = cards;
@@ -91,6 +94,7 @@ class BookingController implements BookingsApi {
         this.participations = participations;
         this.ruleGate = ruleGate;
         this.facility = facility;
+        this.club = club;
         this.clock = clock;
     }
 
@@ -175,7 +179,8 @@ class BookingController implements BookingsApi {
                 .nextCursor(page.nextCursor())
                 .refreshedAt(WireTypes.toOffsetDateTime(clock.instant()))
                 .timeZone(timeZone.id())
-                .courts(courtLabels));
+                .courts(courtLabels)
+                .clubName(club.clubName()));
     }
 
     @Override

@@ -15,7 +15,7 @@ import { useClubConfiguration } from "./club/registry";
 import { brandContrast } from "./brandColor";
 import { applyAccountLocale, supportedLocale } from "./i18n";
 import {
-  clearPersonalBookingsOfflineData, listenForOtherClientSessionChanges, offlineMemberSession
+  clearPersonalBookingsOfflineData, listenForOtherClientSessionChanges, offlineMemberState
 } from "./offlineBookings";
 import { lazySurface } from "./navigation/lazySurface";
 import { HomeView } from "./views/HomeView";
@@ -146,11 +146,12 @@ function FooterLink({ testId, href, label }: { testId: string; href: string; lab
 export function App() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { club, changed: configurationChanged } = useClubConfiguration();
+  const { club, changed: configurationChanged, load: loadClub } = useClubConfiguration();
   const [session, setSession] = useState<SessionStatus>();
   const [source, setSource] = useState<SourceOffer>();
   const [identityStatus, setIdentityStatus] = useState<"loading" | "available" | "unavailable">("loading");
   const [offline, setOffline] = useState(() => !navigator.onLine);
+  const [offlineClub, setOfflineClub] = useState<string>();
   const [passwordChanged, setPasswordChanged] = useState(false);
   const sessionInvalidations = useRef(0);
 
@@ -181,6 +182,7 @@ export function App() {
   useEffect(() => {
     const unauthenticated = () => {
       sessionInvalidations.current += 1;
+      setOfflineClub(undefined);
       setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
       void navigate("/login");
     };
@@ -188,9 +190,10 @@ export function App() {
     void Promise.all([
       refreshSession().catch(async () => {
         setOffline(true);
-        const restored = await offlineMemberSession()
-          ?? { authenticated: false, roles: [], passwordChangeRequired: false };
-        if (startupInvalidations === sessionInvalidations.current) setSession(restored);
+        const member = await offlineMemberState();
+        if (startupInvalidations !== sessionInvalidations.current) return;
+        setOfflineClub(member?.clubName);
+        setSession(member?.session ?? { authenticated: false, roles: [], passwordChangeRequired: false });
       }),
       identify()
     ]);
@@ -211,19 +214,23 @@ export function App() {
   useEffect(() => {
     const wentOffline = () => setOffline(true);
     // Identified before the session lifts the offline state, so an unknown build is never shown in between.
-    const cameOnline = () => void (source ? Promise.resolve() : identify())
-      .then(refreshSession)
-      .catch(() => setOffline(true));
+    const cameOnline = () => {
+      loadClub();
+      void (source ? Promise.resolve() : identify())
+        .then(refreshSession)
+        .catch(() => setOffline(true));
+    };
     window.addEventListener("offline", wentOffline);
     window.addEventListener("online", cameOnline);
     return () => {
       window.removeEventListener("offline", wentOffline);
       window.removeEventListener("online", cameOnline);
     };
-  }, [identify, refreshSession, source]);
+  }, [identify, loadClub, refreshSession, source]);
 
   function initialPasswordChanged() {
     sessionInvalidations.current += 1;
+    setOfflineClub(undefined);
     flushSync(() => {
       setPasswordChanged(true);
       setSession({ authenticated: false, roles: [], passwordChangeRequired: false });
@@ -235,6 +242,7 @@ export function App() {
   // would otherwise be sent home by that page's own redirect before this one is applied.
   function signOut() {
     sessionInvalidations.current += 1;
+    setOfflineClub(undefined);
     flushSync(() => setSession({ authenticated: false, roles: [], passwordChangeRequired: false }));
     void navigate("/login");
   }
@@ -246,7 +254,7 @@ export function App() {
     <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
       <div className="flex items-center gap-3">
         {club?.logoUrl ? <img src={club.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
-        <span data-testid="club-brand-name" className="text-xl font-bold">{club?.clubName ?? t("app.name")}</span>
+        <span data-testid="club-brand-name" className="text-xl font-bold">{club?.clubName ?? offlineClub ?? t("app.name")}</span>
       </div>
       <Preferences authenticated={authenticated} supported={club?.supportedLocales} signedOut={signOut} />
     </header>

@@ -7,7 +7,28 @@ const PERSONAL_BOOKINGS_GENERATION = "/.courtside/personal-bookings-generation";
 const PERSONAL_BOOKINGS_GENERATION_HEADER = "x-courtside-cache-generation";
 let sessionChanges: BroadcastChannel | undefined;
 
+interface OfflinePage {
+  refreshedAt?: string;
+  clubName?: string;
+}
+
+export interface OfflineMemberState {
+  session: SessionStatus;
+  clubName?: string;
+}
+
+export async function offlineMemberState(): Promise<OfflineMemberState | undefined> {
+  const page = await offlinePage();
+  if (!page) return undefined;
+  const clubName = typeof page.clubName === "string" && page.clubName.trim() ? page.clubName : undefined;
+  return { session: { authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false }, clubName };
+}
+
 export async function offlineMemberSession(): Promise<SessionStatus | undefined> {
+  return (await offlineMemberState())?.session;
+}
+
+async function offlinePage(): Promise<OfflinePage | undefined> {
   if (!("caches" in globalThis)) return undefined;
   const [cache, control] = await Promise.all([
     caches.open(PERSONAL_BOOKINGS_CACHE).catch(() => undefined),
@@ -29,10 +50,8 @@ export async function offlineMemberSession(): Promise<SessionStatus | undefined>
     await caches.delete(PERSONAL_BOOKINGS_CACHE).catch(() => false);
     return undefined;
   }
-  const refreshedAt = await cached.clone().json()
-    .then((page: { refreshedAt?: string }) => page.refreshedAt)
-    .catch(() => undefined);
-  const age = refreshedAt ? Date.now() - Date.parse(refreshedAt) : Number.NaN;
+  const page = await (cached.clone().json() as Promise<OfflinePage>).catch(() => undefined);
+  const age = page?.refreshedAt ? Date.now() - Date.parse(page.refreshedAt) : Number.NaN;
   const freshEnough = Number.isFinite(age) && age >= 0 && age <= 7 * 24 * 60 * 60 * 1_000;
   if (!freshEnough) {
     await clearPersonalBookingsOfflineData();
@@ -40,7 +59,7 @@ export async function offlineMemberSession(): Promise<SessionStatus | undefined>
   }
   const latestControl = await caches.open(PERSONAL_BOOKINGS_CONTROL_CACHE).catch(() => undefined);
   if (await storedGeneration(latestControl) !== generation) return undefined;
-  return { authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false };
+  return page;
 }
 
 export async function clearPersonalBookingsOfflineData(): Promise<void> {
