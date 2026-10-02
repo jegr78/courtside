@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-19",
+  "reviewedAt": "2026-10-02",
   "source": "src/main/resources/api/openapi.yaml",
   "authorizationSource": "security/authorization-policy.json",
   "workflows": [
@@ -196,6 +196,7 @@
       "backgroundEntryPoints": [
         "BookingMailer#on(BookingConfirmed)",
         "BookingReminderSchedule#remindWhatIsDue",
+        "BookingValidationPreparation#onWebServerInitialized(ServletWebServerInitializedEvent)",
         "DisplacementMailer#on(BookingDisplaced)",
         "ParticipationMailer#on(ParticipantRecorded)",
         "ParticipationMailer#on(ParticipantWithdrew)",
@@ -218,11 +219,14 @@
       ],
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
+        "src/main/java/org/courtside/booking/web/BookingValidationPreparation.java",
         "src/main/java/org/courtside/booking/ParticipationService.java",
         "src/main/java/org/courtside/booking/series/SeriesService.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/BookingServiceTest.java#givenAnExistingBooking_whenCreatingAnOverlappingOne_thenCourtUnavailableIsThrown",
+        "src/test/java/org/courtside/booking/web/BookingValidationPreparationTest.java#givenAServletClassLoader_whenTheWebServerStarts_thenValidationIsPreparedWithoutCallingTheController",
+        "src/test/java/org/courtside/booking/web/BookingValidationPreparationTest.java#givenFailedMvcBindingValidation_whenTheWebServerStarts_thenStartupFailsAndTheClassLoaderIsRestored",
         "src/test/java/org/courtside/booking/ParticipationServiceTest.java#givenAMemberNamedInSomebodyElsesBooking_whenTheyWithdraw_thenTheBookingKeepsEverythingElse"
       ]
     },
@@ -409,6 +413,7 @@
         "removeRule"
       ],
       "backgroundEntryPoints": [
+        "CoordinationPreparation#prepareCoordination(ApplicationReadyEvent)",
         "ShippedRuleSetNaming#run",
         "ShippedRuleSetNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)"
       ],
@@ -429,11 +434,14 @@
       ],
       "productionPaths": [
         "src/main/java/org/courtside/rules/internal/RuleAdminService.java",
-        "src/main/java/org/courtside/config/internal/ConfigService.java"
+        "src/main/java/org/courtside/config/internal/ConfigService.java",
+        "src/main/java/org/courtside/config/internal/CoordinationPreparation.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenAnUploadedLogoAndAUrlFallback_whenDeletingTheUpload_thenTheFallbackIsEffective",
-        "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenActiveContent_whenUploadingALogo_thenTheTypedViolationIsReturned"
+        "src/test/java/org/courtside/config/web/ConfigControllerTest.java#givenActiveContent_whenUploadingALogo_thenTheTypedViolationIsReturned",
+        "src/test/java/org/courtside/config/internal/CoordinationPreparationTest.java#givenTheActualCoordinationQuery_whenStartupPreparesIt_thenTheBoundedTransactionRollsBackAndReleasesItsLock",
+        "src/test/java/org/courtside/config/internal/CoordinationPreparationTest.java#givenAMissingConfiguration_whenStartupPreparesCoordination_thenReadinessFailsClosed"
       ]
     },
     {
