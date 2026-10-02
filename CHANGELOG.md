@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.0-rc.9](https://github.com/jegr78/courtside/compare/v0.1.0-rc.8...v0.1.0-rc.9) (2026-10-02)
+
+
+### Features
+
+* let operators prune old releases and recovery units ([#1222](https://github.com/jegr78/courtside/issues/1222)) ([40f2369](https://github.com/jegr78/courtside/commit/40f23694b89367f19f9e70da945a077e41c50436))
+* show the club's name in an installed app opened offline ([#1256](https://github.com/jegr78/courtside/issues/1256)) ([cc3a246](https://github.com/jegr78/courtside/commit/cc3a24660205848c8e89ea218b83523e5b0f6298))
+
+
+### Bug fixes
+
+* keep a cancelled booking with its date until that date has passed ([#1250](https://github.com/jegr78/courtside/issues/1250)) ([fd2c7fc](https://github.com/jegr78/courtside/commit/fd2c7fcb3e6e1899406f3a83dc29eb13581f9891))
+* keep booking card role labels and colour fields apart on a tablet ([#1253](https://github.com/jegr78/courtside/issues/1253)) ([acd2f10](https://github.com/jegr78/courtside/commit/acd2f10e84668f2edb488aa06c376472292ca57b))
+* keep the build identity alarm out of an offline launch ([#1255](https://github.com/jegr78/courtside/issues/1255)) ([2cff1fd](https://github.com/jegr78/courtside/commit/2cff1fd95fbe2ad333ea9bdfbdaefeb33b9703c1))
+* let a tapped administration destination open on iPhone and iPad ([#1247](https://github.com/jegr78/courtside/issues/1247)) ([7f7c4af](https://github.com/jegr78/courtside/commit/7f7c4af2624797eeb5d479d13fbd011645b750f9)), closes [#1228](https://github.com/jegr78/courtside/issues/1228)
+* show a refused booking beside the Book button on a phone ([#1251](https://github.com/jegr78/courtside/issues/1251)) ([fe61fdc](https://github.com/jegr78/courtside/commit/fe61fdc09bc87d7d48494da99d9886f20f3ce179))
+* show PostgreSQL's own log level in the operational log ([#1248](https://github.com/jegr78/courtside/issues/1248)) ([76f8e56](https://github.com/jegr78/courtside/commit/76f8e5618ba2b1fda6b6fe37edc1dac33432483c))
+* show the confirm-move action at full contrast as soon as it appears ([#1254](https://github.com/jegr78/courtside/issues/1254)) ([2498e4d](https://github.com/jegr78/courtside/commit/2498e4df4ac4f880d3106946b52fdba8041a20a4)), closes [#1233](https://github.com/jegr78/courtside/issues/1233)
+* stabilize cold booking performance and bound test resources ([#1257](https://github.com/jegr78/courtside/issues/1257)) ([1f94ffa](https://github.com/jegr78/courtside/commit/1f94ffa44c55487b9461ccc19267a4d67119eafc))
+* stop warning about every court conflict the booking module answers ([#1249](https://github.com/jegr78/courtside/issues/1249)) ([2b55a79](https://github.com/jegr78/courtside/commit/2b55a792ef9ac8b8bbd7e5c930af70f403a1cf42))
+* wrap a long heading word instead of widening the page ([#1252](https://github.com/jegr78/courtside/issues/1252)) ([7b0444a](https://github.com/jegr78/courtside/commit/7b0444a52de7571da41781e4ce578d44fc5fafa0))
+
 ## 0.1.0 (2026-09-14)
 
 
@@ -552,4 +574,3 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
-
