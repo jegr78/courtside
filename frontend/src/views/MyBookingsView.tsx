@@ -110,7 +110,7 @@ export function MyBookingsView({ now, offline = false }: {
       .filter((booking) => booking.status === "CONFIRMED" && new Date(booking.endsAt) >= reference)
       .toSorted((left, right) => left.startsAt.localeCompare(right.startsAt)),
     past: bookings
-      .filter((booking) => booking.status === "CANCELLED" || new Date(booking.endsAt) < reference)
+      .filter((booking) => new Date(booking.endsAt) < reference)
       .toSorted((left, right) => right.startsAt.localeCompare(left.startsAt))
   }), [bookings, reference]);
 

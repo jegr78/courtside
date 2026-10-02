@@ -493,3 +493,20 @@ it("given the bound cannot be read, when the bookings load, then they are shown 
   // then
   expect(screen.getByTestId("move-duration")).not.toHaveAttribute("max");
 });
+
+it("given a cancelled booking still ahead and one already past, when loaded, then only the past one counts as past", async () => {
+  // given
+  const cancelled = { courtIds: ["33333333-3333-3333-3333-333333333333"], cardLabel: "Member booking", cardColor: "#176b55", status: "CANCELLED" as const };
+  vi.mocked(api.personalBookings).mockResolvedValue({ items: [
+    { ...cancelled, id: "55555555-5555-5555-5555-555555555555", startsAt: "2026-08-19T16:00:00Z", endsAt: "2026-08-19T17:00:00Z" },
+    { ...cancelled, id: "66666666-6666-6666-6666-666666666666", startsAt: "2026-08-04T16:00:00Z", endsAt: "2026-08-04T17:00:00Z" }
+  ] });
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  expect(await screen.findByTestId("past-bookings-summary"), "a cancellation joins the past once its date has passed, as the page says")
+    .toHaveTextContent(i18n.t("myBookings.pastCount", { count: 1 }));
+  expect(within(screen.getByTestId("upcoming-bookings")).queryAllByRole("button"), "a cancelled booking offers nothing to cancel or move").toEqual([]);
+});
