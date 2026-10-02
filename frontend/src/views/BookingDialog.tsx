@@ -217,9 +217,12 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       <FieldViolations id="booking-note-errors" violations={fieldViolations("note")} />
       </details>
       </div>
-      <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
-      {error && <Alert>{error}</Alert>}
       </div>
+      {/* Outside the scrolling form, so a refusal shows beside the button that caused it. */}
+      {(fieldViolations("general").length > 0 || error) && <div data-testid="booking-outcome" className="shrink-0 grid gap-2 px-6 pt-3">
+        <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
+        {error && <Alert>{error}</Alert>}
+      </div>}
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
         <Button variant="secondary" type="button" data-testid="booking-close" onClick={closed}>{t("booking.close")}</Button>
         <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod}>{t("booking.submit")}</Button>

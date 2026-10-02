@@ -41,7 +41,8 @@ test("stable member surfaces match their reviewed baselines", async ({ page, jou
   await expect(page.getByTestId("booking-dialog").locator("[data-code]")).toBeVisible();
 
   // then
-  await stableScreenshot(page.getByTestId("booking-dialog"), "booking-validation.png");
+  await stableScreenshot(page.getByTestId("booking-dialog"), "booking-validation.png",
+    page.getByTestId("booking-outcome").getByRole("alert"));
 
   // when
   await page.getByTestId("booking-close").click();

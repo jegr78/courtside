@@ -88,7 +88,7 @@ const drivers: Record<string, (page: Page, visualDate: string) => Promise<void>>
     await expect(page.locator('[data-code="booking.rule.advanceWindow.exceeded"]')).toBeVisible();
     // The refusal also carries the reference a member would quote to their board, which is a
     // different string on every screen and belongs in no published picture.
-    await page.evaluate(() => document.querySelector('[data-testid="booking-dialog"] [role="alert"]')?.remove());
+    await page.evaluate(() => document.querySelector('[data-testid="booking-outcome"]')?.remove());
     await page.evaluate(() => window.scrollTo(0, 0));
   },
   "series-form": async (page) => {
