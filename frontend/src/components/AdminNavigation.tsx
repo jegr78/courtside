@@ -120,7 +120,8 @@ export function AdminNavigation({ administrator = true }: { administrator?: bool
     className="group relative"
     open={laidOpen || unfolded}
     onToggle={(event) => { if (!laidOpen) setUnfolded(event.currentTarget.open); }}
-    onBlur={(event) => { if (folding && !event.currentTarget.contains(event.relatedTarget)) setUnfolded(false); }}
+    // Safari does not focus a tapped link, so a blur towards nothing is a tap and is left to the pointer handlers.
+    onBlur={(event) => { if (folding && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setUnfolded(false); }}
   >
     <summary data-testid="admin-menu" className="admin-navigation-menu surface-raised focus-ring flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border px-4 py-3 [&::-webkit-details-marker]:hidden">
       <span className="min-w-0 truncate">

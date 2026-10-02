@@ -1,6 +1,6 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import i18n from "../i18n";
 import { AdminNavigation } from "./AdminNavigation";
@@ -205,6 +205,24 @@ describe("AdminNavigation", () => {
     // then
     expect(screen.getByTestId("admin-navigation")).not.toHaveAttribute("open");
     expect(screen.getByTestId("admin-menu")).toHaveTextContent("Club profile");
+  });
+
+  it("given an open phone navigation, when a tapped destination takes no focus, then the tap still opens it", async () => {
+    // given
+    resizeTo(375);
+    function Where() { return <p data-testid="where">{useLocation().pathname}</p>; }
+    render(<MemoryRouter initialEntries={["/admin/setup"]}><AdminNavigation /><Routes><Route path="*" element={<Where />} /></Routes></MemoryRouter>);
+    await userEvent.click(screen.getByTestId("admin-menu"));
+    const roster = screen.getByTestId("admin-roster-link");
+
+    // when
+    fireEvent.pointerDown(roster);
+    fireEvent.focusOut(screen.getByTestId("admin-menu"), { relatedTarget: null });
+
+    // then
+    expect(screen.getByTestId("admin-navigation"), "Safari blurs the menu without focusing the tapped link").toHaveAttribute("open");
+    fireEvent.click(roster);
+    expect(screen.getByTestId("where")).toHaveTextContent("/admin/roster");
   });
 
   it("given a phone, when the folded navigation is read, then it reads as a menu rather than a field", () => {
