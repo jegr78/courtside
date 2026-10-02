@@ -14,7 +14,7 @@ export function ColorInput({ id, valueTestId, pickerTestId, value, changed, disa
 }) {
   const { t } = useTranslation();
   return <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-end gap-3">
-    <TextField id={`${id}-value`} data-testid={valueTestId} name={name} disabled={disabled} label={t("admin.config.colorHex")}
+    <TextField id={`${id}-value`} className="w-full" data-testid={valueTestId} name={name} disabled={disabled} label={t("admin.config.colorHex")}
                value={value} onChange={(event) => changed(event.target.value)} />
     <label className="grid gap-2 text-sm font-medium" htmlFor={`${id}-picker`}>
       {t("admin.config.colorPicker")}

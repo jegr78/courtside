@@ -722,41 +722,43 @@ async function expectInsideViewport(locator: import("@playwright/test").Locator,
   expect([box!.x >= 0, box!.x + box!.width <= width], `${name} lies inside the ${width} px viewport`).toEqual([true, true]);
 }
 
-test("given a portrait tablet in English, when the new booking card form is read, then no role label or colour field overlaps another", async ({ page }) => {
-  // given
-  await page.setViewportSize({ width: 820, height: 1180 });
-  await signIn(page, "configuration-admin");
-  await expect(page.getByTestId("administration-link")).toBeVisible();
-  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "en-GB"));
+for (const width of [820, 1024]) {
+  test(`given a ${width} px wide window in English, when the new booking card form is read, then no role label or colour field overlaps another`, async ({ page }) => {
+    // given
+    await page.setViewportSize({ width, height: 1180 });
+    await signIn(page, "configuration-admin");
+    await expect(page.getByTestId("administration-link")).toBeVisible();
+    await page.evaluate(() => window.localStorage.setItem("courtside.locale", "en-GB"));
 
-  // when
-  await page.goto("/admin/facility/booking-cards");
-  await expect(page.getByTestId("new-card-role-GROUNDSKEEPER")).toBeVisible();
-  await page.evaluate(() => document.fonts.ready);
+    // when
+    await page.goto("/admin/facility/booking-cards");
+    await expect(page.getByTestId("new-card-role-GROUNDSKEEPER")).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
 
-  // then
-  const crowded = await page.getByTestId("create-card").evaluate((button) => {
-    const labels = [...(button as HTMLButtonElement).form!.querySelectorAll("input[type=checkbox]")].map((box) => box.closest("label")!);
-    const findings: string[] = [];
-    for (const label of labels) {
-      const range = document.createRange();
-      range.selectNodeContents(label);
-      if (range.getBoundingClientRect().right > label.getBoundingClientRect().right + 0.5) findings.push(`${label.textContent} runs past its own box`);
-    }
-    for (const [index, label] of labels.entries()) {
-      const box = label.getBoundingClientRect();
-      for (const other of labels.slice(index + 1)) {
-        const next = other.getBoundingClientRect();
-        if (box.left < next.right && next.left < box.right && box.top < next.bottom && next.top < box.bottom) findings.push(`${label.textContent} overlaps ${other.textContent}`);
+    // then
+    const crowded = await page.getByTestId("create-card").evaluate((button) => {
+      const labels = [...(button as HTMLButtonElement).form!.querySelectorAll("input[type=checkbox]")].map((box) => box.closest("label")!);
+      const findings: string[] = [];
+      for (const label of labels) {
+        const range = document.createRange();
+        range.selectNodeContents(label);
+        if (range.getBoundingClientRect().right > label.getBoundingClientRect().right + 0.5) findings.push(`${label.textContent} runs past its own box`);
       }
-    }
-    return findings;
+      for (const [index, label] of labels.entries()) {
+        const box = label.getBoundingClientRect();
+        for (const other of labels.slice(index + 1)) {
+          const next = other.getBoundingClientRect();
+          if (box.left < next.right && next.left < box.right && box.top < next.bottom && next.top < box.bottom) findings.push(`${label.textContent} overlaps ${other.textContent}`);
+        }
+      }
+      return findings;
+    });
+    expect(crowded, "every checkbox label beside its own box").toEqual([]);
+    const hex = await page.getByTestId("new-card-color-value").boundingBox();
+    const picker = await page.getByTestId("new-card-color").boundingBox();
+    expect(hex!.x + hex!.width, "the hex field ends before the colour picker").toBeLessThanOrEqual(picker!.x);
   });
-  expect(crowded, "every checkbox label beside its own box").toEqual([]);
-  const hex = await page.getByTestId("new-card-color-value").boundingBox();
-  const picker = await page.getByTestId("new-card-color").boundingBox();
-  expect(hex!.x + hex!.width, "the hex field ends before the colour picker").toBeLessThanOrEqual(picker!.x);
-});
+}
 
 test("courts and slot fillers show each entry's name, status and actions on a phone", async ({ page }) => {
   // given
