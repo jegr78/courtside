@@ -159,7 +159,8 @@ test("given contention outcomes, when building a result, then the schema preserv
     technical_errors: { values: { rate: 0 }, thresholds: { bounded: { ok: true } } },
     unexpected_server_errors: metric(0), contention_attempts: metric(20), booking_creations: metric(1),
     booking_conflicts: metric(19), booking_conflict_rate: { values: { rate: 0.95 } },
-    booking_contention_duration: metric(0), booking_cancellations: { ...metric(0), thresholds: { bounded: { ok: false } } }
+    booking_contention_duration: { ...metric(0), values: { "p(50)": 100, "p(90)": 200, "p(95)": 300, "p(99)": 400 } },
+    booking_cancellations: { ...metric(0), thresholds: { bounded: { ok: false } } }
   } };
 
   // when
@@ -172,6 +173,7 @@ test("given contention outcomes, when building a result, then the schema preserv
   assert.equal(result.thresholds.contention, true);
   assert.equal(result.thresholds.cleanup, false);
   assert.equal(result.metrics.bookingConflicts, 19);
+  assert.deepEqual(result.metrics.latencyMilliseconds, { p50: 100, p90: 200, p95: 300, p99: 400 });
   assert.equal(result.metrics.bookingCancellations, 0);
   assert.equal(result.load.readShare, 0);
   assert.equal(result.load.writeShare, 1);

@@ -1255,7 +1255,8 @@ export function buildPerformanceResult({
   const browserRun = profile.kind === "browser";
   const funnelRun = profileName === "funnel-smoke";
   const contentionRun = profileName === "contention";
-  const latencyMetric = browserRun ? raw.metrics.browser_http_req_duration : raw.metrics.http_req_duration;
+  const latencyMetric = browserRun ? raw.metrics.browser_http_req_duration
+    : contentionRun ? raw.metrics.booking_contention_duration : raw.metrics.http_req_duration;
   const latency = latencyMetric.values;
   const thresholdPassed = (name) => Object.values(raw.metrics[name].thresholds).every(value => value.ok);
   const load = {

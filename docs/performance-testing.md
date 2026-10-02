@@ -97,15 +97,41 @@ activity samples ran every 50 ms; these comparisons did not enable JFR.
 | Unmodified rc.8 | 1,364 ms | 9 |
 | Prepared request mapping and validation | 1,128 ms; repeat 1,038 ms | 9 |
 | Preparation plus a local creation queue | 1,257 ms; repeat 1,280 ms | 0 |
+| Preparation plus new-aggregate persistence | 1,096 ms; repeat 975 ms | 9 |
+| Persistence plus prepared request fingerprints | 944 ms | 9 |
+| Fingerprints and an occupied-court JPQL check | 1,038 ms | 9 |
+| Native occupied-court `EXISTS` check | 870 ms | 9 |
 
 Every run produced twenty attempts, one creation, nineteen typed conflicts and one successful
-cancellation, with no technical or server errors. None met the 1,000 ms cold booking budget.
+cancellation, with no technical or server errors. The first three candidates missed the cold
+booking budget. Persistence and fingerprint preparation alone were inconsistent: two additional
+restarts without PostgreSQL sampling measured 995 ms and 1,229 ms.
 The queue removed the observed DB lock wait chain but increased latency relative to preparation
 alone, so it was not retained. Request mapping and validation preparation uses transient DTOs
 before readiness; it does not create a booking or change the database coordination lock.
 
+The retained combination prepares request and fingerprint mapping, persists new aggregates
+without merge-before-insert reads, and checks known occupancy after complete rule validation.
+The native `EXISTS` query uses the same half-open range expression as the GiST constraint.
+Concurrent idempotency replays retain their original result. A write racing after that read is
+still rejected by the unchanged database constraint, with the losing transaction rolled back.
+The aggregate insert test reduced eight SQL statements to four inserts for one allocation and
+two participants; existing and reloaded bookings still update their original identity.
+
+Five consecutive independent restarts of the retained overlay, without JFR or PostgreSQL
+sampling, measured booking p95 of 863, 906, 897, 894 and 859 ms. Their p99 values were 871, 919,
+907, 953 and 900 ms. Every restart passed the unchanged latency, outcome and cleanup thresholds.
+These results cover the first twenty booking attempts after startup and authentication, not
+capacity under a sustained workload. Contention summaries report booking latency directly;
+authentication and setup requests do not dilute that percentile.
+
+A subsequent cold run measured 960 ms p95; its warm repeat measured 329 ms. A one-minute,
+two-user protocol smoke then measured read p95 of 24 ms and booking p95 of 75 ms, with both
+users authenticated, no refused login attempt and no technical or server error. Its 339 request
+samples contained no raw URL tags; eleven cancellations shared one request name and check label.
+
 These twenty-request experiments are diagnostic evidence, not an approved baseline or
-qualification of the complete branch. Raw summaries, HTML reports, PostgreSQL samples and
+qualification of the complete branch image. Raw summaries, HTML reports, PostgreSQL samples and
 container-identity checks remain in the ignored `build/validation-evidence` directory of the
 performance worktree and `build/performance/follow-up` on the runner. UAT identities, start times
 and health stayed unchanged; the disposable stack was stopped after each run.

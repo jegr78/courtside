@@ -1,6 +1,7 @@
 package org.courtside.booking.web;
 
 import jakarta.validation.Validator;
+import lombok.RequiredArgsConstructor;
 import org.courtside.api.ApiCreateBookingRequest;
 import org.courtside.api.ApiParticipantRequest;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -14,15 +15,11 @@ import java.util.Set;
 import java.util.UUID;
 
 @Component
+@RequiredArgsConstructor
 final class BookingValidationPreparation implements SmartInitializingSingleton {
 
     private final Validator validator;
     private final ObjectMapper mapper;
-
-    BookingValidationPreparation(Validator validator, ObjectMapper mapper) {
-        this.validator = validator;
-        this.mapper = mapper;
-    }
 
     @Override
     public void afterSingletonsInstantiated() {

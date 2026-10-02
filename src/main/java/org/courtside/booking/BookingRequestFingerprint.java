@@ -1,6 +1,8 @@
 package org.courtside.booking;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.shared.TimeSlot;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -10,13 +12,22 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
-class BookingRequestFingerprint {
+class BookingRequestFingerprint implements SmartInitializingSingleton {
 
     private final ObjectMapper objectMapper;
+
+    @Override
+    public void afterSingletonsInstantiated() {
+        UUID identifier = new UUID(0, 0);
+        of(new CreateBookingCommand(List.of(identifier), identifier,
+                new TimeSlot(Instant.EPOCH, Instant.EPOCH.plusSeconds(3600)),
+                identifier, null, Set.of(), null, List.of(ParticipantSpec.guest("Example Guest")), null));
+    }
 
     String of(CreateBookingCommand command) {
         Payload payload = new Payload(
