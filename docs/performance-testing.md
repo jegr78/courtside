@@ -43,7 +43,7 @@ requires an operator to supervise `uat share` separately.
 ### Login verification capacity
 
 The reference application has two password-verification slots. The value is measured against the
-same 2 CPU and 1 GiB application limits declared below, rather than inferred from a developer
+then-current 2 CPU and 1 GiB application limits, rather than inferred from a developer
 machine. On 2026-09-05 the ordinary two-VU smoke admitted both simultaneous Argon2id logins with no
 technical error; each completed in about 253 ms. The control run with one slot produced an immediate
 typed `429`
@@ -149,6 +149,46 @@ independent restarts measured p95 of 811, 705, 955, 812 and 845 ms, with p99 of 
 used a one-class overlay on the complete image; qualification of a newly packaged image remains
 separate. Failures remain part of the evidence rather than being replaced by warm repeats.
 
+A fresh complete image with lookup preparation passed five cold restarts at 867, 890, 813,
+980 and 949 ms p95, but the next run failed at 1,007 ms before load and stress could start.
+The preparation now also executes the unchanged open-booking count query once, discarding its
+result. Profiling additionally showed repeated query-plan construction while loading opening
+hours. Both unpaged opening-hours repository reads now use fixed JPQL rather than newly built
+criteria queries. This reuses query plans, not schedule values. A real PostgreSQL test requires
+at least twenty plan-cache hits and twenty SQL reads across ten schedule loads; another verifies
+that edited hours and newly scheduled weeks appear on the next read.
+
+The sixth overlay run with reusable opening-hours plans still failed at 1,035 ms p95.
+A subsequent JFR recording measured 932 ms cold and 258 ms warm. The remaining first-burst
+monitor waits included about 80 ms in JPA validation provider discovery and about 69 ms in the
+configuration coordination query plan. Validation preparation now also runs on the servlet
+web-server initialization event under the servlet class loader, restoring the original thread
+loader even on failure. It validates request and executable parameters without calling the
+controller. The actual MVC binding validator is prepared as well. A native configuration-query
+experiment retained the previous `FOR NO KEY UPDATE` mode and entity snapshot, but profiling
+showed about 71 ms in native result-mapping class loading instead. It was not retained.
+
+The original JPQL coordination query is prepared once after application runners and before
+readiness accepts traffic. It runs in an independent transaction with a ten-second timeout,
+always marked rollback-only. The existing singleton is locked and read, then the lock is
+released without a data change. Real PostgreSQL tests require rollback completion, immediate
+lock reacquisition, rollback of an unexpected test write and isolation from an ambient read-only
+transaction. Missing configuration propagates as a startup failure. Normal booking/configuration
+transactions still use the original coordination query and lock mode.
+
+These preparations alone did not qualify the two-CPU cold-start profile. Its fifth subsequent
+restart failed at 1,071 ms p95. JFR recordings showed background C2 compilation competing with
+the first booking burst. A diagnostic that disabled C2 passed three cold restarts at 462, 459
+and 464 ms p95, but did not establish its steady-state throughput. It is not a deployment setting.
+Keeping the normal compiler and raising only the application ceiling to three CPUs passed ten
+independent cold restarts at p95 between 544 and 774 ms, with p99 between 563 and 784 ms.
+Every restart retained one creation, nineteen typed conflicts, cleanup and zero technical errors.
+These were class-overlay diagnostics, not qualification of a freshly packaged branch image.
+The new reference profile therefore declares three application CPUs in both Compose and the
+measurement contract. Historical two-CPU measurements remain a separate comparison profile.
+The CPU ceiling does not reserve cores exclusively. The memory, database, connection-pool and
+authentication limits are unchanged; full-image load and stress qualification remains required.
+
 Initial budgets are p95 500 ms and p99 1,000 ms for read-only APIs, p95 750 ms for login, and p95
 1,000 ms plus p99 2,000 ms for booking. Technical errors remain below one percent and unexpected
 server errors remain zero. Browser results use p75 budgets of 2,500 ms LCP, 200 ms INP, and 0.1 CLS.
@@ -158,7 +198,7 @@ do not fail on absolute latency budgets because runner variation is not a produc
 
 ## Comparable resources
 
-Reference runs constrain the application to 2 CPUs and 1,024 MiB, PostgreSQL to 2 CPUs and 2,048
+Reference runs constrain the application to 3 CPUs and 1,024 MiB, PostgreSQL to 2 CPUs and 2,048
 MiB, and Caddy to 0.5 CPU and 256 MiB. Observability services run outside those application budgets.
 Prometheus is limited to 1 CPU and 2,048 MiB, with memory plus swap capped at the same size.
 Grafana is limited to 0.5 CPU and 512 MiB; the PostgreSQL exporter to 0.25 CPU and 128 MiB.

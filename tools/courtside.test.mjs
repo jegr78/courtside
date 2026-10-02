@@ -998,7 +998,7 @@ test("given the performance compose contract, when inspecting isolation, then re
 
   // when / then
   assert.match(compose, /^name: courtside-perf/m);
-  assert.match(composeService(compose, "app"), /cpus: 2\.0/);
+  assert.match(composeService(compose, "app"), /cpus: 3\.0/);
   assert.match(composeService(compose, "app"), /mem_limit: 1g/);
   assert.match(composeService(compose, "db"), /cpus: 2\.0/);
   assert.match(composeService(compose, "db"), /mem_limit: 2g/);

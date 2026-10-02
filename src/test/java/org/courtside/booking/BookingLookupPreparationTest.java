@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -35,7 +36,7 @@ class BookingLookupPreparationTest extends AbstractIntegrationTest {
     private JdbcClient jdbc;
 
     @Test
-    void givenTheActualRepository_whenStartupPreparesTheLookup_thenOneReadOnlyQueryLeavesBookingsUnchanged() {
+    void givenTheActualRepository_whenStartupPreparesTheQueries_thenBothReadOnlyQueriesLeaveBookingsUnchanged() {
         // given
         long before = bookings.count();
         clearInvocations(bookings);
@@ -45,13 +46,32 @@ class BookingLookupPreparationTest extends AbstractIntegrationTest {
             readOnlyModes.add(jdbc.sql("SELECT current_setting('transaction_read_only')").query(String.class).single());
             return query.answer(invocation);
         }).when(bookings).findByBookedByAndIdempotencyKey(any(UUID.class), anyString());
+        doAnswer(invocation -> {
+            readOnlyModes.add(jdbc.sql("SELECT current_setting('transaction_read_only')").query(String.class).single());
+            return query.answer(invocation);
+        }).when(bookings).countOpenBookings(any(UUID.class), any(Instant.class));
         try (var context = preparationContext()) {
             // when
             context.refresh();
 
             // then
             verify(bookings, times(1)).findByBookedByAndIdempotencyKey(any(UUID.class), anyString());
-            assertThat(readOnlyModes).containsExactly("on");
+            verify(bookings, times(1)).countOpenBookings(any(UUID.class), any(Instant.class));
+            assertThat(readOnlyModes).containsExactly("on", "on");
+            assertThat(bookings.count()).isEqualTo(before);
+        }
+    }
+
+    @Test
+    void givenAnActualCountQueryFailure_whenPreparingTheQueries_thenStartupFailsWithoutChangingBookings() {
+        // given
+        long before = bookings.count();
+        doAnswer(invocation -> jdbc.sql("SELECT 1 / 0").query(Integer.class).single())
+                .when(bookings).countOpenBookings(any(UUID.class), any(Instant.class));
+        try (var context = preparationContext()) {
+            // when / then
+            assertThatThrownBy(context::refresh).rootCause().hasMessageContaining("division by zero");
+            assertThat(context.isActive()).isFalse();
             assertThat(bookings.count()).isEqualTo(before);
         }
     }

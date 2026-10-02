@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Component
@@ -20,7 +21,10 @@ class BookingLookupPreparation implements SmartInitializingSingleton {
     public void afterSingletonsInstantiated() {
         var transaction = new TransactionTemplate(transactions);
         transaction.setReadOnly(true);
-        transaction.executeWithoutResult(status ->
-                bookings.findByBookedByAndIdempotencyKey(new UUID(0, 0), "startup-preparation"));
+        transaction.executeWithoutResult(status -> {
+            var account = new UUID(0, 0);
+            bookings.findByBookedByAndIdempotencyKey(account, "startup-preparation");
+            bookings.countOpenBookings(account, Instant.EPOCH);
+        });
     }
 }

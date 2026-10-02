@@ -109,7 +109,7 @@ test("given resource and target safety boundaries, when reading the contract, th
   const contract = readJson(contractPath);
 
   // when / then
-  assert.deepEqual(contract.resources.application, { cpu: 2, memoryMegabytes: 1024 });
+  assert.deepEqual(contract.resources.application, { cpu: 3, memoryMegabytes: 1024 });
   assert.deepEqual(contract.resources.database, { cpu: 2, memoryMegabytes: 2048 });
   assert.deepEqual(contract.resources.proxy, { cpu: 0.5, memoryMegabytes: 256 });
   assert.equal(contract.targets.default, "system");

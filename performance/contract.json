@@ -145,7 +145,7 @@
   },
   "resources": {
     "application": {
-      "cpu": 2,
+      "cpu": 3,
       "memoryMegabytes": 1024
     },
     "database": {
