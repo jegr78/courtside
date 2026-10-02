@@ -669,6 +669,22 @@ describe("App build identity", () => {
     expect(await screen.findByTestId("environment-warning")).toHaveAttribute("role", "alert");
   });
 
+  it("given the app opens without a network, when its build cannot be identified, then only the offline notice speaks", async () => {
+    // given
+    vi.spyOn(api, "session").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+
+    // when
+    render(<RoutedShell><App /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("offline-status")).toBeVisible();
+    await waitFor(() => expect(api.source).toHaveBeenCalled());
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByTestId("environment-warning"), "being offline is expected, not a fault of the build").not.toBeInTheDocument();
+  });
+
   it("given the source endpoint hangs, when the app becomes usable, then its identity stays marked as unknown", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);

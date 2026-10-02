@@ -9,6 +9,7 @@ interface BuildIdentityProps {
 
 interface EnvironmentMarkerProps extends BuildIdentityProps {
   identityStatus?: "loading" | "available" | "unavailable";
+  offline?: boolean;
 }
 
 function shortIdentity(source?: SourceOffer): string | undefined {
@@ -96,8 +97,9 @@ export function BuildIdentity({ source }: BuildIdentityProps) {
   </>;
 }
 
-export function EnvironmentMarker({ source, identityStatus = "available" }: EnvironmentMarkerProps) {
+export function EnvironmentMarker({ source, identityStatus = "available", offline = false }: EnvironmentMarkerProps) {
   const { t } = useTranslation();
+  if (identityStatus !== "available" && offline) return null;
   if (identityStatus !== "available") {
     return <div data-testid="environment-warning" role="alert" className="bg-(--cs-environment-error-surface) px-5 py-2 text-center font-semibold text-(--cs-environment-error-text)">
       {t(identityStatus === "loading" ? "environment.loading" : "environment.unavailable")}

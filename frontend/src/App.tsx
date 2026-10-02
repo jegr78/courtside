@@ -245,7 +245,7 @@ export function App() {
       </div>
       <Preferences authenticated={authenticated} supported={club?.supportedLocales} signedOut={signOut} />
     </header>
-    <EnvironmentMarker source={source} identityStatus={identityStatus} />
+    <EnvironmentMarker source={source} identityStatus={identityStatus} offline={offline} />
     <main className="flex flex-1 items-start justify-center px-4 py-8">
       <div className="flex w-full flex-col items-center gap-4">
       {offline && <div data-testid="offline-status" className="w-full max-w-7xl"><Alert tone="warning">{t("status.offline")}</Alert></div>}
