@@ -6,7 +6,7 @@ export function Alert({ children, tone = "error", testId }: {
   tone?: AlertTone;
   testId?: string;
 }) {
-  return <div data-testid={testId} role={tone === "error" ? "alert" : "status"} className={`rounded-lg border p-3 ${noticeColours(tone)}`}>
+  return <div data-testid={testId} role={tone === "error" ? "alert" : "status"} className={`rounded-lg border p-3 wrap-anywhere ${noticeColours(tone)}`}>
     {children}
   </div>;
 }
