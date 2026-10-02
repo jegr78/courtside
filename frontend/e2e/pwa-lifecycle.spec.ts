@@ -71,6 +71,7 @@ for (const locale of ["de", "en"] as const) {
 
     // when
     await context.setOffline(true);
+    const identityRefused = page.waitForEvent("requestfailed", (request) => new URL(request.url()).pathname === "/api/source");
     await page.reload({ waitUntil: "domcontentloaded" });
 
     // then
@@ -79,6 +80,7 @@ for (const locale of ["de", "en"] as const) {
     expect(offlineContract?.cachedAt).toBeGreaterThan(0);
     expect(offlineContract?.cachedGeneration).toBe(offlineContract?.currentGeneration);
     await expect(page.getByTestId("offline-status")).toBeVisible();
+    await identityRefused;
     await expect(page.getByTestId("environment-warning"), "being offline is not a fault of the build").toHaveCount(0);
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();
     await expect(page.locator('[data-testid^="booking-"]').first()).toBeVisible();
