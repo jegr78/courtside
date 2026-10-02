@@ -107,6 +107,35 @@ class BookingServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnExistingBooking_whenAnOverlappingOneIsRefused_thenTheDatabaseLoggerWarnsAboutNothing() {
+        // given
+        bookingService.create(command(SIX_PM, EIGHT_PM));
+        ch.qos.logback.classic.Logger jdbcErrors =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger("org.hibernate.orm.jdbc.error");
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> recorded =
+                new ch.qos.logback.core.read.ListAppender<>();
+        ch.qos.logback.classic.Level testProfileLevel = jdbcErrors.getLevel();
+        jdbcErrors.setLevel(ch.qos.logback.classic.Level.WARN);
+        recorded.start();
+        jdbcErrors.addAppender(recorded);
+
+        // when
+        try {
+            assertThatThrownBy(() -> bookingService.create(command(SEVEN_PM, EIGHT_PM)))
+                    .isInstanceOf(CourtUnavailableException.class);
+        } finally {
+            jdbcErrors.detachAppender(recorded);
+            jdbcErrors.setLevel(testProfileLevel);
+        }
+
+        // then
+        assertThat(recorded.list)
+                .as("a conflict answered with 409 is not a database problem for the operator")
+                .filteredOn(event -> event.getLevel().isGreaterOrEqual(ch.qos.logback.classic.Level.INFO))
+                .isEmpty();
+    }
+
+    @Test
     void givenABookingStartingInThePast_whenCreating_thenItIsRejectedWithoutBeingStored() {
         // given
         Instant start = Instant.parse("2026-05-12T09:00:00Z");
