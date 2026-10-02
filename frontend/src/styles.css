@@ -89,6 +89,14 @@ body {
   background: var(--cs-page);
 }
 
+@layer base {
+  h1,
+  h2,
+  h3 {
+    overflow-wrap: anywhere;
+  }
+}
+
 .font-value,
 time,
 input[type="date"],
