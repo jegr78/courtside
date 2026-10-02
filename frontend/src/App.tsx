@@ -154,6 +154,13 @@ export function App() {
   const [passwordChanged, setPasswordChanged] = useState(false);
   const sessionInvalidations = useRef(0);
 
+  const identify = useCallback(() => api.source()
+    .then((value) => {
+      setSource(value);
+      setIdentityStatus("available");
+    })
+    .catch(() => setIdentityStatus("unavailable")), []);
+
   // The account's language is applied before the session is published, so the signed-in navigation
   // is painted once instead of moving its links out from under whoever is already reaching for one.
   const refreshSession = useCallback(async () => {
@@ -185,12 +192,7 @@ export function App() {
           ?? { authenticated: false, roles: [], passwordChangeRequired: false };
         if (startupInvalidations === sessionInvalidations.current) setSession(restored);
       }),
-      api.source()
-        .then((value) => {
-          setSource(value);
-          setIdentityStatus("available");
-        })
-        .catch(() => setIdentityStatus("unavailable"))
+      identify()
     ]);
     const stopListeningForSessionChanges = listenForOtherClientSessionChanges(unauthenticated);
     window.addEventListener("courtside:unauthenticated", unauthenticated);
@@ -198,7 +200,7 @@ export function App() {
       stopListeningForSessionChanges();
       window.removeEventListener("courtside:unauthenticated", unauthenticated);
     };
-  }, [navigate, refreshSession]);
+  }, [identify, navigate, refreshSession]);
 
   // Before the paint, not after it: the club's colours would otherwise show one frame of the
   // stylesheet's own.
@@ -208,14 +210,17 @@ export function App() {
 
   useEffect(() => {
     const wentOffline = () => setOffline(true);
-    const cameOnline = () => void refreshSession().catch(() => setOffline(true));
+    // Identified before the session lifts the offline state, so an unknown build is never shown in between.
+    const cameOnline = () => void (source ? Promise.resolve() : identify())
+      .then(refreshSession)
+      .catch(() => setOffline(true));
     window.addEventListener("offline", wentOffline);
     window.addEventListener("online", cameOnline);
     return () => {
       window.removeEventListener("offline", wentOffline);
       window.removeEventListener("online", cameOnline);
     };
-  }, [refreshSession]);
+  }, [identify, refreshSession, source]);
 
   function initialPasswordChanged() {
     sessionInvalidations.current += 1;
@@ -245,7 +250,7 @@ export function App() {
       </div>
       <Preferences authenticated={authenticated} supported={club?.supportedLocales} signedOut={signOut} />
     </header>
-    <EnvironmentMarker source={source} identityStatus={identityStatus} />
+    <EnvironmentMarker source={source} identityStatus={identityStatus} offline={offline} />
     <main className="flex flex-1 items-start justify-center px-4 py-8">
       <div className="flex w-full flex-col items-center gap-4">
       {offline && <div data-testid="offline-status" className="w-full max-w-7xl"><Alert tone="warning">{t("status.offline")}</Alert></div>}

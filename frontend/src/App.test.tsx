@@ -669,6 +669,51 @@ describe("App build identity", () => {
     expect(await screen.findByTestId("environment-warning")).toHaveAttribute("role", "alert");
   });
 
+  it("given the app opens without a network, when its build cannot be identified, then only the offline notice speaks", async () => {
+    // given
+    vi.spyOn(api, "session").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValue(new Error("offline"));
+
+    // when
+    render(<RoutedShell><App /></RoutedShell>);
+    await waitFor(() => expect(api.source).toHaveBeenCalled());
+    await act(async () => { await (vi.mocked(api.source).mock.results[0].value as Promise<unknown>).catch(() => undefined); });
+
+    // then
+    expect(await screen.findByTestId("offline-status")).toBeVisible();
+    expect(screen.queryByTestId("environment-warning"), "being offline is expected, not a fault of the build").not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["is identified", true],
+    ["still cannot be identified", false]
+  ])("given an offline launch, when the network returns and the build %s, then the alarm follows only an unknown build", async (_, identified) => {
+    // given
+    vi.spyOn(api, "session").mockRejectedValueOnce(new Error("offline")).mockResolvedValue(anonymous);
+    vi.spyOn(api, "config").mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "source").mockRejectedValueOnce(new Error("offline"));
+    if (identified) vi.mocked(api.source).mockResolvedValue({
+      version: "0.1.0", environment: "PRODUCTION", sourceUrl: "https://github.com/jegr78/courtside"
+    });
+    else vi.mocked(api.source).mockRejectedValue(new Error("unavailable"));
+    render(<RoutedShell><App /></RoutedShell>);
+    expect(await screen.findByTestId("offline-status")).toBeVisible();
+
+    // when
+    act(() => { window.dispatchEvent(new Event("online")); });
+
+    // then
+    await waitFor(() => expect(screen.queryByTestId("offline-status")).not.toBeInTheDocument());
+    expect(api.source).toHaveBeenCalledTimes(2);
+    if (identified) {
+      expect(screen.queryByTestId("environment-warning"), "a build identified on reconnecting raises no alarm").not.toBeInTheDocument();
+      expect(screen.getByTestId("build-identity")).toBeEnabled();
+    } else {
+      expect(screen.getByTestId("environment-warning"), "an unknown build online is still a fault").toHaveAttribute("role", "alert");
+    }
+  });
+
   it("given the source endpoint hangs, when the app becomes usable, then its identity stays marked as unknown", async () => {
     // given
     vi.spyOn(api, "session").mockResolvedValue(anonymous);
