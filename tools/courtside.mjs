@@ -674,6 +674,8 @@ async function execute(options) {
     return;
   }
   if (options.command === "security-run") {
+    // Loaded here rather than at the top: these five bind a schema validator as they load, and every
+    // other command of this tool has to start on a checkout where nothing has been installed yet.
     const {
       runPassiveDeploymentAssessment, runAuthorizationAssessment, renderAuthenticatedZapPlan,
       renderAuthenticatedZapCanaryRetestPlan,
@@ -851,6 +853,8 @@ export function uatStartupSummary(password, needsBootstrap, options) {
   ].join("\n") + "\n";
 }
 
+// Scanning the string for the host let any URL that merely contained it name a repository, so the
+// remote is parsed and its host has to be the one it claims to be.
 export function repositoryFromRemote(url) {
   const remote = (url ?? "").trim();
   const scp = /^(?:[^@/\s]+@)?(?<host>[^:/\s]+):(?<path>\S+)$/.exec(remote);
@@ -1777,6 +1781,8 @@ export function uatResetPlans(all) {
   }
   return [
     { command: "docker", args: [...uatComposeArgs(), "down", "--remove-orphans"] },
+    // A reset states that nothing is left, so it also answers for an environment that never existed:
+    // without --force, docker refuses a volume it cannot find.
     { command: "docker", args: ["volume", "rm", "--force", `${uatProject}_db`] }
   ];
 }

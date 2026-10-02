@@ -85,6 +85,31 @@ Record whether contention ran directly after startup or after other traffic. Col
 can differ materially. Preserve a cold-run latency failure rather than treating a later warm pass
 as proof that the same budget was met after startup.
 
+### Cold booking follow-up
+
+On 2026-10-02, the isolated CachyOS runner compared the rc.8 image with small class overlays.
+Each restart used the same application and database limits and ten-connection pool. The first
+booking workload followed sequential authentication of twenty members. Read-only PostgreSQL
+activity samples ran every 50 ms; these comparisons did not enable JFR.
+
+| Candidate | Booking contention p95 | Maximum observed DB lock waiters |
+| --- | --- | --- |
+| Unmodified rc.8 | 1,364 ms | 9 |
+| Prepared request mapping and validation | 1,128 ms; repeat 1,038 ms | 9 |
+| Preparation plus a local creation queue | 1,257 ms; repeat 1,280 ms | 0 |
+
+Every run produced twenty attempts, one creation, nineteen typed conflicts and one successful
+cancellation, with no technical or server errors. None met the 1,000 ms cold booking budget.
+The queue removed the observed DB lock wait chain but increased latency relative to preparation
+alone, so it was not retained. Request mapping and validation preparation uses transient DTOs
+before readiness; it does not create a booking or change the database coordination lock.
+
+These twenty-request experiments are diagnostic evidence, not an approved baseline or
+qualification of the complete branch. Raw summaries, HTML reports, PostgreSQL samples and
+container-identity checks remain in the ignored `build/validation-evidence` directory of the
+performance worktree and `build/performance/follow-up` on the runner. UAT identities, start times
+and health stayed unchanged; the disposable stack was stopped after each run.
+
 Initial budgets are p95 500 ms and p99 1,000 ms for read-only APIs, p95 750 ms for login, and p95
 1,000 ms plus p99 2,000 ms for booking. Technical errors remain below one percent and unexpected
 server errors remain zero. Browser results use p75 budgets of 2,500 ms LCP, 200 ms INP, and 0.1 CLS.
