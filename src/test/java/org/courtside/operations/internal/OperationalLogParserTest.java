@@ -1,6 +1,8 @@
 package org.courtside.operations.internal;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -38,6 +40,83 @@ class OperationalLogParserTest {
         assertThat(record.severity()).isEqualTo(OperationalLogSeverity.ERROR);
         assertThat(record.message()).isEqualTo("database unavailable");
         assertThat(record.traceId()).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "LOG,  checkpoint complete: wrote 3 buffers, INFO",
+            "NOTICE, relation already exists - skipping, INFO",
+            "WARNING, there is no transaction in progress, WARN",
+            "ERROR, duplicate key value violates unique constraint, ERROR",
+            "FATAL, password authentication failed for user, ERROR",
+            "PANIC, could not locate a valid checkpoint record, ERROR",
+            "DEBUG1, autovacuum launcher started, DEBUG"
+    })
+    void givenADatabaseLineOnStandardError_whenParsing_thenPostgresqlsOwnLevelDecides(
+            String level, String text, OperationalLogSeverity expected) {
+        // given
+        String payload = database("2026-09-19 14:01:00.123 UTC [57] " + level + ":  " + text);
+
+        // when
+        OperationalLogRecord record = parse(payload);
+
+        // then
+        assertThat(record.severity()).as("the level PostgreSQL wrote, not the stream it wrote to").isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "LOG, DETAIL, INFO",
+            "WARNING, HINT, WARN",
+            "ERROR, STATEMENT, ERROR"
+    })
+    void givenAContinuationOfTheSameProcess_whenParsing_thenItTakesTheLevelOfTheMessageItBelongsTo(
+            String level, String continuation, OperationalLogSeverity expected) {
+        // given
+        parse(database("2026-09-19 14:01:00.123 UTC [57] " + level + ":  the message"));
+
+        // when
+        OperationalLogRecord record = parse(database("2026-09-19 14:01:00.123 UTC [57] " + continuation + ":  more"));
+
+        // then
+        assertThat(record.severity()).as("a continuation line is part of the message before it").isEqualTo(expected);
+    }
+
+    @Test
+    void givenAContinuationOfAnotherProcess_whenParsing_thenTheEnvelopeSeverityStands() {
+        // given
+        parse(database("2026-09-19 14:01:00.123 UTC [57] LOG:  the message"));
+
+        // when
+        OperationalLogRecord record = parse(database("2026-09-19 14:01:00.123 UTC [58] DETAIL:  more"));
+
+        // then
+        assertThat(record.severity()).as("nothing is known about process 58").isEqualTo(OperationalLogSeverity.ERROR);
+    }
+
+    @Test
+    void givenAnIndentedLineAfterALogMessage_whenParsing_thenItContinuesThatMessage() {
+        // given
+        parse(database("2026-09-19 14:01:00.123 UTC [57] LOG:  automatic vacuum of table \"courtside.booking\""));
+
+        // when
+        OperationalLogRecord record = parse(database("\tpages: 0 removed, 12 remain"));
+
+        // then
+        assertThat(record.severity()).as("Docker splits a multi-line message into one record per line").isEqualTo(OperationalLogSeverity.INFO);
+    }
+
+    @Test
+    void givenAnotherSourcesLineThatLooksLikePostgresql_whenParsing_thenOnlyTheEnvelopeDecides() {
+        // given
+        String payload = "<11>1 2026-09-19T14:01:00Z host courtside-proxy 42 - - "
+                + "2026-09-19 14:01:00.123 UTC [57] LOG:  upstream reset";
+
+        // when
+        OperationalLogRecord record = parse(payload);
+
+        // then
+        assertThat(record.severity()).as("only the database writes PostgreSQL's prefix").isEqualTo(OperationalLogSeverity.ERROR);
     }
 
     @Test
@@ -159,6 +238,10 @@ class OperationalLogParserTest {
                 .isEqualTo(OperationalLogSeverity.DEBUG);
         assertThat(OperationalLogSeverity.fromText("custom", OperationalLogSeverity.UNKNOWN))
                 .isEqualTo(OperationalLogSeverity.UNKNOWN);
+    }
+
+    private static String database(String message) {
+        return "<11>1 2026-09-19T14:01:00Z host courtside-database 42 - - " + message;
     }
 
     private OperationalLogRecord parse(String payload) {
