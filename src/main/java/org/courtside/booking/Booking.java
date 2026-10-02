@@ -9,10 +9,14 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Persistable;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -23,10 +27,14 @@ import java.util.UUID;
 @Table(name = "booking")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Booking {
+public class Booking implements Persistable<UUID> {
 
     @Id
     private UUID id;
+
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private boolean newEntity = true;
 
     @Column(name = "card_id", nullable = false)
     private UUID cardId;
@@ -85,6 +93,17 @@ public class Booking {
 
     public void allocate(UUID courtId, TimeSlot slot) {
         allocations.add(new CourtAllocation(this, courtId, slot));
+    }
+
+    @Override
+    public boolean isNew() {
+        return newEntity;
+    }
+
+    @PostLoad
+    @PostPersist
+    private void markPersisted() {
+        newEntity = false;
     }
 
     public void clearAllocations() {

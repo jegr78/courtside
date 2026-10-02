@@ -206,7 +206,7 @@ export function parseArguments(argv) {
     throw new Error(`perf-reset requires the exact project name '${perfProject}'`);
   }
   if (command === "perf-run") {
-    const localProfiles = ["smoke", "baseline", "peak", "stress", "soak", "browser"];
+    const localProfiles = ["smoke", "baseline", "peak", "stress", "contention", "soak", "browser"];
     if (options.profile === "funnel-smoke") {
       if (!options.target) {
         throw new Error("perf-run funnel-smoke requires --target with the public Funnel URL");
@@ -222,7 +222,7 @@ export function parseArguments(argv) {
         throw new Error("perf-run funnel-smoke cannot use --fresh");
       }
     } else if (!localProfiles.includes(options.profile)) {
-      throw new Error("perf-run requires smoke, baseline, peak, stress, soak, browser, or funnel-smoke");
+      throw new Error("perf-run requires smoke, baseline, peak, stress, contention, soak, browser, or funnel-smoke");
     }
     if (localProfiles.includes(options.profile) && options.target) {
       throw new Error("--target is only valid for funnel-smoke");
@@ -1051,6 +1051,7 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       "-e", "PERF_TARGET=https://proxy:443",
       "-e", "K6_WEB_DASHBOARD=true",
       "-e", "K6_WEB_DASHBOARD_EXPORT=/results/report.html",
+      ...(options.profile === "contention" ? ["-e", "K6_WEB_DASHBOARD_PERIOD=1s"] : []),
       ...(browserRun ? [
         "-e", "K6_BROWSER_HEADLESS=true",
         "-e", `K6_BROWSER_ARGS=no-sandbox,ignore-certificate-errors-spki-list=${certificatePin}`
@@ -1068,7 +1069,7 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       "run", ...(options.remoteWrite ? ["--out", "experimental-prometheus-rw"] : []),
       "--tag", `testid=${runId}`, "--tag", `profile=${options.profile}`,
       "--summary-trend-stats", "avg,min,med,max,p(50),p(75),p(90),p(95),p(99)",
-      browserRun ? "/scripts/browser.js" : "/scripts/protocol.js"
+      browserRun ? "/scripts/browser.js" : options.profile === "contention" ? "/scripts/contention.js" : "/scripts/protocol.js"
     ]
   };
 }
@@ -1253,13 +1254,15 @@ export function buildPerformanceResult({
   const workload = contract.workloads[profile.workload];
   const browserRun = profile.kind === "browser";
   const funnelRun = profileName === "funnel-smoke";
-  const latencyMetric = browserRun ? raw.metrics.browser_http_req_duration : raw.metrics.http_req_duration;
+  const contentionRun = profileName === "contention";
+  const latencyMetric = browserRun ? raw.metrics.browser_http_req_duration
+    : contentionRun ? raw.metrics.booking_contention_duration : raw.metrics.http_req_duration;
   const latency = latencyMetric.values;
   const thresholdPassed = (name) => Object.values(raw.metrics[name].thresholds).every(value => value.ok);
   const load = {
     dataset: contract.datasets[workload.dataset],
-    readShare: funnelRun ? 1 : workload.readShare,
-    writeShare: funnelRun ? 0 : workload.writeShare,
+    readShare: funnelRun ? 1 : contentionRun ? 0 : workload.readShare,
+    writeShare: funnelRun ? 0 : contentionRun ? 1 : workload.writeShare,
     ...(profile.stages
       ? { stages: profile.stages.map(stage => ({
           targetVirtualUsers: stage.target,
@@ -1292,6 +1295,11 @@ export function buildPerformanceResult({
     } : profileName === "smoke" ? {
       technicalErrorRate: thresholdPassed("technical_errors"),
       unexpectedServerErrors: thresholdPassed("unexpected_server_errors")
+    } : contentionRun ? {
+      technicalErrorRate: thresholdPassed("technical_errors"),
+      unexpectedServerErrors: thresholdPassed("unexpected_server_errors"),
+      contention: ["contention_attempts", "booking_creations", "booking_conflicts", "booking_contention_duration"].every(thresholdPassed),
+      cleanup: thresholdPassed("booking_cancellations")
     } : funnelRun ? {
       technicalErrorRate: thresholdPassed("technical_errors"),
       unexpectedServerErrors: thresholdPassed("unexpected_server_errors"),
@@ -1324,6 +1332,11 @@ export function buildPerformanceResult({
         bookingConflicts: raw.metrics.booking_conflicts?.values.count ?? 0,
         bookingConflictRate: raw.metrics.booking_conflict_rate?.values.rate ?? 0
       }),
+      ...(contentionRun ? {
+        contentionAttempts: raw.metrics.contention_attempts?.values.count ?? 0,
+        bookingCreations: raw.metrics.booking_creations?.values.count ?? 0,
+        bookingCancellations: raw.metrics.booking_cancellations?.values.count ?? 0
+      } : {}),
       latencyMilliseconds: {
         p50: latency["p(50)"], p90: latency["p(90)"], p95: latency["p(95)"], p99: latency["p(99)"]
       }
@@ -2214,7 +2227,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> <IMAGE_DIGEST>\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json>\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|contention|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> <IMAGE_DIGEST>\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json>\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

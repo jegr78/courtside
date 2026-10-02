@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-19",
+  "reviewedAt": "2026-10-02",
   "sources": {
     "openapi": "src/main/resources/api/openapi.yaml",
     "scheduledFiles": [
@@ -21,7 +21,9 @@
     ],
     "listenerFiles": [
       "src/main/java/org/courtside/audit/internal/DomainEventWriter.java",
+      "src/main/java/org/courtside/booking/web/BookingValidationPreparation.java",
       "src/main/java/org/courtside/card/internal/ShippedCardNaming.java",
+      "src/main/java/org/courtside/config/internal/CoordinationPreparation.java",
       "src/main/java/org/courtside/identity/internal/SignInFailureLog.java",
       "src/main/java/org/courtside/member/internal/RosterSecurityEventLog.java",
       "src/main/java/org/courtside/member/internal/ShippedMembershipTypeNaming.java",
@@ -125,6 +127,15 @@
         "ShippedCardNaming#run",
         "ShippedMembershipTypeNaming#run",
         "ShippedRuleSetNaming#run"
+      ]
+    },
+    {
+      "id": "ordinary-startup-preparation",
+      "kind": "ordinary",
+      "rationale": "Servlet initialization validates one fixed booking request and one method invocation shape without calling the controller. Coordination preparation reads and locks one configuration row in an independent rollback-only transaction with a ten-second timeout; completion releases the lock without persisting a value.",
+      "entryPoints": [
+        "BookingValidationPreparation#onWebServerInitialized(ServletWebServerInitializedEvent)",
+        "CoordinationPreparation#prepareCoordination(ApplicationReadyEvent)"
       ]
     },
     {

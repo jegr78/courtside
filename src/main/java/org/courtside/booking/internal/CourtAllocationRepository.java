@@ -18,6 +18,19 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
             SELECT EXISTS (
                 SELECT 1 FROM court_allocation a
                 WHERE a.status = 'CONFIRMED'
+                  AND a.court_id IN (:courtIds)
+                  AND tstzrange(a.starts_at, a.ends_at, '[)')
+                      && tstzrange(CAST(:startsAt AS timestamptz), CAST(:endsAt AS timestamptz), '[)')
+            )
+            """, nativeQuery = true)
+    boolean existsConfirmedOverlapping(@Param("courtIds") Collection<UUID> courtIds,
+                                       @Param("startsAt") Instant startsAt,
+                                       @Param("endsAt") Instant endsAt);
+
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1 FROM court_allocation a
+                WHERE a.status = 'CONFIRMED'
                   AND a.ends_at > :from
                   AND (
                     MOD(EXTRACT(EPOCH FROM

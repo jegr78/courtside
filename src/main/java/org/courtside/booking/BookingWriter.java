@@ -7,6 +7,7 @@ import org.courtside.booking.internal.BookingAccessControl;
 import org.courtside.booking.internal.BookingRuleGate;
 import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.booking.internal.CourtUnavailableException;
+import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.ParticipantKind;
 import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
@@ -48,6 +49,7 @@ class BookingWriter {
     private static final String IDEMPOTENCY_CONSTRAINT = "booking_idempotency_by_account";
 
     private final BookingRepository bookings;
+    private final CourtAllocationRepository allocations;
     private final EntityManager entityManager;
     private final Clock clock;
     private final BookingRuleGate ruleGate;
@@ -72,6 +74,7 @@ class BookingWriter {
         List<ParticipantSpec> slots = resolveSlots(card, command);
         ruleGate.requireNoViolations(new BookingRuleCheck(command.courtIds(), command.cardId(), command.slot(),
                 command.bookedBy(), command.bookedByPersonId(), command.callerRoles()));
+        requireAvailableCourts(command, idempotencyKey);
 
         Booking booking = new Booking(
                 command.cardId(), command.bookedBy(), command.note(), clock.instant());
@@ -84,9 +87,7 @@ class BookingWriter {
             bookings.saveAndFlush(booking);
         } catch (DataIntegrityViolationException e) {
             if (isOverlap(e)) {
-                meters.counter("courtside.bookings.conflicts").increment();
-                throw new CourtUnavailableException(
-                        "One of the requested courts is already occupied for that time", e);
+                throw courtUnavailable(e);
             }
             if (isConstraint(e, IDEMPOTENCY_CONSTRAINT)) {
                 throw new IdempotencyKeyRaceException(e);
@@ -100,6 +101,22 @@ class BookingWriter {
             announceRecordedMembers(booking.getId(), command);
         }
         return booking.getId();
+    }
+
+    private void requireAvailableCourts(CreateBookingCommand command, String idempotencyKey) {
+        if (!allocations.existsConfirmedOverlapping(command.courtIds(), command.slot().start(), command.slot().end())) {
+            return;
+        }
+        if (idempotencyKey != null
+                && bookings.findByBookedByAndIdempotencyKey(command.bookedBy(), idempotencyKey).isPresent()) {
+            throw new IdempotencyKeyRaceException(null);
+        }
+        throw courtUnavailable(null);
+    }
+
+    private CourtUnavailableException courtUnavailable(Throwable cause) {
+        meters.counter("courtside.bookings.conflicts").increment();
+        return new CourtUnavailableException("One of the requested courts is already occupied for that time", cause);
     }
 
     private void announceRecordedMembers(UUID bookingId, CreateBookingCommand command) {

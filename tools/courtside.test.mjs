@@ -998,7 +998,7 @@ test("given the performance compose contract, when inspecting isolation, then re
 
   // when / then
   assert.match(compose, /^name: courtside-perf/m);
-  assert.match(composeService(compose, "app"), /cpus: 2\.0/);
+  assert.match(composeService(compose, "app"), /cpus: 3\.0/);
   assert.match(composeService(compose, "app"), /mem_limit: 1g/);
   assert.match(composeService(compose, "db"), /cpus: 2\.0/);
   assert.match(composeService(compose, "db"), /mem_limit: 2g/);
@@ -1023,6 +1023,30 @@ test("given the performance compose contract, when inspecting isolation, then re
   assert.match(dashboard, /k6_http_req_duration/);
   const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.perf", import.meta.url)), "utf8");
   assert.match(caddy, /^https:\/\/localhost:443, https:\/\/proxy:443 \{$/m);
+});
+
+test("given performance telemetry, when inspecting collectors, then budgets and plugin startup are bounded", () => {
+  // given
+  const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.perf-telemetry.yaml", import.meta.url)), "utf8");
+
+  // when
+  const prometheus = composeService(compose, "prometheus");
+  const grafana = composeService(compose, "grafana");
+  const exporter = composeService(compose, "postgres-exporter");
+
+  // then
+  assert.match(prometheus, /cpus: 1\.0/);
+  assert.match(prometheus, /mem_limit: 2g/);
+  assert.match(prometheus, /memswap_limit: 2g/);
+  assert.match(grafana, /cpus: 0\.5/);
+  assert.match(grafana, /mem_limit: 512m/);
+  assert.match(grafana, /\/tmp:size=256m,mode=1777/);
+  assert.match(grafana, /GF_PLUGINS_PREINSTALL_SYNC: prometheus/);
+  assert.match(grafana, /GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"/);
+  assert.match(grafana, /read_only: true/);
+  assert.doesNotMatch(grafana, /GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS/);
+  assert.match(exporter, /cpus: 0\.25/);
+  assert.match(exporter, /mem_limit: 128m/);
 });
 
 test("given development modes, when validating ports, then debug adds only its listener", () => {
