@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import {
-  clearPersonalBookingsOfflineData, offlineMemberSession, PERSONAL_BOOKINGS_CACHE, PERSONAL_BOOKINGS_CONTROL_CACHE
+  clearPersonalBookingsOfflineData, offlineClubName, offlineMemberSession, PERSONAL_BOOKINGS_CACHE, PERSONAL_BOOKINGS_CONTROL_CACHE
 } from "./offlineBookings";
 
 afterEach(() => {
@@ -157,4 +157,54 @@ it("clears personal booking data without making cache failures break sign-out", 
 
   await expect(clearPersonalBookingsOfflineData()).resolves.toBeUndefined();
   expect(remove).toHaveBeenCalledWith(PERSONAL_BOOKINGS_CACHE);
+});
+
+function cachedPage(page: Record<string, unknown>) {
+  const generation = "generation-1";
+  const request = new Request("http://localhost/api/my/bookings?limit=50");
+  const remove = vi.fn().mockResolvedValue(true);
+  vi.stubGlobal("caches", {
+    open: vi.fn().mockImplementation((name: string) => Promise.resolve(name === PERSONAL_BOOKINGS_CACHE ? {
+      keys: () => Promise.resolve([request]), match: vi.fn().mockResolvedValue({
+        headers: new Headers({ "x-courtside-cache-generation": generation }),
+        clone: () => ({ json: () => Promise.resolve(page) })
+      })
+    } : {
+      match: () => Promise.resolve(new Response(generation)),
+      delete: () => Promise.resolve(true),
+      put: () => Promise.resolve()
+    })),
+    delete: remove
+  });
+  return remove;
+}
+
+it("given a recent personal-booking response, when the app reads it offline, then it names the club", async () => {
+  // given
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-09-24T12:00:00Z"));
+  cachedPage({ refreshedAt: "2026-09-23T12:00:00Z", clubName: "Example Tennis Club" });
+
+  // when
+  const clubName = await offlineClubName();
+
+  // then
+  expect(clubName, "the cached page is the one response an offline launch may read").toBe("Example Tennis Club");
+});
+
+it.each([
+  ["has expired", { refreshedAt: "2026-09-09T12:00:00Z", clubName: "Example Tennis Club" }],
+  ["names no club", { refreshedAt: "2026-09-23T12:00:00Z" }],
+  ["names a blank club", { refreshedAt: "2026-09-23T12:00:00Z", clubName: "  " }]
+])("given a personal-booking response that %s, when the app reads it offline, then it names no club", async (_, page) => {
+  // given
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-09-24T12:00:00Z"));
+  cachedPage(page);
+
+  // when
+  const clubName = await offlineClubName();
+
+  // then
+  expect(clubName).toBeUndefined();
 });

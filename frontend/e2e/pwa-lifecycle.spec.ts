@@ -29,6 +29,7 @@ async function cachedPersonalBookingContract(page: import("@playwright/test").Pa
     return {
       requestPath: `${new URL(requests[0].url).pathname}${new URL(requests[0].url).search}`,
       pageKeys: Object.keys(body).sort(),
+      clubName: "clubName" in body ? body.clubName : undefined,
       cachedAt: Number(response?.headers.get("x-courtside-cached-at")),
       cachedGeneration: response?.headers.get("x-courtside-cache-generation"),
       currentGeneration: await marker?.text(),
@@ -65,6 +66,7 @@ for (const locale of ["de", "en"] as const) {
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();
     await expect(page.locator('[data-testid^="booking-"]').first()).toBeVisible();
     await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings"]);
+    const clubName = await page.getByTestId("club-brand-name").textContent();
     const cachedContract = await cachedPersonalBookingContract(page);
     expect(cachedContract?.requestPath).toBe("/api/my/bookings?limit=50");
     expect(cachedContract?.cachedGeneration).toBe(cachedContract?.currentGeneration);
@@ -79,7 +81,9 @@ for (const locale of ["de", "en"] as const) {
     expect(offlineContract?.requestPath).toBe("/api/my/bookings?limit=50");
     expect(offlineContract?.cachedAt).toBeGreaterThan(0);
     expect(offlineContract?.cachedGeneration).toBe(offlineContract?.currentGeneration);
+    expect(offlineContract?.clubName, "the cached bookings carry the name the shell showed online").toBe(clubName);
     await expect(page.getByTestId("offline-status")).toBeVisible();
+    await expect(page.getByTestId("club-brand-name")).toHaveText(clubName ?? "");
     await identityRefused;
     await expect(page.getByTestId("environment-warning"), "being offline is not a fault of the build").toHaveCount(0);
     await expect(page.getByTestId("my-bookings-page")).toBeVisible();
@@ -172,7 +176,7 @@ test("logout outranks a delayed personal-booking revalidation and the cache cont
   await expect(page.getByTestId("my-bookings-page")).toBeVisible();
   await expect.poll(() => cachedApiPaths(page)).toEqual(["/api/my/bookings"]);
   const cachedContract = await cachedPersonalBookingContract(page);
-  expect(cachedContract?.pageKeys).toEqual(["courts", "items", "refreshedAt", "timeZone"]);
+  expect(cachedContract?.pageKeys).toEqual(["clubName", "courts", "items", "refreshedAt", "timeZone"]);
   const allowedItemKeys = new Set([
     "cardColor", "cardLabel", "courtIds", "endsAt", "id", "seriesId", "startsAt", "status"
   ]);

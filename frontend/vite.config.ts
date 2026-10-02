@@ -63,6 +63,7 @@ export default defineConfig({
                     refreshedAt?: string;
                     timeZone?: string;
                     courts?: unknown[];
+                    clubName?: string;
                   };
                   const control = await caches.open("courtside-personal-bookings-control");
                   const marker = await control.match(new URL("/.courtside/personal-bookings-generation", self.location.origin).href);
@@ -81,7 +82,8 @@ export default defineConfig({
                     })),
                     refreshedAt: page.refreshedAt,
                     timeZone: page.timeZone,
-                    courts: page.courts
+                    courts: page.courts,
+                    clubName: page.clubName
                   };
                   const headers = new Headers(response.headers);
                   headers.delete("content-length");

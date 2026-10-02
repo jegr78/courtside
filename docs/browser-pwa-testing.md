@@ -13,11 +13,12 @@ operations require the network. The precache holds the member surface and every 
 but not the administration surface: its chunk loads when an administrator opens it, and the build
 policy refuses a build whose entry or precache says otherwise. Workbox uses `NetworkOnly` for every API request except the
 member-owned `GET /api/my/bookings`, which uses a seven-day `StaleWhileRevalidate` cache. Its page
-also carries the club time zone and court labels, so the cached response is self-contained. The PWA
-journey inspects Cache Storage after authenticated activity and offline reloads. A German and an
-English offline launch must keep that member's bookings readable with the response's `refreshedAt`
-instant as the visible refresh time, state that the court plan cannot be refreshed, and reconnect without mixed
-assets. Successful login, logout and a server-observed expired session (`401`) clear the personal
+also carries the club time zone, the court labels and the club's name, so the cached response is
+self-contained and the header can still name the club. The PWA journey inspects Cache Storage after
+authenticated activity and offline reloads. A German and an English offline launch must keep that
+member's bookings readable with the response's `refreshedAt` instant as the visible refresh time, keep
+the club's name in the header, raise no build-identity alarm, state that the court plan cannot be
+refreshed, and reconnect without mixed assets. Successful login, logout and a server-observed expired session (`401`) clear the personal
 cache; logout plus Back
 and Forward must not reveal an authenticated view.
 

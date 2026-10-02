@@ -15,7 +15,7 @@ import { useClubConfiguration } from "./club/registry";
 import { brandContrast } from "./brandColor";
 import { applyAccountLocale, supportedLocale } from "./i18n";
 import {
-  clearPersonalBookingsOfflineData, listenForOtherClientSessionChanges, offlineMemberSession
+  clearPersonalBookingsOfflineData, listenForOtherClientSessionChanges, offlineClubName, offlineMemberSession
 } from "./offlineBookings";
 import { lazySurface } from "./navigation/lazySurface";
 import { HomeView } from "./views/HomeView";
@@ -151,6 +151,7 @@ export function App() {
   const [source, setSource] = useState<SourceOffer>();
   const [identityStatus, setIdentityStatus] = useState<"loading" | "available" | "unavailable">("loading");
   const [offline, setOffline] = useState(() => !navigator.onLine);
+  const [offlineClub, setOfflineClub] = useState<string>();
   const [passwordChanged, setPasswordChanged] = useState(false);
   const sessionInvalidations = useRef(0);
 
@@ -188,9 +189,12 @@ export function App() {
     void Promise.all([
       refreshSession().catch(async () => {
         setOffline(true);
-        const restored = await offlineMemberSession()
-          ?? { authenticated: false, roles: [], passwordChangeRequired: false };
-        if (startupInvalidations === sessionInvalidations.current) setSession(restored);
+        const member = await offlineMemberSession();
+        const clubName = member ? await offlineClubName() : undefined;
+        const restored = member ?? { authenticated: false, roles: [], passwordChangeRequired: false };
+        if (startupInvalidations !== sessionInvalidations.current) return;
+        setOfflineClub(clubName);
+        setSession(restored);
       }),
       identify()
     ]);
@@ -246,7 +250,7 @@ export function App() {
     <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
       <div className="flex items-center gap-3">
         {club?.logoUrl ? <img src={club.logoUrl} alt="" data-testid="club-logo" className="h-10 w-10 rounded-lg object-contain" /> : <CourtsideMark />}
-        <span data-testid="club-brand-name" className="text-xl font-bold">{club?.clubName ?? t("app.name")}</span>
+        <span data-testid="club-brand-name" className="text-xl font-bold">{club?.clubName ?? offlineClub ?? t("app.name")}</span>
       </div>
       <Preferences authenticated={authenticated} supported={club?.supportedLocales} signedOut={signOut} />
     </header>
