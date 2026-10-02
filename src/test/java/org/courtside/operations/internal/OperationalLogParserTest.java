@@ -1,6 +1,8 @@
 package org.courtside.operations.internal;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -38,6 +40,40 @@ class OperationalLogParserTest {
         assertThat(record.severity()).isEqualTo(OperationalLogSeverity.ERROR);
         assertThat(record.message()).isEqualTo("database unavailable");
         assertThat(record.traceId()).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "LOG,  checkpoint complete: wrote 3 buffers, INFO",
+            "NOTICE, relation already exists - skipping, INFO",
+            "WARNING, there is no transaction in progress, WARN",
+            "ERROR, duplicate key value violates unique constraint, ERROR",
+            "FATAL, password authentication failed for user, ERROR",
+            "PANIC, could not locate a valid checkpoint record, ERROR",
+            "DEBUG1, autovacuum launcher started, DEBUG"
+    })
+    void givenADatabaseLineOnStandardError_whenParsing_thenPostgresqlsOwnLevelDecides(
+            String level, String text, OperationalLogSeverity expected) {
+        OperationalLogRecord record = parse("<11>1 2026-09-19T14:01:00Z host courtside-database 42 - - "
+                + "2026-09-19 14:01:00.123 UTC [57] " + level + ":  " + text);
+
+        assertThat(record.severity()).as("the level PostgreSQL wrote, not the stream it wrote to").isEqualTo(expected);
+    }
+
+    @Test
+    void givenADatabaseDetailLine_whenParsing_thenTheEnvelopeSeverityStands() {
+        OperationalLogRecord record = parse("<11>1 2026-09-19T14:01:00Z host courtside-database 42 - - "
+                + "2026-09-19 14:01:00.123 UTC [57] STATEMENT:  select 1");
+
+        assertThat(record.severity()).isEqualTo(OperationalLogSeverity.ERROR);
+    }
+
+    @Test
+    void givenAnApplicationLineThatLooksLikePostgresql_whenParsing_thenOnlyTheEnvelopeDecides() {
+        OperationalLogRecord record = parse("<11>1 2026-09-19T14:01:00Z host courtside-proxy 42 - - "
+                + "2026-09-19 14:01:00.123 UTC [57] LOG:  upstream reset");
+
+        assertThat(record.severity()).isEqualTo(OperationalLogSeverity.ERROR);
     }
 
     @Test

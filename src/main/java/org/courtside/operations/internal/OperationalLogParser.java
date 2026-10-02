@@ -64,6 +64,9 @@ final class OperationalLogParser {
         OperationalLogSeverity severity = envelopeSeverity;
         String message = rawMessage;
         String traceId = null;
+        if (source == OperationalLogSource.DATABASE) {
+            severity = OperationalLogSeverity.fromPostgresqlLine(rawMessage, envelopeSeverity);
+        }
         if (source == OperationalLogSource.APPLICATION && rawMessage.startsWith("{")) {
             try {
                 JsonNode ecs = JSON.readTree(rawMessage);
