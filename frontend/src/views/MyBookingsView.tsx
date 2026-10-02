@@ -107,7 +107,7 @@ export function MyBookingsView({ now, offline = false }: {
 
   const sections = useMemo(() => ({
     upcoming: bookings
-      .filter((booking) => booking.status === "CONFIRMED" && new Date(booking.endsAt) >= reference)
+      .filter((booking) => new Date(booking.endsAt) >= reference)
       .toSorted((left, right) => left.startsAt.localeCompare(right.startsAt)),
     past: bookings
       .filter((booking) => new Date(booking.endsAt) < reference)

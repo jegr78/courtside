@@ -192,6 +192,9 @@ The message includes the applicable number. Correct the marked fields and submit
 Courtside releases the court immediately. If the cancellation deadline has passed, the booking
 remains and Courtside tells you which deadline applied.
 
+The cancelled booking stays in the list, marked as cancelled, until its date. After that you find
+it among your past bookings.
+
 ![Upcoming bookings with the cancellation button, the past ones folded away below them.](../screenshots/en/my-bookings.png)
 
 ## Series
