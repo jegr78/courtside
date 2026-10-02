@@ -136,6 +136,30 @@ test("the booking dialog keeps its actions on screen while the browser bar cover
   expect(actions, "the actions stay in place while the form scrolls").toEqual(submit);
 });
 
+test("a refused booking says why on the phone screen and keeps its reference inside the alert", async ({ page, journeyService }) => {
+  // given
+  await signIn(page, "doe.jane");
+  await selectJourneyDate(page, journeyService.visualDate);
+  await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]:visible').tap();
+  await page.getByTestId("booking-more-summary").tap();
+  await page.route("**/api/bookings", async (route) => route.request().method() === "POST"
+    ? route.fulfill({ status: 409, contentType: "application/problem+json", json: {
+      type: "urn:courtside:error:court-unavailable", title: "Court unavailable", status: 409,
+      traceId: "4bf92f3577b34da6a3ce929d0e0e4736", spanId: "00f067aa0ba902b7"
+    } })
+    : route.fallback());
+
+  // when
+  await page.getByTestId("booking-submit").tap();
+
+  // then
+  const refusal = page.getByTestId("booking-dialog").getByRole("alert");
+  await expect(refusal).toContainText("4bf92f3577b34da6a3ce929d0e0e4736");
+  await expect(refusal, "the reason for the refusal is on screen where the member pressed Book").toBeInViewport({ ratio: 1 });
+  const overflow = await refusal.evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(overflow, "the reference wraps inside the alert").toBeLessThanOrEqual(0);
+});
+
 test("the account menu stays inside the narrowest supported viewport", async ({ page }) => {
   // given
   await page.setViewportSize({ width: 320, height: 720 });
