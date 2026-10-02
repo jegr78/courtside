@@ -16,7 +16,7 @@ class CoordinationPreparation {
     private final PlatformTransactionManager transactions;
 
     @EventListener(ApplicationReadyEvent.class)
-    public void prepareCoordination() {
+    public void prepareCoordination(ApplicationReadyEvent event) {
         var transaction = new TransactionTemplate(transactions);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         transaction.setTimeout(10);
