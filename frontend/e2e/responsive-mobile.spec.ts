@@ -854,6 +854,8 @@ async function become(page: Page, persona: Persona) {
 test("given the narrowest supported phone, when a member opens each of their pages, then none scrolls sideways", async ({ page }) => {
   // given
   await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/login");
+  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
   await become(page, "doe.jane");
   const paths = routerPages().filter((route) => !route.redirect && !/[:*]/.test(route.path)
     && personas(route.path).includes("doe.jane")).map((route) => route.path);
@@ -864,6 +866,7 @@ test("given the narrowest supported phone, when a member opens each of their pag
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     await page.evaluate(() => document.fonts.ready);
+    await expect(page.locator("html"), "German carries the longest single words").toHaveAttribute("lang", "de");
     const excess = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (excess > 0) overflowing.push(`${new URL(page.url()).pathname} by ${excess}px`);
   }
