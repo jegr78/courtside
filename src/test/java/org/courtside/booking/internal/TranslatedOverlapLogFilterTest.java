@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.core.spi.FilterReply;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -33,5 +34,31 @@ class TranslatedOverlapLogFilterTest {
 
         // then
         assertThat(reply).as("every other database failure still reaches the log").isEqualTo(expected);
+    }
+
+    @Test
+    void givenAnInstalledFilter_whenTheLoggingSystemResetsTheContext_thenTheFilterIsInPlaceAgain() {
+        // given
+        filter.install(context);
+
+        // when
+        context.reset();
+
+        // then
+        assertThat(context.getTurboFilterList()).as("Spring Boot resets logging when another application context starts").contains(filter);
+        assertThat(filter.isStarted()).isTrue();
+    }
+
+    @Test
+    void givenAnInstalledFilter_whenUninstalled_thenAResetDoesNotBringItBack() {
+        // given
+        filter.install(context);
+        filter.uninstall(context);
+
+        // when
+        context.reset();
+
+        // then
+        assertThat(context.getTurboFilterList()).doesNotContain(filter);
     }
 }
