@@ -285,7 +285,7 @@ async function verifyApplication(password, port, isWriteRequired = true) {
   assert.equal(courts.statusCode, 200, courts.body);
   assert.ok(JSON.parse(courts.body).some((court) => court.name === "Upgrade court"));
   if (!isWriteRequired) return;
-  const bookings = await request(jar, port, { path: "/api/my/bookings" });
+  const bookings = await request(jar, port, { path: "/api/my/bookings?view=HISTORY" });
   assert.equal(bookings.statusCode, 200, bookings.body);
   assert.match(bookings.body, /77000000-0000-0000-0000-000000000001/);
 
