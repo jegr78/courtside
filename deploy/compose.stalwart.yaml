@@ -22,7 +22,7 @@ services:
       - ./Caddyfile.stalwart:/etc/caddy/sites.d/stalwart.caddy:ro
 
   mail:
-    image: stalwartlabs/stalwart:v0.16.23@sha256:be215678796691bc39bdda918ecc50d14a9032a099a1d1950e51950aec7e2592
+    image: stalwartlabs/stalwart:v0.16.24@sha256:ec011be228596e37e65f41aab17deed573859614430472f7eeb42178c50d87b7
     profiles: [mail]
     restart: unless-stopped
     logging: *logging
@@ -150,7 +150,7 @@ services:
     entrypoint: ["sh", "/mail/render.sh", "bootstrap", "base"]
 
   mail-bootstrap:
-    image: stalwartlabs/cli:1.0.12@sha256:fe199affac1d120a8c200ef39ae629765a2976270e0453575c1caf906ee15b52
+    image: stalwartlabs/cli:1.0.13@sha256:9a1e07307d6f890a193322c4b737fc0868405f0f8486a19922cbf362f43884fd
     profiles: [mail-setup]
     logging: *logging
     security_opt:
@@ -176,7 +176,7 @@ services:
     command: ["apply", "--file", "/plan/bootstrap.ndjson"]
 
   mail-configure:
-    image: stalwartlabs/cli:1.0.12@sha256:fe199affac1d120a8c200ef39ae629765a2976270e0453575c1caf906ee15b52
+    image: stalwartlabs/cli:1.0.13@sha256:9a1e07307d6f890a193322c4b737fc0868405f0f8486a19922cbf362f43884fd
     profiles: [mail-setup]
     logging: *logging
     security_opt:
