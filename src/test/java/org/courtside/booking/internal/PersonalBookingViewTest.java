@@ -131,6 +131,48 @@ class PersonalBookingViewTest extends AbstractIntegrationTest {
                 .containsExactly(nextWeek);
     }
 
+    @Test
+    void givenManyCancellationsAheadOfTheActiveBooking_whenListingUpcoming_thenTheActiveBookingLeads() {
+        // given
+        Instant slot = Instant.parse("2026-05-13T16:00:00Z");
+        List<UUID> cancelled = new ArrayList<>();
+        for (int attempt = 0; attempt < 3; attempt += 1) {
+            UUID booking = bookedAt(slot);
+            bookings.cancel(booking, janeAccountId, Set.of(Role.MEMBER));
+            cancelled.add(booking);
+        }
+        UUID active = bookedAt(slot);
+
+        // when
+        PersonalBookingPage first = bookings.personalBookings(janeAccountId, PersonalBookingView.UPCOMING, null, 1);
+
+        // then
+        assertThat(idsOf(first.bookings()))
+                .as("a cancellation in the same slot does not push the booking that stands off the page")
+                .containsExactly(active);
+        assertThat(first.nextCursor()).isNull();
+        assertThat(walk(PersonalBookingView.CANCELLED)).containsExactlyInAnyOrderElementsOf(cancelled);
+    }
+
+    @Test
+    void givenCancellationsBeforeAndAfterTheirDate_whenListingEachView_thenOnlyThoseStillAheadAreCancelled() {
+        // given
+        UUID later = bookedAt(Instant.parse("2026-05-20T16:00:00Z"));
+        UUID sooner = bookedAt(Instant.parse("2026-05-13T16:00:00Z"));
+        UUID passed = bookedAt(Instant.parse("2026-05-14T16:00:00Z"));
+        for (UUID booking : List.of(later, sooner, passed)) {
+            bookings.cancel(booking, janeAccountId, Set.of(Role.MEMBER));
+        }
+        moveTo(passed, Instant.parse("2026-05-05T16:00:00Z"));
+
+        // when / then
+        assertThat(walk(PersonalBookingView.CANCELLED)).as("soonest first, like the upcoming bookings")
+                .containsExactly(sooner, later);
+        assertThat(walk(PersonalBookingView.UPCOMING)).isEmpty();
+        assertThat(walk(PersonalBookingView.HISTORY)).as("a cancellation joins the history once its date has passed")
+                .containsExactly(passed);
+    }
+
     private List<UUID> walk(PersonalBookingView view) {
         List<UUID> walked = new ArrayList<>();
         UUID cursor = null;

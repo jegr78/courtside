@@ -21,6 +21,8 @@ export function MyBookingsView({ now, offline = false }: {
   const { t, i18n } = useTranslation();
   const [reference] = useState(() => now ?? new Date());
   const [bookings, setBookings] = useState<PersonalBooking[]>([]);
+  const [cancelled, setCancelled] = useState<PersonalBooking[]>([]);
+  const [cancelledNextCursor, setCancelledNextCursor] = useState<string>();
   const [history, setHistory] = useState<PersonalBooking[]>([]);
   const [historyNextCursor, setHistoryNextCursor] = useState<string>();
   const [participations, setParticipations] = useState<Participation[]>([]);
@@ -55,9 +57,12 @@ export function MyBookingsView({ now, offline = false }: {
         clearLoad();
         return;
       }
-      const [historyPage, participationPage, availableCourts, bookingGrid] = await Promise.all([
-        api.personalBookings({ view: "HISTORY" }), api.participations(), api.courts(), api.bookingGrid()
+      const [cancelledPage, historyPage, participationPage, availableCourts, bookingGrid] = await Promise.all([
+        api.personalBookings({ view: "CANCELLED" }), api.personalBookings({ view: "HISTORY" }),
+        api.participations(), api.courts(), api.bookingGrid()
       ]);
+      setCancelled(cancelledPage.items);
+      setCancelledNextCursor(cancelledPage.nextCursor ?? undefined);
       setHistory(historyPage.items);
       setHistoryNextCursor(historyPage.nextCursor ?? undefined);
       setParticipations(participationPage.items);
@@ -109,6 +114,12 @@ export function MyBookingsView({ now, offline = false }: {
       (items) => setBookings((current) => [...current, ...items]), setNextCursor);
   }
 
+  async function loadMoreCancelled() {
+    if (!cancelledNextCursor) return;
+    await loadNextPage(() => api.personalBookings({ view: "CANCELLED", cursor: cancelledNextCursor }),
+      (items) => setCancelled((current) => [...current, ...items]), setCancelledNextCursor);
+  }
+
   async function loadMoreHistory() {
     if (!historyNextCursor) return;
     await loadNextPage(() => api.personalBookings({ view: "HISTORY", cursor: historyNextCursor }),
@@ -145,6 +156,11 @@ export function MyBookingsView({ now, offline = false }: {
     {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
       <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} t={t} />
       {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="justify-self-start" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
+      {cancelled.length > 0 && <details data-testid="cancelled-bookings">
+        <summary data-testid="cancelled-bookings-summary" className="cursor-pointer font-semibold">{t(cancelledNextCursor ? "myBookings.cancelledCountMore" : "myBookings.cancelledCount", { count: cancelled.length })}</summary>
+        <div className="mt-3"><BookingSection testId="cancelled-booking-list" empty="" bookings={cancelled} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} action={chooseAction} t={t} /></div>
+        {cancelledNextCursor && <Button variant="secondary" data-testid="load-more-cancelled-bookings" className="mt-4" disabled={loadingMore} onClick={() => void loadMoreCancelled()}>{t("myBookings.loadMoreCancelled")}</Button>}
+      </details>}
       {!offline && (sections.past.length === 0 && !historyNextCursor
         ? <p data-testid="past-bookings" className="text-muted">{t("myBookings.noPast")}</p>
         : <details data-testid="past-bookings">

@@ -1825,7 +1825,7 @@ components:
 
     PersonalBookingView:
       type: string
-      enum: [UPCOMING, HISTORY]
+      enum: [UPCOMING, CANCELLED, HISTORY]
 
     PersonalBookingPage:
       type: object
@@ -3975,9 +3975,11 @@ paths:
       operationId: listPersonalBookings
       summary: The signed-in account's bookings.
       description: |
-        Confirmed and cancelled bookings. `UPCOMING` holds every booking that has not ended yet,
-        soonest first, so the first page always carries the account's next booking. `HISTORY`
-        holds the bookings that have ended, most recent first.
+        Confirmed and cancelled bookings in three views that never share a booking. `UPCOMING`
+        holds the confirmed bookings that have not ended yet, soonest first, so the first page
+        always carries the account's next booking however often it cancelled. `CANCELLED` holds
+        the cancelled bookings whose date is still ahead, soonest first. `HISTORY` holds every
+        booking that has ended, cancelled or not, most recent first.
       parameters:
         - name: view
           in: query

@@ -134,7 +134,10 @@ public class BookingService {
         }
         PageRequest window = PageRequest.of(0, Math.addExact(limit, 1));
         List<UUID> ids = switch (view) {
-            case UPCOMING -> bookings.findUpcomingPersonalBookingIds(bookedBy, clock.instant(), cursor, window);
+            case UPCOMING -> bookings.findUpcomingPersonalBookingIds(
+                    bookedBy, BookingStatus.CONFIRMED, clock.instant(), cursor, window);
+            case CANCELLED -> bookings.findUpcomingPersonalBookingIds(
+                    bookedBy, BookingStatus.CANCELLED, clock.instant(), cursor, window);
             case HISTORY -> bookings.findPersonalBookingHistoryIds(bookedBy, clock.instant(), cursor, window);
         };
         CursorPage.Result<Booking> page = CursorPage.of(ids, limit, bookings::findAllByIdIn, Booking::getId);

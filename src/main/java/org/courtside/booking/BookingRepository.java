@@ -125,6 +125,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("""
             SELECT b.id FROM Booking b
             WHERE b.bookedBy = :bookedBy
+              AND b.status = :status
               AND (SELECT max(a.endsAt) FROM CourtAllocation a WHERE a.booking = b) >= :now
               AND (:cursor IS NULL
                 OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b), b.id)
@@ -135,6 +136,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                      b.id ASC
             """)
     List<UUID> findUpcomingPersonalBookingIds(@Param("bookedBy") UUID bookedBy,
+                                              @Param("status") BookingStatus status,
                                               @Param("now") Instant now,
                                               @Param("cursor") UUID cursor,
                                               Pageable pageable);
