@@ -21,6 +21,8 @@ export function MyBookingsView({ now, offline = false }: {
   const { t, i18n } = useTranslation();
   const [reference] = useState(() => now ?? new Date());
   const [bookings, setBookings] = useState<PersonalBooking[]>([]);
+  const [history, setHistory] = useState<PersonalBooking[]>([]);
+  const [historyNextCursor, setHistoryNextCursor] = useState<string>();
   const [participations, setParticipations] = useState<Participation[]>([]);
   const [courts, setCourts] = useState<PublicCourt[]>([]);
   const [grid, setGrid] = useState<BookingGrid | undefined>(() => offline ? offlineBookingGrid() : undefined);
@@ -53,9 +55,11 @@ export function MyBookingsView({ now, offline = false }: {
         clearLoad();
         return;
       }
-      const [participationPage, availableCourts, bookingGrid] = await Promise.all([
-        api.participations(), api.courts(), api.bookingGrid()
+      const [historyPage, participationPage, availableCourts, bookingGrid] = await Promise.all([
+        api.personalBookings({ view: "HISTORY" }), api.participations(), api.courts(), api.bookingGrid()
       ]);
+      setHistory(historyPage.items);
+      setHistoryNextCursor(historyPage.nextCursor ?? undefined);
       setParticipations(participationPage.items);
       setParticipationsNextCursor(participationPage.nextCursor ?? undefined);
       setCourts(availableCourts);
@@ -79,15 +83,18 @@ export function MyBookingsView({ now, offline = false }: {
       .catch(() => setMaxBookingMinutes(undefined));
   }, [offline]);
 
-  async function loadMore() {
-    if (!nextCursor) return;
+  async function loadNextPage<T>(
+    read: () => Promise<{ items: T[]; nextCursor?: string | null }>,
+    append: (items: T[]) => void,
+    advance: (cursor?: string) => void
+  ) {
     const version = loadVersion.current;
     setLoadingMore(true);
     try {
-      const page = await api.personalBookings(nextCursor);
+      const page = await read();
       if (version !== loadVersion.current) return;
-      setBookings((current) => [...current, ...page.items]);
-      setNextCursor(page.nextCursor ?? undefined);
+      append(page.items);
+      advance(page.nextCursor ?? undefined);
       clear();
     } catch (failure) {
       if (version === loadVersion.current) report(failure);
@@ -96,31 +103,30 @@ export function MyBookingsView({ now, offline = false }: {
     }
   }
 
+  async function loadMore() {
+    if (!nextCursor) return;
+    await loadNextPage(() => api.personalBookings({ cursor: nextCursor }),
+      (items) => setBookings((current) => [...current, ...items]), setNextCursor);
+  }
+
+  async function loadMoreHistory() {
+    if (!historyNextCursor) return;
+    await loadNextPage(() => api.personalBookings({ view: "HISTORY", cursor: historyNextCursor }),
+      (items) => setHistory((current) => [...current, ...items]), setHistoryNextCursor);
+  }
+
   async function loadMoreParticipations() {
     if (!participationsNextCursor) return;
-    const version = loadVersion.current;
-    setLoadingMore(true);
-    try {
-      const page = await api.participations(participationsNextCursor);
-      if (version !== loadVersion.current) return;
-      setParticipations((current) => [...current, ...page.items]);
-      setParticipationsNextCursor(page.nextCursor ?? undefined);
-      clear();
-    } catch (failure) {
-      if (version === loadVersion.current) report(failure);
-    } finally {
-      if (version === loadVersion.current) setLoadingMore(false);
-    }
+    await loadNextPage(() => api.participations(participationsNextCursor),
+      (items) => setParticipations((current) => [...current, ...items]), setParticipationsNextCursor);
   }
 
   const sections = useMemo(() => ({
     upcoming: bookings
       .filter((booking) => new Date(booking.endsAt) >= reference)
       .toSorted((left, right) => left.startsAt.localeCompare(right.startsAt)),
-    past: bookings
-      .filter((booking) => new Date(booking.endsAt) < reference)
-      .toSorted((left, right) => right.startsAt.localeCompare(left.startsAt))
-  }), [bookings, reference]);
+    past: history.toSorted((left, right) => right.startsAt.localeCompare(left.startsAt))
+  }), [bookings, history, reference]);
 
   const courtNames = new Map(courts.map((court) => [court.id, court.name ?? t("court.number", { number: court.number })]));
   const chooseAction = (chosen: { kind: "cancel" | "move"; booking: PersonalBooking }) => {
@@ -138,14 +144,15 @@ export function MyBookingsView({ now, offline = false }: {
     {success && <SuccessFeedback>{success}</SuccessFeedback>}
     {loading ? <p aria-live="polite">{t("status.loading")}</p> : grid && <div className="mt-4 grid gap-6">
       <BookingSection testId="upcoming-bookings" title={t("myBookings.upcoming")} titleHidden empty={t("myBookings.noUpcoming")} bookings={sections.upcoming} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} actionable={!offline} action={chooseAction} t={t} />
-      {sections.past.length === 0
+      {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="justify-self-start" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
+      {!offline && (sections.past.length === 0 && !historyNextCursor
         ? <p data-testid="past-bookings" className="text-muted">{t("myBookings.noPast")}</p>
         : <details data-testid="past-bookings">
-          <summary data-testid="past-bookings-summary" className="cursor-pointer font-semibold">{t("myBookings.pastCount", { count: sections.past.length })}</summary>
+          <summary data-testid="past-bookings-summary" className="cursor-pointer font-semibold">{t(historyNextCursor ? "myBookings.pastCountMore" : "myBookings.pastCount", { count: sections.past.length })}</summary>
           <div className="mt-3"><BookingSection testId="past-booking-list" empty={t("myBookings.noPast")} bookings={sections.past} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} action={chooseAction} t={t} /></div>
-        </details>}
+          {historyNextCursor && <Button variant="secondary" data-testid="load-more-past-bookings" className="mt-4" disabled={loadingMore} onClick={() => void loadMoreHistory()}>{t("myBookings.loadMorePast")}</Button>}
+        </details>)}
     </div>}
-    {!offline && nextCursor && <Button variant="secondary" data-testid="load-more-bookings" className="mt-6" disabled={loadingMore} onClick={() => void loadMore()}>{t("myBookings.loadMore")}</Button>}
     {!offline && !loading && grid && <ParticipationSection participations={participations} courtNames={courtNames} locale={i18n.language} timeZone={grid.timeZone} withdrawn={async () => { await load(); setSuccess(t("participations.withdrawn")); }} nextCursor={participationsNextCursor} loadingMore={loadingMore} loadMore={loadMoreParticipations} t={t} />}
     {grid && action?.kind === "cancel" && <CancelDialog booking={action.booking} seriesBookings={bookings.filter((booking) => booking.seriesId === action.booking.seriesId && booking.status === "CONFIRMED")} hasMoreBookings={nextCursor !== undefined} timeZone={grid.timeZone} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.cancelledSuccess")); }} />}
     {grid && action?.kind === "move" && <MoveDialog booking={action.booking} courts={courts} timeZone={grid.timeZone} maxBookingMinutes={maxBookingMinutes} closed={() => setAction(undefined)} completed={async () => { setAction(undefined); await load(); setSuccess(t("booking.moved")); }} />}

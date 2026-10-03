@@ -125,6 +125,24 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("""
             SELECT b.id FROM Booking b
             WHERE b.bookedBy = :bookedBy
+              AND (SELECT max(a.endsAt) FROM CourtAllocation a WHERE a.booking = b) >= :now
+              AND (:cursor IS NULL
+                OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b), b.id)
+                    > ((SELECT min(ca.startsAt) FROM CourtAllocation ca
+                        WHERE ca.booking.id = :cursor
+                          AND ca.booking.bookedBy = :bookedBy), :cursor))
+            ORDER BY (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b) ASC,
+                     b.id ASC
+            """)
+    List<UUID> findUpcomingPersonalBookingIds(@Param("bookedBy") UUID bookedBy,
+                                              @Param("now") Instant now,
+                                              @Param("cursor") UUID cursor,
+                                              Pageable pageable);
+
+    @Query("""
+            SELECT b.id FROM Booking b
+            WHERE b.bookedBy = :bookedBy
+              AND (SELECT max(a.endsAt) FROM CourtAllocation a WHERE a.booking = b) < :now
               AND (:cursor IS NULL
                 OR ((SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b), b.id)
                     < ((SELECT min(ca.startsAt) FROM CourtAllocation ca
@@ -133,9 +151,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             ORDER BY (SELECT min(a.startsAt) FROM CourtAllocation a WHERE a.booking = b) DESC,
                      b.id DESC
             """)
-    List<UUID> findPersonalBookingIds(@Param("bookedBy") UUID bookedBy,
-                                      @Param("cursor") UUID cursor,
-                                      Pageable pageable);
+    List<UUID> findPersonalBookingHistoryIds(@Param("bookedBy") UUID bookedBy,
+                                             @Param("now") Instant now,
+                                             @Param("cursor") UUID cursor,
+                                             Pageable pageable);
 
     @Query("""
             SELECT b.id FROM Booking b

@@ -7,6 +7,7 @@ import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.ParticipationService;
 import org.courtside.booking.PersonalBookingPage;
+import org.courtside.booking.PersonalBookingView;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
@@ -117,15 +118,15 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
 
         // when
         List<UUID> firstPage = personalPageOfOne(null);
-        List<UUID> secondPage = personalPageOfOne(sortsAfter);
+        List<UUID> secondPage = personalPageOfOne(sortsBefore);
 
         // then
         assertThat(firstPage)
                 .as("a tie is broken by the id, and the page of one must land on the same side of"
                         + " it that the cursor then continues from")
-                .containsExactly(sortsAfter);
-        assertThat(secondPage).containsExactly(sortsBefore);
-        assertThat(personalPageOfOne(sortsBefore))
+                .containsExactly(sortsBefore);
+        assertThat(secondPage).containsExactly(sortsAfter);
+        assertThat(personalPageOfOne(sortsAfter))
                 .as("the walk ends after the second of the pair rather than repeating it")
                 .isEmpty();
     }
@@ -307,12 +308,12 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
     @Test
     void givenACancelledBookingBetweenTwoPages_whenPagingAcrossIt_thenItIsStillTheCursorThatWorks() {
         // given
-        UUID earliest = bookedByJane(firstCourt, TWO_PM, THREE_PM);
-        UUID cancelled = bookedByJane(secondCourt, SIX_PM, SEVEN_PM);
+        UUID cancelled = bookedByJane(firstCourt, TWO_PM, THREE_PM);
+        UUID latest = bookedByJane(secondCourt, SIX_PM, SEVEN_PM);
         bookings.cancel(cancelled, janeAccountId, Set.of(Role.MEMBER));
 
         // when
-        PersonalBookingPage first = bookings.personalBookings(janeAccountId, null, 1);
+        PersonalBookingPage first = bookings.personalBookings(janeAccountId, PersonalBookingView.UPCOMING, null, 1);
         List<UUID> firstPage = idsOf(first.bookings());
         UUID cursor = first.nextCursor();
 
@@ -322,7 +323,7 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
                         + " list and still hands out a usable cursor")
                 .containsExactly(cancelled);
         assertThat(cursor).isEqualTo(cancelled);
-        assertThat(personalPageFor(janeAccountId, cursor)).containsExactly(earliest);
+        assertThat(personalPageFor(janeAccountId, cursor)).containsExactly(latest);
     }
 
     @Test
@@ -367,11 +368,12 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
     }
 
     private List<UUID> personalPageOfOne(UUID cursor) {
-        return idsOf(bookings.personalBookings(janeAccountId, cursor, 1).bookings());
+        return idsOf(bookings.personalBookings(janeAccountId, PersonalBookingView.UPCOMING, cursor, 1).bookings());
     }
 
     private List<UUID> personalPageFor(UUID accountId, UUID cursor) {
-        return idsOf(bookings.personalBookings(accountId, cursor, PAGE_LIMIT).bookings());
+        return idsOf(bookings.personalBookings(
+                accountId, PersonalBookingView.UPCOMING, cursor, PAGE_LIMIT).bookings());
     }
 
     private List<UUID> participationPageFor(UUID cursor) {

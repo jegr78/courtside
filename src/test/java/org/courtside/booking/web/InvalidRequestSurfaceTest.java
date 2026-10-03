@@ -301,6 +301,15 @@ class InvalidRequestSurfaceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void whenAPersonalPageIsAskedForWithAnUnknownView_thenTheParameterIsNamed() throws Exception {
+        // when / then
+        mockMvc.perform(get("/api/my/bookings").param("view", "SOON"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value(PARAMETER_TYPE_MISMATCH))
+                .andExpect(jsonPath("$.violations[0].params.parameter").value("view"));
+    }
+
+    @Test
     void whenAPersonalPageIsAskedForWithALimitBeyondTheBound_thenItIsAFieldErrorOnLimit()
             throws Exception {
         // when / then

@@ -285,20 +285,36 @@ it("given a date, when loading allocations, then that date is sent as a query pa
   expect(allocations[0].cardLabel).toBe("Member booking");
 });
 
-it("given a personal-booking cursor, when loading the next page, then the cursor and bound are sent", async () => {
+it("given a personal-booking cursor, when loading the next page, then the view, cursor and bound are sent", async () => {
   // given
   server.use(http.get("/api/my/bookings", ({ request }) => {
     const query = new URL(request.url).searchParams;
+    expect(query.get("view")).toBe("HISTORY");
     expect(query.get("cursor")).toBe("11111111-1111-1111-1111-111111111111");
     expect(query.get("limit")).toBe("25");
     return HttpResponse.json({ items: [], nextCursor: null });
   }));
 
   // when
-  const page = await api.personalBookings("11111111-1111-1111-1111-111111111111", 25);
+  const page = await api.personalBookings({ view: "HISTORY", cursor: "11111111-1111-1111-1111-111111111111", limit: 25 });
 
   // then
   expect(page.items).toEqual([]);
+});
+
+it("when loading the first upcoming page, then the request is the one the offline cache keeps", async () => {
+  // given
+  let requested: string | undefined;
+  server.use(http.get("/api/my/bookings", ({ request }) => {
+    requested = new URL(request.url).search;
+    return HttpResponse.json({ items: [], nextCursor: null });
+  }));
+
+  // when
+  await api.personalBookings();
+
+  // then
+  expect(requested, "the service worker keys its offline copy to this exact query").toBe("?limit=50");
 });
 
 it("when loading the booking grid, then its club clock and slot duration are returned", async () => {

@@ -1823,6 +1823,10 @@ components:
         status: { $ref: "#/components/schemas/BookingStatus" }
         note: { type: [string, "null"] }
 
+    PersonalBookingView:
+      type: string
+      enum: [UPCOMING, HISTORY]
+
     PersonalBookingPage:
       type: object
       required: [items]
@@ -3970,8 +3974,17 @@ paths:
       tags: [bookings]
       operationId: listPersonalBookings
       summary: The signed-in account's bookings.
-      description: Confirmed and cancelled bookings, ordered from newest occurrence to oldest.
+      description: |
+        Confirmed and cancelled bookings. `UPCOMING` holds every booking that has not ended yet,
+        soonest first, so the first page always carries the account's next booking. `HISTORY`
+        holds the bookings that have ended, most recent first.
       parameters:
+        - name: view
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/PersonalBookingView"
+            default: UPCOMING
         - name: cursor
           in: query
           required: false
@@ -3987,7 +4000,7 @@ paths:
           schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         "200":
-          description: Every booking created by this account.
+          description: The bookings created by this account in the requested view.
           content:
             application/json:
               schema:

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-02",
+  "reviewedAt": "2026-10-03",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "dee474caf6c987f3f368c3dc091d8efa16fc7f62fed6380f6a95ea735b2c49bf",
+  "openApiFieldInventorySha256": "fcc18b50af24f7da0f9b134f3fc6cf499ea679a877edd80645276c652ecdd38c",
   "protectedFieldInventorySha256": "4f16eed4229be447f36a68cbd5c82d5b9f5afb3c6dbad61dcad6c242025d9bad",
-  "productionAuthorizationSha256": "a6429e9a77ae5ba16b5ab63dadf80adb9f601ee6e8d4a6794f9b2c6c17a361f3",
+  "productionAuthorizationSha256": "966e0d9c38896c0c5f5464fee18a3f46af4d044e9ff02c41506de532a701fc9c",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1127,6 +1127,7 @@
     "listParticipantCardsForAdmin:response:Violation.params.*",
     "listPersonalBookings:parameter:$parameter.query.cursor",
     "listPersonalBookings:parameter:$parameter.query.limit",
+    "listPersonalBookings:parameter:$parameter.query.view",
     "listPersonalBookings:response:FieldError.code",
     "listPersonalBookings:response:FieldError.field",
     "listPersonalBookings:response:FieldError.params",

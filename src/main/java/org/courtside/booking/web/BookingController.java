@@ -10,6 +10,7 @@ import org.courtside.api.ApiPersonalBooking;
 import org.courtside.api.ApiParticipation;
 import org.courtside.api.ApiParticipationPage;
 import org.courtside.api.ApiPersonalBookingPage;
+import org.courtside.api.ApiPersonalBookingView;
 import org.courtside.api.ApiPublicCourt;
 import org.courtside.api.ApiManagedAppointment;
 import org.courtside.api.ApiManagedAppointmentDetail;
@@ -25,6 +26,7 @@ import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.ParticipationPage;
 import org.courtside.booking.ParticipationService;
 import org.courtside.booking.PersonalBookingPage;
+import org.courtside.booking.PersonalBookingView;
 import org.courtside.booking.Booking;
 import org.courtside.booking.internal.AllocationVisibilityService;
 import org.courtside.booking.internal.BookingRuleGate;
@@ -150,11 +152,13 @@ class BookingController implements BookingsApi {
     }
 
     @Override
-    public ResponseEntity<ApiPersonalBookingPage> listPersonalBookings(UUID cursor, Integer limit) {
+    public ResponseEntity<ApiPersonalBookingPage> listPersonalBookings(
+            ApiPersonalBookingView view, UUID cursor, Integer limit) {
         UserAccount account = currentUser.requireAccount();
         Map<UUID, BookingCard> cardsById = cards.allCards().stream()
                 .collect(Collectors.toMap(BookingCard::getId, card -> card));
-        PersonalBookingPage page = bookings.personalBookings(account.getId(), cursor, limit);
+        PersonalBookingPage page = bookings.personalBookings(
+                account.getId(), PersonalBookingView.valueOf(view.getValue()), cursor, limit);
         List<ApiPersonalBooking> items = page.bookings().stream()
                 .map(booking -> {
                     List<CourtAllocation> allocations = booking.getAllocations();
