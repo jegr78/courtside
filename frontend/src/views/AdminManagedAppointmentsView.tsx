@@ -102,6 +102,15 @@ export function AdminManagedAppointmentsView() {
     }
   }
 
+  const startCancelling = (appointment: ManagedAppointment) => {
+    setSuccess(undefined);
+    setCancelling(appointment);
+  };
+  const startMoving = (appointment: ManagedAppointment) => {
+    setSuccess(undefined);
+    setMoving(appointment);
+  };
+
   const courtNames = useMemo(() => new Map(courts.map((court) => [
     court.id, court.name ?? t("court.number", { number: court.number })
   ])), [courts, t]);
@@ -114,7 +123,7 @@ export function AdminManagedAppointmentsView() {
       <p className="text-muted mt-2">{t("managedAppointments.description")}</p>
     </div>
     {grid && courtsReady && <SeriesForm timeZone={grid.timeZone} courts={courts}
-      created={async () => { await load(); setSuccess(t("series.createdSuccess")); }}
+      created={async () => { setSuccess(undefined); await load(); setSuccess(t("series.createdSuccess")); }}
       reportError={(failure) => { setSuccess(undefined); report(failure); }} />}
 
     <div className="mt-6 flex flex-wrap gap-2" role="group" aria-label={t("managedAppointments.viewLabel")}>
@@ -146,7 +155,7 @@ export function AdminManagedAppointmentsView() {
 
     {error && <div className="mt-4"><LoadFailure message={error} retry={() => { clear(); void load(); }} /></div>}
     {referenceError && <div className="mt-4"><LoadFailure message={referenceError} retry={() => { clearReference(); void loadReferenceData(); }} /></div>}
-    {success && <div className="mt-4"><SuccessFeedback>{success}</SuccessFeedback></div>}
+    {success && <div className="mt-4"><SuccessFeedback testId="managed-success">{success}</SuccessFeedback></div>}
     {loading ? <p className="mt-6" role="status">{t("status.loading")}</p>
       : groups.length === 0 ? <p className="text-muted mt-6">{t("managedAppointments.empty")}</p>
       : <div data-testid="managed-bookings" className="mt-6 divide-y border-y">
@@ -158,11 +167,11 @@ export function AdminManagedAppointmentsView() {
             <ul className="divide-y border-t pl-4 sm:pl-8">{group.items.map((appointment) => <AppointmentRow key={appointment.id}
               appointment={appointment} courtNames={courtNames} locale={i18n.language} timeZone={timeZone}
               actionsOpen={openActionsId === appointment.id} toggleActions={setOpenActionsId} moveAvailable={courtsReady}
-              showDetail={setDetail} cancel={setCancelling} move={setMoving} t={t} />)}</ul>
+              showDetail={setDetail} cancel={startCancelling} move={startMoving} t={t} />)}</ul>
           </details>
           : <ul key={group.key}><AppointmentRow appointment={group.items[0]} courtNames={courtNames}
             locale={i18n.language} timeZone={timeZone} actionsOpen={openActionsId === group.items[0].id}
-            toggleActions={setOpenActionsId} moveAvailable={courtsReady} showDetail={setDetail} cancel={setCancelling} move={setMoving} t={t} /></ul>)}
+            toggleActions={setOpenActionsId} moveAvailable={courtsReady} showDetail={setDetail} cancel={startCancelling} move={startMoving} t={t} /></ul>)}
       </div>}
 
     {nextCursor && <Button data-testid="managed-load-more" variant="secondary" className="mt-5" disabled={loadingMore}
