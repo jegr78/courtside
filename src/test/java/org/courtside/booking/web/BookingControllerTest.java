@@ -437,18 +437,18 @@ class BookingControllerTest extends AbstractIntegrationTest {
 
     @Test
     @WithMockUser(username = "doe.jane", roles = "MEMBER")
-    void givenMorePersonalBookingsThanTheLimit_whenFollowingTheCursor_thenEveryBookingIsReturnedOnce()
+    void givenMorePersonalBookingsThanTheLimit_whenFollowingTheCursor_thenTheSoonestComesFirstAndEachOnce()
             throws Exception {
         // given
-        String older = JsonPath.read(mockMvc.perform(bookingPost()
+        String later = JsonPath.read(mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .content(bookingJson("2026-05-12T19:00:00+02:00", "2026-05-12T20:00:00+02:00"))
                         .with(csrf()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "$.id");
-        String newer = JsonPath.read(mockMvc.perform(bookingPost()
+        String sooner = JsonPath.read(mockMvc.perform(bookingPost()
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(bookingJson("2026-05-12T19:00:00+02:00", "2026-05-12T20:00:00+02:00"))
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
                         .with(csrf()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "$.id");
@@ -456,8 +456,8 @@ class BookingControllerTest extends AbstractIntegrationTest {
         // when
         String firstPage = mockMvc.perform(get("/api/my/bookings").param("limit", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].id").value(newer))
-                .andExpect(jsonPath("$.nextCursor").value(newer))
+                .andExpect(jsonPath("$.items[0].id").value(sooner))
+                .andExpect(jsonPath("$.nextCursor").value(sooner))
                 .andReturn().getResponse().getContentAsString();
         String cursor = JsonPath.read(firstPage, "$.nextCursor");
 
@@ -467,8 +467,27 @@ class BookingControllerTest extends AbstractIntegrationTest {
                         .param("cursor", cursor))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
-                .andExpect(jsonPath("$.items[0].id").value(older))
+                .andExpect(jsonPath("$.items[0].id").value(later))
                 .andExpect(jsonPath("$.nextCursor").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "doe.jane", roles = "MEMBER")
+    void givenOnlyUpcomingBookings_whenListingTheHistory_thenItIsEmpty() throws Exception {
+        // given
+        mockMvc.perform(bookingPost()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson("2026-05-12T18:00:00+02:00", "2026-05-12T19:00:00+02:00"))
+                        .with(csrf()))
+                .andExpect(status().isCreated());
+
+        // when / then
+        mockMvc.perform(get("/api/my/bookings").param("view", "HISTORY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty());
+        mockMvc.perform(get("/api/my/bookings").param("view", "UPCOMING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1));
     }
 
     @Test

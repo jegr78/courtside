@@ -316,7 +316,7 @@ class BookingServiceTest extends AbstractIntegrationTest {
     @MethodSource("invalidPageLimits")
     void givenAnInvalidPageLimit_whenListingPersonalBookings_thenItIsRejected(int limit) {
         // when / then
-        assertThatThrownBy(() -> bookingService.personalBookings(someUser, null, limit))
+        assertThatThrownBy(() -> bookingService.personalBookings(someUser, PersonalBookingView.UPCOMING, null, limit))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Personal booking page size must be between 1 and 100");
     }

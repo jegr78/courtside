@@ -20,7 +20,8 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: ({ request, url }) => request.method === "GET"
-              && url.pathname === "/api/my/bookings" && !url.searchParams.has("cursor"),
+              && url.pathname === "/api/my/bookings" && !url.searchParams.has("cursor")
+              && (url.searchParams.get("view") ?? "UPCOMING") === "UPCOMING",
             handler: "StaleWhileRevalidate",
             options: {
               cacheName: "courtside-personal-bookings",

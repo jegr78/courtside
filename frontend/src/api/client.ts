@@ -93,6 +93,7 @@ export type BookingCreated = components["schemas"]["BookingCreated"];
 export type BookingEligibility = components["schemas"]["BookingEligibility"];
 export type PersonalBooking = components["schemas"]["PersonalBooking"];
 export type PersonalBookingPage = components["schemas"]["PersonalBookingPage"];
+export type PersonalBookingView = components["schemas"]["PersonalBookingView"];
 export type Participation = components["schemas"]["Participation"];
 export type ParticipationPage = components["schemas"]["ParticipationPage"];
 export type ManagedAppointment = components["schemas"]["ManagedAppointment"];
@@ -544,8 +545,12 @@ export const api = {
   }),
   bookingEligibility: () => request<BookingEligibility>("/api/booking-eligibility"),
   cancelBooking: (bookingId: string) => request<void>(`/api/bookings/${bookingId}`, { method: "DELETE" }),
-  personalBookings: (cursor?: string, limit = 50) => request<PersonalBookingPage>(
-    `/api/my/bookings?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  personalBookings: (options: { view?: PersonalBookingView; cursor?: string; limit?: number } = {}) => request<PersonalBookingPage>(
+    `/api/my/bookings?${new URLSearchParams({
+      limit: String(options.limit ?? 50),
+      ...(options.view ? { view: options.view } : {}),
+      ...(options.cursor ? { cursor: options.cursor } : {})
+    })}`
   ),
   participations: (cursor?: string, limit = 50) => request<ParticipationPage>(
     `/api/my/participations?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`

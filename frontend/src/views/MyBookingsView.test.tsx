@@ -17,18 +17,8 @@ beforeEach(async () => {
   vi.spyOn(api, "bookingGrid").mockResolvedValue({
     timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingHours: []
   });
-  vi.spyOn(api, "personalBookings").mockResolvedValue({ items: [
-    {
-      id: upcomingId,
-      seriesId,
-      courtIds: ["33333333-3333-3333-3333-333333333333"],
-      startsAt: "2026-08-12T16:00:00Z",
-      endsAt: "2026-08-12T17:00:00Z",
-      cardLabel: "Member booking",
-      cardColor: "#176b55",
-      status: "CONFIRMED"
-    },
-    {
+  vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view === "HISTORY"
+    ? { items: [{
       id: "44444444-4444-4444-4444-444444444444",
       seriesId,
       courtIds: ["33333333-3333-3333-3333-333333333333"],
@@ -37,8 +27,17 @@ beforeEach(async () => {
       cardLabel: "Member booking",
       cardColor: "#176b55",
       status: "CONFIRMED"
-    }
-  ] });
+    }] }
+    : { items: [{
+      id: upcomingId,
+      seriesId,
+      courtIds: ["33333333-3333-3333-3333-333333333333"],
+      startsAt: "2026-08-12T16:00:00Z",
+      endsAt: "2026-08-12T17:00:00Z",
+      cardLabel: "Member booking",
+      cardColor: "#176b55",
+      status: "CONFIRMED"
+    }] }));
   vi.spyOn(api, "participations").mockResolvedValue({ items: [] });
   vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
   vi.spyOn(api, "previewSeriesMove").mockResolvedValue({
@@ -206,9 +205,8 @@ it("given loaded bookings, when translations rebind, then the data remains mount
 
 it("given another page exists, when loading more, then its bookings are appended", async () => {
   // given
-  vi.mocked(api.personalBookings)
-    .mockResolvedValueOnce({ items: [], nextCursor: upcomingId })
-    .mockResolvedValueOnce({ items: [{
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve(options?.cursor
+    ? { items: [{
       id: upcomingId,
       courtIds: ["33333333-3333-3333-3333-333333333333"],
       startsAt: "2026-08-12T16:00:00Z",
@@ -216,7 +214,8 @@ it("given another page exists, when loading more, then its bookings are appended
       cardLabel: "Member booking",
       cardColor: "#176b55",
       status: "CONFIRMED"
-    }] });
+    }] }
+    : options?.view === "HISTORY" ? { items: [] } : { items: [], nextCursor: upcomingId }));
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
 
   // when
@@ -224,19 +223,21 @@ it("given another page exists, when loading more, then its bookings are appended
 
   // then
   expect(await screen.findByTestId(`booking-${upcomingId}`)).toHaveTextContent("Member booking");
-  expect(api.personalBookings).toHaveBeenLastCalledWith(upcomingId);
+  expect(api.personalBookings).toHaveBeenLastCalledWith({ cursor: upcomingId });
 });
 
 it("given the next page cannot be read, when the member asks for it, then the failure offers no reload of the whole page", async () => {
   // given
-  vi.mocked(api.personalBookings).mockResolvedValueOnce({
-    items: [{
-      id: upcomingId, seriesId, courtIds: ["33333333-3333-3333-3333-333333333333"],
-      startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
-      cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED"
-    }],
-    nextCursor: upcomingId
-  }).mockRejectedValueOnce(new Error("offline for a moment"));
+  vi.mocked(api.personalBookings).mockImplementation((options) => options?.cursor
+    ? Promise.reject(new Error("offline for a moment"))
+    : Promise.resolve(options?.view === "HISTORY" ? { items: [] } : {
+      items: [{
+        id: upcomingId, seriesId, courtIds: ["33333333-3333-3333-3333-333333333333"],
+        startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
+        cardLabel: "Member booking", cardColor: "#176b55", status: "CONFIRMED"
+      }],
+      nextCursor: upcomingId
+    }));
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
 
   // when
@@ -497,10 +498,9 @@ it("given the bound cannot be read, when the bookings load, then they are shown 
 it("given a cancelled booking still ahead and one already past, when loaded, then each stays with its date and only the past one counts as past", async () => {
   // given
   const cancelled = { courtIds: ["33333333-3333-3333-3333-333333333333"], cardLabel: "Member booking", cardColor: "#176b55", status: "CANCELLED" as const };
-  vi.mocked(api.personalBookings).mockResolvedValue({ items: [
-    { ...cancelled, id: "55555555-5555-5555-5555-555555555555", startsAt: "2026-08-19T16:00:00Z", endsAt: "2026-08-19T17:00:00Z" },
-    { ...cancelled, id: "66666666-6666-6666-6666-666666666666", startsAt: "2026-08-04T16:00:00Z", endsAt: "2026-08-04T17:00:00Z" }
-  ] });
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve({ items: options?.view === "HISTORY"
+    ? [{ ...cancelled, id: "66666666-6666-6666-6666-666666666666", startsAt: "2026-08-04T16:00:00Z", endsAt: "2026-08-04T17:00:00Z" }]
+    : [{ ...cancelled, id: "55555555-5555-5555-5555-555555555555", startsAt: "2026-08-19T16:00:00Z", endsAt: "2026-08-19T17:00:00Z" }] }));
 
   // when
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
@@ -532,9 +532,12 @@ it("given the list reloads, when it shows its loading state, then load more is n
   // given
   recordedAsCoPlayer();
   vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
-  vi.mocked(api.personalBookings)
-    .mockResolvedValueOnce({ items: [], nextCursor: upcomingId })
-    .mockReturnValueOnce(new Promise(() => undefined));
+  let upcomingReads = 0;
+  vi.mocked(api.personalBookings).mockImplementation((options) => {
+    if (options?.view === "HISTORY") return Promise.resolve({ items: [] });
+    upcomingReads += 1;
+    return upcomingReads === 1 ? Promise.resolve({ items: [], nextCursor: upcomingId }) : new Promise(() => undefined);
+  });
   render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
   await screen.findByTestId("load-more-bookings");
 
@@ -542,7 +545,7 @@ it("given the list reloads, when it shows its loading state, then load more is n
   await userEvent.click(await screen.findByTestId("withdraw-participation"));
 
   // then
-  await waitFor(() => expect(api.personalBookings).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(upcomingReads).toBe(2));
   expect(screen.queryByTestId("load-more-bookings"), "the cursor belongs to the list before the reload").not.toBeInTheDocument();
 });
 
@@ -552,15 +555,15 @@ it("given a booking page is in flight, when the list reloads first, then that pa
   let resolveMore!: (page: { items: ReturnType<typeof participation>[] }) => void;
   recordedAsCoPlayer();
   vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
-  vi.mocked(api.personalBookings).mockImplementation((cursor) => cursor
+  vi.mocked(api.personalBookings).mockImplementation((options) => options?.cursor
     ? new Promise((resolve) => { resolveMore = resolve; })
-    : Promise.resolve({ items: [], nextCursor: upcomingId }));
+    : Promise.resolve(options?.view === "HISTORY" ? { items: [] } : { items: [], nextCursor: upcomingId }));
   render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
   await userEvent.click(await screen.findByTestId("load-more-bookings"));
 
   // when
   await userEvent.click(screen.getByTestId("withdraw-participation"));
-  await waitFor(() => expect(api.personalBookings).toHaveBeenCalledTimes(3));
+  await waitFor(() => expect(api.participations).toHaveBeenCalledTimes(2));
   await screen.findByTestId("upcoming-bookings");
   await act(() => {
     resolveMore({ items: [participation(stale)] });
@@ -602,15 +605,15 @@ it("given a booking page is in flight, when the list reloads before that page fa
   let rejectMore!: (failure: Error) => void;
   recordedAsCoPlayer();
   vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
-  vi.mocked(api.personalBookings).mockImplementation((cursor) => cursor
+  vi.mocked(api.personalBookings).mockImplementation((options) => options?.cursor
     ? new Promise((_, reject) => { rejectMore = reject; })
-    : Promise.resolve({ items: [], nextCursor: upcomingId }));
+    : Promise.resolve(options?.view === "HISTORY" ? { items: [] } : { items: [], nextCursor: upcomingId }));
   render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
   await userEvent.click(await screen.findByTestId("load-more-bookings"));
 
   // when
   await userEvent.click(screen.getByTestId("withdraw-participation"));
-  await waitFor(() => expect(api.personalBookings).toHaveBeenCalledTimes(3));
+  await waitFor(() => expect(api.participations).toHaveBeenCalledTimes(2));
   await screen.findByTestId("upcoming-bookings");
   await act(() => {
     rejectMore(new Error("stale page failed"));
@@ -619,4 +622,115 @@ it("given a booking page is in flight, when the list reloads before that page fa
 
   // then
   expect(screen.queryByRole("alert"), "a failure of a page read before the reload belongs to no list on screen").not.toBeInTheDocument();
+});
+
+function pastBooking(id: string, startsAt: string) {
+  const endsAt = new Date(Date.parse(startsAt) + 60 * 60 * 1000).toISOString();
+  return { ...participation(id), startsAt, endsAt };
+}
+
+it("when the page loads, then the upcoming and the past are each read as their own list", async () => {
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  await screen.findByTestId("past-bookings-summary");
+  expect(api.personalBookings, "the first page of the upcoming view is the request the offline cache keeps").toHaveBeenCalledWith();
+  expect(api.personalBookings).toHaveBeenCalledWith({ view: "HISTORY" });
+  expect(within(screen.getByTestId("upcoming-bookings")).getByTestId(`booking-${upcomingId}`)).toBeInTheDocument();
+  expect(within(screen.getByTestId("past-booking-list")).getByTestId("booking-44444444-4444-4444-4444-444444444444")).toBeInTheDocument();
+});
+
+it("given more past bookings than one page, when the member asks for more, then the next past page is appended", async () => {
+  // given
+  const recent = "88888888-8888-8888-8888-888888888888";
+  const older = "99999999-9999-9999-9999-999999999999";
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve(options?.view !== "HISTORY"
+    ? { items: [] }
+    : options.cursor
+      ? { items: [pastBooking(older, "2026-07-01T16:00:00Z")] }
+      : { items: [pastBooking(recent, "2026-08-01T16:00:00Z")], nextCursor: recent }));
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("past-bookings-summary"));
+
+  // when
+  await userEvent.click(screen.getByTestId("load-more-past-bookings"));
+
+  // then
+  expect(await screen.findByTestId(`booking-${older}`)).toBeInTheDocument();
+  expect(api.personalBookings).toHaveBeenLastCalledWith({ view: "HISTORY", cursor: recent });
+  expect(screen.queryByTestId("load-more-past-bookings"), "the history has no page left").not.toBeInTheDocument();
+  expect(screen.queryByTestId("load-more-bookings"), "the upcoming list was complete all along").not.toBeInTheDocument();
+});
+
+it("given more past bookings than one page, when loaded, then the summary does not pretend to know their number", async () => {
+  // given
+  const recent = "88888888-8888-8888-8888-888888888888";
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve(options?.view === "HISTORY"
+    ? { items: [pastBooking(recent, "2026-08-01T16:00:00Z")], nextCursor: recent }
+    : { items: [] }));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  expect(await screen.findByTestId("past-bookings-summary"))
+    .toHaveTextContent(i18n.t("myBookings.pastCountMore", { count: 1 }));
+});
+
+it("given a past page is in flight, when the list reloads first, then that page is discarded", async () => {
+  // given
+  const recent = "88888888-8888-8888-8888-888888888888";
+  const stale = "77777777-7777-7777-7777-777777777777";
+  let resolveMore!: (page: { items: ReturnType<typeof participation>[] }) => void;
+  recordedAsCoPlayer();
+  vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
+  vi.mocked(api.personalBookings).mockImplementation((options) => options?.cursor
+    ? new Promise((resolve) => { resolveMore = resolve; })
+    : Promise.resolve(options?.view === "HISTORY"
+      ? { items: [pastBooking(recent, "2026-08-01T16:00:00Z")], nextCursor: recent }
+      : { items: [] }));
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("past-bookings-summary"));
+  await userEvent.click(screen.getByTestId("load-more-past-bookings"));
+
+  // when
+  await userEvent.click(screen.getByTestId("withdraw-participation"));
+  await waitFor(() => expect(api.participations).toHaveBeenCalledTimes(2));
+  await screen.findByTestId("past-bookings-summary");
+  await act(() => {
+    resolveMore({ items: [pastBooking(stale, "2026-07-01T16:00:00Z")] });
+    return Promise.resolve();
+  });
+
+  // then
+  expect(screen.queryByTestId(`booking-${stale}`), "a page read before the reload is not appended to it").not.toBeInTheDocument();
+});
+
+it("given a cached personal page, when offline, then no past is claimed that the cache does not hold", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockResolvedValue({ items: [], refreshedAt: "2026-08-11T10:30:00Z", timeZone: "Europe/Berlin" });
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} offline />);
+
+  // then
+  await screen.findByTestId("upcoming-bookings");
+  expect(api.personalBookings).toHaveBeenCalledTimes(1);
+  expect(screen.queryByTestId("past-bookings"), "the offline copy holds the upcoming page only").not.toBeInTheDocument();
+});
+
+it("given more upcoming bookings than one page, when loaded, then their load more sits with them rather than below the past", async () => {
+  // given
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve(options?.view === "HISTORY"
+    ? { items: [pastBooking("88888888-8888-8888-8888-888888888888", "2026-08-01T16:00:00Z")] }
+    : { items: [], nextCursor: upcomingId }));
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  const loadMore = await screen.findByTestId("load-more-bookings");
+  expect(loadMore.compareDocumentPosition(screen.getByTestId("past-bookings")) & Node.DOCUMENT_POSITION_FOLLOWING,
+    "the control reads the upcoming list only").toBeTruthy();
 });

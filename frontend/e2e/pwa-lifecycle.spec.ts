@@ -34,7 +34,10 @@ async function cachedPersonalBookingContract(page: import("@playwright/test").Pa
       cachedGeneration: response?.headers.get("x-courtside-cache-generation"),
       currentGeneration: await marker?.text(),
       itemKeys: body.items.map((booking: unknown) =>
-        typeof booking === "object" && booking !== null ? Object.keys(booking).sort() : [])
+        typeof booking === "object" && booking !== null ? Object.keys(booking).sort() : []),
+      readAt: Date.now(),
+      itemEnds: body.items.map((booking: unknown) =>
+        typeof booking === "object" && booking !== null && "endsAt" in booking ? Date.parse(String(booking.endsAt)) : Number.NaN)
     };
   });
 }
@@ -71,6 +74,8 @@ for (const locale of ["de", "en"] as const) {
     const cachedContract = await cachedPersonalBookingContract(page);
     expect(cachedContract?.requestPath).toBe("/api/my/bookings?limit=50");
     expect(cachedContract?.cachedGeneration).toBe(cachedContract?.currentGeneration);
+    expect(cachedContract?.itemEnds.length, "the history page read after it must not replace the upcoming page").toBeGreaterThan(0);
+    expect(cachedContract?.itemEnds.every((end) => end >= cachedContract.readAt), "only the upcoming view is kept offline").toBe(true);
 
     // when
     await context.setOffline(true);

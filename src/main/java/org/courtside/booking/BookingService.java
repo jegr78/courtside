@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -36,6 +37,7 @@ public class BookingService {
     private final BookingRequestFingerprint fingerprints;
     private final BookingAccessControl accessControl;
     private final MeterRegistry meters;
+    private final Clock clock;
 
     public UUID create(CreateBookingCommand command) {
         try {
@@ -125,10 +127,16 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public PersonalBookingPage personalBookings(UUID bookedBy, UUID cursor, int limit) {
+    public PersonalBookingPage personalBookings(UUID bookedBy, PersonalBookingView view, UUID cursor, int limit) {
         validatePageLimit(limit);
-        List<UUID> ids = bookings.findPersonalBookingIds(
-                bookedBy, cursor, PageRequest.of(0, Math.addExact(limit, 1)));
+        if (view == null) {
+            throw new IllegalStateException("A personal booking page needs a view");
+        }
+        PageRequest window = PageRequest.of(0, Math.addExact(limit, 1));
+        List<UUID> ids = switch (view) {
+            case UPCOMING -> bookings.findUpcomingPersonalBookingIds(bookedBy, clock.instant(), cursor, window);
+            case HISTORY -> bookings.findPersonalBookingHistoryIds(bookedBy, clock.instant(), cursor, window);
+        };
         CursorPage.Result<Booking> page = CursorPage.of(ids, limit, bookings::findAllByIdIn, Booking::getId);
         return new PersonalBookingPage(page.items(), page.nextCursor());
     }
