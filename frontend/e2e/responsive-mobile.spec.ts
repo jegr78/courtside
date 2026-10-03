@@ -761,6 +761,25 @@ for (const width of [820, 1024]) {
   });
 }
 
+for (const width of [820, 1024]) {
+  test(`given a ${width} px wide window, when the new court form is read, then the number field ends before the name field`, async ({ page }) => {
+    // given
+    await page.setViewportSize({ width, height: 1180 });
+    await signIn(page, "configuration-admin");
+    await expect(page.getByTestId("administration-link")).toBeVisible();
+
+    // when
+    await page.goto("/admin/facility/courts");
+    await expect(page.getByTestId("new-court-number")).toBeVisible();
+
+    // then
+    const number = await page.getByTestId("new-court-number").boundingBox();
+    const name = await page.getByTestId("new-court-name").boundingBox();
+    expect(number!.y, "the two fields share a row at this width").toBeCloseTo(name!.y, 0);
+    expect(number!.x + number!.width, "the number input stays inside its column").toBeLessThanOrEqual(name!.x);
+  });
+}
+
 test("courts and slot fillers show each entry's name, status and actions on a phone", async ({ page }) => {
   // given
   await signIn(page, "configuration-admin");

@@ -14,12 +14,12 @@ export function TextField<T extends HTMLInputTypeAttribute = "text">(
   if (type === "password" && id !== undefined) {
     return <PasswordField label={label} id={id} className={className} {...props} />;
   }
-  return <label className="grid gap-2 font-medium" htmlFor={id}>
+  return <label className="grid min-w-0 gap-2 font-medium" htmlFor={id}>
     {label}
     <input
       id={id}
       type={type}
-      className={`form-control rounded-lg border px-3 py-3 ${className}`}
+      className={`form-control w-full min-w-0 rounded-lg border px-3 py-3 ${className}`}
       {...props}
     />
   </label>;
