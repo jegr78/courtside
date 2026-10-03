@@ -527,3 +527,96 @@ it("given a move dialog, when the preview arrives, then the confirm action is a 
   const confirm = await screen.findByTestId("confirm-move");
   expect(confirm, "a reused button fades from the preview button's colours and fails contrast while it does").not.toBe(previewButton);
 });
+
+it("given the list reloads, when it shows its loading state, then load more is not offered", async () => {
+  // given
+  recordedAsCoPlayer();
+  vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
+  vi.mocked(api.personalBookings)
+    .mockResolvedValueOnce({ items: [], nextCursor: upcomingId })
+    .mockReturnValueOnce(new Promise(() => undefined));
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  await screen.findByTestId("load-more-bookings");
+
+  // when
+  await userEvent.click(await screen.findByTestId("withdraw-participation"));
+
+  // then
+  await waitFor(() => expect(api.personalBookings).toHaveBeenCalledTimes(2));
+  expect(screen.queryByTestId("load-more-bookings"), "the cursor belongs to the list before the reload").not.toBeInTheDocument();
+});
+
+it("given a booking page is in flight, when the list reloads first, then that page is discarded", async () => {
+  // given
+  const stale = "77777777-7777-7777-7777-777777777777";
+  let resolveMore!: (page: { items: ReturnType<typeof participation>[] }) => void;
+  recordedAsCoPlayer();
+  vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
+  vi.mocked(api.personalBookings).mockImplementation((cursor) => cursor
+    ? new Promise((resolve) => { resolveMore = resolve; })
+    : Promise.resolve({ items: [], nextCursor: upcomingId }));
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("load-more-bookings"));
+
+  // when
+  await userEvent.click(screen.getByTestId("withdraw-participation"));
+  await waitFor(() => expect(api.personalBookings).toHaveBeenCalledTimes(3));
+  await screen.findByTestId("upcoming-bookings");
+  await act(() => {
+    resolveMore({ items: [participation(stale)] });
+    return Promise.resolve();
+  });
+
+  // then
+  expect(screen.queryByTestId(`booking-${stale}`), "a page read before the reload is not appended to it").not.toBeInTheDocument();
+  expect(screen.getByTestId("load-more-bookings")).not.toBeDisabled();
+});
+
+it("given a participation page is in flight, when the list reloads first, then that page is discarded", async () => {
+  // given
+  const stale = "77777777-7777-7777-7777-777777777777";
+  let resolveMore!: (page: { items: ReturnType<typeof participation>[] }) => void;
+  vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
+  vi.spyOn(api, "participations").mockImplementation((cursor) => cursor
+    ? new Promise((resolve) => { resolveMore = resolve; })
+    : Promise.resolve({ items: [participation(participationId)], nextCursor: participationId }));
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("load-more-participations"));
+
+  // when
+  await userEvent.click(screen.getByTestId("withdraw-participation"));
+  await waitFor(() => expect(api.participations).toHaveBeenCalledTimes(3));
+  await screen.findByTestId("upcoming-bookings");
+  await act(() => {
+    resolveMore({ items: [participation(stale)] });
+    return Promise.resolve();
+  });
+
+  // then
+  expect(screen.queryByTestId(`participation-${stale}`), "a page read before the reload is not appended to it").not.toBeInTheDocument();
+  expect(screen.getByTestId("load-more-participations")).not.toBeDisabled();
+});
+
+it("given a booking page is in flight, when the list reloads before that page fails, then its failure is discarded", async () => {
+  // given
+  let rejectMore!: (failure: Error) => void;
+  recordedAsCoPlayer();
+  vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
+  vi.mocked(api.personalBookings).mockImplementation((cursor) => cursor
+    ? new Promise((_, reject) => { rejectMore = reject; })
+    : Promise.resolve({ items: [], nextCursor: upcomingId }));
+  render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("load-more-bookings"));
+
+  // when
+  await userEvent.click(screen.getByTestId("withdraw-participation"));
+  await waitFor(() => expect(api.personalBookings).toHaveBeenCalledTimes(3));
+  await screen.findByTestId("upcoming-bookings");
+  await act(() => {
+    rejectMore(new Error("stale page failed"));
+    return Promise.resolve();
+  });
+
+  // then
+  expect(screen.queryByRole("alert"), "a failure of a page read before the reload belongs to no list on screen").not.toBeInTheDocument();
+});

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type BookingGrid, type Participation, type PersonalBooking, type PublicCourt } from "../api/client";
 import { useReportedFailure } from "../failures/useReportedFailure";
@@ -34,9 +34,13 @@ export function MyBookingsView({ now, offline = false }: {
   const { message: loadError, report: reportLoad, clear: clearLoad } = useReportedFailure();
   const [success, setSuccess] = useState<string>();
   const [action, setAction] = useState<{ kind: "cancel" | "move"; booking: PersonalBooking }>();
+  const loadVersion = useRef(0);
 
   const load = useCallback(async () => {
+    loadVersion.current += 1;
     setLoading(true);
+    setLoadingMore(false);
+    setNextCursor(undefined);
     try {
       const page = await api.personalBookings();
       setBookings(page.items);
@@ -77,31 +81,35 @@ export function MyBookingsView({ now, offline = false }: {
 
   async function loadMore() {
     if (!nextCursor) return;
+    const version = loadVersion.current;
     setLoadingMore(true);
     try {
       const page = await api.personalBookings(nextCursor);
+      if (version !== loadVersion.current) return;
       setBookings((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor ?? undefined);
       clear();
     } catch (failure) {
-      report(failure);
+      if (version === loadVersion.current) report(failure);
     } finally {
-      setLoadingMore(false);
+      if (version === loadVersion.current) setLoadingMore(false);
     }
   }
 
   async function loadMoreParticipations() {
     if (!participationsNextCursor) return;
+    const version = loadVersion.current;
     setLoadingMore(true);
     try {
       const page = await api.participations(participationsNextCursor);
+      if (version !== loadVersion.current) return;
       setParticipations((current) => [...current, ...page.items]);
       setParticipationsNextCursor(page.nextCursor ?? undefined);
       clear();
     } catch (failure) {
-      report(failure);
+      if (version === loadVersion.current) report(failure);
     } finally {
-      setLoadingMore(false);
+      if (version === loadVersion.current) setLoadingMore(false);
     }
   }
 
