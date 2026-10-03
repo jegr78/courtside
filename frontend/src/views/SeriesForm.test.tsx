@@ -254,4 +254,35 @@ describe("SeriesForm", () => {
     expect(created).toHaveBeenCalled();
     expect(screen.queryByTestId("series-skipped")).not.toBeInTheDocument();
   });
+
+  it("given exactly one occurrence chosen, when the preview offers to create it, then the button speaks of one appointment", async () => {
+    // given
+    vi.spyOn(api, "previewSeries").mockResolvedValue(preview);
+    show();
+    await describeRule();
+    await userEvent.click(screen.getByTestId("preview-series"));
+    await screen.findByTestId("confirm-series");
+
+    // when
+    await userEvent.click(screen.getByTestId("series-occurrence-chosen-1"));
+
+    // then
+    expect(screen.getByTestId("confirm-series")).toHaveTextContent(/^Create one appointment$/);
+    await i18n.changeLanguage("de");
+    expect(screen.getByTestId("confirm-series")).toHaveTextContent(/^Einen Termin anlegen$/);
+    await i18n.changeLanguage("en");
+  });
+
+  it("given several occurrences chosen, when the preview offers to create them, then the button counts them", async () => {
+    // given
+    vi.spyOn(api, "previewSeries").mockResolvedValue(preview);
+    show();
+    await describeRule();
+
+    // when
+    await userEvent.click(screen.getByTestId("preview-series"));
+
+    // then
+    expect(await screen.findByTestId("confirm-series")).toHaveTextContent(/^Create 2 appointments$/);
+  });
 });

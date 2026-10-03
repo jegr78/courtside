@@ -218,7 +218,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
         </li>)}
       </ul>
       <Button variant="primary" data-testid="confirm-series" disabled={pending || chosen.length === 0} className="justify-self-start" type="button" onClick={() => void create()}>
-        {t("series.create", { chosen: chosen.length })}
+        {t("series.create", { count: chosen.length })}
       </Button>
     </div>}
 
