@@ -10,6 +10,7 @@
 
 
 
+
 ### Notable changes
 
 * bundled PostgreSQL 18 deployments bind the generated COURTSIDE_DATABASE_VOLUME explicitly.
@@ -191,6 +192,14 @@
 * write to a member in the language they read ([#447](https://github.com/jegr78/courtside/issues/447)) ([596ce57](https://github.com/jegr78/courtside/commit/596ce576320ebf65ae3727d3e5059afdac42c5ef))
 
 ### Bug fixes
+
+* clear the previous confirmation when a managed appointment action starts ([#1281](https://github.com/jegr78/courtside/issues/1281)) ([4ebcaa2](https://github.com/jegr78/courtside/commit/4ebcaa290dcc30329f80dd5de8c443183741a4f6)), closes [#1268](https://github.com/jegr78/courtside/issues/1268)
+* discard a load-more page that belongs to the list before a reload ([#1266](https://github.com/jegr78/courtside/issues/1266)) ([b194064](https://github.com/jegr78/courtside/commit/b1940641559a375de123e37491a5bbbd5fe3c7a4)), closes [#1263](https://github.com/jegr78/courtside/issues/1263)
+* keep cancelled bookings from crowding out active ones in My bookings ([#1278](https://github.com/jegr78/courtside/issues/1278)) ([9af185c](https://github.com/jegr78/courtside/commit/9af185ca5f99284c4cbf975c9874fd7716b52082)), closes [#1265](https://github.com/jegr78/courtside/issues/1265)
+* keep the new-court number field inside its column ([#1282](https://github.com/jegr78/courtside/issues/1282)) ([3ade5d1](https://github.com/jegr78/courtside/commit/3ade5d101e88d4575384e25158e99f9a5d84822e)), closes [#1269](https://github.com/jegr78/courtside/issues/1269)
+* page My bookings from the member's next booking onwards ([#1277](https://github.com/jegr78/courtside/issues/1277)) ([ba79f7d](https://github.com/jegr78/courtside/commit/ba79f7d4fe53edaa6d80e9235950a8d18eeceaa2)), closes [#1264](https://github.com/jegr78/courtside/issues/1264)
+* say "one appointment" on the series button for a single occurrence ([#1280](https://github.com/jegr78/courtside/issues/1280)) ([76b12a1](https://github.com/jegr78/courtside/commit/76b12a1a2a90687f8adab94fb6256a56d9861626)), closes [#1270](https://github.com/jegr78/courtside/issues/1270)
+* scroll the court plan to the current time once, and not after a touch ([#1283](https://github.com/jegr78/courtside/issues/1283)) ([41e5180](https://github.com/jegr78/courtside/commit/41e5180935551735c5a829a81c800bfda709726b)), closes [#1239](https://github.com/jegr78/courtside/issues/1239)
 
 * keep a cancelled booking with its date until that date has passed ([#1250](https://github.com/jegr78/courtside/issues/1250)) ([fd2c7fc](https://github.com/jegr78/courtside/commit/fd2c7fcb3e6e1899406f3a83dc29eb13581f9891))
 * keep booking card role labels and colour fields apart on a tablet ([#1253](https://github.com/jegr78/courtside/issues/1253)) ([acd2f10](https://github.com/jegr78/courtside/commit/acd2f10e84668f2edb488aa06c376472292ca57b))
@@ -496,6 +505,9 @@
 * stop the assessment from filing an issue for every unprovable control ([#910](https://github.com/jegr78/courtside/issues/910)) ([8740314](https://github.com/jegr78/courtside/commit/87403146786f632a5c7006fa0de871bb65978cf7))
 
 ### Build and dependencies
+
+* **deps-dev:** bump the frontend-minor-and-patch group across 1 directory with 3 updates ([#1284](https://github.com/jegr78/courtside/issues/1284)) ([5410445](https://github.com/jegr78/courtside/commit/5410445cd9f16d27b62b372f4cd2c3f774c56f7d))
+* **deps:** bump Maven, deployment images, msw and the frontend group ([#1279](https://github.com/jegr78/courtside/issues/1279)) ([23ae4e9](https://github.com/jegr78/courtside/commit/23ae4e936056ee908baff33e75970498e753f857))
 
 * **deps:** bump brace-expansion in /frontend ([#1211](https://github.com/jegr78/courtside/issues/1211)) ([fc53d00](https://github.com/jegr78/courtside/commit/fc53d003fba6d4c8b2f86716bc31691bda56ab28))
 
