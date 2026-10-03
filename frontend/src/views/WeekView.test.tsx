@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
 import { WeekView } from "./WeekView";
@@ -1565,4 +1565,73 @@ it("given a gap between the open rows and a booking's rows, when the time falls 
   const line = await screen.findByTestId("current-time-line");
   expect(line, "eight open rows, then half of the 18:00 row, 40 pixels each below the 48-pixel header")
     .toHaveStyle({ top: "388px" });
+});
+
+function documentScrolling() {
+  const toSlot = vi.fn();
+  const original = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+  Object.defineProperty(Element.prototype, "scrollIntoView", { value: toSlot, configurable: true, writable: true });
+  onTestFinished(() => {
+    if (original) Object.defineProperty(Element.prototype, "scrollIntoView", original);
+    else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  });
+  vi.spyOn(window, "getComputedStyle").mockReturnValue({ overflowY: "visible" } as CSSStyleDeclaration);
+  return () => toSlot.mock.calls.filter(([options]) => (options as ScrollIntoViewOptions | undefined)?.block === "center").length;
+}
+
+async function nextFrame() {
+  await act(() => new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve())));
+}
+
+it("given the plan open on today, when the current time passes into the next slot, then the page stays where the member left it", async () => {
+  // given
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const scrollsToNow = documentScrolling();
+  let now = clubInstant("12:15");
+  render(<WeekView clock={() => now} />);
+  await waitFor(() => expect(scrollsToNow(), "the plan opens at the current time").toBe(1));
+
+  // when
+  now = clubInstant("12:31");
+  await vi.advanceTimersByTimeAsync(60_000);
+  await waitFor(() => expect(screen.getByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:31"));
+  await nextFrame();
+
+  // then
+  expect(scrollsToNow(), "a new slot does not pull the page back to the current time").toBe(1);
+});
+
+it("given the member touches the page before the plan has loaded, when it loads, then it does not jump under their finger", async () => {
+  // given
+  const scrollsToNow = documentScrolling();
+  const today = deferred<Awaited<ReturnType<typeof api.allocations>>>();
+  const otherDays = vi.mocked(api.allocations).getMockImplementation()!;
+  vi.mocked(api.allocations).mockImplementation((date) => date === "2026-08-10" ? today.promise : otherDays(date));
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // when
+  fireEvent.pointerDown(document.body);
+  today.resolve([]);
+  await screen.findByTestId("week-grid");
+  await nextFrame();
+
+  // then
+  expect(scrollsToNow()).toBe(0);
+});
+
+it("given the member touched the page, when they choose today again from another day, then the plan still opens at the current time", async () => {
+  // given
+  const scrollsToNow = documentScrolling();
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+  await waitFor(() => expect(scrollsToNow()).toBe(1));
+  fireEvent.pointerDown(document.body);
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-11"));
+
+  // when
+  await userEvent.click(screen.getByTestId("day-selector-2026-08-10"));
+  await nextFrame();
+
+  // then
+  expect(scrollsToNow(), "choosing a day is asking to see it").toBe(2);
 });
