@@ -66,6 +66,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const dayNavigationRef = useRef<HTMLElement>(null);
   const eligibilityRequest = useRef(0);
   const shownDate = useRef<string>(undefined);
+  const scrolledToNowOn = useRef<string>(undefined);
+  const memberMoved = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -225,10 +227,30 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   }, [clock, data, refreshDate, report, selectedDate]);
 
   useEffect(() => {
-    if (!isToday || !currentSlot) return;
-    const frame = window.requestAnimationFrame(() => scrollToSlot(planRef.current, currentSlot));
+    const moved = () => { memberMoved.current = true; };
+    const events = ["pointerdown", "wheel", "touchstart", "keydown"] as const;
+    for (const event of events) window.addEventListener(event, moved, { capture: true, passive: true });
+    return () => {
+      for (const event of events) window.removeEventListener(event, moved, { capture: true });
+    };
+  }, []);
+
+  // A day the member chose is one they asked to see; only the plan's own first load must not move under them.
+  useEffect(() => {
+    if (shownDate.current === undefined || shownDate.current === selectedDate) return;
+    memberMoved.current = false;
+    scrolledToNowOn.current = undefined;
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!isToday || !currentSlot || !selectedDate || scrolledToNowOn.current === selectedDate) return;
+    if (memberMoved.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      scrolledToNowOn.current = selectedDate;
+      scrollToSlot(planRef.current, currentSlot);
+    });
     return () => window.cancelAnimationFrame(frame);
-  }, [currentSlot, isToday]);
+  }, [currentSlot, isToday, selectedDate]);
 
   // Another day has no current time to scroll to.
   useEffect(() => {
