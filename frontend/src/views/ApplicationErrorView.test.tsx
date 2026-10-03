@@ -78,13 +78,17 @@ it("given the page may just be stale, when reloading from the error page, then t
 
 it("given the sign-out is refused, when it is attempted from the error page, then nothing claims it ended", async () => {
   // given
+  let refusals = 0;
   server.use(
     http.get("/api/session", () => HttpResponse.json({
       authenticated: true, roles: [], passwordChangeRequired: false
     })),
-    http.post("/api/session/logout", () => HttpResponse.json({
-      type: "urn:courtside:error:access-denied", title: "Refused", status: 403
-    }, { status: 403, headers: { "Content-Type": "application/problem+json" } }))
+    http.post("/api/session/logout", () => {
+      refusals += 1;
+      return HttpResponse.json({
+        type: "urn:courtside:error:access-denied", title: "Refused", status: 403
+      }, { status: 403, headers: { "Content-Type": "application/problem+json" } });
+    })
   );
   render(<ApplicationErrorView />);
 
@@ -93,6 +97,7 @@ it("given the sign-out is refused, when it is attempted from the error page, the
 
   // then
   await waitFor(() => expect(screen.getAllByRole("alert").length).toBeGreaterThan(1));
+  expect(refusals, "the refusal must come from the logout endpoint, not from a request nobody answered").toBe(1);
   expect(assign).not.toHaveBeenCalled();
 });
 
@@ -100,13 +105,17 @@ it("given the sign-out is refused, when it is attempted from the error page, the
 // sign-out did not happen — the same reading Preferences holds.
 it("given the sign-out is refused as unauthenticated, when it is attempted from the error page, then nothing claims it ended", async () => {
   // given
+  let refusals = 0;
   server.use(
     http.get("/api/session", () => HttpResponse.json({
       authenticated: true, roles: [], passwordChangeRequired: false
     })),
-    http.post("/api/session/logout", () => HttpResponse.json({
-      type: "urn:courtside:error:unauthenticated", title: "Not authenticated", status: 401
-    }, { status: 401, headers: { "Content-Type": "application/problem+json" } }))
+    http.post("/api/session/logout", () => {
+      refusals += 1;
+      return HttpResponse.json({
+        type: "urn:courtside:error:unauthenticated", title: "Not authenticated", status: 401
+      }, { status: 401, headers: { "Content-Type": "application/problem+json" } });
+    })
   );
   render(<ApplicationErrorView />);
 
@@ -115,5 +124,6 @@ it("given the sign-out is refused as unauthenticated, when it is attempted from 
 
   // then
   await waitFor(() => expect(screen.getAllByRole("alert").length).toBeGreaterThan(1));
+  expect(refusals, "the refusal must come from the logout endpoint, not from a request nobody answered").toBe(1);
   expect(assign).not.toHaveBeenCalled();
 });
