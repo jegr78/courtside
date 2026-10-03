@@ -195,6 +195,24 @@ describe("AdminManagedAppointmentsView", () => {
     expect(screen.getByTestId("managed-load-more")).not.toBeDisabled();
   });
 
+  it("given the list reloads, when it shows its loading state, then load more is not offered", async () => {
+    // given
+    vi.mocked(api.managedAppointments).mockImplementation((options) => options?.courtId
+      ? new Promise(() => undefined)
+      : Promise.resolve({ items: [first], nextCursor: first.id }));
+    show();
+    await screen.findByTestId("managed-load-more");
+
+    // when
+    await userEvent.selectOptions(screen.getByTestId("managed-court-filter"), "court-1");
+
+    // then
+    await waitFor(() => expect(api.managedAppointments).toHaveBeenLastCalledWith({
+      view: "UPCOMING", courtId: "court-1", cardId: undefined, limit: 20
+    }));
+    expect(screen.queryByTestId("managed-load-more"), "the cursor belongs to the list before the reload").not.toBeInTheDocument();
+  });
+
   it("given the first page is loading, when the active view is chosen again, then that load still completes", async () => {
     // given
     let resolveInitial!: (page: { items: ManagedAppointment[] }) => void;

@@ -41,6 +41,7 @@ export function AdminManagedAppointmentsView() {
     const version = ++loadVersion.current;
     setLoading(true);
     setLoadingMore(false);
+    setNextCursor(undefined);
     try {
       const page = await api.managedAppointments({
         view, courtId: courtId || undefined, cardId: cardId || undefined, limit: PAGE_SIZE
