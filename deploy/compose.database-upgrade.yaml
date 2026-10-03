@@ -10,7 +10,7 @@ services:
     volumes:
       - db:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U courtside -d courtside"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U courtside -d courtside"]
       interval: 2s
       timeout: 3s
       retries: 30

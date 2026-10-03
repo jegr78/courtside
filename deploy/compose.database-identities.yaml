@@ -7,7 +7,7 @@ services:
     volumes:
       - ${COURTSIDE_DB_OWNER_PASSWORD_FILE:?set COURTSIDE_DB_OWNER_PASSWORD_FILE in .env}:/run/secrets/database-owner-password:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${COURTSIDE_DB_OWNER_USERNAME:-courtside_owner} -d courtside"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${COURTSIDE_DB_OWNER_USERNAME:-courtside_owner} -d courtside"]
 
   database-setup:
     image: ghcr.io/jegr78/courtside@sha256:${COURTSIDE_IMAGE_DIGEST:?set COURTSIDE_IMAGE_DIGEST in .env}
