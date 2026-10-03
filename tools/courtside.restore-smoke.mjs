@@ -254,7 +254,7 @@ async function verifyApplication(password, port) {
     body: `username=upgrade-member&password=${encodeURIComponent(password)}`
   });
   assert.equal(login.statusCode, 200, login.body);
-  const bookings = await request(jar, port, { path: "/api/my/bookings" });
+  const bookings = await request(jar, port, { path: "/api/my/bookings?view=HISTORY" });
   assert.equal(bookings.statusCode, 200, bookings.body);
   assert.match(bookings.body, /77000000-0000-0000-0000-000000000001/);
   const startsAt = new Date();
