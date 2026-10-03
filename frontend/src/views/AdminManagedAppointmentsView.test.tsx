@@ -195,6 +195,86 @@ describe("AdminManagedAppointmentsView", () => {
     expect(screen.getByTestId("managed-load-more")).not.toBeDisabled();
   });
 
+  it("given a confirmed cancellation, when the next action starts, then the earlier confirmation leaves", async () => {
+    // given
+    vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
+    let reads = 0;
+    vi.mocked(api.managedAppointments).mockImplementation(() => {
+      reads += 1;
+      return reads <= 2 ? Promise.resolve({ items: [first, second] }) : new Promise(() => undefined);
+    });
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+    await userEvent.click(within(screen.getByTestId(`booking-${first.id}`)).getByTestId("managed-cancel"));
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+    expect(await screen.findByTestId("managed-success")).toHaveTextContent(i18n.t("booking.cancelledSuccess"));
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+
+    // when
+    await userEvent.click(within(screen.getByTestId(`booking-${second.id}`)).getByTestId("managed-cancel"));
+
+    // then
+    expect(screen.queryByTestId("managed-success"), "a confirmation belongs to the action that produced it").not.toBeInTheDocument();
+
+    // when
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+
+    // then
+    await waitFor(() => expect(reads).toBe(3));
+    expect(screen.queryByTestId("managed-success"), "nothing is confirmed while the list is still reloading").not.toBeInTheDocument();
+  });
+
+  it("given a confirmed cancellation, when a move starts next, then the earlier confirmation leaves", async () => {
+    // given
+    vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+    await userEvent.click(within(screen.getByTestId(`booking-${first.id}`)).getByTestId("managed-cancel"));
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+    await screen.findByTestId("managed-success");
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+
+    // when
+    await userEvent.click(within(screen.getByTestId(`booking-${second.id}`)).getByTestId("move-booking"));
+
+    // then
+    expect(screen.queryByTestId("managed-success"), "a confirmation belongs to the action that produced it").not.toBeInTheDocument();
+  });
+
+  it("given a confirmed cancellation, when a series is created next, then the earlier confirmation leaves before the reload", async () => {
+    // given
+    vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
+    vi.spyOn(api, "previewSeries").mockResolvedValue({
+      creatableCount: 1, truncatedByHorizon: false, horizonLimit: null,
+      occurrences: [{ startsAt: "2026-09-07T16:00:00Z", endsAt: "2026-09-07T17:00:00Z", blockedCourtIds: [], violations: [], creatable: true }]
+    });
+    vi.spyOn(api, "createSeries").mockResolvedValue({ seriesId: "series-2", bookingIds: ["booking-9"], skipped: [] });
+    let reads = 0;
+    vi.mocked(api.managedAppointments).mockImplementation(() => {
+      reads += 1;
+      return reads <= 2 ? Promise.resolve({ items: [first, second] }) : new Promise(() => undefined);
+    });
+    show();
+    await userEvent.click(within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary"));
+    await userEvent.click(within(screen.getByTestId(`booking-${first.id}`)).getByTestId("managed-cancel"));
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+    await screen.findByTestId("managed-success");
+    await userEvent.click(screen.getByTestId("new-series"));
+    await userEvent.selectOptions(await screen.findByTestId("series-courts"), ["court-1"]);
+    await userEvent.selectOptions(await screen.findByTestId("series-card"), ["card-training"]);
+    await userEvent.type(screen.getByTestId("series-starts-on"), "2026-09-07");
+    await userEvent.type(screen.getByTestId("series-start-time"), "18:00");
+    await userEvent.click(screen.getByTestId("series-weekday-MONDAY"));
+    await userEvent.click(screen.getByTestId("preview-series"));
+
+    // when
+    await userEvent.click(await screen.findByTestId("confirm-series"));
+
+    // then
+    await waitFor(() => expect(reads).toBe(3));
+    expect(screen.queryByTestId("managed-success"), "nothing is confirmed while the list is still reloading").not.toBeInTheDocument();
+  });
+
   it("given the list reloads, when it shows its loading state, then load more is not offered", async () => {
     // given
     vi.mocked(api.managedAppointments).mockImplementation((options) => options?.courtId
