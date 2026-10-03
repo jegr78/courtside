@@ -17,7 +17,9 @@ beforeEach(async () => {
   vi.spyOn(api, "bookingGrid").mockResolvedValue({
     timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingHours: []
   });
-  vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view === "HISTORY"
+  vi.spyOn(api, "personalBookings").mockImplementation((options) => Promise.resolve(options?.view === "CANCELLED"
+    ? { items: [] }
+    : options?.view === "HISTORY"
     ? { items: [{
       id: "44444444-4444-4444-4444-444444444444",
       seriesId,
@@ -215,7 +217,7 @@ it("given another page exists, when loading more, then its bookings are appended
       cardColor: "#176b55",
       status: "CONFIRMED"
     }] }
-    : options?.view === "HISTORY" ? { items: [] } : { items: [], nextCursor: upcomingId }));
+    : options?.view ? { items: [] } : { items: [], nextCursor: upcomingId }));
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
 
   // when
@@ -230,7 +232,7 @@ it("given the next page cannot be read, when the member asks for it, then the fa
   // given
   vi.mocked(api.personalBookings).mockImplementation((options) => options?.cursor
     ? Promise.reject(new Error("offline for a moment"))
-    : Promise.resolve(options?.view === "HISTORY" ? { items: [] } : {
+    : Promise.resolve(options?.view ? { items: [] } : {
       items: [{
         id: upcomingId, seriesId, courtIds: ["33333333-3333-3333-3333-333333333333"],
         startsAt: "2026-08-12T16:00:00Z", endsAt: "2026-08-12T17:00:00Z",
@@ -495,22 +497,62 @@ it("given the bound cannot be read, when the bookings load, then they are shown 
   expect(screen.getByTestId("move-duration")).not.toHaveAttribute("max");
 });
 
-it("given a cancelled booking still ahead and one already past, when loaded, then each stays with its date and only the past one counts as past", async () => {
+it("given cancelled bookings still ahead, when loaded, then they fold into their own section between the upcoming and the past", async () => {
   // given
   const cancelled = { courtIds: ["33333333-3333-3333-3333-333333333333"], cardLabel: "Member booking", cardColor: "#176b55", status: "CANCELLED" as const };
-  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve({ items: options?.view === "HISTORY"
-    ? [{ ...cancelled, id: "66666666-6666-6666-6666-666666666666", startsAt: "2026-08-04T16:00:00Z", endsAt: "2026-08-04T17:00:00Z" }]
-    : [{ ...cancelled, id: "55555555-5555-5555-5555-555555555555", startsAt: "2026-08-19T16:00:00Z", endsAt: "2026-08-19T17:00:00Z" }] }));
+  const ahead = "55555555-5555-5555-5555-555555555555";
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve(options?.view === "CANCELLED"
+    ? { items: [
+      { ...cancelled, id: ahead, startsAt: "2026-08-19T16:00:00Z", endsAt: "2026-08-19T17:00:00Z" },
+      { ...cancelled, id: "66666666-6666-6666-6666-666666666666", startsAt: "2026-08-19T16:00:00Z", endsAt: "2026-08-19T17:00:00Z" }
+    ] }
+    : options?.view === "HISTORY" ? { items: [] }
+    : { items: [{ ...cancelled, id: upcomingId, status: "CONFIRMED", startsAt: "2026-08-19T16:00:00Z", endsAt: "2026-08-19T17:00:00Z" }] }));
 
   // when
   render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
 
   // then
-  expect(await screen.findByTestId("past-bookings-summary"), "a cancellation joins the past once its date has passed, as the page says")
-    .toHaveTextContent(i18n.t("myBookings.pastCount", { count: 1 }));
-  const ahead = within(screen.getByTestId("upcoming-bookings")).getByTestId("booking-55555555-5555-5555-5555-555555555555");
-  expect(ahead, "the member keeps a record of what they cancelled").toHaveTextContent(i18n.t("myBookings.cancelled"));
-  expect(within(ahead).queryAllByRole("button"), "a cancelled booking offers nothing to cancel or move").toEqual([]);
+  const section = await screen.findByTestId("cancelled-bookings");
+  expect(section.tagName, "cancellations cost a line until opened").toBe("DETAILS");
+  expect(screen.getByTestId("cancelled-bookings-summary")).toHaveTextContent(i18n.t("myBookings.cancelledCount", { count: 2 }));
+  expect(within(screen.getByTestId("upcoming-bookings")).queryByTestId(`booking-${ahead}`), "the upcoming list holds what still stands").not.toBeInTheDocument();
+  expect(screen.getByTestId("upcoming-bookings").compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(section.compareDocumentPosition(screen.getByTestId("past-bookings")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const entry = within(section).getByTestId(`booking-${ahead}`);
+  expect(entry, "the member keeps a record of what they cancelled").toHaveTextContent(i18n.t("myBookings.cancelled"));
+  expect(within(entry).queryAllByRole("button"), "a cancelled booking offers nothing to cancel or move").toEqual([]);
+  expect(api.personalBookings).toHaveBeenCalledWith({ view: "CANCELLED" });
+});
+
+it("given no cancellation ahead, when loaded, then no cancelled section is shown", async () => {
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // then
+  await screen.findByTestId("past-bookings-summary");
+  expect(screen.queryByTestId("cancelled-bookings")).not.toBeInTheDocument();
+});
+
+it("given more cancellations than one page, when the member asks for more, then the next page is appended and the count stays honest", async () => {
+  // given
+  const cancelled = { ...participation("55555555-5555-5555-5555-555555555555"), status: "CANCELLED" as const };
+  const later = { ...cancelled, id: "66666666-6666-6666-6666-666666666666" };
+  vi.mocked(api.personalBookings).mockImplementation((options) => Promise.resolve(options?.view !== "CANCELLED"
+    ? { items: [] }
+    : options.cursor ? { items: [later] } : { items: [cancelled], nextCursor: cancelled.id }));
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  expect(await screen.findByTestId("cancelled-bookings-summary")).toHaveTextContent(i18n.t("myBookings.cancelledCountMore", { count: 1 }));
+  await userEvent.click(screen.getByTestId("cancelled-bookings-summary"));
+
+  // when
+  await userEvent.click(screen.getByTestId("load-more-cancelled-bookings"));
+
+  // then
+  expect(await screen.findByTestId(`booking-${later.id}`)).toBeInTheDocument();
+  expect(api.personalBookings).toHaveBeenLastCalledWith({ view: "CANCELLED", cursor: cancelled.id });
+  expect(screen.getByTestId("cancelled-bookings-summary")).toHaveTextContent(i18n.t("myBookings.cancelledCount", { count: 2 }));
+  expect(screen.queryByTestId("load-more-cancelled-bookings")).not.toBeInTheDocument();
 });
 
 it("given a move dialog, when the preview arrives, then the confirm action is a new button rather than the disabled preview one recoloured", async () => {
@@ -534,7 +576,7 @@ it("given the list reloads, when it shows its loading state, then load more is n
   vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
   let upcomingReads = 0;
   vi.mocked(api.personalBookings).mockImplementation((options) => {
-    if (options?.view === "HISTORY") return Promise.resolve({ items: [] });
+    if (options?.view) return Promise.resolve({ items: [] });
     upcomingReads += 1;
     return upcomingReads === 1 ? Promise.resolve({ items: [], nextCursor: upcomingId }) : new Promise(() => undefined);
   });
@@ -557,7 +599,7 @@ it("given a booking page is in flight, when the list reloads first, then that pa
   vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
   vi.mocked(api.personalBookings).mockImplementation((options) => options?.cursor
     ? new Promise((resolve) => { resolveMore = resolve; })
-    : Promise.resolve(options?.view === "HISTORY" ? { items: [] } : { items: [], nextCursor: upcomingId }));
+    : Promise.resolve(options?.view ? { items: [] } : { items: [], nextCursor: upcomingId }));
   render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
   await userEvent.click(await screen.findByTestId("load-more-bookings"));
 
@@ -607,7 +649,7 @@ it("given a booking page is in flight, when the list reloads before that page fa
   vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
   vi.mocked(api.personalBookings).mockImplementation((options) => options?.cursor
     ? new Promise((_, reject) => { rejectMore = reject; })
-    : Promise.resolve(options?.view === "HISTORY" ? { items: [] } : { items: [], nextCursor: upcomingId }));
+    : Promise.resolve(options?.view ? { items: [] } : { items: [], nextCursor: upcomingId }));
   render(<MyBookingsView now={new Date("2026-08-12T12:00:00Z")} />);
   await userEvent.click(await screen.findByTestId("load-more-bookings"));
 

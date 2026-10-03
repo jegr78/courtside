@@ -306,24 +306,22 @@ class CursorVisibilityTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenACancelledBookingBetweenTwoPages_whenPagingAcrossIt_thenItIsStillTheCursorThatWorks() {
+    void givenAFirstPersonalPage_whenItsCursorIsCancelledBeforeTheNextPage_thenPagingContinues() {
         // given
-        UUID cancelled = bookedByJane(firstCourt, TWO_PM, THREE_PM);
+        UUID earliest = bookedByJane(firstCourt, TWO_PM, THREE_PM);
         UUID latest = bookedByJane(secondCourt, SIX_PM, SEVEN_PM);
-        bookings.cancel(cancelled, janeAccountId, Set.of(Role.MEMBER));
+        PersonalBookingPage first = bookings.personalBookings(janeAccountId, PersonalBookingView.UPCOMING, null, 1);
+        assertThat(idsOf(first.bookings())).containsExactly(earliest);
+        bookings.cancel(earliest, janeAccountId, Set.of(Role.MEMBER));
 
         // when
-        PersonalBookingPage first = bookings.personalBookings(janeAccountId, PersonalBookingView.UPCOMING, null, 1);
-        List<UUID> firstPage = idsOf(first.bookings());
-        UUID cursor = first.nextCursor();
+        List<UUID> next = personalPageFor(janeAccountId, first.nextCursor());
 
         // then
-        assertThat(firstPage)
-                .as("a booking is cancelled and never removed, so it still holds its place in the"
-                        + " list and still hands out a usable cursor")
-                .containsExactly(cancelled);
-        assertThat(cursor).isEqualTo(cancelled);
-        assertThat(personalPageFor(janeAccountId, cursor)).containsExactly(latest);
+        assertThat(next)
+                .as("a booking is cancelled and never removed, so its id stays a usable cursor after it"
+                        + " leaves the upcoming view")
+                .containsExactly(latest);
     }
 
     @Test

@@ -36,7 +36,7 @@ class CursorPredicateTest {
 
     private static final Map<String, Set<String>> NOT_A_VISIBILITY_BOUNDARY_BY_QUERY = Map.of(
             "findUpcomingManagedBookingIds", Set.of("now"),
-            "findUpcomingPersonalBookingIds", Set.of("now"),
+            "findUpcomingPersonalBookingIds", Set.of("now", "status"),
             "findPersonalBookingHistoryIds", Set.of("now"));
 
     @Test
