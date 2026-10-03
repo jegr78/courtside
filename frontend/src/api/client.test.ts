@@ -6,7 +6,7 @@ import { api } from "./client";
 
 const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();

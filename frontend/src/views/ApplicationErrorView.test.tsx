@@ -20,7 +20,7 @@ function stubNavigation() {
   });
 }
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
 beforeEach(async () => {
   await i18n.changeLanguage("en");
   assign.mockReset();
