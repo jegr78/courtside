@@ -620,8 +620,13 @@ jobs:
           distribution: temurin
           cache: maven
       - uses: ./.github/actions/tool-dependencies
+      - name: Install the pinned frontend toolchain
+        run: >
+          ./mvnw -B
+          com.github.eirslett:frontend-maven-plugin:install-node-and-npm
+          com.github.eirslett:frontend-maven-plugin:npm@npm-ci
       - name: Build and qualify the pull-request image
-        run: node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+        run: frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat
       - id: images
         name: Build the booking seed and record both image identities
         env:

@@ -170,7 +170,7 @@ test("given the gate image job, when it builds, then the head branch reaches the
   assert.match(record.run, /--workflow nightly-image\.yml/);
   assert.match(record.run, /test -z "\$\(git status --porcelain --ignored -- deploy\/\)"/,
     "the archive is built from a deploy directory the qualification left untouched");
-  assert.ok(steps.some((step) => step.run === "node tools/courtside.uat-smoke.mjs --confirm courtside-uat"),
+  assert.ok(steps.some((step) => step.run === "frontend/node/node tools/courtside.uat-smoke.mjs --confirm courtside-uat"),
     "the image is qualified before the gates use it");
   assert.equal(build.jobs["gates-image"].permissions.contents, "read");
   assert.equal(Object.keys(build.jobs["gates-image"].permissions).length, 1, "the gate image needs no write scope");
