@@ -316,8 +316,9 @@ test("given a candidate archive, when any release job inspects it, then the book
   const inspections = [...inspectionsOf(releaseJobs, "release"), ...inspectionsOf(gateJobs, "release-gates")];
   const boundDigest = {
     release: "ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}",
-    "release-gates": "ghcr.io/${{ github.repository }}@${{ inputs.booking-seed-digest }}"
+    "release-gates": "${{ steps.booking-seed.outputs.pinned }}"
   };
+  const seedOf = (job) => gateJobs[job].steps.find((step) => step.id === "booking-seed");
 
   // then
   assert.ok(inspections.some(({ job }) => job === "release-gates:mail"), "the mail gate inspects the archive");
@@ -325,6 +326,10 @@ test("given a candidate archive, when any release job inspects it, then the book
   for (const { job, step } of inspections) {
     assert.match(step.run, /--booking-seed-image "\$BOOKING_SEED_IMAGE"/, `${job} passes the booking-seed image`);
     assert.equal(step.env?.BOOKING_SEED_IMAGE, boundDigest[job.split(":")[0]], `${job} binds the booking-seed digest`);
+    if (job.startsWith("release-gates:")) {
+      assert.equal(seedOf(job.split(":")[1]).with.digest, "${{ inputs.booking-seed-digest }}",
+        `${job} resolves the booking seed from its digest input`);
+    }
   }
 });
 

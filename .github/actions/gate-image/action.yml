@@ -1,0 +1,77 @@
+name: Gate image
+description: Provides the image under test and the pinned name the deployment archive records.
+
+inputs:
+  source:
+    description: registry for a pushed digest, artifact for an image saved earlier in the run
+    required: true
+  digest:
+    description: The registry digest, or the image ID of a saved image
+    required: true
+  repository:
+    description: The repository whose registry name the archive records
+    required: true
+  artifact:
+    description: The artifact holding images.tar when the source is artifact
+    required: false
+    default: ''
+  run-id:
+    description: The run that uploaded the artifact
+    required: false
+    default: ''
+  github-token:
+    description: Token for downloading the artifact
+    required: false
+    default: ''
+  load:
+    description: false when the job only needs the pinned name
+    required: false
+    default: 'true'
+
+outputs:
+  reference:
+    description: What docker and Compose run
+    value: ${{ steps.resolve.outputs.reference }}
+  pinned:
+    description: The digest-pinned registry name an archive records
+    value: ${{ steps.resolve.outputs.pinned }}
+
+runs:
+  using: composite
+  steps:
+    - if: inputs.source == 'artifact' && inputs.load == 'true'
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      with:
+        name: ${{ inputs.artifact }}
+        path: ${{ runner.temp }}/gate-image
+        run-id: ${{ inputs.run-id }}
+        github-token: ${{ inputs.github-token }}
+    - id: resolve
+      shell: bash
+      env:
+        SOURCE: ${{ inputs.source }}
+        LOAD: ${{ inputs.load }}
+        DIGEST: ${{ inputs.digest }}
+        REPOSITORY: ${{ inputs.repository }}
+      run: |
+        [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+        case "$SOURCE" in
+          artifact)
+            if [ "$LOAD" = true ]; then
+              docker load --input "$RUNNER_TEMP/gate-image/images.tar"
+              docker image inspect "$DIGEST" > /dev/null
+            fi
+            reference="$DIGEST"
+            ;;
+          registry)
+            reference="ghcr.io/$REPOSITORY@$DIGEST"
+            ;;
+          *)
+            echo "::error::unknown image source $SOURCE"
+            exit 1
+            ;;
+        esac
+        {
+          echo "reference=$reference"
+          echo "pinned=ghcr.io/$REPOSITORY@$DIGEST"
+        } >> "$GITHUB_OUTPUT"

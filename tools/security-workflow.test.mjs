@@ -535,7 +535,9 @@ test("given a release candidate, when publishing it, then its exact digest passe
   assert.match(release, /\n  gates:\n    needs: \[build, image, archive, qualify\]/);
   assert.match(release, /image-digest: \$\{\{ needs\.image\.outputs\.digest \}\}/);
   assert.match(release, /\n  publish:\n    needs: \[[^\]]*\bgates\b[^\]]*\]/);
-  assert.match(gates, /IMAGE: ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ inputs\.image-digest \}\}/);
+  assert.match(gates,
+    /active-security:[\s\S]+?- id: image\n\s+uses: \.\/\.github\/actions\/gate-image\n[\s\S]+?digest: \$\{\{ inputs\.image-digest \}\}/);
+  assert.match(gates, /IMAGE: \$\{\{ steps\.image\.outputs\.reference \}\}/);
   assert.match(gates, /security-run "\$RUN_ID" active/);
   assert.match(gates,
     /set -o pipefail[\s\S]{0,120}?node tools\/security-image-inventory\.mjs active \| xargs -n1 docker pull/);

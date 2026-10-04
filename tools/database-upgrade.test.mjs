@@ -253,7 +253,9 @@ test("given a release candidate, when release qualification runs, then every sup
   assert.match(releaseWorkflow, /--release-origins "\$GITHUB_REPOSITORY"/);
   assert.match(releaseWorkflow, /upgrade-origins: \$\{\{ needs\.build\.outputs\.upgrade-origins \}\}/);
   assert.match(gatesWorkflow, /node tools\/courtside\.upgrade-smoke\.mjs --confirm courtside-upgrade/);
-  assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_IMAGE:[^\n]+inputs\.image-digest/);
+  assert.match(gatesWorkflow,
+    /\n  upgrade:\n[\s\S]+?uses: \.\/\.github\/actions\/gate-image\n[\s\S]+?digest: \$\{\{ inputs\.image-digest \}\}/);
+  assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_IMAGE: \$\{\{ steps\.image\.outputs\.reference \}\}/);
   assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_ORIGIN_IMAGE: \$\{\{ matrix\.origin\.image \}\}/);
   assert.match(releaseWorkflow, /Supported database upgrade origins/);
   assert.match(releaseWorkflow, /needs: \[archive, build, browser, image, qualify, gates\]/);
