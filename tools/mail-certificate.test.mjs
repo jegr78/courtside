@@ -160,12 +160,14 @@ test("given a change to the mail certificate peer, when a pull request is classi
   assert.doesNotMatch(mailWorkflow, /\n {2}pull_request:/, "the build's gate replaces the path-filtered trigger");
 });
 
-test("given a change to the code that talks to the relay, when a pull request is classified, then the mail gate runs", () => {
+test("given a change to the code that talks to the relay, when a pull request is classified, then the release gates run", () => {
   // when
   const jobs = selectedJobs("src/main/java/org/courtside/notification/Example.java");
 
   // then
-  assert.ok(jobs.includes("gates"), "a notification change decides whether a message goes out");
+  assert.ok(jobs.includes("gates"), "a backend change selects the release gates");
+  assert.doesNotMatch(smoke, /COURTSIDE_UAT_IMAGE|COURTSIDE_RESTORE_IMAGE|COURTSIDE_UPGRADE_CANDIDATE_IMAGE/,
+    "the Stalwart journey starts no application image, so it proves the mail stack and not this code");
 });
 
 test("given the temporary bootstrap credential, when the smoke tests legacy metadata, then setup "

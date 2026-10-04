@@ -42,13 +42,15 @@ Tests are placed at the lowest level that can prove the risk. Database guarantee
 | Local unit and contract feedback | under 2 minutes | Focused tests for the changed decision and its negative boundary. |
 | Required pull-request checks | under 15 minutes | Green required checks plus the pull-request risk and evidence declaration. |
 | Local single-area pull-request verification | under 15 minutes | `node tools/courtside.mjs check` selects and runs one protected reduced profile against a pinned commit. |
-| Local combined or full pull-request verification | under 25 minutes, plus 15 for the Docker release gates of `full` | Mixed profiles run additively; `full` validates workflows and documentation, runs clean non-browser verification, exercises a fresh Compose deployment, runs browser and WebKit reliability gates and then the qualification, Stalwart, restore, upgrade and active assessment gates against the same pinned commit. |
+| Local combined or full pull-request verification | under 25 minutes, plus 35 for the Docker release gates of `full` | Mixed profiles run additively; `full` validates workflows and documentation, runs clean non-browser verification, exercises a fresh Compose deployment, runs browser and WebKit reliability gates and then the qualification, Stalwart, restore, upgrade and active assessment gates against the same pinned commit. |
 | Nightly qualification | under 90 minutes | Periodic browser, order, concurrency, security and bounded performance evidence assigned by risk. |
 | Release qualification | under 45 minutes | Candidate-image, upgrade, restore and release-risk evidence; long soak runs are recorded separately. |
 
 A timeout or unavailable required tool makes a gate incomplete, not successful. Budgets are reviewed when their representative workload changes; tests are not silently removed to meet a budget.
 
 A workflow job's `timeout-minutes` is set from measurement: at least twice the longest recent successful run, rounded up to five minutes.
+
+The local Docker release gates follow the same rule: their 35 minutes are twice the 17.1 minutes the five gates took with a cold image build on an arm64 Mac.
 
 ## Evidence rules
 

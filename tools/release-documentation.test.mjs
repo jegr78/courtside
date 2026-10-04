@@ -227,3 +227,18 @@ test("given pull requests that can change the image, when the document explains 
   assert.match(section, /npm advisor(?:y|ies)[^.]*image CVE scan[^.]*stay out of pull requests[^.]*move without a change/,
     "volatile external checks stay in the nightly and the release");
 });
+
+test("given the gates a pull request runs, when the document states their limits, then it claims no more than the jobs do", () => {
+  // given
+  const text = document.replace(/\s+/g, " ");
+  const quality = repositoryFile("docs/quality-strategy.md").replace(/\s+/g, " ");
+
+  // when / then
+  assert.doesNotMatch(text, /covers every path it filtered on/,
+    "neither the Stalwart journey nor the archive binding starts the application image");
+  assert.match(text, /The Stalwart journey starts no application image/);
+  assert.match(text, /`github\.token` only to download artifacts of the same run, read-only/);
+  assert.match(text, /a failed shifted-clock run keeps the nightly image from being published/);
+  assert.match(quality, /plus 35 for the Docker release gates of `full`/);
+  assert.match(quality, /twice the 17\.1 minutes the five gates took with a cold image build/);
+});
