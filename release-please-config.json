@@ -9,7 +9,7 @@
   "initial-version": "0.1.0-rc.1",
   "commit-search-depth": 2000,
   "versioning": "prerelease",
-  "prerelease": true,
+  "prerelease": false,
   "draft": true,
   "force-tag-creation": true,
   "changelog-sections": [
