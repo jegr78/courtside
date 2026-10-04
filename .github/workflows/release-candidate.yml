@@ -396,7 +396,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository }}:release-candidate-${{ needs.select.outputs.commit }}
+          tags: ghcr.io/${{ github.repository }}:release-candidate-${{ needs.select.outputs.commit }}-${{ github.run_id }}
           labels: |
             org.opencontainers.image.revision=${{ needs.select.outputs.commit }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
@@ -410,7 +410,7 @@ jobs:
           build-args: BASE_IMAGE=ghcr.io/${{ github.repository }}@${{ steps.push.outputs.digest }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository }}:booking-seed-release-candidate-${{ needs.select.outputs.commit }}
+          tags: ghcr.io/${{ github.repository }}:booking-seed-release-candidate-${{ needs.select.outputs.commit }}-${{ github.run_id }}
           labels: |
             org.opencontainers.image.revision=${{ needs.select.outputs.commit }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
@@ -467,7 +467,7 @@ jobs:
       contents: read
       packages: read
     env:
-      COURTSIDE_UAT_VERSION: release-candidate-${{ needs.select.outputs.commit }}@${{ needs.image.outputs.digest }}
+      COURTSIDE_UAT_VERSION: release-candidate-${{ needs.select.outputs.commit }}-${{ github.run_id }}@${{ needs.image.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

@@ -5,7 +5,7 @@ const datedTagPatterns = [
   /^nightly-\d{8}-[a-f0-9]{7}$/,
   /^booking-seed-nightly-\d{8}-[a-f0-9]{7}$/,
 ];
-const releaseCandidateTagPattern = /^(?:booking-seed-)?release-candidate-[a-f0-9]{40}$/;
+const releaseCandidateTagPattern = /^(?:booking-seed-)?release-candidate-[a-f0-9]{40}(?:-\d+)?$/;
 const movingNightlyTags = new Set([
   "nightly",
   "nightly-candidate",

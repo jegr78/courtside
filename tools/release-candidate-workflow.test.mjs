@@ -189,8 +189,8 @@ test("given a candidate image, when it is built, then it carries the selected re
   // when / then
   assert.equal(jobs.image.concurrency.group, "container-registry-${{ github.repository }}");
   assert.equal(jobs.image.concurrency["cancel-in-progress"], false);
-  assert.match(image, /tags: ghcr\.io\/\$\{\{ github\.repository \}\}:release-candidate-\$\{\{ needs\.select\.outputs\.commit \}\}/);
-  assert.match(image, /tags: ghcr\.io\/\$\{\{ github\.repository \}\}:booking-seed-release-candidate-\$\{\{ needs\.select\.outputs\.commit \}\}/);
+  assert.match(image, /tags: ghcr\.io\/\$\{\{ github\.repository \}\}:release-candidate-\$\{\{ needs\.select\.outputs\.commit \}\}-\$\{\{ github\.run_id \}\}\n/);
+  assert.match(image, /tags: ghcr\.io\/\$\{\{ github\.repository \}\}:booking-seed-release-candidate-\$\{\{ needs\.select\.outputs\.commit \}\}-\$\{\{ github\.run_id \}\}\n/);
   assert.match(image, /org\.opencontainers\.image\.revision=\$\{\{ needs\.select\.outputs\.commit \}\}/);
   assert.doesNotMatch(image, /metadata-action/, "the metadata action labels the dispatch commit, not the selected one");
   assert.match(image, /file: Dockerfile\.fixtures/);
@@ -215,7 +215,8 @@ test("given a candidate image, when it is qualified, then the same digest passes
     { architecture: "arm64", "runs-on": "ubuntu-24.04-arm" }
   ]);
   assert.equal(jobs.qualify.env.COURTSIDE_UAT_VERSION,
-    "release-candidate-${{ needs.select.outputs.commit }}@${{ needs.image.outputs.digest }}");
+    "release-candidate-${{ needs.select.outputs.commit }}-${{ github.run_id }}@${{ needs.image.outputs.digest }}",
+    "a run-unique tag cannot be moved by another candidate of the same commit or by release.yml");
   assert.match(qualify, /node tools\/courtside\.uat-smoke\.mjs --confirm courtside-uat/);
   assert.match(qualify, /deployment-qualification\.mjs --inspect-archive/);
   assert.match(qualify, /--recipes standard,full-self-hosted,existing-infrastructure,funnel/);
