@@ -689,6 +689,7 @@ jobs:
     uses: ./.github/workflows/release-gates.yml
     with:
       image-source: artifact
+      upgrade-base: ${{ github.event.pull_request.base.sha }}
       image-artifact: gate-image-${{ github.run_id }}
       image-digest: ${{ needs.gates-image.outputs.image-id }}
       booking-seed-digest: ${{ needs.gates-image.outputs.booking-seed-id }}

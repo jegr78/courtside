@@ -38,6 +38,17 @@ test("given no upgrade origin, when the upgrade gate is planned, then it fails i
   assert.throws(() => gatePlans("upgrade", { image, repository: "a/b", origins: [] }), /no upgrade origin/);
 });
 
+test("given no origin and a change that corrects a migration, when the upgrade gate is planned, then it passes with a notice", () => {
+  // given
+  const notice = "no comparable upgrade origin: this change modifies upgrade/verify.sql; the next nightly covers the upgrade";
+
+  // when
+  const plans = gatePlans("upgrade", { image, repository: "a/b", origins: [], originNotice: notice });
+
+  // then
+  assert.deepEqual(plans, [{ label: "upgrade-notice", notice }]);
+});
+
 test("when an unknown gate is requested, then it is refused by name", () => {
   // when / then
   assert.throws(() => gatePlans("npm-audit", {}), /unknown gate npm-audit/);

@@ -149,6 +149,8 @@ test("given a pull request selecting the gates, when the build runs, then the ga
   assert.equal(gatesJob.with["image-digest"], "${{ needs.gates-image.outputs.image-id }}");
   assert.equal(gatesJob.with["booking-seed-digest"], "${{ needs.gates-image.outputs.booking-seed-id }}");
   assert.equal(gatesJob.with["source-commit"], "${{ github.sha }}", "the gates test the commit every other job tests");
+  assert.equal(gatesJob.with["upgrade-base"], "${{ github.event.pull_request.base.sha }}",
+    "an empty upgrade origin set is judged against the pull request's own diff");
   assert.deepEqual(gatesJob.needs, ["test-profile-plan", "gates-image"]);
   assert.match(gatesJob.if, /needs\.gates-image\.result == 'success'/);
   assert.match(image.if, /github\.event_name == 'pull_request' && needs\.test-profile-plan\.outputs\.gates == 'true'/);

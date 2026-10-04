@@ -3,7 +3,8 @@ import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkoutRepository } from "./courtside.mjs";
-import { gitHistory, nightlyUpgradeOrigins } from "./courtside.upgrade-smoke.mjs";
+import { emptyOriginNotice, gitHistory, modifiedUpgradeInputs, nightlyUpgradeOrigins }
+  from "./courtside.upgrade-smoke.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const qualificationPath = "build/uat-smoke/qualification.json";
@@ -24,6 +25,9 @@ export function gatePlans(gate, context) {
       return [{ label: "restore", arguments: ["tools/courtside.restore-smoke.mjs", "--confirm", "courtside-restore"],
         environment: { COURTSIDE_RESTORE_IMAGE: context.image } }];
     case "upgrade":
+      if (context.origins?.length === 0 && typeof context.originNotice === "string") {
+        return [{ label: "upgrade-notice", notice: context.originNotice }];
+      }
       if (!Array.isArray(context.origins) || context.origins.length === 0) {
         throw new Error("no upgrade origin: no retained nightly shares this commit's migrations");
       }
@@ -92,6 +96,10 @@ function run(command, arguments_, options = {}) {
 }
 
 function executePlan(plan) {
+  if (plan.notice !== undefined) {
+    process.stdout.write(`${plan.notice}\n`);
+    return 0;
+  }
   const environment = { ...process.env, ...plan.environment };
   if (plan.pull) {
     const inventory = run(process.execPath, plan.arguments, { env: environment, stdio: ["ignore", "pipe", "inherit"] });
@@ -152,12 +160,15 @@ async function context(gate) {
   const { image, commit } = candidateImage();
   const repository = checkoutRepository();
   if (!repository) throw new Error("Cannot name the repository: give this checkout an origin remote on GitHub");
+  const origins = gate === "upgrade" ? await upgradeOrigins(repository, commit) : [];
   return {
     image,
     repository,
     commit,
     runId: `local-${Date.now()}`,
-    origins: gate === "upgrade" ? await upgradeOrigins(repository, commit) : []
+    origins,
+    originNotice: origins.length === 0 && gate === "upgrade"
+      ? emptyOriginNotice(modifiedUpgradeInputs("origin/main", commit, root)) : undefined
   };
 }
 
