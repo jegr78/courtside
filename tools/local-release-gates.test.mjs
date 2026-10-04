@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { gatePlans, qualifiedCandidate, runGatePlans } from "./local-release-gates.mjs";
+import { gatePlans, qualifiedCandidate, qualifyCandidate, runGatePlans } from "./local-release-gates.mjs";
 
 const image = `sha256:${"a".repeat(64)}`;
 
@@ -147,4 +147,16 @@ test("given only passing steps, when the plans run, then every step runs once", 
 
   // then
   assert.deepEqual(ran, ["a", "b"]);
+});
+
+test("given a qualification that fails, when the uat gate ends, then its run-scoped image is removed", () => {
+  // given
+  const removed = [];
+
+  // when / then
+  assert.throws(() => qualifyCandidate([{ label: "uat" }], "courtside:uat-gate-9", () => 1, (tag) => removed.push(tag)),
+    /uat failed/);
+  assert.deepEqual(removed, ["courtside:uat-gate-9"], "a failed run leaves no image only it could have used");
+  qualifyCandidate([{ label: "uat" }], "courtside:uat-gate-10", () => 0, (tag) => removed.push(tag));
+  assert.deepEqual(removed, ["courtside:uat-gate-9"], "a qualified image stays for the gates after it");
 });

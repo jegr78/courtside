@@ -104,6 +104,15 @@ export function runGatePlans(plans, execute) {
   if (failures.length > 0) throw new Error(`${failures.join(", ")} failed`);
 }
 
+export function qualifyCandidate(plans, tag, execute, remove) {
+  try {
+    runGatePlans(plans, execute);
+  } catch (failure) {
+    remove(tag);
+    throw failure;
+  }
+}
+
 function run(command, arguments_, options = {}) {
   const result = spawnSync(command, arguments_, { cwd: root, encoding: "utf8", ...options });
   if (result.error) throw result.error;
@@ -228,9 +237,13 @@ async function main() {
   const head = run("git", ["rev-parse", "HEAD"]).stdout.trim();
   const gateContext = await context(gate);
   const plans = gatePlans(gate, gateContext);
-  if (gate === "uat") forgetPreviousCandidate();
-  runGatePlans(plans, executePlan);
-  if (gate === "uat") recordCandidate(head, gateContext.instance.image);
+  if (gate === "uat") {
+    forgetPreviousCandidate();
+    qualifyCandidate(plans, gateContext.instance.image, executePlan, (tag) => run("docker", ["image", "rm", tag]));
+    recordCandidate(head, gateContext.instance.image);
+  } else {
+    runGatePlans(plans, executePlan);
+  }
   process.stdout.write(`Gate ${gate} passed\n`);
 }
 
