@@ -1,5 +1,7 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { createSocket } from "node:dgram";
+import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkoutRepository } from "./courtside.mjs";
@@ -8,16 +10,29 @@ import { emptyOriginNotice, gitHistory, modifiedUpgradeInputs, nightlyUpgradeOri
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const qualificationPath = "build/uat-smoke/qualification.json";
-const candidateTag = "courtside:uat-local";
+const runScopedProject = /^courtside-uat-gate-[a-z0-9-]+$/;
+const runScopedImage = /^courtside:uat-gate-[a-z0-9-]+$/;
 const candidatePath = "build/local-gates/candidate.json";
 
 export const localGates = ["uat", "mail", "restore", "upgrade", "active-security"];
 
 export function gatePlans(gate, context) {
   switch (gate) {
-    case "uat":
-      return [{ label: "uat", arguments: ["tools/courtside.uat-smoke.mjs", "--confirm", "courtside-uat"],
-        environment: {} }];
+    case "uat": {
+      const { instance } = context;
+      if (!runScopedProject.test(instance?.project ?? "") || !runScopedImage.test(instance?.image ?? "")) {
+        throw new Error("the uat gate needs a run-scoped UAT project and image");
+      }
+      return [{ label: "uat", arguments: ["tools/courtside.uat-smoke.mjs", "--confirm", instance.project],
+        environment: {
+          COURTSIDE_UAT_PROJECT: instance.project,
+          COURTSIDE_UAT_LOCAL_IMAGE: instance.image,
+          COURTSIDE_UAT_HTTP_PORT: String(instance.httpPort),
+          COURTSIDE_UAT_HTTPS_PORT: String(instance.httpsPort),
+          COURTSIDE_UAT_SHARED_PORT: String(instance.sharedPort),
+          COURTSIDE_OPERATIONAL_LOG_PORT: String(instance.logPort)
+        } }];
+    }
     case "mail":
       return [{ label: "mail", arguments: ["tools/courtside.mail-smoke.mjs"],
         environment: { COURTSIDE_MAIL_SMOKE_LOGS: "build/deployment-mail/server-logs" } }];
@@ -67,16 +82,16 @@ export function gatePlans(gate, context) {
 
 export function qualifiedCandidate(imageId, qualification, recorded) {
   if (!/^sha256:[0-9a-f]{64}$/.test(imageId ?? "") || qualification?.status !== "passed"
-      || !/^[0-9a-f]{40}$/.test(recorded?.commit ?? "")) {
-    throw new Error(`no qualified ${candidateTag}: run the uat gate first`);
+      || !/^[0-9a-f]{40}$/.test(recorded?.commit ?? "") || !runScopedImage.test(recorded?.tag ?? "")) {
+    throw new Error("no qualified gate image: run the uat gate first");
   }
   if (qualification.manifestDigest !== imageId) {
-    throw new Error(`${qualificationPath} qualified another image than ${candidateTag} (${imageId})`);
+    throw new Error(`${qualificationPath} qualified another image than ${recorded.tag} (${imageId})`);
   }
   if (recorded.image !== imageId) {
-    throw new Error(`${candidatePath} recorded another image than ${candidateTag} (${imageId})`);
+    throw new Error(`${candidatePath} recorded another image than ${recorded.tag} (${imageId})`);
   }
-  return { image: imageId, commit: recorded.commit };
+  return { image: imageId, commit: recorded.commit, tag: recorded.tag };
 }
 
 export function runGatePlans(plans, execute) {
@@ -125,9 +140,36 @@ function executePlan(plan) {
 }
 
 function candidateImage() {
-  const inspected = run("docker", ["image", "inspect", "--format", "{{.Id}}", candidateTag]);
+  const recorded = readJson(candidatePath);
+  const inspected = runScopedImage.test(recorded?.tag ?? "")
+    ? run("docker", ["image", "inspect", "--format", "{{.Id}}", recorded.tag]) : { status: 1 };
   const imageId = inspected.status === 0 ? inspected.stdout.trim() : "";
-  return qualifiedCandidate(imageId, readJson(qualificationPath), readJson(candidatePath));
+  return qualifiedCandidate(imageId, readJson(qualificationPath), recorded);
+}
+
+function freePort(kind) {
+  return new Promise((resolvePort, reject) => {
+    const socket = kind === "udp" ? createSocket("udp4") : createServer();
+    socket.once("error", reject);
+    const done = () => {
+      const { port } = socket.address();
+      socket.close(() => resolvePort(port));
+    };
+    if (kind === "udp") socket.bind(0, "127.0.0.1", done);
+    else socket.listen(0, "127.0.0.1", done);
+  });
+}
+
+async function runScopedInstance() {
+  const suffix = `${process.pid}-${Date.now().toString(36)}`;
+  return {
+    project: `courtside-uat-gate-${suffix}`,
+    image: `courtside:uat-gate-${suffix}`,
+    httpPort: await freePort("tcp"),
+    httpsPort: await freePort("tcp"),
+    sharedPort: await freePort("tcp"),
+    logPort: await freePort("udp")
+  };
 }
 
 function readJson(path) {
@@ -135,12 +177,18 @@ function readJson(path) {
   return existsSync(absolute) ? JSON.parse(readFileSync(absolute, "utf8")) : undefined;
 }
 
-function recordCandidate(commit) {
-  const inspected = run("docker", ["image", "inspect", "--format", "{{.Id}}", candidateTag]);
-  if (inspected.status !== 0) throw new Error(`the uat gate left no ${candidateTag}`);
+function recordCandidate(commit, tag) {
+  const inspected = run("docker", ["image", "inspect", "--format", "{{.Id}}", tag]);
+  if (inspected.status !== 0) throw new Error(`the uat gate left no ${tag}`);
   const target = join(root, candidatePath);
   mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, `${JSON.stringify({ image: inspected.stdout.trim(), commit }, null, 2)}\n`);
+  writeFileSync(target, `${JSON.stringify({ image: inspected.stdout.trim(), commit, tag }, null, 2)}\n`);
+}
+
+function forgetPreviousCandidate() {
+  const previous = readJson(candidatePath);
+  if (runScopedImage.test(previous?.tag ?? "")) run("docker", ["image", "rm", previous.tag]);
+  rmSync(join(root, candidatePath), { force: true });
 }
 
 async function upgradeOrigins(repository, commit) {
@@ -156,7 +204,8 @@ async function upgradeOrigins(repository, commit) {
 }
 
 async function context(gate) {
-  if (gate === "uat" || gate === "mail") return {};
+  if (gate === "uat") return { instance: await runScopedInstance() };
+  if (gate === "mail") return {};
   const { image, commit } = candidateImage();
   const repository = checkoutRepository();
   if (!repository) throw new Error("Cannot name the repository: give this checkout an origin remote on GitHub");
@@ -177,10 +226,11 @@ async function main() {
   if (process.argv.length !== 3) throw new Error(`usage: node tools/local-release-gates.mjs <${localGates.join("|")}>`);
   if (!localGates.includes(gate)) gatePlans(gate, {});
   const head = run("git", ["rev-parse", "HEAD"]).stdout.trim();
-  const plans = gatePlans(gate, await context(gate));
-  if (gate === "uat") rmSync(join(root, candidatePath), { force: true });
+  const gateContext = await context(gate);
+  const plans = gatePlans(gate, gateContext);
+  if (gate === "uat") forgetPreviousCandidate();
   runGatePlans(plans, executePlan);
-  if (gate === "uat") recordCandidate(head);
+  if (gate === "uat") recordCandidate(head, gateContext.instance.image);
   process.stdout.write(`Gate ${gate} passed\n`);
 }
 

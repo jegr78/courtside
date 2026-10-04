@@ -54,13 +54,29 @@ test("when an unknown gate is requested, then it is refused by name", () => {
   assert.throws(() => gatePlans("npm-audit", {}), /unknown gate npm-audit/);
 });
 
-test("given the qualification and mail gates, when they are planned, then each runs its own journey", () => {
+test("given a run-scoped instance, when the qualification is planned, then it never touches the developer's UAT", () => {
+  // given
+  const instance = { project: "courtside-uat-gate-17", image: "courtside:uat-gate-17", httpPort: 41001,
+    httpsPort: 41002, sharedPort: 41003, logPort: 41004 };
+
   // when
-  const [uat] = gatePlans("uat", {});
+  const [uat] = gatePlans("uat", { instance });
+
+  // then
+  assert.deepEqual(uat.arguments, ["tools/courtside.uat-smoke.mjs", "--confirm", "courtside-uat-gate-17"]);
+  assert.deepEqual(uat.environment, { COURTSIDE_UAT_PROJECT: "courtside-uat-gate-17",
+    COURTSIDE_UAT_LOCAL_IMAGE: "courtside:uat-gate-17", COURTSIDE_UAT_HTTP_PORT: "41001",
+    COURTSIDE_UAT_HTTPS_PORT: "41002", COURTSIDE_UAT_SHARED_PORT: "41003", COURTSIDE_OPERATIONAL_LOG_PORT: "41004" });
+  assert.throws(() => gatePlans("uat", { instance: { ...instance, project: "courtside-uat" } }),
+    /run-scoped/, "the developer's own UAT project is never a gate target");
+  assert.throws(() => gatePlans("uat", { instance: { ...instance, image: "courtside:uat-local" } }), /run-scoped/);
+});
+
+test("given the mail gate, when it is planned, then it runs the Stalwart journey", () => {
+  // when
   const [mail] = gatePlans("mail", {});
 
   // then
-  assert.deepEqual(uat.arguments, ["tools/courtside.uat-smoke.mjs", "--confirm", "courtside-uat"]);
   assert.deepEqual(mail.arguments, ["tools/courtside.mail-smoke.mjs"]);
   assert.equal(mail.environment.COURTSIDE_MAIL_SMOKE_LOGS, "build/deployment-mail/server-logs");
 });
@@ -87,10 +103,10 @@ test("given a qualification of another image, when a gate needs the candidate, t
   // given
   const commit = "c".repeat(40);
   const passed = { status: "passed", manifestDigest: image };
-  const recorded = { image, commit };
+  const recorded = { image, commit, tag: "courtside:uat-gate-1" };
 
   // when / then
-  assert.deepEqual(qualifiedCandidate(image, passed, recorded), { image, commit },
+  assert.deepEqual(qualifiedCandidate(image, passed, recorded), { image, commit, tag: "courtside:uat-gate-1" },
     "the gates assess the commit the image was built from, not whatever HEAD is now");
   assert.throws(() => qualifiedCandidate(image, undefined, recorded), /run the uat gate first/);
   assert.throws(() => qualifiedCandidate(image, { status: "passed", manifestDigest: `sha256:${"b".repeat(64)}` },
@@ -100,9 +116,10 @@ test("given a qualification of another image, when a gate needs the candidate, t
   assert.throws(() => qualifiedCandidate("", { status: "passed", manifestDigest: "" }, recorded),
     /run the uat gate first/);
   assert.throws(() => qualifiedCandidate(image, passed, undefined), /run the uat gate first/);
-  assert.throws(() => qualifiedCandidate(image, passed, { image: `sha256:${"b".repeat(64)}`, commit }),
+  assert.throws(() => qualifiedCandidate(image, passed, { ...recorded, image: `sha256:${"b".repeat(64)}` }),
     /recorded another image/);
-  assert.throws(() => qualifiedCandidate(image, passed, { image, commit: "main" }), /run the uat gate first/);
+  assert.throws(() => qualifiedCandidate(image, passed, { ...recorded, commit: "main" }), /run the uat gate first/);
+  assert.throws(() => qualifiedCandidate(image, passed, { ...recorded, tag: "courtside:uat-local" }), /run the uat gate first/);
 });
 
 test("given a failing step, when the plans run, then only the always steps follow and the gate fails by label", () => {
