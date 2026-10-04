@@ -1,16 +1,6 @@
 # Changelog
 
-## 0.1.0 (2026-09-14)
-
-
-
-
-
-
-
-
-
-
+## 0.1.0 (2026-10-04)
 
 ### Notable changes
 
@@ -509,6 +499,8 @@
 * stop the assessment from filing an issue for every unprovable control ([#910](https://github.com/jegr78/courtside/issues/910)) ([8740314](https://github.com/jegr78/courtside/commit/87403146786f632a5c7006fa0de871bb65978cf7))
 
 ### Build and dependencies
+
+* graduate the 0.1.0 candidate line ([#1289](https://github.com/jegr78/courtside/issues/1289)) ([ddf5aa1](https://github.com/jegr78/courtside/commit/ddf5aa107a7622f820503b120edb28c6848daebe))
 
 * **deps-dev:** bump the frontend-minor-and-patch group across 1 directory with 3 updates ([#1284](https://github.com/jegr78/courtside/issues/1284)) ([5410445](https://github.com/jegr78/courtside/commit/5410445cd9f16d27b62b372f4cd2c3f774c56f7d))
 * **deps:** bump Maven, deployment images, msw and the frontend group ([#1279](https://github.com/jegr78/courtside/issues/1279)) ([23ae4e9](https://github.com/jegr78/courtside/commit/23ae4e936056ee908baff33e75970498e753f857))
