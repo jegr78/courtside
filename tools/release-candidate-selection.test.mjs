@@ -22,7 +22,8 @@ function workflowRun(overrides = {}) {
     ref: "refs/heads/main",
     rehearsal: "",
     commit: mergeCommit,
-    build: { event: "push", headBranch: "main", headRepository: "jegr78/courtside", conclusion: "success" },
+    build: { event: "push", headBranch: "main", headRepository: "jegr78/courtside", conclusion: "success",
+      runId: 37211926309, runAttempt: 1 },
     repository: "jegr78/courtside",
     onMain: true,
     manifest: "0.1.0",
@@ -33,7 +34,7 @@ function workflowRun(overrides = {}) {
     pendingPullRequests: [
       { number: 1290, title: "chore(main): release 0.1.0", mergeCommit, mergeCommitIsAncestor: true }
     ],
-    exactBuildGreen: true,
+    exactBuild: { runId: 37211926310, runAttempt: 1 },
     ...overrides
   };
 }
@@ -56,7 +57,7 @@ test("given a green push build of a release merge on main, when the candidate se
   // then
   assert.deepEqual(selection, {
     release: true, reason: "release-commit", commit: mergeCommit, version: "0.1.0", tag: "v0.1.0",
-    rehearsal: false, pendingPullRequest: 1290
+    rehearsal: false, pendingPullRequest: 1290, build: { runId: 37211926309, runAttempt: 1 }
   }, "a release merge with one pending release pull request and no tag is a candidate");
 });
 
@@ -166,7 +167,7 @@ test("given a later commit on main after a failed candidate, when it is dispatch
   // then
   assert.deepEqual(selection, {
     release: true, reason: "re-run", commit: laterCommit, version: "0.1.0", tag: "v0.1.0",
-    rehearsal: false, pendingPullRequest: 1290
+    rehearsal: false, pendingPullRequest: 1290, build: { runId: 37211926310, runAttempt: 1 }
   }, "a fix on main is qualified under the version the pending release pull request records");
 });
 
@@ -191,20 +192,20 @@ test("given a dispatched release that is already tagged, when the candidate sele
 
 test("given a dispatched commit without a green build on main, when the candidate selects, then the run fails", () => {
   // when / then
-  assert.throws(() => selectReleaseCandidate(dispatch({ exactBuildGreen: false })), /no green build/);
+  assert.throws(() => selectReleaseCandidate(dispatch({ exactBuild: null })), /no green build/);
 });
 
 test("given a rehearsal dispatch on a branch, when the candidate selects, then it qualifies without release preconditions", () => {
   // when
   const selection = selectReleaseCandidate(dispatch({
     rehearsal: "true", ref: "refs/heads/ci/release-candidate-rehearsal", onMain: false, tagExists: true,
-    pendingPullRequests: [], exactBuildGreen: false
+    pendingPullRequests: [], exactBuild: null
   }));
 
   // then
   assert.deepEqual(selection, {
     release: true, reason: "rehearsal", commit: laterCommit, version: "0.1.0", tag: "v0.1.0",
-    rehearsal: true, pendingPullRequest: null
+    rehearsal: true, pendingPullRequest: null, build: null
   }, "a rehearsal proves the pipeline without a pending release, a main commit or a free tag");
 });
 
@@ -259,14 +260,44 @@ test("given a dispatched commit whose manifest moved past the pending release, w
 
 test("given build runs of a commit, when the exact build is read, then only a green main run of this repository counts", () => {
   // given
-  const green = { id: 37211926309, event: "push", head_branch: "main", conclusion: "success",
+  const green = { id: 37211926309, run_attempt: 1, event: "push", head_branch: "main", conclusion: "success",
     head_repository: { full_name: "jegr78/courtside" }, path: ".github/workflows/build.yml" };
 
   // when / then
-  assert.equal(greenExactBuild([{ workflow_runs: [green] }], "jegr78/courtside"), true);
+  assert.deepEqual(greenExactBuild([{ workflow_runs: [green] }], "jegr78/courtside"),
+    { runId: 37211926309, runAttempt: 1 });
   for (const other of [{ head_branch: "feature" }, { event: "pull_request" }, { conclusion: "failure" },
     { head_repository: { full_name: "someone/courtside" } }]) {
-    assert.equal(greenExactBuild([{ workflow_runs: [{ ...green, ...other }] }], "jegr78/courtside"), false,
+    assert.equal(greenExactBuild([{ workflow_runs: [{ ...green, ...other }] }], "jegr78/courtside"), null,
       `${JSON.stringify(other)} is not the exact-sha build on main`);
   }
+});
+
+test("given a push build that turned green on its second attempt, when a candidate is selected, then that attempt is recorded",
+  () => {
+    // given
+    const rerun = { id: 37211926309, run_attempt: 2, event: "push", head_branch: "main", conclusion: "success",
+      head_repository: { full_name: "jegr78/courtside" } };
+
+    // when
+    const exactBuild = greenExactBuild([{ workflow_runs: [rerun] }], "jegr78/courtside");
+    const dispatched = selectReleaseCandidate(dispatch({ exactBuild }));
+    const finished = selectReleaseCandidate(workflowRun({ build: { ...workflowRun().build, runAttempt: 2 } }));
+
+    // then
+    assert.deepEqual([dispatched.build, finished.build],
+      [{ runId: 37211926309, runAttempt: 2 }, { runId: 37211926309, runAttempt: 2 }],
+      "a green re-run attempt counts and the evidence names it");
+  });
+
+test("given a push build whose latest attempt is red, when a candidate is selected, then it is refused", () => {
+  // given
+  const red = { id: 37211926309, run_attempt: 2, event: "push", head_branch: "main", conclusion: "failure",
+    head_repository: { full_name: "jegr78/courtside" } };
+
+  // when / then
+  assert.throws(() => selectReleaseCandidate(dispatch({
+    exactBuild: greenExactBuild([{ workflow_runs: [red] }], "jegr78/courtside") })), /no green build/);
+  assert.equal(selectReleaseCandidate(workflowRun({ build: { ...workflowRun().build, conclusion: "failure",
+    runAttempt: 2 } })).reason, "build-not-green");
 });

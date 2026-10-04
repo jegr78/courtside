@@ -96,7 +96,7 @@ test("given a dispatch, when the candidate selects, then the selection tool deci
   assert.match(selection.run, /--github-output "\$GITHUB_OUTPUT"/);
   assert.deepEqual(selection.env, { GH_TOKEN: "${{ github.token }}", EVENT: "${{ github.event_name }}",
     REQUESTED_COMMIT: "${{ inputs.commit }}", REHEARSAL: "${{ inputs.rehearsal }}" });
-  for (const output of ["release", "commit", "version", "tag", "rehearsal"]) {
+  for (const output of ["release", "commit", "version", "tag", "rehearsal", "build-run-id", "build-run-attempt"]) {
     assert.equal(jobs.select.outputs[output], `\${{ steps.selection.outputs.${output} }}`);
   }
   assert.equal(jobs.select.steps[0].with["fetch-depth"], 0, "ancestry checks need the whole history");
@@ -306,6 +306,7 @@ test("given a green candidate, when its evidence job runs, then the record it wr
     cwd: directory,
     env: { ...process.env, COMMIT: commit, VERSION: "0.1.0", REHEARSAL: "true",
       IMAGE_DIGEST: `sha256:${"e".repeat(64)}`, BOOKING_SEED_DIGEST: `sha256:${"f".repeat(64)}`,
+      BUILD_RUN_ID: "", BUILD_RUN_ATTEMPT: "",
       RESULTS: JSON.stringify(needs), GITHUB_REPOSITORY: "jegr78/courtside", GITHUB_RUN_ID: "7",
       GITHUB_RUN_ATTEMPT: "1", GITHUB_REF: "refs/heads/ci/release-candidate-rehearsal",
       GITHUB_WORKFLOW_REF: "jegr78/courtside/.github/workflows/release-candidate.yml@refs/heads/ci/release-candidate-rehearsal" },
@@ -317,13 +318,15 @@ test("given a green candidate, when its evidence job runs, then the record it wr
   assert.equal(verifyCandidateEvidence(written, { commit, version: "", runId: 7, mode: "rehearsal" }).version, "0.1.0");
   assert.equal(upload.with.name.replace("${{ needs.select.outputs.commit }}", commit), artifactNameOf(commit),
     "the promotion looks the record up by this name");
-  assert.deepEqual(Object.keys(record.env).sort(), ["BOOKING_SEED_DIGEST", "COMMIT", "IMAGE_DIGEST", "REHEARSAL",
-    "RESULTS", "VERSION"]);
+  assert.deepEqual(Object.keys(record.env).sort(), ["BOOKING_SEED_DIGEST", "BUILD_RUN_ATTEMPT", "BUILD_RUN_ID",
+    "COMMIT", "IMAGE_DIGEST", "REHEARSAL", "RESULTS", "VERSION"]);
+  assert.equal(record.env.BUILD_RUN_ATTEMPT, "${{ needs.select.outputs.build-run-attempt }}");
   assert.equal(record.env.RESULTS, "${{ toJSON(needs) }}");
   assert.throws(() => execFileSync("bash", ["-c", record.run], {
     cwd: directory,
     env: { ...process.env, COMMIT: commit, VERSION: "0.1.0", REHEARSAL: "true",
       IMAGE_DIGEST: `sha256:${"e".repeat(64)}`, BOOKING_SEED_DIGEST: `sha256:${"f".repeat(64)}`,
+      BUILD_RUN_ID: "37211926309", BUILD_RUN_ATTEMPT: "2",
       RESULTS: JSON.stringify({ ...needs, gates: { result: "failure" } }), GITHUB_REPOSITORY: "jegr78/courtside",
       GITHUB_RUN_ID: "7", GITHUB_RUN_ATTEMPT: "1", GITHUB_REF: "refs/heads/main",
       GITHUB_WORKFLOW_REF: "jegr78/courtside/.github/workflows/release-candidate.yml@refs/heads/main" },

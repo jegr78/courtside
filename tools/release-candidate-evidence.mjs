@@ -9,7 +9,7 @@ export const candidateWorkflow = ".github/workflows/release-candidate.yml";
 export const candidateJobs = ["preconditions", "release-build", "image", "archive", "qualify", "gates"];
 
 const contract = "release-candidate-v1";
-const recordFields = ["archive", "bookingSeedImage", "commit", "contract", "image", "jobs", "outcome", "ref",
+const recordFields = ["archive", "bookingSeedImage", "build", "commit", "contract", "image", "jobs", "outcome", "ref",
   "rehearsal", "repository", "runAttempt", "runId", "schemaVersion", "tag", "version", "workflow"];
 const commitPattern = /^[a-f0-9]{40}$/;
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
@@ -31,8 +31,17 @@ function image(repository, digest) {
   return `ghcr.io/${repository}@${digest}`;
 }
 
+function buildOf(build, rehearsal) {
+  if (build === null && rehearsal) return null;
+  if (!hasExactly(build, ["runAttempt", "runId"]) || !Number.isSafeInteger(build.runId) || build.runId < 1
+      || !Number.isSafeInteger(build.runAttempt) || build.runAttempt < 1) {
+    throw new Error("candidate evidence names no green push build of its commit");
+  }
+  return { runId: build.runId, runAttempt: build.runAttempt };
+}
+
 export function candidateRecord({ repository, commit, version, rehearsal, runId, runAttempt, workflowRef, ref,
-  imageDigest, bookingSeedDigest, archive, results }) {
+  imageDigest, bookingSeedDigest, archive, build, results }) {
   if (!repositoryPattern.test(repository ?? "")) throw new Error("the repository is malformed");
   if (!commitPattern.test(commit ?? "")) throw new Error("the candidate commit is malformed");
   if (!versionPattern.test(version ?? "")) throw new Error("the candidate version is malformed");
@@ -66,6 +75,7 @@ export function candidateRecord({ repository, commit, version, rehearsal, runId,
     image: image(repository, imageDigest),
     bookingSeedImage: image(repository, bookingSeedDigest),
     archive: { name: archive.name, sha256: archive.sha256 },
+    build: buildOf(build, rehearsal),
     jobs: Object.fromEntries(candidateJobs.map((job) => [job, "success"])),
     outcome: "passed"
   };
@@ -95,6 +105,7 @@ export function verifyCandidateEvidence(record, { commit, version, runId, mode, 
     throw new Error(`a ${rehearsalMode ? "release" : "rehearsal"} record cannot be promoted in ${mode} mode`);
   }
   if (!rehearsalMode && record.ref !== "refs/heads/main") throw new Error(`the release candidate ran on ${record.ref}`);
+  const build = buildOf(record.build, record.rehearsal);
   for (const [job, result] of Object.entries(record.jobs)) {
     if (result !== "success") throw new Error(`candidate job ${job} is ${result}`);
   }
@@ -108,7 +119,7 @@ export function verifyCandidateEvidence(record, { commit, version, runId, mode, 
     throw new Error(`archive ${archiveSha256} does not match the qualified ${record.archive.sha256}`);
   }
   return { runId: record.runId, version: record.version, image: record.image,
-    bookingSeedImage: record.bookingSeedImage, archiveSha256: record.archive.sha256 };
+    bookingSeedImage: record.bookingSeedImage, archiveSha256: record.archive.sha256, build };
 }
 
 export function candidateRuns({ artifacts, runs, jobs, commit, mode }) {
@@ -171,6 +182,8 @@ function write(options, environment) {
     imageDigest: options["image-digest"],
     bookingSeedDigest: options["booking-seed-digest"],
     archive: { name: basename(options.archive), sha256: sha256Of(options.archive) },
+    build: options["build-run-id"] === "" && options["build-run-attempt"] === "" ? null
+      : { runId: Number(options["build-run-id"]), runAttempt: Number(options["build-run-attempt"]) },
     results: JSON.parse(options.results)
   });
   mkdirSync(dirname(options.output), { recursive: true });
@@ -219,7 +232,7 @@ function verify(options) {
 
 const modes = {
   "--write": { run: write, required: ["commit", "version", "rehearsal", "image-digest", "booking-seed-digest",
-    "archive", "results", "output"], optional: [] },
+    "archive", "build-run-id", "build-run-attempt", "results", "output"], optional: [] },
   "--find": { run: find, required: ["commit", "mode"], optional: ["download", "github-output"] },
   "--verify": { run: verify, required: ["evidence", "commit", "run-id", "mode"],
     optional: ["version", "archive", "github-output"] }

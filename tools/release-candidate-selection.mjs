@@ -45,6 +45,14 @@ function pendingRelease(pullRequests, version, commit) {
   return pullRequest.number;
 }
 
+function buildRunOf(run) {
+  if (!Number.isSafeInteger(run?.runId) || run.runId < 1 || !Number.isSafeInteger(run?.runAttempt)
+      || run.runAttempt < 1) {
+    return null;
+  }
+  return { runId: run.runId, runAttempt: run.runAttempt };
+}
+
 export function selectReleaseCandidate(facts) {
   const rehearsal = rehearsalFlag(facts.rehearsal);
   const { event, commit } = facts;
@@ -53,7 +61,7 @@ export function selectReleaseCandidate(facts) {
     throw new Error("the candidate commit must be a full 40-character sha");
   }
   const skip = (reason) => ({ release: false, reason, commit, version: "", tag: "", rehearsal: false,
-    pendingPullRequest: null });
+    pendingPullRequest: null, build: null });
   if (event === "workflow_run") {
     const build = facts.build ?? {};
     if (build.event !== "push" || build.headBranch !== "main" || build.headRepository !== facts.repository) {
@@ -64,9 +72,9 @@ export function selectReleaseCandidate(facts) {
     if (facts.tagExists) return skip("already-tagged");
   }
   const version = agreedVersion(facts);
-  const selected = (reason, pendingPullRequest) => ({ release: true, reason, commit, version, tag: `v${version}`,
-    rehearsal: event === "workflow_dispatch" && rehearsal, pendingPullRequest });
-  if (event === "workflow_dispatch" && rehearsal) return selected("rehearsal", null);
+  const selected = (reason, pendingPullRequest, build) => ({ release: true, reason, commit, version,
+    tag: `v${version}`, rehearsal: event === "workflow_dispatch" && rehearsal, pendingPullRequest, build });
+  if (event === "workflow_dispatch" && rehearsal) return selected("rehearsal", null, null);
   if (event === "workflow_dispatch") {
     if (facts.ref !== "refs/heads/main") {
       throw new Error(`the candidate workflow at ${facts.ref} is not on main, so only a rehearsal may run it`);
@@ -75,10 +83,9 @@ export function selectReleaseCandidate(facts) {
     if (facts.tagExists) throw new Error(`v${version} is already tagged`);
   }
   const pullRequest = pendingRelease(facts.pendingPullRequests, version, commit);
-  if (event === "workflow_dispatch" && facts.exactBuildGreen !== true) {
-    throw new Error(`no green build of ${commit} on main`);
-  }
-  return selected(event === "workflow_run" ? "release-commit" : "re-run", pullRequest);
+  const build = buildRunOf(event === "workflow_run" ? facts.build : facts.exactBuild);
+  if (build === null) throw new Error(`no green build of ${commit} on main`);
+  return selected(event === "workflow_run" ? "release-commit" : "re-run", pullRequest, build);
 }
 
 export function readCommitFacts(commit, git) {
@@ -113,10 +120,12 @@ export function releasePullRequestOf(pull, mergeCommitIsAncestor) {
 }
 
 export function greenExactBuild(pages, repository) {
-  return pages.flatMap((page) => page.workflow_runs ?? []).some((run) => run.head_branch === "main"
-    && (run.event === "push" || run.event === "workflow_dispatch")
-    && run.conclusion === "success"
-    && run.head_repository?.full_name === repository);
+  const run = pages.flatMap((page) => page.workflow_runs ?? []).filter((candidate) => candidate.head_branch === "main"
+    && (candidate.event === "push" || candidate.event === "workflow_dispatch")
+    && candidate.conclusion === "success"
+    && candidate.head_repository?.full_name === repository)
+    .toSorted((left, right) => right.id - left.id)[0];
+  return run === undefined ? null : buildRunOf({ runId: run.id, runAttempt: run.run_attempt });
 }
 
 function command(executable, arguments_) {
@@ -147,7 +156,8 @@ function repositoryOf(environment) {
 function workflowRunBuild(environment) {
   const run = JSON.parse(readFileSync(environment.GITHUB_EVENT_PATH, "utf8")).workflow_run ?? {};
   return { headSha: run.head_sha, build: { event: run.event, headBranch: run.head_branch,
-    headRepository: run.head_repository?.full_name, conclusion: run.conclusion } };
+    headRepository: run.head_repository?.full_name, conclusion: run.conclusion, runId: run.id,
+    runAttempt: run.run_attempt } };
 }
 
 export function gatherFacts(options, environment = process.env) {
@@ -158,7 +168,7 @@ export function gatherFacts(options, environment = process.env) {
   if (!commitPattern.test(commit ?? "")) throw new Error("the candidate commit must be a full 40-character sha");
   if (!succeeds("git", ["cat-file", "-e", `${commit}^{commit}`])) throw new Error(`${commit} is not in this checkout`);
   const facts = { event, ref: options.ref ?? environment.GITHUB_REF, rehearsal, commit, repository,
-    ...readCommitFacts(commit, git), onMain: false, tagExists: false, pendingPullRequests: [], exactBuildGreen: false };
+    ...readCommitFacts(commit, git), onMain: false, tagExists: false, pendingPullRequests: [], exactBuild: null };
   if (event === "workflow_run") {
     const { headSha, build } = workflowRunBuild(environment);
     if (headSha !== commit) throw new Error(`the finished build ran ${headSha}, not ${commit}`);
@@ -180,7 +190,7 @@ export function gatherFacts(options, environment = process.env) {
     })
     .filter((pullRequest) => pullRequest !== null);
   if (event === "workflow_dispatch") {
-    facts.exactBuildGreen = greenExactBuild(
+    facts.exactBuild = greenExactBuild(
       api(`repos/${repository}/actions/workflows/build.yml/runs?head_sha=${commit}&status=success&per_page=100`),
       repository);
   }
@@ -216,7 +226,8 @@ function write(selection, options, environment) {
   }
   const outputs = { release: selection.release, reason: selection.reason, commit: selection.commit,
     version: selection.version, tag: selection.tag, rehearsal: selection.rehearsal,
-    "pending-pull-request": selection.pendingPullRequest ?? "" };
+    "pending-pull-request": selection.pendingPullRequest ?? "",
+    "build-run-id": selection.build?.runId ?? "", "build-run-attempt": selection.build?.runAttempt ?? "" };
   appendFileSync(options["github-output"],
     Object.entries(outputs).map(([key, value]) => `${key}=${value}\n`).join(""));
   if (environment.GITHUB_STEP_SUMMARY) {

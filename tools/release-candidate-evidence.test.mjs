@@ -29,7 +29,7 @@ function record({ rehearsal = false, ref = "refs/heads/main", runId = 42, ...ove
     repository: "jegr78/courtside", commit, version: "0.1.0", rehearsal, runId, runAttempt: 1,
     workflowRef: `jegr78/courtside/.github/workflows/release-candidate.yml@${ref}`, ref,
     imageDigest, bookingSeedDigest, archive: { name: "courtside-deployment-0.1.0.zip", sha256: archiveSha256 },
-    results: results(), ...overrides
+    build: rehearsal ? null : { runId: 37211926309, runAttempt: 2 }, results: results(), ...overrides
   });
 }
 
@@ -44,7 +44,8 @@ test("given a candidate whose every job succeeded, when its evidence is verified
     runId: 42, version: "0.1.0",
     image: `ghcr.io/jegr78/courtside@${imageDigest}`,
     bookingSeedImage: `ghcr.io/jegr78/courtside@${bookingSeedDigest}`,
-    archiveSha256
+    archiveSha256,
+    build: { runId: 37211926309, runAttempt: 2 }
   }, "the promotion takes its digests and the archive checksum from the verified record");
 });
 
@@ -190,6 +191,7 @@ test("given the command line, when a candidate writes its evidence, then the ver
   // when
   execFileSync(process.execPath, [tool, "--write", "--commit", commit, "--version", "0.1.0", "--rehearsal", "false",
     "--image-digest", imageDigest, "--booking-seed-digest", bookingSeedDigest, "--archive", archive,
+    "--build-run-id", "37211926309", "--build-run-attempt", "2",
     "--results", JSON.stringify(results()), "--output", output], { env: environment });
   execFileSync(process.execPath, [tool, "--verify", "--evidence", output, "--commit", commit, "--version", "0.1.0",
     "--run-id", "42", "--mode", "release", "--archive", archive, "--github-output", githubOutput], { env: environment });
@@ -198,9 +200,32 @@ test("given the command line, when a candidate writes its evidence, then the ver
   const written = JSON.parse(readFileSync(output, "utf8"));
   assert.equal(written.archive.sha256, createHash("sha256").update("archive bytes").digest("hex"));
   assert.equal(written.runAttempt, 2);
+  assert.deepEqual(written.build, { runId: 37211926309, runAttempt: 2 }, "the green push build attempt is recorded");
   assert.match(readFileSync(githubOutput, "utf8"), new RegExp(`^image=ghcr\\.io/jegr78/courtside@${imageDigest}$`, "m"));
   writeFileSync(archive, "other bytes");
   assert.throws(() => execFileSync(process.execPath, [tool, "--verify", "--evidence", output, "--commit", commit,
     "--version", "0.1.0", "--run-id", "42", "--mode", "release", "--archive", archive], { env: environment, stdio: "pipe" }),
   /does not match/, "a replaced archive must not pass as the qualified one");
+});
+
+test("given the exact-sha push build, when a release record is written or verified, then its green attempt is required", () => {
+  // given
+  const valid = record();
+
+  // when / then
+  assert.deepEqual(valid.build, { runId: 37211926309, runAttempt: 2 });
+  assert.throws(() => record({ build: null }), /names no green push build/);
+  assert.throws(() => record({ build: { runId: 37211926309, runAttempt: 0 } }), /names no green push build/);
+  assert.throws(() => verifyCandidateEvidence({ ...valid, build: null }, expected), /names no green push build/);
+  assert.throws(() => verifyCandidateEvidence({ ...valid, build: { runId: "1", runAttempt: 1 } }, expected),
+    /names no green push build/);
+});
+
+test("given a rehearsal without a push build, when its record is verified, then the missing build is accepted", () => {
+  // given
+  const rehearsal = record({ rehearsal: true, ref: "refs/heads/ci/rehearsal" });
+
+  // when / then
+  assert.equal(rehearsal.build, null);
+  assert.equal(verifyCandidateEvidence(rehearsal, { ...expected, mode: "rehearsal" }).build, null);
 });

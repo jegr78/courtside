@@ -34,6 +34,8 @@ jobs:
       version: ${{ steps.selection.outputs.version }}
       tag: ${{ steps.selection.outputs.tag }}
       rehearsal: ${{ steps.selection.outputs.rehearsal }}
+      build-run-id: ${{ steps.selection.outputs.build-run-id }}
+      build-run-attempt: ${{ steps.selection.outputs.build-run-attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -637,11 +639,14 @@ jobs:
           REHEARSAL: ${{ needs.select.outputs.rehearsal }}
           IMAGE_DIGEST: ${{ needs.image.outputs.digest }}
           BOOKING_SEED_DIGEST: ${{ needs.image.outputs.booking-seed-digest }}
+          BUILD_RUN_ID: ${{ needs.select.outputs.build-run-id }}
+          BUILD_RUN_ATTEMPT: ${{ needs.select.outputs.build-run-attempt }}
           RESULTS: ${{ toJSON(needs) }}
         run: >
           node tools/release-candidate-evidence.mjs --write
           --commit "$COMMIT" --version "$VERSION" --rehearsal "$REHEARSAL"
           --image-digest "$IMAGE_DIGEST" --booking-seed-digest "$BOOKING_SEED_DIGEST"
+          --build-run-id "$BUILD_RUN_ID" --build-run-attempt "$BUILD_RUN_ATTEMPT"
           --archive "build/archive/courtside-deployment-$VERSION.zip" --results "$RESULTS"
           --output build/candidate/evidence.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
