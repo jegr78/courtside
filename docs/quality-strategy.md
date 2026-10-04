@@ -81,9 +81,15 @@ combination. Backend changes run backend, tooling and security verification; fro
 tooling and security verification. Frontend compilation, lint, unit tests and coverage finish before
 the browser jobs consume the same packaged candidate. Blocking visual and guide snapshots run first;
 only then do two stable functional shards cover Chromium, WebKit, accessibility, phone layouts and
-the journey catalogue. On both phone projects, every page the router declares must render its text
+the journey catalogue. A third shard runs the WebKit accessibility project, which used to run only
+when a release was cut. On both phone projects, every page the router declares must render its text
 at 10 px or more and keep each control inside the viewport's width. A full selection also starts a fresh Compose project from an image built for
 that commit and proves its application, database and log-collector wait contract.
+Backend, frontend and full selections can change the image, so they also build and qualify an image
+for the merge commit and run the release gates on it: the controlled Stalwart journey, the active
+security assessment, backup and restore, the database upgrade from a retained nightly and the
+archive reproducibility check. Tooling and full selections run the tool suite a second time under a
+clock shifted by 400 days.
 Documentation changes run the bounded documentation job and the tooling job. The tooling job travels
 with all three because the policies under `tools/` read `src/`, `frontend/` and `docs/`, and a rule
 this repository enforces with a test has to run for the change that could break it. The
@@ -134,8 +140,11 @@ duplicate manifest entries fail closed.
 
 The full local profile runs the pinned `actionlint` release and documentation checks before the
 longer build. It then runs clean Maven verification with browser journeys disabled, exercises the
-Compose wait contract with a uniquely named project and immutable image ID, and finally runs the
-browser and WebKit reliability gates. CI downloads the matching official actionlint archive and
+Compose wait contract with a uniquely named project and immutable image ID, and runs the browser and
+WebKit reliability gates. Last come the Docker release gates, each a task of its own so a red one is
+named in the result: `gate-uat` builds and qualifies `courtside:uat-local`, and `gate-mail`,
+`gate-restore`, `gate-upgrade` and `gate-active-security` refuse to start unless that qualification
+recorded the image ID the tag still names. CI downloads the matching official actionlint archive and
 verifies its GitHub attestation before running the same workflow check. ShellCheck remains a
 separate repository concern, so this invocation checks GitHub workflow structure, expressions, job
 dependencies and permissions without making a platform's optional ShellCheck installation part of

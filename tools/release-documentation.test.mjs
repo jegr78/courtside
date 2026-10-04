@@ -209,3 +209,21 @@ test("given a draft the pipeline has to publish, when the release is written, th
     assert.equal(publish.with.prerelease, "${{ contains(github.ref_name, '-') }}",
       "a candidate is marked here rather than by release-please, which knows only the strategy");
   });
+
+test("given pull requests that can change the image, when the document explains the gates, then it names what they run and what stays out", () => {
+  // given
+  const text = document.replace(/\s+/g, " ");
+  const start = text.indexOf("## What pull requests prove");
+  const section = text.slice(start, text.indexOf("## What the nightly rehearses"));
+
+  // when / then
+  assert.ok(start >= 0 && section.length > 0, "the document needs a section on the gates pull requests run");
+  for (const job of ["mail", "restore", "upgrade", "active-security", "archive-reproducibility"]) {
+    assert.match(section, new RegExp(`\`${job}\``), `the pull-request gates include ${job}`);
+  }
+  assert.match(section, /amd64 qualification/, "the image is qualified before the gates use it");
+  assert.match(section, /builds? (?:its own|the) image|image the pull request builds/,
+    "the gates run against an image the pull request builds, not one from the registry");
+  assert.match(section, /npm advisor(?:y|ies)[^.]*image CVE scan[^.]*stay out of pull requests[^.]*move without a change/,
+    "volatile external checks stay in the nightly and the release");
+});

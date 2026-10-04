@@ -177,6 +177,11 @@
       "local": "Repository tool tests; hosted CodeQL, dependency review and container scanning unavailable"
     },
     {
+      "scope": "release-gates",
+      "ci": "Backend, frontend and full pull requests run archive reproducibility, the Stalwart journey, the active assessment, restore and upgrade on an amd64 image built in the run",
+      "local": "The full profile runs the qualification, Stalwart, restore, upgrade and active gates against courtside:uat-local on the host architecture; archive reproducibility runs only in CI"
+    },
+    {
       "scope": "site",
       "ci": "The documentation job installs and builds the documentation site whenever it runs",
       "local": "Built by the documentation profile; Maven's full verification does not build the site"
