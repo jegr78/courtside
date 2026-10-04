@@ -86,12 +86,15 @@ function hasExactly(value, fields) {
     && Object.keys(value).toSorted().join() === fields.toSorted().join();
 }
 
-export function verifyCandidateEvidence(record, { commit, version, runId, mode, archiveSha256 }) {
+export function verifyCandidateEvidence(record, { repository, commit, version, runId, mode, archiveSha256 }) {
   const rehearsalMode = modeOf(mode) === "rehearsal";
   if (!hasExactly(record, recordFields) || record.schemaVersion !== 1 || record.contract !== contract
       || record.outcome !== "passed" || !hasExactly(record.archive, ["name", "sha256"])
       || !hasExactly(record.jobs, candidateJobs) || !repositoryPattern.test(record.repository)) {
     throw new Error("candidate evidence is incomplete or invalid");
+  }
+  if (record.repository !== repository) {
+    throw new Error(`candidate evidence records repository ${record.repository}, not ${repository}`);
   }
   if (record.workflow !== candidateWorkflow) throw new Error(`candidate evidence was written by ${record.workflow}`);
   if (record.commit !== commit) throw new Error(`candidate evidence records commit ${record.commit}, not ${commit}`);
@@ -217,8 +220,9 @@ function find(options, environment) {
   process.stdout.write(`${JSON.stringify(found)}\n`);
 }
 
-function verify(options) {
+function verify(options, environment) {
   const verified = verifyCandidateEvidence(JSON.parse(readFileSync(options.evidence, "utf8")), {
+    repository: environment.GITHUB_REPOSITORY,
     commit: options.commit,
     version: options.version ?? "",
     runId: Number(options["run-id"]),

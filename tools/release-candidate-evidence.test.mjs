@@ -33,7 +33,7 @@ function record({ rehearsal = false, ref = "refs/heads/main", runId = 42, ...ove
   });
 }
 
-const expected = { commit, version: "0.1.0", runId: 42, mode: "release", archiveSha256 };
+const expected = { repository: "jegr78/courtside", commit, version: "0.1.0", runId: 42, mode: "release", archiveSha256 };
 
 test("given a candidate whose every job succeeded, when its evidence is verified, then the promotion reads its digests", () => {
   // when
@@ -228,4 +228,15 @@ test("given a rehearsal without a push build, when its record is verified, then 
   // when / then
   assert.equal(rehearsal.build, null);
   assert.equal(verifyCandidateEvidence(rehearsal, { ...expected, mode: "rehearsal" }).build, null);
+});
+
+test("given evidence written in another repository, when it is verified, then it is refused", () => {
+  // given
+  const foreign = record({ repository: "someone/courtside",
+    workflowRef: "someone/courtside/.github/workflows/release-candidate.yml@refs/heads/main" });
+
+  // when / then
+  assert.throws(() => verifyCandidateEvidence(foreign, expected), /records repository someone\/courtside/);
+  assert.throws(() => verifyCandidateEvidence(record(), { ...expected, repository: undefined }),
+    /records repository jegr78\/courtside/);
 });

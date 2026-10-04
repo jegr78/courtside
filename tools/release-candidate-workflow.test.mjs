@@ -49,14 +49,30 @@ test("given a candidate, when it builds, then it neither stamps a version nor re
   assert.match(step("release-build", "Package the selected commit").run, /^\.\/mvnw -B package -DskipTests$/);
 });
 
+const controlJobs = ["preconditions", "evidence"];
+
+test("given a job that judges the candidate, when it runs, then its tools come from the dispatched workflow's commit", () => {
+  // when
+  const checkouts = controlJobs.map((name) => jobs[name].steps
+    .find((entry) => String(entry.uses).startsWith("actions/checkout")).with);
+
+  // then
+  for (const [index, checkout] of checkouts.entries()) {
+    assert.equal(checkout.ref, "${{ github.workflow_sha }}",
+      `${controlJobs[index]} would let an older candidate commit supply its own judge`);
+  }
+  assert.equal(checkouts[0]["fetch-depth"], 0, "the nightly ancestry check needs the candidate commit's history");
+  assert.match(step("evidence", "Record the candidate").run, /^node tools\/release-candidate-evidence\.mjs --write/);
+});
+
 test("given every job that checks out source, when the candidate runs, then it checks out the selected commit", () => {
   // when
-  const checkouts = Object.entries(jobs).filter(([name]) => name !== "select" && name !== "gates")
+  const checkouts = Object.entries(jobs).filter(([name]) => !["select", "gates", ...controlJobs].includes(name))
     .flatMap(([name, job]) => job.steps.filter((entry) => String(entry.uses).startsWith("actions/checkout"))
       .map((entry) => [name, entry.with?.ref]));
 
   // then
-  assert.ok(checkouts.length >= 6, "the candidate jobs check out source");
+  assert.ok(checkouts.length >= 4, "the candidate jobs check out source");
   for (const [name, ref] of checkouts) {
     assert.equal(ref, "${{ needs.select.outputs.commit }}", `${name} would build the dispatch ref`);
   }
@@ -124,7 +140,6 @@ test("given a candidate, when its preconditions run, then a nightly verified an 
   assert.match(gate, /courtside-nightly-fingerprint/);
   assert.match(gate, /select\(\.body \| contains\("- Workflow: `npm audit`"\) \| not\)/);
   assert.deepEqual(jobs.preconditions.permissions, { actions: "read", contents: "read", issues: "read" });
-  assert.equal(jobs.preconditions.steps[0].with["fetch-depth"], 0);
 });
 
 test("given a candidate build, when security and dependency policy run, then they bind the selected commit", () => {
@@ -315,7 +330,8 @@ test("given a green candidate, when its evidence job runs, then the record it wr
 
   // then
   const written = JSON.parse(readFileSync(join(directory, upload.with.path), "utf8"));
-  assert.equal(verifyCandidateEvidence(written, { commit, version: "", runId: 7, mode: "rehearsal" }).version, "0.1.0");
+  assert.equal(verifyCandidateEvidence(written, { repository: "jegr78/courtside", commit, version: "", runId: 7,
+    mode: "rehearsal" }).version, "0.1.0");
   assert.equal(upload.with.name.replace("${{ needs.select.outputs.commit }}", commit), artifactNameOf(commit),
     "the promotion looks the record up by this name");
   assert.deepEqual(Object.keys(record.env).sort(), ["BOOKING_SEED_DIGEST", "BUILD_RUN_ATTEMPT", "BUILD_RUN_ID",
