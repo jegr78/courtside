@@ -967,3 +967,25 @@ test("every page keeps its text legible and its controls on screen at phone widt
   expect.soft(missed.map((route) => route.path), "a page the guard never reached").toEqual([]);
   expect([...new Set(findings)], "text below 10px or a control beyond the phone's edge").toEqual([]);
 });
+
+test("given today's plan on a phone, when its grid first appears, then the page already stands where it stays", async ({ page }) => {
+  // given
+  await page.addInitScript(() => {
+    new MutationObserver((_, observer) => {
+      if (!document.querySelector('[data-testid="week-grid"]')) return;
+      (window as unknown as { gridShownAt?: number }).gridShownAt = window.scrollY;
+      observer.disconnect();
+    }).observe(document, { childList: true, subtree: true });
+  });
+
+  // when
+  await signIn(page, "doe.jane");
+  await expect(page.getByTestId("week-grid")).toBeVisible();
+  const settled = await page.evaluate(() => new Promise<number>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => resolve(window.scrollY), 300)))));
+
+  // then
+  const shownAt = await page.evaluate(() => (window as unknown as { gridShownAt?: number }).gridShownAt);
+  expect(settled, "the plan scrolls the page to the current time").toBeGreaterThan(0);
+  expect(shownAt, "a page that moves after the grid appears moves it under a tap already on its way").toBe(settled);
+});

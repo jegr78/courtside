@@ -1635,3 +1635,16 @@ it("given the member touched the page, when they choose today again from another
   // then
   expect(scrollsToNow(), "choosing a day is asking to see it").toBe(2);
 });
+
+it("given today, when the plan's grid first appears, then it already stands at the current time", async () => {
+  // given
+  const scrollsToNow = documentScrolling();
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 0);
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+
+  // then
+  expect(scrollsToNow(), "a scroll after the grid is painted moves it under a tap already on its way").toBe(1);
+});

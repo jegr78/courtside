@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { allocationLabel } from "../booking/allocationLabel";
 import {
@@ -236,20 +236,18 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   }, []);
 
   // A day the member chose is one they asked to see; only the plan's own first load must not move under them.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (shownDate.current === undefined || shownDate.current === selectedDate) return;
     memberMoved.current = false;
     scrolledToNowOn.current = undefined;
   }, [selectedDate]);
 
-  useEffect(() => {
+  // Before paint, so the grid never shows a position it is about to leave.
+  useLayoutEffect(() => {
     if (!isToday || !currentSlot || !selectedDate || scrolledToNowOn.current === selectedDate) return;
     if (memberMoved.current) return;
-    const frame = window.requestAnimationFrame(() => {
-      scrolledToNowOn.current = selectedDate;
-      scrollToSlot(planRef.current, currentSlot);
-    });
-    return () => window.cancelAnimationFrame(frame);
+    scrolledToNowOn.current = selectedDate;
+    scrollToSlot(planRef.current, currentSlot);
   }, [currentSlot, isToday, selectedDate]);
 
   // Another day has no current time to scroll to.
