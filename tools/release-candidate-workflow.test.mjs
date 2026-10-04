@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -355,4 +355,28 @@ test("given a pending release candidate, when any other run queues, then nothing
   // then
   assert.deepEqual(groups, [],
     "a concurrency group keeps one pending run and cancels it when the next one queues, whatever cancel-in-progress says");
+});
+
+test("given a rehearsal, when it uploads, then nothing another workflow reads as previous evidence comes from it", () => {
+  // given
+  const directory = fileURLToPath(new URL("../.github/workflows/", import.meta.url));
+  const prefixes = readdirSync(directory).filter((file) => file.endsWith(".yml") && file !== "release-candidate.yml")
+    .flatMap((file) => [...readFileSync(join(directory, file), "utf8")
+      .matchAll(/select\(\.name \| startswith\("([^"]+)"\)\)/g)].map((match) => match[1]));
+  const uploads = Object.values(jobs).flatMap(({ steps = [] }) => steps)
+    .filter((entry) => String(entry.uses).startsWith("actions/upload-artifact"));
+
+  // when
+  const consumed = uploads.filter((entry) => {
+    const literal = entry.with.name.split("${{")[0];
+    return prefixes.some((prefix) => literal.startsWith(prefix) || prefix.startsWith(literal));
+  });
+
+  // then
+  assert.ok(prefixes.includes("dependency-remediation-completed-"), "the cross-run lookups are read");
+  assert.ok(consumed.length > 0, "the candidate uploads dependency evidence other workflows consume");
+  for (const entry of consumed) {
+    assert.match(String(entry.if), /needs\.select\.outputs\.rehearsal != 'true'/,
+      `${entry.with.name} would let a rehearsal stand in as previous evidence`);
+  }
 });
