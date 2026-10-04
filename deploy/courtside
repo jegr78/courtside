@@ -1349,6 +1349,36 @@ environment_value() {
   done < "$file"
 }
 
+# Stalwart compares the recovery password as a stored hash, so a leading _, $ or { never matches.
+mail_recovery_problem() {
+  local file=$1 key value
+  for key in COURTSIDE_MAIL_SETUP_PASSWORD COURTSIDE_MAIL_RECOVERY_ADMIN; do
+    value=$(environment_value "$file" "$key")
+    if [ "$key" = COURTSIDE_MAIL_RECOVERY_ADMIN ]; then
+      [[ "$value" == *:* ]] || continue
+      value=${value#*:}
+    fi
+    value=${value#"${value%%[![:space:]]*}"}
+    case "$value" in
+      _* | \$* | \{*)
+        printf '%s must not start with _, $ or {: the mail server reads such a password as a hash' "$key"
+        if [ "$key" = COURTSIDE_MAIL_SETUP_PASSWORD ]; then
+          printf '; run rotate-secret mail-setup\n'
+        else
+          printf '; set it to admin:<COURTSIDE_MAIL_SETUP_PASSWORD>\n'
+        fi
+        return 0
+        ;;
+    esac
+  done
+}
+
+refuse_mail_recovery_problem() {
+  local problem
+  problem=$(mail_recovery_problem "$installation_directory/config/.env")
+  [ -z "$problem" ] || refuse "$problem"
+}
+
 validate_environment_file() {
   local file=$1 line key seen="" number=0
   [ -f "$file" ] || refuse "$file is missing"
@@ -2269,6 +2299,7 @@ command_rotate_secret() {
       || refuse "$name requires the database-identities overlay"
   fi
   recover_secret_rotation "$name"
+  [ "$name" != mail-admin ] && [ "$name" != mail-reload ] || refuse_mail_recovery_problem
   printf 'Plan: rotate only %s and restart %s\n' "$name" "$component"
   confirm "$confirmed"
   if [ "$name" = mail-relay ]; then
@@ -2485,6 +2516,14 @@ command_doctor() {
     doctor_result PASS secret-files "secret files are regular files with mode 0600"
   else
     doctor_result FAIL secret-files "secret files must be regular mode-0600 files"
+  fi
+  if [ "$config_recipe" = full-self-hosted ]; then
+    problem=$(mail_recovery_problem "$installation_directory/config/.env")
+    if [ -z "$problem" ]; then
+      doctor_result PASS mail-recovery "the mail recovery password is one the mail server can compare"
+    else
+      doctor_result FAIL mail-recovery "$problem"
+    fi
   fi
   if [ -n "$docker_path" ]; then
     prepare_docker_command

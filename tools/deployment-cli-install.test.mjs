@@ -465,3 +465,94 @@ test("given alternate Compose dotenv syntax shadows an image key, when up valida
     });
   }
 });
+
+function withEnvironmentValue(context, key, value) {
+  const envPath = join(context.target, "config", ".env");
+  const kept = readFileSync(envPath, "utf8").split("\n").filter((line) => line && !line.startsWith(`${key}=`));
+  writeFileSync(envPath, `${[...kept, `${key}="${value}"`].join("\n")}\n`);
+}
+
+function mailRecoveryCheck(result) {
+  return JSON.parse(result.stdout).checks.find((check) => check.name === "mail-recovery");
+}
+
+test("given a mail recovery password Stalwart would read as a hash, when doctor runs, then it fails the check without echoing it", () => {
+  for (const [key, value] of [
+    ["COURTSIDE_MAIL_SETUP_PASSWORD", `_${"a".repeat(47)}`],
+    ["COURTSIDE_MAIL_SETUP_PASSWORD", `{SHA}${"a".repeat(43)}`],
+    ["COURTSIDE_MAIL_SETUP_PASSWORD", `$$${"a".repeat(47)}`],
+    ["COURTSIDE_MAIL_RECOVERY_ADMIN", `admin:_${"a".repeat(47)}`],
+    ["COURTSIDE_MAIL_RECOVERY_ADMIN", `admin: _${"a".repeat(47)}`],
+  ]) {
+    fixture((context) => {
+      // given
+      assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+      withEnvironmentValue(context, key, value);
+
+      // when
+      const doctor = run(context.archive, context.target, ["doctor", "--json"], context.environment);
+
+      // then
+      assert.equal(doctor.status, 2, `${key}=${value} passed doctor`);
+      assert.equal(mailRecoveryCheck(doctor)?.state, "FAIL", `${key}=${value} did not fail mail-recovery`);
+      assert.match(mailRecoveryCheck(doctor).detail, new RegExp(`${key} must not start with _, \\$ or \\{`));
+      assert.doesNotMatch(doctor.stdout + doctor.stderr, /a{40}/, "doctor echoes the secret");
+    });
+  }
+});
+
+test("given a mail recovery password the mail server can compare, when doctor runs, then the check passes", () => {
+  for (const [key, value] of [
+    ["COURTSIDE_MAIL_SETUP_PASSWORD", `-${"a".repeat(47)}`],
+    ["COURTSIDE_MAIL_SETUP_PASSWORD", `a_${"a".repeat(46)}`],
+    ["COURTSIDE_MAIL_RECOVERY_ADMIN", `admin:a:_${"a".repeat(45)}`],
+    ["COURTSIDE_MAIL_RECOVERY_ADMIN", `_${"a".repeat(47)}`],
+  ]) {
+    fixture((context) => {
+      // given
+      assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+      withEnvironmentValue(context, key, value);
+
+      // when
+      const doctor = run(context.archive, context.target, ["doctor", "--json"], context.environment);
+
+      // then
+      assert.equal(mailRecoveryCheck(doctor)?.state, "PASS", `${key}=${value} failed mail-recovery`);
+    });
+  }
+});
+
+test("given a setup password the mail server reads as a hash, when mail-setup rotates, then the generated value repairs it", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+    withEnvironmentValue(context, "COURTSIDE_MAIL_SETUP_PASSWORD", `_${"a".repeat(47)}`);
+
+    // when
+    const rotation = run(context.archive, context.target, ["rotate-secret", "mail-setup", "--yes"], context.environment);
+    const doctor = run(context.archive, context.target, ["doctor", "--json"], context.environment);
+
+    // then
+    assert.equal(rotation.status, 0, rotation.stderr);
+    assert.equal(mailRecoveryCheck(doctor)?.state, "PASS", "the rotated setup password still fails mail-recovery");
+  });
+});
+
+test("given a setup password the mail server reads as a hash, when mail-admin rotates, then it refuses before changing state", () => {
+  fixture((context) => {
+    // given
+    assert.equal(initialize(context, { recipe: "full-self-hosted", mail_relay_host: "" }).status, 0);
+    withEnvironmentValue(context, "COURTSIDE_MAIL_SETUP_PASSWORD", `_${"a".repeat(47)}`);
+    const envPath = join(context.target, "config", ".env");
+    const before = readFileSync(envPath, "utf8");
+
+    // when
+    const rotation = run(context.archive, context.target, ["rotate-secret", "mail-admin", "--yes"], context.environment);
+
+    // then
+    assert.equal(rotation.status, 2);
+    assert.match(rotation.stderr, /COURTSIDE_MAIL_SETUP_PASSWORD must not start with .*run rotate-secret mail-setup/);
+    assert.equal(readFileSync(envPath, "utf8"), before, "the refused rotation changed .env");
+    assert.ok(!existsSync(join(context.target, ".courtside-rotation")), "the refused rotation left a journal");
+  });
+});
