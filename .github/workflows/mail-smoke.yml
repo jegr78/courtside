@@ -3,23 +3,6 @@ name: mail smoke
 on:
   schedule:
     - cron: '41 4 * * 4'
-  pull_request:
-    paths:
-      - 'deploy/mail/**'
-      - 'deploy/compose.mail-smoke.yaml'
-      - 'deploy/compose.yaml'
-      - 'deploy/compose.stalwart.yaml'
-      - 'deploy/Caddyfile'
-      - 'deploy/Caddyfile.stalwart'
-      - 'deploy/Caddyfile.mail-smoke'
-      - 'deploy/mail-certificate.sh'
-      - 'deploy/mail-certificate-peer.mjs'
-      - 'deploy/mail-reload.sh'
-      - 'tools/courtside.mail-smoke.mjs'
-      - '.github/workflows/mail-smoke.yml'
-      # The code that talks to the relay decides whether a message goes out, so a change to it is
-      # as much a reason to run this as a change to the server it talks to.
-      - 'src/main/java/org/courtside/notification/**'
   workflow_dispatch:
 
 concurrency:

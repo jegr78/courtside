@@ -3,6 +3,8 @@ import { createRequire } from "node:module";
 import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { classifyChanges } from "./test-profile-classifier.mjs";
+import { ciJobsForProfiles, loadProfileContract } from "./test-profile-contract.mjs";
 
 function deploymentFile(name) {
   return readFileSync(fileURLToPath(new URL(`../deploy/${name}`, import.meta.url)), "utf8");
@@ -145,12 +147,26 @@ test("given an accepted reload, when health is decided, then the served leaf mus
     /- \.\/mail-certificate-peer\.mjs:\/mail-certificate-peer\.mjs:ro$/m);
 });
 
-test("given the listener verifier changes, when GitHub selects checks, then the real mail stack runs",
-  () => {
-    // given / when / then
-    assert.match(mailWorkflow, /- 'deploy\/mail-certificate-peer\.mjs'/,
-      "an isolated verifier change would otherwise skip its only real Stalwart execution");
-  });
+function selectedJobs(path) {
+  return ciJobsForProfiles(loadProfileContract(), classifyChanges([{ status: "M", path }], []).profiles);
+}
+
+test("given a change to the mail certificate peer, when a pull request is classified, then the mail gate runs", () => {
+  // when
+  const jobs = selectedJobs("deploy/mail-certificate-peer.mjs");
+
+  // then
+  assert.ok(jobs.includes("gates"), "the build's gates include the Stalwart journey");
+  assert.doesNotMatch(mailWorkflow, /\n {2}pull_request:/, "the build's gate replaces the path-filtered trigger");
+});
+
+test("given a change to the code that talks to the relay, when a pull request is classified, then the mail gate runs", () => {
+  // when
+  const jobs = selectedJobs("src/main/java/org/courtside/notification/Example.java");
+
+  // then
+  assert.ok(jobs.includes("gates"), "a notification change decides whether a message goes out");
+});
 
 test("given the temporary bootstrap credential, when the smoke tests legacy metadata, then setup "
   + "keeps its established critical path", () => {
