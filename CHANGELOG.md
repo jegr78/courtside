@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-rc.11](https://github.com/jegr78/courtside/compare/v0.1.0-rc.10...v0.1.0-rc.11) (2026-10-04)
+
+
+### Bug fixes
+
+* let the court plan stand at the current time before it is shown ([#1287](https://github.com/jegr78/courtside/issues/1287)) ([15a63de](https://github.com/jegr78/courtside/commit/15a63de61e98234703d8ad668dcfd6d97efd76ef))
+
 ## 0.1.0 (2026-09-14)
 
 
@@ -580,4 +587,3 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
-
