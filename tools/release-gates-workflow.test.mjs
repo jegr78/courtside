@@ -52,13 +52,17 @@ test("given an image from a pull request, when the gates run, then nothing logs 
   assert.doesNotMatch(gatesSource, /push: true|docker push/, "no gate writes to a registry");
 });
 
-test("given an image from a pull request, when the gates run, then the volatile and release-only jobs stay out", () => {
+test("given an image from a pull request, when the gates run, then only the npm audit and the release record stay out", () => {
+  // given
+  const registryOnly = ["npm-audit", "security-record"];
+
   // when / then
-  for (const job of ["npm-audit", "security-record"]) {
+  for (const job of registryOnly) {
     assert.equal(gates.jobs[job].if, "inputs.image-source == 'registry'", `${job} must not run on a PR image`);
   }
-  for (const job of ["mail", "active-security", "restore", "upgrade-origins", "upgrade", "archive-reproducibility"]) {
-    assert.doesNotMatch(String(gates.jobs[job].if ?? ""), /image-source/, `${job} must run on a PR image`);
+  for (const [name, job] of Object.entries(gates.jobs).filter(([name]) => !registryOnly.includes(name))) {
+    assert.doesNotMatch(String(job.if ?? ""), /image-source|registry/,
+      `${name} is a release gate a pull request must run; a registry-only gate needs a reason here first`);
   }
 });
 
@@ -188,4 +192,56 @@ test("given the browser matrix, when WebKit accessibility runs, then only its sh
   // then
   assert.deepEqual(browser.strategy.matrix.group, ["functional-a", "functional-b", "webkit-accessibility"]);
   assert.equal(shard.env.COURTSIDE_WEBKIT_AXE, "${{ matrix.group == 'webkit-accessibility' && 'true' || 'false' }}");
+});
+
+const enforce = build.jobs.build.steps.find((step) => step.name === "Enforce required build results").run;
+const qualityJobs = ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"];
+
+function aggregate(event, results, selected = {}) {
+  const environment = { PATH: process.env.PATH, EVENT_NAME: event, IDENTITY_RESULT: "skipped",
+    COMPARISON_RESULT: "skipped", PROFILE_PLAN_RESULT: event === "pull_request" ? "success" : "skipped" };
+  for (const job of [...qualityJobs, "gates", "clock_shift"]) {
+    const isSelected = selected[job] ?? true;
+    environment[`${job.toUpperCase()}_SELECTED`] = String(isSelected);
+    environment[`${job.toUpperCase()}_RESULT`] = isSelected || event !== "pull_request" ? "success" : "skipped";
+  }
+  environment.GATES_IMAGE_RESULT = environment.GATES_RESULT;
+  Object.assign(environment, results);
+  return spawnSync("bash", ["-e", "-c", enforce], { env: environment, encoding: "utf8" }).status;
+}
+
+test("given a pull request that selects the gates, when the aggregate decides, then only a run of both gate jobs passes", () => {
+  // when / then
+  assert.equal(aggregate("pull_request", {}), 0, "selected and succeeded");
+  assert.notEqual(aggregate("pull_request", { GATES_RESULT: "skipped" }), 0, "selected but skipped");
+  assert.notEqual(aggregate("pull_request", { GATES_RESULT: "failure" }), 0, "selected and failed");
+  assert.notEqual(aggregate("pull_request", { GATES_IMAGE_RESULT: "skipped" }), 0, "gates without the image they test");
+  assert.notEqual(aggregate("pull_request", { GATES_IMAGE_RESULT: "failure" }), 0, "an image that failed to build");
+  assert.notEqual(aggregate("pull_request", { CLOCK_SHIFT_RESULT: "skipped" }), 0, "a selected shifted clock that never ran");
+});
+
+test("given a pull request that does not select the gates, when the aggregate decides, then a gate that ran anyway fails it", () => {
+  // given
+  const unselected = { gates: false, clock_shift: false };
+
+  // when / then
+  assert.equal(aggregate("pull_request", {}, unselected), 0, "unselected and skipped");
+  assert.notEqual(aggregate("pull_request", { GATES_RESULT: "success" }, unselected), 0, "unselected but ran");
+  assert.notEqual(aggregate("pull_request", { GATES_IMAGE_RESULT: "success" }, unselected), 0, "an unselected image build");
+  assert.notEqual(aggregate("pull_request", { CLOCK_SHIFT_RESULT: "success" }, unselected), 0, "an unselected clock shift");
+});
+
+test("given the push and nightly paths, when the aggregate decides, then the gates stay skipped and the clock shift follows the event", () => {
+  // given
+  const skippedGates = { GATES_RESULT: "skipped", GATES_IMAGE_RESULT: "skipped" };
+
+  // when / then
+  assert.equal(aggregate("push", { ...skippedGates, CLOCK_SHIFT_RESULT: "skipped" }), 0);
+  assert.notEqual(aggregate("push", { ...skippedGates, CLOCK_SHIFT_RESULT: "success" }), 0, "a push runs no clock shift");
+  assert.equal(aggregate("schedule", skippedGates), 0);
+  assert.notEqual(aggregate("schedule", { ...skippedGates, CLOCK_SHIFT_RESULT: "failure" }), 0,
+    "a failed shifted clock blocks the nightly image");
+  assert.notEqual(aggregate("workflow_dispatch", { ...skippedGates, CLOCK_SHIFT_RESULT: "skipped" }), 0);
+  assert.notEqual(aggregate("schedule", { GATES_RESULT: "success", GATES_IMAGE_RESULT: "skipped" }), 0,
+    "the nightly runs its gates in registry mode, never the pull-request ones");
 });
