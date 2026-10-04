@@ -70,7 +70,9 @@ unit tests, build, audit, application packaging and browser journeys. A mixed ch
 profiles. Added tool tests use the tooling profile when the same change only appends their complete
 manifest entries; runners and helpers remain full. The reference deployment guide uses the
 documentation profile. Build, workflow, security, executable deployment, database, OpenAPI, shared
-test-infrastructure, unknown and structural changes run the complete Maven verification.
+test-infrastructure, unknown and structural changes run the complete Maven verification, the
+browser and WebKit reliability gates, and then the Docker release gates: qualification, Stalwart,
+restore, upgrade and the active security assessment.
 
 The command writes `build/local-check/result.json` with the base and head commits, a content
 fingerprint, selected profiles, reasons, tasks and outcome. It checks out the recorded head in a
@@ -106,6 +108,9 @@ Connect to Dev PostgreSQL with database `courtside_dev`, username `courtside`, p
 Start UAT with `node tools/courtside.mjs uat`. The default command verifies the current checkout,
 builds its container image, and starts it as the `courtside-uat` Compose project. Its database and
 Caddy certificate authority survive restarts and source rebuilds. UAT never loads demo data.
+`COURTSIDE_UAT_PROJECT`, `COURTSIDE_UAT_LOCAL_IMAGE`, `COURTSIDE_UAT_HTTP_PORT`,
+`COURTSIDE_UAT_HTTPS_PORT`, `COURTSIDE_UAT_SHARED_PORT` and `COURTSIDE_OPERATIONAL_LOG_PORT` name a
+second instance; the local check's qualification gate uses them so it never touches this one.
 
 On an empty database, the CLI prints the generated one-time password for the local `admin` account.
 Change it at the first login. Later starts preserve that account and do not reset its password.

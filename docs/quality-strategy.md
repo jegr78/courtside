@@ -81,8 +81,7 @@ combination. Backend changes run backend, tooling and security verification; fro
 tooling and security verification. Frontend compilation, lint, unit tests and coverage finish before
 the browser jobs consume the same packaged candidate. Blocking visual and guide snapshots run first;
 only then do two stable functional shards cover Chromium, WebKit, accessibility, phone layouts and
-the journey catalogue. A third shard runs the WebKit accessibility project, which used to run only
-when a release was cut. On both phone projects, every page the router declares must render its text
+the journey catalogue. A third shard runs the WebKit accessibility project. On both phone projects, every page the router declares must render its text
 at 10 px or more and keep each control inside the viewport's width. A full selection also starts a fresh Compose project from an image built for
 that commit and proves its application, database and log-collector wait contract.
 Backend, frontend and full selections can change the image, so they also build and qualify an image
@@ -320,8 +319,7 @@ The pull-request browser gate makes two separate product claims. The blocking vi
 snapshots run as the first browser job, so a known pixel regression stops the more expensive
 functional shards. Chromium runs the blocking
 automated WCAG 2.2 AA rule scan, while WebKit runs blocking core compatibility journeys. WebKit
-plus axe remains a qualification signal until retained first-attempt evidence supports admitting
-that combination. Browser process loss, an internal engine error, a lost target or a test-level
+plus axe runs in a blocking shard of its own. Browser process loss, an internal engine error, a lost target or a test-level
 timeout makes the harness outcome incomplete. A failed product assertion remains a product
 failure. The retained browser outcome records those claims separately, and neither class can turn
 the other green.
@@ -391,8 +389,8 @@ days; the safe records remain available for 90 days. Validate one record with
 The summary counts attempts, streaks and first-attempt failure rates, and a streak is not a failure
 rate. Zero failures in thirty trials still leave substantial statistical uncertainty, so a historical
 streak never becomes a broader reliability claim. These records exist to explain a concrete failure
-when one happens, not to earn an admission: WebKit plus axe stays out of the merge gate, so there is
-no threshold for the streak to reach.
+when one happens, not to earn an admission: WebKit plus axe already blocks a merge in its own shard,
+so there is no threshold for the streak to reach.
 
 <!-- risk-register:operations-and-release:start -->
 ### Operations and release
