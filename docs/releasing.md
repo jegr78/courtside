@@ -42,7 +42,9 @@ runs the release gates before it merges. The `gates-image` job builds the image 
 request's merge commit, runs the amd64 qualification on it with `tools/courtside.uat-smoke.mjs`, adds
 the booking seed and writes a deployment archive shaped like a nightly one. It hands both images to
 `release-gates.yml` as an artifact of the same run instead of through the registry. No gate job logs
-in, pushes or reads a secret, so a pull request from a fork or from Dependabot runs the same gates.
+in, pushes or reads a secret, so a pull request from a fork or from Dependabot runs the same gates. The archive records the
+head branch as its ref, so a fork branch whose name uses characters outside `A-Z`, `a-z`, `0-9`,
+`.`, `_`, `/` and `-` fails `gates-image` instead of running the gates.
 From that workflow the pull request runs `archive-reproducibility`, `mail`, `active-security`,
 `restore` and `upgrade`, the last from the earliest retained nightly whose migrations it still
 carries. The jobs that run the image load it and refer to it by image ID; `mail` and

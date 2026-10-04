@@ -597,7 +597,7 @@ The pull-request classifier selects checks from closed path inventories and fall
 build for unknown or structural changes. Pushes to `main`, schedules and releases execute the full
 set. A pull request that can change the image also runs the release gates against an image it builds
 itself; npm advisories and the image CVE scan stay with the nightly and the release because they
-change without a change to the repository. A scheduled test is regression evidence, not the first execution of a changed scheduled path.
+move while the repository does not. A scheduled test is regression evidence, not the first execution of a changed scheduled path.
 
 See [`quality-strategy.md`](quality-strategy.md), [`security-assessment.md`](security-assessment.md)
 and [`releasing.md`](releasing.md) for the detailed workflows.
