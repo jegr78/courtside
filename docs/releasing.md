@@ -319,6 +319,44 @@ repository has **published**, not from the tags that exist. A tag whose run stop
 therefore names a draft and no published release, is no origin, and shortens no range. It stays
 where it is, and nothing has to be deleted to move on.
 
+## Rehearsing a release candidate
+
+The `release candidate` workflow qualifies one commit the way the release does, without a tag.
+Nothing depends on it yet: a release still runs as described above. Run it with
+
+```bash
+gh workflow run release-candidate.yml --ref main -f commit=<sha> -f rehearsal=true
+```
+
+`commit` is the full 40-character sha to qualify. `rehearsal` defaults to `true`. A rehearsal may
+qualify any commit, a branch head included, and skips the release preconditions: a pending release
+pull request, a commit on `main`, an unused tag and a green push build of that commit. With
+`rehearsal=false` the workflow refuses to run from anything but `main` and demands all four.
+GitHub dispatches a workflow only once its file exists on the default branch.
+
+The jobs, in order:
+
+| Job | What it proves |
+| --- | --- |
+| `select` | The commit, its version and tag, and whether it qualifies at all |
+| `preconditions` | A nightly verified an ancestor, and no nightly failure issue is open |
+| `release-build` | The release-build security and dependency policy, release notes and upgrade origins, without running the test suite again |
+| `image` | The image and booking-seed image of that commit, pushed as `release-candidate-<sha>-<run id>` and `booking-seed-release-candidate-<sha>-<run id>` |
+| `archive` | The deployment archive for the `release.yml` identity at `refs/tags/v<version>` |
+| `qualify` | The reference deployment and image policy on `amd64` and `arm64` |
+| `gates` | Every release gate on those exact digests and that archive |
+| `evidence` | The record `release-candidate-evidence-<sha>`, written only when every job above succeeded |
+
+The run writes no git tag, no GitHub release and no version tag. Its only registry writes are the
+two candidate image tags above, which nightly retention removes after 14 days. A rehearsal uploads
+no dependency evidence, so later runs cannot read it as their previous evidence.
+
+The evidence, the archive and the release notes are kept for 14 days, and the candidate images for
+the same window. A promotion has to read them within those 14 days; after that, run a new
+candidate. Re-run failed jobs on a red run to finish it: the `evidence` job runs again and uploads
+the record. Re-run all jobs on a green run cannot upload the record again, because the run already
+holds an artifact of that name. Dispatch a new run instead.
+
 ## When the change is breaking
 
 The compatibility contract in `docs/design.md` says what counts: the REST API, the environment

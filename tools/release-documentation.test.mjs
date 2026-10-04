@@ -242,3 +242,29 @@ test("given the gates a pull request runs, when the document states their limits
   assert.match(quality, /plus 35 for the Docker release gates of `full`/);
   assert.match(quality, /twice the 17\.1 minutes the five gates took with a cold image build/);
 });
+
+test("given the rehearsal pipeline, when the document describes it, then it says how to run it and what it leaves behind",
+  () => {
+    // given
+    const start = document.indexOf("## Rehearsing a release candidate");
+    const section = document.slice(start, document.indexOf("\n## ", start + 1));
+    const candidate = yaml.load(repositoryFile(".github/workflows/release-candidate.yml"));
+
+    // when / then
+    assert.ok(start >= 0, "docs/releasing.md has no section on rehearsing a release candidate");
+    assert.match(section, /gh workflow run release-candidate\.yml --ref main -f commit=<sha> -f rehearsal=true/);
+    for (const input of Object.keys(candidate.on.workflow_dispatch.inputs)) {
+      assert.match(section, new RegExp("`" + input + "`"), `the section does not explain the ${input} input`);
+    }
+    for (const job of Object.keys(candidate.jobs)) {
+      assert.match(section, new RegExp("`" + job + "`"), `the section does not explain the ${job} job`);
+    }
+    assert.match(section, /`release-candidate-<sha>-<run id>`/);
+    assert.match(section, /`booking-seed-release-candidate-<sha>-<run id>`/);
+    assert.match(section, /`release-candidate-evidence-<sha>`/);
+    assert.match(section, /no git tag, no GitHub release and no version tag/);
+    assert.match(section, /default branch/, "a dispatch needs the workflow on main");
+    assert.match(section, /Re-run failed jobs/);
+    assert.match(section, /Re-run all jobs/);
+    assert.match(section, /14 days/);
+  });
