@@ -187,7 +187,6 @@ test("given a candidate image, when it is built, then it carries the selected re
   // when / then
   assert.match(image, /tags: ghcr\.io\/\$\{\{ github\.repository \}\}:release-candidate-\$\{\{ needs\.select\.outputs\.commit \}\}-\$\{\{ github\.run_id \}\}\n/);
   assert.match(image, /tags: ghcr\.io\/\$\{\{ github\.repository \}\}:booking-seed-release-candidate-\$\{\{ needs\.select\.outputs\.commit \}\}-\$\{\{ github\.run_id \}\}\n/);
-  assert.match(image, /org\.opencontainers\.image\.revision=\$\{\{ needs\.select\.outputs\.commit \}\}/);
   assert.doesNotMatch(image, /metadata-action/, "the metadata action labels the dispatch commit, not the selected one");
   assert.match(image, /file: Dockerfile\.fixtures/);
   assert.match(image, /build-args: BASE_IMAGE=ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ steps\.push\.outputs\.digest \}\}/);
@@ -378,5 +377,64 @@ test("given a rehearsal, when it uploads, then nothing another workflow reads as
   for (const entry of consumed) {
     assert.match(String(entry.if), /needs\.select\.outputs\.rehearsal != 'true'/,
       `${entry.with.name} would let a rehearsal stand in as previous evidence`);
+  }
+});
+
+const releasedLabels = {
+  "org.opencontainers.image.created": "2026-10-04T11:57:38.909Z",
+  "org.opencontainers.image.description":
+    "Court booking system for sports clubs — one single-tenant instance per club. AGPL-3.0.",
+  "org.opencontainers.image.licenses": "AGPL-3.0",
+  "org.opencontainers.image.revision": "e59fe4f638c93e9186377e0c8c507299fac0f19b",
+  "org.opencontainers.image.source": "https://github.com/jegr78/courtside",
+  "org.opencontainers.image.title": "courtside",
+  "org.opencontainers.image.url": "https://github.com/jegr78/courtside",
+  "org.opencontainers.image.version": "release-candidate-e59fe4f638c93e9186377e0c8c507299fac0f19b"
+};
+
+function candidateLabels(labelStep, commit) {
+  const directory = mkdtempSync(join(tmpdir(), "courtside-candidate-labels-"));
+  const output = join(directory, "github-output");
+  writeFileSync(output, "");
+  execFileSync("bash", ["-c", labelStep.run], {
+    cwd: fileURLToPath(new URL("../", import.meta.url)),
+    env: { ...process.env, GITHUB_OUTPUT: output, COMMIT: commit,
+      DESCRIPTION: releasedLabels["org.opencontainers.image.description"], LICENSES: "AGPL-3.0",
+      SOURCE: "https://github.com/jegr78/courtside", TITLE: "courtside",
+      CANDIDATE_TAG: `release-candidate-${commit}-7` },
+    stdio: "pipe"
+  });
+  const [, body] = /^labels<<(\S+)\n([\s\S]*?)\n\1\n$/.exec(readFileSync(output, "utf8"))?.slice(1) ?? [];
+  return Object.fromEntries(body.split("\n").map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]));
+}
+
+test("given a candidate image, when it is labelled, then it carries every label the released images carry", () => {
+  // given
+  const labelStep = step("image", "labels");
+  const commit = execFileSync("git", ["rev-parse", "b1cd6c3a^{commit}"],
+    { cwd: fileURLToPath(new URL("../", import.meta.url)), encoding: "utf8" }).trim();
+
+  // when
+  const labels = candidateLabels(labelStep, commit);
+
+  // then
+  assert.deepEqual(Object.keys(labels).sort(), Object.keys(releasedLabels).sort(),
+    "the candidate images carry the label set release.yml's metadata action wrote on v0.1.0-rc.11");
+  assert.equal(labels["org.opencontainers.image.revision"], commit);
+  assert.equal(labels["org.opencontainers.image.version"], `release-candidate-${commit}-7`);
+  assert.equal(labels["org.opencontainers.image.description"], releasedLabels["org.opencontainers.image.description"]);
+  assert.equal(labels["org.opencontainers.image.created"], "2026-10-04T15:09:05.000Z",
+    "created is the selected commit's committer time, so a re-run labels the same instant");
+  assert.deepEqual(candidateLabels(labelStep, commit), labels);
+  assert.deepEqual(labelStep.env, {
+    COMMIT: "${{ needs.select.outputs.commit }}",
+    DESCRIPTION: "${{ github.event.repository.description }}",
+    LICENSES: "${{ github.event.repository.license.spdx_id }}",
+    SOURCE: "${{ github.server_url }}/${{ github.repository }}",
+    TITLE: "${{ github.event.repository.name }}",
+    CANDIDATE_TAG: "release-candidate-${{ needs.select.outputs.commit }}-${{ github.run_id }}"
+  });
+  for (const push of ["push", "booking-seed-push"]) {
+    assert.equal(step("image", push).with.labels, "${{ steps.labels.outputs.labels }}", `${push} uses the shared labels`);
   }
 });
