@@ -11,7 +11,7 @@
 
     <groupId>org.courtside</groupId>
     <artifactId>courtside</artifactId>
-    <version>0.1.0-rc.9</version>
+    <version>0.1.0-rc.10</version>
     <name>courtside</name>
     <description>Court booking system for sports clubs</description>
     <!-- The one place the upstream repository is named; application.yaml takes it as the
@@ -29,7 +29,7 @@
     <properties>
         <java.version>25</java.version>
         <!-- Maven 3.10 dates every artifact 1980 by default; an empty value keeps the real build time. -->
-        <project.build.outputTimestamp></project.build.outputTimestamp>
+        <project.build.outputTimestamp/>
         <maven-antrun-plugin.version>3.2.0</maven-antrun-plugin.version>
         <spring-modulith.version>2.1.1</spring-modulith.version>
         <tomcat.version>11.0.25</tomcat.version>

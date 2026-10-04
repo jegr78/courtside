@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.0-rc.10](https://github.com/jegr78/courtside/compare/v0.1.0-rc.9...v0.1.0-rc.10) (2026-10-04)
+
+
+### Bug fixes
+
+* clear the previous confirmation when a managed appointment action starts ([#1281](https://github.com/jegr78/courtside/issues/1281)) ([4ebcaa2](https://github.com/jegr78/courtside/commit/4ebcaa290dcc30329f80dd5de8c443183741a4f6)), closes [#1268](https://github.com/jegr78/courtside/issues/1268)
+* discard a load-more page that belongs to the list before a reload ([#1266](https://github.com/jegr78/courtside/issues/1266)) ([b194064](https://github.com/jegr78/courtside/commit/b1940641559a375de123e37491a5bbbd5fe3c7a4)), closes [#1263](https://github.com/jegr78/courtside/issues/1263)
+* keep cancelled bookings from crowding out active ones in My bookings ([#1278](https://github.com/jegr78/courtside/issues/1278)) ([9af185c](https://github.com/jegr78/courtside/commit/9af185ca5f99284c4cbf975c9874fd7716b52082)), closes [#1265](https://github.com/jegr78/courtside/issues/1265)
+* keep the new-court number field inside its column ([#1282](https://github.com/jegr78/courtside/issues/1282)) ([3ade5d1](https://github.com/jegr78/courtside/commit/3ade5d101e88d4575384e25158e99f9a5d84822e)), closes [#1269](https://github.com/jegr78/courtside/issues/1269)
+* page My bookings from the member's next booking onwards ([#1277](https://github.com/jegr78/courtside/issues/1277)) ([ba79f7d](https://github.com/jegr78/courtside/commit/ba79f7d4fe53edaa6d80e9235950a8d18eeceaa2)), closes [#1264](https://github.com/jegr78/courtside/issues/1264)
+* report the database healthy only once it accepts TCP connections ([#1286](https://github.com/jegr78/courtside/issues/1286)) ([69b9813](https://github.com/jegr78/courtside/commit/69b98136c9275a10d7dc9713671a7b6bfb9aed34))
+* say "one appointment" on the series button for a single occurrence ([#1280](https://github.com/jegr78/courtside/issues/1280)) ([76b12a1](https://github.com/jegr78/courtside/commit/76b12a1a2a90687f8adab94fb6256a56d9861626)), closes [#1270](https://github.com/jegr78/courtside/issues/1270)
+* scroll the court plan to the current time once, and not after a touch ([#1283](https://github.com/jegr78/courtside/issues/1283)) ([41e5180](https://github.com/jegr78/courtside/commit/41e5180935551735c5a829a81c800bfda709726b)), closes [#1239](https://github.com/jegr78/courtside/issues/1239)
+
+
+### Build and dependencies
+
+* **deps-dev:** bump the frontend-minor-and-patch group across 1 directory with 3 updates ([#1284](https://github.com/jegr78/courtside/issues/1284)) ([5410445](https://github.com/jegr78/courtside/commit/5410445cd9f16d27b62b372f4cd2c3f774c56f7d))
+* **deps:** bump Maven, deployment images, msw and the frontend group ([#1279](https://github.com/jegr78/courtside/issues/1279)) ([23ae4e9](https://github.com/jegr78/courtside/commit/23ae4e936056ee908baff33e75970498e753f857))
+
 ## 0.1.0 (2026-09-14)
 
 
@@ -567,4 +587,3 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
-
