@@ -105,6 +105,13 @@ export function pendingReleasePullRequests(pages) {
     .map(({ number, title }) => ({ number, title }));
 }
 
+export function releasePullRequestOf(pull, mergeCommitIsAncestor) {
+  if (pull?.base?.ref !== "main") return null;
+  const mergeCommit = pull.merge_commit_sha ?? null;
+  return { number: pull.number, title: pull.title, mergeCommit,
+    mergeCommitIsAncestor: commitPattern.test(mergeCommit ?? "") && mergeCommitIsAncestor === true };
+}
+
 export function greenExactBuild(pages, repository) {
   return pages.flatMap((page) => page.workflow_runs ?? []).some((run) => run.head_branch === "main"
     && (run.event === "push" || run.event === "workflow_dispatch")
@@ -165,15 +172,13 @@ export function gatherFacts(options, environment = process.env) {
   const label = encodeURIComponent(pendingLabel);
   facts.pendingPullRequests = pendingReleasePullRequests(
     api(`repos/${repository}/issues?state=closed&labels=${label}&per_page=100`))
-    .map(({ number, title }) => {
+    .map(({ number }) => {
       const pull = JSON.parse(command("gh", ["api", `repos/${repository}/pulls/${number}`]));
-      const mergeCommit = pull.merge_commit_sha;
-      return { number, title, base: pull.base?.ref, mergeCommit,
-        mergeCommitIsAncestor: commitPattern.test(mergeCommit ?? "")
-          && succeeds("git", ["merge-base", "--is-ancestor", mergeCommit, commit]) };
+      const merged = pull.merge_commit_sha;
+      return releasePullRequestOf(pull, commitPattern.test(merged ?? "")
+        && succeeds("git", ["merge-base", "--is-ancestor", merged, commit]));
     })
-    .filter(({ base }) => base === "main")
-    .map(({ base, ...pullRequest }) => pullRequest);
+    .filter((pullRequest) => pullRequest !== null);
   if (event === "workflow_dispatch") {
     facts.exactBuildGreen = greenExactBuild(
       api(`repos/${repository}/actions/workflows/build.yml/runs?head_sha=${commit}&status=success&per_page=100`),

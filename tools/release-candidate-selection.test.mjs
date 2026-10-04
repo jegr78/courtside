@@ -6,6 +6,7 @@ import {
   greenExactBuild,
   pendingReleasePullRequests,
   readCommitFacts,
+  releasePullRequestOf,
   selectReleaseCandidate
 } from "./release-candidate-selection.mjs";
 
@@ -222,18 +223,39 @@ test("given a commit that is not a full sha, when the candidate selects, then th
   }
 });
 
-test("given closed issues labelled pending, when release pull requests are read, then only merged pull requests count", () => {
-  // given
-  const issues = [[
-    { number: 1290, title: "chore(main): release 0.1.0", pull_request: { merged_at: "2026-10-04T15:09:05Z" } },
-    { number: 1200, title: "chore(main): release 0.1.0-rc.9", pull_request: { merged_at: null } },
-    { number: 1100, title: "a closed issue", labels: [] }
-  ]];
+const recordedIssuePage = [
+  { number: 1290, pull_request: { merged_at: "2026-10-04T15:09:05Z" }, title: "chore(main): release 0.1.0" },
+  { number: 1288, pull_request: { merged_at: "2026-10-04T11:14:39Z" }, title: "chore(main): release 0.1.0-rc.11" },
+  { number: 750, pull_request: { merged_at: null },
+    title: "build(deps): bump softprops/action-gh-release from 3.0.2 to 3.0.3" },
+  { number: 1270, title: "The series button reads \"Create 1 appointments\"" }
+];
+const recordedPull = { base: { ref: "main" }, merge_commit_sha: "b1cd6c3a7a05164552a414bc4a88ea2441ebf31e",
+  number: 1290, title: "chore(main): release 0.1.0" };
 
+test("given a recorded issues page, when release pull requests are read, then only merged pull requests count", () => {
   // when / then
-  assert.deepEqual(pendingReleasePullRequests(issues), [{ number: 1290, title: "chore(main): release 0.1.0" }],
-    "a closed unmerged pull request and a plain issue are not pending releases");
+  assert.deepEqual(pendingReleasePullRequests([recordedIssuePage]), [
+    { number: 1290, title: "chore(main): release 0.1.0" },
+    { number: 1288, title: "chore(main): release 0.1.0-rc.11" }
+  ], "a closed unmerged pull request and a plain issue are not releases");
 });
+
+test("given a recorded pull request, when its merge is read, then it names the merge commit on main", () => {
+  // when / then
+  assert.deepEqual(releasePullRequestOf(recordedPull, true), { number: 1290, title: "chore(main): release 0.1.0",
+    mergeCommit: "b1cd6c3a7a05164552a414bc4a88ea2441ebf31e", mergeCommitIsAncestor: true });
+  assert.equal(releasePullRequestOf({ ...recordedPull, base: { ref: "release/0.1" } }, true), null,
+    "a release pull request into another branch is not this line's release");
+  assert.equal(releasePullRequestOf({ ...recordedPull, merge_commit_sha: null }, true).mergeCommitIsAncestor, false);
+});
+
+test("given a dispatched commit whose manifest moved past the pending release, when the candidate selects, then the run fails",
+  () => {
+    // when / then
+    assert.throws(() => selectReleaseCandidate(dispatch({ manifest: "0.1.1", parentManifest: "0.1.1",
+      pomVersion: "0.1.1", packageVersion: "0.1.1" })), /names 0\.1\.0, but the manifest records 0\.1\.1/);
+  });
 
 test("given build runs of a commit, when the exact build is read, then only a green main run of this repository counts", () => {
   // given
