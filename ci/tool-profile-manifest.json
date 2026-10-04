@@ -119,6 +119,7 @@
     { "path": "tools/release-candidate-evidence.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-candidate-selection.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/release-candidate-selection.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/release-candidate-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-documentation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-gates-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-notes.mjs", "profiles": ["full"], "test": false },
