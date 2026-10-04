@@ -98,8 +98,6 @@ test("given the rehearsal pipeline, when it runs, then it can be dispatched only
     /gh release/, /contents: write/, /imagetools create/]) {
     assert.doesNotMatch(source, forbidden, `the candidate must not ${forbidden}`);
   }
-  assert.equal(candidate.concurrency.group, "release-candidate");
-  assert.equal(candidate.concurrency["cancel-in-progress"], false);
 });
 
 test("given a dispatch, when the candidate selects, then the selection tool decides for every later job", () => {
@@ -182,13 +180,11 @@ test("given a candidate build, when its notes and origins are collected, then th
   assert.match(step("release-build", "Extract the layers").run, /target\/courtside-\$VERSION\.jar/);
 });
 
-test("given a candidate image, when it is built, then it carries the selected revision and shares the registry lock", () => {
+test("given a candidate image, when it is built, then it carries the selected revision", () => {
   // given
   const image = jobText("image");
 
   // when / then
-  assert.equal(jobs.image.concurrency.group, "container-registry-${{ github.repository }}");
-  assert.equal(jobs.image.concurrency["cancel-in-progress"], false);
   assert.match(image, /tags: ghcr\.io\/\$\{\{ github\.repository \}\}:release-candidate-\$\{\{ needs\.select\.outputs\.commit \}\}-\$\{\{ github\.run_id \}\}\n/);
   assert.match(image, /tags: ghcr\.io\/\$\{\{ github\.repository \}\}:booking-seed-release-candidate-\$\{\{ needs\.select\.outputs\.commit \}\}-\$\{\{ github\.run_id \}\}\n/);
   assert.match(image, /org\.opencontainers\.image\.revision=\$\{\{ needs\.select\.outputs\.commit \}\}/);
@@ -349,4 +345,14 @@ test("given a green candidate, when its evidence job runs, then the record it wr
       GITHUB_WORKFLOW_REF: "jegr78/courtside/.github/workflows/release-candidate.yml@refs/heads/main" },
     stdio: "pipe"
   }), /gates is failure/, "a red gate leaves no passed record");
+});
+
+test("given a pending release candidate, when any other run queues, then nothing can cancel it", () => {
+  // when
+  const groups = [["workflow", candidate.concurrency],
+    ...Object.entries(jobs).map(([name, job]) => [name, job.concurrency])].filter(([, group]) => group !== undefined);
+
+  // then
+  assert.deepEqual(groups, [],
+    "a concurrency group keeps one pending run and cancels it when the next one queues, whatever cancel-in-progress says");
 });

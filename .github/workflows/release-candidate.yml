@@ -13,10 +13,6 @@ on:
         type: boolean
         default: true
 
-concurrency:
-  group: release-candidate
-  cancel-in-progress: false
-
 permissions: {}
 
 jobs:
@@ -360,9 +356,6 @@ jobs:
     needs: [select, release-build]
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    concurrency:
-      group: container-registry-${{ github.repository }}
-      cancel-in-progress: false
     outputs:
       digest: ${{ steps.push.outputs.digest }}
       booking-seed-digest: ${{ steps.booking-seed-push.outputs.digest }}
