@@ -11,6 +11,7 @@
 
 
 
+
 ### Notable changes
 
 * bundled PostgreSQL 18 deployments bind the generated COURTSIDE_DATABASE_VOLUME explicitly.
@@ -192,6 +193,8 @@
 * write to a member in the language they read ([#447](https://github.com/jegr78/courtside/issues/447)) ([596ce57](https://github.com/jegr78/courtside/commit/596ce576320ebf65ae3727d3e5059afdac42c5ef))
 
 ### Bug fixes
+
+* let the court plan stand at the current time before it is shown ([#1287](https://github.com/jegr78/courtside/issues/1287)) ([15a63de](https://github.com/jegr78/courtside/commit/15a63de61e98234703d8ad668dcfd6d97efd76ef))
 
 * clear the previous confirmation when a managed appointment action starts ([#1281](https://github.com/jegr78/courtside/issues/1281)) ([4ebcaa2](https://github.com/jegr78/courtside/commit/4ebcaa290dcc30329f80dd5de8c443183741a4f6)), closes [#1268](https://github.com/jegr78/courtside/issues/1268)
 * discard a load-more page that belongs to the list before a reload ([#1266](https://github.com/jegr78/courtside/issues/1266)) ([b194064](https://github.com/jegr78/courtside/commit/b1940641559a375de123e37491a5bbbd5fe3c7a4)), closes [#1263](https://github.com/jegr78/courtside/issues/1263)
