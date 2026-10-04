@@ -1712,3 +1712,16 @@ test("given the UAT compose file, when a run-scoped instance starts, then its po
   assert.match(compose, /COURTSIDE_UAT_HTTPS_PORT: \$\{COURTSIDE_UAT_HTTPS_PORT:-8443\}/);
   assert.match(caddy, /redir https:\/\/localhost:\{\$COURTSIDE_UAT_HTTPS_PORT:8443\}\{uri\} permanent/);
 });
+
+test("given a run-scoped instance, when the smoke composes the UAT, then it runs the instance's own image", () => {
+  // given
+  const environment = { COURTSIDE_UAT_LOCAL_IMAGE: "courtside:uat-gate-7" };
+
+  // when
+  const resolved = uatSmokeEnvironment(undefined, environment, () => undefined);
+
+  // then
+  assert.equal(resolved.COURTSIDE_UAT_IMAGE, "courtside:uat-gate-7",
+    "Compose would otherwise fall back to the shared courtside:uat-local and recreate the app from it");
+  assert.equal(uatSmokeEnvironment(undefined, {}, () => undefined).COURTSIDE_UAT_IMAGE, "courtside:uat-local");
+});

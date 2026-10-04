@@ -922,7 +922,7 @@ export function uatImageReference(version, environment = process.env, checkout =
 
 export function uatSmokeEnvironment(version, environment = process.env, checkout = checkoutRepository) {
   const resolved = { ...environment };
-  if (version) resolved.COURTSIDE_UAT_IMAGE = uatImageReference(version, environment, checkout);
+  resolved.COURTSIDE_UAT_IMAGE = uatImageReference(version, environment, checkout);
   return resolved;
 }
 

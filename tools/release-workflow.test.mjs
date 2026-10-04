@@ -410,7 +410,11 @@ test("given no release passes upgrade origins, when the gates run at night, then
   // when / then
   assert.equal(call.default, "nightly", "build.yml and the branch rehearsal pass no origins and must still rehearse");
   assert.match(resolve, /--nightly-origins "\$GITHUB_REPOSITORY"/);
-  assert.match(resolve, /test "\$origins" != '\[\]'/, "a night that found no origin must not pass silently");
+  assert.match(resolve, /if \[ "\$origins" = '\[\]' \]; then\s+test -n "\$UPGRADE_BASE"/,
+    "a night that found no origin must not pass silently");
+  const nightly = yaml.load(readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"))
+    .jobs["release-gates"];
+  assert.equal(nightly.with["upgrade-base"], undefined, "the nightly names no base, so an empty set fails it");
   assert.deepEqual(gates.jobs.upgrade.needs, "upgrade-origins");
   assert.equal(gates.jobs["upgrade-origins"].steps.find((step) => step.id === "resolve").shell, "bash",
     "GitHub adds pipefail only to an explicit bash shell, so a failed registry request would read as bad JSON");
