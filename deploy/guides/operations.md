@@ -842,8 +842,10 @@ Treat the whole recovery unit as a secret and verify its restore before dependin
 ### When the mail administrator password is lost
 
 Set `COURTSIDE_MAIL_RECOVERY_ADMIN` to `admin:${COURTSIDE_MAIL_SETUP_PASSWORD}` and restart the
-`mail` service, then sign in as `admin`. Any password works to sign in, but the setup commands read
-that one variable, so choosing anything else means they can no longer authenticate.
+`mail` service, then sign in as `admin`. The setup commands read that one variable, so choosing any
+other password means they can no longer authenticate. An installation managed by the `courtside`
+launcher keeps `.env` without interpolation, so write the setup password itself after `admin:` there.
+`courtside doctor` fails its `mail-recovery` check when either value starts with `_`, `$` or `{`.
 
 **The server stops accepting and delivering mail while that variable is set**, it runs in recovery
 mode and serves only its admin port. Clear it and recreate the container once you are back in.
@@ -1164,7 +1166,7 @@ default.
 | `COURTSIDE_MAIL_HOSTNAME` | *required with the mail server* | The mail server's own name. Its forward and reverse DNS must agree, and Caddy obtains a certificate for it, so it must point at this host. Only `full-self-hosted` reads it: `compose.stalwart.yaml` adds the site block in `Caddyfile.stalwart` to the proxy, and a recipe without the mail server never asks Caddy for this name. |
 | `COURTSIDE_MAIL_DKIM_SELECTOR` | *required with the mail server* | The selector of the DKIM key the setup wizard generated, as it appears in the admin interface. |
 | `COURTSIDE_MAIL_ADMIN_PASSWORD` | *required with the mail server* | Password for the club's mail administrator, written into the account by `mail-configure`. |
-| `COURTSIDE_MAIL_SETUP_PASSWORD` | *required with the mail server* | Password the setup commands authenticate with while the server still has no accounts. Pair it with `COURTSIDE_MAIL_RECOVERY_ADMIN`. |
+| `COURTSIDE_MAIL_SETUP_PASSWORD` | *required with the mail server* | Password the setup commands authenticate with while the server still has no accounts. Pair it with `COURTSIDE_MAIL_RECOVERY_ADMIN`. It must not start with `_`, `$` or `{`: the mail server reads such a value as a password hash and rejects every login, and `courtside doctor` reports it. |
 | `COURTSIDE_MAIL_ADMIN_USERNAME` | `postmaster` | Local part of the mail administrator's address. |
 | `COURTSIDE_MAIL_RECOVERY_MODE` | *unset* | Set to `1` to force recovery mode without a recovery credential. Mail stops while it is set. |
 | `COURTSIDE_MAIL_PASSWORD` | *required with the mail server*, *unset* otherwise | Password the instance authenticates with when it hands a message in. With the mail server, written into its sending account by `mail-configure`; the instance is not an administrator of the mail server. With an external relay, set it together with `COURTSIDE_MAIL_RELAY_USERNAME`. |
@@ -1180,7 +1182,7 @@ default.
 | `COURTSIDE_MAIL_RELAY_PORT` | `587` | Submission port on that host. |
 | `COURTSIDE_MAIL_TRUST_RELAY_CERTIFICATE` | `false` | Accept the certificate the relay presents without authenticating it, neither its issuer nor the name on it. Nothing here needs it: the mail server serves Caddy's certificate for `COURTSIDE_MAIL_HOSTNAME` and the instance dials exactly that name. Set it only for a relay whose certificate the instance cannot check, such as one issued by a private authority the container does not hold, and know that whoever can redirect the connection then reads the mail. |
 | `COURTSIDE_MAIL_ADMIN_PORT` | `8081` | Host port on the loopback interface for the mail server's admin interface. |
-| `COURTSIDE_MAIL_RECOVERY_ADMIN` | *unset* | Temporary credential for the mail server's administrator, as `admin:<password>`. Needed for the initial setup, and a way back in afterwards. **The server serves no mail while it is set.** |
+| `COURTSIDE_MAIL_RECOVERY_ADMIN` | *unset* | Temporary credential for the mail server's administrator, as `admin:<password>`, where the password must not start with `_`, `$` or `{`. Needed for the initial setup, and a way back in afterwards. **The server serves no mail while it is set.** |
 | `COURTSIDE_MAIL_OUTBOUND_PROBE` | `gmail-smtp-in.l.google.com` | The host `mail-check` opens port 25 to when testing whether outbound mail leaves at all. A third party by default; point it at a server of your own if you would rather not tell one. |
 | `COURTSIDE_MAIL_RELAY_PROBE` | `relay-probe.example.com` | The foreign domain `mail-check` asks this instance to relay for, to prove it refuses. |
 | `COURTSIDE_MAIL_RELAY_TARGET` | `mail` | Where the relay test connects. The service on the compose network by default, because a host seldom reaches its own published port from inside a container. |

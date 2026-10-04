@@ -16,10 +16,10 @@ const domain = "courts.example.org";
 const hostname = `mail.${domain}`;
 // The same foreign domain the deployment's own setup check offers it, so both ask one question.
 const relayProbeDomain = process.env.COURTSIDE_MAIL_RELAY_PROBE ?? "relay-probe.example.com";
-const setupPassword = randomBytes(18).toString("base64url");
-const adminPassword = randomBytes(18).toString("base64url");
-const applicationPassword = randomBytes(18).toString("base64url");
-const reloadPassword = randomBytes(18).toString("base64url");
+const setupPassword = randomBytes(24).toString("hex");
+const adminPassword = randomBytes(24).toString("hex");
+const applicationPassword = randomBytes(24).toString("hex");
+const reloadPassword = randomBytes(24).toString("hex");
 const runtime = mkdtempSync(join(tmpdir(), "courtside-mail-smoke-"));
 const reloadAuthority = join(runtime, "reload-authority.crt");
 writeFileSync(reloadAuthority, "");
