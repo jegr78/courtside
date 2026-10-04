@@ -13,6 +13,7 @@ const fixtures = readFileSync(join(root, "frontend/e2e/fixtures.ts"), "utf8");
 const playwright = readFileSync(join(root, "frontend/playwright.config.ts"), "utf8");
 const pom = readFileSync(join(root, "pom.xml"), "utf8");
 const stability = readFileSync(join(root, ".github/workflows/test-stability.yml"), "utf8");
+const build = readFileSync(join(root, ".github/workflows/build.yml"), "utf8");
 
 test("given the required accessibility gate, when inspecting its browser coverage, then axe blocks in Chromium only", () => {
   assert.match(accessibility, /wcag22aa/);
@@ -22,6 +23,7 @@ test("given the required accessibility gate, when inspecting its browser coverag
   assert.match(playwright, /name: "webkit-accessibility"/);
   assert.match(playwright, /COURTSIDE_WEBKIT_AXE/);
   assert.match(stability, /COURTSIDE_WEBKIT_AXE: 'true'/);
+  assert.match(build, /COURTSIDE_WEBKIT_AXE: \$\{\{ matrix\.group == 'webkit-accessibility' && 'true' \|\| 'false' \}\}/);
   assert.doesNotMatch(pom, /COURTSIDE_WEBKIT_AXE/);
   // Every browser draws in the pinned image, so the build installs none of them.
   assert.doesNotMatch(pom, /playwright install/);

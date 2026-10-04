@@ -23,7 +23,7 @@ test("given profile classification, when the pull request runs, then selected qu
     /git worktree add --detach "\$PROFILE_ROOT" "\$BASE_REF"[\s\S]+node "\$PROFILE_ROOT\/tools\/test-profile-classifier\.mjs"/);
   assert.match(workflow, /outputs:[\s\S]+backend: \$\{\{ steps\.selection\.outputs\.backend \}\}/);
   assert.match(workflow,
-    /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
+    /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, gates-image, gates, clock-shift, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(workflow, /pull_request\)\s+test "\$PROFILE_PLAN_RESULT" = success/);
   assert.match(workflow, /push\|schedule\|workflow_dispatch\)\s+test "\$PROFILE_PLAN_RESULT" = skipped/);
   assert.match(workflow,
@@ -37,7 +37,7 @@ test("given profile classification, when the pull request runs, then selected qu
   assert.match(workflow,
     /browser_visual:[\s\S]+COURTSIDE_BROWSER_GROUP: visual[\s\S]+npm run test:e2e/);
   assert.match(workflow,
-    /browser:[\s\S]+group: \[functional-a, functional-b\][\s\S]+COURTSIDE_BROWSER_GROUP: \$\{\{ matrix\.group \}\}/);
+    /browser:[\s\S]+group: \[functional-a, functional-b, webkit-accessibility\][\s\S]+COURTSIDE_BROWSER_GROUP: \$\{\{ matrix\.group \}\}/);
   assert.match(workflow,
     /deployment:[\s\S]+name: Exercise Compose wait with a fresh immutable image[\s\S]+node tools\/compose-wait-smoke\.mjs/);
   assert.doesNotMatch(workflow, /npm-cli\.js audit/);
@@ -72,7 +72,7 @@ test("given reduced profiles, when jobs are scheduled, then only their conservat
   assert.match(workflow,
     /SELECTED=\$\(jq -nr --argjson jobs "\$JOBS" --arg job "\$job" '\(\$jobs \| index\(\$job\)\) != null'\)/);
   assert.match(workflow,
-    /if \[\[ "\$PROFILES" = '\["full"\]' \]\]; then\s+JOBS='\["docs","backend","frontend","browser_visual","browser","deployment","tooling","security"\]'/);
+    /if \[\[ "\$PROFILES" = '\["full"\]' \]\]; then\s+JOBS='\["docs","backend","frontend","browser_visual","browser","deployment","tooling","security","gates","clock_shift"\]'/);
   assert.doesNotMatch(workflow, /\$job == "frontend" or \$job == "security"/);
 });
 
@@ -82,7 +82,7 @@ test("given the classifier fails, when the plan runs, then full selection still 
   assert.match(workflow,
     /if \.plannerOutcome == "failed" then \.isFull and \.profiles == \["full"\]\s+else \$classifierExit == 0 end/);
   assert.match(workflow,
-    /else\s+PROFILES='\["full"\]'\s+JOBS='\["docs","backend","frontend","browser_visual","browser","deployment","tooling","security"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
+    /else\s+PROFILES='\["full"\]'\s+JOBS='\["docs","backend","frontend","browser_visual","browser","deployment","tooling","security","gates","clock_shift"\]'[\s\S]+The classifier did not produce a trustworthy plan/);
 });
 
 test("given an unrecognised repository variable, when selecting coverage, then anything but the classified default escalates", () => {
@@ -174,4 +174,28 @@ test("given the aggregate only evaluates coverage, when node is prepared, then i
   assert.doesNotMatch(workflow,
     /name: Install coverage toolchain[\s\S]{0,300}run: \.\/mvnw/);
   assert.match(workflow, /node tools\/coverage-diff\.mjs/);
+});
+
+test("given plan schema 6, when the plan is read, then the release gates and the shifted clock are selectable jobs", () => {
+  // when / then
+  assert.match(workflow, /'type == "object" and \.schemaVersion == 6 and/);
+  assert.match(workflow, /\. == "tooling" or \. == "security" or \. == "gates" or \. == "clock_shift"\)\)/);
+  assert.match(workflow, /gates: \$\{\{ steps\.selection\.outputs\.gates \}\}/);
+  assert.match(workflow, /clock_shift: \$\{\{ steps\.selection\.outputs\.clock_shift \}\}/);
+  assert.equal(workflow.match(/for job in docs backend frontend browser_visual browser deployment tooling security gates clock_shift; do/g)?.length, 3,
+    "selection, enforcement and summary all walk the ten jobs");
+});
+
+test("given the gates and the shifted clock, when the aggregate decides, then each event demands its own outcome", () => {
+  // when / then
+  assert.match(workflow, /GATES_IMAGE_RESULT: \$\{\{ needs\.gates-image\.result \}\}/);
+  assert.match(workflow, /CLOCK_SHIFT_RESULT: \$\{\{ needs\.clock-shift\.result \}\}/);
+  assert.match(workflow,
+    /if \[\[ "\$GATES_SELECTED" = true \]\]; then\s+test "\$GATES_IMAGE_RESULT" = success\s+else\s+test "\$GATES_IMAGE_RESULT" = skipped\s+fi/,
+    "a selected gate cannot pass on an image that was never built");
+  assert.match(workflow,
+    /push\|schedule\|workflow_dispatch\)[\s\S]+?test "\$GATES_IMAGE_RESULT" = skipped\s+test "\$GATES_RESULT" = skipped\s+if \[\[ "\$EVENT_NAME" = push \]\]; then\s+test "\$CLOCK_SHIFT_RESULT" = skipped\s+else\s+test "\$CLOCK_SHIFT_RESULT" = success\s+fi/,
+    "the nightly path keeps its own registry gates and runs the shifted clock");
+  assert.match(workflow,
+    /clock-shift:\n\s+needs: test-profile-plan\n\s+if: always\(\) && \(github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch' \|\| \(github\.event_name == 'pull_request' && needs\.test-profile-plan\.outputs\.clock_shift == 'true'\)\)/);
 });

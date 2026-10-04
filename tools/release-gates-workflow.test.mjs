@@ -12,6 +12,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 const gatesSource = read(".github/workflows/release-gates.yml");
 const gates = yaml.load(gatesSource);
 const action = yaml.load(read(".github/actions/gate-image/action.yml"));
+const build = yaml.load(read(".github/workflows/build.yml"));
 const digest = `sha256:${"a".repeat(64)}`;
 
 function stepsUsing(job, uses) {
@@ -134,4 +135,55 @@ test("given an unknown source or a floating reference, when the gate image is re
   assert.notEqual(resolveImage({ SOURCE: "cache", DIGEST: digest }).status, 0, "an unknown source is refused");
   assert.notEqual(resolveImage({ SOURCE: "registry", DIGEST: "latest" }).status, 0, "a tag is not a digest");
   assert.notEqual(resolveImage({ SOURCE: "artifact", DIGEST: "" }).status, 0, "an empty digest is refused");
+});
+
+test("given a pull request selecting the gates, when the build runs, then the gates use a locally built image", () => {
+  // given
+  const gatesJob = build.jobs.gates;
+  const image = build.jobs["gates-image"];
+
+  // when / then
+  assert.equal(gatesJob.uses, "./.github/workflows/release-gates.yml");
+  assert.equal(gatesJob.with["image-source"], "artifact");
+  assert.equal(gatesJob.with["image-artifact"], "gate-image-${{ github.run_id }}");
+  assert.equal(gatesJob.with["image-digest"], "${{ needs.gates-image.outputs.image-id }}");
+  assert.equal(gatesJob.with["booking-seed-digest"], "${{ needs.gates-image.outputs.booking-seed-id }}");
+  assert.equal(gatesJob.with["source-commit"], "${{ github.sha }}", "the gates test the commit every other job tests");
+  assert.deepEqual(gatesJob.needs, ["test-profile-plan", "gates-image"]);
+  assert.match(gatesJob.if, /needs\.gates-image\.result == 'success'/);
+  assert.match(image.if, /github\.event_name == 'pull_request' && needs\.test-profile-plan\.outputs\.gates == 'true'/);
+  assert.ok(build.jobs.build.needs.includes("gates"), "the required check must wait for the gates");
+  assert.ok(build.jobs.build.needs.includes("gates-image"), "the required check must wait for the gate image");
+  assert.ok(build.jobs.build.needs.includes("clock-shift"), "the required check must wait for the shifted clock");
+});
+
+test("given the gate image job, when it builds, then the head branch reaches the shell only through the environment", () => {
+  // given
+  const steps = build.jobs["gates-image"].steps;
+
+  // when
+  const record = steps.find((step) => step.id === "images");
+
+  // then
+  for (const step of steps) assert.doesNotMatch(step.run ?? "", /\$\{\{/, `${step.name ?? step.uses} interpolates into a shell`);
+  assert.equal(record.env.HEAD_REF, "${{ github.head_ref }}");
+  assert.match(record.run, /--workflow nightly-image\.yml/);
+  assert.match(record.run, /test -z "\$\(git status --porcelain --ignored -- deploy\/\)"/,
+    "the archive is built from a deploy directory the qualification left untouched");
+  assert.ok(steps.some((step) => step.run === "node tools/courtside.uat-smoke.mjs --confirm courtside-uat"),
+    "the image is qualified before the gates use it");
+  assert.equal(build.jobs["gates-image"].permissions.contents, "read");
+  assert.equal(Object.keys(build.jobs["gates-image"].permissions).length, 1, "the gate image needs no write scope");
+});
+
+test("given the browser matrix, when WebKit accessibility runs, then only its shard sets the axe flag", () => {
+  // given
+  const browser = build.jobs.browser;
+
+  // when
+  const shard = browser.steps.find((step) => step.name === "Run the functional browser shard");
+
+  // then
+  assert.deepEqual(browser.strategy.matrix.group, ["functional-a", "functional-b", "webkit-accessibility"]);
+  assert.equal(shard.env.COURTSIDE_WEBKIT_AXE, "${{ matrix.group == 'webkit-accessibility' && 'true' || 'false' }}");
 });

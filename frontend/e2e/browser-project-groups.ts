@@ -1,7 +1,8 @@
 export const regularBrowserProjectGroups = {
   visual: ["visual", "guides-de", "guides-en"],
   "functional-a": ["chromium", "webkit-core", "webkit-pwa"],
-  "functional-b": ["chromium-accessibility", "iphone", "android", "journey-gate"]
+  "functional-b": ["chromium-accessibility", "iphone", "android", "journey-gate"],
+  "webkit-accessibility": ["webkit-accessibility"]
 } as const;
 
 type NamedProject = { name: string };
