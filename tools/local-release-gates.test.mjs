@@ -73,13 +73,25 @@ test("given the active gate, when it is planned, then the target is removed even
 });
 
 test("given a qualification of another image, when a gate needs the candidate, then it refuses to run", () => {
+  // given
+  const commit = "c".repeat(40);
+  const passed = { status: "passed", manifestDigest: image };
+  const recorded = { image, commit };
+
   // when / then
-  assert.equal(qualifiedCandidate(image, { status: "passed", manifestDigest: image }), image);
-  assert.throws(() => qualifiedCandidate(image, undefined), /run the uat gate first/);
-  assert.throws(() => qualifiedCandidate(image, { status: "passed", manifestDigest: `sha256:${"b".repeat(64)}` }),
-    /qualified another image/);
-  assert.throws(() => qualifiedCandidate(image, { status: "failed", manifestDigest: image }), /run the uat gate first/);
-  assert.throws(() => qualifiedCandidate("", { status: "passed", manifestDigest: "" }), /run the uat gate first/);
+  assert.deepEqual(qualifiedCandidate(image, passed, recorded), { image, commit },
+    "the gates assess the commit the image was built from, not whatever HEAD is now");
+  assert.throws(() => qualifiedCandidate(image, undefined, recorded), /run the uat gate first/);
+  assert.throws(() => qualifiedCandidate(image, { status: "passed", manifestDigest: `sha256:${"b".repeat(64)}` },
+    recorded), /qualified another image/);
+  assert.throws(() => qualifiedCandidate(image, { status: "failed", manifestDigest: image }, recorded),
+    /run the uat gate first/);
+  assert.throws(() => qualifiedCandidate("", { status: "passed", manifestDigest: "" }, recorded),
+    /run the uat gate first/);
+  assert.throws(() => qualifiedCandidate(image, passed, undefined), /run the uat gate first/);
+  assert.throws(() => qualifiedCandidate(image, passed, { image: `sha256:${"b".repeat(64)}`, commit }),
+    /recorded another image/);
+  assert.throws(() => qualifiedCandidate(image, passed, { image, commit: "main" }), /run the uat gate first/);
 });
 
 test("given a failing step, when the plans run, then only the always steps follow and the gate fails by label", () => {

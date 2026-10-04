@@ -1,4 +1,4 @@
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,7 @@ import { gitHistory, nightlyUpgradeOrigins } from "./courtside.upgrade-smoke.mjs
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const qualificationPath = "build/uat-smoke/qualification.json";
 const candidateTag = "courtside:uat-local";
+const candidatePath = "build/local-gates/candidate.json";
 
 export const localGates = ["uat", "mail", "restore", "upgrade", "active-security"];
 
@@ -60,14 +61,18 @@ export function gatePlans(gate, context) {
   }
 }
 
-export function qualifiedCandidate(imageId, qualification) {
-  if (!/^sha256:[0-9a-f]{64}$/.test(imageId ?? "") || qualification?.status !== "passed") {
+export function qualifiedCandidate(imageId, qualification, recorded) {
+  if (!/^sha256:[0-9a-f]{64}$/.test(imageId ?? "") || qualification?.status !== "passed"
+      || !/^[0-9a-f]{40}$/.test(recorded?.commit ?? "")) {
     throw new Error(`no qualified ${candidateTag}: run the uat gate first`);
   }
   if (qualification.manifestDigest !== imageId) {
     throw new Error(`${qualificationPath} qualified another image than ${candidateTag} (${imageId})`);
   }
-  return imageId;
+  if (recorded.image !== imageId) {
+    throw new Error(`${candidatePath} recorded another image than ${candidateTag} (${imageId})`);
+  }
+  return { image: imageId, commit: recorded.commit };
 }
 
 export function runGatePlans(plans, execute) {
@@ -114,9 +119,20 @@ function executePlan(plan) {
 function candidateImage() {
   const inspected = run("docker", ["image", "inspect", "--format", "{{.Id}}", candidateTag]);
   const imageId = inspected.status === 0 ? inspected.stdout.trim() : "";
-  const path = join(root, qualificationPath);
-  const qualification = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : undefined;
-  return qualifiedCandidate(imageId, qualification);
+  return qualifiedCandidate(imageId, readJson(qualificationPath), readJson(candidatePath));
+}
+
+function readJson(path) {
+  const absolute = join(root, path);
+  return existsSync(absolute) ? JSON.parse(readFileSync(absolute, "utf8")) : undefined;
+}
+
+function recordCandidate(commit) {
+  const inspected = run("docker", ["image", "inspect", "--format", "{{.Id}}", candidateTag]);
+  if (inspected.status !== 0) throw new Error(`the uat gate left no ${candidateTag}`);
+  const target = join(root, candidatePath);
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, `${JSON.stringify({ image: inspected.stdout.trim(), commit }, null, 2)}\n`);
 }
 
 async function upgradeOrigins(repository, commit) {
@@ -133,10 +149,9 @@ async function upgradeOrigins(repository, commit) {
 
 async function context(gate) {
   if (gate === "uat" || gate === "mail") return {};
-  const image = candidateImage();
+  const { image, commit } = candidateImage();
   const repository = checkoutRepository();
   if (!repository) throw new Error("Cannot name the repository: give this checkout an origin remote on GitHub");
-  const commit = run("git", ["rev-parse", "HEAD"]).stdout.trim();
   return {
     image,
     repository,
@@ -150,8 +165,11 @@ async function main() {
   const gate = process.argv[2];
   if (process.argv.length !== 3) throw new Error(`usage: node tools/local-release-gates.mjs <${localGates.join("|")}>`);
   if (!localGates.includes(gate)) gatePlans(gate, {});
+  const head = run("git", ["rev-parse", "HEAD"]).stdout.trim();
   const plans = gatePlans(gate, await context(gate));
+  if (gate === "uat") rmSync(join(root, candidatePath), { force: true });
   runGatePlans(plans, executePlan);
+  if (gate === "uat") recordCandidate(head);
   process.stdout.write(`Gate ${gate} passed\n`);
 }
 
