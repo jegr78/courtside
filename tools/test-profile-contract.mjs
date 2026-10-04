@@ -43,7 +43,8 @@ export function validateContract(contract) {
       || Object.keys(contract).some((field) => !rootFields.includes(field))
       || JSON.stringify(contract.profileOrder) !== JSON.stringify(["docs", "backend", "frontend", "tooling", "full"])
       || JSON.stringify(contract.ciJobOrder) !== JSON.stringify([
-        "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"
+        "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security", "gates",
+        "clock_shift"
       ])
       || Object.keys(contract.profiles ?? {}).length !== contract.profileOrder.length
       || Object.keys(contract.localTaskDefinitions ?? {}).length < 1

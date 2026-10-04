@@ -1,18 +1,21 @@
 {
   "schemaVersion": 1,
   "profileOrder": ["docs", "backend", "frontend", "tooling", "full"],
-  "ciJobOrder": ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"],
+  "ciJobOrder": [
+    "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security", "gates",
+    "clock_shift"
+  ],
   "profiles": {
     "docs": {
       "ciJobs": ["docs", "tooling"],
       "localTasks": ["frontend-toolchain", "docs-check", "site-install", "site-build", "tooling-test"]
     },
     "backend": {
-      "ciJobs": ["backend", "tooling", "security"],
+      "ciJobs": ["backend", "tooling", "security", "gates"],
       "localTasks": ["frontend-toolchain", "backend", "tooling-test"]
     },
     "frontend": {
-      "ciJobs": ["frontend", "browser_visual", "browser", "tooling", "security"],
+      "ciJobs": ["frontend", "browser_visual", "browser", "tooling", "security", "gates"],
       "localTasks": [
         "frontend-toolchain",
         "frontend-lint",
@@ -24,11 +27,14 @@
       ]
     },
     "tooling": {
-      "ciJobs": ["tooling", "security"],
+      "ciJobs": ["tooling", "security", "clock_shift"],
       "localTasks": ["frontend-toolchain", "tooling-test"]
     },
     "full": {
-      "ciJobs": ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"],
+      "ciJobs": [
+        "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security", "gates",
+        "clock_shift"
+      ],
       "localTasks": [
         "workflow-lint",
         "docs-check",

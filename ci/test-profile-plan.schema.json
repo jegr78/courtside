@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:ci:test-profile-plan:v5",
+  "$id": "urn:courtside:ci:test-profile-plan:v6",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": 5
+      "const": 6
     },
     "runId": {
       "type": "integer",

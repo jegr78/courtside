@@ -494,7 +494,7 @@ test("given a profile plan, when binding it to the workflow run, then every iden
   });
 
   // then
-  assert.equal(bound.schemaVersion, 5);
+  assert.equal(bound.schemaVersion, 6);
   assert.equal(bound.runId, 101);
   assert.equal(bound.attempt, 1);
   assert.equal(bound.baseCommit, "a".repeat(40));
@@ -554,3 +554,19 @@ function commitInventory(headManifest, { baseManifest = toolManifest, omit = [],
     }
   };
 }
+
+test("given the files release-please changed in a release commit, when they are classified, then the plan is full", () => {
+  // given
+  const changes = parseNameStatus(execFileSync("git",
+    ["diff", "--name-status", "-z", "--find-renames", "b1cd6c3a^", "b1cd6c3a"],
+    { cwd: repository, encoding: "utf8" }));
+
+  // when
+  const plan = bindPlanToRun(classifyChanges(changes, []),
+    { runId: 1, attempt: 1, baseCommit: "a".repeat(40), headCommit: "b".repeat(40) });
+
+  // then
+  assert.deepEqual(plan.profiles, ["full"], "a release pull request must run every gate");
+  assert.ok(plan.ciJobs.includes("gates"), "a release pull request runs the release gates");
+  assert.equal(plan.schemaVersion, 6);
+});
