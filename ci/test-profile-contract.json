@@ -41,7 +41,12 @@
         "full-without-browser",
         "compose-wait-smoke",
         "frontend-e2e",
-        "webkit-reliability"
+        "webkit-reliability",
+        "gate-uat",
+        "gate-mail",
+        "gate-restore",
+        "gate-upgrade",
+        "gate-active-security"
       ]
     }
   },
@@ -133,6 +138,31 @@
       "workingDirectory": "frontend",
       "executable": "npm",
       "arguments": ["run", "reliability:webkit", "--", "--order", "configured"]
+    },
+    "gate-uat": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/local-release-gates.mjs", "uat"]
+    },
+    "gate-mail": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/local-release-gates.mjs", "mail"]
+    },
+    "gate-restore": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/local-release-gates.mjs", "restore"]
+    },
+    "gate-upgrade": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/local-release-gates.mjs", "upgrade"]
+    },
+    "gate-active-security": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/local-release-gates.mjs", "active-security"]
     }
   },
   "coverageDifferences": [

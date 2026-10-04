@@ -874,7 +874,7 @@ function parsedUrl(value) {
   }
 }
 
-function checkoutRepository() {
+export function checkoutRepository() {
   const remote = spawnSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf8" });
   return remote.status === 0 ? repositoryFromRemote(remote.stdout) : undefined;
 }

@@ -109,7 +109,8 @@ test("given any full profile, when resolving coverage, then only full coverage r
     "security", "gates", "clock_shift"]);
   assert.deepEqual(tasks.map((task) => task.label),
     ["workflow-lint", "docs-check", "full-without-browser", "compose-wait-smoke",
-      "frontend-e2e", "webkit-reliability"]);
+      "frontend-e2e", "webkit-reliability", "gate-uat", "gate-mail", "gate-restore", "gate-upgrade",
+      "gate-active-security"]);
 });
 
 test("given the contract, when its jobs are read, then image-changing profiles select the release gates", () => {
