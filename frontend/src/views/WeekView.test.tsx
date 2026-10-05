@@ -552,13 +552,21 @@ it("given the plan remains open, when one minute passes, then its current-time s
 it("given the plan is open, when the refresh interval elapses and focus returns, then the selected day is refreshed", async () => {
   // given
   vi.useFakeTimers({ shouldAdvanceTime: true });
+  const scrollIntoView = vi.fn();
+  const originalScroll = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+  Object.defineProperty(Element.prototype, "scrollIntoView", { value: scrollIntoView, configurable: true, writable: true });
+  onTestFinished(() => {
+    if (originalScroll) Object.defineProperty(Element.prototype, "scrollIntoView", originalScroll);
+    else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  });
   render(<WeekView today={clubInstant("12:00")} />);
   await screen.findByTestId("week-grid");
+  await act(async () => {});
   vi.mocked(api.allocations).mockClear();
   const activeDay = screen.getByTestId("day-selector-2026-08-10");
-  const scrollIntoView = vi.fn();
-  activeDay.scrollIntoView = scrollIntoView;
-  await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(scrollIntoView.mock.instances.filter((target) => target === activeDay)).toHaveLength(1));
+  expect(scrollIntoView.mock.calls[scrollIntoView.mock.instances.indexOf(activeDay)])
+    .toEqual([{ block: "nearest", inline: "nearest" }]);
   scrollIntoView.mockClear();
 
   // when
@@ -569,7 +577,7 @@ it("given the plan is open, when the refresh interval elapses and focus returns,
   await waitFor(() => expect(api.allocations).toHaveBeenCalledTimes(2));
   expect(api.allocations).toHaveBeenNthCalledWith(1, "2026-08-10");
   expect(api.allocations).toHaveBeenNthCalledWith(2, "2026-08-10");
-  expect(scrollIntoView).not.toHaveBeenCalled();
+  expect(scrollIntoView.mock.instances.filter((target) => target === activeDay)).toHaveLength(0);
 });
 
 it("given a booking conflict, when submission fails, then the affected day is refreshed", async () => {
