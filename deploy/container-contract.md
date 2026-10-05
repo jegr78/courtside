@@ -30,9 +30,9 @@ define.
   with `COURTSIDE_APP_TLS_CERTIFICATE` and `COURTSIDE_APP_TLS_KEY` to serve TLS on the same port, as
   [Encrypting the connection between the proxy and the application](guides/operations.md#encrypting-the-connection-between-the-proxy-and-the-application)
   describes.
-- The Java heap takes at most 75 percent of the container's memory limit, so set a limit. The
-  reference deployment sets 1 GiB. The process exits on an `OutOfMemoryError` instead of running
-  on degraded, so give it a restart policy.
+- The Java heap takes at most 50 percent of the container's memory limit, so set a limit. The
+  reference deployment sets 1 GiB, leaving half for other JVM and process memory. The process exits
+  on an `OutOfMemoryError` instead of running on degraded, so give it a restart policy.
 - Logs go to standard output, one Elastic Common Schema JSON object per line.
 - `--collect-operational-logs` starts the bounded UDP collector instead of the web application. It
   listens on `COURTSIDE_OPERATIONAL_LOG_PORT`, accepts only the fixed application, database and
