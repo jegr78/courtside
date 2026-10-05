@@ -346,3 +346,36 @@ test("given a tag moves after planning, when deletion starts, then no stale vers
   }), /registry changed after retention planning/);
   assert.deepEqual(deleted, []);
 });
+
+test("given run-unique candidate tags inside the promotion window, when retention runs, then both images remain", () => {
+  // given
+  const image = `sha256:${"a".repeat(64)}`;
+  const seed = `sha256:${"b".repeat(64)}`;
+  const versions = [
+    version(1, image, [`release-candidate-${"d".repeat(40)}-37211926309`], "2026-09-01T12:00:00.000Z"),
+    version(2, seed, [`booking-seed-release-candidate-${"d".repeat(40)}-37211926309`], "2026-09-01T12:00:00.000Z"),
+  ];
+
+  // when
+  const plan = planNightlyImageRetention({ versions, manifests: manifests(image, seed), now });
+
+  // then
+  assert.deepEqual(plan.keepVersionIds, [1, 2], "a candidate the promotion may still read must not be deleted");
+  assert.deepEqual(plan.deleteVersionIds, []);
+});
+
+test("given run-unique candidate tags past the promotion window, when retention runs, then they expire", () => {
+  // given
+  const image = `sha256:${"a".repeat(64)}`;
+  const seed = `sha256:${"b".repeat(64)}`;
+  const versions = [
+    version(1, image, [`release-candidate-${"d".repeat(40)}-37211926309`], "2026-08-29T11:59:59.999Z"),
+    version(2, seed, [`booking-seed-release-candidate-${"d".repeat(40)}-37211926309`], "2026-08-29T11:59:59.999Z"),
+  ];
+
+  // when
+  const plan = planNightlyImageRetention({ versions, manifests: manifests(image, seed), now });
+
+  // then
+  assert.deepEqual(plan.deleteVersionIds, [1, 2], "candidate tags must not accumulate forever");
+});

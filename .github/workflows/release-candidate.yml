@@ -1,0 +1,668 @@
+name: release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: The commit on main to qualify, or the branch head for a rehearsal
+        required: true
+        type: string
+      rehearsal:
+        description: Qualify without writing a tag
+        required: false
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      release: ${{ steps.selection.outputs.release }}
+      commit: ${{ steps.selection.outputs.commit }}
+      version: ${{ steps.selection.outputs.version }}
+      tag: ${{ steps.selection.outputs.tag }}
+      rehearsal: ${{ steps.selection.outputs.rehearsal }}
+      build-run-id: ${{ steps.selection.outputs.build-run-id }}
+      build-run-attempt: ${{ steps.selection.outputs.build-run-attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+      - id: selection
+        name: Select the commit this candidate qualifies
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REQUESTED_COMMIT: ${{ inputs.commit }}
+          REHEARSAL: ${{ inputs.rehearsal }}
+        run: >
+          node tools/release-candidate-selection.mjs
+          --event "$EVENT" --commit "$REQUESTED_COMMIT" --rehearsal "$REHEARSAL"
+          --github-output "$GITHUB_OUTPUT"
+
+  preconditions:
+    needs: select
+    if: needs.select.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+    env:
+      COMMIT: ${{ needs.select.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Demand a nightly that verified this release
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?branch=${DEFAULT_BRANCH}&status=success&per_page=100" \
+            --slurp | jq -r 'map(.workflow_runs[])[] |
+              select(.event == "schedule" or .event == "workflow_dispatch") | select(.run_attempt == 1) |
+              select(.head_sha | test("^[a-f0-9]{40}$")) | "\(.id) \(.head_sha)"' > nightly-runs.txt
+          verified=""
+          while read -r id head; do
+            git cat-file -e "${head}^{commit}" 2>/dev/null || continue
+            git merge-base --is-ancestor "$head" "$COMMIT" || continue
+            rm -rf nightly-evidence
+            mkdir -p nightly-evidence
+            gh run download "$id" --dir nightly-evidence \
+              --name "nightly-release-evidence-${id}-1" || continue
+            node tools/nightly-release-evidence.mjs \
+              --evidence nightly-evidence/evidence.json \
+              --commit "$head" --run-id "$id" || continue
+            verified="$id"
+            break
+          done < nightly-runs.txt
+          test -n "$verified" \
+            || { echo "::error::no green first-attempt build with a completed nightly release rehearsal verified a commit this candidate builds on"; exit 1; }
+          rm -rf nightly-runs.txt nightly-evidence
+
+      - name: Refuse unresolved nightly failures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues?state=open&labels=nightly&per_page=100" \
+            --slurp | jq '[map(.[])[] | select(.pull_request == null) |
+              select(.title | startswith("[nightly] ")) |
+              select(.body | contains("courtside-nightly-fingerprint")) |
+              select(.body | contains("- Workflow: `npm audit`") | not)] | length')
+          test "$count" = 0 || { echo "::error::$count nightly failure issue(s) remain open"; exit 1; }
+
+  release-build:
+    needs: select
+    if: needs.select.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      vulnerability-alerts: read
+    env:
+      COMMIT: ${{ needs.select.outputs.commit }}
+      TAG: ${{ needs.select.outputs.tag }}
+      VERSION: ${{ needs.select.outputs.version }}
+    outputs:
+      upgrade-origins: ${{ steps.upgrade-origins.outputs.origins }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.select.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: github/codeql-action/init@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef # v4
+        with:
+          languages: java-kotlin,javascript-typescript
+          queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Package the selected commit
+        run: ./mvnw -B package -DskipTests
+
+      - name: Extract the layers
+        run: >
+          java -Djarmode=tools -jar "target/courtside-$VERSION.jar"
+          extract --layers --launcher --destination build/layers
+
+      - name: Capture npm audit evidence
+        working-directory: frontend
+        run: |
+          mkdir -p ../build/security/codeql
+          ./node/node ./node/node_modules/npm/bin/npm-cli.js run audit:security -- \
+            --output ../build/security/npm.json
+
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: rootfs
+          scan-ref: build/layers
+          scanners: vuln
+          format: json
+          output: build/security/trivy-runtime.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret,misconfig
+          format: json
+          output: build/security/trivy-source.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+          skip-dirs: frontend/node_modules,frontend/node,target,build/layers
+
+      - uses: github/codeql-action/analyze@c16c0f3f2812ec4bb3750a5ed64873fe2ce0fbef # v4
+        with:
+          output: build/security/codeql
+          upload: never
+          upload-database: false
+
+      - id: release-security
+        name: Enforce release-build security policy
+        continue-on-error: true
+        run: >
+          node tools/security-findings.mjs
+          --npm build/security/npm.json
+          --trivy build/security/trivy-runtime.json
+          --trivy build/security/trivy-source.json
+          --codeql build/security/codeql
+          --npm-version "$(frontend/node/node frontend/node/node_modules/npm/bin/npm-cli.js --version)"
+          --trivy-version "$(trivy --version | awk 'NR == 1 { print $2 }')"
+          --exceptions security/exceptions.json
+          --assessment-policy not-applicable
+          --scope release-build
+          --subject "$COMMIT"
+          --output build/security/release-build.json
+
+      - id: previous-dependency-evidence
+        name: Find the latest successful dependency evidence
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! artifacts=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" --slurp); then
+            echo "::warning::Previous dependency evidence metadata is unavailable"
+            exit 0
+          fi
+          record=$(jq -r --arg branch "$DEFAULT_BRANCH" '[map(.artifacts[])[] | select(.expired == false) |
+            select(.workflow_run.head_branch == $branch) |
+            select(.name | startswith("dependency-remediation-completed-"))] |
+            sort_by(.created_at) | last | if . then "\(.workflow_run.id) \(.name)" else empty end' <<< "$artifacts")
+          if [ -z "$record" ]; then
+            exit 0
+          fi
+          read -r run_id artifact_name <<< "$record"
+          if [[ ! "$run_id" =~ ^[0-9]+$ || ! "$artifact_name" =~ ^dependency-remediation-completed-(ready|blocked)-[0-9]+$ ]]; then
+            echo "::warning::Previous dependency evidence metadata is malformed"
+            exit 0
+          fi
+          mkdir -p build/security/previous-dependency
+          if ! gh run download "$run_id" --name "$artifact_name" --dir build/security/previous-dependency; then
+            echo "::warning::Previous dependency evidence could not be downloaded"
+            rm -rf build/security/previous-dependency
+          fi
+      - id: dependency-remediation
+        name: Enforce dependency remediation deadlines
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          args=(
+            --repository "${{ github.repository }}"
+            --subject "$COMMIT"
+            --current-summary build/security/release-build.json
+            --output build/security/dependency-remediation.json
+          )
+          if [ -f build/security/previous-dependency/dependency-remediation.json ]; then
+            args+=(--previous-evidence build/security/previous-dependency/dependency-remediation.json)
+          fi
+          node tools/dependency-remediation.mjs "${args[@]}"
+      - id: dependency-evidence
+        name: Classify retained dependency evidence
+        if: always()
+        run: |
+          test -f build/security/dependency-remediation.json || exit 0
+          echo "status=$(jq -er '.status | select(. == "completed" or . == "skipped")' build/security/dependency-remediation.json)" >> "$GITHUB_OUTPUT"
+          echo "readiness=$(jq -er '.releaseReadiness | select(. == "ready" or . == "blocked" or . == "unknown")' build/security/dependency-remediation.json)" >> "$GITHUB_OUTPUT"
+      - name: Stage booking seed classes for the published helper image
+        run: |
+          mkdir -p build/fixtures
+          cp -R target/fixtures-classes build/fixtures/classes
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always() && needs.select.outputs.rehearsal != 'true'
+        with:
+          name: dependency-remediation-${{ steps.dependency-evidence.outputs.status }}-${{ steps.dependency-evidence.outputs.readiness }}-${{ github.run_id }}
+          path: build/security/dependency-remediation.json
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Remove raw release-build security reports
+        if: always()
+        run: rm -rf build/security/npm.json build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql
+
+      - name: Require completed release security gates
+        if: always()
+        env:
+          DEPENDENCY_REMEDIATION_OUTCOME: ${{ steps.dependency-remediation.outcome }}
+          RELEASE_SECURITY_OUTCOME: ${{ steps.release-security.outcome }}
+        run: |
+          test "$RELEASE_SECURITY_OUTCOME" = success
+          test "$DEPENDENCY_REMEDIATION_OUTCOME" = success
+
+      - name: Read the releases this repository has published
+        id: published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tags=$(node tools/published-release-tags.mjs)
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+      - name: Collect cumulative release-line notes
+        run: >
+          node tools/release-notes.mjs
+          --changelog CHANGELOG.md
+          --tag "$TAG"
+          --output build/release-body.md
+
+      - name: Collect the upgrade notes
+        env:
+          PUBLISHED_TAGS: ${{ steps.published.outputs.tags }}
+        run: |
+          previous=$(node tools/courtside.upgrade-smoke.mjs --previous-release \
+            "$TAG" "$PUBLISHED_TAGS")
+          breaking=''
+          if [ -n "$previous" ]; then
+            breaking=$(git log --no-merges --format='%s%n%b' "$previous..$COMMIT" \
+              | grep -E '^BREAKING CHANGE:|^[a-z]+(\(.+\))?!:' || true)
+          fi
+          if [ -z "$previous" ]; then
+            printf '\n## Upgrade notes\n\nFirst public release; no prior supported version to upgrade from.\n\n' >> build/release-body.md
+          elif [ -n "$breaking" ]; then
+            fence='```'
+            printf '\n## Upgrade notes\n\nThis release changes a published surface — the REST API, an environment variable or the container contract.\n\n%s\n%s\n%s\n\n' "$fence" "$breaking" "$fence" >> build/release-body.md
+          else
+            code='`'
+            printf '\n## Upgrade notes\n\nNo published surface changed. Replace %sCOURTSIDE_IMAGE_DIGEST%s and restart.\n\n' "$code" "$code" >> build/release-body.md
+          fi
+
+      - name: Resolve supported database upgrade origins
+        id: upgrade-origins
+        env:
+          PUBLISHED_TAGS: ${{ steps.published.outputs.tags }}
+        run: |
+          origins=$(node tools/courtside.upgrade-smoke.mjs --origins "$TAG" \
+            "$PUBLISHED_TAGS")
+          resolved=$(node tools/courtside.upgrade-smoke.mjs --release-origins "$GITHUB_REPOSITORY" "$origins")
+          echo "origins=$resolved" >> "$GITHUB_OUTPUT"
+          printf '\n## Supported database upgrade origins\n\n' >> build/release-body.md
+          node -e 'const origins = JSON.parse(process.argv[1]);
+            if (origins.length === 0) console.log("None; no stable release precedes this one.");
+            for (const origin of origins) console.log("- " + origin)' "$origins" >> build/release-body.md
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: image-input
+          path: build
+          retention-days: 14
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-notes
+          path: build/release-body.md
+          retention-days: 14
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: assessment-fixtures
+          path: target/fixtures-classes
+          retention-days: 1
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-security-base
+          path: build/security/release-build.json
+          retention-days: 14
+          if-no-files-found: error
+
+  image:
+    needs: [select, release-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+      booking-seed-digest: ${{ steps.booking-seed-push.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.select.outputs.commit }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: image-input
+          path: build
+
+      - name: Restore the layer directory an empty artifact drops
+        run: mkdir -p build/layers/snapshot-dependencies
+
+      - id: labels
+        name: Label the candidate as the release images are labelled
+        env:
+          COMMIT: ${{ needs.select.outputs.commit }}
+          DESCRIPTION: ${{ github.event.repository.description }}
+          LICENSES: ${{ github.event.repository.license.spdx_id }}
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}
+          TITLE: ${{ github.event.repository.name }}
+          CANDIDATE_TAG: release-candidate-${{ needs.select.outputs.commit }}-${{ github.run_id }}
+        run: |
+          created=$(TZ=UTC0 git show -s --date='format-local:%Y-%m-%dT%H:%M:%S.000Z' --format=%cd "$COMMIT")
+          {
+            echo 'labels<<CANDIDATE_LABELS'
+            echo "org.opencontainers.image.created=$created"
+            echo "org.opencontainers.image.description=$DESCRIPTION"
+            echo "org.opencontainers.image.licenses=$LICENSES"
+            echo "org.opencontainers.image.revision=$COMMIT"
+            echo "org.opencontainers.image.source=$SOURCE"
+            echo "org.opencontainers.image.title=$TITLE"
+            echo "org.opencontainers.image.url=$SOURCE"
+            echo "org.opencontainers.image.version=$CANDIDATE_TAG"
+            echo 'CANDIDATE_LABELS'
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository }}:release-candidate-${{ needs.select.outputs.commit }}-${{ github.run_id }}
+          labels: ${{ steps.labels.outputs.labels }}
+
+      - id: booking-seed-push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          file: Dockerfile.fixtures
+          build-args: BASE_IMAGE=ghcr.io/${{ github.repository }}@${{ steps.push.outputs.digest }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository }}:booking-seed-release-candidate-${{ needs.select.outputs.commit }}-${{ github.run_id }}
+          labels: ${{ steps.labels.outputs.labels }}
+
+  archive:
+    needs: [select, image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.select.outputs.commit }}
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+
+      - name: Build the deployment archive
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          BOOKING_SEED_IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}
+          COMMIT: ${{ needs.select.outputs.commit }}
+          TAG: ${{ needs.select.outputs.tag }}
+          VERSION: ${{ needs.select.outputs.version }}
+        run: |
+          test -z "$(git status --porcelain --ignored -- deploy/)" \
+            || { echo "deploy/ differs from the selected commit"; exit 1; }
+          mkdir -p build
+          node tools/deployment-archive.mjs --version "$VERSION" --revision "$COMMIT" \
+            --image "$IMAGE" --booking-seed-image "$BOOKING_SEED_IMAGE" \
+            --repository "$GITHUB_REPOSITORY" --workflow release.yml --ref "refs/tags/$TAG" --output build
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: deployment-archive
+          path: build/courtside-deployment-*
+          retention-days: 14
+          if-no-files-found: error
+
+  qualify:
+    needs: [select, archive, image]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runs-on: ubuntu-latest
+          - architecture: arm64
+            runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    env:
+      COURTSIDE_UAT_VERSION: release-candidate-${{ needs.select.outputs.commit }}-${{ github.run_id }}@${{ needs.image.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.select.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: deployment-archive
+          path: build/deployment-archive
+
+      - name: Inspect the exact candidate archive and every recipe
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          BOOKING_SEED_IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}
+        run: |
+          mkdir -p build/uat-smoke
+          archive=$(find "$GITHUB_WORKSPACE/build/deployment-archive" -maxdepth 1 \
+            -name 'courtside-deployment-*.zip' -print -quit)
+          test -n "$archive"
+          node tools/deployment-qualification.mjs --inspect-archive \
+            --archive "$archive" --destination "$RUNNER_TEMP/courtside-deployment" \
+            --image "$IMAGE" --booking-seed-image "$BOOKING_SEED_IMAGE" \
+            --recipes standard,full-self-hosted,existing-infrastructure,funnel \
+            --output "build/uat-smoke/archive-${{ matrix.architecture }}.json"
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upgrade an installed PostgreSQL 17 nightly through the shipped launcher
+        if: matrix.architecture == 'amd64'
+        run: |
+          candidate=$(find "$RUNNER_TEMP/courtside-deployment" \
+            -name manifest.json -type f -print -quit)
+          test -n "$candidate"
+          node tools/installed-upgrade-smoke.mjs --candidate "${candidate%/manifest.json}" \
+            --confirm installed-postgresql-upgrade
+
+      - name: Validate the deployment model
+        env:
+          COURTSIDE_UAT_IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          COURTSIDE_UAT_ADMIN_PASSWORD: compose-validation-only
+        run: docker compose -f deploy/compose.uat.yaml config --quiet
+
+      - name: Qualify the image through the reference deployment
+        env:
+          COURTSIDE_UAT_BOOKING_SEED_IMAGE: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}
+        run: |
+          export COURTSIDE_UAT_BOOKING_SEED_COMPOSE
+          COURTSIDE_UAT_BOOKING_SEED_COMPOSE=$(find "$RUNNER_TEMP/courtside-deployment" \
+            -name compose.booking-seed.yaml -type f -print -quit)
+          test -n "$COURTSIDE_UAT_BOOKING_SEED_COMPOSE"
+          node tools/courtside.uat-smoke.mjs --confirm courtside-uat
+
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
+          format: json
+          output: build/uat-smoke/trivy-${{ matrix.architecture }}.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}
+          format: json
+          output: build/uat-smoke/trivy-booking-seed-${{ matrix.architecture }}.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Enforce candidate-image security policy
+        run: >
+          node tools/security-findings.mjs
+          --trivy build/uat-smoke/trivy-${{ matrix.architecture }}.json
+          --trivy-version "$(trivy --version | awk 'NR == 1 { print $2 }')"
+          --exceptions security/exceptions.json
+          --assessment-policy not-applicable
+          --scope release-image-${{ matrix.architecture }}
+          --subject ${{ needs.image.outputs.digest }}
+          --output build/uat-smoke/security-summary-${{ matrix.architecture }}.json
+
+      - name: Enforce booking-seed image security policy
+        run: >
+          node tools/security-findings.mjs
+          --trivy build/uat-smoke/trivy-booking-seed-${{ matrix.architecture }}.json
+          --trivy-version "$(trivy --version | awk 'NR == 1 { print $2 }')"
+          --exceptions security/exceptions.json
+          --assessment-policy not-applicable
+          --scope release-image-${{ matrix.architecture }}
+          --subject ${{ needs.image.outputs.booking-seed-digest }}
+          --output build/uat-smoke/security-summary-booking-seed-${{ matrix.architecture }}.json
+
+      - name: Remove raw security report
+        if: always()
+        run: rm -f build/uat-smoke/trivy-${{ matrix.architecture }}.json build/uat-smoke/trivy-booking-seed-${{ matrix.architecture }}.json
+
+      - name: Capture deployment diagnostics
+        if: failure()
+        run: |
+          mkdir -p build/uat-smoke
+          if [[ ! -s build/uat-smoke/container-logs.txt ]]; then
+            docker compose -p courtside-uat -f deploy/compose.uat.yaml logs --no-color \
+              > build/uat-smoke/container-logs.txt 2>&1 || true
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: image-qualification-${{ matrix.architecture }}
+          path: build/uat-smoke
+          retention-days: 14
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always() && matrix.architecture == 'amd64'
+        with:
+          name: installed-database-upgrade-${{ matrix.architecture }}
+          path: build/installed-database-upgrade
+          retention-days: 14
+          if-no-files-found: warn
+
+  gates:
+    needs: [select, release-build, image, archive, qualify]
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    uses: ./.github/workflows/release-gates.yml
+    with:
+      image-digest: ${{ needs.image.outputs.digest }}
+      booking-seed-digest: ${{ needs.image.outputs.booking-seed-digest }}
+      source-commit: ${{ needs.select.outputs.commit }}
+      run-label: release
+      archive-artifact: deployment-archive
+      archive-version: ${{ needs.select.outputs.version }}
+      archive-ref: refs/tags/${{ needs.select.outputs.tag }}
+      archive-workflow: release.yml
+      qualification-artifact-prefix: image-qualification-
+      fixtures-artifact: assessment-fixtures
+      security-base-artifact: release-security-base
+      upgrade-origins: ${{ needs.release-build.outputs.upgrade-origins }}
+
+  evidence:
+    needs: [select, preconditions, release-build, image, archive, qualify, gates]
+    if: ${{ always() && needs.select.outputs.release == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/tool-dependencies
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: deployment-archive
+          path: build/archive
+      - name: Record the candidate
+        env:
+          COMMIT: ${{ needs.select.outputs.commit }}
+          VERSION: ${{ needs.select.outputs.version }}
+          REHEARSAL: ${{ needs.select.outputs.rehearsal }}
+          IMAGE_DIGEST: ${{ needs.image.outputs.digest }}
+          BOOKING_SEED_DIGEST: ${{ needs.image.outputs.booking-seed-digest }}
+          BUILD_RUN_ID: ${{ needs.select.outputs.build-run-id }}
+          BUILD_RUN_ATTEMPT: ${{ needs.select.outputs.build-run-attempt }}
+          RESULTS: ${{ toJSON(needs) }}
+        run: >
+          node tools/release-candidate-evidence.mjs --write
+          --commit "$COMMIT" --version "$VERSION" --rehearsal "$REHEARSAL"
+          --image-digest "$IMAGE_DIGEST" --booking-seed-digest "$BOOKING_SEED_DIGEST"
+          --build-run-id "$BUILD_RUN_ID" --build-run-attempt "$BUILD_RUN_ATTEMPT"
+          --archive "build/archive/courtside-deployment-$VERSION.zip" --results "$RESULTS"
+          --output build/candidate/evidence.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-candidate-evidence-${{ needs.select.outputs.commit }}
+          path: build/candidate/evidence.json
+          retention-days: 14
+          if-no-files-found: error
