@@ -516,7 +516,7 @@ export async function runAuthorizationAssessment(plan, context) {
     throw new Error("The authorization suite requires the configured address failure limit");
   }
   let requestCount = 0;
-  const request = async (client, probe, options = {}) => {
+  const send = async (client, probe, options = {}) => {
     control.beforeRequest();
     if (++requestCount > context.maxRequests) throw new Error("The authorization request budget was exceeded");
     return authorizationRequest(plan.target, client, probe, {
@@ -526,6 +526,7 @@ export async function runAuthorizationAssessment(plan, context) {
       ...options
     });
   };
+  const request = (client, probe, options = {}) => executeAuthorizationProbe(send, client, probe, options);
   try {
     const clients = Object.fromEntries(authorizationActors.map((actor) => [actor, new SecurityCookieJar()]));
     for (const actor of authorizationActors.filter((candidate) => candidate !== "ANONYMOUS")) {
@@ -601,6 +602,16 @@ async function signInSecurityUsername(request, client, username, password, actor
     headers: { "content-type": "application/x-www-form-urlencoded" }, body }, { csrf: true });
   if (response.status !== 200) throw new Error(`Synthetic ${actor} authentication failed with ${response.status}`);
   return response;
+}
+
+export async function executeAuthorizationProbe(send, client, probe, options = {}) {
+  if (options.csrf && !client.csrfToken()) {
+    await send(client, { method: "GET", path: "/api/session", headers: {} });
+    if (!client.csrfToken()) {
+      throw new Error(`A probe of ${probe.method} ${probe.path} still has no CSRF token after bootstrap`);
+    }
+  }
+  return send(client, probe, options);
 }
 
 export class SecurityCookieJar {

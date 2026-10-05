@@ -16,7 +16,7 @@ import {
   runLifecyclePlans, startProcesses,
   superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfComposePlan, perfResetPlan,
-  writePrivateFile, performanceRunPlan, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
+  writePrivateFile, performanceRunPlan, performanceIdentityRequest, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
   funnelPerformanceRunPlan, localRequest, validateFunnelTarget, validatePerformanceResult,
   redactUatDiagnostics, resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference,
@@ -611,8 +611,34 @@ test("given the browser profile, when planning k6, then Chromium and the browser
   assert.ok(plan.args.some((argument) => /^grafana\/k6:\S+-with-browser@sha256:[a-f0-9]{64}$/.test(argument)));
   assert.ok(plan.args.includes("/scripts/browser.js"));
   assert.ok(plan.args.includes("K6_BROWSER_HEADLESS=true"));
+  assert.ok(plan.args.includes("HOME=/tmp"));
+  const target = plan.args.find(argument => argument.startsWith("PERF_TARGET=")).slice("PERF_TARGET=".length);
+  assert.equal(target, new URL(target).origin);
+  if (process.platform !== "win32") assert.ok(plan.args.includes(`${process.getuid()}:${process.getgid()}`));
+  assert.equal(plan.args[plan.args.indexOf("--network") + 1], "courtside-perf_load");
+  assert.equal(plan.args.includes("--privileged"), false);
+  assert.equal(plan.args.includes("seccomp=unconfined"), false);
   assert.ok(plan.args.includes("K6_BROWSER_ARGS=no-sandbox,ignore-certificate-errors-spki-list=test-pin"));
   assert.ok(plan.args.some((argument) => argument.includes("p(75)")));
+});
+
+test("given distinct localhost and proxy certificates, when probing performance identity, then the browser target supplies the TLS pin", () => {
+  // given
+  const options = parseArguments(["perf-run", "browser", "--confirm", "courtside-perf"]);
+  const plan = performanceRunPlan(options, "/results", "/root.crt", "test-run", "test-pin");
+  const target = new URL(plan.args.find(argument => argument.startsWith("PERF_TARGET=")).slice("PERF_TARGET=".length));
+  const ca = Buffer.from("private test authority");
+
+  // when
+  const request = performanceIdentityRequest(ca);
+
+  // then
+  assert.equal(request.servername, target.hostname);
+  assert.equal(request.headers.Host, target.host);
+  assert.equal(request.secure, true);
+  assert.equal(request.port, 9443);
+  assert.equal(request.path, "/api/source");
+  assert.equal(request.ca, ca);
 });
 
 test("given a finished performance run, when planning its logs, then they can be captured without following", () => {
@@ -660,8 +686,9 @@ test("given a protocol profile, when planning k6, then the pinned image and isol
   assert.equal(plan.command, "docker");
   assert.ok(plan.args.some((argument) => /^grafana\/k6:[^-\s]+@sha256:[a-f0-9]{64}$/.test(argument)));
   assert.ok(plan.args.includes("PERF_PROFILE=peak"));
+  assert.equal(plan.args.includes("HOME=/tmp"), false);
   assert.ok(plan.args.includes("PERF_RUN_ID=test-run"));
-  assert.ok(plan.args.includes("PERF_TARGET=https://proxy:443"));
+  assert.ok(plan.args.includes("PERF_TARGET=https://proxy"));
   assert.equal(plan.args[plan.args.indexOf("--network") + 1], "courtside-perf_load");
   assert.equal(plan.args.includes("--add-host"), false);
   assert.ok(plan.args.includes("/tmp/performance-result:/results"));

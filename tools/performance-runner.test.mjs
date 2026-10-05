@@ -50,8 +50,12 @@ test("given the automated smoke profile, when applying thresholds, then shared-r
 test("given a browser journey, when inspecting it, then the member workflow stays in the language-neutral UI", () => {
   // when / then
   assert.match(browserScript, /getByTestId\("login-view"\)/);
-  assert.match(browserScript, /getByTestId\("week-next"\)/);
-  assert.match(browserScript, /getByTestId\("free-slot"\)/);
+  assert.match(browserScript, /prepareBrowserBooking\(page, __VU\)/);
+  const bookingJourney = readFileSync(new URL("../performance/browser-journey.js", import.meta.url), "utf8");
+  assert.match(bookingJourney, /getByTestId\("week-next"\)/);
+  assert.match(browserScript, /waitForResponse\(`\$\{target\}\/api\/booking-eligibility`\)/);
+  assert.match(bookingJourney, /data-testid="free-slot"/);
+  assert.doesNotMatch(bookingJourney, /page\.evaluate|fetch\(|http\.(?:get|post|put|patch|del)\(/);
   assert.match(browserScript, /getByTestId\("booking-submit"\)/);
   assert.match(browserScript, /waitForResponse/);
   assert.match(browserScript, /response\.json\(\)/);
