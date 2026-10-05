@@ -456,6 +456,58 @@
       ]
     },
     {
+      "id": "security-session-attribute-digest",
+      "purpose": "Name the serialized session attribute bytes decoded by the native assessment helper so its semantic projection can be compared with the disposable database observation",
+      "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output. This digest names content and authenticates neither the database observation nor the projection."
+      },
+      "class": "content-hash",
+      "owner": "repository-maintainer",
+      "storageBoundary": "Computed in memory by the separately packaged assessment fixture and returned with its semantic projection through stdout. Serialized bytes are supplied through stdin and are not returned. The observation belongs to private assessment evidence, not public reports.",
+      "permittedUse": "Comparing the exact serialized bytes with the bytes named by a projection. It is not a MAC, a credential, a tamper-proof receipt or an integrity guarantee against a party who can replace the observation and its digest.",
+      "rotation": "Not applicable: no key exists. Each observation computes its own digest.",
+      "revocation": "Not applicable.",
+      "recovery": "Repeat the observation and recompute the projection; no key or stored digest needs recovery.",
+      "retirement": "Introduce a successor digest with a new decoder contract before comparing observations produced under it.",
+      "evidence": "src/test/java/org/courtside/securityassessment/SecuritySessionAttributeProjectionTest.java",
+      "detects": [
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/securityassessment/SecuritySessionAttributeProjection.java"
+      ]
+    },
+    {
+      "id": "security-publication-class-digest",
+      "purpose": "Name the native JDBC publication repository class bytes loaded by the separately packaged assessment helper alongside its fixed repository policy projection",
+      "algorithm": "SHA-256",
+      "implementation": "java-runtime",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The collision resistance of SHA-256's 256-bit output. This digest names class content and does not authenticate an image, a producer or an assessment result."
+      },
+      "class": "content-hash",
+      "owner": "repository-maintainer",
+      "storageBoundary": "Computed in memory from one fixed native class resource in the assessment fixture and returned through stdout with the publication policy. The value belongs to private assessment binding evidence; no credentials or serialized session bytes are read by this projection.",
+      "permittedUse": "Comparing the loaded class content within an immutable candidate and fixture binding. It is not a MAC, a signature, a credential or independent proof that a replaceable class or observation is trustworthy.",
+      "rotation": "Not applicable: no key exists. Each projection computes the class digest again.",
+      "revocation": "Not applicable.",
+      "recovery": "Repeat the native projection against the recorded immutable candidate; no key needs recovery.",
+      "retirement": "Introduce a successor digest with a new projection contract before comparing observations produced under it.",
+      "evidence": "src/test/java/org/courtside/notification/internal/SecurityPublicationPolicyProjectionTest.java",
+      "detects": [
+        "MessageDigest"
+      ],
+      "locations": [
+        "src/main/java/org/courtside/securityassessment/SecurityPublicationPolicyProjection.java"
+      ]
+    },
+    {
       "id": "idempotency-key",
       "purpose": "Give a submitted booking a client-side identity so a retry is recognised",
       "algorithm": "crypto.getRandomValues",
@@ -606,6 +658,79 @@
         "tools/courtside.mail-smoke.mjs",
         "tools/security-workflow.test.mjs",
         "frontend/e2e/global-setup.ts"
+      ]
+    },
+    {
+      "id": "security-mail-fixture-certificate",
+      "purpose": "Generate the private relay identity used to exercise real STARTTLS mail delivery inside one disposable security environment",
+      "algorithm": "RSA-3072",
+      "parameters": {
+        "modulusBits": 3072,
+        "validityDays": 1,
+        "dnsName": "mail"
+      },
+      "implementation": "openssl",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The generated RSA modulus is 3072 bits, rated at 128 bits of security. This describes the fixture key, not the cipher suite negotiated by the TLS implementations."
+      },
+      "class": "credential-protection",
+      "owner": "repository-maintainer",
+      "storageBoundary": "The ignored per-run mail directory below build/security includes the full random instance fingerprint in its name. It is created with mode 0700 and its unencrypted key.pem has mode 0600. Mailpit reads the certificate and private key through a read-only bind mount on the internal backend network. Retained private diagnostic assets can outlive teardown; no key, certificate fingerprint or raw mail is published or tracked.",
+      "permittedUse": "Presenting the self-signed certificate for the DNS name mail in the disposable SECURITY environment. The application and seeder trust it through the separate fixture truststore entry. X509Certificate checks the generated certificate's hostname and self-signature; fingerprint256 records its identity as private metadata and does not perform TLS peer pinning.",
+      "rotation": "The first start attempt creates a fresh certificate unconditionally. Bind retries within that same start retain the same identity and assets. A new random instance uses a distinct directory even when the run ID is reused, and never reuses retained material.",
+      "revocation": "Remove the run-owned consumers and their trust configuration to stop using the identity. There is no external authority or revocation service. Retaining a diagnostic key does not extend trust into a new instance.",
+      "recovery": "Retained material is diagnostic evidence, not a backup for a fresh environment. Start a new instance to create a new key and certificate; existing same-start retry assets are not regenerated or independently revalidated by the retry path.",
+      "retirement": "Stop all consumers before replacing the fixture identity scheme. Retained private diagnostic assets remain under the operator's evidence-retention control rather than being silently deleted by teardown.",
+      "evidence": "tools/security-mail-capture.test.mjs, tools/security-environment.test.mjs",
+      "detects": [
+        "openssl",
+        "newkey",
+        "X509Certificate",
+        "fingerprint256"
+      ],
+      "locations": [
+        "tools/security-mail-capture.mjs",
+        "tools/security-mail-capture.test.mjs",
+        "tools/security-environment.mjs",
+        "tools/security-environment.test.mjs",
+        "deploy/compose.security.yaml"
+      ]
+    },
+    {
+      "id": "security-mail-fixture-trust",
+      "purpose": "Configure certificate-authority trust for real STARTTLS delivery to the disposable security environment's mail relay without disabling issuer or hostname validation",
+      "algorithm": "RSA-3072",
+      "implementation": "openssl",
+      "strength": {
+        "decidedBy": "repository",
+        "bits": 128,
+        "basis": "The OpenSSL-generated RSA-3072 public key trusted by the JVM has 128 bits of security. This rates the imported trust anchor, not the TLS cipher suite or the PKCS12 protection algorithms. The candidate's JDK implements keytool import, certificate validation and TLS negotiation; no suite or store protection algorithm is selected here."
+      },
+      "class": "transport",
+      "owner": "repository-maintainer",
+      "storageBoundary": "The candidate image's keytool imports cert.pem into the per-instance mail.p12 as a trusted certificate, not a private-key entry, in an offline bounded container running with the host owner's numeric identity. The owner-only parent directory protects the retained asset; mail.p12 is made mode 0444 so non-root application and seeder users can read their read-only file mounts. The fixed store password is not a credential or the confidentiality boundary.",
+      "permittedUse": "Setting javax.net.ssl.trustStore for the application and seeder JVMs in the disposable SECURITY environment. This replaces their default truststore process-wide, not only for SMTP. STARTTLS remains required and relay hostname validation remains enabled. This is certificate-authority trust, not a comparison with a pinned peer fingerprint; the fixture fingerprint is metadata only. Never use this trust anchor in a club deployment.",
+      "rotation": "Import the newly generated certificate for each new instance before starting its consumers. Same-start bind retries reuse that instance's truststore. Replacing a truststore requires restarting its JVM consumers; retained stores are not reused by a fresh instance.",
+      "revocation": "Stop the run-owned JVM consumers and withdraw their truststore configuration. No certificate revocation service is configured for this isolated fixture authority.",
+      "recovery": "A failed initial import stops startup rather than enabling unverified TLS. Create a new instance and import its fresh certificate instead of reusing retained diagnostic assets from an older instance.",
+      "retirement": "Remove the JVM truststore configuration and mounts with the fixture relay scheme. Retained public-certificate stores and private keys stay within the private diagnostic evidence boundary until the operator retires those assets.",
+      "evidence": "tools/security-mail-capture.test.mjs, tools/security-environment.test.mjs",
+      "detects": [
+        "keystore",
+        "truststore",
+        "trust-store",
+        "starttls",
+        "checkserveridentity",
+        "trust-relay"
+      ],
+      "locations": [
+        "tools/security-mail-capture.mjs",
+        "tools/security-mail-capture.test.mjs",
+        "tools/security-environment.mjs",
+        "tools/security-environment.test.mjs",
+        "deploy/compose.security.yaml"
       ]
     },
     {

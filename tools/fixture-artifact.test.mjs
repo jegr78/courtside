@@ -55,5 +55,5 @@ test("given a base image, when planning the fixture image, then the staged class
   });
   assert.match(dockerfile, /^ARG BASE_IMAGE$/m);
   assert.match(dockerfile, /^FROM \$\{BASE_IMAGE\}$/m);
-  assert.match(dockerfile, /^COPY build\/fixtures\/classes\/ \.\/BOOT-INF\/classes\/$/m);
+  assert.match(dockerfile, /^COPY --chown=10001:10001 build\/fixtures\/classes\/ \.\/BOOT-INF\/classes\/$/m);
 });

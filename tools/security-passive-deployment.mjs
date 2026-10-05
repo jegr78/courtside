@@ -904,6 +904,7 @@ export function runOwnedProcess(command, args, {
     let outputBytes = 0;
     let errorBytes = 0;
     let terminationReason;
+    let finishing = false;
     const collect = (chunks, chunk, current) => {
       if (current + chunk.length > outputLimitBytes) {
         terminationReason = "Owned security process output exceeded its safety limit";
@@ -937,19 +938,33 @@ export function runOwnedProcess(command, args, {
       }
     }, 50);
     child.once("close", async (code, signal) => {
+      if (finishing) return;
+      finishing = true;
       clearTimeout(deadline);
       clearInterval(stop);
-      const accepted = acceptedExitCodes.includes(code);
-      if (signal || !accepted) await cleanup();
+      const accepted = !terminationReason && !signal && acceptedExitCodes.includes(code);
+      if (!accepted) {
+        try { await cleanup(); }
+        catch {
+          reject(new Error("Owned security process cleanup failed"));
+          return;
+        }
+      }
       if (accepted) resolve({ code, stdout: Buffer.concat(output).toString("utf8"),
         stderr: Buffer.concat(errors).toString("utf8") });
       else reject(new Error(`${terminationReason ?? `Owned security process failed (${signal ?? code})`}: `
         + Buffer.concat(errors).toString("utf8")));
     });
     child.once("error", async (failure) => {
+      if (finishing) return;
+      finishing = true;
       clearTimeout(deadline);
       clearInterval(stop);
-      await cleanup();
+      try { await cleanup(); }
+      catch {
+        reject(new Error("Owned security process cleanup failed"));
+        return;
+      }
       reject(failure);
     });
   });

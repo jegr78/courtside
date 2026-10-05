@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1398,4 +1398,178 @@ test("given a scanner reaches its request boundary, when it is still running, th
     cleanup: async () => { cleaned = true; }
   }), /request budget was reached/);
   assert.equal(cleaned, true);
+});
+
+function holdEventLoopUntilProducerFinished(marker) {
+  const deadline = Date.now() + 5000;
+  const waiting = new Int32Array(new SharedArrayBuffer(4));
+  let finished = false;
+  while (Date.now() < deadline) {
+    try {
+      finished = readFileSync(marker, "utf8") === "done";
+      if (finished) break;
+    } catch { }
+    Atomics.wait(waiting, 0, 0, 20);
+  }
+  assert.equal(finished, true, "The native producer did not finish while the parent event loop was held");
+  Atomics.wait(waiting, 0, 0, 100);
+}
+
+for (const scenario of [
+  { name: "stdout", source: "fs.writeSync(1, 'A'.repeat(128));" },
+  { name: "stderr", source: "fs.writeSync(2, 'A'.repeat(128));" },
+  { name: "valid JSON followed by stderr", source: "fs.writeSync(1, JSON.stringify({ ok: true })); fs.writeSync(2, 'A'.repeat(128));" }
+]) {
+  test(`given a native ${scenario.name} overflow, when the child exits zero before collection, then overflow rejects and cleans up`, async () => {
+    // given
+    const directory = mkdtempSync(join(tmpdir(), "courtside-native-overflow-"));
+    const marker = join(directory, "DONE");
+    let cleanupCalls = 0;
+    const producer = `const fs = require('node:fs'); ${scenario.source}
+      fs.writeFileSync(process.argv[1], 'done'); process.exit(0);`;
+    // when
+    const result = runOwnedProcess(process.execPath, ["-e", producer, marker], {
+      timeoutMilliseconds: 10000, stopFile: join(directory, "STOP"), outputLimitBytes: 64,
+      cleanup: async () => { cleanupCalls++; }
+    });
+    holdEventLoopUntilProducerFinished(marker);
+    // then
+    await assert.rejects(result, /Owned security process output exceeded its safety limit/);
+    assert.equal(cleanupCalls, 1);
+  });
+}
+
+test("given a native output at the byte boundary, when the child exits zero, then all output is retained without cleanup", async () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-native-boundary-"));
+  const marker = join(directory, "DONE");
+  let cleanupCalls = 0;
+  const producer = "const fs = require('node:fs'); fs.writeSync(1, 'A'.repeat(64)); fs.writeFileSync(process.argv[1], 'done'); process.exit(0);";
+  // when
+  const result = runOwnedProcess(process.execPath, ["-e", producer, marker], {
+    timeoutMilliseconds: 10000, stopFile: join(directory, "STOP"), outputLimitBytes: 64,
+    cleanup: async () => { cleanupCalls++; }
+  });
+  holdEventLoopUntilProducerFinished(marker);
+  // then
+  assert.deepEqual(await result, { code: 0, stdout: "A".repeat(64), stderr: "" });
+  assert.equal(cleanupCalls, 0);
+});
+
+for (const code of [2, 99]) {
+  test(`given native accepted exit code ${code}, when no termination was requested, then it resolves without cleanup`, async () => {
+    // given
+    const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-native-accepted-")), "STOP");
+    let cleanupCalls = 0;
+    // when
+    const result = await runOwnedProcess(process.execPath, ["-e", `process.exit(${code})`], {
+      timeoutMilliseconds: 5000, stopFile, acceptedExitCodes: [0, code],
+      cleanup: async () => { cleanupCalls++; }
+    });
+    // then
+    assert.deepEqual(result, { code, stdout: "", stderr: "" });
+    assert.equal(cleanupCalls, 0);
+  });
+}
+
+test("given a native child already exited zero, when its duration callback runs before close, then timeout rejects and cleans up", async () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-native-timeout-"));
+  const marker = join(directory, "DONE");
+  let cleanupCalls = 0;
+  const producer = "require('node:fs').writeFileSync(process.argv[1], 'done'); process.exit(0);";
+  // when
+  const result = runOwnedProcess(process.execPath, ["-e", producer, marker], {
+    timeoutMilliseconds: 1, stopFile: join(directory, "STOP"),
+    cleanup: async () => { cleanupCalls++; }
+  });
+  holdEventLoopUntilProducerFinished(marker);
+  // then
+  await assert.rejects(result, /Owned security process exceeded its duration limit/);
+  assert.equal(cleanupCalls, 1);
+});
+
+test("given a native child already exited zero, when an emergency stop is observed before close, then stop rejects and cleans up", async () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-native-stop-race-"));
+  const marker = join(directory, "DONE");
+  const stopFile = join(directory, "STOP");
+  let cleanupCalls = 0;
+  const producer = "require('node:fs').writeFileSync(process.argv[1], 'done'); process.exit(0);";
+  // when
+  const result = runOwnedProcess(process.execPath, ["-e", producer, marker], {
+    timeoutMilliseconds: 10000, stopFile,
+    cleanup: async () => { cleanupCalls++; }
+  });
+  holdEventLoopUntilProducerFinished(marker);
+  writeFileSync(stopFile, "stop");
+  // then
+  await assert.rejects(result, /Emergency stop requested/);
+  assert.equal(cleanupCalls, 1);
+});
+
+test("given a native signal with an accepted null exit code, when the child closes, then the signal rejects and cleans up", async () => {
+  // given
+  const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-native-signal-")), "STOP");
+  let cleanupCalls = 0;
+  // when
+  const result = runOwnedProcess(process.execPath, ["-e", "process.kill(process.pid, 'SIGTERM')"], {
+    timeoutMilliseconds: 5000, stopFile, acceptedExitCodes: [0, null],
+    cleanup: async () => { cleanupCalls++; }
+  });
+  // then
+  await assert.rejects(result, /Owned security process failed \(SIGTERM\)/);
+  assert.equal(cleanupCalls, 1);
+});
+
+for (const kind of ["close", "error"]) {
+  test(`given native ${kind} cleanup throws, when its handler runs, then the owned promise rejects without an unhandled rejection`, async () => {
+    // given
+    const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-native-cleanup-rejection-")), "STOP");
+    const moduleUrl = new URL("./security-passive-deployment.mjs", import.meta.url).href;
+    assert.equal(existsSync(`${process.execPath}-courtside-absent-executable`), false);
+    const producer = `import { runOwnedProcess } from ${JSON.stringify(moduleUrl)};
+      let unhandled = false;
+      let state = 'pending';
+      let message = null;
+      let cleanupCalls = 0;
+      process.on('unhandledRejection', () => { unhandled = true; });
+      const result = runOwnedProcess(${kind === "close" ? "process.execPath" : "process.execPath + '-courtside-absent-executable'"},
+        ${kind === "close" ? "['-e', 'process.exit(2)']" : "[]"}, {
+          timeoutMilliseconds: 500,
+          stopFile: ${JSON.stringify(stopFile)},
+          cleanup: async () => { cleanupCalls++; throw new Error('private-cleanup-detail'); }
+        });
+      result.then(() => { state = 'resolved'; }, error => { state = 'rejected'; message = error.message; });
+      setTimeout(() => {
+        console.log(JSON.stringify({ state, message, unhandled, cleanupCalls }));
+        process.exit(0);
+      }, 750);`;
+    // when
+    const result = await runOwnedProcess(process.execPath, ["--input-type=module", "-e", producer], {
+      timeoutMilliseconds: 2000, stopFile, outputLimitBytes: 1024
+    });
+    // then
+    assert.deepEqual(JSON.parse(result.stdout), {
+      state: "rejected", message: "Owned security process cleanup failed", unhandled: false, cleanupCalls: 1
+    });
+    assert.equal(result.stderr, "");
+  });
+}
+
+test("given a native spawn failure, when cleanup succeeds, then the original failure is rejected and cleanup runs once", async () => {
+  // given
+  const command = `${process.execPath}-courtside-absent-executable`;
+  assert.equal(existsSync(command), false);
+  const stopFile = join(mkdtempSync(join(tmpdir(), "courtside-native-spawn-failure-")), "STOP");
+  let cleanupCalls = 0;
+  // when
+  const result = runOwnedProcess(command, [], {
+    timeoutMilliseconds: 2000, stopFile,
+    cleanup: async () => { cleanupCalls++; }
+  });
+  // then
+  await assert.rejects(result, error => error.code === "ENOENT");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(cleanupCalls, 1);
 });

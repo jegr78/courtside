@@ -1,8 +1,10 @@
 import collections
+import datetime
 import http.client
 import http.server
 import json
 import os
+import re
 import threading
 import time
 import urllib.parse
@@ -21,6 +23,7 @@ CANARY_ENABLED = os.environ.get("COURTSIDE_SECURITY_CANARY_ENABLED", "false") ==
 CANARY_PATH = "/__security/zap-canary"
 MAX_TARGET_BYTES = int(os.environ.get("COURTSIDE_SECURITY_MAX_TARGET_BYTES", "8192"))
 MAX_GENERATED_BYTES = int(os.environ["COURTSIDE_SECURITY_MAX_GENERATED_BYTES"])
+METRICS_PATH = "/tmp/security-gateway-metrics"
 counter_lock = threading.Lock()
 concurrency = threading.BoundedSemaphore(MAX_CONCURRENCY)
 request_count = 0
@@ -28,6 +31,8 @@ request_bytes = 0
 upstream_errors = 0
 latencies = collections.deque(maxlen=2048)
 upstream_outcomes = collections.deque(maxlen=2048)
+body_limit_receipts = []
+body_limit_receipts_complete = True
 
 
 class RequestHandler(http.server.BaseHTTPRequestHandler):
@@ -65,6 +70,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 return
             request_count += 1
             request_bytes += content_length
+            if content_length > MAX_BODY_BYTES:
+                self.record_body_limit(content_length, canonical_path)
             self.write_metrics()
         if content_length > MAX_BODY_BYTES:
             self.reject(413)
@@ -79,7 +86,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 return
             body = self.rfile.read(content_length) if content_length else None
             headers = {name: value for name, value in self.headers.items()
-                       if name.lower() not in {"connection", "host", "proxy-connection", "transfer-encoding"}}
+                       if name.lower() not in {"connection", "host", "proxy-connection", "transfer-encoding",
+                                               "x-courtside-journal-operation"}}
             headers["Host"] = "proxy"
             connection = http.client.HTTPConnection(UPSTREAM_HOST, UPSTREAM_PORT, timeout=10)
             started = time.monotonic()
@@ -131,7 +139,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(payload)
 
     def write_metrics(self):
-        temporary = "/tmp/security-gateway-metrics.next"
+        temporary = f"{METRICS_PATH}.next"
         ordered = sorted(latencies)
         percentile_index = max(0, (len(ordered) * 95 + 99) // 100 - 1)
         p95 = ordered[percentile_index] if ordered else 0
@@ -139,8 +147,28 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         with open(temporary, "w", encoding="ascii") as output:
             json.dump({"requests": request_count, "requestBytes": request_bytes,
                        "upstreamErrors": upstream_errors, "requestP95Milliseconds": p95,
-                       "errorRate": error_rate}, output, separators=(",", ":"))
-        os.replace(temporary, "/tmp/security-gateway-metrics")
+                       "errorRate": error_rate, "bodyLimitReceipts": body_limit_receipts,
+                       "bodyLimitReceiptsComplete": body_limit_receipts_complete}, output, separators=(",", ":"))
+        os.replace(temporary, METRICS_PATH)
+
+    def record_body_limit(self, content_length, path):
+        global body_limit_receipts_complete
+        identifiers = self.headers.get_all("X-Courtside-Journal-Operation", [])
+        if not identifiers:
+            return
+        content_types = self.headers.get_all("Content-Type", [])
+        lengths = self.headers.get_all("Content-Length", [])
+        if len(identifiers) != 1 or not re.fullmatch(r"[0-9]{1,3}:[0-9]{1,6}", identifiers[0]) \
+                or self.command != "POST" or path != "/api/session" or self.path != path \
+                or content_types != ["application/x-www-form-urlencoded"] or len(lengths) != 1 \
+                or len(body_limit_receipts) >= 16:
+            body_limit_receipts_complete = False
+            return
+        body_limit_receipts.append({"operationId": identifiers[0], "method": self.command, "path": path,
+                                    "status": 413, "bodyBytes": content_length, "contentType": content_types[0],
+                                    "maximumBodyBytes": MAX_BODY_BYTES, "forwarded": False,
+                                    "observedAt": datetime.datetime.now(datetime.timezone.utc)
+                                    .isoformat(timespec="milliseconds").replace("+00:00", "Z")})
 
     def record_upstream(self, status, started):
         global upstream_errors
