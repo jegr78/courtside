@@ -419,6 +419,13 @@ Accounts sign in by username. Passwords use Argon2id with `m=19456`, `t=2`, `p=1
 rehashes an older encoding when possible. Failure to store that opportunistic rehash does not reject
 the correct password.
 
+Temporary login admission refusals are retried only for the typed login rate-limit problem with a
+valid server-directed wait of one to five seconds. One submission allows at most five credential
+POSTs, including CSRF recovery, and ten seconds of accumulated waiting. The fifteen-second deadline
+includes the session refresh. The browser shows the waiting state, cancels when the member leaves
+and does not persist the submitted password. Wrong credentials and unrelated admission failures do
+not trigger capacity retries. Server-side verification capacity and rate limits remain authoritative.
+
 A permanent password has 12 to 256 characters. Courtside rejects common passwords, identity terms
 and an issued one-time credential. Password changes also check the Have I Been Pwned range API. Only
 the first five hexadecimal characters of its SHA-1 protocol digest leave the instance. Failure of

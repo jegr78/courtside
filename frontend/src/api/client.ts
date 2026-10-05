@@ -1,4 +1,5 @@
 import type { components } from "./schema";
+import { abortable } from "./abortable";
 import { clearPersonalBookingsOfflineData, notifyOtherClientsOfSessionChange } from "../offlineBookings";
 
 export type SessionStatus = components["schemas"]["SessionStatus"];
@@ -135,7 +136,9 @@ export interface RosterCriteria {
 export class ApiError extends Error {
   constructor(
     readonly status: number,
-    readonly problem?: Problem
+    readonly problem?: Problem,
+    readonly retryAfterSeconds?: number,
+    readonly requestAttempts = 1
   ) {
     super(problem?.type ?? `HTTP ${status}`);
   }
@@ -144,15 +147,21 @@ export class ApiError extends Error {
 const ACCESS_DENIED = "urn:courtside:error:access-denied";
 
 async function send(path: string, init: RequestInit, notifyUnauthorized: boolean,
-                    announceSessionChange: boolean): Promise<Response> {
+                    announceSessionChange: boolean, maximumRequests = 2): Promise<Response> {
+  init.signal?.throwIfAborted();
   const write = Boolean(init.method) && init.method !== "GET" && init.method !== "HEAD";
-  const sent = write ? await usableCsrfToken() : undefined;
+  const sent = write ? await abortable(usableCsrfToken, init.signal ?? undefined) : undefined;
+  init.signal?.throwIfAborted();
+  let requestAttempts = 1;
   let response = await fetch(path, carrying(init, sent));
   let problem = await problemIn(response);
   // A request that started alongside this one can mint a token of its own and replace the cookie,
   // and the rotation is what tells that refusal apart from one the account has actually earned.
-  if (write && problem?.type === ACCESS_DENIED && csrfToken() !== sent) {
-    response = await fetch(path, carrying(init, await usableCsrfToken()));
+  if (write && problem?.type === ACCESS_DENIED && csrfToken() !== sent && requestAttempts < maximumRequests) {
+    const replacement = await abortable(usableCsrfToken, init.signal ?? undefined);
+    init.signal?.throwIfAborted();
+    requestAttempts++;
+    response = await fetch(path, carrying(init, replacement));
     problem = await problemIn(response);
   }
   if (!response.ok) {
@@ -161,7 +170,10 @@ async function send(path: string, init: RequestInit, notifyUnauthorized: boolean
       notifyOtherClientsOfSessionChange();
       window.dispatchEvent(new Event("courtside:unauthenticated"));
     }
-    throw new ApiError(response.status, problem);
+    const advice = response.headers.get("Retry-After");
+    const seconds = advice !== null && /^\d+$/.test(advice) ? Number(advice) : undefined;
+    throw new ApiError(response.status, problem,
+      seconds !== undefined && Number.isSafeInteger(seconds) ? seconds : undefined, requestAttempts);
   }
   if (write) {
     await clearPersonalBookingsOfflineData();
@@ -171,8 +183,8 @@ async function send(path: string, init: RequestInit, notifyUnauthorized: boolean
 }
 
 async function request<T>(path: string, init: RequestInit = {}, notifyUnauthorized = true,
-                          announceSessionChange = false): Promise<T> {
-  const response = await send(path, init, notifyUnauthorized, announceSessionChange);
+                          announceSessionChange = false, maximumRequests = 2): Promise<T> {
+  const response = await send(path, init, notifyUnauthorized, announceSessionChange, maximumRequests);
   if (response.status === 204 || response.headers.get("Content-Length") === "0") {
     return undefined as T;
   }
@@ -240,7 +252,7 @@ function withPeriod(path: string, period?: StatisticsPeriodQuery): string {
 }
 
 export const api = {
-  session: () => request<SessionStatus>("/api/session"),
+  session: (signal?: AbortSignal) => request<SessionStatus>("/api/session", { signal }),
   config: () => request<ClubConfig>("/api/public/config"),
   changeOwnLocale: (locale: string) => request<void>("/api/account/locale", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale })
@@ -592,11 +604,12 @@ export const api = {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(move)
     }
   ),
-  login: (username: string, password: string) => request<void>("/api/session", {
+  login: (username: string, password: string, signal?: AbortSignal, maximumRequests = 2) => request<void>("/api/session", {
     method: "POST",
+    signal,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ username, password })
-  }, false, true),
+  }, false, true, maximumRequests),
   changeInitialPassword: (password: string) => request<void>("/api/account/initial-password", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },

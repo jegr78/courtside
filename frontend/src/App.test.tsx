@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { useMemo, type ReactNode } from "react";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, AppRoutes } from "./App";
 import { api, type SessionStatus } from "./api/client";
 import { ClubConfigurationProvider } from "./club/ClubConfigurationProvider";
@@ -422,6 +422,41 @@ describe("App build identity", () => {
     clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
     defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin"
   };
+
+  afterEach(() => vi.useRealTimers());
+
+  it("given a sign-in session refresh finishes after cancellation, when its late authority arrives, then never publish the cancelled session", async () => {
+    // given
+    let resolveSession!: (value: SessionStatus) => void;
+    const pending = new Promise<SessionStatus>((resolve) => { resolveSession = resolve; });
+    const session = vi.spyOn(api, "session").mockResolvedValueOnce(anonymous).mockReturnValue(pending);
+    const login = vi.spyOn(api, "login").mockResolvedValue();
+    vi.spyOn(api, "config").mockResolvedValue(club);
+    vi.spyOn(api, "source").mockRejectedValue(new Error("unavailable"));
+    vi.spyOn(api, "courts").mockResolvedValue([]);
+    vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingHours: [] });
+    vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [] });
+    render(<RoutedShell initialEntries={["/login"]}><App /></RoutedShell>);
+    await screen.findByTestId("login-view");
+    await userEvent.type(screen.getByTestId("username"), "doe.jane");
+    await userEvent.type(screen.getByTestId("password"), "secret");
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByTestId("login-submit"));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(session).toHaveBeenCalledTimes(2);
+    // when
+    await act(() => vi.advanceTimersByTimeAsync(15_000));
+    await act(async () => {
+      resolveSession({ authenticated: true, roles: ["MEMBER"], passwordChangeRequired: false });
+      await pending;
+    });
+    // then
+    expect(session.mock.calls[1][0]?.aborted).toBe(true);
+    expect(screen.getByTestId("login-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("logout")).not.toBeInTheDocument();
+    expect(screen.getByTestId("login-submit")).toBeEnabled();
+    expect(login).toHaveBeenCalledOnce();
+  });
   const adminClub = {
     ...club, newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
     bookingReminderHours: 24, logoUploaded: false
