@@ -96,6 +96,7 @@
     { "path": "tools/npm-audit.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/npm-audit.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/operational-log-deployment.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/performance-browser.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/performance-contention.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/performance-contract.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/performance-protocol.test.mjs", "profiles": ["tooling"], "test": true },

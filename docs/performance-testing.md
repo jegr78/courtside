@@ -40,6 +40,13 @@ Only `smoke` is suitable for routine automation. Baseline, peak, stress, content
 manual until a dedicated runner provides stable resources. The Funnel profile is always manual and
 requires an operator to supervise `uat share` separately.
 
+Browser containers retain the UID and GID of the private credential owner and use `/tmp` as their
+home directory, since the image's default home belongs to another UID. The trusted loopback identity
+probe uses the browser target's hostname for SNI and HTTP Host, so Chromium receives that target's
+verified public-key pin rather than a distinct `localhost` certificate. TLS verification stays enabled.
+The target is a canonical HTTPS origin without an explicit default port, matching Chromium's
+request and response URLs.
+
 ### Login verification capacity
 
 The reference application has two password-verification slots. The value is measured against the
@@ -355,6 +362,15 @@ The CLI exports Caddy's disposable root CA for the duration of a run. Both the e
 and k6 validate the certificate chain and hostname against that CA; the test does not disable TLS
 verification. Chromium receives only the SPKI pin from that verified target certificate, rather
 than a general instruction to accept invalid certificates.
+
+The browser journey uses the earliest enabled slot on its VU's dedicated court, checking the
+selected day and the remaining current-week days before a single next-week fallback. It fails
+explicitly if neither week offers an enabled slot. It expands the additional booking
+fields and waits for the guest input to be visible before filling it. This keeps the UI request
+within the fixture card's advance window and includes the required second participant without
+bypassing the UI or weakening booking rules. The journey awaits the eligibility response and its
+interactive rendering before searching; a week switch awaits a date selector from the newly
+loaded week. The two-week search itself does not override or independently validate booking rules.
 
 ## Reference baselines
 

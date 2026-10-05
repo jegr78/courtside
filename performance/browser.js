@@ -1,6 +1,7 @@
 import { browser } from "k6/browser";
 import { check } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
+import { prepareBrowserBooking } from "./browser-journey.js";
 
 const contract = JSON.parse(open("/scripts/contract.json"));
 const credentials = JSON.parse(open("/run/courtside/perf.json"));
@@ -80,13 +81,14 @@ export default async function () {
     await page.getByTestId("login-view").waitFor();
     await page.getByTestId("username").fill(username());
     await page.getByTestId("password").fill(credentials.password);
+    const eligibilityResponsePromise = page.waitForResponse(`${target}/api/booking-eligibility`);
     await page.getByTestId("login-submit").click();
+    const eligibilityResponse = await eligibilityResponsePromise;
+    if (eligibilityResponse.status() !== 200) throw new Error(`Booking eligibility returned status ${eligibilityResponse.status()}`);
+    await eligibilityResponse.json();
     await page.getByTestId("court-plan-view").waitFor();
     await page.getByTestId("week-grid").waitFor();
-    await page.getByTestId("week-next").click();
-    await page.locator('[data-testid="week-grid"][data-week-offset="1"]').waitFor();
-    await page.getByTestId("free-slot").nth(__VU - 1).click();
-    await page.getByTestId("guest-name").fill("Browser Test Guest");
+    await prepareBrowserBooking(page, __VU);
     const bookingResponsePromise = page.waitForResponse(`${target}/api/bookings`);
     await page.getByTestId("booking-submit").click();
     const response = await bookingResponsePromise;

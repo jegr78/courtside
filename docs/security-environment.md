@@ -115,6 +115,12 @@ The emergency stop is local and immediate. The current prerequisite checks it be
 node tools/courtside.mjs security-stop run-0001
 ```
 
+Before an authorization probe that requires a CSRF token, an empty cookie jar acquires a fresh
+host-bound token through `GET /api/session`. This bootstrap uses the same controlled sender, so
+its request counts against the budget and respects the deadline and stop signal. A bootstrap
+without a host-bound token fails closed. Deliberate missing-CSRF probes do not acquire or inject
+a token, and a refresh never signs an actor in or restores a revoked session.
+
 Scheduled safe assessments are defined in
 [`security-assessment.yml`](../.github/workflows/security-assessment.yml). The active assessment a
 release requires is defined in [`release-gates.yml`](../.github/workflows/release-gates.yml), which

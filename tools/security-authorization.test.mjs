@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import {
+  executeAuthorizationProbe,
   rosterListingProbe,
   authorizationActors,
   buildOperationAuthorizationMatrix,
@@ -207,6 +208,72 @@ test("given session cookies, when rotating and expiring them, then the request j
   assert.equal(jar.csrfToken(), "one two");
   jar.update(["__Host-SESSION=; Max-Age=0; Path=/"]);
   assert.equal(jar.header(), "__Host-XSRF-TOKEN=one%20two");
+});
+
+test("given an anonymous client without a CSRF token, when probing a protected mutation, then bootstrap through the budgeted sender first", async () => {
+  // given
+  const jar = new SecurityCookieJar();
+  const calls = [];
+  const probe = { method: "POST", path: "/api/session", headers: { host: "untrusted.example" } };
+  const send = async (client, request, options = {}) => {
+    calls.push({ request, options });
+    if (request.method === "GET") client.update(["__Host-XSRF-TOKEN=fresh; Path=/; Secure"]);
+    else assert.equal(client.csrfToken(), "fresh");
+    return { status: request.method === "GET" ? 401 : 421 };
+  };
+  // when
+  const result = await executeAuthorizationProbe(send, jar, probe, { csrf: true });
+  // then
+  assert.equal(result.status, 421);
+  assert.deepEqual(calls[0], { request: { method: "GET", path: "/api/session", headers: {} }, options: {} });
+  assert.equal(calls[1].request, probe);
+  assert.deepEqual(calls[1].options, { csrf: true });
+  assert.equal(calls.length, 2);
+});
+
+test("given a missing-CSRF boundary probe, when sending it, then do not bootstrap or inject a token", async () => {
+  // given
+  const jar = new SecurityCookieJar();
+  const calls = [];
+  const probe = { method: "POST", path: "/api/session", headers: {} };
+  // when
+  await executeAuthorizationProbe(async (...args) => { calls.push(args); }, jar, probe, { csrf: false });
+  // then
+  assert.equal(calls.length, 1);
+  assert.equal(jar.csrfToken(), undefined);
+  assert.equal(calls[0][1], probe);
+});
+
+test("given a bootstrap without a host-bound token, when probing a protected mutation, then fail before the mutation", async () => {
+  // given
+  const jar = new SecurityCookieJar();
+  let requests = 0;
+  // when / then
+  await assert.rejects(executeAuthorizationProbe(async () => { requests++; }, jar,
+    { method: "POST", path: "/api/session", headers: {} }, { csrf: true }), /CSRF token/);
+  assert.equal(requests, 1);
+});
+
+test("given a current host-bound token, when probing a protected mutation, then preserve the token and avoid a redundant bootstrap", async () => {
+  // given
+  const jar = new SecurityCookieJar();
+  jar.update(["__Host-XSRF-TOKEN=current; Path=/; Secure"]);
+  const requests = [];
+  const probe = { method: "POST", path: "/api/session", headers: {} };
+  // when
+  await executeAuthorizationProbe(async (client, request) => { requests.push(request); }, jar, probe, { csrf: true });
+  // then
+  assert.deepEqual(requests, [probe]);
+  assert.equal(jar.csrfToken(), "current");
+});
+
+test("given an exhausted request budget during CSRF bootstrap, when probing a mutation, then the mutation never runs", async () => {
+  // given
+  let requests = 0;
+  // when / then
+  await assert.rejects(executeAuthorizationProbe(async () => { requests++; throw new Error("Request budget exceeded"); },
+    new SecurityCookieJar(), { method: "POST", path: "/api/session", headers: {} }, { csrf: true }), /Request budget exceeded/);
+  assert.equal(requests, 1);
 });
 
 test("given host and legacy CSRF cookies, when reading the token, then the host-bound value wins", () => {

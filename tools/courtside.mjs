@@ -56,6 +56,7 @@ const perfComposeFile = join(root, "deploy", "compose.perf.yaml");
 const perfDbComposeFile = join(root, "deploy", "compose.perf-db.yaml");
 const perfTelemetryComposeFile = join(root, "deploy", "compose.perf-telemetry.yaml");
 const perfProject = "courtside-perf";
+const perfTarget = "https://proxy";
 const funnelPerformanceConfirmation = "courtside-uat-funnel";
 const perfStateFile = join(root, "build", "perf-environment.json");
 const perfMailDirectory = join(root, "build", "perf-mail");
@@ -1060,6 +1061,11 @@ export function performanceImage(service) {
   return reference;
 }
 
+export function performanceIdentityRequest(ca) {
+  const target = new URL(perfTarget);
+  return { secure: true, port: 9443, path: "/api/source", ca, servername: target.hostname, headers: { Host: target.host } };
+}
+
 export function performanceRunPlan(options, resultDirectory, certificateFile, runId = "test-run", certificatePin) {
   const contract = JSON.parse(readFileSync(join(root, "performance", "contract.json"), "utf8"));
   const browserRun = contract.profiles[options.profile].kind === "browser";
@@ -1073,11 +1079,12 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       "run", "--rm", ...containerUserArguments(), "--network", "courtside-perf_load",
       "-e", `PERF_PROFILE=${options.profile}`,
       "-e", `PERF_RUN_ID=${runId}`,
-      "-e", "PERF_TARGET=https://proxy:443",
+      "-e", `PERF_TARGET=${perfTarget}`,
       "-e", "K6_WEB_DASHBOARD=true",
       "-e", "K6_WEB_DASHBOARD_EXPORT=/results/report.html",
       ...(options.profile === "contention" ? ["-e", "K6_WEB_DASHBOARD_PERIOD=1s"] : []),
       ...(browserRun ? [
+        "-e", "HOME=/tmp",
         "-e", "K6_BROWSER_HEADLESS=true",
         "-e", `K6_BROWSER_ARGS=no-sandbox,ignore-certificate-errors-spki-list=${certificatePin}`
       ] : []),
@@ -1137,9 +1144,7 @@ async function runPerformance(options) {
   mkdirSync(resultDirectory, { recursive: true });
   runInteractive(perfComposePlan(
     ["cp", "proxy:/data/caddy/pki/authorities/local/root.crt", certificateFile]));
-  const identity = await localRequest({
-    secure: true, port: 9443, path: "/api/source", ca: readFileSync(certificateFile), servername: "localhost"
-  });
+  const identity = await localRequest(performanceIdentityRequest(readFileSync(certificateFile)));
   const source = parseJson(identity.body);
   if (identity.statusCode !== 200 || source.environment !== "PERFORMANCE") {
     throw new Error("The target did not identify itself as the disposable PERFORMANCE environment");
