@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/jegr78/courtside/compare/v0.1.0...v0.1.1) (2026-10-05)
+
+
+### Bug fixes
+
+* keep the mail recovery password out of Stalwart's hash formats ([#1291](https://github.com/jegr78/courtside/issues/1291)) ([82f526b](https://github.com/jegr78/courtside/commit/82f526b7cfd146860ef34968cea9b7898e3c9704))
+
 ## 0.1.0 (2026-10-04)
 
 ### Notable changes
@@ -575,4 +582,3 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
-
