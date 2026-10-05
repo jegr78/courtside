@@ -217,12 +217,24 @@ test("given mail settlement after pressure stopped, when observing the actual ef
 test("given whole native authentication capture, when observing an effects snapshot, then merge its attributed journal and contract with one decoder callback", async () => {
   // given
   const input = fixture(); const h = await harness(input); let calls = 0;
+  const observedAuthentication = structuredClone(input.contract.authentication);
+  observedAuthentication.sessionPolicy.passwordFactorRequired = true;
+  observedAuthentication.loginPolicy.global.threshold = 20;
+  const initialAuthentication = { ...structuredClone(observedAuthentication), ownedSessionPrimaryIds: [], loginSubjects: [] };
+  delete initialAuthentication.loginPolicy.sourceAddress;
+  input.contract.authentication = initialAuthentication;
   h.options.projectSessions = async ({ phase, before, snapshot, journal, contract }) => {
     calls++;
     assert.equal(phase, "after");
     assert.deepEqual(before, input.before);
     assert.deepEqual(snapshot, input.effects);
-    return { outcome: "passed", authentication: contract.authentication,
+    assert.deepEqual(contract.authentication, initialAuthentication);
+    assert.equal(contract.authentication.sessionPolicy.passwordFactorRequired, true);
+    assert.equal(contract.authentication.loginPolicy.proofMode, "http-bounded-v1");
+    assert.ok(!Object.hasOwn(contract.authentication.loginPolicy, "sourceAddress"));
+    assert.deepEqual(before.tables.spring_session.rows, []);
+    assert.deepEqual(snapshot.tables.spring_session.rows, []);
+    return { outcome: "passed", authentication: observedAuthentication,
       journal: { ...journal, sessions: [], operations: journal.operations.map(operation => ({ ...operation, sourceAddress: "172.30.0.5" })) },
       privateProof: { decoder: "native-test-observation" }, runtimeDigest: `sha256:${"a".repeat(64)}` };
   };
@@ -231,6 +243,7 @@ test("given whole native authentication capture, when observing an effects snaps
   // then
   assert.equal(effects.outcome, "passed");
   assert.equal(calls, 1);
+  assert.deepEqual(JSON.parse(readFileSync(join(h.directory, "contract-001.json"))).authentication, observedAuthentication);
   const journal = JSON.parse(readFileSync(join(h.directory, "journal-001.json")));
   assert.equal(journal.operations[0].sourceAddress, "172.30.0.5");
   assert.ok(JSON.parse(readFileSync(join(h.directory, "sessions-001.json"))).privateProof);

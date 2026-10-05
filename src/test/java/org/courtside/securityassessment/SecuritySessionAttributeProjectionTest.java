@@ -110,7 +110,10 @@ class SecuritySessionAttributeProjectionTest {
     @Test
     void givenDuplicateAttributes_whenProjected_thenRejected() throws Exception {
         // given
-        var attribute = JSON.readTree(input("courtside.browser-family", serialized("Firefox"))).get("attributes").get(0);
+        var valid = input("courtside.browser-family", serialized("FIREFOX"));
+        var positive = JSON.readTree(SecuritySessionAttributeProjection.project(valid));
+        assertThat(positive.get("attributes").get(0).get("value").get("value").asString()).isEqualTo("FIREFOX");
+        var attribute = JSON.readTree(valid).get("attributes").get(0);
         var request = JSON.writeValueAsBytes(Map.of("attributes", List.of(attribute, attribute)));
         // when / then
         assertThatThrownBy(() -> SecuritySessionAttributeProjection.project(request)).isInstanceOf(IOException.class);
@@ -119,21 +122,27 @@ class SecuritySessionAttributeProjectionTest {
     @Test
     void givenTrailingObjectOrResetOrByte_whenProjected_thenRejected() throws Exception {
         // given
+        var original = serialized("FIREFOX");
+        var positive = JSON.readTree(SecuritySessionAttributeProjection.project(input("courtside.browser-family", original)));
+        assertThat(positive.get("attributes").get(0).get("value").get("value").asString()).isEqualTo("FIREFOX");
         var bytes = new ByteArrayOutputStream();
         try (var stream = new ObjectOutputStream(bytes)) {
-            stream.writeObject("Firefox");
+            stream.writeObject("FIREFOX");
             stream.writeObject(new Gadget());
         }
-        // when / then
-        assertThatThrownBy(() -> SecuritySessionAttributeProjection.project(input("courtside.browser-family", bytes.toByteArray())))
-                .isInstanceOf(IOException.class);
+        assertThat(java.util.Arrays.copyOf(bytes.toByteArray(), original.length)).isEqualTo(original);
+        var trailingInputs = new java.util.ArrayList<byte[]>();
+        trailingInputs.add(bytes.toByteArray());
         for (byte suffix : new byte[]{0x79, 0x00}) {
-            var original = serialized("Firefox");
             var extended = java.util.Arrays.copyOf(original, original.length + 1);
             extended[original.length] = suffix;
-            assertThatThrownBy(() -> SecuritySessionAttributeProjection.project(input("courtside.browser-family", extended)))
-                    .isInstanceOf(IOException.class);
+            trailingInputs.add(extended);
         }
+        // when / then
+        org.junit.jupiter.api.Assertions.assertAll(trailingInputs.stream().map(trailing ->
+                (org.junit.jupiter.api.function.Executable) () ->
+                        assertThatThrownBy(() -> SecuritySessionAttributeProjection.project(input("courtside.browser-family", trailing)))
+                                .isInstanceOf(IOException.class)));
     }
 
     @Test

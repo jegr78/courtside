@@ -67,3 +67,16 @@ test("given missing malformed or incomplete database output, when parsing a snap
   // when / then
   for (const output of outputs) assert.throws(() => parseResourceState(output), /snapshot/);
 });
+
+test("given a complete valid snapshot, when only its valid primary-key row is duplicated, then parsing rejects the duplicate", () => {
+  // given
+  const snapshot = { schemaVersion: 1, tables: {
+    person: { columns: ["id", "first_name"], primaryKey: ["id"],
+      rows: [{ id: "person-1", first_name: "Jane" }] }
+  } };
+  assert.deepEqual(parseResourceState(JSON.stringify(snapshot)), snapshot);
+  const duplicate = structuredClone(snapshot);
+  duplicate.tables.person.rows.push(structuredClone(duplicate.tables.person.rows[0]));
+  // when / then
+  assert.throws(() => parseResourceState(JSON.stringify(duplicate)), /duplicate primary keys/);
+});
