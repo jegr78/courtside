@@ -178,6 +178,15 @@ Candidates are opened and closed with one line of configuration, not with a hand
    merging it.
 3. Set `"prerelease": false` again to graduate. The suffix is stripped and the next release pull
    request proposes `v0.3.0`.
+4. A graduation whose release run failed before it published may instead reopen the line, the one
+   exception *When a release fails* names: set `"prerelease": true` again, return the manifest,
+   `pom.xml`, `frontend/package.json` and both root versions in `frontend/package-lock.json` to the
+   last published candidate, and restore `CHANGELOG.md` to its state before the graduation. The
+   graduation pull request keeps `autorelease: tagged`, because a merged release pull request
+   marked `pending` makes release-please recreate its tag and refuse every new release pull
+   request. The next release pull request proposes the following candidate, `v0.3.0-rc.<n+1>`.
+   Delete the unpublished tag and its draft before the line graduates again, or the new graduation
+   finds the old tag and publishes the old commit.
 
 Every candidate is a checkpoint on the same release line. Release Please proposes the changes
 since the preceding candidate; the release-please workflow then folds those entries into the single
@@ -312,6 +321,12 @@ looks for a `v0.2.0` that never appeared.
 
 Only a tag no run ever saw is free to move, and under a `v*` trigger that is rarer than it sounds,
 a misspelling that keeps the leading `v` still starts a run.
+
+One exception exists, and it is a maintainer's decision, not a routine: a graduation that never
+published may reopen its candidate line instead of being skipped, as `0.1.0` did when its release run
+failed and further changes were still due. No consumer could install that version, so its tag and
+draft are deleted and the version is cut again later from the commit the line finally graduates on.
+*Cutting a candidate* lists the steps.
 
 A failed tag costs the next release nothing. Both things the release reads from its history, the
 supported upgrade origins and the range the upgrade notes cover, come from the releases this
