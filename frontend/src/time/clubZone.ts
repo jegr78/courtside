@@ -1,3 +1,5 @@
+import { dateTimeFormatter } from "./dateTimeFormatter";
+
 export function zonedDateTime(date: string, time: string, timeZone: string): string {
   const wallClock = Date.parse(`${date}T${time}:00Z`);
   const offsets = new Set([
@@ -30,7 +32,7 @@ export function bookingTimeSlot(date: string, time: string, timeZone: string, du
 }
 
 function localDateTime(instant: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+  const parts = dateTimeFormatter("en-CA", {
     timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit"
   }).formatToParts(instant);
@@ -39,7 +41,7 @@ function localDateTime(instant: Date, timeZone: string): string {
 }
 
 function offsetAt(instant: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
+  const parts = dateTimeFormatter("en-US", {
     timeZone, timeZoneName: "longOffset", hour: "2-digit"
   }).formatToParts(instant);
   const label = parts.find((part) => part.type === "timeZoneName")?.value.replace("GMT", "") || "";
@@ -58,7 +60,7 @@ function offsetLabel(offset: number): string {
 }
 
 export function dateInTimeZone(instant: Date, timeZone: string): Date {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+  const parts = dateTimeFormatter("en-CA", {
     timeZone, year: "numeric", month: "2-digit", day: "2-digit"
   }).formatToParts(instant);
   const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
@@ -74,7 +76,7 @@ export function shortTime(value: string | null | undefined): string {
 }
 
 export function formatTime(timestamp: string, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-GB", {
+  const parts = dateTimeFormatter("en-GB", {
     timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23"
   }).formatToParts(new Date(timestamp));
   const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
@@ -82,28 +84,28 @@ export function formatTime(timestamp: string, timeZone: string): string {
 }
 
 export function formatDateTime(timestamp: string, locale: string, timeZone: string): string {
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone })
+  return dateTimeFormatter(locale, { dateStyle: "medium", timeStyle: "short", timeZone })
     .format(new Date(timestamp));
 }
 
 export function formatBookingPeriod(startsAt: string, endsAt: string, locale: string, timeZone: string): string {
   const start = new Date(startsAt);
   const end = new Date(endsAt);
-  const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone });
+  const dateTime = dateTimeFormatter(locale, { dateStyle: "medium", timeStyle: "short", timeZone });
   if (localDateKey(start, timeZone) !== localDateKey(end, timeZone)) {
     return `${dateTime.format(start)} – ${dateTime.format(end)}`;
   }
-  const endTime = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone }).format(end);
+  const endTime = dateTimeFormatter(locale, { timeStyle: "short", timeZone }).format(end);
   return `${dateTime.format(start)} – ${endTime}`;
 }
 
 export function formatBookingTimeRange(startsAt: string, endsAt: string, locale: string, timeZone: string): string {
-  const time = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone });
+  const time = dateTimeFormatter(locale, { timeStyle: "short", timeZone });
   return `${time.format(new Date(startsAt))} – ${time.format(new Date(endsAt))}`;
 }
 
 function localDateKey(instant: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
+  return dateTimeFormatter("en-CA", {
     timeZone, year: "numeric", month: "2-digit", day: "2-digit"
   }).format(instant);
 }
@@ -120,7 +122,7 @@ export function formatDate(date: Date): string {
 }
 
 export function formatDateRange(from: string, to: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).formatRange(parseDate(from), parseDate(to));
+  return dateTimeFormatter(locale, { dateStyle: "medium" }).formatRange(parseDate(from), parseDate(to));
 }
 
 export function parseDate(value: string): Date {
