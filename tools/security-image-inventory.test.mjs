@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
 import { assessmentImages } from "./security-image-inventory.mjs";
 import { securityImportSourceKey, securityImportSourceRequest } from "./security-openapi-fuzz.mjs";
+
+const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+const composeServices = yaml.load(readFileSync(new URL("../deploy/compose.security.yaml", import.meta.url), "utf8")).services;
 
 test("given active assessment configuration, when resolving images, then all pinned runtime images are returned once", () => {
   // when
@@ -24,10 +28,13 @@ test("given active assessment configuration, when resolving images, then all pin
 
 for (const profile of ["safe", "active", "destructive"]) {
   test(`given ${profile} assessment Compose runtime images, when resolving inventory, then include the pinned mail sink and exclude candidate variables`, () => {
+    // given
+    const mailImage = composeServices.mail.image;
+    assert.match(mailImage, /^axllent\/mailpit:[^\s@]+@sha256:[a-f0-9]{64}$/);
     // when
     const images = assessmentImages(profile);
     // then
-    assert.ok(images.includes("axllent/mailpit:v1.31@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d"));
+    assert.ok(images.includes(mailImage));
     assert.ok(images.every((image) => !image.includes("$")));
     assert.equal(images.some((image) => image.startsWith("grafana/k6:")), profile === "destructive");
   });

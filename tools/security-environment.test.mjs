@@ -1301,6 +1301,74 @@ test("given BASE state missing a required value, when HEAD seeds it, then every 
   } finally { rmSync(fixture.checkout, { recursive: true, force: true }); }
 });
 
+test("given distinct BASE and HEAD interpolation names, when planning the bridge, then the complete BASE allowlist alone selects recorded values", () => {
+  // given
+  const fixture = pairedSeedCheckout();
+  const recorded = { ...fixture.recorded, COURTSIDE_SECURITY_BASE_TOKEN: "base-only",
+    COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES: "5", PATH: "/untrusted", DOCKER_HOST: "tcp://untrusted.invalid:2375" };
+  writeFileSync(fixture.compose, readFileSync(fixture.compose, "utf8")
+    + '      BASE_TOKEN: ${COURTSIDE_SECURITY_BASE_TOKEN:?required}\n');
+  try {
+    // when
+    let plan;
+    assert.doesNotThrow(() => {
+      plan = securitySeedPlan("compare-base-1-1", recorded.COURTSIDE_SECURITY_IMAGE, recorded,
+        { composeRoot: fixture.checkout });
+    });
+    // then
+    assert.deepEqual(plan.environment, {
+      COURTSIDE_SECURITY_FIXTURES_IMAGE: securitySeedImageTag("compare-base-1-1"),
+      COURTSIDE_SECURITY_SHARED_PASSWORD: recorded.COURTSIDE_SECURITY_SHARED_PASSWORD,
+      COURTSIDE_SECURITY_SEED_FINGERPRINT: recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+      COURTSIDE_SECURITY_BASE_TOKEN: "base-only"
+    });
+    const { COURTSIDE_SECURITY_BASE_TOKEN, ...missing } = recorded;
+    assert.throws(() => securitySeedPlan("compare-base-1-1", recorded.COURTSIDE_SECURITY_IMAGE, missing,
+      { composeRoot: fixture.checkout }), /required compose value/);
+  } finally { rmSync(fixture.checkout, { recursive: true, force: true }); }
+});
+
+test("given identical valid state in a foreign canonical checkout, when seeding BASE, then path binding refuses before every native closure", () => {
+  // given
+  const fixture = pairedSeedCheckout();
+  const foreign = pairedSeedCheckout();
+  chmodSync(fixture.state, 0o600);
+  writeFileSync(foreign.state, readFileSync(fixture.state), { mode: 0o600 });
+  chmodSync(foreign.state, 0o600);
+  const calls = [];
+  const labels = {
+    "com.docker.compose.project": "courtside-security-compare-base-1-1",
+    "org.courtside.environment": "SECURITY",
+    "org.courtside.security.run-id": "compare-base-1-1",
+    "org.courtside.security.seed-fingerprint": fixture.recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+    "org.courtside.security.instance-fingerprint": fixture.recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
+  };
+  const runtime = {
+    resources: () => { calls.push("resources"); return [{ type: "container", id: "owned", labels }]; },
+    buildFixtures: () => calls.push("build"),
+    execute: () => calls.push("execute"),
+    removeImage: () => calls.push("remove"),
+    stageClasses: () => calls.push("stage"),
+    inspect: () => calls.push("inspect")
+  };
+  try {
+    // when
+    seedSecurityEnvironment("compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE,
+      fixture.state, { composeRoot: fixture.checkout }, runtime);
+    // then
+    assert.deepEqual(calls, ["resources", "build", "execute", "remove"]);
+    assert.deepEqual(readFileSync(foreign.state), readFileSync(fixture.state));
+    assert.equal(realpathSync(foreign.state), foreign.state);
+    calls.length = 0;
+    assert.throws(() => seedSecurityEnvironment("compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE,
+      foreign.state, { composeRoot: fixture.checkout }, runtime), /state must belong to the compose checkout and run/);
+    assert.deepEqual(calls, []);
+  } finally {
+    rmSync(fixture.checkout, { recursive: true, force: true });
+    rmSync(foreign.checkout, { recursive: true, force: true });
+  }
+});
+
 test("given a recorded environment, when the candidate seeds it, then the seeder runs beside the target it names", () => {
   // given
   const recorded = recordedEnvironment();
