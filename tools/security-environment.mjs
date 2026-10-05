@@ -19,13 +19,12 @@ import { observeResourceEffects, cleanupAndRecoverResourceRuntime, createResourc
   writeNativeEvidence, retainResourceEvidenceFailure } from "./security-resource-runtime.mjs";
 import { captureResourceAuthentication, resourceSessionProjectionClassPaths } from "./security-resource-auth.mjs";
 import { captureSecurityStartupDiagnostics } from "./security-startup-diagnostics.mjs";
+import { inspectReusableImages, verifyReusableImages } from "./immutable-image-reuse.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
 const schemathesisReasonProjection = readFileSync(join(root, "security", "schemathesis_reason.py"), "utf8");
 const stateRoot = join(root, "build", "security");
-// The reservation holds a port for the assessment, so it holds it with the proxy the assessment
-// itself runs; read from there, a bump under deploy/ needs no second edit here.
 const reservationImage = deployedCaddyImage();
 export const securityStateRoot = stateRoot;
 
@@ -230,8 +229,13 @@ export function securitySeedPlan(runId, image, recorded, { composeRoot } = {}) {
   }
   const file = seedComposeFile(composeRoot);
   const interpolated = interpolatedSecurityNames(file);
+  const fixture = recorded.immutableImages?.fixturesImageID;
+  if (recorded.immutableImages && (recorded.immutableImages.productionImageID !== image
+      || !/^sha256:[a-f0-9]{64}$/.test(fixture ?? ""))) {
+    throw new Error("The recorded prebuilt fixture binding does not match the candidate");
+  }
   const environment = Object.fromEntries([...Object.entries(recorded),
-    ["COURTSIDE_SECURITY_FIXTURES_IMAGE", securitySeedImageTag(runId)]]
+    ["COURTSIDE_SECURITY_FIXTURES_IMAGE", fixture ?? securitySeedImageTag(runId)]]
     .filter(([name]) => interpolated.has(name)));
   if (composeRoot !== undefined) {
     for (const [, name, operator] of readFileSync(file, "utf8").matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)(:\?|\?)/g)) {
@@ -243,7 +247,7 @@ export function securitySeedPlan(runId, image, recorded, { composeRoot } = {}) {
   }
   return {
     command: "docker",
-    args: ["compose", "-p", securityProject(runId), "-f", file, "run", "--rm", "--no-deps", "-T", "seeder"],
+    args: ["compose", "-p", securityProject(runId), "-f", file, "run", "--rm", ...(fixture ? ["--pull", "never"] : []), "--no-deps", "-T", "seeder"],
     environment
   };
 }
@@ -341,9 +345,38 @@ export function assertSecurityStartAvailable(resources, stateExists, identityExi
   }
 }
 
-export function assertSecurityIdentity({ source, labels, image }, expected, expectedImage = expected.COURTSIDE_SECURITY_IMAGE) {
+export function securityRuntimeBinding(resources) {
+  const containers = resources.filter(resource => resource.type === "container");
+  if (containers.length > 32 || containers.some(resource => !/^[a-f0-9]{64}$/.test(resource.id ?? "")
+      || !resource.config || typeof resource.config !== "object" || Array.isArray(resource.config)
+      || !resource.hostConfig || typeof resource.hostConfig !== "object" || Array.isArray(resource.hostConfig))) {
+    throw new Error("Immutable SECURITY effective runtime is incomplete");
+  }
+  return JSON.parse(JSON.stringify(containers.sort((left, right) => left.id.localeCompare(right.id))));
+}
+
+export function assertSecurityRuntimeBinding(resources, expected, { allowMissing = false } = {}) {
+  if (!Array.isArray(expected) || !expected.length) throw new Error("Immutable SECURITY retained runtime is missing");
+  const actual = securityRuntimeBinding(resources);
+  securityRuntimeBinding(expected);
+  const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === "object"
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+  if (actual.some(resource => {
+    const recorded = expected.find(item => item.id === resource.id);
+    return !recorded || JSON.stringify(canonical(recorded)) !== JSON.stringify(canonical(resource));
+  }) || !allowMissing && expected.some(recorded => !actual.some(resource => resource.id === recorded.id))) {
+    throw new Error("Immutable SECURITY effective runtime changed");
+  }
+}
+
+export function assertSecurityIdentity({ source, labels, image, reference }, expected, expectedImage = expected.COURTSIDE_SECURITY_IMAGE) {
   if (source.environment !== "SECURITY") throw new Error("The target does not report SECURITY");
-  if (image !== expectedImage) throw new Error("The running target image does not match this security run");
+  const proof = expected.immutableImages;
+  if (proof ? expectedImage !== proof.productionImageID || reference !== proof.productionImageID
+      || !/^sha256:[a-f0-9]{64}$/.test(proof.runtimeImageIDs?.production ?? "")
+      || image !== proof.runtimeImageIDs.production : image !== expectedImage) {
+    throw new Error("The running target image does not match this security run");
+  }
   if (labels["org.courtside.environment"] !== "SECURITY"
       || labels["org.courtside.security.run-id"] !== expected.COURTSIDE_SECURITY_RUN_ID
       || labels["org.courtside.security.seed-fingerprint"] !== expected.COURTSIDE_SECURITY_SEED_FINGERPRINT
@@ -352,11 +385,24 @@ export function assertSecurityIdentity({ source, labels, image }, expected, expe
   }
 }
 
-// Every docker command here ends when its process ends; the job's timeout-minutes bounds the rest.
 function execute(command, args, environment = process.env) {
   return execFileSync(command, args, {
     cwd: root, env: environment, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
   });
+}
+
+export function executeReusableSecurityCommand(command, args, environment = process.env, timeoutMilliseconds = 10000,
+  executeCommand = spawnSync) {
+  if (!["docker", "curl"].includes(command) || !Number.isSafeInteger(timeoutMilliseconds)
+      || timeoutMilliseconds < 1 || timeoutMilliseconds > 180000) throw new Error("Immutable SECURITY command exceeds its budget");
+  const result = executeCommand(command, args, { cwd: root, env: environment, shell: false,
+    encoding: "utf8", timeout: timeoutMilliseconds, maxBuffer: 4 * 1024 * 1024 });
+  if (!result || result.error || result.status !== 0 || result.signal || result.truncated || result.timedOut
+      || typeof result.stdout !== "string" || typeof result.stderr !== "string"
+      || Buffer.byteLength(result.stdout) > 4 * 1024 * 1024 || Buffer.byteLength(result.stderr) > 4 * 1024 * 1024) {
+    throw new Error("Immutable SECURITY command did not complete within its bounds");
+  }
+  return result.stdout;
 }
 
 export function securityStateFile(runId) {
@@ -369,10 +415,10 @@ export function securityIdentityFile(runId) {
   return join(stateRoot, runId, "identity.json");
 }
 
-function writeState(runId, environment) {
+function writeState(runId, environment, immutableImages) {
   const file = securityStateFile(runId);
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
-  writeFileSync(file, `${JSON.stringify(environment, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(file, `${JSON.stringify({ ...environment, ...(immutableImages ? { immutableImages } : {}) }, null, 2)}\n`, { mode: 0o600 });
   chmodSync(file, 0o600);
 }
 
@@ -397,14 +443,17 @@ function writeIdentity(runId, identity) {
   chmodSync(file, 0o600);
 }
 
-export async function startSecurityEnvironment(runId, image) {
-  assertSecurityStartAvailable(securityProjectResources(runId), existsSync(securityStateFile(runId)),
+export async function startSecurityEnvironment(runId, image, selection) {
+  const immutableImages = selection ? inspectReusableImages({ image, ...selection, root }) : undefined;
+  const command = immutableImages ? executeReusableSecurityCommand : execute;
+  assertSecurityStartAvailable(securityProjectResources(runId, command), existsSync(securityStateFile(runId)),
     existsSync(securityIdentityFile(runId)));
   let environment = securityEnvironment(runId, image, randomBytes(24).toString("base64url"),
     await availableLoopbackPort());
+  if (immutableImages) environment.COURTSIDE_SECURITY_FIXTURES_IMAGE = immutableImages.fixturesImageID;
   for (let attempt = 1; attempt <= 3; attempt++) {
-    reserveSecurityEnvironment(environment);
-    writeState(runId, environment);
+    reserveSecurityEnvironment(environment, command);
+    writeState(runId, environment, immutableImages);
     try {
       if (attempt === 1) {
         const certificate = createSecurityMailCertificate(environment.COURTSIDE_SECURITY_MAIL_DIRECTORY);
@@ -412,14 +461,26 @@ export async function startSecurityEnvironment(runId, image) {
           environment.COURTSIDE_SECURITY_MAIL_USER, { runId,
             seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
             instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT });
-        execute(trust.command, trust.args, { ...process.env, ...environment });
+        command(trust.command, trust.args, { ...process.env, ...environment });
         chmodSync(join(environment.COURTSIDE_SECURITY_MAIL_DIRECTORY, "mail.p12"), 0o444);
         environment = { ...environment, COURTSIDE_SECURITY_MAIL_CERTIFICATE_FINGERPRINT: certificate.fingerprint };
-        writeState(runId, environment);
+        writeState(runId, environment, immutableImages);
       }
-      buildSecurityFixturesImage(runId, image);
-      execute("docker", [...securityComposeArgs(runId), "up", "-d", "--wait"],
-        { ...process.env, ...environment });
+      if (immutableImages) verifyReusableImages(immutableImages, { image, ...selection, root });
+      else buildSecurityFixturesImage(runId, image);
+      command("docker", [...securityComposeArgs(runId), "up", ...(immutableImages ? ["--no-build", "--pull", "never"] : []), "-d", "--wait"],
+        { ...process.env, ...environment }, ...(immutableImages ? [180000] : []));
+      if (immutableImages) {
+        const resources = securityProjectResources(runId, command);
+        assertSecurityRecoveryOwnership(resources, { runId,
+          seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+          instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT });
+        environment = { ...environment, immutableRuntime: securityRuntimeBinding(resources) };
+        if (!environment.immutableRuntime.some(resource => resource.labels?.["com.docker.compose.service"] === "app")) {
+          throw new Error("Immutable SECURITY startup app is missing");
+        }
+        writeState(runId, environment, immutableImages);
+      }
       break;
     } catch (failure) {
       const output = `${failure.stderr ?? ""}`;
@@ -450,8 +511,6 @@ export async function startSecurityEnvironment(runId, image) {
   process.stdout.write(`${securityEnvironmentReadyMessage(runId)}\n`);
 }
 
-// A locally built image also carries a `name@sha256:<image id>` digest that no store resolves, so a
-// tag is the reference to try first and a registry digest only the fallback for a pulled candidate.
 export function fixtureImageBase({ RepoDigests: digests = [], RepoTags: tags = [] }) {
   const reference = [...tags, ...digests].find((candidate) => candidate && !candidate.includes("<none>"));
   if (!reference) throw new Error("The security candidate carries no reference a build can start from");
@@ -499,7 +558,12 @@ export function seedSecurityEnvironment(runId, image, stateFile, options = {}, {
   }
   const recorded = JSON.parse(readFileSync(resolve(stateFile), "utf8"));
   const plan = securitySeedPlan(runId, image, recorded, options);
-  const ownedResources = resources(runId);
+  if (recorded.immutableImages) verifyReusableImages(recorded.immutableImages, {
+    image, fixturesImage: recorded.immutableImages.fixturesImageID,
+    sourceCommit: recorded.immutableImages.sourceCommit, root
+  });
+  const command = recorded.immutableImages ? executeReusableSecurityCommand : executeSeed;
+  const ownedResources = resources(runId, command);
   if (ownedResources.length === 0) {
     throw new Error("No security environment of this run is running");
   }
@@ -508,12 +572,21 @@ export function seedSecurityEnvironment(runId, image, stateFile, options = {}, {
     seedFingerprint: recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
     instanceFingerprint: recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
   });
+  if (recorded.immutableImages) {
+    const apps = ownedResources.filter((resource) => resource.type === "container"
+      && resource.labels?.["com.docker.compose.service"] === "app");
+    if (apps.length !== 1 || apps[0].reference !== recorded.immutableImages.productionImageID
+        || apps[0].image !== recorded.immutableImages.runtimeImageIDs?.production) {
+      throw new Error("Immutable SECURITY seed runtime identity changed");
+    }
+  }
   const tag = plan.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE;
+  if (recorded.immutableImages) assertSecurityRuntimeBinding(ownedResources, recorded.immutableRuntime);
   try {
-    buildFixtures(runId, image, tag);
-    executeSeed(plan.command, plan.args, { ...process.env, ...plan.environment });
+    if (!recorded.immutableImages) buildFixtures(runId, image, tag);
+    command(plan.command, plan.args, { ...process.env, ...plan.environment }, ...(recorded.immutableImages ? [180000] : []));
   } finally {
-    removeImage(tag);
+    if (!recorded.immutableImages) removeImage(tag);
   }
   process.stdout.write(`Security environment ${runId} carries the synthetic assessment dataset\n`);
 }
@@ -529,15 +602,25 @@ export function securityEnvironmentReadyMessage(runId) {
 
 export function verifySecurityEnvironment(runId) {
   const environment = readSecurityEnvironment(runId);
+  if (environment.immutableImages) verifyReusableImages(environment.immutableImages, {
+    image: environment.COURTSIDE_SECURITY_IMAGE, fixturesImage: environment.immutableImages.fixturesImageID,
+    sourceCommit: environment.immutableImages.sourceCommit, root
+  });
   const port = environment.COURTSIDE_SECURITY_HTTPS_PORT;
-  const source = JSON.parse(execute("curl", ["--fail", "--silent", "--insecure",
+  const command = environment.immutableImages ? executeReusableSecurityCommand : execute;
+  if (environment.immutableImages) assertSecurityRuntimeBinding(securityProjectResources(runId, command), environment.immutableRuntime);
+  const source = JSON.parse(command("curl", ["--fail", "--silent", "--insecure",
     "--resolve", `localhost:${port}:127.0.0.1`, `https://localhost:${port}/api/source`]));
-  const container = JSON.parse(execute("docker", ["inspect", `${securityProject(runId)}-app-1`, "--format", "{{json .}}"]));
-  const expectedImage = execute("docker", ["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE,
+  const container = JSON.parse(command("docker", ["inspect", `${securityProject(runId)}-app-1`, "--format", "{{json .}}"]));
+  const expectedImage = command("docker", ["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE,
     "--format", "{{.Id}}"]).trim();
-  const imageArchitecture = execute("docker", ["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE,
+  const imageArchitecture = command("docker", ["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE,
     "--format", "{{.Architecture}}"]).trim();
-  assertSecurityIdentity({ source, labels: container.Config.Labels, image: container.Image }, environment, expectedImage);
+  assertSecurityIdentity({ source, labels: container.Config.Labels, image: container.Image,
+    reference: container.Config.Image }, environment, expectedImage);
+  if (environment.immutableImages && source.commit !== environment.immutableImages.sourceCommit) {
+    throw new Error("Immutable security runtime source does not match the selected commit");
+  }
   if (typeof source.commit !== "string" || !/^[a-f0-9]{7,64}$/.test(source.commit)) {
     throw new Error("The security candidate does not report a traceable source commit");
   }
@@ -557,7 +640,12 @@ export function verifySecurityEnvironment(runId) {
 }
 
 export async function verifySecurityEnvironmentForAssessment(runId, { stopFile, deadline }) {
-  const environment = mergeSecurityProcessEnvironment(readSecurityEnvironment(runId));
+  const recorded = readSecurityEnvironment(runId);
+  if (recorded.immutableImages) verifyReusableImages(recorded.immutableImages, {
+    image: recorded.COURTSIDE_SECURITY_IMAGE, fixturesImage: recorded.immutableImages.fixturesImageID,
+    sourceCommit: recorded.immutableImages.sourceCommit, root
+  });
+  const environment = mergeSecurityProcessEnvironment(recorded);
   const control = {
     beforeRequest() {
       if (existsSync(stopFile)) throw new Error("Emergency stop requested");
@@ -569,6 +657,21 @@ export async function verifySecurityEnvironmentForAssessment(runId, { stopFile, 
   };
   const command = async (args) => runSecurityCommand("docker", args, environment, control, stopFile);
   control.beforeRequest();
+  if (recorded.immutableImages) {
+    if (!Array.isArray(recorded.immutableRuntime) || !recorded.immutableRuntime.length) {
+      throw new Error("Immutable SECURITY retained runtime is missing");
+    }
+    const ids = (await command(["ps", "-aq", "--no-trunc", "--filter",
+      `label=com.docker.compose.project=${securityProject(runId)}`])).stdout.trim().split("\n").filter(Boolean);
+    if (!ids.length || ids.length > 32 || ids.some(id => !/^[a-f0-9]{64}$/.test(id))) {
+      throw new Error("Immutable SECURITY effective runtime is incomplete");
+    }
+    const containers = JSON.parse((await command(["inspect", ...ids])).stdout);
+    const resources = containers.map(container => ({ type: "container", id: container.Id, name: container.Name,
+      image: container.Image, reference: container.Config?.Image, labels: container.Config?.Labels,
+      config: container.Config, hostConfig: container.HostConfig }));
+    assertSecurityRuntimeBinding(resources, recorded.immutableRuntime);
+  }
   const port = environment.COURTSIDE_SECURITY_HTTPS_PORT;
   const sourceResult = await runOwnedProcess("curl", ["--fail", "--silent", "--insecure",
     "--resolve", `localhost:${port}:127.0.0.1`, `https://localhost:${port}/api/source`], {
@@ -582,7 +685,11 @@ export async function verifySecurityEnvironmentForAssessment(runId, { stopFile, 
   const container = JSON.parse(containerResult.stdout);
   const expectedImage = imageResult.stdout.trim();
   const imageArchitecture = architectureResult.stdout.trim();
-  assertSecurityIdentity({ source, labels: container.Config.Labels, image: container.Image }, environment, expectedImage);
+  assertSecurityIdentity({ source, labels: container.Config.Labels, image: container.Image,
+    reference: container.Config.Image }, { ...environment, ...(recorded.immutableImages ? { immutableImages: recorded.immutableImages } : {}) }, expectedImage);
+  if (recorded.immutableImages && source.commit !== recorded.immutableImages.sourceCommit) {
+    throw new Error("Immutable security runtime source does not match the selected commit");
+  }
   if (typeof source.commit !== "string" || !/^[a-f0-9]{7,64}$/.test(source.commit)) {
     throw new Error("The security candidate does not report a traceable source commit");
   }
@@ -623,9 +730,6 @@ export async function inspectPassiveSecurityRuntime(plan, { control, stopFile })
   const management = (await runSecurityCommand("docker", ["exec", `${project}-app-1`, "curl", "--silent",
     "--output", "/dev/null", "--write-out", "%{http_code}", "http://127.0.0.1:8080/actuator/health"],
   environment, control, stopFile)).stdout.trim();
-  // The meter registry answers inside the container so the abuse run can sample it, and the proxy
-  // must answer 404 for it. Two requests rather than a reading of the files that configure them:
-  // this deployment already rewrites two other actuator paths onto external routes.
   const meters = (await runSecurityCommand("docker", ["exec", `${project}-app-1`, "curl", "--silent",
     "--output", "/dev/null", "--write-out", "%{http_code}", "http://127.0.0.1:8080/actuator/prometheus"],
   environment, control, stopFile)).stdout.trim();
@@ -917,8 +1021,6 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
   }
 }
 
-// The cap the gateway relays under is stated here, not derived from what the scanner may probe:
-// widening the probe set must not widen the boundary that is meant to bound it.
 const GATEWAY_RELAYABLE_METHODS = ["HEAD", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 
 export function relayableMethods(policy) {
@@ -1004,8 +1106,6 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
       generatedBytes += Buffer.byteLength(report);
       events[mode] = report.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
     };
-    // Positive mode used to be GET-only, so a fingerprint taken after it still bracketed every
-    // request that could write; it now generates reading POSTs, whose effect would be baked in.
     const stateBefore = await limits.captureState();
     await runMode("positive");
     await runMode("negative");
@@ -1070,7 +1170,9 @@ export async function resetSecurityLoginAttempts(runId, stopFile, timeoutMillise
 }
 
 export async function runResourceAbuse(plan, stopFile, limits) {
-  const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
+  const recorded = readSecurityEnvironment(plan.runId);
+  const immutableImages = recorded.immutableImages;
+  const environment = { ...process.env, ...mergeSecurityProcessEnvironment(recorded),
     COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests),
     COURTSIDE_SECURITY_MAX_CONCURRENCY: String(plan.budgets.concurrency),
     COURTSIDE_SECURITY_ALLOWED_METHODS: "GET,HEAD,POST,DELETE,OPTIONS",
@@ -1137,7 +1239,9 @@ export async function runResourceAbuse(plan, stopFile, limits) {
     const candidate = JSON.parse((await command(["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE,
       "--format", "{{json .}}"])).stdout);
     if (!scannerRuntimeOwned(appRuntime, environment) || !/^sha256:[a-f0-9]{64}$/.test(candidate.Id)
-        || appRuntime.Image !== candidate.Id || appRuntime.Config?.Image !== environment.COURTSIDE_SECURITY_IMAGE
+        || (immutableImages ? candidate.Id !== immutableImages.productionImageID
+          || appRuntime.Image !== immutableImages.runtimeImageIDs?.production : appRuntime.Image !== candidate.Id)
+        || appRuntime.Config?.Image !== environment.COURTSIDE_SECURITY_IMAGE
         || !candidate.Config || !appRuntime.Config
         || ["Entrypoint", "Cmd", "User"].some(field =>
           JSON.stringify(appRuntime.Config[field] ?? null) !== JSON.stringify(candidate.Config[field] ?? null))) {
@@ -1146,6 +1250,9 @@ export async function runResourceAbuse(plan, stopFile, limits) {
     const fixture = JSON.parse((await command(["image", "inspect", environment.COURTSIDE_SECURITY_FIXTURES_IMAGE,
       "--format", "{{json .}}"])).stdout);
     assertFixtureImageDerivation(candidate, fixture);
+    if (immutableImages && fixture.Id !== immutableImages.fixturesImageID) {
+      throw new Error("Resource-abuse immutable fixture identity mismatch");
+    }
     const decoderPlan = resourceSessionDecoderPlan(environment, limits.attempt, fixture.Id);
     const sourceAddress = gatewayRuntime.NetworkSettings.Networks[`${securityProject(plan.runId)}_scanner-upstream`]?.IPAddress;
     if (typeof sourceAddress !== "string" || !/^(?:\d{1,3}\.){3}\d{1,3}$/.test(sourceAddress)
@@ -1163,7 +1270,18 @@ export async function runResourceAbuse(plan, stopFile, limits) {
     try {
       decoder = decoderPlan.name;
       await command(decoderPlan.args);
+      if (immutableImages) {
+        const runtime = JSON.parse((await command(["inspect", decoder, "--format", "{{json .}}"])).stdout);
+        if (!scannerRuntimeOwned(runtime, environment) || runtime.Config?.Image !== immutableImages.fixturesImageID
+            || runtime.Image !== immutableImages.runtimeImageIDs?.fixtures) {
+          throw new Error("Immutable SECURITY decoder runtime identity changed");
+        }
+      }
       const classDigests = await mountedFileDigests(decoder, resourceSessionProjectionClassPaths, command);
+      if (immutableImages && resourceSessionProjectionClassPaths.some(path =>
+        classDigests[path] !== `sha256:${immutableImages.helperClassDigests?.[path]}`)) {
+        throw new Error("Immutable SECURITY decoder helper bytes changed");
+      }
       runtimeBinding = { sourceDigest: `sha256:${createHash("sha256").update(readFileSync(join(root,
         "src/main/java/org/courtside/securityassessment/SecuritySessionAttributeProjection.java"))).digest("hex")}`, classDigests };
     } catch { }
@@ -1174,6 +1292,9 @@ export async function runResourceAbuse(plan, stopFile, limits) {
         const eventClass = "/app/BOOT-INF/classes/org/courtside/shared/BookingConfirmed.class";
         const candidateClasses = await mountedFileDigests(app, [listenerClass, eventClass, publicationPolicy.repositoryJarPath], command);
         const decoderClasses = await mountedFileDigests(decoder, [helperClass, listenerClass, eventClass, publicationPolicy.repositoryJarPath], command);
+        if (immutableImages && decoderClasses[helperClass] !== `sha256:${immutableImages.helperClassDigests?.[helperClass]}`) {
+          throw new Error("Immutable SECURITY publication helper bytes changed");
+        }
         if ([listenerClass, eventClass, publicationPolicy.repositoryJarPath].some(path => candidateClasses[path] !== decoderClasses[path])) {
           throw new Error("Resource-abuse publication class mismatch");
         }
@@ -1345,7 +1466,9 @@ export async function runResourceAbuse(plan, stopFile, limits) {
         })).stdout);
         if (!scannerRuntimeOwned(runtime, environment)
             || runtime.Config?.Labels?.["com.docker.compose.project"] !== securityProject(plan.runId)
-            || !/^[a-f0-9]{64}$/.test(runtime.Id)) {
+            || !/^[a-f0-9]{64}$/.test(runtime.Id)
+            || immutableImages && resource === decoder && (runtime.Config?.Image !== immutableImages.fixturesImageID
+              || runtime.Image !== immutableImages.runtimeImageIDs?.fixtures)) {
           cleanupFailures.push(resource);
           continue;
         }
@@ -1527,17 +1650,17 @@ export function stopSecurityEnvironment(runId) {
   });
 }
 
-function reserveSecurityEnvironment(environment) {
-  execute("docker", securityReservationArgs(environment));
+function reserveSecurityEnvironment(environment, command = execute) {
+  command("docker", securityReservationArgs(environment));
   const expected = {
     runId: environment.COURTSIDE_SECURITY_RUN_ID,
     seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
     instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
   };
   try {
-    assertSecurityRecoveryOwnership(securityProjectResources(expected.runId), expected);
+    assertSecurityRecoveryOwnership(securityProjectResources(expected.runId, command), expected);
   } catch (failure) {
-    execute("docker", ["rm", `courtside-security-reservation-${expected.runId}`]);
+    command("docker", ["rm", `courtside-security-reservation-${expected.runId}`]);
     throw failure;
   }
 }
@@ -1548,10 +1671,28 @@ export function recoverSecurityEnvironment(runId, expected) {
 }
 
 function removeOwnedSecurityEnvironment(runId, expected) {
-  const resources = securityProjectResources(runId);
+  const recorded = existsSync(securityStateFile(runId)) ? readSecurityEnvironment(runId) : undefined;
+  const command = recorded?.immutableImages ? executeReusableSecurityCommand : execute;
+  const resources = securityProjectResources(runId, command);
   assertSecurityRecoveryOwnership(resources, expected);
-  removeSecurityResources(resources);
-  removeSecurityImage(securityFixturesImageTag(runId));
+  if (recorded?.immutableImages) verifyReusableImages(recorded.immutableImages, {
+    image: recorded.COURTSIDE_SECURITY_IMAGE, fixturesImage: recorded.immutableImages.fixturesImageID,
+    sourceCommit: recorded.immutableImages.sourceCommit, root
+  });
+  if (recorded?.immutableImages) {
+    const proof = recorded.immutableImages;
+    for (const resource of resources.filter((item) => item.type === "container")) {
+      const service = resource.labels?.["com.docker.compose.service"];
+      const subject = service === "app" ? "production" : ["seeder", "session-decoder"].includes(service) ? "fixtures" : undefined;
+      if (subject && (resource.reference !== (subject === "production" ? proof.productionImageID : proof.fixturesImageID)
+          || resource.image !== proof.runtimeImageIDs?.[subject])) {
+        throw new Error("Immutable SECURITY cleanup runtime identity changed");
+      }
+    }
+    assertSecurityRuntimeBinding(resources, recorded.immutableRuntime, { allowMissing: true });
+  }
+  removeSecurityResources(resources, command);
+  if (!recorded?.immutableImages) removeSecurityImage(securityFixturesImageTag(runId));
   rmSync(securityStateFile(runId), { force: true });
   rmSync(securityIdentityFile(runId), { force: true });
 }
@@ -1561,33 +1702,35 @@ function removeSecurityImage(tag) {
   execute("docker", ["image", "rm", "-f", tag]);
 }
 
-function securityProjectResources(runId) {
+function securityProjectResources(runId, command = execute) {
   const project = securityProject(runId);
   const filter = `label=com.docker.compose.project=${project}`;
-  const containers = execute("docker", ["ps", "-aq", "--filter", filter]).trim().split("\n").filter(Boolean);
-  const networks = execute("docker", ["network", "ls", "-q", "--filter", filter]).trim().split("\n").filter(Boolean);
-  const volumes = execute("docker", ["volume", "ls", "-q", "--filter", filter]).trim().split("\n").filter(Boolean);
+  const containers = command("docker", ["ps", "-aq", "--no-trunc", "--filter", filter]).trim().split("\n").filter(Boolean);
+  const networks = command("docker", ["network", "ls", "-q", "--filter", filter]).trim().split("\n").filter(Boolean);
+  const volumes = command("docker", ["volume", "ls", "-q", "--filter", filter]).trim().split("\n").filter(Boolean);
   return [
-    ...inspectResources("container", containers, ["inspect"]),
-    ...inspectResources("network", networks, ["network", "inspect"]),
-    ...inspectResources("volume", volumes, ["volume", "inspect"])
+    ...inspectResources("container", containers, ["inspect"], command),
+    ...inspectResources("network", networks, ["network", "inspect"], command),
+    ...inspectResources("volume", volumes, ["volume", "inspect"], command)
   ];
 }
 
-function inspectResources(type, ids, command) {
+function inspectResources(type, ids, args, command = execute) {
   if (!ids.length) return [];
-  return JSON.parse(execute("docker", [...command, ...ids])).map((resource) => ({
+  return JSON.parse(command("docker", [...args, ...ids])).map((resource) => ({
     type,
     id: resource.Id ?? resource.ID ?? resource.Name,
-    labels: resource.Config?.Labels ?? resource.Labels
+    labels: resource.Config?.Labels ?? resource.Labels,
+    ...(type === "container" ? { image: resource.Image, reference: resource.Config?.Image, name: resource.Name,
+      config: resource.Config, hostConfig: resource.HostConfig } : {})
   }));
 }
 
-function removeSecurityResources(resources) {
-  for (const [type, command] of [["container", ["rm", "-f"]], ["network", ["network", "rm"]],
+function removeSecurityResources(resources, command = execute) {
+  for (const [type, args] of [["container", ["rm", "-f"]], ["network", ["network", "rm"]],
     ["volume", ["volume", "rm"]]]) {
     const ids = resources.filter((resource) => resource.type === type).map((resource) => resource.id);
-    if (ids.length) execute("docker", [...command, ...ids]);
+    if (ids.length) command("docker", [...args, ...ids]);
   }
 }
 

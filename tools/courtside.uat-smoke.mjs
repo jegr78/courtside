@@ -8,359 +8,446 @@ import {
   uatImageReference, uatInstance, uatSmokeEnvironment
 } from "./courtside.mjs";
 
-const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const confirmation = process.argv.slice(2);
-const instance = uatInstance();
-const compose = ["compose", "-p", instance.project, "-f", join(root, "deploy", "compose.uat.yaml")];
-const build = join(root, "build", "uat-smoke");
+import { createImmutableQualification, immutableQualificationOptions, immutableQualificationRequest } from "./immutable-qualification.mjs";
+import { createHash } from "node:crypto";
 
-if (confirmation.join(" ") !== `--confirm ${instance.project}`) {
-  throw new Error(`UAT smoke testing is destructive; pass --confirm ${instance.project}`);
-}
+const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
-const version = process.env.COURTSIDE_UAT_VERSION;
-const smokeEnvironment = uatSmokeEnvironment(version);
+export async function runUatSmoke({ args = process.argv.slice(2), environment = process.env,
+  execute = spawnSync, request: suppliedRequest, repository = repositoryRoot,
+  platform = process.platform, architecture = process.arch } = {}) {
+  const root = repository;
+  const immutable = immutableQualificationOptions(args, environment);
+  const request = suppliedRequest ?? (immutable ? immutableQualificationRequest : localRequest);
+  const selectedEnvironment = immutable ? { ...environment, COURTSIDE_UAT_PROJECT: immutable.project } : environment;
+  const confirmation = args;
+  const instance = uatInstance(selectedEnvironment);
+  const compose = ["compose", "-p", instance.project, "-f", join(root, "deploy", "compose.uat.yaml")];
+  const build = immutable ? join(root, "build", "immutable-qualification", immutable.project) : join(root, "build", "uat-smoke");
 
-mkdirSync(build, { recursive: true });
-
-function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
-    cwd: root, encoding: options.binary ? undefined : "utf8", env: options.environment ?? process.env,
-    stdio: options.inherit ? "inherit" : "pipe"
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} exited with status ${result.status}: ${result.stderr ?? ""}`);
-  return result.stdout?.toString().trim() ?? "";
-}
-
-function cli(args, environment = process.env) {
-  run(process.execPath, [join(root, "tools", "courtside.mjs"), ...args], { inherit: true, environment });
-}
-
-function composeRun(...args) {
-  return run("docker", [...compose, ...args], { environment: smokeEnvironment });
-}
-
-function previewBookingSeed() {
-  const candidate = uatBookingSeedCandidate();
-  if (!candidate) return;
-  const output = run("docker", [...compose, "-f", candidate.composeFile,
-    "run", "--rm", "--no-deps", "app"], {
-    environment: { ...smokeEnvironment, COURTSIDE_BOOKING_SEED_IMAGE: candidate.image,
-      COURTSIDE_BOOKING_SEED_WRITE: "false" },
-  });
-  assert.match(output, /UAT booking seed previewed: planned=\d+, inserted=0, existing=\d+, conflicts=\d+, unavailable=/);
-}
-
-function rememberCookies(jar, response) {
-  for (const cookie of response.headers["set-cookie"] ?? []) {
-    const [pair] = cookie.split(";", 1);
-    const separator = pair.indexOf("=");
-    jar.set(pair.slice(0, separator), pair.slice(separator + 1));
+  if (!immutable && confirmation.join(" ") !== `--confirm ${instance.project}`) {
+    throw new Error(`UAT smoke testing is destructive; pass --confirm ${instance.project}`);
   }
-}
 
-function sessionHeaders(jar, headers = {}) {
-  return {
-    Cookie: [...jar].map(([name, value]) => `${name}=${value}`).join("; "),
-    ...headers
+  const version = environment.COURTSIDE_UAT_VERSION;
+  const smokeEnvironment = immutable ? { ...selectedEnvironment, COURTSIDE_UAT_IMAGE: immutable.image }
+    : uatSmokeEnvironment(version, selectedEnvironment);
+  let lifecycle;
+  let receipt;
+  let originalFailure;
+
+  if (immutable && existsSync(build)) throw new Error("Immutable qualification evidence directory already exists");
+  mkdirSync(build, { recursive: true, mode: immutable ? 0o700 : 0o777 });
+  const attempt = immutable ? { schemaVersion: 1, ...immutable, status: "running",
+    startedAt: new Date().toISOString(), cleanup: "not-started" } : undefined;
+  const persistAttempt = () => {
+    if (attempt) writeFileSync(join(build, "attempt.json"), `${JSON.stringify(attempt, null, 2)}\n`, { mode: 0o600 });
   };
-}
+  persistAttempt();
 
-function mutationHeaders(jar, headers = {}) {
-  return sessionHeaders(jar, { "X-XSRF-TOKEN": decodeURIComponent(jar.get("__Host-XSRF-TOKEN")), ...headers });
-}
-
-async function requestWithCookies(jar, options) {
-  const response = await localRequest({ secure: false, port: instance.sharedPort, ...options,
-    headers: sessionHeaders(jar, options.headers) });
-  rememberCookies(jar, response);
-  return response;
-}
-
-async function logIn(jar, password) {
-  const setup = await requestWithCookies(jar, { path: "/api/session" });
-  assert.equal(setup.statusCode, 200);
-  const response = await requestWithCookies(jar, {
-    path: "/api/session", method: "POST",
-    headers: mutationHeaders(jar, { "Content-Type": "application/x-www-form-urlencoded" }),
-    body: `username=admin&password=${encodeURIComponent(password)}`
-  });
-  assert.equal(response.statusCode, 200);
-  return response;
-}
-
-function futureBookingSlot() {
-  const startsAt = new Date();
-  startsAt.setUTCDate(startsAt.getUTCDate() + 2);
-  startsAt.setUTCHours(10, 0, 0, 0);
-  return { startsAt: startsAt.toISOString(), endsAt: new Date(startsAt.getTime() + 3_600_000).toISOString() };
-}
-
-function assertPlaintextRefusal(response) {
-  assert.equal(response.statusCode, 400);
-  assert.equal(response.body, "Plain HTTP is not accepted.");
-  assert.equal(response.headers.location, undefined);
-  assert.equal(response.headers["set-cookie"], undefined);
-  assert.equal(response.headers.server, undefined);
-  assert.equal(response.headers.via, undefined);
-  assert.equal(response.headers["cache-control"], "no-store");
-  assert.match(response.headers["content-security-policy"], /base-uri 'none'/);
-}
-
-function assertHostCookie(cookie, name, { httpOnly, expired = false }) {
-  assert.ok(cookie?.startsWith(`${name}=`));
-  const attributes = new Map(cookie.split(";").slice(1).map((part) => {
-    const [attribute, ...value] = part.trim().split("=");
-    return [attribute.toLowerCase(), value.join("=")];
-  }));
-  assert.equal(attributes.get("path"), "/");
-  assert.equal(attributes.get("samesite"), "Lax");
-  assert.equal(attributes.has("secure"), true);
-  assert.equal(attributes.has("httponly"), httpOnly);
-  assert.equal(attributes.has("domain"), false);
-  if (expired) assert.equal(attributes.get("max-age"), "0");
-}
-
-function assertNoLegacyAuthenticationCookies(response) {
-  for (const cookie of response.headers["set-cookie"] ?? []) {
-    assert.doesNotMatch(cookie, /^(?:SESSION|XSRF-TOKEN)=/);
-  }
-}
-
-const password = newBootstrapPassword();
-const permanentPassword = newBootstrapPassword();
-const plaintextCredential = "plaintext-credential-canary";
-const plaintextBody = "plaintext-body-canary";
-const cookies = new Map();
-let resetPassword;
-
-// The bootstrap password only reaches an instance whose database has no account yet, so a run
-// against a started UAT would sign in with a password that instance never had.
-cli(["uat-reset", instance.project]);
-
-try {
-  const startArguments = ["uat", "--no-credential-output", ...(version ? ["--version", version] : ["--skip-verify"])];
-  cli(startArguments, { ...smokeEnvironment, COURTSIDE_UAT_BOOTSTRAP_PASSWORD: password });
-  const appBefore = composeRun("ps", "-q", "app");
-  const image = composeRun("images", "app", "--format", "json");
-  const accountCount = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from user_account");
-  const localCa = composeRun("exec", "-T", "proxy", "cat", "/data/caddy/pki/authorities/local/root.crt");
-  composeRun("stop", "app");
-  const redirect = await localRequest({ secure: false, port: instance.httpPort, path: "/login?from=smoke" });
-  const headRedirect = await localRequest({
-    secure: false, port: instance.httpPort, path: "/courts?from=head", method: "HEAD"
-  });
-  const hostileRedirect = await localRequest({
-    secure: false, port: instance.httpPort, path: "/courts", headers: { Host: "attacker.example", Accept: "text/html" }
-  });
-  const plaintextRefusals = await Promise.all([
-    localRequest({
-      secure: false, port: instance.httpPort, path: "/api/session",
-      headers: { Accept: "text/html", Authorization: `Bearer ${plaintextCredential}` }
-    }),
-    localRequest({
-      secure: false, port: instance.httpPort, path: "/api/session", method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Mode": "navigate" },
-      body: `username=admin&password=${plaintextCredential}`
-    }),
-    localRequest({
-      secure: false, port: instance.httpPort, path: "/api/admin/import", method: "POST",
-      headers: { "Content-Type": "multipart/form-data; boundary=courtside-smoke" },
-      body: `--courtside-smoke\r\nContent-Disposition: form-data; name="file"\r\n\r\n${plaintextBody}\r\n`
-        + "--courtside-smoke--\r\n"
-    }),
-    localRequest({ secure: false, port: instance.httpPort, path: "/api/public/courts", method: "QUERY" }),
-    localRequest({
-      secure: false, port: instance.httpPort, path: "/login", method: "POST",
-      headers: { Accept: "text/html", "X-Forwarded-Proto": "https" }, body: plaintextBody
-    })
-  ]);
-  assert.equal(redirect.statusCode, 301);
-  assert.equal(redirect.headers.location, `https://localhost:${instance.httpsPort}/login?from=smoke`);
-  assert.equal(redirect.headers.server, undefined);
-  assert.equal(redirect.headers.via, undefined);
-  assert.equal(redirect.headers["cache-control"], "no-store");
-  assert.match(redirect.headers["content-security-policy"], /base-uri 'none'/);
-  assert.equal(headRedirect.statusCode, 301);
-  assert.equal(headRedirect.headers.location, `https://localhost:${instance.httpsPort}/courts?from=head`);
-  assert.equal(headRedirect.body, "");
-  assertPlaintextRefusal(hostileRedirect);
-  plaintextRefusals.forEach(assertPlaintextRefusal);
-  composeRun("up", "-d", "--wait", "app", "proxy");
-  const appStartedBefore = JSON.parse(run("docker", ["inspect", appBefore]))[0].State.StartedAt;
-  const session = await localRequest({ secure: true, port: instance.httpsPort, path: "/api/session", ca: localCa });
-  const frontend = await localRequest({ secure: true, port: instance.httpsPort, path: "/", ca: localCa });
-  const apiUi = await localRequest({ secure: true, port: instance.httpsPort, path: "/api-ui/", ca: localCa });
-  const apiDocument = await localRequest({ secure: true, port: instance.httpsPort, path: "/api/openapi.yaml", ca: localCa });
-  const sharedSession = await localRequest({ secure: false, port: instance.sharedPort, path: "/api/session" });
-  const sharedApiUi = await localRequest({ secure: false, port: instance.sharedPort, path: "/api-ui/" });
-  const sharedApiDocument = await localRequest({ secure: false, port: instance.sharedPort, path: "/api/openapi.yaml" });
-  const sharedActuator = await localRequest({ secure: false, port: instance.sharedPort, path: "/actuator/health" });
-  const csrfCookie = sharedSession.headers["set-cookie"]
-    .find((cookie) => cookie.startsWith("__Host-XSRF-TOKEN="));
-  const csrfToken = csrfCookie.match(/^__Host-XSRF-TOKEN=([^;]+)/)[1];
-  const login = await localRequest({
-    secure: false,
-    port: instance.sharedPort,
-    path: "/api/session",
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Cookie": `__Host-XSRF-TOKEN=${csrfToken}`,
-      "X-XSRF-TOKEN": csrfToken
-    },
-    body: `username=admin&password=${password}`
-  });
-
-  assert.equal(session.statusCode, 200);
-  assert.equal(frontend.statusCode, 200);
-  assert.match(frontend.body, /<div id="root"><\/div>/);
-  assert.equal(apiUi.statusCode, 200);
-  assert.match(apiUi.body, /Swagger UI/);
-  assert.match(apiUi.headers["content-security-policy"], /base-uri 'none'/);
-  assert.equal(apiDocument.statusCode, 200);
-  assert.match(apiDocument.body, /^openapi: 3\.1\.0/m);
-  assert.equal(sharedSession.statusCode, 200);
-  assert.equal(sharedApiUi.statusCode, 404);
-  assert.equal(sharedApiDocument.statusCode, 404);
-  assert.equal(sharedActuator.statusCode, 404);
-  assert.equal(sharedSession.headers["strict-transport-security"], "max-age=31536000");
-  assert.equal(sharedSession.headers["x-robots-tag"], "noindex, nofollow");
-  assert.equal(sharedSession.headers.via, undefined);
-  assert.match(sharedSession.headers["content-security-policy"], /img-src 'self' https:;/);
-  assert.match(sharedSession.headers["content-security-policy"], /base-uri 'none'/);
-  assert.doesNotMatch(sharedSession.headers["content-security-policy"], /(?:http:|data:)/);
-  assertHostCookie(csrfCookie, "__Host-XSRF-TOKEN", { httpOnly: false });
-  assert.equal(login.statusCode, 200);
-  assertHostCookie(login.headers["set-cookie"].find((cookie) => cookie.startsWith("__Host-SESSION=")),
-    "__Host-SESSION", { httpOnly: true });
-  [session, sharedSession, login].forEach(assertNoLegacyAuthenticationCookies);
-  assert.notEqual(accountCount, "0");
-  previewBookingSeed();
-
-  await logIn(cookies, password);
-  const passwordChange = await requestWithCookies(cookies, {
-    path: "/api/account/initial-password", method: "PUT",
-    headers: mutationHeaders(cookies, { "Content-Type": "application/json" }),
-    body: JSON.stringify({ password: permanentPassword })
-  });
-  assert.equal(passwordChange.statusCode, 204);
-  cookies.clear();
-  await logIn(cookies, permanentPassword);
-
-  const courts = await requestWithCookies(cookies, { path: "/api/public/courts" });
-  const cards = await requestWithCookies(cookies, { path: "/api/public/booking-cards" });
-  assert.equal(courts.statusCode, 200);
-  assert.equal(cards.statusCode, 200);
-  const unsupportedMethod = await requestWithCookies(cookies, {
-    path: "/api/public/courts", method: "QUERY", headers: mutationHeaders(cookies)
-  });
-  assert.equal(unsupportedMethod.statusCode, 405, unsupportedMethod.body);
-  assert.match(unsupportedMethod.headers["content-type"], /^application\/problem\+json/);
-  assert.equal(unsupportedMethod.headers.allow, "GET");
-  assert.equal(JSON.parse(unsupportedMethod.body).type, "urn:courtside:error:method-not-supported");
-  assert.equal(JSON.parse(unsupportedMethod.body).title, "Method not allowed");
-  const booking = await requestWithCookies(cookies, {
-    path: "/api/bookings", method: "POST",
-    headers: mutationHeaders(cookies, { "Content-Type": "application/json", "Idempotency-Key": "uat-image-smoke" }),
-    body: JSON.stringify({
-      courtIds: [JSON.parse(courts.body)[0].id],
-      cardId: JSON.parse(cards.body).find((card) => card.id === "11111111-1111-1111-1111-111111111111").id,
-      ...futureBookingSlot(),
-      participants: [{ guestName: "John Roe" }]
-    })
-  });
-  assert.equal(booking.statusCode, 201, booking.body);
-  const bookingId = JSON.parse(booking.body).id;
-  const oversizedRequest = await requestWithCookies(cookies, {
-    path: "/api/bookings", method: "POST",
-    headers: mutationHeaders(cookies, { "Content-Type": "application/json", "Idempotency-Key": "uat-oversized-request" }),
-    body: JSON.stringify({ padding: "x".repeat(2 * 1024 * 1024) })
-  });
-  assert.equal(oversizedRequest.statusCode, 413);
-  const sessionsBeforeRestart = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from spring_session");
-
-  composeRun("restart", "app");
-  composeRun("up", "-d", "--wait", "app", "proxy");
-  assert.equal(composeRun("ps", "-q", "app"), appBefore);
-  assert.notEqual(JSON.parse(run("docker", ["inspect", appBefore]))[0].State.StartedAt, appStartedBefore);
-  assert.equal(composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from user_account"), accountCount);
-  const sessionsAfterRestart = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from spring_session");
-  const persistedSession = await requestWithCookies(cookies, { path: "/api/session" });
-  assert.equal(JSON.parse(persistedSession.body).authenticated, true,
-    JSON.stringify({ sessionsBeforeRestart, sessionsAfterRestart, cookies: [...cookies.keys()], body: persistedSession.body }));
-  const personalBookings = await requestWithCookies(cookies, { path: "/api/my/bookings" });
-  assert.equal(personalBookings.statusCode, 200);
-  assert.match(personalBookings.body, new RegExp(bookingId));
-
-  const hostileHeaders = await localRequest({
-    secure: false, port: instance.sharedPort, path: "/api/session",
-    headers: { Host: "attacker.example", Forwarded: "host=attacker.example;proto=http", "X-Forwarded-Proto": "http" }
-  });
-  assert.equal(hostileHeaders.statusCode, 200);
-  assert.equal(hostileHeaders.headers["strict-transport-security"], "max-age=31536000");
-  assert.doesNotMatch(hostileHeaders.body, /attacker\.example/);
-
-  const logout = await requestWithCookies(cookies, {
-    path: "/api/session/logout", method: "POST", headers: mutationHeaders(cookies)
-  });
-  assert.equal(logout.statusCode, 204);
-  assertHostCookie(logout.headers["set-cookie"].find((cookie) => cookie.startsWith("__Host-SESSION=")),
-    "__Host-SESSION", { httpOnly: true, expired: true });
-  assertNoLegacyAuthenticationCookies(logout);
-  const loggedOutSession = await requestWithCookies(cookies, { path: "/api/session" });
-  assert.equal(JSON.parse(loggedOutSession.body).authenticated, false);
-
-  const appInspection = JSON.parse(run("docker", ["inspect", composeRun("ps", "-q", "app")]))[0];
-  assert.equal(appInspection.Config.User, "10001:10001");
-  assert.equal(appInspection.HostConfig.ReadonlyRootfs, true);
-  assert.deepEqual(appInspection.HostConfig.CapDrop, ["ALL"]);
-  assert.ok(appInspection.HostConfig.SecurityOpt.includes("no-new-privileges:true"));
-  assert.ok(Object.hasOwn(appInspection.HostConfig.Tmpfs, "/tmp"));
-  assert.equal(appInspection.NetworkSettings.Ports["8080/tcp"], null);
-
-  if (version) {
-    const imageReference = uatImageReference(version);
-    const repoDigests = JSON.parse(run("docker", ["image", "inspect", imageReference]))[0].RepoDigests;
-    assert.ok(repoDigests.some((digest) => digest.endsWith(`@${version.split("@")[1]}`)));
+  function run(command, args, options = {}) {
+    const result = execute(command, args, {
+      cwd: root, encoding: options.binary ? undefined : "utf8", env: options.environment ?? selectedEnvironment,
+      stdio: options.inherit ? "inherit" : "pipe",
+      ...(immutable ? { shell: false, timeout: 60_000, maxBuffer: 4 * 1024 * 1024 } : {})
+    });
+    if (immutable && (result.truncated || result.timedOut || result.signal)) throw new Error("Immutable smoke command exceeded its bounds");
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(immutable ? `${command} did not complete immutable smoke testing`
+      : `${command} exited with status ${result.status}: ${result.stderr ?? ""}`);
+    return result.stdout?.toString().trim() ?? "";
   }
 
-  const logs = composeRun("logs", "--no-color", "app", "proxy");
-  assert.match(logs, /Graceful shutdown complete/);
-  assert.doesNotMatch(logs,
-    new RegExp(`${password}|${permanentPassword}|${plaintextCredential}|${plaintextBody}`));
-  writeFileSync(join(build, "qualification.json"), `${JSON.stringify({
-    schemaVersion: 1,
-    status: "passed",
-    image: JSON.parse(image),
-    manifestDigest: version?.split("@")[1] ?? appInspection.Image,
-    architecture: process.arch === "x64" ? "amd64" : process.arch,
-    checks: { deployment: true, authentication: true, bookingPersistence: true, hardening: true }
-  }, null, 2)}\n`);
+  function cli(args, environment = selectedEnvironment) {
+    if (immutable) throw new Error("Immutable smoke cannot invoke the legacy lifecycle");
+    run(process.execPath, [join(root, "tools", "courtside.mjs"), ...args], { inherit: true, environment });
+  }
 
-  composeRun("cp", "proxy:/data/caddy/pki/authorities/local/root.crt", join(build, "root-before.crt"));
-  cli(["uat-reset", instance.project]);
-  assert.equal(existsSync(join(build, "root-before.crt")), true);
-  assert.equal(run("docker", ["volume", "ls", "--quiet", "--filter", `name=^${instance.project}_db$`]), "");
-  assert.equal(run("docker", ["volume", "ls", "--quiet", "--filter", `name=^${instance.project}_caddy-data$`]), `${instance.project}_caddy-data`);
+  function composeRun(...args) {
+    if (lifecycle) return lifecycle.composeRun(...args);
+    return run("docker", [...compose, ...args], { environment: smokeEnvironment });
+  }
 
-  resetPassword = newBootstrapPassword();
-  smokeEnvironment.COURTSIDE_UAT_ADMIN_PASSWORD = resetPassword;
-  composeRun("up", "-d", "--wait", "app", "proxy");
-  composeRun("cp", "proxy:/data/caddy/pki/authorities/local/root.crt", join(build, "root-after.crt"));
-  assert.deepEqual(readFileSync(join(build, "root-after.crt")), readFileSync(join(build, "root-before.crt")));
-} catch (failure) {
+  function previewBookingSeed() {
+    const candidate = uatBookingSeedCandidate(selectedEnvironment);
+    if (!candidate) return;
+    const output = run("docker", [...compose, "-f", candidate.composeFile,
+      "run", "--rm", "--no-deps", "app"], {
+      environment: { ...smokeEnvironment, COURTSIDE_BOOKING_SEED_IMAGE: candidate.image,
+        COURTSIDE_BOOKING_SEED_WRITE: "false" },
+    });
+    assert.match(output, /UAT booking seed previewed: planned=\d+, inserted=0, existing=\d+, conflicts=\d+, unavailable=/);
+  }
+
+  function rememberCookies(jar, response) {
+    for (const cookie of response.headers["set-cookie"] ?? []) {
+      const [pair] = cookie.split(";", 1);
+      const separator = pair.indexOf("=");
+      jar.set(pair.slice(0, separator), pair.slice(separator + 1));
+    }
+  }
+
+  function sessionHeaders(jar, headers = {}) {
+    return {
+      Cookie: [...jar].map(([name, value]) => `${name}=${value}`).join("; "),
+      ...headers
+    };
+  }
+
+  function mutationHeaders(jar, headers = {}) {
+    return sessionHeaders(jar, { "X-XSRF-TOKEN": decodeURIComponent(jar.get("__Host-XSRF-TOKEN")), ...headers });
+  }
+
+  async function requestWithCookies(jar, options) {
+    const response = await request({ secure: false, port: instance.sharedPort, ...options,
+      headers: sessionHeaders(jar, options.headers) });
+    rememberCookies(jar, response);
+    return response;
+  }
+
+  async function logIn(jar, password) {
+    const setup = await requestWithCookies(jar, { path: "/api/session" });
+    assert.equal(setup.statusCode, 200);
+    const response = await requestWithCookies(jar, {
+      path: "/api/session", method: "POST",
+      headers: mutationHeaders(jar, { "Content-Type": "application/x-www-form-urlencoded" }),
+      body: `username=admin&password=${encodeURIComponent(password)}`
+    });
+    assert.equal(response.statusCode, 200);
+    return response;
+  }
+
+  function futureBookingSlot() {
+    const startsAt = new Date();
+    startsAt.setUTCDate(startsAt.getUTCDate() + 2);
+    startsAt.setUTCHours(10, 0, 0, 0);
+    return { startsAt: startsAt.toISOString(), endsAt: new Date(startsAt.getTime() + 3_600_000).toISOString() };
+  }
+
+  function assertPlaintextRefusal(response) {
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.body, "Plain HTTP is not accepted.");
+    assert.equal(response.headers.location, undefined);
+    assert.equal(response.headers["set-cookie"], undefined);
+    assert.equal(response.headers.server, undefined);
+    assert.equal(response.headers.via, undefined);
+    assert.equal(response.headers["cache-control"], "no-store");
+    assert.match(response.headers["content-security-policy"], /base-uri 'none'/);
+  }
+
+  function assertHostCookie(cookie, name, { httpOnly, expired = false }) {
+    assert.ok(cookie?.startsWith(`${name}=`));
+    const attributes = new Map(cookie.split(";").slice(1).map((part) => {
+      const [attribute, ...value] = part.trim().split("=");
+      return [attribute.toLowerCase(), value.join("=")];
+    }));
+    assert.equal(attributes.get("path"), "/");
+    assert.equal(attributes.get("samesite"), "Lax");
+    assert.equal(attributes.has("secure"), true);
+    assert.equal(attributes.has("httponly"), httpOnly);
+    assert.equal(attributes.has("domain"), false);
+    if (expired) assert.equal(attributes.get("max-age"), "0");
+  }
+
+  function assertNoLegacyAuthenticationCookies(response) {
+    for (const cookie of response.headers["set-cookie"] ?? []) {
+      assert.doesNotMatch(cookie, /^(?:SESSION|XSRF-TOKEN)=/);
+    }
+  }
+
+  const password = newBootstrapPassword();
+  const permanentPassword = newBootstrapPassword();
+  const plaintextCredential = "plaintext-credential-canary";
+  const plaintextBody = "plaintext-body-canary";
+  const cookies = new Map();
+  let resetPassword;
+
+  if (!immutable) cli(["uat-reset", instance.project]);
+
   try {
-    const secrets = [
-      password, permanentPassword, resetPassword, plaintextCredential, plaintextBody, ...cookies.values()
-    ];
-    const logs = redactUatDiagnostics(composeRun("logs", "--no-color"), secrets);
-    writeFileSync(join(build, "container-logs.txt"), `${logs}\n`);
-  } catch {
-    writeFileSync(join(build, "container-logs.txt"), "Container logs were unavailable before cleanup.\n");
+    const startArguments = ["uat", "--no-credential-output", ...(version ? ["--version", version] : ["--skip-verify"])];
+    if (immutable) {
+      lifecycle = createImmutableQualification({ ...immutable, root, evidence: build, execute,
+        environment: selectedEnvironment, platform, architecture });
+      lifecycle.start(password);
+      lifecycle.assertCandidate();
+    } else {
+      cli(startArguments, { ...smokeEnvironment, COURTSIDE_UAT_BOOTSTRAP_PASSWORD: password });
+    }
+    const appBefore = composeRun("ps", "-q", "app");
+    const image = composeRun("images", "app", "--format", "json");
+    const accountCount = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from user_account");
+    const localCa = composeRun("exec", "-T", "proxy", "cat", "/data/caddy/pki/authorities/local/root.crt");
+    if (lifecycle) {
+      const source = await request({ secure: true, port: instance.httpsPort, path: "/api/source", ca: localCa });
+      assert.equal(source.statusCode, 200);
+      const offer = JSON.parse(source.body);
+      assert.equal(offer.commit, immutable.sourceCommit);
+      assert.equal(offer.environment, "UAT");
+      lifecycle.proof.tlsSource = { commit: offer.commit, version: offer.version,
+        bodySha256: createHash("sha256").update(source.body).digest("hex"), certificateSha256: source.certificateSha256 };
+    }
+    composeRun("stop", "app");
+    const redirect = await request({ secure: false, port: instance.httpPort, path: "/login?from=smoke" });
+    const headRedirect = await request({
+      secure: false, port: instance.httpPort, path: "/courts?from=head", method: "HEAD"
+    });
+    const hostileRedirect = await request({
+      secure: false, port: instance.httpPort, path: "/courts", headers: { Host: "attacker.example", Accept: "text/html" }
+    });
+    const plaintextRefusals = await Promise.all([
+      request({
+        secure: false, port: instance.httpPort, path: "/api/session",
+        headers: { Accept: "text/html", Authorization: `Bearer ${plaintextCredential}` }
+      }),
+      request({
+        secure: false, port: instance.httpPort, path: "/api/session", method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Mode": "navigate" },
+        body: `username=admin&password=${plaintextCredential}`
+      }),
+      request({
+        secure: false, port: instance.httpPort, path: "/api/admin/import", method: "POST",
+        headers: { "Content-Type": "multipart/form-data; boundary=courtside-smoke" },
+        body: `--courtside-smoke\r\nContent-Disposition: form-data; name="file"\r\n\r\n${plaintextBody}\r\n`
+          + "--courtside-smoke--\r\n"
+      }),
+      request({ secure: false, port: instance.httpPort, path: "/api/public/courts", method: "QUERY" }),
+      request({
+        secure: false, port: instance.httpPort, path: "/login", method: "POST",
+        headers: { Accept: "text/html", "X-Forwarded-Proto": "https" }, body: plaintextBody
+      })
+    ]);
+    assert.equal(redirect.statusCode, 301);
+    assert.equal(redirect.headers.location, `https://localhost:${instance.httpsPort}/login?from=smoke`);
+    assert.equal(redirect.headers.server, undefined);
+    assert.equal(redirect.headers.via, undefined);
+    assert.equal(redirect.headers["cache-control"], "no-store");
+    assert.match(redirect.headers["content-security-policy"], /base-uri 'none'/);
+    assert.equal(headRedirect.statusCode, 301);
+    assert.equal(headRedirect.headers.location, `https://localhost:${instance.httpsPort}/courts?from=head`);
+    assert.equal(headRedirect.body, "");
+    assertPlaintextRefusal(hostileRedirect);
+    plaintextRefusals.forEach(assertPlaintextRefusal);
+    composeRun("up", "-d", "--wait", "app", "proxy");
+    const appStartedBefore = JSON.parse(run("docker", ["inspect", appBefore]))[0].State.StartedAt;
+    const session = await request({ secure: true, port: instance.httpsPort, path: "/api/session", ca: localCa });
+    const frontend = await request({ secure: true, port: instance.httpsPort, path: "/", ca: localCa });
+    const apiUi = await request({ secure: true, port: instance.httpsPort, path: "/api-ui/", ca: localCa });
+    const apiDocument = await request({ secure: true, port: instance.httpsPort, path: "/api/openapi.yaml", ca: localCa });
+    const sharedSession = await request({ secure: false, port: instance.sharedPort, path: "/api/session" });
+    const sharedApiUi = await request({ secure: false, port: instance.sharedPort, path: "/api-ui/" });
+    const sharedApiDocument = await request({ secure: false, port: instance.sharedPort, path: "/api/openapi.yaml" });
+    const sharedActuator = await request({ secure: false, port: instance.sharedPort, path: "/actuator/health" });
+    const csrfCookie = sharedSession.headers["set-cookie"]
+      .find((cookie) => cookie.startsWith("__Host-XSRF-TOKEN="));
+    const csrfToken = csrfCookie.match(/^__Host-XSRF-TOKEN=([^;]+)/)[1];
+    const login = await request({
+      secure: false,
+      port: instance.sharedPort,
+      path: "/api/session",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Cookie": `__Host-XSRF-TOKEN=${csrfToken}`,
+        "X-XSRF-TOKEN": csrfToken
+      },
+      body: `username=admin&password=${password}`
+    });
+
+    assert.equal(session.statusCode, 200);
+    assert.equal(frontend.statusCode, 200);
+    assert.match(frontend.body, /<div id="root"><\/div>/);
+    assert.equal(apiUi.statusCode, 200);
+    assert.match(apiUi.body, /Swagger UI/);
+    assert.match(apiUi.headers["content-security-policy"], /base-uri 'none'/);
+    assert.equal(apiDocument.statusCode, 200);
+    assert.match(apiDocument.body, /^openapi: 3\.1\.0/m);
+    assert.equal(sharedSession.statusCode, 200);
+    assert.equal(sharedApiUi.statusCode, 404);
+    assert.equal(sharedApiDocument.statusCode, 404);
+    assert.equal(sharedActuator.statusCode, 404);
+    assert.equal(sharedSession.headers["strict-transport-security"], "max-age=31536000");
+    assert.equal(sharedSession.headers["x-robots-tag"], "noindex, nofollow");
+    assert.equal(sharedSession.headers.via, undefined);
+    assert.match(sharedSession.headers["content-security-policy"], /img-src 'self' https:;/);
+    assert.match(sharedSession.headers["content-security-policy"], /base-uri 'none'/);
+    assert.doesNotMatch(sharedSession.headers["content-security-policy"], /(?:http:|data:)/);
+    assertHostCookie(csrfCookie, "__Host-XSRF-TOKEN", { httpOnly: false });
+    assert.equal(login.statusCode, 200);
+    assertHostCookie(login.headers["set-cookie"].find((cookie) => cookie.startsWith("__Host-SESSION=")),
+      "__Host-SESSION", { httpOnly: true });
+    [session, sharedSession, login].forEach(assertNoLegacyAuthenticationCookies);
+    assert.notEqual(accountCount, "0");
+    previewBookingSeed();
+
+    await logIn(cookies, password);
+    const passwordChange = await requestWithCookies(cookies, {
+      path: "/api/account/initial-password", method: "PUT",
+      headers: mutationHeaders(cookies, { "Content-Type": "application/json" }),
+      body: JSON.stringify({ password: permanentPassword })
+    });
+    assert.equal(passwordChange.statusCode, 204);
+    cookies.clear();
+    await logIn(cookies, permanentPassword);
+
+    const courts = await requestWithCookies(cookies, { path: "/api/public/courts" });
+    const cards = await requestWithCookies(cookies, { path: "/api/public/booking-cards" });
+    assert.equal(courts.statusCode, 200);
+    assert.equal(cards.statusCode, 200);
+    const unsupportedMethod = await requestWithCookies(cookies, {
+      path: "/api/public/courts", method: "QUERY", headers: mutationHeaders(cookies)
+    });
+    assert.equal(unsupportedMethod.statusCode, 405, unsupportedMethod.body);
+    assert.match(unsupportedMethod.headers["content-type"], /^application\/problem\+json/);
+    assert.equal(unsupportedMethod.headers.allow, "GET");
+    assert.equal(JSON.parse(unsupportedMethod.body).type, "urn:courtside:error:method-not-supported");
+    assert.equal(JSON.parse(unsupportedMethod.body).title, "Method not allowed");
+    const booking = await requestWithCookies(cookies, {
+      path: "/api/bookings", method: "POST",
+      headers: mutationHeaders(cookies, { "Content-Type": "application/json", "Idempotency-Key": "uat-image-smoke" }),
+      body: JSON.stringify({
+        courtIds: [JSON.parse(courts.body)[0].id],
+        cardId: JSON.parse(cards.body).find((card) => card.id === "11111111-1111-1111-1111-111111111111").id,
+        ...futureBookingSlot(),
+        participants: [{ guestName: "John Roe" }]
+      })
+    });
+    assert.equal(booking.statusCode, 201, booking.body);
+    const bookingId = JSON.parse(booking.body).id;
+    const oversizedRequest = await requestWithCookies(cookies, {
+      path: "/api/bookings", method: "POST",
+      headers: mutationHeaders(cookies, { "Content-Type": "application/json", "Idempotency-Key": "uat-oversized-request" }),
+      body: JSON.stringify({ padding: "x".repeat(2 * 1024 * 1024) })
+    });
+    assert.equal(oversizedRequest.statusCode, 413);
+    const sessionsBeforeRestart = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from spring_session");
+
+    composeRun("restart", "app");
+    composeRun("up", "-d", "--wait", "app", "proxy");
+    if (lifecycle) lifecycle.assertCandidate();
+    assert.equal(composeRun("ps", "-q", "app"), appBefore);
+    assert.notEqual(JSON.parse(run("docker", ["inspect", appBefore]))[0].State.StartedAt, appStartedBefore);
+    assert.equal(composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from user_account"), accountCount);
+    const sessionsAfterRestart = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from spring_session");
+    const persistedSession = await requestWithCookies(cookies, { path: "/api/session" });
+    assert.equal(JSON.parse(persistedSession.body).authenticated, true,
+      JSON.stringify({ sessionsBeforeRestart, sessionsAfterRestart, cookies: [...cookies.keys()], body: persistedSession.body }));
+    const personalBookings = await requestWithCookies(cookies, { path: "/api/my/bookings" });
+    assert.equal(personalBookings.statusCode, 200);
+    assert.match(personalBookings.body, new RegExp(bookingId));
+
+    const hostileHeaders = await request({
+      secure: false, port: instance.sharedPort, path: "/api/session",
+      headers: { Host: "attacker.example", Forwarded: "host=attacker.example;proto=http", "X-Forwarded-Proto": "http" }
+    });
+    assert.equal(hostileHeaders.statusCode, 200);
+    assert.equal(hostileHeaders.headers["strict-transport-security"], "max-age=31536000");
+    assert.doesNotMatch(hostileHeaders.body, /attacker\.example/);
+
+    const logout = await requestWithCookies(cookies, {
+      path: "/api/session/logout", method: "POST", headers: mutationHeaders(cookies)
+    });
+    assert.equal(logout.statusCode, 204);
+    assertHostCookie(logout.headers["set-cookie"].find((cookie) => cookie.startsWith("__Host-SESSION=")),
+      "__Host-SESSION", { httpOnly: true, expired: true });
+    assertNoLegacyAuthenticationCookies(logout);
+    const loggedOutSession = await requestWithCookies(cookies, { path: "/api/session" });
+    assert.equal(JSON.parse(loggedOutSession.body).authenticated, false);
+
+    const appInspection = JSON.parse(run("docker", ["inspect", composeRun("ps", "-q", "app")]))[0];
+    assert.equal(appInspection.Config.User, "10001:10001");
+    assert.equal(appInspection.HostConfig.ReadonlyRootfs, true);
+    assert.deepEqual(appInspection.HostConfig.CapDrop, ["ALL"]);
+    assert.ok(appInspection.HostConfig.SecurityOpt.includes("no-new-privileges:true"));
+    assert.ok(Object.hasOwn(appInspection.HostConfig.Tmpfs, "/tmp"));
+    assert.equal(appInspection.NetworkSettings.Ports["8080/tcp"], null);
+
+    if (version) {
+      const imageReference = uatImageReference(version);
+      const repoDigests = JSON.parse(run("docker", ["image", "inspect", imageReference]))[0].RepoDigests;
+      assert.ok(repoDigests.some((digest) => digest.endsWith(`@${version.split("@")[1]}`)));
+    }
+
+    const logs = composeRun("logs", "--no-color", "app", "proxy");
+    assert.match(logs, /Graceful shutdown complete/);
+    assert.doesNotMatch(logs,
+      new RegExp(`${password}|${permanentPassword}|${plaintextCredential}|${plaintextBody}`));
+    if (lifecycle) lifecycle.assertCandidate();
+    receipt = {
+      schemaVersion: 1,
+      status: "passed",
+      image: JSON.parse(image),
+      manifestDigest: immutable?.image ?? version?.split("@")[1] ?? appInspection.Image,
+      architecture: lifecycle?.proof.architecture ?? (process.arch === "x64" ? "amd64" : process.arch),
+      checks: { deployment: true, authentication: true, bookingPersistence: true, hardening: true }
+    };
+    if (!immutable) writeFileSync(join(build, "qualification.json"), `${JSON.stringify(receipt, null, 2)}\n`);
+
+    composeRun("cp", "proxy:/data/caddy/pki/authorities/local/root.crt", join(build, "root-before.crt"));
+    if (lifecycle) lifecycle.reset();
+    else cli(["uat-reset", instance.project]);
+    assert.equal(existsSync(join(build, "root-before.crt")), true);
+    assert.equal(run("docker", ["volume", "ls", "--quiet", "--filter", `name=^${instance.project}_db$`]), "");
+    assert.equal(run("docker", ["volume", "ls", "--quiet", "--filter", `name=^${instance.project}_caddy-data$`]), `${instance.project}_caddy-data`);
+
+    resetPassword = newBootstrapPassword();
+    smokeEnvironment.COURTSIDE_UAT_ADMIN_PASSWORD = resetPassword;
+    if (lifecycle) lifecycle.environment.COURTSIDE_UAT_ADMIN_PASSWORD = resetPassword;
+    composeRun("up", "-d", "--wait", "app", "proxy");
+    if (lifecycle) lifecycle.assertCandidate();
+    composeRun("cp", "proxy:/data/caddy/pki/authorities/local/root.crt", join(build, "root-after.crt"));
+    assert.deepEqual(readFileSync(join(build, "root-after.crt")), readFileSync(join(build, "root-before.crt")));
+  } catch (failure) {
+    originalFailure = failure;
+    if (attempt) {
+      attempt.status = "failed";
+      attempt.finishedAt = new Date().toISOString();
+      persistAttempt();
+    }
+    try {
+      const secrets = [
+        password, permanentPassword, resetPassword, plaintextCredential, plaintextBody, ...cookies.values()
+      ];
+      if (immutable && !lifecycle) {
+        writeFileSync(join(build, "container-logs.txt"), "Container logs were unavailable before cleanup.\n", { mode: 0o600 });
+      } else {
+        const logs = redactUatDiagnostics(composeRun("logs", "--no-color"), secrets);
+        writeFileSync(join(build, "container-logs.txt"), `${logs}\n`, immutable ? { mode: 0o600 } : undefined);
+      }
+    } catch {
+      writeFileSync(join(build, "container-logs.txt"), "Container logs were unavailable before cleanup.\n", immutable ? { mode: 0o600 } : undefined);
+    }
+    throw failure;
+  } finally {
+    if (lifecycle) {
+      try {
+        lifecycle.cleanup();
+        attempt.cleanup = "passed";
+      } catch (failure) {
+        attempt.status = "failed";
+        attempt.cleanup = "failed";
+        persistAttempt();
+        throw new AggregateError([originalFailure, failure].filter(Boolean), "Immutable qualification cleanup failed");
+      }
+      persistAttempt();
+    }
+    else if (!immutable) cli(["uat-reset", instance.project, "--all"]);
   }
-  throw failure;
-} finally {
-  cli(["uat-reset", instance.project, "--all"]);
+  if (immutable) {
+    const bytes = `${JSON.stringify(receipt, null, 2)}\n`;
+    writeFileSync(join(build, "provenance.json"), `${JSON.stringify({
+      ...lifecycle.proof, project: immutable.project,
+      qualificationSha256: createHash("sha256").update(bytes).digest("hex"),
+      cleanup: "passed"
+    }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+    writeFileSync(join(build, "qualification.json"), bytes, { mode: 0o600, flag: "wx" });
+    attempt.status = "passed";
+    attempt.finishedAt = new Date().toISOString();
+    persistAttempt();
+  }
+  return receipt;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await runUatSmoke();
 }

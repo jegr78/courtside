@@ -15,6 +15,8 @@ import {
   authenticatedZapDiagnostic,
   assertSecurityIdentity, assertSecurityRecoveryOwnership, assertSecurityStartAvailable, availableLoopbackPort,
   evaluateRuntimeFilePermissions, recoveryEnvironment,
+  executeReusableSecurityCommand,
+  securityRuntimeBinding, assertSecurityRuntimeBinding,
   isMissingDockerResource,
   mergeSecurityProcessEnvironment,
   prometheusMetric,
@@ -35,11 +37,298 @@ import { fixtureImagePlan } from "./fixture-artifact.mjs";
 
 const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 
+function securityContainerFixture(recorded, service = "app") {
+  const labels = { "com.docker.compose.project": "courtside-security-run-0001", "com.docker.compose.service": service,
+    "org.courtside.environment": "SECURITY", "org.courtside.security.run-id": "run-0001",
+    "org.courtside.security.seed-fingerprint": recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+    "org.courtside.security.instance-fingerprint": recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT };
+  return { type: "container", id: createHash("sha256").update(service).digest("hex"),
+    name: `/courtside-security-run-0001-${service}-1`, labels,
+    image: recorded.immutableImages?.runtimeImageIDs?.production ?? recorded.COURTSIDE_SECURITY_IMAGE,
+    reference: recorded.COURTSIDE_SECURITY_IMAGE,
+    config: { Image: recorded.COURTSIDE_SECURITY_IMAGE, Env: ["LANG=C"], Entrypoint: ["java"], Cmd: [],
+      User: "10001:10001", Labels: labels }, hostConfig: { Memory: 1024 * 1024 * 1024, ReadonlyRootfs: true } };
+}
+
+test("given flagged incomplete or oversized immutable SECURITY command output, when the bounded executor returns, then reject instead of accepting a valid prefix", () => {
+  // given
+  // when / then
+  for (const result of [{ status: 0, stdout: "{}", stderr: "", truncated: true },
+    { status: 0, stdout: "{}", stderr: "", timedOut: true },
+    { status: 0, stdout: "{}" }, { status: 0, stdout: "{}", stderr: "x".repeat(4 * 1024 * 1024 + 1) }]) {
+    assert.throws(() => executeReusableSecurityCommand("docker", ["inspect", "owned"], {}, 10000, () => result),
+      { message: "Immutable SECURITY command did not complete within its bounds" });
+  }
+  const calls = [];
+  assert.equal(executeReusableSecurityCommand("docker", ["inspect", "owned"], {}, 10000,
+    (command, args, options) => { calls.push({ command, args, options }); return { status: 0, stdout: "{}", stderr: "" }; }), "{}");
+  assert.equal(calls[0].options.timeout, 10000);
+  assert.equal(calls[0].options.shell, false);
+  assert.throws(() => executeReusableSecurityCommand("sh", ["-c", "true"], {}, 10000, () => { throw new Error("Must not execute"); }),
+    { message: "Immutable SECURITY command exceeds its budget" });
+});
+
 function publicationPolicyFixture() {
   return { runtime: { Config: { Env: [], Entrypoint: ["java", "org.springframework.boot.loader.launch.JarLauncher"], Cmd: null } },
     application: yaml.load(readFileSync(new URL("../src/main/resources/application.yaml", import.meta.url), "utf8")),
     classpath: '- "BOOT-INF/lib/spring-modulith-events-jdbc-2.1.1.jar"\n' };
 }
+
+test("given immutable SECURITY state, when verifying startup identity, then bound every runtime query and reject another source commit", () => {
+  // given
+  const source = readFileSync(new URL("./security-environment.mjs", import.meta.url), "utf8");
+  const body = source.slice(source.indexOf("export function verifySecurityEnvironment("),
+    source.indexOf("\nexport async function verifySecurityEnvironmentForAssessment")).replace("export function", "function");
+  const image = `sha256:${"a".repeat(64)}`;
+  const recorded = { ...securityEnvironment("run-0001", image), immutableImages: {
+    productionImageID: image, fixturesImageID: `sha256:${"b".repeat(64)}`, sourceCommit: "c".repeat(40),
+    runtimeImageIDs: { production: `sha256:${"d".repeat(64)}` } } };
+  const calls = [];
+  let commit = recorded.immutableImages.sourceCommit;
+  const resources = [securityContainerFixture(recorded)];
+  recorded.immutableRuntime = securityRuntimeBinding(resources);
+  const context = { root: "/repo", readSecurityEnvironment: () => recorded, verifyReusableImages: () => {}, securityProject,
+    assertSecurityIdentity: () => {}, securityProjectResources: () => resources, assertSecurityRuntimeBinding,
+    execute: () => { throw new Error("Unexpected unbounded query"); },
+    executeReusableSecurityCommand: (command, args) => {
+      calls.push([command, ...args]);
+      if (command === "curl") return JSON.stringify({ environment: "SECURITY", commit });
+      if (args[0] === "inspect") return JSON.stringify({ Config: { Labels: {}, Image: image }, Image: recorded.immutableImages.runtimeImageIDs.production });
+      return args.at(-1) === "{{.Id}}" ? image : "amd64";
+    } };
+  vm.createContext(context);
+  vm.runInContext(body + "\nthis.verify = verifySecurityEnvironment;", context);
+  // when / then
+  assert.equal(context.verify("run-0001").applicationCommit, commit);
+  assert.equal(calls.length, 4);
+  resources[0].config.Env.push("JAVA_TOOL_OPTIONS=-Xmx4g");
+  assert.throws(() => context.verify("run-0001"), { message: "Immutable SECURITY effective runtime changed" });
+  resources[0].config.Env.pop();
+  resources[0].id = "f".repeat(64);
+  assert.throws(() => context.verify("run-0001"), { message: "Immutable SECURITY effective runtime changed" });
+  resources[0].id = recorded.immutableRuntime[0].id;
+  commit = "e".repeat(40);
+  assert.throws(() => context.verify("run-0001"), { message: "Immutable security runtime source does not match the selected commit" });
+});
+
+test("given immutable SECURITY assessment runtime drift, when the actual asynchronous verifier runs, then reject replacement ENV or limits before HTTP", async () => {
+  // given
+  const source = readFileSync(new URL("./security-environment.mjs", import.meta.url), "utf8");
+  const body = source.slice(source.indexOf("export async function verifySecurityEnvironmentForAssessment("),
+    source.indexOf("\nasync function runSecurityCommand(")).replace("export async function", "async function");
+  const image = `sha256:${"a".repeat(64)}`;
+  const recorded = { ...securityEnvironment("run-0001", image), immutableImages: {
+    fixturesImageID: `sha256:${"b".repeat(64)}`, sourceCommit: "c".repeat(40) } };
+  const original = securityContainerFixture(recorded);
+  recorded.immutableRuntime = securityRuntimeBinding([original]);
+  for (const mutation of [item => { item.id = "f".repeat(64); },
+    item => { item.config.Env.push("JAVA_TOOL_OPTIONS=-Xmx4g"); }, item => { item.hostConfig.Memory *= 2; }]) {
+    const item = structuredClone(original);
+    mutation(item);
+    const calls = [];
+    const context = { root: "/repo", readSecurityEnvironment: () => recorded, verifyReusableImages() {},
+      mergeSecurityProcessEnvironment: () => recorded, existsSync: () => false, securityProject,
+      assertSecurityRuntimeBinding, runOwnedProcess: () => { throw new Error("Unexpected HTTP request"); },
+      runSecurityCommand: async (_command, args) => {
+        calls.push(args);
+        return { stdout: args[0] === "ps" ? item.id : JSON.stringify([{ Id: item.id, Name: item.name,
+          Image: item.image, Config: item.config, HostConfig: item.hostConfig }]) };
+      } };
+    vm.createContext(context);
+    vm.runInContext(body + "\nthis.verify = verifySecurityEnvironmentForAssessment;", context);
+    // when / then
+    await assert.rejects(() => context.verify("run-0001", { stopFile: "/private/stop", deadline: new Date(Date.now() + 10000) }),
+      /Immutable SECURITY effective runtime changed/);
+    assert.deepEqual(calls.map(args => args[0]), ["ps", "inspect"]);
+    assert.ok(calls[0].includes("--no-trunc"));
+  }
+});
+
+function prebuiltRecoveryHarness({ drift = false, foreign = false, proofFailure = false, replacement = false, configDrift = false, limitDrift = false } = {}) {
+  const source = readFileSync(new URL("./security-environment.mjs", import.meta.url), "utf8");
+  const body = source.slice(source.indexOf("function removeOwnedSecurityEnvironment("),
+    source.indexOf("\nfunction removeSecurityImage("));
+  const image = `sha256:${"a".repeat(64)}`;
+  const runtimeImage = `sha256:${"b".repeat(64)}`;
+  const recorded = { ...securityEnvironment("run-0001", image), immutableImages: {
+    productionImageID: image, fixturesImageID: `sha256:${"c".repeat(64)}`,
+    sourceCommit: "d".repeat(40), runtimeImageIDs: { production: runtimeImage, fixtures: `sha256:${"e".repeat(64)}` } } };
+  const expected = { runId: "run-0001", seedFingerprint: recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+    instanceFingerprint: recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT };
+  const events = [];
+  const resources = [{ type: "container", id: "f".repeat(64), image: drift ? image : runtimeImage,
+    reference: image, labels: { "com.docker.compose.project": "courtside-security-run-0001",
+      "com.docker.compose.service": "app", "org.courtside.environment": "SECURITY",
+      "org.courtside.security.run-id": "run-0001", "org.courtside.security.seed-fingerprint": expected.seedFingerprint,
+      "org.courtside.security.instance-fingerprint": foreign ? "foreign" : expected.instanceFingerprint } }];
+  resources[0].name = "/courtside-security-run-0001-app-1";
+  resources[0].config = { Image: image, Env: ["LANG=C"], Entrypoint: ["java"], User: "10001:10001", Labels: resources[0].labels };
+  resources[0].hostConfig = { Memory: 1024 * 1024 * 1024, ReadonlyRootfs: true };
+  recorded.immutableRuntime = securityRuntimeBinding(resources);
+  if (replacement) resources[0].id = "e".repeat(64);
+  if (configDrift) resources[0].config.Env.push("JAVA_TOOL_OPTIONS=-Xmx4g");
+  if (limitDrift) resources[0].hostConfig.Memory *= 2;
+  const context = { root: "/repo", existsSync: () => true, securityStateFile: () => "/private/state",
+    securityIdentityFile: () => "/private/identity", readSecurityEnvironment: () => recorded,
+    execute: () => { throw new Error("Unexpected legacy command"); },
+    executeReusableSecurityCommand: () => { throw new Error("Unexpected uninjected command"); },
+    securityProjectResources: () => resources, assertSecurityRecoveryOwnership,
+    assertSecurityRuntimeBinding,
+    verifyReusableImages: () => { events.push("proof"); if (proofFailure) throw new Error("Proof changed"); },
+    removeSecurityResources: () => events.push("remove-resources"), removeSecurityImage: () => events.push("remove-image"),
+    securityFixturesImageTag: () => "unused", rmSync: () => events.push("remove-state") };
+  vm.createContext(context);
+  vm.runInContext(body + "\nthis.remove = removeOwnedSecurityEnvironment;", context);
+  return { events, run: () => context.remove("run-0001", expected) };
+}
+
+test("given same-image SECURITY replacement or effective configuration drift, when the actual recovery producer runs, then refuse before removing any resource or state", () => {
+  // given
+  for (const scenario of [{ replacement: true }, { configDrift: true }, { limitDrift: true }]) {
+    const harness = prebuiltRecoveryHarness(scenario);
+    // when / then
+    assert.throws(harness.run, { message: "Immutable SECURITY effective runtime changed" });
+    assert.ok(!harness.events.includes("remove-resources"));
+    assert.ok(!harness.events.includes("remove-state"));
+  }
+});
+
+test("given retained immutable SECURITY runtime mapping, when recovering owned resources, then retain shared images and refuse drift before removal", () => {
+  // given
+  const valid = prebuiltRecoveryHarness();
+  const changed = prebuiltRecoveryHarness({ drift: true });
+  // when / then
+  assert.doesNotThrow(valid.run);
+  assert.deepEqual(valid.events, ["proof", "remove-resources", "remove-state", "remove-state"]);
+  assert.throws(changed.run, { message: "Immutable SECURITY cleanup runtime identity changed" });
+  assert.deepEqual(changed.events, ["proof"]);
+});
+
+test("given foreign ownership or changed immutable SECURITY proof, when recovering, then retain resources state and imported images", () => {
+  // given
+  const foreign = prebuiltRecoveryHarness({ foreign: true });
+  const changed = prebuiltRecoveryHarness({ proofFailure: true });
+  // when / then
+  assert.throws(foreign.run);
+  assert.deepEqual(foreign.events, []);
+  assert.throws(changed.run, { message: "Proof changed" });
+  assert.deepEqual(changed.events, ["proof"]);
+});
+
+test("given independently proven engine and runtime image IDs, when verifying SECURITY identity, then accept only the exact retained mapping and requested reference", () => {
+  // given
+  const engineID = `sha256:${"a".repeat(64)}`;
+  const runtimeID = `sha256:${"b".repeat(64)}`;
+  const expected = { ...securityEnvironment("run-0001", engineID), immutableImages: {
+    productionImageID: engineID, runtimeImageIDs: { production: runtimeID } } };
+  const observed = { source: { environment: "SECURITY" }, image: runtimeID, reference: engineID, labels: {
+    "org.courtside.environment": "SECURITY", "org.courtside.security.run-id": "run-0001",
+    "org.courtside.security.seed-fingerprint": expected.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+    "org.courtside.security.instance-fingerprint": expected.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT } };
+  // when / then
+  assert.doesNotThrow(() => assertSecurityIdentity(observed, expected, engineID));
+  assert.throws(() => assertSecurityIdentity({ ...observed, reference: runtimeID }, expected, engineID),
+    { message: "The running target image does not match this security run" });
+  assert.throws(() => assertSecurityIdentity({ ...observed, image: engineID }, expected, engineID),
+    { message: "The running target image does not match this security run" });
+});
+
+test("given retained prebuilt fixture identity, when planning SECURITY seed, then reuse its exact image instead of a new build tag", () => {
+  // given
+  const image = `sha256:${"a".repeat(64)}`;
+  const fixture = `sha256:${"b".repeat(64)}`;
+  const recorded = { ...securityEnvironment("run-0001", image), immutableImages: {
+    schemaVersion: 1, productionImageID: image, fixturesImageID: fixture, sourceCommit: "c".repeat(40)
+  } };
+  // when
+  const plan = securitySeedPlan("run-0001", image, recorded);
+  // then
+  assert.equal(plan.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, fixture);
+  assert.ok(!Object.hasOwn(plan.environment, "immutableImages"));
+  assert.ok(!plan.args.includes("build"));
+  assert.deepEqual(plan.args.slice(plan.args.indexOf("--pull"), plan.args.indexOf("--pull") + 2), ["--pull", "never"]);
+});
+
+function prebuiltSeedHarness({ rejectProof = false, runtimeDrift = false, replacement = false, configDrift = false } = {}) {
+  const source = readFileSync(new URL("./security-environment.mjs", import.meta.url), "utf8");
+  const body = source.slice(source.indexOf("export function seedSecurityEnvironment("),
+    source.indexOf("\nfunction inspectImage(")).replace("export function", "function");
+  const image = `sha256:${"a".repeat(64)}`;
+  const recorded = { ...securityEnvironment("run-0001", image), immutableImages: {
+    productionImageID: image, fixturesImageID: `sha256:${"b".repeat(64)}`, sourceCommit: "c".repeat(40),
+    runtimeImageIDs: { production: `sha256:${"d".repeat(64)}` } } };
+  const events = [];
+  const context = { root: "/repo", resolve: (value) => value,
+    readFileSync: () => JSON.stringify(recorded), securitySeedPlan,
+    seedComposeFile: () => "/repo/deploy/compose.security.yaml",
+    stageFixtureClasses: () => { throw new Error("Unexpected immutable fixture staging"); },
+    inspectImage: () => { throw new Error("Unexpected immutable fixture build inspection"); },
+    verifyReusableImages: () => { events.push("proof"); if (rejectProof) throw new Error("Prebuilt fixture changed"); },
+    securityProjectResources: () => [{ type: "container", id: "d".repeat(64),
+      image: runtimeDrift ? image : recorded.immutableImages.runtimeImageIDs.production, reference: image, labels: {
+      "com.docker.compose.service": "app",
+      "com.docker.compose.project": "courtside-security-run-0001",
+      "org.courtside.environment": "SECURITY", "org.courtside.security.run-id": "run-0001",
+      "org.courtside.security.seed-fingerprint": recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+      "org.courtside.security.instance-fingerprint": recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT } }],
+    assertSecurityRecoveryOwnership, assertSecurityRuntimeBinding,
+    buildSecurityFixturesImage: () => events.push("build"), removeSecurityImage: () => events.push("delete-image"),
+    execute: (command, args, environment) => events.push({ command, args, environment }),
+    executeReusableSecurityCommand: (command, args, environment, timeoutMilliseconds) => events.push({ command, args, environment, timeoutMilliseconds }),
+    process: { env: {}, stdout: { write: () => {} } } };
+  const resources = context.securityProjectResources();
+  resources[0].name = "/courtside-security-run-0001-app-1";
+  resources[0].config = { Image: image, Env: ["LANG=C"], Labels: resources[0].labels };
+  resources[0].hostConfig = { Memory: 1024 * 1024 * 1024 };
+  recorded.immutableRuntime = securityRuntimeBinding(resources);
+  if (replacement) resources[0].id = "e".repeat(64);
+  if (configDrift) resources[0].config.Env.push("JAVA_TOOL_OPTIONS=-Xmx4g");
+  context.securityProjectResources = () => resources;
+  vm.createContext(context);
+  vm.runInContext(body + "\nthis.seed = seedSecurityEnvironment;", context);
+  return { events, fixture: recorded.immutableImages.fixturesImageID,
+    run: () => context.seed("run-0001", image, "/private/environment.json") };
+}
+
+test("given an owned prebuilt SECURITY fixture, when the actual seed producer runs, then verify proof before seeding and never rebuild or delete its imported image", () => {
+  // given
+  const harness = prebuiltSeedHarness();
+  // when
+  harness.run();
+  // then
+  assert.equal(harness.events[0], "proof");
+  assert.equal(harness.events.length, 2);
+  assert.equal(harness.events[1].environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, harness.fixture);
+  assert.ok(!Object.hasOwn(harness.events[1].environment, "immutableImages"));
+  assert.ok(harness.events[1].args.includes("never"));
+  assert.equal(harness.events[1].timeoutMilliseconds, 180_000);
+});
+
+test("given changed prebuilt SECURITY proof, when the actual seed producer refuses, then neither launch seeding nor delete the imported fixture", () => {
+  // given
+  const harness = prebuiltSeedHarness({ rejectProof: true });
+  // when / then
+  assert.throws(harness.run, { message: "Prebuilt fixture changed" });
+  assert.deepEqual(harness.events, ["proof"]);
+});
+
+test("given changed immutable SECURITY app runtime, when the seed producer checks its target, then refuse before seeding or image deletion", () => {
+  // given
+  const harness = prebuiltSeedHarness({ runtimeDrift: true });
+  // when / then
+  assert.throws(harness.run, { message: "Immutable SECURITY seed runtime identity changed" });
+  assert.deepEqual(harness.events, ["proof"]);
+});
+
+test("given same-image replacement or configuration drift in SECURITY, when the actual seed producer verifies retained containers, then refuse before seeding", () => {
+  // given
+  for (const scenario of [{ replacement: true }, { configDrift: true }]) {
+    const harness = prebuiltSeedHarness(scenario);
+    // when / then
+    assert.throws(harness.run, { message: "Immutable SECURITY effective runtime changed" });
+    assert.deepEqual(harness.events, ["proof"]);
+  }
+});
 
 test("given the actual native application YAML and approved diagnostic heap flags, when repository policy binds, then legitimate schema initialization false and trust options remain supported", () => {
   // given
@@ -119,7 +408,7 @@ test("given flattened settings or alternative Spring configuration sources, when
   }
 });
 
-function startupFailureHarness({ captureFailure = false, cleanupFailure = false, portConflict = false } = {}) {
+function startupFailureHarness({ captureFailure = false, cleanupFailure = false, portConflict = false, prebuilt = false, successful = false } = {}) {
   const source = readFileSync(new URL("./security-environment.mjs", import.meta.url), "utf8");
   const start = source.indexOf("export async function startSecurityEnvironment(");
   const end = source.indexOf("\nexport function fixtureImageBase", start);
@@ -129,15 +418,28 @@ function startupFailureHarness({ captureFailure = false, cleanupFailure = false,
   const failure = Object.assign(new Error("native private startup error"), { stderr: portConflict ? "port is already allocated" : "seeder failed" });
   const environment = securityEnvironment("run-0001", `sha256:${"a".repeat(64)}`);
   const commandEvents = [];
+  const states = [];
   const context = { events, failure, process: { env: {}, stdout: { write: () => {} } },
     stateRoot: "/private/security", root: "/repo", join, chmodSync: () => {},
-    assertSecurityStartAvailable: () => {}, securityProjectResources: () => [], existsSync: () => false,
+    assertSecurityStartAvailable: () => {}, securityProjectResources: () => events.includes("startup-succeeded")
+      ? [securityContainerFixture(environment)] : [], existsSync: () => false,
+    assertSecurityRecoveryOwnership, securityRuntimeBinding,
     securityStateFile: () => "/private/state", securityIdentityFile: () => "/private/identity",
     securityEnvironment: () => environment, randomBytes: () => Buffer.from("opaque"), availableLoopbackPort: async () => 12345,
-    reserveSecurityEnvironment: () => events.push("reserve"), writeState: () => {},
+    reserveSecurityEnvironment: () => events.push("reserve"), writeState: (_runId, state) => states.push(JSON.parse(JSON.stringify(state))),
     createSecurityMailCertificate: () => ({ fingerprint: "native" }), securityMailTrustPlan: () => ({ command: "docker", args: ["trust"] }),
-    buildSecurityFixturesImage: () => {}, securityComposeArgs: () => ["compose"],
+    inspectReusableImages: () => ({ schemaVersion: 1, productionImageID: `sha256:${"a".repeat(64)}`,
+      fixturesImageID: `sha256:${"b".repeat(64)}`, sourceCommit: "c".repeat(40) }),
+    verifyReusableImages: () => events.push("prebuilt-verified"),
+    buildSecurityFixturesImage: () => { if (prebuilt) events.push("unexpected-build"); }, securityComposeArgs: () => ["compose"],
     execute: (command, args) => { if (args.includes("up")) { events.push("startup-failed"); throw failure; } },
+    executeReusableSecurityCommand: (command, args, environment, timeoutMilliseconds) => {
+      if (args.includes("up")) {
+        events.push({ startupBudget: timeoutMilliseconds });
+        if (successful) { commandEvents.push({ command, args, environment }); events.push("startup-succeeded"); return; }
+        events.push("startup-failed"); throw failure;
+      }
+    },
     captureSecurityStartupDiagnostics: input => {
       events.push("capture");
       captureAttempts.push(input.attempt);
@@ -156,11 +458,44 @@ function startupFailureHarness({ captureFailure = false, cleanupFailure = false,
       return { status: 0, signal: null, stdout: Buffer.from("native JVM stdout"), stderr: Buffer.from("native JVM stderr") };
     },
     removeOwnedSecurityEnvironment: () => { events.push("cleanup"); if (cleanupFailure) throw new Error("raw cleanup error"); },
-    verifySecurityEnvironment: () => { throw new Error("must not verify after failure"); }, writeIdentity: () => {} };
+    verifySecurityEnvironment: () => { if (successful) return { runId: "run-0001" }; throw new Error("must not verify after failure"); },
+    writeIdentity: () => events.push("identity"), securityEnvironmentReadyMessage: () => "ready" };
   vm.createContext(context);
   vm.runInContext(body + "\nthis.start = startSecurityEnvironment;", context);
-  return { failure, events, commandEvents, captureAttempts, run: () => context.start("run-0001", `sha256:${"a".repeat(64)}`) };
+  return { failure, events, commandEvents, captureAttempts, states, run: () => context.start("run-0001", `sha256:${"a".repeat(64)}`,
+    prebuilt ? { fixturesImage: `sha256:${"b".repeat(64)}`, sourceCommit: "c".repeat(40) } : undefined) };
 }
+
+test("given complete prebuilt SECURITY selection, when the actual startup producer succeeds, then use no-build pull-never and retain identity without building fixtures", async () => {
+  // given
+  const harness = startupFailureHarness({ prebuilt: true, successful: true });
+  // when
+  await harness.run();
+  // then
+  const startup = harness.commandEvents.find(({ args }) => args.includes("up"));
+  assert.ok(startup.args.includes("--no-build"));
+  assert.deepEqual(Array.from(startup.args.slice(startup.args.indexOf("--pull"), startup.args.indexOf("--pull") + 2)), ["--pull", "never"]);
+  assert.equal(startup.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, `sha256:${"b".repeat(64)}`);
+  assert.ok(harness.events.includes("identity"));
+  assert.ok(!harness.events.includes("unexpected-build"));
+  assert.ok(!harness.events.includes("cleanup"));
+  const binding = harness.states.at(-1).immutableRuntime;
+  assert.equal(binding.length, 1);
+  assert.match(binding[0].id, /^[a-f0-9]{64}$/);
+  assert.equal(binding[0].hostConfig.Memory, 1024 * 1024 * 1024);
+  assert.deepEqual(binding[0].config.Env, ["LANG=C"]);
+});
+
+test("given explicit prebuilt selection and startup failure, when retaining diagnostics and cleaning owned resources, then never build the fixture", async () => {
+  // given
+  const harness = startupFailureHarness({ prebuilt: true });
+  // when / then
+  await assert.rejects(harness.run(), error => error === harness.failure);
+  assert.ok(harness.events.includes("prebuilt-verified"));
+  assert.ok(!harness.events.includes("unexpected-build"));
+  assert.ok(harness.events.indexOf("capture") < harness.events.indexOf("cleanup"));
+  assert.equal(harness.events.find(event => event?.startupBudget)?.startupBudget, 180_000);
+});
 
 for (const scenario of [{}, { captureFailure: true }, { cleanupFailure: true, portConflict: true }]) {
   test(`given a native startup failure with capture failure ${!!scenario.captureFailure} and cleanup failure ${!!scenario.cleanupFailure}, when handling it, then capture before cleanup and preserve the original primary error`, async () => {
@@ -192,15 +527,24 @@ function resourceIntegrationHarness({ processFailure = false, effectsOutcome = "
   malformedSummary = false, missingTelemetry = false, missingGatewayReceipt = false, evidenceMegabytes = 200,
   imageReference = `sha256:${"a".repeat(64)}`, runtimeImageId = `sha256:${"a".repeat(64)}`, runtimeOverride = {},
   privateRoot, earlyFailure, delayedPressure = false, oversizedBaseline = false,
-  completionMode = "delete", publicationOverride = false, publicationOutput, publicationClassDrift = false, publicationJarDrift = false } = {}) {
+  completionMode = "delete", publicationOverride = false, publicationOutput, publicationClassDrift = false, publicationJarDrift = false,
+  immutableProof = false, helperDrift = false, decoderRuntimeDrift = false, decoderCleanupDrift = false } = {}) {
   const calls = [];
   const writes = [];
   const events = [];
   const observations = [];
   const mailInputs = [];
   let releasePressure;
+  let decoderInspections = 0;
   const digest = `sha256:${"a".repeat(64)}`;
   const environment = { ...securityEnvironment("run-0001", imageReference), COURTSIDE_SECURITY_SHARED_PASSWORD: "private-password" };
+  if (immutableProof) {
+    environment.COURTSIDE_SECURITY_FIXTURES_IMAGE = `sha256:${"b".repeat(64)}`;
+    environment.immutableImages = { productionImageID: imageReference, fixturesImageID: environment.COURTSIDE_SECURITY_FIXTURES_IMAGE,
+      runtimeImageIDs: { production: runtimeImageId, fixtures: `sha256:${"c".repeat(64)}` },
+      helperClassDigests: { "/app/BOOT-INF/classes/Projection.class": "a".repeat(64),
+        "/app/BOOT-INF/classes/org/courtside/securityassessment/SecurityPublicationPolicyProjection.class": "a".repeat(64) } };
+  }
   const imageDefaults = { Entrypoint: ["java", "org.springframework.boot.loader.launch.JarLauncher"], Cmd: null, User: "10001:10001" };
   const labels = { "org.courtside.environment": "SECURITY", "org.courtside.security.run-id": "run-0001",
     "com.docker.compose.project": "courtside-security-run-0001",
@@ -237,11 +581,12 @@ function resourceIntegrationHarness({ processFailure = false, effectsOutcome = "
     writeNativeEvidence: privateRoot ? writeNativeEvidence : (handle, entry) => writes.push(entry),
     retainResourceEvidenceFailure,
     securityProject, securityComposeArgs, securityAssessmentReservationArgs, resourceSessionDecoderPlan, resourceAuthenticationPolicy, resourcePublicationPolicy, resourcePublicationProjection,
-    readSecurityEnvironment: () => environment, scannerRuntimeOwned: value => !value.foreign, scannerRuntimeHardened: () => true,
+    readSecurityEnvironment: () => environment, mergeSecurityProcessEnvironment,
+    scannerRuntimeOwned: value => !value.foreign, scannerRuntimeHardened: () => true,
     assertFixtureImageDerivation: () => events.push("fixture-binding"),
     resourceSessionProjectionClassPaths: ["/app/BOOT-INF/classes/Projection.class"],
     mountedFileDigests: async (container, paths) => Object.fromEntries(paths.map(path => [path,
-      container.includes("decoder") && (publicationClassDrift && path.endsWith("/BookingMailer.class")
+      container.includes("decoder") && (helperDrift && path.endsWith("/Projection.class") || publicationClassDrift && path.endsWith("/BookingMailer.class")
         || publicationJarDrift && path.endsWith("/spring-modulith-events-jdbc-2.1.1.jar")) ? `sha256:${"b".repeat(64)}` : digest])),
     captureResourceState: async () => { events.push("before-snapshot"); return before; },
     captureSecurityMailBaseline: async input => { mailInputs.push(input); events.push("mail-baseline"); return { status: "complete", messageIds: [], ...(oversizedBaseline ? { privateRaw: "x".repeat(20000) } : {}) }; },
@@ -285,6 +630,7 @@ function resourceIntegrationHarness({ processFailure = false, effectsOutcome = "
     setTimeout: callback => { queueMicrotask(callback); },
     runOwnedProcess: async (executable, args, options) => {
       calls.push({ args, options });
+      if (args[0] === "inspect" && args[1]?.startsWith("courtside-security-decoder-")) decoderInspections++;
       if (args[0] === "rm" && releasePressure) releasePressure({ code: 0, stdout: "actual-private-journal", stderr: "private-cookie=not-public" });
       if (args.some(value => value.startsWith("courtside-security-decoder-")) && args.includes("--network") && args.includes("none")) {
         events.push("decoder"); if (decoderFailure) throw new Error("private decoder failure");
@@ -304,11 +650,16 @@ function resourceIntegrationHarness({ processFailure = false, effectsOutcome = "
       if (args.includes("cat") && args.at(-1) === "/results/summary.json") return { stdout: malformedSummary ? "private malformed summary" : JSON.stringify({
         checks: [{ name: "competing-court-occupancy:serialized", passes: 2, fails: 0 }] }) };
       if (args[0] === "inspect" || args[0] === "image") return { stdout: JSON.stringify({
-        Id: args[0] === "image" ? digest : createHash("sha256").update(args[1]).digest("hex"),
-        Image: args[0] === "inspect" && args[1]?.endsWith("-app-1") ? runtimeImageId : digest,
+        Id: args[0] === "image" ? immutableProof && args[2] === environment.COURTSIDE_SECURITY_FIXTURES_IMAGE
+          ? environment.COURTSIDE_SECURITY_FIXTURES_IMAGE : digest : createHash("sha256").update(args[1]).digest("hex"),
+        Image: args[0] === "inspect" && args[1]?.endsWith("-app-1") ? runtimeImageId
+          : immutableProof && args[1]?.startsWith("courtside-security-decoder-") && !decoderRuntimeDrift
+            && !(decoderCleanupDrift && decoderInspections > 1)
+            ? environment.immutableImages.runtimeImageIDs.fixtures : digest,
         foreign: foreignDecoder && args[1]?.startsWith("courtside-security-decoder-"),
         Config: { ...imageDefaults, ...(args[0] === "inspect" && args[1]?.endsWith("-app-1") ? runtimeOverride : {}),
-          Image: args[1]?.includes("k6") ? "native-k6" : imageReference,
+          Image: args[1]?.includes("k6") ? "native-k6"
+            : immutableProof && args[1]?.startsWith("courtside-security-decoder-") ? environment.COURTSIDE_SECURITY_FIXTURES_IMAGE : imageReference,
           Env: ["COURTSIDE_COOKIE_SECURE=true", ...(publicationOverride ? ["SPRING_MODULITH_EVENTS_COMPLETION_MODE=delete"] : [])], Labels: labels },
         NetworkSettings: { Networks: { "courtside-security-run-0001_scanner-upstream": { IPAddress: "192.0.2.10" } } } }) };
       return { code: 0, stdout: "", stderr: "" };
@@ -323,6 +674,29 @@ function resourceIntegrationHarness({ processFailure = false, effectsOutcome = "
       circuitBreakers: { sampleIntervalMilliseconds: 1 }, interruptGraceMilliseconds: 1 } };
   return { run: () => context.run(plan, "/stop", limits), events, calls, writes, observations, mailInputs, environment };
 }
+
+test("given immutable SECURITY fixture proof, when the actual resource producer starts its decoder, then match runtime mapping and helper bytes before pressure", async () => {
+  // given
+  const valid = resourceIntegrationHarness({ immutableProof: true });
+  const changed = [resourceIntegrationHarness({ immutableProof: true, helperDrift: true }),
+    resourceIntegrationHarness({ immutableProof: true, decoderRuntimeDrift: true })];
+  // when / then
+  await valid.run();
+  assert.ok(valid.events.includes("pressure"));
+  for (const harness of changed) {
+    await assert.rejects(harness.run, /Resource-abuse observation incomplete|Resource-abuse cleanup was incomplete/);
+    assert.ok(!harness.events.includes("pressure"));
+  }
+});
+
+test("given an immutable decoder runtime replaced after pressure, when finalizing SECURITY, then refuse its deletion and report incomplete cleanup", async () => {
+  // given
+  const harness = resourceIntegrationHarness({ immutableProof: true, decoderCleanupDrift: true });
+  const decoderId = createHash("sha256").update("courtside-security-decoder-run-0001-1").digest("hex");
+  // when / then
+  await assert.rejects(harness.run, /Resource-abuse cleanup was incomplete: courtside-security-decoder-run-0001-1/);
+  assert.ok(!harness.calls.some(({ args }) => args[0] === "rm" && args.includes(decoderId)));
+});
 
 test("given native publication policy and matching candidate classes, when pressure stops, then bind only the actual projected listener and configured delete lifecycle", async () => {
   // given
@@ -697,8 +1071,6 @@ test("given a built seeder image, when it is not the candidate plus its classes,
     /not the candidate carrying its fixture classes/);
 });
 
-// The base is resolved through a mutable local tag, so identical layers alone would also accept an
-// image that merely shares them and starts something else.
 test("given a built seeder image, when it starts something other than the candidate, then the run is refused", () => {
   // given
   const candidate = ["sha256:one", "sha256:two"];
@@ -981,8 +1353,6 @@ test("given parallel attempts for one run, when reserving scanner access, then o
   assert.ok(second.includes("org.courtside.security.attempt=2"));
 });
 
-// The scanner's contract and the digest the run plans against come from one path. Pinning the mount
-// to the checkout would make a paired comparison assess two different contracts against one target.
 test("given the security Compose file, when mounting the contract, then the run may point it at another revision", () => {
   // given
   const compose = readFileSync(fileURLToPath(new URL("../deploy/compose.security.yaml", import.meta.url)), "utf8");
@@ -1128,8 +1498,6 @@ test("given a scanner response assertion, when reporting it, then the closed rea
   assert.ok(diagnostic.length < 500);
 });
 
-// A JSON schema and a run contract cannot read the deployment, so nothing would carry a scanner
-// bump into them. This is what notices when one is left behind.
 test("given the scanner version, when a static file names it, then it is the deployed one", () => {
   // given
   const read = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8"));
@@ -1182,6 +1550,31 @@ function pairedSeedCheckout() {
   writeFileSync(state, JSON.stringify(recorded));
   return { checkout, compose, state, recorded };
 }
+
+test("given an immutable fixture and an explicit BASE checkout, when planning seeding, then preserve both exact bindings and refuse their drift", () => {
+  // given
+  const fixture = pairedSeedCheckout();
+  const fixtureImage = `sha256:${"d".repeat(64)}`;
+  const recorded = { ...fixture.recorded, immutableImages: {
+    productionImageID: fixture.recorded.COURTSIDE_SECURITY_IMAGE, fixturesImageID: fixtureImage
+  } };
+  try {
+    // when
+    const plan = securitySeedPlan("compare-base-1-1", recorded.COURTSIDE_SECURITY_IMAGE, recorded,
+      { composeRoot: fixture.checkout });
+    // then
+    assert.equal(plan.args[4], fixture.compose);
+    assert.deepEqual(plan.args.slice(5), ["run", "--rm", "--pull", "never", "--no-deps", "-T", "seeder"]);
+    assert.equal(plan.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, fixtureImage);
+    assert.equal(Object.hasOwn(plan.environment, "immutableImages"), false);
+    assert.throws(() => securitySeedPlan("compare-base-1-1", recorded.COURTSIDE_SECURITY_IMAGE,
+      { ...recorded, immutableImages: { ...recorded.immutableImages, productionImageID: fixtureImage } },
+      { composeRoot: fixture.checkout }), /prebuilt fixture binding/);
+    assert.throws(() => securitySeedPlan("compare-base-1-1", recorded.COURTSIDE_SECURITY_IMAGE,
+      { ...recorded, COURTSIDE_SECURITY_SHARED_PASSWORD: "" },
+      { composeRoot: fixture.checkout }), /missing a required compose value/);
+  } finally { rmSync(fixture.checkout, { recursive: true, force: true }); }
+});
 
 test("given an older checkout without mail state, when HEAD seeds it, then BASE compose and HEAD fixture production remain separate", () => {
   // given
@@ -1418,9 +1811,6 @@ test("given a recorded environment, when the candidate seeds it, then only what 
   }
 });
 
-// A run measures its own meter boundary now: `meter-registry-separation` asks the container and
-// the proxy and compares 200 against 404. What is left here is the arrangement that makes that
-// measurement possible, which no request can show — the flag that lets the registry answer at all.
 test("given the security Compose file, when the run samples the meter registry, "
   + "then the environment enables it and the run measures who can reach it", () => {
   // given

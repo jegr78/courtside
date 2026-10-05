@@ -11,11 +11,14 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { containerIdentity } from "./mail-relay-certificate.mjs";
 import vm from "node:vm";
+import { runInNewContext } from "node:vm";
 import {
   assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
   openBackupForRestore, packagedApplicationJar, processPlans, requiredPorts, restoreDatabase, runInteractive,
   runLifecyclePlans, startProcesses,
+  startPerformance,
+  assertPerformanceSource,
   superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfComposePlan, perfResetPlan,
   writePrivateFile, performanceRunPlan, performanceContainerLogPlan, performanceIdentityRequest, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
@@ -56,6 +59,298 @@ test("given an explicit BASE compose root, when the CLI dispatches seeding, then
   await execute(options);
   // then
   assert.deepEqual(calls, [[options.runId, options.image, options.state, { composeRoot: "/base" }]]);
+});
+
+test("given an image proof failure with a private cleanup receipt, when the actual CLI catches it, then report the first error and bounded cleanup outcome", async () => {
+  // given
+  const source = readFileSync(new URL("./courtside.mjs", import.meta.url), "utf8");
+  const body = source.slice(source.indexOf("async function main("), source.indexOf("\nasync function execute("));
+  const failure = Object.assign(new Error("Immutable image proof exceeded its command budget"), {
+    imageProbeFailureReceipt: "/private/probe.json", imageProbeCleanup: { outcome: "passed", reason: "secret-native-stderr" }
+  });
+  let output = "";
+  const process = { argv: [], stderr: { write: value => { output += value; } } };
+  const main = runInNewContext(body + "\nmain", { process, parseArguments: () => ({ command: "perf", image: "selected" }),
+    validateNode() {}, validateDocker() {}, execute: async () => { throw failure; } });
+  // when
+  await main();
+  // then
+  assert.match(output, /Immutable image proof exceeded its command budget/);
+  assert.match(output, /image probe cleanup: passed; private failure receipt retained/);
+  assert.doesNotMatch(output, /secret-native-stderr/);
+  assert.equal(process.exitCode, 1);
+});
+
+function performanceResetStateHarness({ missing = false, corrupt = false, override = false, reservation = false, command = "perf-reset" } = {}) {
+  const source = readFileSync(new URL("./courtside.mjs", import.meta.url), "utf8");
+  const reader = source.slice(source.indexOf("function readPerformanceState("), source.indexOf("\nexport function perfResetPlan("));
+  const reset = source.slice(source.indexOf(command === "perf-reset" ? '  if (options.command === "perf-reset") {' : '  if (["perf-stop", "perf-logs", "perf-db-shell"].includes(options.command)) {'),
+    source.indexOf('  if (options.command === "perf-run") {'));
+  const events = [];
+  const context = { options: { command }, root: "/repo", perfStateFile: "/repo/build/perf-environment.json",
+    perfMailDirectory: "/repo/build/perf-mail", process: { stdout: { write() {} }, env: {} },
+    readFileSync: () => { if (missing) throw Object.assign(new Error("missing"), { code: "ENOENT" }); return corrupt ? "{" : JSON.stringify({ password: "legacy-password" }); },
+    existsSync: () => override,
+    assertPerformanceStateOwnership: (state) => {
+      if (override || reservation) throw new Error("Immutable PERFORMANCE state is unavailable; reset refused");
+    },
+    resetPerformanceReuse: () => events.push("immutable-reset"), performanceRelaySettings: () => ({}),
+    runInteractive: () => events.push("legacy-down"), perfResetPlan: () => ({}), lifecyclePlan: () => ({}),
+    rmSync: () => events.push("remove-file") };
+  return { events, run: runInNewContext(reader + "\n(async () => {" + reset + "})", context) };
+}
+
+test("given missing PERFORMANCE state and surviving immutable ownership, when stop logs or db-shell runs, then refuse before legacy lifecycle", async () => {
+  // given
+  for (const command of ["perf-stop", "perf-logs", "perf-db-shell"]) {
+    for (const retained of [{ override: true }, { reservation: true }]) {
+      const harness = performanceResetStateHarness({ missing: true, command, ...retained });
+      // when / then
+      await assert.rejects(harness.run, /Immutable PERFORMANCE state is unavailable/);
+      assert.deepEqual(harness.events, []);
+    }
+  }
+});
+
+test("given missing PERFORMANCE state with an immutable override or reservation, when the actual reset producer runs, then refuse before legacy down or file removal", async () => {
+  // given
+  for (const retained of [{ override: true }, { reservation: true }]) {
+    const harness = performanceResetStateHarness({ missing: true, ...retained });
+    // when / then
+    await assert.rejects(harness.run, { message: "Immutable PERFORMANCE state is unavailable; reset refused" });
+    assert.deepEqual(harness.events, []);
+  }
+});
+
+test("given corrupt PERFORMANCE state, when the actual reset producer reads it, then refuse instead of treating it as missing", async () => {
+  // given
+  const harness = performanceResetStateHarness({ corrupt: true });
+  // when / then
+  await assert.rejects(harness.run, /PERFORMANCE state is corrupt/);
+  assert.deepEqual(harness.events, []);
+});
+
+test("given an oversized immutable PERFORMANCE identity response, when the actual HTTP helper reads it, then abort at the byte ceiling", async () => {
+  // given
+  const server = createServer((_request, response) => response.end("x".repeat(2048)));
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  try {
+    // when / then
+    await assert.rejects(() => localRequest({ secure: false, port: server.address().port, path: "/api/source",
+      absoluteDeadlineMilliseconds: 1000, responseLimitBytes: 1024 }), { message: "Identity response exceeded its byte budget" });
+  } finally { await new Promise(resolve => server.close(resolve)); }
+});
+
+test("given an immutable PERFORMANCE identity stream that keeps sending bytes, when its absolute deadline expires, then abort despite socket activity", async () => {
+  // given
+  const server = createServer((_request, response) => {
+    const timer = setInterval(() => response.write("x"), 5);
+    const finish = setTimeout(() => response.end(), 150);
+    response.once("close", () => { clearInterval(timer); clearTimeout(finish); });
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  try {
+    // when / then
+    await assert.rejects(() => localRequest({ secure: false, port: server.address().port, path: "/api/source",
+      absoluteDeadlineMilliseconds: 30, responseLimitBytes: 1024 }), { message: "Identity request absolute deadline exceeded" });
+  } finally { await new Promise(resolve => server.close(resolve)); }
+});
+
+test("given immutable PERFORMANCE HTTPS identity options, when the actual request helper encounters certificate rejection, then preserve the owned CA hostname and TLS verification", async () => {
+  // given
+  const source = readFileSync(new URL("./courtside.mjs", import.meta.url), "utf8");
+  const body = source.slice(source.indexOf("export function localRequest("), source.indexOf("\nfunction certificatePublicKeyPin("))
+    .replace("export function", "function");
+  const captured = [];
+  const context = { Buffer, setTimeout, clearTimeout,
+    httpRequest: () => { throw new Error("Unexpected HTTP downgrade"); },
+    httpsRequest: (options) => {
+      captured.push(options);
+      const request = new EventEmitter();
+      request.end = () => queueMicrotask(() => request.emit("error", new Error("Certificate rejected")));
+      request.destroy = () => {};
+      return request;
+    },
+    certificatePublicKeyPin: () => { throw new Error("No unverified certificate may be pinned"); } };
+  const request = runInNewContext(body + "\nlocalRequest", context);
+  // when / then
+  await assert.rejects(() => request(performanceIdentityRequest("owned-ca", { immutable: true })), { message: "Certificate rejected" });
+  assert.equal(captured[0].rejectUnauthorized, true);
+  assert.equal(captured[0].ca, "owned-ca");
+  assert.equal(captured[0].servername, "proxy");
+  assert.equal(captured[0].hostname, "127.0.0.1");
+});
+
+function immutablePerformanceHarness({ wrongSource = false, runnerFailure = false } = {}) {
+  const text = readFileSync(new URL("./courtside.mjs", import.meta.url), "utf8");
+  const body = text.slice(text.indexOf("async function runPerformance(options)"), text.indexOf("async function runFunnelPerformance(options)"));
+  const events = [];
+  const files = new Map();
+  const state = { password: "private-test-password", immutableImages: { sourceCommit: "c".repeat(40) } };
+  const context = { root: "/private/scratch", join, process: { env: {}, platform: "linux", arch: "x64", stdout: { write() {} } },
+    Date, JSON, createHash: () => ({ update() { return this; }, digest: () => "a".repeat(64) }),
+    readPerformanceState: () => state, performanceRelaySettings: () => ({}),
+    assertPerformanceReuse: () => { events.push("proof"); return { runtime: { oomKilled: false, restartCount: 0 } }; },
+    mkdirSync: () => {}, perfComposePlan: (args) => ({ command: "docker", args, environment: {} }),
+    boundedImageCommand: (_execute, command, args) => { events.push({ command, args, bounded: true }); }, spawnSync: () => { throw new Error("Unexpected process closure"); },
+    runInteractive: () => { events.push("unbounded"); files.set("raw-summary.json", "{}"); },
+    localRequest: async (request) => { events.push({ identityRequest: request }); return { statusCode: 200, body: JSON.stringify({ environment: "PERFORMANCE", version: "1.2.3", commit: (wrongSource ? "d" : "c").repeat(40) }), certificatePin: "pin" }; },
+    performanceIdentityRequest, parseJson: JSON.parse, assertPerformanceSource,
+    performanceRunPlan: () => ({ command: "docker", args: ["run", "--pull=never"], environment: {} }),
+    runOwnedProcess: async (_command, _args, options) => { events.push({ runner: true, options }); if (runnerFailure) { await options.cleanup(); throw new Error("Runner refused"); } files.set("raw-summary.json", "{}"); },
+    randomBytes: () => Buffer.from("owned-runner"), cleanupPerformanceRunner: () => events.push("runner-cleanup"),
+    readFileSync: (file) => file.endsWith("contract.json") ? JSON.stringify({ profiles: { smoke: { limits: { maximumDuration: "1m" } } } }) : file.endsWith("root.crt") ? "trusted-ca" : files.get("raw-summary.json"),
+    existsSync: () => files.has("raw-summary.json"), writePrivateFile: () => events.push("private-proof"), writeFileSync: () => events.push("summary"), rmSync: () => {},
+    buildPerformanceResult: () => ({}), validatePerformanceResult: () => {}, durationSeconds: () => 60 };
+  return { events, run: runInNewContext(`${body}; runPerformance`, context) };
+}
+
+test("given proven immutable PERFORMANCE state, when the actual runner producer executes, then bound certificate and traffic commands and retain before-after runtime evidence", async () => {
+  // given
+  const harness = immutablePerformanceHarness();
+  // when
+  await harness.run({ profile: "smoke" });
+  // then
+  assert.ok(!harness.events.includes("unbounded"));
+  assert.equal(harness.events.filter(event => event === "proof").length, 2);
+  const runner = harness.events.find(event => event?.runner);
+  assert.equal(runner.options.timeoutMilliseconds, 180_000);
+  assert.equal(runner.options.outputLimitBytes, 4 * 1024 * 1024);
+  assert.ok(harness.events.includes("private-proof"));
+  const request = harness.events.find(event => event?.identityRequest).identityRequest;
+  assert.equal(request.absoluteDeadlineMilliseconds, 30000);
+  assert.equal(request.responseLimitBytes, 4 * 1024 * 1024);
+  assert.equal(request.secure, true);
+  assert.equal(request.ca, "trusted-ca");
+  assert.equal(request.servername, "proxy");
+});
+
+test("given a different immutable PERFORMANCE source, when the actual producer observes TLS identity, then refuse before any traffic command", async () => {
+  // given
+  const harness = immutablePerformanceHarness({ wrongSource: true });
+  // when / then
+  await assert.rejects(() => harness.run({ profile: "smoke" }), { message: "Immutable PERFORMANCE runtime source does not match the selected commit" });
+  assert.ok(!harness.events.some(event => event?.runner));
+  assert.ok(!harness.events.includes("unbounded"));
+});
+
+test("given a failed immutable PERFORMANCE runner, when the actual producer aborts, then clean the owned runner and retain runtime evidence without a passing summary", async () => {
+  // given
+  const harness = immutablePerformanceHarness({ runnerFailure: true });
+  // when / then
+  await assert.rejects(() => harness.run({ profile: "smoke" }), { message: "Runner refused" });
+  assert.ok(harness.events.includes("runner-cleanup"));
+  assert.ok(harness.events.includes("private-proof"));
+  assert.ok(!harness.events.includes("summary"));
+});
+
+test("given an explicitly proven prebuilt PERF selection, when starting through the producer, then never execute a package or image build", async () => {
+  // given
+  const image = `sha256:${"a".repeat(64)}`;
+  const fixturesImage = `sha256:${"b".repeat(64)}`;
+  const sourceCommit = "c".repeat(40);
+  const events = [];
+  const runtime = { readState: () => undefined, stateExists: () => false,
+    inspect: () => ({ productionImageID: image, fixturesImageID: fixturesImage, sourceCommit }),
+    assertEmpty: () => events.push("empty"), relay: () => ({}),
+    prepare: () => ({ owner: "d".repeat(32), override: "/private/override" }),
+    writeState: (record) => events.push(record), start: async () => events.push("start"),
+    assertRuntime: () => ({ resources: [], runtime: { oomKilled: false, restartCount: 0 } }), output: () => {},
+    run: () => { throw new Error("Unexpected legacy build path"); } };
+  // when / then
+  await assert.doesNotReject(() => startPerformance({ image, fixturesImage, sourceCommit, showCredentials: false }, runtime));
+  assert.ok(events.includes("empty"));
+  assert.ok(events.includes("start"));
+  const record = events.find((event) => typeof event === "object");
+  assert.equal(record.immutableImages.fixturesImageID, fixturesImage);
+});
+
+test("given an incomplete execution seam, when starting PERFORMANCE, then refuse before reading credentials or launching any command", async () => {
+  // given
+  const events = [];
+  const runtime = { run: () => events.push("run"), readState: () => events.push("state") };
+  // when / then
+  await assert.rejects(() => startPerformance({}, runtime), { message: "Performance execution seam is incomplete" });
+  assert.deepEqual(events, []);
+});
+
+test("given rejected immutable source proof, when starting PERFORMANCE, then create no credentials certificate or runtime state", async () => {
+  // given
+  const events = [];
+  const record = () => events.push("unexpected mutation");
+  const runtime = { readState: () => undefined, inspect: () => { throw new Error("Source proof rejected"); },
+    assertEmpty: record, relay: record, prepare: record, writeState: record,
+    start: record, assertRuntime: record, output: record };
+  // when / then
+  await assert.rejects(() => startPerformance({ image: `sha256:${"a".repeat(64)}`,
+    fixturesImage: `sha256:${"b".repeat(64)}`, sourceCommit: "c".repeat(40) }, runtime), { message: "Source proof rejected" });
+  assert.deepEqual(events, []);
+});
+
+test("given retained immutable PERFORMANCE state, when planning compose operations, then reuse the exact owned override and private environment", () => {
+  // given
+  const state = { password: "private-test-password", immutableImages: { sourceCommit: "c".repeat(40) },
+    immutableDeployment: { compose: ["compose", "--env-file", "/dev/null", "-p", "courtside-perf", "-f", "/private/override.json"] } };
+  // when
+  const plan = perfComposePlan(["cp", "proxy:/data/root.crt", "/private/root.crt"], { state, environment: {} });
+  // then
+  assert.deepEqual(plan.args, [...state.immutableDeployment.compose, "cp", "proxy:/data/root.crt", "/private/root.crt"]);
+  assert.equal(plan.environment.COURTSIDE_PERF_SHARED_PASSWORD, state.password);
+});
+
+test("given immutable PERFORMANCE state, when planning its runner, then refuse automatic runner pulls without changing the legacy plan", () => {
+  // given
+  const state = { immutableImages: { sourceCommit: "c".repeat(40) } };
+  // when
+  const immutable = performanceRunPlan({ profile: "smoke" }, "/private/results", "/private/root.crt", "test-run", undefined, state);
+  const legacy = performanceRunPlan({ profile: "smoke" }, "/private/results", "/private/root.crt", "test-run", undefined, undefined);
+  // then
+  assert.ok(immutable.args.includes("--pull=never"));
+  assert.ok(!legacy.args.includes("--pull=never"));
+});
+
+test("given immutable PERFORMANCE source binding, when the TLS source reports another commit, then refuse the profile before generating traffic", () => {
+  // given
+  const state = { immutableImages: { sourceCommit: "c".repeat(40) } };
+  // when / then
+  assert.throws(() => assertPerformanceSource({ environment: "PERFORMANCE", commit: "d".repeat(40) }, state),
+    { message: "Immutable PERFORMANCE runtime source does not match the selected commit" });
+  assert.doesNotThrow(() => assertPerformanceSource({ environment: "PERFORMANCE", commit: "c".repeat(40) }, state));
+});
+
+test("given complete immutable PERF and SECURITY selections, when parsing CLI arguments, then preserve exact engine-native IDs and source without changing defaults", () => {
+  // given
+  const image = `sha256:${"a".repeat(64)}`;
+  const fixturesImage = `sha256:${"b".repeat(64)}`;
+  const commit = "c".repeat(40);
+  // when / then
+  for (const args of [["perf", "--image", image], ["security", "run-0001", image],
+    ["security", "run-0001", "--image", image]]) {
+    let selected;
+    assert.doesNotThrow(() => { selected = parseArguments([...args, "--fixtures-image", fixturesImage, "--source-commit", commit]); });
+    assert.equal(selected.image, image);
+    assert.equal(selected.fixturesImage, fixturesImage);
+    assert.equal(selected.sourceCommit, commit);
+  }
+  assert.equal(parseArguments(["perf", "--skip-verify"]).skipVerify, true);
+});
+
+test("given partial duplicate tag or conflicting immutable selection, when parsing CLI arguments, then reject before any command", () => {
+  // given
+  const image = `sha256:${"a".repeat(64)}`;
+  const fixturesImage = `sha256:${"b".repeat(64)}`;
+  const source = "c".repeat(40);
+  const args = ["perf", "--image", image, "--fixtures-image", fixturesImage, "--source-commit", source];
+  // when / then
+  for (const invalid of [["perf", "--image", image], [...args, "--image", image],
+    [...args, "--source-commit", source], [...args.slice(0, 2), "courtside:local", ...args.slice(3)],
+    [...args, "--skip-verify"], ["security", "run-0001", image, "--source-commit", source],
+    ["security", "run-0001", "--image", image],
+    ["security", "run-0001", image, "--image", image, "--fixtures-image", fixturesImage, "--source-commit", source]]) {
+    assert.throws(() => parseArguments(invalid));
+  }
 });
 
 function passingPerformanceResult() {
@@ -385,8 +680,6 @@ test("given security commands, when parsing them, then run identity and authoriz
     /courtside-security-run-0001/);
 });
 
-// A plain production image would leave the environment with no accounts to load, and a load test
-// against an empty database reports a number rather than failing.
 test("given the performance environment, when its image is built, then Compose runs the fixture image", () => {
   // given
   const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
@@ -1381,8 +1674,8 @@ test("given the release qualification smoke, when starting UAT, then credential 
 
   // when / then
   assert.match(smoke, /startArguments = \["uat", "--no-credential-output"/);
-  assert.ok(smoke.indexOf("confirmation.join") < smoke.indexOf("uatSmokeEnvironment(version)"));
-  assert.match(smoke, /const smokeEnvironment = uatSmokeEnvironment\(version\)/);
+  assert.ok(smoke.indexOf("confirmation.join") < smoke.indexOf("uatSmokeEnvironment(version,"));
+  assert.match(smoke, /: uatSmokeEnvironment\(version, selectedEnvironment\)/);
   assert.match(smoke, /run\("docker", \[\.\.\.compose, \.\.\.args\], \{ environment: smokeEnvironment \}\)/);
   assert.match(smoke, /resetPassword = newBootstrapPassword\(\)/);
   assert.match(smoke, /smokeEnvironment\.COURTSIDE_UAT_ADMIN_PASSWORD = resetPassword/);
@@ -1643,7 +1936,7 @@ test("given nothing names the repository, when a version is qualified, then it s
 });
 
 test("given a remote that only carries github.com somewhere, when it is read, then no repository is named", () => {
-  // when / then — every one of these resolved to a repository while the host was merely scanned for
+  // when / then
   assert.equal(repositoryFromRemote("https://elsewhere.example//github.com/attacker/courtside.git"), undefined);
   assert.equal(repositoryFromRemote("https://elsewhere.example/redirect@github.com/attacker/courtside.git"), undefined);
   assert.equal(repositoryFromRemote("git@evil.example:mirror/of@github.com/attacker/courtside.git"), undefined);
