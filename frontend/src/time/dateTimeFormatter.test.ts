@@ -109,6 +109,7 @@ it("given many court-plan slots in one club zone, when resolving their instants,
 
 it("given formatting options inherited from a prototype, when requesting a formatter, then inherited Intl settings cannot alias another zone", () => {
   // given
+  vi.stubEnv("TZ", "UTC");
   const utc = dateTimeFormatter("en", { timeZone: "UTC", hour: "2-digit", hourCycle: "h23" });
   const inherited = Object.create({ timeZone: "Europe/Berlin" }) as Intl.DateTimeFormatOptions;
   inherited.hour = "2-digit";
