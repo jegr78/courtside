@@ -116,7 +116,7 @@ test("given an oversized correlated request, when the native gateway rejects it,
   const attempt = request({ host: "127.0.0.1", port, method: "POST", path: "/api/session",
     headers: { "Content-Length": "2000001", "Content-Type": "application/x-www-form-urlencoded",
       "X-Courtside-Journal-Operation": "14:1" } });
-  const startedAt = Date.now();
+  const startedAt = Math.floor(performance.timeOrigin + performance.now());
   // when
   attempt.end();
   const [response] = await once(attempt, "response");
@@ -133,7 +133,8 @@ test("given an oversized correlated request, when the native gateway rejects it,
     assert.deepEqual({ ...receipt, observedAt: null }, { operationId: "14:1", method: "POST", path: "/api/session",
       status: 413, bodyBytes: 2000001, contentType: "application/x-www-form-urlencoded",
       maximumBodyBytes: 2000000, forwarded: false, observedAt: null });
-    assert.ok(Date.parse(receipt.observedAt) >= startedAt && Date.parse(receipt.observedAt) <= Date.now());
+    assert.ok(Date.parse(receipt.observedAt) >= startedAt
+      && Date.parse(receipt.observedAt) <= Math.floor(performance.timeOrigin + performance.now()));
     assert.equal(metrics.bodyLimitReceipts.length, 1);
   } finally {
     gatewayProcess.kill();
