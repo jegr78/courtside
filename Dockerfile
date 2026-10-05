@@ -19,6 +19,7 @@ COPY ${LAYERS}/application/ ./
 COPY LICENSE NOTICE ./
 
 RUN set -eu; \
+    chmod -R a+rX /app; \
     recorded=0; \
     while IFS= read -r file; do \
       [ -n "$file" ] || continue; \
