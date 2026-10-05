@@ -43,7 +43,8 @@ export function validateContract(contract) {
       || Object.keys(contract).some((field) => !rootFields.includes(field))
       || JSON.stringify(contract.profileOrder) !== JSON.stringify(["docs", "backend", "frontend", "tooling", "full"])
       || JSON.stringify(contract.ciJobOrder) !== JSON.stringify([
-        "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"
+        "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security", "gates",
+        "clock_shift"
       ])
       || Object.keys(contract.profiles ?? {}).length !== contract.profileOrder.length
       || Object.keys(contract.localTaskDefinitions ?? {}).length < 1
@@ -67,7 +68,8 @@ export function validateContract(contract) {
   if (JSON.stringify(contract.profiles.full.ciJobs) !== JSON.stringify(contract.ciJobOrder)
       || JSON.stringify(contract.profiles.full.localTasks)
         !== JSON.stringify(["workflow-lint", "docs-check", "full-without-browser",
-          "compose-wait-smoke", "frontend-e2e", "webkit-reliability"])) {
+          "compose-wait-smoke", "frontend-e2e", "webkit-reliability", "gate-uat", "gate-mail",
+          "gate-restore", "gate-upgrade", "gate-active-security"])) {
     throw new Error("Full test profile coverage is incomplete");
   }
   for (const [label, task] of Object.entries(contract.localTaskDefinitions)) {

@@ -845,7 +845,8 @@ public class ReferenceDeploymentSecurityTest {
         for (var source : List.of(
                 new PlaintextSource(production, PRODUCTION_PLAINTEXT_SITE_BLOCK,
                         "https://{$COURTSIDE_DOMAIN}{uri}"),
-                new PlaintextSource(uat, UAT_PLAINTEXT_SITE_BLOCK, "https://localhost:8443{uri}"))) {
+                new PlaintextSource(uat, UAT_PLAINTEXT_SITE_BLOCK,
+                        "https://localhost:{$COURTSIDE_UAT_HTTPS_PORT:8443}{uri}"))) {
             Matcher site = source.pattern().matcher(source.caddyfile());
             assertThat(site.find()).isTrue();
             assertThat(site.group("body"))

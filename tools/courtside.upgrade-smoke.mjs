@@ -119,6 +119,20 @@ export function gitHistory(candidate, cwd = root) {
   };
 }
 
+export function modifiedUpgradeInputs(base, candidate, cwd = root) {
+  const mergeBase = run("git", ["merge-base", base, candidate], { cwd }).stdout.trim();
+  return run("git", ["diff", "--name-only", "--diff-filter=MDR", mergeBase, candidate, "--",
+    "src/main/resources/db/migration", originVerification], { cwd }).stdout.split("\n").filter(Boolean);
+}
+
+export function emptyOriginNotice(paths) {
+  if (paths.length === 0) {
+    throw new Error("no upgrade origin: no retained nightly shares this commit's migrations, "
+      + "and this change modifies none of them");
+  }
+  return `no comparable upgrade origin: this change modifies ${paths.join(", ")}; the next nightly covers the upgrade`;
+}
+
 export function selectRepositoryDigest(repository, originTag, repoDigests) {
   const prefix = `ghcr.io/${repository}@sha256:`;
   const matches = repoDigests.filter((digest) => digest.startsWith(prefix));
@@ -407,6 +421,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } else if (process.argv[2] === "--nightly-origins") {
     process.stdout.write(`${JSON.stringify(nightlyUpgradeOrigins(process.argv[3], JSON.parse(process.argv[4]),
       gitHistory(process.argv[5])))}\n`);
+  } else if (process.argv[2] === "--empty-origin-notice") {
+    process.stdout.write(`${emptyOriginNotice(modifiedUpgradeInputs(process.argv[3], process.argv[4]))}\n`);
   } else if (process.argv[2] === "--previous-release") {
     process.stdout.write(`${previousReleaseTag(process.argv[3], JSON.parse(process.argv[4])) ?? ""}\n`);
   } else {

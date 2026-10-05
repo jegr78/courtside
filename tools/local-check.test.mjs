@@ -148,7 +148,8 @@ test("given destructive or unknown changes, when planning the local check, then 
   assert.deepEqual(unknown.profiles, ["full"]);
   assert.deepEqual(deleted.tasks.map((task) => task.label), [
     "workflow-lint", "docs-check", "full-without-browser", "compose-wait-smoke",
-    "frontend-e2e", "webkit-reliability"
+    "frontend-e2e", "webkit-reliability", "gate-uat", "gate-mail", "gate-restore", "gate-upgrade",
+    "gate-active-security"
   ]);
 });
 
@@ -163,14 +164,15 @@ test("given a full plan, when its tasks are planned, then the documentation gate
     assert.deepEqual(plan.profiles, ["full"]);
     assert.deepEqual(plan.tasks.map((task) => task.label), [
       "workflow-lint", "docs-check", "full-without-browser", "compose-wait-smoke",
-      "frontend-e2e", "webkit-reliability"
+      "frontend-e2e", "webkit-reliability", "gate-uat", "gate-mail", "gate-restore", "gate-upgrade",
+      "gate-active-security"
     ]);
-    assert.deepEqual(plan.tasks.at(-4), {
+    assert.deepEqual(plan.tasks.at(2), {
       label: "full-without-browser", workingDirectory: "repository", executable: "maven",
       arguments: ["clean", "verify", "-Dfrontend.e2e.skip=true",
         "-Dmaven.test.redirectTestOutputToFile=true"]
     });
-    assert.deepEqual(plan.tasks.at(-1), {
+    assert.deepEqual(plan.tasks.at(5), {
       label: "webkit-reliability", workingDirectory: "frontend", executable: "npm",
       arguments: ["run", "reliability:webkit", "--", "--order", "configured"]
     });
@@ -223,7 +225,11 @@ test("given no base commit, when the protected classification fails closed, then
       {
         label: "webkit-reliability", workingDirectory: "frontend", executable: "npm",
         arguments: ["run", "reliability:webkit", "--", "--order", "configured"]
-      }
+      },
+      ...["uat", "mail", "restore", "upgrade", "active-security"].map((gate) => ({
+        label: `gate-${gate}`, workingDirectory: "repository", executable: "node",
+        arguments: ["tools/local-release-gates.mjs", gate]
+      }))
     ]);
   });
 
@@ -621,7 +627,8 @@ test("given protected classification fails, when planning locally, then candidat
   assert.deepEqual(record.profiles, ["full"]);
   assert.deepEqual(record.tasks, [
     "workflow-lint", "docs-check", "full-without-browser", "compose-wait-smoke",
-    "frontend-e2e", "webkit-reliability"
+    "frontend-e2e", "webkit-reliability", "gate-uat", "gate-mail", "gate-restore", "gate-upgrade",
+    "gate-active-security"
   ]);
   const execution = localVerificationPlans(planTasks({ profiles: ["full"] }).tasks, "linux", "/repo");
   assert.deepEqual(execution.slice(0, 3).map((plan) => plan.arguments), [
@@ -631,7 +638,7 @@ test("given protected classification fails, when planning locally, then candidat
       "-Dmaven.test.redirectTestOutputToFile=true"]
   ]);
   // npm runs through the pinned node, so the CLI path leads the arguments the task itself declares.
-  assert.deepEqual(execution.at(-1).arguments.slice(-5),
+  assert.deepEqual(execution.at(5).arguments.slice(-5),
     ["run", "reliability:webkit", "--", "--order", "configured"]);
 });
 
@@ -819,3 +826,15 @@ test("given the Windows maven wrapper, when planning a task, then PATH cannot de
     assert.equal(plan.command, "cmd.exe");
     assert.equal(plan.arguments.at(-1), `"${join("/repo", "mvnw.cmd")}" clean verify`);
   });
+
+test("given a full classification, when tasks are planned, then the Docker release gates follow the browsers", () => {
+  // when
+  const labels = planTasks({ profiles: ["full"], reasons: [] }).tasks.map((task) => task.label);
+
+  // then
+  assert.deepEqual(labels.slice(-5), ["gate-uat", "gate-mail", "gate-restore", "gate-upgrade", "gate-active-security"]);
+  assert.deepEqual(localCheckPrerequisites(labels), { java: true, docker: true });
+  for (const gate of labels.slice(-5)) {
+    assert.deepEqual(localCheckPrerequisites([gate]), { java: true, docker: true }, `${gate} needs Docker`);
+  }
+});

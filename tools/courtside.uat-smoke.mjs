@@ -5,16 +5,17 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   localRequest, newBootstrapPassword, redactUatDiagnostics, uatBookingSeedCandidate,
-  uatImageReference, uatSmokeEnvironment
+  uatImageReference, uatInstance, uatSmokeEnvironment
 } from "./courtside.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const confirmation = process.argv.slice(2);
-const compose = ["compose", "-p", "courtside-uat", "-f", join(root, "deploy", "compose.uat.yaml")];
+const instance = uatInstance();
+const compose = ["compose", "-p", instance.project, "-f", join(root, "deploy", "compose.uat.yaml")];
 const build = join(root, "build", "uat-smoke");
 
-if (confirmation.join(" ") !== "--confirm courtside-uat") {
-  throw new Error("UAT smoke testing is destructive; pass --confirm courtside-uat");
+if (confirmation.join(" ") !== `--confirm ${instance.project}`) {
+  throw new Error(`UAT smoke testing is destructive; pass --confirm ${instance.project}`);
 }
 
 const version = process.env.COURTSIDE_UAT_VERSION;
@@ -71,7 +72,7 @@ function mutationHeaders(jar, headers = {}) {
 }
 
 async function requestWithCookies(jar, options) {
-  const response = await localRequest({ secure: false, port: 8083, ...options,
+  const response = await localRequest({ secure: false, port: instance.sharedPort, ...options,
     headers: sessionHeaders(jar, options.headers) });
   rememberCookies(jar, response);
   return response;
@@ -136,7 +137,7 @@ let resetPassword;
 
 // The bootstrap password only reaches an instance whose database has no account yet, so a run
 // against a started UAT would sign in with a password that instance never had.
-cli(["uat-reset", "courtside-uat"]);
+cli(["uat-reset", instance.project]);
 
 try {
   const startArguments = ["uat", "--no-credential-output", ...(version ? ["--version", version] : ["--skip-verify"])];
@@ -146,62 +147,62 @@ try {
   const accountCount = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from user_account");
   const localCa = composeRun("exec", "-T", "proxy", "cat", "/data/caddy/pki/authorities/local/root.crt");
   composeRun("stop", "app");
-  const redirect = await localRequest({ secure: false, port: 8081, path: "/login?from=smoke" });
+  const redirect = await localRequest({ secure: false, port: instance.httpPort, path: "/login?from=smoke" });
   const headRedirect = await localRequest({
-    secure: false, port: 8081, path: "/courts?from=head", method: "HEAD"
+    secure: false, port: instance.httpPort, path: "/courts?from=head", method: "HEAD"
   });
   const hostileRedirect = await localRequest({
-    secure: false, port: 8081, path: "/courts", headers: { Host: "attacker.example", Accept: "text/html" }
+    secure: false, port: instance.httpPort, path: "/courts", headers: { Host: "attacker.example", Accept: "text/html" }
   });
   const plaintextRefusals = await Promise.all([
     localRequest({
-      secure: false, port: 8081, path: "/api/session",
+      secure: false, port: instance.httpPort, path: "/api/session",
       headers: { Accept: "text/html", Authorization: `Bearer ${plaintextCredential}` }
     }),
     localRequest({
-      secure: false, port: 8081, path: "/api/session", method: "POST",
+      secure: false, port: instance.httpPort, path: "/api/session", method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Mode": "navigate" },
       body: `username=admin&password=${plaintextCredential}`
     }),
     localRequest({
-      secure: false, port: 8081, path: "/api/admin/import", method: "POST",
+      secure: false, port: instance.httpPort, path: "/api/admin/import", method: "POST",
       headers: { "Content-Type": "multipart/form-data; boundary=courtside-smoke" },
       body: `--courtside-smoke\r\nContent-Disposition: form-data; name="file"\r\n\r\n${plaintextBody}\r\n`
         + "--courtside-smoke--\r\n"
     }),
-    localRequest({ secure: false, port: 8081, path: "/api/public/courts", method: "QUERY" }),
+    localRequest({ secure: false, port: instance.httpPort, path: "/api/public/courts", method: "QUERY" }),
     localRequest({
-      secure: false, port: 8081, path: "/login", method: "POST",
+      secure: false, port: instance.httpPort, path: "/login", method: "POST",
       headers: { Accept: "text/html", "X-Forwarded-Proto": "https" }, body: plaintextBody
     })
   ]);
   assert.equal(redirect.statusCode, 301);
-  assert.equal(redirect.headers.location, "https://localhost:8443/login?from=smoke");
+  assert.equal(redirect.headers.location, `https://localhost:${instance.httpsPort}/login?from=smoke`);
   assert.equal(redirect.headers.server, undefined);
   assert.equal(redirect.headers.via, undefined);
   assert.equal(redirect.headers["cache-control"], "no-store");
   assert.match(redirect.headers["content-security-policy"], /base-uri 'none'/);
   assert.equal(headRedirect.statusCode, 301);
-  assert.equal(headRedirect.headers.location, "https://localhost:8443/courts?from=head");
+  assert.equal(headRedirect.headers.location, `https://localhost:${instance.httpsPort}/courts?from=head`);
   assert.equal(headRedirect.body, "");
   assertPlaintextRefusal(hostileRedirect);
   plaintextRefusals.forEach(assertPlaintextRefusal);
   composeRun("up", "-d", "--wait", "app", "proxy");
   const appStartedBefore = JSON.parse(run("docker", ["inspect", appBefore]))[0].State.StartedAt;
-  const session = await localRequest({ secure: true, port: 8443, path: "/api/session", ca: localCa });
-  const frontend = await localRequest({ secure: true, port: 8443, path: "/", ca: localCa });
-  const apiUi = await localRequest({ secure: true, port: 8443, path: "/api-ui/", ca: localCa });
-  const apiDocument = await localRequest({ secure: true, port: 8443, path: "/api/openapi.yaml", ca: localCa });
-  const sharedSession = await localRequest({ secure: false, port: 8083, path: "/api/session" });
-  const sharedApiUi = await localRequest({ secure: false, port: 8083, path: "/api-ui/" });
-  const sharedApiDocument = await localRequest({ secure: false, port: 8083, path: "/api/openapi.yaml" });
-  const sharedActuator = await localRequest({ secure: false, port: 8083, path: "/actuator/health" });
+  const session = await localRequest({ secure: true, port: instance.httpsPort, path: "/api/session", ca: localCa });
+  const frontend = await localRequest({ secure: true, port: instance.httpsPort, path: "/", ca: localCa });
+  const apiUi = await localRequest({ secure: true, port: instance.httpsPort, path: "/api-ui/", ca: localCa });
+  const apiDocument = await localRequest({ secure: true, port: instance.httpsPort, path: "/api/openapi.yaml", ca: localCa });
+  const sharedSession = await localRequest({ secure: false, port: instance.sharedPort, path: "/api/session" });
+  const sharedApiUi = await localRequest({ secure: false, port: instance.sharedPort, path: "/api-ui/" });
+  const sharedApiDocument = await localRequest({ secure: false, port: instance.sharedPort, path: "/api/openapi.yaml" });
+  const sharedActuator = await localRequest({ secure: false, port: instance.sharedPort, path: "/actuator/health" });
   const csrfCookie = sharedSession.headers["set-cookie"]
     .find((cookie) => cookie.startsWith("__Host-XSRF-TOKEN="));
   const csrfToken = csrfCookie.match(/^__Host-XSRF-TOKEN=([^;]+)/)[1];
   const login = await localRequest({
     secure: false,
-    port: 8083,
+    port: instance.sharedPort,
     path: "/api/session",
     method: "POST",
     headers: {
@@ -294,7 +295,7 @@ try {
   assert.match(personalBookings.body, new RegExp(bookingId));
 
   const hostileHeaders = await localRequest({
-    secure: false, port: 8083, path: "/api/session",
+    secure: false, port: instance.sharedPort, path: "/api/session",
     headers: { Host: "attacker.example", Forwarded: "host=attacker.example;proto=http", "X-Forwarded-Proto": "http" }
   });
   assert.equal(hostileHeaders.statusCode, 200);
@@ -339,10 +340,10 @@ try {
   }, null, 2)}\n`);
 
   composeRun("cp", "proxy:/data/caddy/pki/authorities/local/root.crt", join(build, "root-before.crt"));
-  cli(["uat-reset", "courtside-uat"]);
+  cli(["uat-reset", instance.project]);
   assert.equal(existsSync(join(build, "root-before.crt")), true);
-  assert.equal(run("docker", ["volume", "ls", "--quiet", "--filter", "name=^courtside-uat_db$"]), "");
-  assert.equal(run("docker", ["volume", "ls", "--quiet", "--filter", "name=^courtside-uat_caddy-data$"]), "courtside-uat_caddy-data");
+  assert.equal(run("docker", ["volume", "ls", "--quiet", "--filter", `name=^${instance.project}_db$`]), "");
+  assert.equal(run("docker", ["volume", "ls", "--quiet", "--filter", `name=^${instance.project}_caddy-data$`]), `${instance.project}_caddy-data`);
 
   resetPassword = newBootstrapPassword();
   smokeEnvironment.COURTSIDE_UAT_ADMIN_PASSWORD = resetPassword;
@@ -361,5 +362,5 @@ try {
   }
   throw failure;
 } finally {
-  cli(["uat-reset", "courtside-uat", "--all"]);
+  cli(["uat-reset", instance.project, "--all"]);
 }

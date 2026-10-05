@@ -1,18 +1,21 @@
 {
   "schemaVersion": 1,
   "profileOrder": ["docs", "backend", "frontend", "tooling", "full"],
-  "ciJobOrder": ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"],
+  "ciJobOrder": [
+    "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security", "gates",
+    "clock_shift"
+  ],
   "profiles": {
     "docs": {
       "ciJobs": ["docs", "tooling"],
       "localTasks": ["frontend-toolchain", "docs-check", "site-install", "site-build", "tooling-test"]
     },
     "backend": {
-      "ciJobs": ["backend", "tooling", "security"],
+      "ciJobs": ["backend", "tooling", "security", "gates"],
       "localTasks": ["frontend-toolchain", "backend", "tooling-test"]
     },
     "frontend": {
-      "ciJobs": ["frontend", "browser_visual", "browser", "tooling", "security"],
+      "ciJobs": ["frontend", "browser_visual", "browser", "tooling", "security", "gates"],
       "localTasks": [
         "frontend-toolchain",
         "frontend-lint",
@@ -24,18 +27,26 @@
       ]
     },
     "tooling": {
-      "ciJobs": ["tooling", "security"],
+      "ciJobs": ["tooling", "security", "clock_shift"],
       "localTasks": ["frontend-toolchain", "tooling-test"]
     },
     "full": {
-      "ciJobs": ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"],
+      "ciJobs": [
+        "docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security", "gates",
+        "clock_shift"
+      ],
       "localTasks": [
         "workflow-lint",
         "docs-check",
         "full-without-browser",
         "compose-wait-smoke",
         "frontend-e2e",
-        "webkit-reliability"
+        "webkit-reliability",
+        "gate-uat",
+        "gate-mail",
+        "gate-restore",
+        "gate-upgrade",
+        "gate-active-security"
       ]
     }
   },
@@ -127,6 +138,31 @@
       "workingDirectory": "frontend",
       "executable": "npm",
       "arguments": ["run", "reliability:webkit", "--", "--order", "configured"]
+    },
+    "gate-uat": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/local-release-gates.mjs", "uat"]
+    },
+    "gate-mail": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/local-release-gates.mjs", "mail"]
+    },
+    "gate-restore": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/local-release-gates.mjs", "restore"]
+    },
+    "gate-upgrade": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/local-release-gates.mjs", "upgrade"]
+    },
+    "gate-active-security": {
+      "workingDirectory": "repository",
+      "executable": "node",
+      "arguments": ["tools/local-release-gates.mjs", "active-security"]
     }
   },
   "coverageDifferences": [
@@ -139,6 +175,11 @@
       "scope": "tooling",
       "ci": "Repository tool tests; the security job runs beside them for every profile except documentation",
       "local": "Repository tool tests; hosted CodeQL, dependency review and container scanning unavailable"
+    },
+    {
+      "scope": "release-gates",
+      "ci": "Backend, frontend and full pull requests run archive reproducibility, the Stalwart journey, the active assessment, restore and upgrade on an amd64 image built in the run",
+      "local": "The full profile runs the qualification, Stalwart, restore, upgrade and active gates against courtside:uat-local on the host architecture; archive reproducibility runs only in CI"
     },
     {
       "scope": "site",

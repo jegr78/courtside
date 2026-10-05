@@ -71,6 +71,13 @@
       ]
     },
     {
+      "path": ".github/actions/gate-image/action.yml",
+      "profiles": [
+        "full"
+      ],
+      "validators": []
+    },
+    {
       "path": ".github/actions/tool-dependencies/action.yml",
       "profiles": [
         "full"

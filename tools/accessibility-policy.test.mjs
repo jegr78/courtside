@@ -13,8 +13,9 @@ const fixtures = readFileSync(join(root, "frontend/e2e/fixtures.ts"), "utf8");
 const playwright = readFileSync(join(root, "frontend/playwright.config.ts"), "utf8");
 const pom = readFileSync(join(root, "pom.xml"), "utf8");
 const stability = readFileSync(join(root, ".github/workflows/test-stability.yml"), "utf8");
+const build = readFileSync(join(root, ".github/workflows/build.yml"), "utf8");
 
-test("given the required accessibility gate, when inspecting its browser coverage, then axe blocks in Chromium only", () => {
+test("given the required accessibility gate, when inspecting its browser coverage, then axe blocks in Chromium and in the WebKit shard", () => {
   assert.match(accessibility, /wcag22aa/);
   assert.match(accessibility, /initial password change is operable using only the keyboard/);
   assert.match(accessibility, /a booking is operable using only the keyboard/);
@@ -22,6 +23,7 @@ test("given the required accessibility gate, when inspecting its browser coverag
   assert.match(playwright, /name: "webkit-accessibility"/);
   assert.match(playwright, /COURTSIDE_WEBKIT_AXE/);
   assert.match(stability, /COURTSIDE_WEBKIT_AXE: 'true'/);
+  assert.match(build, /COURTSIDE_WEBKIT_AXE: \$\{\{ matrix\.group == 'webkit-accessibility' && 'true' \|\| 'false' \}\}/);
   assert.doesNotMatch(pom, /COURTSIDE_WEBKIT_AXE/);
   // Every browser draws in the pinned image, so the build installs none of them.
   assert.doesNotMatch(pom, /playwright install/);
@@ -143,3 +145,18 @@ function sourceFiles(directory) {
     ? sourceFiles(join(directory, entry.name))
     : [join(directory, entry.name)]);
 }
+
+test("given WebKit plus axe runs in its own pull-request shard, when the documents describe it, then none calls it outside the merge gate", () => {
+  // given
+  const documents = ["docs/accessibility-testing.md", "docs/browser-pwa-testing.md", "docs/quality-strategy.md"]
+    .map((path) => [path, readFileSync(join(root, path), "utf8").replace(/\s+/g, " ")]);
+
+  // when / then
+  for (const [path, text] of documents) {
+    assert.doesNotMatch(text, /not a merge gate|stays out of the merge gate|remains a qualification signal/,
+      `${path} still describes WebKit plus axe as outside the merge gate`);
+    assert.doesNotMatch(text, /used to run only/, `${path} narrates history instead of the current gate`);
+  }
+  assert.match(documents[0][1], /WebKit plus axe combination runs in its own pull-request browser shard/);
+  assert.match(documents[1][1], /WebKit plus axe combination runs in its own pull-request browser shard/);
+});

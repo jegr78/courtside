@@ -15,7 +15,7 @@ http://:80 {
 			-Server
 			-Via
 		}
-		redir https://localhost:8443{uri} permanent
+		redir https://localhost:{$COURTSIDE_UAT_HTTPS_PORT:8443}{uri} permanent
 	}
 	handle {
 		header {

@@ -8,7 +8,9 @@ import { fileURLToPath } from "node:url";
 import {
   selectRepositoryDigest,
   publishedTags,
+  emptyOriginNotice,
   gitHistory,
+  modifiedUpgradeInputs,
   nightlyUpgradeOrigins,
   previousReleaseTag,
   releaseUpgradeOrigins,
@@ -253,7 +255,9 @@ test("given a release candidate, when release qualification runs, then every sup
   assert.match(releaseWorkflow, /--release-origins "\$GITHUB_REPOSITORY"/);
   assert.match(releaseWorkflow, /upgrade-origins: \$\{\{ needs\.build\.outputs\.upgrade-origins \}\}/);
   assert.match(gatesWorkflow, /node tools\/courtside\.upgrade-smoke\.mjs --confirm courtside-upgrade/);
-  assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_IMAGE:[^\n]+inputs\.image-digest/);
+  assert.match(gatesWorkflow,
+    /\n  upgrade:\n[\s\S]+?uses: \.\/\.github\/actions\/gate-image\n[\s\S]+?digest: \$\{\{ inputs\.image-digest \}\}/);
+  assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_IMAGE: \$\{\{ steps\.image\.outputs\.reference \}\}/);
   assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_ORIGIN_IMAGE: \$\{\{ matrix\.origin\.image \}\}/);
   assert.match(releaseWorkflow, /Supported database upgrade origins/);
   assert.match(releaseWorkflow, /needs: \[archive, build, browser, image, qualify, gates\]/);
@@ -394,4 +398,101 @@ test("given a history where a shipped migration was corrected, when git is asked
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+function upgradeHistory() {
+  const directory = mkdtempSync(join(tmpdir(), "courtside-upgrade-change-"));
+  const git = (args) => execFileSync("git", args, { cwd: directory, encoding: "utf8",
+    env: { ...process.env, GIT_AUTHOR_NAME: "Jane Doe", GIT_AUTHOR_EMAIL: "jane@example.org",
+      GIT_COMMITTER_NAME: "Jane Doe", GIT_COMMITTER_EMAIL: "jane@example.org" } }).trim();
+  const commit = (path, content) => {
+    mkdirSync(join(directory, path, ".."), { recursive: true });
+    writeFileSync(join(directory, path), content);
+    git(["add", "."]);
+    git(["commit", "-q", "-m", path]);
+    return git(["rev-parse", "HEAD"]);
+  };
+  git(["init", "-q", "-b", "main"]);
+  commit("upgrade/verify.sql", "select 1;");
+  const base = commit("src/main/resources/db/migration/V1__base.sql", "create table a();");
+  return { directory, git, commit, base };
+}
+
+test("given a change that corrects a shipped migration, when no nightly origin remains, then the gate passes with a notice", () => {
+  // given
+  const { directory, git, commit, base } = upgradeHistory();
+  try {
+    git(["switch", "-q", "-c", "change"]);
+    const candidate = commit("src/main/resources/db/migration/V1__base.sql", "create table a(id int);");
+
+    // when
+    const paths = modifiedUpgradeInputs(base, candidate, directory);
+
+    // then
+    assert.deepEqual(paths, ["src/main/resources/db/migration/V1__base.sql"]);
+    assert.equal(emptyOriginNotice(paths), "no comparable upgrade origin: this change modifies "
+      + "src/main/resources/db/migration/V1__base.sql; the next nightly covers the upgrade");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("given a change that rewrites the upgrade verification, when no nightly origin remains, then the gate passes with a notice", () => {
+  // given
+  const { directory, git, commit, base } = upgradeHistory();
+  try {
+    git(["switch", "-q", "-c", "change"]);
+    const candidate = commit("upgrade/verify.sql", "select 2;");
+
+    // when / then
+    assert.deepEqual(modifiedUpgradeInputs(base, candidate, directory), ["upgrade/verify.sql"]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("given a change that only adds a migration, when no nightly origin remains, then the empty origin set fails", () => {
+  // given
+  const { directory, git, commit, base } = upgradeHistory();
+  try {
+    git(["switch", "-q", "-c", "change"]);
+    const candidate = commit("src/main/resources/db/migration/V2__more.sql", "create table b();");
+
+    // when
+    const paths = modifiedUpgradeInputs(base, candidate, directory);
+
+    // then
+    assert.deepEqual(paths, [], "an added migration upgrades from every nightly before it");
+    assert.throws(() => emptyOriginNotice(paths), /no upgrade origin/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("given a base that corrected a migration after the change branched, when the change is read, then only its own diff counts", () => {
+  // given
+  const { directory, git, commit, base } = upgradeHistory();
+  try {
+    git(["switch", "-q", "-c", "change"]);
+    const candidate = commit("src/main/resources/db/migration/V2__more.sql", "create table b();");
+    git(["switch", "-q", "main"]);
+    const advanced = commit("src/main/resources/db/migration/V1__base.sql", "create table a(id int);");
+
+    // when / then
+    assert.notEqual(advanced, base);
+    assert.deepEqual(modifiedUpgradeInputs(advanced, candidate, directory), [],
+      "a correction on the base branch is not this change's reason to skip the upgrade");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("given an empty origin set, when the gate resolves origins, then only a pull request with its own base may pass it", () => {
+  // when / then
+  assert.match(gatesWorkflow, /UPGRADE_BASE: \$\{\{ inputs\.upgrade-base \}\}/);
+  assert.match(gatesWorkflow,
+    /if \[ "\$origins" = '\[\]' \]; then\s+test -n "\$UPGRADE_BASE"\s+notice=\$\(node tools\/courtside\.upgrade-smoke\.mjs --empty-origin-notice "\$UPGRADE_BASE" "\$SOURCE_COMMIT"\)/,
+    "registry mode has no upgrade base and keeps failing on an empty set");
+  assert.match(gatesWorkflow, /echo "::notice::\$notice"/);
+  assert.match(gatesWorkflow, /echo "\$notice" >> "\$GITHUB_STEP_SUMMARY"/);
 });

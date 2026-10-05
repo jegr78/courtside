@@ -20,7 +20,7 @@ import {
   performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
   funnelPerformanceRunPlan, localRequest, validateFunnelTarget, validatePerformanceResult,
   redactUatDiagnostics, resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference,
-  uatSmokeEnvironment, repositoryFromRemote, uatBookingSeedCandidate, uatBookingSeedPlans,
+  uatInstance, uatStateFile, uatSmokeEnvironment, repositoryFromRemote, uatBookingSeedCandidate, uatBookingSeedPlans,
   validateNode, validatePublicAddress
 } from "./courtside.mjs";
 
@@ -1405,7 +1405,7 @@ test("given UAT persistence, when reading its Compose contract, then data, CA, T
   assert.match(caddy, /auto_https disable_redirects/);
   assert.match(caddy, /method GET HEAD/);
   assert.match(caddy, /path \/ \/courts \/login/);
-  assert.match(caddy, /redir https:\/\/localhost:8443\{uri\} permanent/);
+  assert.match(caddy, /redir https:\/\/localhost:\{\$COURTSIDE_UAT_HTTPS_PORT:8443\}\{uri\} permanent/);
   assert.match(caddy, /respond "Plain HTTP is not accepted\." 400/);
   assert.doesNotMatch(caddy, /auto_https (?:off|disable_certs)/);
   assert.doesNotMatch(localCaddy, /Strict-Transport-Security/);
@@ -1418,7 +1418,7 @@ test("given the Funnel ingress, when reading its proxy contract, then only appli
   const caddy = readFileSync(fileURLToPath(new URL("../deploy/Caddyfile.uat", import.meta.url)), "utf8");
 
   // when / then
-  assert.match(compose, /127\.0\.0\.1:8083:8083/);
+  assert.match(compose, /"127\.0\.0\.1:\$\{COURTSIDE_UAT_SHARED_PORT:-8083\}:8083"/);
   assert.match(caddy, /http:\/\/:8083/);
   assert.match(caddy, /X-Robots-Tag "noindex, nofollow"/);
   assert.match(caddy, /Strict-Transport-Security/);
@@ -1658,3 +1658,70 @@ test("given a readiness probe, when the target does not answer within its deadli
       server.close();
     }
   });
+
+test("given no instance settings, when the UAT instance is named, then it is the developer's fixed one", () => {
+  // when
+  const instance = uatInstance({});
+
+  // then
+  assert.deepEqual(instance, { project: "courtside-uat", image: "courtside:uat-local", httpPort: 8081,
+    httpsPort: 8443, sharedPort: 8083, logPort: 1515 });
+  assert.equal(uatImageReference(undefined, {}, () => undefined), "courtside:uat-local");
+});
+
+test("given a run-scoped instance, when the UAT is composed, then it never names the developer's project, image or ports", () => {
+  // given
+  const environment = { COURTSIDE_UAT_PROJECT: "courtside-uat-gate-7", COURTSIDE_UAT_LOCAL_IMAGE: "courtside:uat-gate-7",
+    COURTSIDE_UAT_HTTP_PORT: "41001", COURTSIDE_UAT_HTTPS_PORT: "41002", COURTSIDE_UAT_SHARED_PORT: "41003",
+    COURTSIDE_OPERATIONAL_LOG_PORT: "41004" };
+
+  // when
+  const instance = uatInstance(environment);
+  const composed = uatComposeArgs(false, environment);
+  const reset = uatResetPlans(false, environment);
+
+  // then
+  assert.deepEqual(instance, { project: "courtside-uat-gate-7", image: "courtside:uat-gate-7", httpPort: 41001,
+    httpsPort: 41002, sharedPort: 41003, logPort: 41004 });
+  assert.equal(composed[composed.indexOf("-p") + 1], "courtside-uat-gate-7");
+  assert.deepEqual(reset.at(-1).args, ["volume", "rm", "--force", "courtside-uat-gate-7_db"]);
+  assert.equal(uatImageReference(undefined, environment, () => undefined), "courtside:uat-gate-7");
+  assert.ok(!JSON.stringify([composed, reset]).includes("courtside-uat\""), "the developer's project stays untouched");
+  assert.match(uatStateFile(environment), /build\/uat-environment-courtside-uat-gate-7\.json$/,
+    "a gate run keeps its state beside the developer's, not over it");
+  assert.match(uatStateFile({}), /build\/uat-environment\.json$/);
+});
+
+test("given an instance setting outside the UAT namespace, when the instance is named, then it is refused", () => {
+  // when / then
+  assert.throws(() => uatInstance({ COURTSIDE_UAT_PROJECT: "courtside-perf" }), /UAT project/);
+  assert.throws(() => uatInstance({ COURTSIDE_UAT_LOCAL_IMAGE: "ghcr.io/x/y:1" }), /UAT image/);
+  assert.throws(() => uatInstance({ COURTSIDE_UAT_HTTPS_PORT: "80" }), /UAT port/);
+  assert.throws(() => uatInstance({ COURTSIDE_UAT_HTTP_PORT: "8081x" }), /UAT port/);
+});
+
+test("given the UAT compose file, when a run-scoped instance starts, then its ports and redirect follow the instance", () => {
+  // given
+  const compose = readFileSync(new URL("../deploy/compose.uat.yaml", import.meta.url), "utf8");
+  const caddy = readFileSync(new URL("../deploy/Caddyfile.uat", import.meta.url), "utf8");
+
+  // when / then
+  assert.match(compose, /- "127\.0\.0\.1:\$\{COURTSIDE_UAT_HTTP_PORT:-8081\}:80"/);
+  assert.match(compose, /- "127\.0\.0\.1:\$\{COURTSIDE_UAT_HTTPS_PORT:-8443\}:443"/);
+  assert.match(compose, /- "127\.0\.0\.1:\$\{COURTSIDE_UAT_SHARED_PORT:-8083\}:8083"/);
+  assert.match(compose, /COURTSIDE_UAT_HTTPS_PORT: \$\{COURTSIDE_UAT_HTTPS_PORT:-8443\}/);
+  assert.match(caddy, /redir https:\/\/localhost:\{\$COURTSIDE_UAT_HTTPS_PORT:8443\}\{uri\} permanent/);
+});
+
+test("given a run-scoped instance, when the smoke composes the UAT, then it runs the instance's own image", () => {
+  // given
+  const environment = { COURTSIDE_UAT_LOCAL_IMAGE: "courtside:uat-gate-7" };
+
+  // when
+  const resolved = uatSmokeEnvironment(undefined, environment, () => undefined);
+
+  // then
+  assert.equal(resolved.COURTSIDE_UAT_IMAGE, "courtside:uat-gate-7",
+    "Compose would otherwise fall back to the shared courtside:uat-local and recreate the app from it");
+  assert.equal(uatSmokeEnvironment(undefined, {}, () => undefined).COURTSIDE_UAT_IMAGE, "courtside:uat-local");
+});

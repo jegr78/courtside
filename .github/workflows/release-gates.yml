@@ -48,6 +48,18 @@ on:
         required: false
         type: string
         default: nightly
+      image-source:
+        required: false
+        type: string
+        default: registry
+      upgrade-base:
+        required: false
+        type: string
+        default: ''
+      image-artifact:
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       image-digest:
@@ -93,6 +105,18 @@ on:
         required: false
         type: string
         default: nightly
+      image-source:
+        required: false
+        type: string
+        default: registry
+      upgrade-base:
+        required: false
+        type: string
+        default: ''
+      image-artifact:
+        required: false
+        type: string
+        default: ''
 
 permissions: {}
 
@@ -109,6 +133,20 @@ jobs:
           ref: ${{ inputs.source-commit }}
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
+      - id: image
+        uses: ./.github/actions/gate-image
+        with:
+          source: ${{ inputs.image-source }}
+          digest: ${{ inputs.image-digest }}
+          repository: ${{ github.repository }}
+          load: 'false'
+      - id: booking-seed
+        uses: ./.github/actions/gate-image
+        with:
+          source: ${{ inputs.image-source }}
+          digest: ${{ inputs.booking-seed-digest }}
+          repository: ${{ github.repository }}
+          load: 'false'
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ inputs.archive-artifact }}
@@ -117,8 +155,8 @@ jobs:
           github-token: ${{ github.token }}
       - name: Rebuild the deployment archive and compare it with the one to publish
         env:
-          IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
-          BOOKING_SEED_IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.booking-seed-digest }}
+          IMAGE: ${{ steps.image.outputs.pinned }}
+          BOOKING_SEED_IMAGE: ${{ steps.booking-seed.outputs.pinned }}
           VERSION: ${{ inputs.archive-version }}
           ARCHIVE_REF: ${{ inputs.archive-ref }}
           ARCHIVE_WORKFLOW: ${{ inputs.archive-workflow }}
@@ -147,6 +185,20 @@ jobs:
           ref: ${{ inputs.source-commit }}
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
+      - id: image
+        uses: ./.github/actions/gate-image
+        with:
+          source: ${{ inputs.image-source }}
+          digest: ${{ inputs.image-digest }}
+          repository: ${{ github.repository }}
+          load: 'false'
+      - id: booking-seed
+        uses: ./.github/actions/gate-image
+        with:
+          source: ${{ inputs.image-source }}
+          digest: ${{ inputs.booking-seed-digest }}
+          repository: ${{ github.repository }}
+          load: 'false'
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: ${{ inputs.archive-artifact }}
@@ -155,8 +207,8 @@ jobs:
           github-token: ${{ github.token }}
       - name: Bind the Stalwart journey to the candidate archive
         env:
-          IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
-          BOOKING_SEED_IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.booking-seed-digest }}
+          IMAGE: ${{ steps.image.outputs.pinned }}
+          BOOKING_SEED_IMAGE: ${{ steps.booking-seed.outputs.pinned }}
         run: |
           mkdir -p build/deployment-mail
           archive=$(find "$GITHUB_WORKSPACE/build/deployment-archive" -maxdepth 1 \
@@ -176,7 +228,7 @@ jobs:
         if: always()
         env:
           JOURNEY_OUTCOME: ${{ steps.journey.outcome }}
-          IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
+          IMAGE: ${{ steps.image.outputs.pinned }}
         run: |
           jq -n \
             --arg image "$IMAGE" \
@@ -213,14 +265,23 @@ jobs:
       packages: read
     env:
       RUN_ID: ${{ inputs.run-label }}-${{ github.run_id }}-${{ github.run_attempt }}
-      IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ inputs.source-commit }}
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      - id: image
+        uses: ./.github/actions/gate-image
+        with:
+          source: ${{ inputs.image-source }}
+          digest: ${{ inputs.image-digest }}
+          repository: ${{ github.repository }}
+          artifact: ${{ inputs.image-artifact }}
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
+      - if: inputs.image-source == 'registry'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -237,10 +298,16 @@ jobs:
           path: target/fixtures-classes
           run-id: ${{ inputs.artifacts-run-id || github.run_id }}
           github-token: ${{ github.token }}
+      - name: Pull the digest-bound security target
+        if: inputs.image-source == 'registry'
+        env:
+          IMAGE: ${{ steps.image.outputs.reference }}
+        run: docker pull "$IMAGE"
       - name: Start the digest-bound security target
+        env:
+          IMAGE: ${{ steps.image.outputs.reference }}
         run: |
           set -o pipefail
-          docker pull "$IMAGE"
           node tools/security-image-inventory.mjs active | xargs -n1 docker pull
           node tools/courtside.mjs security "$RUN_ID" "$IMAGE"
       - name: Execute the required active assessment
@@ -257,6 +324,7 @@ jobs:
       - name: Enforce the release assessment gate
         if: always()
         env:
+          IMAGE: ${{ steps.image.outputs.reference }}
           SOURCE_COMMIT: ${{ inputs.source-commit }}
         run: >
           node tools/security-assessment-gate.mjs
@@ -280,6 +348,7 @@ jobs:
 
   security-record:
     needs: active-security
+    if: inputs.image-source == 'registry'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -353,6 +422,7 @@ jobs:
         env:
           REQUESTED: ${{ inputs.upgrade-origins }}
           SOURCE_COMMIT: ${{ inputs.source-commit }}
+          UPGRADE_BASE: ${{ inputs.upgrade-base }}
         shell: bash
         run: |
           if [ "$REQUESTED" = nightly ]; then
@@ -361,7 +431,12 @@ jobs:
               "https://ghcr.io/v2/$GITHUB_REPOSITORY/tags/list?n=10000" | jq -c .tags)
             origins=$(node tools/courtside.upgrade-smoke.mjs --nightly-origins "$GITHUB_REPOSITORY" "$tags" \
               "$SOURCE_COMMIT")
-            test "$origins" != '[]'
+            if [ "$origins" = '[]' ]; then
+              test -n "$UPGRADE_BASE"
+              notice=$(node tools/courtside.upgrade-smoke.mjs --empty-origin-notice "$UPGRADE_BASE" "$SOURCE_COMMIT")
+              echo "::notice::$notice"
+              echo "$notice" >> "$GITHUB_STEP_SUMMARY"
+            fi
           else
             origins="$REQUESTED"
           fi
@@ -377,10 +452,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
-      COURTSIDE_UPGRADE_CANDIDATE_IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
       COURTSIDE_UPGRADE_ORIGIN: ${{ matrix.origin.ref }}
       COURTSIDE_UPGRADE_ORIGIN_IMAGE: ${{ matrix.origin.image }}
     steps:
@@ -392,13 +467,26 @@ jobs:
 
       - uses: ./.github/actions/tool-dependencies
 
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      - id: image
+        uses: ./.github/actions/gate-image
+        with:
+          source: ${{ inputs.image-source }}
+          digest: ${{ inputs.image-digest }}
+          repository: ${{ github.repository }}
+          artifact: ${{ inputs.image-artifact }}
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
+
+      - if: inputs.image-source == 'registry'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prove the database upgrade path
+        env:
+          COURTSIDE_UPGRADE_CANDIDATE_IMAGE: ${{ steps.image.outputs.reference }}
         run: node tools/courtside.upgrade-smoke.mjs --confirm courtside-upgrade
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -413,10 +501,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
+      actions: read
       contents: read
       packages: read
-    env:
-      COURTSIDE_RESTORE_IMAGE: ghcr.io/${{ github.repository }}@${{ inputs.image-digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -425,13 +512,26 @@ jobs:
 
       - uses: ./.github/actions/tool-dependencies
 
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      - id: image
+        uses: ./.github/actions/gate-image
+        with:
+          source: ${{ inputs.image-source }}
+          digest: ${{ inputs.image-digest }}
+          repository: ${{ github.repository }}
+          artifact: ${{ inputs.image-artifact }}
+          run-id: ${{ inputs.artifacts-run-id || github.run_id }}
+          github-token: ${{ github.token }}
+
+      - if: inputs.image-source == 'registry'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prove backup and restore
+        env:
+          COURTSIDE_RESTORE_IMAGE: ${{ steps.image.outputs.reference }}
         run: node tools/courtside.restore-smoke.mjs --confirm courtside-restore
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -448,6 +548,7 @@ jobs:
           if-no-files-found: error
 
   npm-audit:
+    if: inputs.image-source == 'registry'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

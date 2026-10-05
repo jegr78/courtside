@@ -47,7 +47,10 @@ const uatSeedComposeFile = join(root, "deploy", "compose.uat-seed.yaml");
 const uatProject = "courtside-uat";
 const funnelTarget = "http://127.0.0.1:8083";
 const stateFile = join(root, "build", "dev-processes.json");
-const uatStateFile = join(root, "build", "uat-environment.json");
+export function uatStateFile(environment = process.env) {
+  const { project } = uatInstance(environment);
+  return join(root, "build", project === uatProject ? "uat-environment.json" : `uat-environment-${project}.json`);
+}
 const uatFunnelStateFile = join(root, "build", "uat-funnel.json");
 const perfComposeFile = join(root, "deploy", "compose.perf.yaml");
 const perfDbComposeFile = join(root, "deploy", "compose.perf-db.yaml");
@@ -193,14 +196,14 @@ export function parseArguments(argv) {
   if (command === "status" && !options.environment) {
     throw new Error("status requires the environment 'dev', 'uat', or 'perf'");
   }
-  if (command === "uat-restore" && (!options.file || options.confirm !== uatProject)) {
-    throw new Error(`uat-restore requires a file and --confirm ${uatProject}`);
+  if (command === "uat-restore" && (!options.file || options.confirm !== uatInstance().project)) {
+    throw new Error(`uat-restore requires a file and --confirm ${uatInstance().project}`);
   }
-  if (command === "uat-reset" && options.confirm !== uatProject) {
-    throw new Error(`uat-reset requires the exact project name '${uatProject}'`);
+  if (command === "uat-reset" && options.confirm !== uatInstance().project) {
+    throw new Error(`uat-reset requires the exact project name '${uatInstance().project}'`);
   }
-  if (command === "uat-seed-bookings" && options.confirm && options.confirm !== uatProject) {
-    throw new Error(`uat-seed-bookings writes only with --confirm ${uatProject}`);
+  if (command === "uat-seed-bookings" && options.confirm && options.confirm !== uatInstance().project) {
+    throw new Error(`uat-seed-bookings writes only with --confirm ${uatInstance().project}`);
   }
   if (command === "perf-reset" && options.confirm !== perfProject) {
     throw new Error(`perf-reset requires the exact project name '${perfProject}'`);
@@ -317,8 +320,30 @@ function validateImageVersion(version) {
   }
 }
 
-export function uatComposeArgs(withDatabasePort = false) {
-  return ["compose", "-p", uatProject, "-f", uatComposeFile,
+export function uatInstance(environment = process.env) {
+  const project = environment.COURTSIDE_UAT_PROJECT || uatProject;
+  if (!/^courtside-uat(?:-[a-z0-9][a-z0-9-]{0,40})?$/.test(project)) throw new Error(`Invalid UAT project: ${project}`);
+  const image = environment.COURTSIDE_UAT_LOCAL_IMAGE || "courtside:uat-local";
+  if (!/^courtside:uat-[a-z0-9][a-z0-9._-]{0,60}$/.test(image)) throw new Error(`Invalid UAT image: ${image}`);
+  const port = (name, fallback) => {
+    const value = environment[name] || String(fallback);
+    if (!/^[0-9]{4,5}$/.test(value) || Number(value) < 1024 || Number(value) > 65535) {
+      throw new Error(`Invalid UAT port ${name}: ${value}`);
+    }
+    return Number(value);
+  };
+  return {
+    project,
+    image,
+    httpPort: port("COURTSIDE_UAT_HTTP_PORT", 8081),
+    httpsPort: port("COURTSIDE_UAT_HTTPS_PORT", 8443),
+    sharedPort: port("COURTSIDE_UAT_SHARED_PORT", 8083),
+    logPort: port("COURTSIDE_OPERATIONAL_LOG_PORT", 1515)
+  };
+}
+
+export function uatComposeArgs(withDatabasePort = false, environment = process.env) {
+  return ["compose", "-p", uatInstance(environment).project, "-f", uatComposeFile,
     ...(withDatabasePort ? ["-f", uatDbComposeFile] : [])];
 }
 
@@ -623,7 +648,7 @@ async function execute(options) {
     return;
   }
   if (options.command === "uat-seed-bookings") {
-    seedUatBookings(options.confirm === uatProject);
+    seedUatBookings(options.confirm === uatInstance().project);
     return;
   }
   if (options.command === "perf") {
@@ -820,7 +845,7 @@ function startUat(options) {
   } else {
     runInteractive(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
     extractApplicationLayers();
-    runInteractive({ command: "docker", args: ["build", "-t", "courtside:uat-local", "."] });
+    runInteractive({ command: "docker", args: ["build", "-t", uatInstance().image, "."] });
   }
   runInteractive({ command: "docker", args: [...uatComposeArgs(options.dbPort), "up", "-d", "--wait", "db"], environment });
   const needsBootstrap = !uatHasAccounts(options.dbPort, environment);
@@ -838,14 +863,14 @@ function startUat(options) {
       environment
     });
   }
-  mkdirSync(dirname(uatStateFile), { recursive: true });
-  writeFileSync(uatStateFile, `${JSON.stringify({ image: environment.COURTSIDE_UAT_IMAGE, dbPort: options.dbPort }, null, 2)}\n`, { mode: 0o600 });
+  mkdirSync(dirname(uatStateFile()), { recursive: true });
+  writeFileSync(uatStateFile(), `${JSON.stringify({ image: environment.COURTSIDE_UAT_IMAGE, dbPort: options.dbPort }, null, 2)}\n`, { mode: 0o600 });
   process.stdout.write(uatStartupSummary(password, needsBootstrap, options));
 }
 
 export function uatStartupSummary(password, needsBootstrap, options) {
   return [
-    "UAT: https://localhost:8443 | HTTP redirect: http://localhost:8081",
+    `UAT: https://localhost:${uatInstance().httpsPort} | HTTP redirect: http://localhost:${uatInstance().httpPort}`,
     ...(needsBootstrap && options.showCredentials
       ? [`Bootstrap admin: admin | one-time password: ${password}`]
       : []),
@@ -874,14 +899,14 @@ function parsedUrl(value) {
   }
 }
 
-function checkoutRepository() {
+export function checkoutRepository() {
   const remote = spawnSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf8" });
   return remote.status === 0 ? repositoryFromRemote(remote.stdout) : undefined;
 }
 
 // A fork qualifies the image it published, not the one this repository happens to be named after.
 export function uatImageReference(version, environment = process.env, checkout = checkoutRepository) {
-  if (!version) return "courtside:uat-local";
+  if (!version) return uatInstance(environment).image;
   const named = environment.GITHUB_REPOSITORY || checkout();
   if (!named) {
     throw new Error("Cannot name the image to qualify: set GITHUB_REPOSITORY, "
@@ -897,7 +922,7 @@ export function uatImageReference(version, environment = process.env, checkout =
 
 export function uatSmokeEnvironment(version, environment = process.env, checkout = checkoutRepository) {
   const resolved = { ...environment };
-  if (version) resolved.COURTSIDE_UAT_IMAGE = uatImageReference(version, environment, checkout);
+  resolved.COURTSIDE_UAT_IMAGE = uatImageReference(version, environment, checkout);
   return resolved;
 }
 
@@ -1712,7 +1737,7 @@ function seedUatBookings(write) {
   runInteractive(plans.image);
   runInteractive(plans.run);
   if (!write) {
-    process.stdout.write(`Preview only. Re-run with --confirm ${uatProject} to write the displayed dataset.\n`);
+    process.stdout.write(`Preview only. Re-run with --confirm ${uatInstance().project} to write the displayed dataset.\n`);
   }
 }
 
@@ -1764,11 +1789,11 @@ function resetUat(all) {
   const plans = uatResetPlans(all);
   runLifecyclePlans(plans);
   if (all) {
-    rmSync(uatStateFile, { force: true });
+    rmSync(uatStateFile(), { force: true });
     process.stdout.write("UAT database and local certificate authority removed.\n");
     return;
   }
-  rmSync(uatStateFile, { force: true });
+  rmSync(uatStateFile(), { force: true });
   process.stdout.write("UAT database removed; the local certificate authority was retained.\n");
 }
 
@@ -1776,27 +1801,27 @@ export function runLifecyclePlans(plans, run = runInteractive) {
   plans.forEach((plan) => run(plan));
 }
 
-export function uatResetPlans(all) {
+export function uatResetPlans(all, environment = process.env) {
   if (all) {
-    return [{ command: "docker", args: [...uatComposeArgs(), "down", "--volumes", "--remove-orphans"] }];
+    return [{ command: "docker", args: [...uatComposeArgs(false, environment), "down", "--volumes", "--remove-orphans"] }];
   }
   return [
-    { command: "docker", args: [...uatComposeArgs(), "down", "--remove-orphans"] },
+    { command: "docker", args: [...uatComposeArgs(false, environment), "down", "--remove-orphans"] },
     // A reset states that nothing is left, so it also answers for an environment that never existed:
     // without --force, docker refuses a volume it cannot find.
-    { command: "docker", args: ["volume", "rm", "--force", `${uatProject}_db`] }
+    { command: "docker", args: ["volume", "rm", "--force", `${uatInstance(environment).project}_db`] }
   ];
 }
 
 function readUatState() {
   try {
-    const state = JSON.parse(readFileSync(uatStateFile, "utf8"));
+    const state = JSON.parse(readFileSync(uatStateFile(), "utf8"));
     return {
-      image: typeof state.image === "string" ? state.image : "courtside:uat-local",
+      image: typeof state.image === "string" ? state.image : uatInstance().image,
       dbPort: state.dbPort === true
     };
   } catch {
-    return { image: "courtside:uat-local", dbPort: false };
+    return { image: uatInstance().image, dbPort: false };
   }
 }
 

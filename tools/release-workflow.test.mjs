@@ -316,8 +316,9 @@ test("given a candidate archive, when any release job inspects it, then the book
   const inspections = [...inspectionsOf(releaseJobs, "release"), ...inspectionsOf(gateJobs, "release-gates")];
   const boundDigest = {
     release: "ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}",
-    "release-gates": "ghcr.io/${{ github.repository }}@${{ inputs.booking-seed-digest }}"
+    "release-gates": "${{ steps.booking-seed.outputs.pinned }}"
   };
+  const seedOf = (job) => gateJobs[job].steps.find((step) => step.id === "booking-seed");
 
   // then
   assert.ok(inspections.some(({ job }) => job === "release-gates:mail"), "the mail gate inspects the archive");
@@ -325,6 +326,10 @@ test("given a candidate archive, when any release job inspects it, then the book
   for (const { job, step } of inspections) {
     assert.match(step.run, /--booking-seed-image "\$BOOKING_SEED_IMAGE"/, `${job} passes the booking-seed image`);
     assert.equal(step.env?.BOOKING_SEED_IMAGE, boundDigest[job.split(":")[0]], `${job} binds the booking-seed digest`);
+    if (job.startsWith("release-gates:")) {
+      assert.equal(seedOf(job.split(":")[1]).with.digest, "${{ inputs.booking-seed-digest }}",
+        `${job} resolves the booking seed from its digest input`);
+    }
   }
 });
 
@@ -405,7 +410,11 @@ test("given no release passes upgrade origins, when the gates run at night, then
   // when / then
   assert.equal(call.default, "nightly", "build.yml and the branch rehearsal pass no origins and must still rehearse");
   assert.match(resolve, /--nightly-origins "\$GITHUB_REPOSITORY"/);
-  assert.match(resolve, /test "\$origins" != '\[\]'/, "a night that found no origin must not pass silently");
+  assert.match(resolve, /if \[ "\$origins" = '\[\]' \]; then\s+test -n "\$UPGRADE_BASE"/,
+    "a night that found no origin must not pass silently");
+  const nightly = yaml.load(readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8"))
+    .jobs["release-gates"];
+  assert.equal(nightly.with["upgrade-base"], undefined, "the nightly names no base, so an empty set fails it");
   assert.deepEqual(gates.jobs.upgrade.needs, "upgrade-origins");
   assert.equal(gates.jobs["upgrade-origins"].steps.find((step) => step.id === "resolve").shell, "bash",
     "GitHub adds pipefail only to an explicit bash shell, so a failed registry request would read as bad JSON");

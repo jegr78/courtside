@@ -35,6 +35,37 @@ runs the same reference deployment smoke, Trivy scan and `release-image-amd64` o
 there is still no version tag to spend. The scheduled failure tracker records it as part of the
 failed scheduled build.
 
+## What pull requests prove
+
+A pull request whose plan selects the backend, frontend or full profile can change the image, so it
+runs the release gates before it merges. The `gates-image` job builds the image from the pull
+request's merge commit, runs the amd64 qualification on it with `tools/courtside.uat-smoke.mjs`, adds
+the booking seed and writes a deployment archive shaped like a nightly one. It hands both images to
+`release-gates.yml` as an artifact of the same run instead of through the registry. No gate job logs
+in, pushes or reads a secret; the jobs use `github.token` only to download artifacts of the same
+run, read-only. A pull request from a fork or from Dependabot therefore runs the same gates. The
+archive records the head branch as its ref, so a fork branch whose name uses characters outside `A-Z`, `a-z`, `0-9`,
+`.`, `_`, `/` and `-` fails `gates-image` instead of running the gates.
+From that workflow the pull request runs `archive-reproducibility`, `mail`, `active-security`,
+`restore` and `upgrade`, the last from the earliest retained nightly whose migrations it still
+carries. The jobs that run the image load it and refer to it by image ID; `mail` and
+`archive-reproducibility` only bind the archive and read the pinned name it records.
+
+npm advisories and the image CVE scan stay out of pull requests because they move without a change:
+a new advisory would turn an unrelated pull request red. They run at night and in the release, and
+so do `npm-audit` and `security-record`, which assemble release evidence. The arm64 qualification
+and the booking-seed preview need a registry digest and stay there as well. The required `build`
+check waits for the gates, for the WebKit accessibility shard and, for tooling and full plans, for
+the tool suite under a clock shifted by 400 days. A scheduled or dispatched `build` runs that
+shifted clock too, and the `build` job waits for it, so a failed shifted-clock run keeps the nightly
+image from being published.
+
+The weekly `mail smoke` keeps its schedule and its manual dispatch; a pull request no longer starts
+it by path. The build's `mail` gate runs the same Stalwart journey for every change to `deploy/`,
+the mail tools and the backend. The Stalwart journey starts no application image, so it proves the
+mail stack and its certificate handling, not the notification code that talks to the relay; that
+code is covered by the backend tests and by the restore journey, which sends a message.
+
 ## What the nightly rehearses
 
 A release confirms what the night before already proved; it does not discover it. A scheduled or

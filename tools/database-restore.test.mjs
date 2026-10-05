@@ -54,7 +54,9 @@ test("given a release candidate, when release qualification runs, then restore b
 
   // when / then
   assert.match(gates, /\n  restore:\n    runs-on: ubuntu-latest/);
-  assert.match(gates, /COURTSIDE_RESTORE_IMAGE:[^\n]+inputs\.image-digest/);
+  assert.match(gates,
+    /\n  restore:\n[\s\S]+?uses: \.\/\.github\/actions\/gate-image\n[\s\S]+?digest: \$\{\{ inputs\.image-digest \}\}/);
+  assert.match(gates, /COURTSIDE_RESTORE_IMAGE: \$\{\{ steps\.image\.outputs\.reference \}\}/);
   assert.match(gates, /node tools\/courtside\.restore-smoke\.mjs --confirm courtside-restore/);
   assert.match(gates, /!build\/database-restore\/\*\*\/\*\.dump/);
   assert.match(gates, /!build\/database-restore\/\*\*\/\*\.sql/);

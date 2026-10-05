@@ -42,13 +42,15 @@ Tests are placed at the lowest level that can prove the risk. Database guarantee
 | Local unit and contract feedback | under 2 minutes | Focused tests for the changed decision and its negative boundary. |
 | Required pull-request checks | under 15 minutes | Green required checks plus the pull-request risk and evidence declaration. |
 | Local single-area pull-request verification | under 15 minutes | `node tools/courtside.mjs check` selects and runs one protected reduced profile against a pinned commit. |
-| Local combined or full pull-request verification | under 25 minutes | Mixed profiles run additively; `full` validates workflows and documentation, runs clean non-browser verification, exercises a fresh Compose deployment and then runs browser and WebKit reliability gates against the same pinned commit. |
+| Local combined or full pull-request verification | under 25 minutes, plus 35 for the Docker release gates of `full` | Mixed profiles run additively; `full` validates workflows and documentation, runs clean non-browser verification, exercises a fresh Compose deployment, runs browser and WebKit reliability gates and then the qualification, Stalwart, restore, upgrade and active assessment gates against the same pinned commit. |
 | Nightly qualification | under 90 minutes | Periodic browser, order, concurrency, security and bounded performance evidence assigned by risk. |
 | Release qualification | under 45 minutes | Candidate-image, upgrade, restore and release-risk evidence; long soak runs are recorded separately. |
 
 A timeout or unavailable required tool makes a gate incomplete, not successful. Budgets are reviewed when their representative workload changes; tests are not silently removed to meet a budget.
 
 A workflow job's `timeout-minutes` is set from measurement: at least twice the longest recent successful run, rounded up to five minutes.
+
+The local Docker release gates follow the same rule: their 35 minutes are twice the 17.1 minutes the five gates took with a cold image build on an arm64 Mac.
 
 ## Evidence rules
 
@@ -81,9 +83,14 @@ combination. Backend changes run backend, tooling and security verification; fro
 tooling and security verification. Frontend compilation, lint, unit tests and coverage finish before
 the browser jobs consume the same packaged candidate. Blocking visual and guide snapshots run first;
 only then do two stable functional shards cover Chromium, WebKit, accessibility, phone layouts and
-the journey catalogue. On both phone projects, every page the router declares must render its text
+the journey catalogue. A third shard runs the WebKit accessibility project. On both phone projects, every page the router declares must render its text
 at 10 px or more and keep each control inside the viewport's width. A full selection also starts a fresh Compose project from an image built for
 that commit and proves its application, database and log-collector wait contract.
+Backend, frontend and full selections can change the image, so they also build and qualify an image
+for the merge commit and run the release gates on it: the controlled Stalwart journey, the active
+security assessment, backup and restore, the database upgrade from a retained nightly and the
+archive reproducibility check. Tooling and full selections run the tool suite a second time under a
+clock shifted by 400 days.
 Documentation changes run the bounded documentation job and the tooling job. The tooling job travels
 with all three because the policies under `tools/` read `src/`, `frontend/` and `docs/`, and a rule
 this repository enforces with a test has to run for the change that could break it. The
@@ -134,8 +141,11 @@ duplicate manifest entries fail closed.
 
 The full local profile runs the pinned `actionlint` release and documentation checks before the
 longer build. It then runs clean Maven verification with browser journeys disabled, exercises the
-Compose wait contract with a uniquely named project and immutable image ID, and finally runs the
-browser and WebKit reliability gates. CI downloads the matching official actionlint archive and
+Compose wait contract with a uniquely named project and immutable image ID, and runs the browser and
+WebKit reliability gates. Last come the Docker release gates, each a task of its own so a red one is
+named in the result: `gate-uat` builds and qualifies `courtside:uat-local`, and `gate-mail`,
+`gate-restore`, `gate-upgrade` and `gate-active-security` refuse to start unless that qualification
+recorded the image ID the tag still names. CI downloads the matching official actionlint archive and
 verifies its GitHub attestation before running the same workflow check. ShellCheck remains a
 separate repository concern, so this invocation checks GitHub workflow structure, expressions, job
 dependencies and permissions without making a platform's optional ShellCheck installation part of
@@ -311,8 +321,7 @@ The pull-request browser gate makes two separate product claims. The blocking vi
 snapshots run as the first browser job, so a known pixel regression stops the more expensive
 functional shards. Chromium runs the blocking
 automated WCAG 2.2 AA rule scan, while WebKit runs blocking core compatibility journeys. WebKit
-plus axe remains a qualification signal until retained first-attempt evidence supports admitting
-that combination. Browser process loss, an internal engine error, a lost target or a test-level
+plus axe runs in a blocking shard of its own. Browser process loss, an internal engine error, a lost target or a test-level
 timeout makes the harness outcome incomplete. A failed product assertion remains a product
 failure. The retained browser outcome records those claims separately, and neither class can turn
 the other green.
@@ -382,8 +391,8 @@ days; the safe records remain available for 90 days. Validate one record with
 The summary counts attempts, streaks and first-attempt failure rates, and a streak is not a failure
 rate. Zero failures in thirty trials still leave substantial statistical uncertainty, so a historical
 streak never becomes a broader reliability claim. These records exist to explain a concrete failure
-when one happens, not to earn an admission: WebKit plus axe stays out of the merge gate, so there is
-no threshold for the streak to reach.
+when one happens, not to earn an admission: WebKit plus axe already blocks a merge in its own shard,
+so there is no threshold for the streak to reach.
 
 <!-- risk-register:operations-and-release:start -->
 ### Operations and release

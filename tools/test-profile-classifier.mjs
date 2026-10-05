@@ -257,7 +257,7 @@ export function bindPlanToRun(plan, identity) {
   }
   const contract = loadProfileContract();
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     runId: identity.runId,
     attempt: identity.attempt,
     baseCommit: identity.baseCommit,
@@ -274,7 +274,7 @@ export function bindPlanToRun(plan, identity) {
 export function fallbackPlanToRun(identity) {
   const contract = loadProfileContract();
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     runId: identity.runId,
     attempt: identity.attempt,
     baseCommit: identity.baseCommit,

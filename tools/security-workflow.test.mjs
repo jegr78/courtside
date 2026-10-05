@@ -291,7 +291,7 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /security-cleanup "\$BASE_RUN_ID"[\s\S]+\) \|\| BASE_CLEANUP=\$\?/);
   assert.match(build, /security-cleanup "\$CANDIDATE_RUN_ID" \|\| CANDIDATE_CLEANUP=\$\?/);
   assert.match(build,
-    /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
+    /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, gates-image, gates, clock-shift, assessment-runtime, tool-update-comparison, test-profile-plan\]/);
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
@@ -384,7 +384,7 @@ test("given nothing the assessment runtime varies, when the required build runs,
     + "indistinguishable from one that ran.");
   assert.doesNotMatch(comparison, /steps\.runtime\.outputs\.changed/);
   assert.match(jobIn(build, "build"),
-    /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, assessment-runtime, tool-update-comparison, test-profile-plan\]/,
+    /needs: \[docs, backend, frontend, browser_visual, browser, deployment, tooling, security, gates-image, gates, clock-shift, assessment-runtime, tool-update-comparison, test-profile-plan\]/,
     "a runtime identification that fails must not leave the comparison silently unstarted");
   assert.match(identity, /- uses: actions\/upload-artifact@[a-f0-9]{40}\n\s+if: always\(\)/,
     "the report naming what changed is the only account of why no comparison was needed, and a"
@@ -535,7 +535,9 @@ test("given a release candidate, when publishing it, then its exact digest passe
   assert.match(release, /\n  gates:\n    needs: \[build, image, archive, qualify\]/);
   assert.match(release, /image-digest: \$\{\{ needs\.image\.outputs\.digest \}\}/);
   assert.match(release, /\n  publish:\n    needs: \[[^\]]*\bgates\b[^\]]*\]/);
-  assert.match(gates, /IMAGE: ghcr\.io\/\$\{\{ github\.repository \}\}@\$\{\{ inputs\.image-digest \}\}/);
+  assert.match(gates,
+    /active-security:[\s\S]+?- id: image\n\s+uses: \.\/\.github\/actions\/gate-image\n[\s\S]+?digest: \$\{\{ inputs\.image-digest \}\}/);
+  assert.match(gates, /IMAGE: \$\{\{ steps\.image\.outputs\.reference \}\}/);
   assert.match(gates, /security-run "\$RUN_ID" active/);
   assert.match(gates,
     /set -o pipefail[\s\S]{0,120}?node tools\/security-image-inventory\.mjs active \| xargs -n1 docker pull/);

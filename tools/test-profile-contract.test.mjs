@@ -25,7 +25,7 @@ test("given combined reduced profiles, when resolving coverage, then jobs and ta
   const tasks = localTasksForProfiles(contract, ["backend", "frontend"]);
 
   // then
-  assert.deepEqual(jobs, ["backend", "frontend", "browser_visual", "browser", "tooling", "security"]);
+  assert.deepEqual(jobs, ["backend", "frontend", "browser_visual", "browser", "tooling", "security", "gates"]);
   assert.equal(tasks[0].label, "backend");
   assert.equal(tasks.at(-1).label, "tooling-test");
   assert.equal(new Set(tasks.map((task) => task.label)).size, tasks.length);
@@ -105,9 +105,28 @@ test("given any full profile, when resolving coverage, then only full coverage r
   const tasks = localTasksForProfiles(contract, ["frontend", "full"]);
 
   // then
-  assert.deepEqual(jobs,
-    ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling", "security"]);
+  assert.deepEqual(jobs, ["docs", "backend", "frontend", "browser_visual", "browser", "deployment", "tooling",
+    "security", "gates", "clock_shift"]);
   assert.deepEqual(tasks.map((task) => task.label),
     ["workflow-lint", "docs-check", "full-without-browser", "compose-wait-smoke",
-      "frontend-e2e", "webkit-reliability"]);
+      "frontend-e2e", "webkit-reliability", "gate-uat", "gate-mail", "gate-restore", "gate-upgrade",
+      "gate-active-security"]);
+});
+
+test("given the contract, when its jobs are read, then image-changing profiles select the release gates", () => {
+  // given
+  const contract = loadProfileContract();
+
+  // when
+  const jobsOf = (profile) => ciJobsForProfiles(contract, [profile]);
+
+  // then
+  assert.ok(jobsOf("backend").includes("gates"), "a backend change alters the image");
+  assert.ok(jobsOf("frontend").includes("gates"), "a frontend change alters the image");
+  assert.ok(jobsOf("full").includes("gates"), "a full change runs every gate");
+  assert.ok(!jobsOf("docs").includes("gates"), "documentation cannot change the image");
+  assert.ok(!jobsOf("tooling").includes("gates"), "gate tools themselves classify as full");
+  assert.ok(jobsOf("tooling").includes("clock_shift"), "tool changes run under the shifted clock");
+  assert.ok(jobsOf("full").includes("clock_shift"), "a full change runs under the shifted clock");
+  assert.ok(!jobsOf("docs").includes("clock_shift"), "documentation runs no tool under a shifted clock");
 });

@@ -46,14 +46,18 @@ const protectedFullTasks = [
     executable: "npm",
     arguments: ["run", "test:e2e"]
   },
-  // Last, because it walks the browsers against the jar the run above builds - and here at all
-  // because the scheduled workflow that owns it is the one gate a branch cannot answer locally.
   {
     label: "webkit-reliability",
     workingDirectory: "frontend",
     executable: "npm",
     arguments: ["run", "reliability:webkit", "--", "--order", "configured"]
-  }
+  },
+  ...["uat", "mail", "restore", "upgrade", "active-security"].map((gate) => ({
+    label: `gate-${gate}`,
+    workingDirectory: "repository",
+    executable: "node",
+    arguments: ["tools/local-release-gates.mjs", gate]
+  }))
 ];
 
 export function planTasks(classified) {
@@ -163,7 +167,7 @@ export function localCheckPrerequisites(tasks) {
   const java = tasks.some((task) => task !== "docs-check");
   const docker = tasks.some((task) =>
     ["backend", "frontend-e2e", "full-without-browser", "compose-wait-smoke",
-      "webkit-reliability"].includes(task));
+      "webkit-reliability"].includes(task) || task.startsWith("gate-"));
   return { java, docker };
 }
 
