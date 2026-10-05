@@ -19,6 +19,7 @@ import {
   weekDays, zonedDateTime
 } from "../time/clubZone";
 import { hoursOn } from "../time/openingHours";
+import { dateTimeFormatter } from "../time/dateTimeFormatter";
 import { violationMessage } from "../api/problem-message";
 
 interface WeekViewProps {
@@ -664,18 +665,18 @@ function localDate(timestamp: string, timeZone: string): string | undefined {
 }
 
 function formatWeekday(date: Date, language: string): string {
-  return new Intl.DateTimeFormat(language, { weekday: "short" }).format(date);
+  return dateTimeFormatter(language, { weekday: "short" }).format(date);
 }
 
 function formatDayMonth(date: Date, language: string): string {
-  return new Intl.DateTimeFormat(language, { day: "2-digit", month: "2-digit" }).format(date);
+  return dateTimeFormatter(language, { day: "2-digit", month: "2-digit" }).format(date);
 }
 
 function formatDayLong(date: Date, language: string): string {
-  return new Intl.DateTimeFormat(language, { weekday: "long", month: "long", day: "numeric" }).format(date);
+  return dateTimeFormatter(language, { weekday: "long", month: "long", day: "numeric" }).format(date);
 }
 
 function formatWeekRange(days: Date[], language: string): string {
-  const formatter = new Intl.DateTimeFormat(language, { year: "numeric", month: "short", day: "numeric" });
+  const formatter = dateTimeFormatter(language, { year: "numeric", month: "short", day: "numeric" });
   return `${formatter.format(days[0])} – ${formatter.format(days[6])}`;
 }

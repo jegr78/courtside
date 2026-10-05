@@ -372,6 +372,13 @@ bypassing the UI or weakening booking rules. The journey awaits the eligibility 
 interactive rendering before searching; a week switch awaits a date selector from the newly
 loaded week. The two-week search itself does not override or independently validate booking rules.
 
+### Formatter reuse
+
+The frontend retains at most 64 date/time formatter objects per module instance. Locale and Intl
+formatting options, including time zone and hour cycle, identify each entry. The cache evicts the
+oldest entry when full. It never stores formatted dates, and each formatter still resolves offsets
+for the instant being formatted. Club-time helpers and court-plan date labels share this cache.
+
 ## Reference baselines
 
 Only a successful authoritative `baseline`, `browser`, or `soak` result using the current
