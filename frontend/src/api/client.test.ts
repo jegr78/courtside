@@ -221,6 +221,75 @@ it("given valid credentials, when the empty login response arrives, then login s
   await expect(api.login("doe.jane", "secret")).resolves.toBeUndefined();
 });
 
+it("given server admission pressure, when login is refused, then preserve the typed problem and valid retry advice", async () => {
+  // given
+  server.use(http.post("/api/session", () => HttpResponse.json({
+    type: "urn:courtside:error:login-rate-limited", title: "Busy", status: 429
+  }, { status: 429, headers: { "Content-Type": "application/problem+json", "Retry-After": "1" } })));
+  // when / then
+  await expect(api.login("doe.jane", "secret")).rejects.toMatchObject({
+    status: 429, problem: { type: "urn:courtside:error:login-rate-limited" }, retryAfterSeconds: 1
+  });
+});
+
+it("given malformed retry advice, when login is refused, then never interpret it as a safe delay", async () => {
+  // given
+  for (const advice of ["1.5", "-1", "1junk", "Infinity", "99999999999999999999999"]) {
+    server.use(http.post("/api/session", () => HttpResponse.json({
+      type: "urn:courtside:error:login-rate-limited", title: "Busy", status: 429
+    }, { status: 429, headers: { "Content-Type": "application/problem+json", "Retry-After": advice } })));
+    // when / then
+    await expect(api.login("doe.jane", "secret")).rejects.toMatchObject({ status: 429, retryAfterSeconds: undefined });
+  }
+});
+
+it("given only one credential request remains, when CSRF rotates during login, then never exceed that request budget", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=first-token";
+  let attempts = 0;
+  server.use(http.post("/api/session", () => {
+    attempts++;
+    document.cookie = `XSRF-TOKEN=rotated-${attempts}`;
+    return refusal();
+  }));
+  // when / then
+  await expect(api.login("doe.jane", "secret", undefined, 1)).rejects.toMatchObject({
+    status: 403, problem: { type: "urn:courtside:error:access-denied" }, requestAttempts: 1
+  });
+  expect(attempts).toBe(1);
+});
+
+it("given login waiting for a shared CSRF bootstrap, when cancelled before the bootstrap completes, then never send the credentials", async () => {
+  // given
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => { entered = resolve; });
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  const submitted = vi.fn();
+  server.use(
+    http.get("/api/session", async () => { entered(); await pending; return HttpResponse.json({ authenticated: false }); }),
+    http.post("/api/session", () => { submitted(); return new HttpResponse(null, { status: 200 }); })
+  );
+  const controller = new AbortController();
+  const result = api.login("doe.jane", "secret", controller.signal);
+  const assertion = expect(result).rejects.toMatchObject({ name: "AbortError" });
+  await started;
+  // when
+  controller.abort();
+  // then
+  try {
+    const outcome = await Promise.race([
+      result.then(() => "completed", (failure: unknown) => failure instanceof Error ? failure.name : "unknown"),
+      new Promise<string>((resolve) => setTimeout(() => resolve("still waiting for CSRF"), 25))
+    ]);
+    expect(outcome).toBe("AbortError");
+  } finally {
+    release();
+    await assertion;
+  }
+  expect(submitted).not.toHaveBeenCalled();
+});
+
 it("given a successful login, when the account boundary changes, then other tabs are notified", async () => {
   const postMessage = vi.fn();
   const close = vi.fn();

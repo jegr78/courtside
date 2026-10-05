@@ -31,7 +31,7 @@ const AdminRoutes = lazySurface(() => import("./views/AdminRoutes"));
 
 interface AppRoutesProps {
   session: SessionStatus;
-  refreshSession: () => Promise<void>;
+  refreshSession: (signal?: AbortSignal) => Promise<void>;
   passwordChanged?: boolean;
   initialPasswordChanged?: () => void;
   signedOut?: () => void;
@@ -164,16 +164,19 @@ export function App() {
 
   // The account's language is applied before the session is published, so the signed-in navigation
   // is painted once instead of moving its links out from under whoever is already reaching for one.
-  const refreshSession = useCallback(async () => {
+  const refreshSession = useCallback(async (signal?: AbortSignal) => {
     const requestedBefore = sessionInvalidations.current;
-    const current = await api.session();
+    const current = await api.session(signal);
+    signal?.throwIfAborted();
     if (requestedBefore !== sessionInvalidations.current) return;
     const accountLocale = supportedLocale(current.locale);
     if (accountLocale) {
       await applyAccountLocale(accountLocale).catch(() => undefined);
     }
+    signal?.throwIfAborted();
     if (requestedBefore !== sessionInvalidations.current) return;
     if (!current.authenticated) await clearPersonalBookingsOfflineData();
+    signal?.throwIfAborted();
     if (requestedBefore !== sessionInvalidations.current) return;
     setSession(current);
     setOffline(false);
@@ -217,7 +220,7 @@ export function App() {
     const cameOnline = () => {
       loadClub();
       void (source ? Promise.resolve() : identify())
-        .then(refreshSession)
+        .then(() => refreshSession())
         .catch(() => setOffline(true));
     };
     window.addEventListener("offline", wentOffline);
