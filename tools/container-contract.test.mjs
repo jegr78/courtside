@@ -125,6 +125,20 @@ test("given the image, when the contract describes its process, then it states t
       "exits on an `OutOfMemoryError`", "Elastic Common Schema JSON object per line"], "the process");
   });
 
+test("given a one GiB application limit, when applying the image heap default, then at least half remains for other process memory", () => {
+  // given
+  const entrypoint = JSON.parse(/^ENTRYPOINT (\[.*\])$/m.exec(dockerfile)[1]);
+  const memoryLimitMiB = 1024;
+  // when
+  const share = Number(entrypoint.find(argument => argument.startsWith("-XX:MaxRAMPercentage=")).split("=")[1]);
+  const heapMiB = memoryLimitMiB * share / 100;
+  // then
+  assert.equal(heapMiB, 512);
+  assert.ok(memoryLimitMiB - heapMiB >= 512);
+  assert.ok(entrypoint.includes("--sun-misc-unsafe-memory-access=deny"));
+  assert.ok(entrypoint.includes("-XX:+ExitOnOutOfMemoryError"));
+});
+
 test("given the image's health check, when the contract describes health, then it states the path, timing and body",
   () => {
     // given
