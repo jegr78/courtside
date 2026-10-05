@@ -1968,7 +1968,7 @@ test("given the exact source-bound gateway rejection, when protected account or 
   assert.equal(result.outcome, "failed");
 });
 
-function nativePasswordFactor() {
+function nativeAuthenticatedSessionFixture() {
   const fixture = sharedSessionAfterBooking();
   fixture.input.contract.authentication.sessionPolicy.passwordFactorRequired = true;
   const context = fixture.observation.attributes[0].value;
@@ -1979,7 +1979,7 @@ function nativePasswordFactor() {
 
 test("given native Spring password-factor evidence, when its issuance fits the original login before session fixation, then later booking access does not invalidate authentication", () => {
   // given
-  const { input } = nativePasswordFactor();
+  const { input } = nativeAuthenticatedSessionFixture();
   // when
   const result = compareResourceIntegrity(input);
   // then
@@ -1989,7 +1989,7 @@ test("given native Spring password-factor evidence, when its issuance fits the o
 for (const mutation of ["missing-factor", "duplicate-factor", "principal-factor", "principal-roles", "missing-issued-at", "future-issued-at", "later-read-issued-at"]) {
   test(`given current native Spring authentication, when ${mutation} violates its closed authority and original-login contract, then integrity fails`, () => {
     // given
-    const { input, context, read } = nativePasswordFactor();
+    const { input, context, read } = nativeAuthenticatedSessionFixture();
     if (mutation === "missing-factor") context.authorities = ["ROLE_SPORT_DIRECTOR"];
     if (mutation === "duplicate-factor") context.authorities.unshift("FACTOR_PASSWORD");
     if (mutation === "principal-factor") context.principalAuthorities.unshift("FACTOR_PASSWORD");
@@ -2006,7 +2006,7 @@ for (const mutation of ["missing-factor", "duplicate-factor", "principal-factor"
 
 test("given a current native session contract, when its decoder omits the password-factor field, then missing producer evidence cannot qualify", () => {
   // given
-  const { input, context } = nativePasswordFactor();
+  const { input, context } = nativeAuthenticatedSessionFixture();
   delete context.passwordFactorIssuedAt;
   // when
   const result = compareResourceIntegrity(input);

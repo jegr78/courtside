@@ -701,14 +701,31 @@ test("given a long outer deadline and an application that stays starting, when t
   assert.ok(h.calls.every(({ options }) => options.timeoutMilliseconds <= 10000));
 });
 
+function nativeHealthArguments(value, timeout = false) {
+  return ["-e", timeout ? "process.stderr.write('ExampleSecret');setInterval(()=>{},1000)"
+    : "setTimeout(()=>process.stdout.write(process.argv[1]),5)", JSON.stringify(value)];
+}
+
+test("given JSON containing quotes backticks and JavaScript text, when a bounded native child returns it, then preserve literal data without executing the marker", async () => {
+  // given
+  const value = { observation: "\"'` ${process.exit(73)}; process.stdout.write('executed-marker')" };
+  // when
+  const native = await runOwnedProcess(process.execPath, nativeHealthArguments(value), {
+    timeoutMilliseconds: 1000, outputLimitBytes: 8192
+  });
+  // then
+  assert.equal(native.code, 0);
+  assert.equal(native.stderr, "");
+  assert.equal(native.stdout, JSON.stringify(value));
+  assert.deepEqual(JSON.parse(native.stdout), value);
+});
+
 for (const mode of ["delayed", "never", "timeout"]) {
   test(`given a real bounded native child producing ${mode} health observations, when recovering, then retain the actual native outcome without extending deadlines`, async () => {
     // given
     const h = await harness(fixture(), { recoveryApps: async (app, poll, options) => {
       app.State.Health.Status = mode === "delayed" && poll >= 1 ? "healthy" : "starting";
-      const script = mode === "timeout" ? "process.stderr.write('ExampleSecret');setInterval(()=>{},1000)"
-        : `setTimeout(()=>process.stdout.write(${JSON.stringify(JSON.stringify([app]))}),5)`;
-      const native = await runOwnedProcess(process.execPath, ["-e", script], {
+      const native = await runOwnedProcess(process.execPath, nativeHealthArguments([app], mode === "timeout"), {
         timeoutMilliseconds: Math.min(mode === "timeout" ? 30 : 1000, options.timeoutMilliseconds),
         stopFile: join(h.directory, "absent-stop"), outputLimitBytes: 8192
       });

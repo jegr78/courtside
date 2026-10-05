@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { zapVersion } from "./security-passive-deployment.mjs";
 import { openApiFuzzPolicy, openApiFuzzVersion } from "./security-openapi-fuzz.mjs";
-import { readFileSync, mkdtempSync, mkdirSync, chmodSync, lstatSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, symlinkSync, realpathSync, mkdtempSync, mkdirSync, chmodSync, lstatSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createResourceEvidence, writeNativeEvidence, retainResourceEvidenceFailure } from "./security-resource-runtime.mjs";
@@ -28,7 +28,7 @@ import {
   securityAssessmentReservationArgs, securityComposeArgs, securityDownPlan, securityEnvironment, securityProject,
   assertFixtureImageDerivation, fixtureImageBase,
   securityFixturesImageTag,
-  securitySeedImageTag, securitySeedPlan,
+  securitySeedImageTag, securitySeedPlan, seedSecurityEnvironment,
   securityReservationArgs, securityStateFile
 } from "./security-environment.mjs";
 import { fixtureImagePlan } from "./fixture-artifact.mjs";
@@ -1170,6 +1170,136 @@ function recordedEnvironment(overrides = {}) {
     ...overrides
   };
 }
+
+function pairedSeedCheckout() {
+  const checkout = realpathSync(mkdtempSync(join(tmpdir(), "courtside-seed-base-")));
+  mkdirSync(join(checkout, "deploy"));
+  mkdirSync(join(checkout, "build/security/compare-base-1-1"), { recursive: true });
+  const compose = join(checkout, "deploy/compose.security.yaml");
+  writeFileSync(compose, 'services:\n  seeder:\n    image: ${COURTSIDE_SECURITY_FIXTURES_IMAGE:?required}\n    environment:\n      PASSWORD: ${COURTSIDE_SECURITY_SHARED_PASSWORD:?required}\n      SEED: ${COURTSIDE_SECURITY_SEED_FINGERPRINT:?required}\n');
+  const state = join(checkout, "build/security/compare-base-1-1/environment.json");
+  const recorded = recordedEnvironment();
+  writeFileSync(state, JSON.stringify(recorded));
+  return { checkout, compose, state, recorded };
+}
+
+test("given an older checkout without mail state, when HEAD seeds it, then BASE compose and HEAD fixture production remain separate", () => {
+  // given
+  const fixture = pairedSeedCheckout();
+  const calls = [];
+  const labels = {
+    "com.docker.compose.project": "courtside-security-compare-base-1-1",
+    "org.courtside.environment": "SECURITY",
+    "org.courtside.security.run-id": "compare-base-1-1",
+    "org.courtside.security.seed-fingerprint": fixture.recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+    "org.courtside.security.instance-fingerprint": fixture.recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
+  };
+  try {
+    // when
+    seedSecurityEnvironment("compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE, fixture.state,
+      { composeRoot: fixture.checkout }, {
+        resources: () => [{ type: "container", id: "owned", labels }],
+        buildFixtures: (...args) => calls.push(["build", ...args]),
+        execute: (...args) => calls.push(["execute", ...args]),
+        removeImage: (...args) => calls.push(["remove", ...args])
+      });
+    // then
+    assert.deepEqual(calls[0], ["build", "compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE,
+      securitySeedImageTag("compare-base-1-1")]);
+    assert.equal(calls[1][2][4], fixture.compose);
+    assert.equal(calls[1][3].COURTSIDE_SECURITY_SEED_FINGERPRINT, labels["org.courtside.security.seed-fingerprint"]);
+    assert.equal("COURTSIDE_SECURITY_MAIL_DIRECTORY" in calls[1][3], false);
+    assert.deepEqual(calls[2], ["remove", securitySeedImageTag("compare-base-1-1")]);
+  } finally { rmSync(fixture.checkout, { recursive: true, force: true }); }
+});
+
+test("given a BASE compose bridge, when the real HEAD fixture build plan runs, then class staging and image derivation stay bound to HEAD", () => {
+  // given
+  const fixture = pairedSeedCheckout();
+  const calls = [];
+  const candidate = { RepoTags: ["courtside:owned-candidate"], RootFS: { Layers: ["candidate-layer"] },
+    Config: { User: "10001", Entrypoint: ["java"], Cmd: [] } };
+  const labels = {
+    "com.docker.compose.project": "courtside-security-compare-base-1-1",
+    "org.courtside.environment": "SECURITY",
+    "org.courtside.security.run-id": "compare-base-1-1",
+    "org.courtside.security.seed-fingerprint": fixture.recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+    "org.courtside.security.instance-fingerprint": fixture.recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
+  };
+  try {
+    // when
+    seedSecurityEnvironment("compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE, fixture.state,
+      { composeRoot: fixture.checkout }, {
+        resources: () => [{ type: "container", id: "owned", labels }],
+        stageClasses: path => calls.push(["stage", path]),
+        inspect: image => image === fixture.recorded.COURTSIDE_SECURITY_IMAGE ? candidate
+          : { ...candidate, RootFS: { Layers: ["candidate-layer", "head-fixtures"] } },
+        execute: (...args) => calls.push(["execute", ...args]),
+        removeImage: tag => calls.push(["remove", tag])
+      });
+    // then
+    const headRoot = fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/, "");
+    assert.deepEqual(calls[0], ["stage", headRoot]);
+    assert.deepEqual(calls[1][2], fixtureImagePlan(securitySeedImageTag("compare-base-1-1"),
+      "courtside:owned-candidate").args);
+    assert.equal(calls[2][2][4], fixture.compose);
+    assert.equal(calls[2][3].COURTSIDE_SECURITY_SEED_FINGERPRINT, fixture.recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT);
+    assert.equal(calls[2][3].COURTSIDE_SECURITY_SHARED_PASSWORD, fixture.recorded.COURTSIDE_SECURITY_SHARED_PASSWORD);
+    assert.deepEqual(calls[3], ["remove", securitySeedImageTag("compare-base-1-1")]);
+  } finally { rmSync(fixture.checkout, { recursive: true, force: true }); }
+});
+
+test("given a foreign BASE project, when HEAD attempts the bridge, then no fixture or native command runs", () => {
+  // given
+  const fixture = pairedSeedCheckout();
+  const unexpected = () => assert.fail("Native operation must not run");
+  try {
+    // when / then
+    assert.throws(() => seedSecurityEnvironment("compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE,
+      fixture.state, { composeRoot: fixture.checkout }, {
+        resources: () => [{ type: "container", id: "foreign", labels: { "com.docker.compose.project": "foreign" } }],
+        stageClasses: unexpected, inspect: unexpected, buildFixtures: unexpected,
+        execute: unexpected, removeImage: unexpected
+      }), /does not belong/);
+  } finally { rmSync(fixture.checkout, { recursive: true, force: true }); }
+});
+
+test("given an explicit BASE checkout, when required state or checkout binding is invalid, then seeding refuses before native operations", () => {
+  // given
+  const fixture = pairedSeedCheckout();
+  try {
+    // when / then
+    assert.throws(() => securitySeedPlan("compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE,
+      { ...fixture.recorded, COURTSIDE_SECURITY_SHARED_PASSWORD: "" }, { composeRoot: fixture.checkout }), /required/);
+    assert.throws(() => seedSecurityEnvironment("compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE,
+      fixture.state, { composeRoot: join(fixture.checkout, "missing") }, {}), /checkout|compose|ENOENT/);
+    assert.throws(() => seedSecurityEnvironment("compare-head-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE,
+      fixture.state, { composeRoot: fixture.checkout }, {}), /state|run/);
+    const alias = join(fixture.checkout, "alias");
+    symlinkSync(fixture.checkout, alias);
+    assert.throws(() => securitySeedPlan("compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE,
+      fixture.recorded, { composeRoot: alias }), /canonical/);
+    assert.throws(() => securitySeedPlan("compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE,
+      fixture.recorded, { composeRoot: "." }), /absolute/);
+  } finally { rmSync(fixture.checkout, { recursive: true, force: true }); }
+});
+
+test("given BASE state missing a required value, when HEAD seeds it, then every native closure remains unused", () => {
+  // given
+  const fixture = pairedSeedCheckout();
+  const calls = [];
+  const unexpected = () => calls.push("native");
+  writeFileSync(fixture.state, JSON.stringify({ ...fixture.recorded, COURTSIDE_SECURITY_SHARED_PASSWORD: "" }));
+  try {
+    // when / then
+    assert.throws(() => seedSecurityEnvironment("compare-base-1-1", fixture.recorded.COURTSIDE_SECURITY_IMAGE,
+      fixture.state, { composeRoot: fixture.checkout }, {
+        resources: unexpected, buildFixtures: unexpected, execute: unexpected, removeImage: unexpected,
+        stageClasses: unexpected, inspect: unexpected
+      }), /required compose value/);
+    assert.deepEqual(calls, []);
+  } finally { rmSync(fixture.checkout, { recursive: true, force: true }); }
+});
 
 test("given a recorded environment, when the candidate seeds it, then the seeder runs beside the target it names", () => {
   // given

@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -202,27 +202,49 @@ export function securitySeedImageTag(runId) {
   return `courtside:security-seed-${runId}`;
 }
 
-// Compose reads only the names its own file interpolates, and any other key of the recorded file
-// would reach the docker child as PATH or DOCKER_HOST and decide which executable runs.
-function interpolatedSecurityNames() {
-  return new Set([...readFileSync(composeFile, "utf8").matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)/g)]
+function interpolatedSecurityNames(file = composeFile) {
+  return new Set([...readFileSync(file, "utf8").matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)/g)]
     .map(([, name]) => name));
 }
 
-export function securitySeedPlan(runId, image, recorded) {
+function seedComposeFile(composeRoot) {
+  if (composeRoot === undefined) return composeFile;
+  if (!isAbsolute(composeRoot)) throw new Error("The compose checkout root must be absolute");
+  if (resolve(composeRoot) !== composeRoot || realpathSync(composeRoot) !== composeRoot
+      || !lstatSync(composeRoot).isDirectory()) {
+    throw new Error("The compose checkout root must be canonical");
+  }
+  const file = join(composeRoot, "deploy", "compose.security.yaml");
+  if (realpathSync(file) !== file || !lstatSync(file).isFile()) {
+    throw new Error("The compose checkout file must be canonical and regular");
+  }
+  return file;
+}
+
+export function securitySeedPlan(runId, image, recorded, { composeRoot } = {}) {
   if (recorded.COURTSIDE_SECURITY_RUN_ID !== runId) {
     throw new Error("The recorded environment belongs to a different security run");
   }
   if (recorded.COURTSIDE_SECURITY_IMAGE !== image) {
     throw new Error("The recorded environment assesses a different candidate image");
   }
-  const interpolated = interpolatedSecurityNames();
+  const file = seedComposeFile(composeRoot);
+  const interpolated = interpolatedSecurityNames(file);
+  const environment = Object.fromEntries([...Object.entries(recorded),
+    ["COURTSIDE_SECURITY_FIXTURES_IMAGE", securitySeedImageTag(runId)]]
+    .filter(([name]) => interpolated.has(name)));
+  if (composeRoot !== undefined) {
+    for (const [, name, operator] of readFileSync(file, "utf8").matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)(:\?|\?)/g)) {
+      if (!(name in environment) || typeof environment[name] !== "string"
+          || (operator === ":?" && environment[name] === "")) {
+        throw new Error("The recorded environment is missing a required compose value");
+      }
+    }
+  }
   return {
     command: "docker",
-    args: [...securityComposeArgs(runId), "run", "--rm", "--no-deps", "-T", "seeder"],
-    environment: Object.fromEntries([...Object.entries(recorded),
-      ["COURTSIDE_SECURITY_FIXTURES_IMAGE", securitySeedImageTag(runId)]]
-      .filter(([name]) => interpolated.has(name)))
+    args: ["compose", "-p", securityProject(runId), "-f", file, "run", "--rm", "--no-deps", "-T", "seeder"],
+    environment
   };
 }
 
@@ -450,33 +472,48 @@ export function assertFixtureImageDerivation(candidate, fixtures) {
   }
 }
 
-// The seeder writes the assessment data through the candidate's own domain services, so it is built
-// from the candidate rather than named beside it; a bare image ID is not a reference a build accepts.
-function buildSecurityFixturesImage(runId, image, tag = securityFixturesImageTag(runId)) {
-  stageFixtureClasses();
-  const plan = fixtureImagePlan(tag, fixtureImageBase(inspectImage(image)));
-  execute(plan.command, plan.args);
-  assertFixtureImageDerivation(inspectImage(image), inspectImage(tag));
+function buildSecurityFixturesImage(runId, image, tag = securityFixturesImageTag(runId), {
+  stageClasses = stageFixtureClasses, inspect = inspectImage, executeBuild = execute
+} = {}) {
+  stageClasses(root);
+  const plan = fixtureImagePlan(tag, fixtureImageBase(inspect(image)));
+  executeBuild(plan.command, plan.args);
+  assertFixtureImageDerivation(inspect(image), inspect(tag));
 }
 
-export function seedSecurityEnvironment(runId, image, stateFile) {
+export function seedSecurityEnvironment(runId, image, stateFile, options = {}, {
+  resources = securityProjectResources,
+  execute: executeSeed = execute,
+  stageClasses = stageFixtureClasses,
+  inspect = inspectImage,
+  buildFixtures = (id, candidate, tag) => buildSecurityFixturesImage(id, candidate, tag,
+    { stageClasses, inspect, executeBuild: executeSeed }),
+  removeImage = removeSecurityImage
+} = {}) {
+  seedComposeFile(options.composeRoot);
+  if (options.composeRoot !== undefined) {
+    const expected = join(options.composeRoot, "build", "security", runId, "environment.json");
+    if (stateFile !== expected || realpathSync(stateFile) !== expected || !lstatSync(stateFile).isFile()) {
+      throw new Error("The recorded state must belong to the compose checkout and run");
+    }
+  }
   const recorded = JSON.parse(readFileSync(resolve(stateFile), "utf8"));
-  const plan = securitySeedPlan(runId, image, recorded);
-  const resources = securityProjectResources(runId);
-  if (resources.length === 0) {
+  const plan = securitySeedPlan(runId, image, recorded, options);
+  const ownedResources = resources(runId);
+  if (ownedResources.length === 0) {
     throw new Error("No security environment of this run is running");
   }
-  assertSecurityRecoveryOwnership(resources, {
+  assertSecurityRecoveryOwnership(ownedResources, {
     runId,
     seedFingerprint: recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
     instanceFingerprint: recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
   });
   const tag = plan.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE;
   try {
-    buildSecurityFixturesImage(runId, image, tag);
-    execute(plan.command, plan.args, { ...process.env, ...plan.environment });
+    buildFixtures(runId, image, tag);
+    executeSeed(plan.command, plan.args, { ...process.env, ...plan.environment });
   } finally {
-    removeSecurityImage(tag);
+    removeImage(tag);
   }
   process.stdout.write(`Security environment ${runId} carries the synthetic assessment dataset\n`);
 }

@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import vm from "node:vm";
 import {
   assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
@@ -27,6 +28,34 @@ import {
 function composeService(compose, service) {
   return compose.match(new RegExp(`^  ${service}:\\n(?<body>.*?)(?=^  [\\w-]+:|^volumes:|^networks:)`, "ms"))?.groups.body ?? "";
 }
+
+test("given a paired seed command, when parsing its BASE checkout, then the explicit compose root is retained only for seeding", () => {
+  // given
+  const args = ["security-seed", "compare-base-1-1", `sha256:${"a".repeat(64)}`,
+    "--state", "/base/build/security/compare-base-1-1/environment.json"];
+  // when / then
+  assert.equal(parseArguments([...args, "--compose-root", "/base"]).composeRoot, "/base");
+  assert.equal(parseArguments(args).composeRoot, undefined);
+  assert.throws(() => parseArguments([...args, "--compose-root"]), /requires/);
+  assert.throws(() => parseArguments(["security-stop", "compare-base-1-1", "--compose-root", "/base"]), /Unknown option/);
+});
+
+test("given an explicit BASE compose root, when the CLI dispatches seeding, then it passes the checkout to the HEAD producer", async () => {
+  // given
+  const source = readFileSync(new URL("./courtside.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("async function execute(options) {");
+  const declaration = source.slice(start, source.indexOf("\n}\n", start) + 2);
+  const calls = [];
+  const execute = vm.runInNewContext("(" + declaration + ")", {
+    seedSecurityEnvironment: (...args) => calls.push(JSON.parse(JSON.stringify(args)))
+  });
+  const options = parseArguments(["security-seed", "compare-base-1-1", `sha256:${"a".repeat(64)}`,
+    "--state", "/base/build/security/compare-base-1-1/environment.json", "--compose-root", "/base"]);
+  // when
+  await execute(options);
+  // then
+  assert.deepEqual(calls, [[options.runId, options.image, options.state, { composeRoot: "/base" }]]);
+});
 
 function passingPerformanceResult() {
   return {
