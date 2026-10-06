@@ -395,8 +395,11 @@ export function executeReusableSecurityCommand(command, args, environment = proc
   executeCommand = spawnSync) {
   if (!["docker", "curl"].includes(command) || !Number.isSafeInteger(timeoutMilliseconds)
       || timeoutMilliseconds < 1 || timeoutMilliseconds > 180000) throw new Error("Immutable SECURITY command exceeds its budget");
-  const result = executeCommand(command, args, { cwd: root, env: environment, shell: false,
-    encoding: "utf8", timeout: timeoutMilliseconds, maxBuffer: 4 * 1024 * 1024 });
+  const options = { cwd: root, env: environment, shell: false,
+    encoding: "utf8", timeout: timeoutMilliseconds, maxBuffer: 4 * 1024 * 1024 };
+  const result = command === "docker"
+    ? executeCommand("docker", args, options)
+    : executeCommand("curl", args, options);
   if (!result || result.error || result.status !== 0 || result.signal || result.truncated || result.timedOut
       || typeof result.stdout !== "string" || typeof result.stderr !== "string"
       || Buffer.byteLength(result.stdout) > 4 * 1024 * 1024 || Buffer.byteLength(result.stderr) > 4 * 1024 * 1024) {

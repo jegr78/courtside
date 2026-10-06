@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
-import { immutableImageSelection, inspectReusableImages, boundedImageCommand, preparePerformanceReuse,
+import { immutableImageSelection, inspectReusableImages, assertPerformanceReuse, boundedImageCommand, preparePerformanceReuse,
   resetPerformanceReuse, startPerformanceReuse, cleanupPerformanceRunner, assertPerformanceStateOwnership } from "./immutable-image-reuse.mjs";
 
 const image = `sha256:${"a".repeat(64)}`;
@@ -14,6 +16,87 @@ const sourceCommit = "c".repeat(40);
 const helperNames = ["SecuritySessionAttributeProjection.class", "SecuritySessionAttributeProjection$RestrictedStream.class",
   "SecurityPublicationPolicyProjection.class"];
 const hash = (value) => createHash("sha256").update(value).digest("hex");
+
+for (const replacement of ["symlink", "regular"]) {
+  test(`given a compiled file changed to a ${replacement} after inventory stat, when the actual image proof reads it, then refuse before any probe`, t => {
+    // given
+    const f = fixture();
+    const path = join(f.root, "target/classes/org/courtside/CourtsideApplication.class");
+    const bytes = readFileSync(path);
+    const original = fs.lstatSync;
+    let changed = false;
+    const mock = t.mock.method(fs, "lstatSync", value => {
+      const stat = original(value);
+      if (value === path && !changed) {
+        changed = true;
+        fs.renameSync(path, path + ".retained");
+        if (replacement === "symlink") fs.symlinkSync(path + ".retained", path);
+        else writeFileSync(path, bytes);
+      }
+      return stat;
+    });
+    syncBuiltinESMExports();
+    try {
+      // when / then
+      assert.throws(() => inspectReusableImages(f.options), /unsafe|changed|symbolic|ELOOP/i);
+      assert.ok(changed);
+      assert.ok(!f.calls.some(call => call.args[0] === "run"));
+    } finally { mock.mock.restore(); syncBuiltinESMExports(); f.cleanup(); }
+  });
+}
+
+for (const change of ["grow", "truncate", "replace-path"]) {
+  test(`given a compiled FD with ${change} during its read, when the actual image proof hashes it, then refuse changed bytes and close the descriptor`, t => {
+    // given
+    const f = fixture();
+    const path = join(f.root, "target/classes/org/courtside/CourtsideApplication.class");
+    const bytes = readFileSync(path);
+    const originalRead = fs.readSync, originalFile = fs.readFileSync, originalOpen = fs.openSync, originalClose = fs.closeSync;
+    const descriptors = new Set(), closed = new Set();
+    let changed = false;
+    const mutate = () => {
+      if (changed) return;
+      changed = true;
+      if (change === "replace-path") { fs.renameSync(path, path + ".retained"); writeFileSync(path, bytes); }
+      else writeFileSync(path, change === "grow" ? Buffer.concat([bytes, Buffer.from("extra")]) : bytes.subarray(0, 1));
+    };
+    const mocks = [
+      t.mock.method(fs, "openSync", (...args) => { const fd = originalOpen(...args); if (args[0] === path) descriptors.add(fd); return fd; }),
+      t.mock.method(fs, "closeSync", fd => { if (descriptors.has(fd)) closed.add(fd); return originalClose(fd); }),
+      t.mock.method(fs, "readSync", (...args) => { const n = originalRead(...args); if (descriptors.has(args[0])) mutate(); return n; }),
+      t.mock.method(fs, "readFileSync", (...args) => { const value = originalFile(...args); if (args[0] === path) mutate(); return value; })
+    ];
+    syncBuiltinESMExports();
+    try {
+      // when / then
+      assert.throws(() => inspectReusableImages(f.options), /unsafe|changed|grew|truncated/i);
+      assert.ok(changed);
+      assert.deepEqual(closed, descriptors);
+      assert.ok(!f.calls.some(call => call.args[0] === "run"));
+    } finally { for (const mock of mocks) mock.mock.restore(); syncBuiltinESMExports(); f.cleanup(); }
+  });
+}
+
+test("given an oversized tracked source file, when the actual image proof binds source bytes, then refuse from FD size before any content read", t => {
+  // given
+  const f = fixture();
+  const path = join(f.root, "pom.xml");
+  fs.truncateSync(path, 16 * 1024 * 1024 + 1);
+  const originalFile = fs.readFileSync, originalRead = fs.readSync, originalOpen = fs.openSync;
+  let descriptor, reads = 0;
+  const mocks = [
+    t.mock.method(fs, "openSync", (...args) => { const fd = originalOpen(...args); if (args[0] === path) descriptor = fd; return fd; }),
+    t.mock.method(fs, "readSync", (...args) => { if (args[0] === descriptor) reads++; return originalRead(...args); }),
+    t.mock.method(fs, "readFileSync", (...args) => { if (args[0] === path) reads++; return originalFile(...args); })
+  ];
+  syncBuiltinESMExports();
+  try {
+    // when / then
+    assert.throws(() => inspectReusableImages(f.options), /bound/);
+    assert.equal(reads, 0);
+    assert.ok(!f.calls.some(call => call.args[0] === "run"));
+  } finally { for (const mock of mocks) mock.mock.restore(); syncBuiltinESMExports(); f.cleanup(); }
+});
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "courtside-image-reuse-"));
@@ -78,6 +161,91 @@ function fixture() {
   };
   return { root, images, files, calls, runtimeIDs, execute, options: { image, fixturesImage, sourceCommit, root,
     execute, platform: "linux", architecture: "x64", environment: {} }, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+}
+
+function performanceFixture(t) {
+  const platform = Object.getOwnPropertyDescriptor(process, "platform");
+  const architecture = Object.getOwnPropertyDescriptor(process, "arch");
+  Object.defineProperties(process, { platform: { ...platform, value: "linux" }, arch: { ...architecture, value: "x64" } });
+  t.after(() => Object.defineProperties(process, { platform, arch: architecture }));
+  const f = fixture();
+  const override = join(f.root, "build", "immutable-performance-compose.json");
+  const overrideBytes = Buffer.from("{}\n");
+  writeFileSync(override, overrideBytes);
+  const owner = "9".repeat(32), databaseImage = "sha256:" + "6".repeat(64);
+  const databaseReference = "example.org/database@" + databaseImage;
+  const databaseMetadata = { ...structuredClone(f.images[image]), Id: databaseImage };
+  f.images[databaseImage] = databaseMetadata;
+  const labels = service => ({ "org.courtside.image-reuse.owner": owner,
+    "com.docker.compose.project": "courtside-perf", "com.docker.compose.service": service,
+    "com.docker.compose.project.config_files": override });
+  const app = { Id: "3".repeat(64), Name: "/courtside-perf-app-1", Image: fixturesImage,
+    Created: "2026-10-06T00:00:00Z", Config: { ...structuredClone(f.images[fixturesImage].Config),
+      Image: fixturesImage, Labels: labels("app") },
+    HostConfig: { ReadonlyRootfs: true, Memory: 1073741824, NanoCpus: 3000000000,
+      CapDrop: ["ALL"], SecurityOpt: ["no-new-privileges:true"] },
+    State: { OOMKilled: false, StartedAt: "2026-10-06T00:00:00Z" }, RestartCount: 0 };
+  const database = { Id: "4".repeat(64), Name: "/courtside-perf-db-1", Image: databaseImage,
+    Created: "2026-10-06T00:00:00Z", Config: { ...structuredClone(databaseMetadata.Config),
+      Image: databaseReference, Labels: labels("db") },
+    HostConfig: { Memory: 2147483648, NanoCpus: 2000000000 } };
+  const reservation = { Id: "5".repeat(64), Name: "/courtside-perf-reuse-reservation", Image: image,
+    Created: "2026-10-06T00:00:00Z", Config: { Image: image, Labels: { "org.courtside.image-reuse.owner": owner } } };
+  const containers = [app, database, reservation];
+  const execute = (command, args, options) => {
+    const ok = stdout => { f.calls.push({ command, args, options }); return { status: 0, signal: null, stdout, stderr: "" }; };
+    if (command === "docker" && args[0] === "ps") return ok(containers.map(item => item.Id).join("\n"));
+    if (command === "docker" && ["network", "volume"].includes(args[0]) && args[1] === "ls") return ok("");
+    if (command === "docker" && args[0] === "inspect") {
+      const selected = args.slice(1).map(id => containers.find(item => item.Id === id || item.Name === "/" + id));
+      if (selected.every(Boolean)) return ok(JSON.stringify(selected));
+    }
+    return f.execute(command, args, options);
+  };
+  const proof = inspectReusableImages(f.options);
+  const record = { immutableImages: proof, immutableDeployment: { owner, override, overrideSha256: hash(overrideBytes),
+    productionImageID: image, runtimeImageIDs: proof.runtimeImageIDs,
+    services: { app: { image: fixturesImage, environment: {} }, db: { image: databaseReference, cpus: 2, mem_limit: "2147483648" } },
+    images: { app: f.images[fixturesImage], db: databaseMetadata }, networks: [], volumes: [] } };
+  return { ...f, record, database, runtime: { root: f.root, environment: {}, execute } };
+}
+
+test("given unchanged rendered database limits, when the actual reuse guard checks a retained same CID, then accept the configured CPU and memory values", t => {
+  // given
+  const f = performanceFixture(t);
+  try {
+    const id = f.database.Id;
+    for (const [cpus, memory] of [[2, "2147483648"], ["1.5", "3221225472"]]) {
+      f.record.immutableDeployment.services.db.cpus = cpus;
+      f.record.immutableDeployment.services.db.mem_limit = memory;
+      f.database.HostConfig.NanoCpus = Number(cpus) * 1000000000;
+      f.database.HostConfig.Memory = Number(memory);
+      // when
+      f.record.immutableResources = assertPerformanceReuse(f.record, f.runtime).resources;
+      const actual = assertPerformanceReuse(f.record, f.runtime);
+      // then
+      assert.equal(actual.resources.find(item => item.name === "courtside-perf-db-1").id, id);
+      assert.equal(f.database.Id, id);
+    }
+  } finally { f.cleanup(); }
+});
+
+for (const field of ["NanoCpus", "Memory"]) {
+  test(`given same-CID database ${field} drift, when the actual reuse guard inspects retained PERFORMANCE, then reject before workload or cleanup`, t => {
+    // given
+    const f = performanceFixture(t);
+    try {
+      f.record.immutableResources = assertPerformanceReuse(f.record, f.runtime).resources;
+      const before = structuredClone(f.database);
+      f.database.HostConfig[field] *= 2;
+      // when / then
+      assert.throws(() => assertPerformanceReuse(f.record, f.runtime), /Immutable PERFORMANCE database limits drifted/);
+      assert.equal(f.database.Id, before.Id);
+      assert.deepEqual(f.database.Config, before.Config);
+      assert.equal(f.database.Image, before.Image);
+      assert.ok(!f.calls.some(call => ["update", "compose", "pull", "build"].includes(call.args[0])));
+    } finally { f.cleanup(); }
+  });
 }
 
 test("given engine-native IDs distinct from OCI config identity, when selecting reusable images, then retain the opaque exact IDs without digest fabrication", () => {

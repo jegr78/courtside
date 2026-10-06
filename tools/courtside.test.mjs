@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { EventEmitter, once } from "node:events";
 import { createServer } from "node:http";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -12,6 +12,7 @@ import { test } from "node:test";
 import { containerIdentity } from "./mail-relay-certificate.mjs";
 import vm from "node:vm";
 import { runInNewContext } from "node:vm";
+import { assertPerformanceStateOwnership } from "./immutable-image-reuse.mjs";
 import {
   assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
@@ -32,6 +33,46 @@ import {
 function composeService(compose, service) {
   return compose.match(new RegExp(`^  ${service}:\\n(?<body>.*?)(?=^  [\\w-]+:|^volumes:|^networks:)`, "ms"))?.groups.body ?? "";
 }
+
+for (const scenario of ["state", "images-only", "deployment-only", "override", "reservation"]) {
+test(`given retained immutable PERFORMANCE ${scenario}, when the actual legacy start runs, then refuse before relay state writes or build plans`, async () => {
+  // given
+    const root = mkdtempSync(join(tmpdir(), "legacy-perf-refusal-"));
+    if (scenario === "override") {
+      mkdirSync(join(root, "build"));
+      writeFileSync(join(root, "build/immutable-performance-compose.json"), "{}");
+    }
+    const events = [];
+    const state = ["state", "images-only", "deployment-only"].includes(scenario) ? { password: "retained-private-password",
+      ...(scenario !== "deployment-only" ? { immutableImages: { sourceCommit: "a".repeat(40) } } : {}),
+      ...(scenario !== "images-only" ? { immutableDeployment: { owner: "b".repeat(32) } } : {}) } : undefined;
+    const runtime = { readState: () => state, assertStateOwnership: value => assertPerformanceStateOwnership(value, { root,
+      execute: () => ({ status: 0, stdout: scenario === "reservation" ? "c".repeat(64) : "", stderr: "" }) }),
+      run: () => events.push("run"), relay: () => { events.push("relay"); return {}; },
+    writeState: () => events.push("state"), extract: () => events.push("extract"), stage: () => events.push("stage"),
+    output: () => events.push("output") };
+    // when / then
+    try {
+      await assert.rejects(() => startPerformance({ command: "perf", skipVerify: true }, runtime), /Immutable PERFORMANCE/);
+      assert.deepEqual(events, []);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+});
+}
+
+test("given marker-free legacy PERFORMANCE state, when the actual legacy start runs with complete injected closures, then preserve its existing build behavior", async () => {
+  // given
+  const events = [];
+  const runtime = { readState: () => ({ password: "retained-private-password" }),
+    assertStateOwnership: () => events.push("ownership"), run: plan => events.push(plan), relay: () => ({}),
+    writeState: state => events.push(state), extract() {}, stage() {}, output() {} };
+  // when
+  await startPerformance({ command: "perf", skipVerify: true }, runtime);
+  // then
+  assert.equal(events[0], "ownership");
+  assert.equal(events[1].password, "retained-private-password");
+  assert.ok(events.some(event => event.command === "./mvnw"));
+  assert.ok(events.some(event => event.args?.includes("--force-recreate")));
+});
 
 test("given a paired seed command, when parsing its BASE checkout, then the explicit compose root is retained only for seeding", () => {
   // given

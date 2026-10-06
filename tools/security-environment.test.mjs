@@ -37,6 +37,42 @@ import { fixtureImagePlan } from "./fixture-artifact.mjs";
 
 const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 
+test("given hostile SECURITY executable names, when the actual bounded executor dispatches, then refuse before invoking its injected process", () => {
+  // given
+  const calls = [];
+  const execute = (...args) => { calls.push(args); return { status: 0, stdout: "unexpected", stderr: "" }; };
+  // when / then
+  for (const command of ["sh", "/usr/bin/docker", "docker; echo injected", "curl && echo injected", "", null]) {
+    assert.throws(() => executeReusableSecurityCommand(command, ["inspect", "owned"], {}, 10000, execute),
+      { message: "Immutable SECURITY command exceeds its budget" });
+  }
+  assert.deepEqual(calls, []);
+});
+
+test("given trusted docker and curl SECURITY commands with structured argv, when the actual bounded executor dispatches, then retain exact arguments environment and shell false budgets", () => {
+  // given
+  const args = ["owned argument with spaces", "literal;$(not-a-shell)"];
+  const environment = { PATH: "/trusted/bin", COURTSIDE_SECURITY_RUN_ID: "run-0001" };
+  const calls = [];
+  const execute = (command, received, options) => {
+    calls.push({ command, received, options });
+    return { status: 0, stdout: command + " output", stderr: "" };
+  };
+  // when / then
+  for (const command of ["docker", "curl"]) {
+    assert.equal(executeReusableSecurityCommand(command, args, environment, 180000, execute), command + " output");
+    const call = calls.at(-1);
+    assert.equal(call.command, command);
+    assert.equal(call.received, args);
+    assert.equal(call.options.env, environment);
+    assert.equal(call.options.shell, false);
+    assert.equal(call.options.timeout, 180000);
+    assert.equal(call.options.maxBuffer, 4 * 1024 * 1024);
+    assert.equal(call.options.encoding, "utf8");
+    assert.equal(call.options.cwd, fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/, ""));
+  }
+});
+
 function securityContainerFixture(recorded, service = "app") {
   const labels = { "com.docker.compose.project": "courtside-security-run-0001", "com.docker.compose.service": service,
     "org.courtside.environment": "SECURITY", "org.courtside.security.run-id": "run-0001",

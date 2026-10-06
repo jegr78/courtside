@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, lstatSync, readdirSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readSync, readdirSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import { performance } from "node:perf_hooks";
 
@@ -78,6 +78,40 @@ function paths(bytes) {
   return values.sort();
 }
 
+function readImmutableFile(path, expected) {
+  const identity = stat => [stat.dev, stat.ino, stat.mode, stat.uid, stat.gid, stat.nlink, stat.size, stat.mtimeMs, stat.ctimeMs];
+  let fd;
+  try {
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  } catch (error) {
+    throw new Error("Immutable file is unsafe or changed before opening", { cause: error });
+  }
+  try {
+    const before = fstatSync(fd);
+    if (!before.isFile() || !Number.isSafeInteger(before.size) || before.size < 0 || before.size > 16 * 1024 * 1024) {
+      throw new Error("Immutable file exceeds its bound or is not regular");
+    }
+    if (expected && JSON.stringify(identity(before)) !== JSON.stringify(identity(expected))) {
+      throw new Error("Immutable file changed since inventory");
+    }
+    const bytes = Buffer.alloc(before.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = readSync(fd, bytes, offset, bytes.length - offset, offset);
+      if (count === 0) throw new Error("Immutable file was truncated during reading");
+      offset += count;
+    }
+    if (readSync(fd, Buffer.alloc(1), 0, 1, offset) !== 0) throw new Error("Immutable file grew during reading");
+    if (JSON.stringify(identity(fstatSync(fd))) !== JSON.stringify(identity(before))
+        || JSON.stringify(identity(lstatSync(path))) !== JSON.stringify(identity(before))) {
+      throw new Error("Immutable file changed during reading");
+    }
+    return bytes;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function compiledFiles(root, directory) {
   const base = join(root, directory);
   const files = {};
@@ -92,7 +126,7 @@ function compiledFiles(root, directory) {
         if (!pathPattern.test(key) || Object.keys(files).length >= 8192 || (bytes += stat.size) > 256 * 1024 * 1024) {
           throw new Error("Immutable compiled artifact inventory exceeds its bounds");
         }
-        files[key] = sha(readFileSync(path));
+        files[key] = sha(readImmutableFile(path, stat));
       } else throw new Error("Immutable compiled artifact contains unsupported files");
     }
   };
@@ -161,7 +195,10 @@ export function inspectReusableImages({ image, fixturesImage, sourceCommit, root
   if (helpers.some((path) => allCompiled[path] !== fixtureCompiled[path])) {
     throw new Error("Immutable fixture helper differs from actual compiled output");
   }
-  const sourceBytes = readFileSync(join(root, "target/classes/git.properties"), "utf8");
+  const sourceBytes = readImmutableFile(join(root, "target/classes/git.properties")).toString("utf8");
+  if (sha(sourceBytes) !== allCompiled["/app/BOOT-INF/classes/git.properties"]) {
+    throw new Error("Immutable compiled source properties changed since inventory");
+  }
   if (sourceBytes.split(/\r?\n/).filter((line) => /^git\.commit\.id[=:]/.test(line)).join("\n") !== `git.commit.id=${sourceCommit}`) {
     throw new Error("Immutable compiled source binding is stale");
   }
@@ -171,8 +208,7 @@ export function inspectReusableImages({ image, fixturesImage, sourceCommit, root
   }
   const sourceDigests = {};
   for (const path of tracked) {
-    const bytes = readFileSync(join(root, path));
-    if (bytes.length > 16 * 1024 * 1024) throw new Error("Immutable source file exceeds its bound");
+    const bytes = readImmutableFile(join(root, path));
     sourceDigests[path] = sha(bytes);
   }
   const runtimeImageIDs = {};
@@ -334,6 +370,10 @@ function performanceInventory(run, root, owner, deployment) {
               || JSON.stringify(runtimeImage.RootFS) !== JSON.stringify(metadata.RootFS)
               || runtimeImage.Os !== "linux" || runtimeImage.Architecture !== "amd64") {
             throw new Error("Immutable PERFORMANCE runtime image bytes drifted");
+          }
+          if (service === "db" && (item.HostConfig?.NanoCpus !== Number(expected.cpus) * 1000000000
+              || item.HostConfig?.Memory !== Number(expected.mem_limit))) {
+            throw new Error("Immutable PERFORMANCE database limits drifted");
           }
           if (service === "app") {
             const expectedEnv = Object.fromEntries((metadata.Config.Env ?? []).map((value) => {

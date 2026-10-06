@@ -998,7 +998,7 @@ export async function startPerformance(options, runtime = {}) {
   const injected = Object.keys(runtime).length !== 0;
   const required = immutable
     ? ["readState", "inspect", "assertEmpty", "relay", "prepare", "writeState", "start", "assertRuntime", "output"]
-    : ["readState", "run", "relay", "writeState", "extract", "stage", "output"];
+    : ["readState", "assertStateOwnership", "run", "relay", "writeState", "extract", "stage", "output"];
   if (injected && required.some((key) => typeof runtime[key] !== "function")) {
     throw new Error("Performance execution seam is incomplete");
   }
@@ -1026,6 +1026,8 @@ export async function startPerformance(options, runtime = {}) {
   }
   const run = runtime.run ?? runInteractive;
   const state = (runtime.readState ?? readPerformanceState)();
+  if (state?.immutableImages || state?.immutableDeployment) throw new Error("Immutable PERFORMANCE requires owned reset before legacy start");
+  (runtime.assertStateOwnership ?? assertPerformanceStateOwnership)(state, { root });
   const password = state?.password ?? newBootstrapPassword();
   const environment = {
     ...process.env,

@@ -211,8 +211,9 @@ runtime instead of rebuilding a fixture. Recovery checks ownership and retained 
 Both lifecycles retain imported production and fixture images.
 
 Missing or corrupt PERFORMANCE state cannot select a legacy reset, stop, logs or DB-shell
-while an immutable override or reservation remains. SECURITY retains exact container IDs and
-effective Config/HostConfig and rejects same-image replacements or configuration drift before
+while an immutable override or reservation remains.
+Legacy PERFORMANCE starts are refused until the owned immutable reset succeeds; an override cannot bypass this refusal.
+SECURITY retains exact container IDs and effective Config/HostConfig and rejects same-image replacements or configuration drift before
 seed, verification and cleanup. UAT checks initial effective settings against rendered Compose;
 only the planned bootstrap app recreation may introduce its replacement container.
 
