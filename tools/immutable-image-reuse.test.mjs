@@ -395,6 +395,29 @@ test("given a backward wall-clock jump during readiness polling, when monotonic 
   assert.ok(!calls.some((call) => call[1] === "inspect"));
 });
 
+test("given dependency readiness takes eleven seconds, when immutable PERFORMANCE starts, then Compose shares the startup deadline while metadata probes stay bounded", async () => {
+  // given
+  let elapsed = 0;
+  const calls = [];
+  const execute = (command, args, options) => {
+    calls.push({ command, args, options });
+    if (args[0] === "create") elapsed = 3000;
+    if (args[0] === "compose") {
+      if (options.timeout < 11000) return { status: null, signal: "SIGTERM", error: { code: "ETIMEDOUT" }, stdout: "", stderr: "" };
+      elapsed += 11000;
+    }
+    if (args[0] === "ps") elapsed = 180001;
+    return { status: 0, signal: null, stdout: "", stderr: "" };
+  };
+  // when / then
+  await assert.rejects(() => startPerformanceReuse({ productionImageID: image, owner: "a".repeat(32),
+    compose: ["compose", "-p", "courtside-perf"] }, { root: "/private", environment: {}, execute, now: () => elapsed }),
+  { message: "Immutable PERFORMANCE startup deadline exceeded" });
+  assert.equal(calls.find(call => call.args[0] === "compose").options.timeout, 177000);
+  assert.ok(calls.filter(call => call.args[0] !== "compose").every(call => call.options.timeout <= 10000));
+  assert.ok(!calls.some(call => call.args[0] === "inspect"));
+});
+
 test("given Maven-staged fixtures excluded by the production JAR, when proving the packaged classpath, then bind production bytes without requiring fixture classes in production", () => {
   // given
   const f = fixture();

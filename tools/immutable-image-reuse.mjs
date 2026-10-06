@@ -19,8 +19,12 @@ export function immutableImageSelection({ image, fixturesImage, sourceCommit }) 
 }
 
 export function boundedImageCommand(execute, command, args, root, environment = process.env, timeoutMilliseconds = 10000) {
+  return boundedCommand(execute, command, args, root, environment, timeoutMilliseconds, 10000);
+}
+
+function boundedCommand(execute, command, args, root, environment, timeoutMilliseconds, maximumMilliseconds) {
   if (!["docker", "git"].includes(command)) throw new Error("Unsupported immutable image command");
-  if (!Number.isSafeInteger(timeoutMilliseconds) || timeoutMilliseconds < 1 || timeoutMilliseconds > 10000) {
+  if (!Number.isSafeInteger(timeoutMilliseconds) || timeoutMilliseconds < 1 || timeoutMilliseconds > maximumMilliseconds) {
     throw new Error("Immutable image command timeout is outside its bound");
   }
   const result = execute(command, args, { cwd: root, env: environment, shell: false,
@@ -451,16 +455,17 @@ export function preparePerformanceReuse(proof, { root, environment, telemetry = 
 
 export async function startPerformanceReuse(deployment, { root, environment, execute = spawnSync, now = () => performance.now() }) {
   const deadline = now() + 180000;
-  const run = (args) => {
+  const run = (args, startup = false) => {
     const remaining = deadline - now();
     if (!Number.isFinite(remaining) || remaining < 1) throw new Error("Immutable PERFORMANCE startup deadline exceeded");
-    return boundedImageCommand(execute, "docker", args, root, environment, Math.min(10000, Math.floor(remaining)));
+    const maximum = startup ? 180000 : 10000;
+    return boundedCommand(execute, "docker", args, root, environment, Math.min(maximum, Math.floor(remaining)), maximum);
   };
   run(["create", "--pull=never", "--name", "courtside-perf-reuse-reservation", "--network=none", "--read-only",
     "--user=10001:10001", "--cap-drop=ALL", "--security-opt=no-new-privileges:true", "--memory=64m", "--memory-swap=64m",
     "--cpus=0.25", "--pids-limit=16", "--label", `org.courtside.image-reuse.owner=${deployment.owner}`,
     "--entrypoint", "/bin/sleep", deployment.productionImageID, "1"]);
-  run([...deployment.compose, "up", "-d", "--no-build", "--pull", "never"]);
+  run([...deployment.compose, "up", "-d", "--no-build", "--pull", "never"], true);
   while (now() < deadline) {
     performanceInventory(run, root, deployment.owner, deployment);
     const app = inspection(run(["inspect", "courtside-perf-app-1"]));
