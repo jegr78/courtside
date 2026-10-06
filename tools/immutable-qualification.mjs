@@ -380,7 +380,7 @@ export function createImmutableQualification({ project, image, sourceCommit, roo
         throw new Error("Immutable qualification container provenance changed");
       }
       if (service === "app" && (JSON.stringify(item.Config.Entrypoint) !== JSON.stringify(proof.image.Config.Entrypoint)
-          || JSON.stringify(item.Config.Cmd) !== JSON.stringify(proof.image.Config.Cmd))) {
+          || JSON.stringify(item.Config.Cmd ?? null) !== JSON.stringify(proof.image.Config.Cmd ?? null))) {
         throw new Error("Immutable qualification native application entrypoint changed");
       }
       if (!recorded.has(`container:${id}`)) assertEffective(item, service, expectedServices[service]);

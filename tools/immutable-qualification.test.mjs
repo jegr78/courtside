@@ -79,8 +79,9 @@ for (const invalid of [
 
 function lifecycleExecute({ collision = false, foreign = false, root = "/example", cleanupFails = false,
   hardeningFails = false, imageDrift = false, entrypointDrift = false, runtimeIncomplete = false,
-  reservationTimedOut = false, runtimeImage = image, logCollector = true } = {}) {
-  const candidate = candidateExecute({ runtimeImage });
+  reservationTimedOut = false, runtimeImage = image, logCollector = true, imageCommandAbsent = false } = {}) {
+  const candidate = candidateExecute({ runtimeImage, imageOverride: imageCommandAbsent
+    ? { Config: { User: "10001:10001", Entrypoint: nativeEntrypoint, Labels: {} } } : {} });
   let reserved = false;
   let started = false;
   const removed = new Set();
@@ -158,7 +159,7 @@ function lifecycleExecute({ collision = false, foreign = false, root = "/example
           Env: id === appId ? [`COURTSIDE_BOOTSTRAP_ADMIN_PASSWORD=${bootstrapPassword}`] : [],
           Entrypoint: id === reservationId ? ["/bin/cat"] : entrypointDrift && id === appId ? ["java", "-Xmx2g"] : nativeEntrypoint,
           ...(id === appId ? configDrift.config : {}),
-          Cmd: id === reservationId ? ["/dev/null"] : id === collectorId ? ["--collect-operational-logs"] : [], Labels: { "org.courtside.qualification.owner": id === "9".repeat(64) ? "foreign" : token,
+          Cmd: id === reservationId ? ["/dev/null"] : id === collectorId ? ["--collect-operational-logs"] : imageCommandAbsent ? null : [], Labels: { "org.courtside.qualification.owner": id === "9".repeat(64) ? "foreign" : token,
           ...(id === reservationId ? {} : { "com.docker.compose.project": project,
             "com.docker.compose.service": id === dbId ? "db" : id === proxyId ? "proxy" : id === collectorId ? "log-collector" : "app",
             "com.docker.compose.project.config_files": composePath }) } } })));
@@ -207,6 +208,79 @@ function lifecycleExecute({ collision = false, foreign = false, root = "/example
     return result;
   };
   return { execute: wrapped, calls: candidate.calls, configDrift };
+}
+
+test("given original native image Cmd absent and container Cmd null with equal Java entrypoint and user, when the immutable producer completes, then accept the command representation and clean owned resources", async () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "immutable-uat-null-command-"));
+  const { execute } = lifecycleExecute({ root, imageCommandAbsent: true });
+  const { runUatSmoke } = await import("./courtside.uat-smoke.mjs");
+  try {
+    // when
+    const receipt = await runUatSmoke({ args, environment: nativeEnvironment, repository: root, execute,
+      request: smokeRequest(), platform: "linux", architecture: "x64" }).catch(error => {
+      assert.fail([error, ...(error.errors ?? [])].map(failure => failure.message).join("; "));
+    });
+    // then
+    assert.equal(receipt.manifestDigest, image);
+    const proof = JSON.parse(readFileSync(join(root, "build/immutable-qualification", project, "provenance.json"), "utf8"));
+    assert.equal(Object.hasOwn(proof.image.Config, "Cmd"), false);
+    assert.deepEqual(proof.image.Config.Entrypoint, nativeEntrypoint);
+    assert.equal(proof.image.Config.User, "10001:10001");
+    assert.ok(proof.runtime.length > 0 && proof.runtime.every(item => item.command === null));
+    assert.deepEqual(proof.liveResources, []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+for (const mode of ["valid", "config", "source", "owner"]) {
+  test(`given ${mode} planned partial startup after failed Compose up, when owned cleanup runs, then remove only fully admitted resources`, () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "immutable-uat-partial-"));
+    const harness = lifecycleExecute({ root, imageCommandAbsent: true, foreign: mode === "owner" });
+    let attempted = false;
+    const execute = (command, commandArgs, options) => {
+      const result = harness.execute(command, commandArgs, options);
+      if (commandArgs[0] === "compose" && commandArgs.includes("up")) {
+        attempted = true;
+        if (mode === "config") Object.assign(harness.configDrift, { service: "app", config: { Env: ["UNDECLARED=changed"] } });
+        return { ...result, status: 1 };
+      }
+      return command === "git" && attempted && mode === "source" && commandArgs[0] === "rev-parse"
+        ? { ...result, stdout: "f".repeat(40) } : result;
+    };
+    const lifecycle = qualification.createImmutableQualification({ project, image, sourceCommit, root,
+      evidence: join(root, "proof"), execute, environment: nativeEnvironment, platform: "linux", architecture: "x64" });
+    try {
+      // when / then
+      assert.throws(() => lifecycle.start("a-private-bootstrap-password"), mode === "valid" ? /command did not complete/
+        : mode === "config" ? /effective container configuration changed/ : mode === "source" ? /source or Compose binding changed/ : /resource ownership does not match/);
+      if (mode === "valid") {
+        lifecycle.cleanup();
+        assert.deepEqual(lifecycle.proof.liveResources, []);
+        assert.ok(harness.calls.some(({ args: commandArgs }) => commandArgs[0] === "rm" && commandArgs.at(-1) === "2".repeat(64)));
+      } else {
+        assert.throws(() => lifecycle.cleanup());
+        assert.ok(!harness.calls.some(({ args: commandArgs }) => commandArgs[0] === "rm"
+          && commandArgs.at(-1) !== "d".repeat(64)));
+      }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
+for (const [name, config] of [["empty command", { Cmd: [] }], ["nonempty command", { Cmd: ["--unexpected"] }],
+  ["changed entrypoint", { Entrypoint: ["java", "-Xmx2g"] }]]) {
+  test(`given original native image Cmd absent and ${name}, when startup inspects the app, then reject native command drift`, () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "immutable-uat-command-drift-"));
+    const harness = lifecycleExecute({ root, imageCommandAbsent: true });
+    const lifecycle = qualification.createImmutableQualification({ project, image, sourceCommit, root,
+      evidence: join(root, "proof"), execute: harness.execute, environment: nativeEnvironment, platform: "linux", architecture: "x64" });
+    Object.assign(harness.configDrift, { service: "app", config });
+    try {
+      // when / then
+      assert.throws(() => lifecycle.start("a-private-bootstrap-password"), /native application entrypoint changed/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
 }
 
 test("given the recorded Docker memory default and UAT collector without declared swap, when first accepted then rechecked, then accept twice memory and reject retained swap drift", () => {
