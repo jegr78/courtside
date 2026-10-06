@@ -1677,6 +1677,21 @@ it("given an unchanged week, when opening a booking dialog, then other days keep
 });
 
 
+it("given unchanged opening hours, when opening a booking dialog, then visible slots retain their wall-clock validation", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "13:00");
+  const validSlots = vi.spyOn(clubZone, "isValidZonedDateTime");
+
+  // when
+  await userEvent.click(slot);
+  await screen.findByTestId("booking-dialog");
+
+  // then
+  expect(validSlots.mock.calls.filter(([date]) => date === "2026-08-10")).toHaveLength(0);
+  expect(freeSlot(2, "13:00")).toHaveAttribute("data-state", "free");
+});
+
 it("given several courts on the same row, when opening a booking dialog, then each row resolves its instant at most once per render", async () => {
   // given
   const commits = vi.fn();

@@ -143,13 +143,18 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const days = data?.days ?? [];
   const renderedWeekStart = days[0] ? formatDate(days[0]) : undefined;
   const selectedDay = days.find((day) => formatDate(day) === selectedDate);
-  const selectedAllocations = selectedDate ? data?.allocations.get(selectedDate) ?? [] : [];
-  const daySlots = selectedDay && data ? slotsFor(selectedDay, data.grid) : [];
-  const outsideSlots = selectedDate && data
-    ? slotsOutsideHours(selectedDate, daySlots, selectedAllocations, data.grid) : [];
+  const selectedAllocations = useMemo(() => selectedDate ? data?.allocations.get(selectedDate) ?? [] : [],
+    [selectedDate, data]);
+  const grid = data?.grid;
+  const daySlots = useMemo(() => selectedDay && grid ? slotsFor(selectedDay, grid) : [], [selectedDay, grid]);
+  const outsideSlots = useMemo(() => selectedDate && grid
+    ? slotsOutsideHours(selectedDate, daySlots, selectedAllocations, grid) : [],
+  [selectedDate, daySlots, selectedAllocations, grid]);
   const isToday = selectedDate === dateInTimeZoneValue(currentInstant, data?.grid.timeZone);
   const currentTime = data ? formatTime(currentInstant.toISOString(), data.grid.timeZone) : undefined;
-  const slots = [...daySlots, ...outsideSlots].sort();
+  const slots = useMemo(() => [...daySlots, ...outsideSlots].sort(), [daySlots, outsideSlots]);
+  const slotStarts = useMemo(() => new Map(slots.map((slot) => [slot, selectedDate && grid
+    ? Date.parse(zonedDateTime(selectedDate, slot, grid.timeZone)) : Number.NaN])), [slots, selectedDate, grid]);
   const isOutside = (slot: string) => outsideSlots.includes(slot);
 
   function isBookable(courtId: string, slot: string): boolean {
@@ -380,9 +385,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         </thead>
         <tbody>
           {slots.map((slot) => {
-            const visibleSlotStartsAt = selectedDate
-              ? Date.parse(zonedDateTime(selectedDate, slot, data.grid.timeZone))
-              : Number.NaN;
+            const visibleSlotStartsAt = slotStarts.get(slot) ?? Number.NaN;
             const past = visibleSlotStartsAt < currentInstant.getTime();
             const outside = isOutside(slot);
             return <tr key={slot} data-testid={`slot-row-${slot}`} data-slot={slot}
