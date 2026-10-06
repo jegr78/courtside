@@ -1,9 +1,11 @@
+import { Profiler } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
 import { WeekView } from "./WeekView";
+import * as clubZone from "../time/clubZone";
 
 const courts = [
   { id: "11111111-1111-1111-1111-111111111111", number: 1, name: "Centre Court" },
@@ -1655,4 +1657,83 @@ it("given today, when the plan's grid first appears, then it already stands at t
 
   // then
   expect(scrollsToNow(), "a scroll after the grid is painted moves it under a tap already on its way").toBe(1);
+});
+
+
+it("given an unchanged week, when opening a booking dialog, then other days keep their availability without repeated slot validation", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "13:00");
+  const count = screen.getByTestId("day-free-count-2026-08-11").dataset.freeCount;
+  const pastSlots = vi.spyOn(clubZone, "isPastSlot");
+
+  // when
+  await userEvent.click(slot);
+  await screen.findByTestId("booking-dialog");
+
+  // then
+  expect(screen.getByTestId("day-free-count-2026-08-11")).toHaveAttribute("data-free-count", count);
+  expect(pastSlots.mock.calls.filter(([date]) => date !== "2026-08-10")).toHaveLength(0);
+});
+
+
+it("given several courts on the same row, when opening a booking dialog, then each row resolves its instant at most once per render", async () => {
+  // given
+  const commits = vi.fn();
+  render(<Profiler id="week" onRender={commits}><WeekView today={clubInstant("12:00")} /></Profiler>);
+  const slot = await findFreeSlot(1, "13:00");
+  const rows = screen.getAllByTestId(/^slot-row-/).map((row) => row.dataset.slot);
+  const instants = vi.spyOn(clubZone, "zonedDateTime");
+  commits.mockClear();
+
+  // when
+  await userEvent.click(slot);
+  await screen.findByTestId("booking-dialog");
+
+  // then
+  expect(instants.mock.calls.filter(([date, time]) => date === "2026-08-10" && rows.includes(time)).length)
+    .toBeLessThanOrEqual(rows.length * commits.mock.calls.length);
+  expect(freeSlot(2, "13:00")).toHaveAttribute("data-state", "free");
+});
+
+
+it("given fresh allocations and the same clock, when the selected day refreshes, then its availability reflects the new occupancy", async () => {
+  // given
+  const now = clubInstant("12:15");
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView clock={() => now} />);
+  expect(await screen.findByTestId("day-free-count-2026-08-10")).toHaveAttribute("data-free-count", "38");
+  vi.mocked(api.allocations).mockResolvedValue([{
+    bookingId: "77777777-7777-7777-7777-777777777777",
+    courtId: courts[0].id, startsAt: "2026-08-10T13:00:00+02:00", endsAt: "2026-08-10T13:30:00+02:00",
+    cardLabel: "Member booking", cardColor: "#176b55", ownBooking: false,
+    showGenericOccupancy: true, participantCount: 2
+  }]);
+
+  // when
+  await act(async () => window.dispatchEvent(new Event("focus")));
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("day-free-count-2026-08-10"))
+    .toHaveAttribute("data-free-count", "37"));
+  expect(screen.getByTestId("day-free-count-2026-08-11")).toHaveAttribute("data-free-count", "56");
+});
+
+it("given a delayed allocation refresh, when the clock crosses a slot boundary, then availability advances without waiting for the network", async () => {
+  // given
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  let now = clubInstant("12:15");
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  render(<WeekView clock={() => now} />);
+  expect(await screen.findByTestId("day-free-count-2026-08-10")).toHaveAttribute("data-free-count", "38");
+  vi.mocked(api.allocations).mockImplementation(() => new Promise(() => {}));
+
+  // when
+  now = clubInstant("12:31");
+  await vi.advanceTimersByTimeAsync(60_000);
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("day-free-count-2026-08-10"))
+    .toHaveAttribute("data-free-count", "36"));
+  expect(screen.getByTestId("day-free-count-2026-08-11")).toHaveAttribute("data-free-count", "56");
 });

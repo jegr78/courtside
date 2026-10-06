@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { allocationLabel } from "../booking/allocationLabel";
 import {
@@ -136,6 +136,9 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     if (eligibilityError || eligibility?.violations.length) setBookingSelection(undefined);
   }, [eligibility, eligibilityError]);
 
+  const remainingCounts = useMemo(() => data && data.courts.length > 0
+    ? new Map(data.days.map((day) => [formatDate(day), remainingFreeSlots(day, data, currentInstant)] as const))
+    : new Map<string, number>(), [data, currentInstant]);
   const hasCourts = (data?.courts.length ?? 0) > 0;
   const days = data?.days ?? [];
   const renderedWeekStart = days[0] ? formatDate(days[0]) : undefined;
@@ -155,8 +158,6 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     return !isOccupied(selectedAllocations, courtId, slot, data.grid.timeZone);
   }
 
-  // The run stops at the first slot the court cannot give, so the highlight a member drags
-  // over is what they get - a span silently clamped on release would surprise them instead.
   function bookableSpan(courtId: string, anchor: string, head: string): string[] {
     const from = slots.indexOf(anchor);
     const to = slots.indexOf(head);
@@ -303,7 +304,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
           aria-label={t("week.previous")}>‹</Button>
         {days.map((day) => {
           const date = formatDate(day);
-          const count = remainingFreeSlots(day, data, currentInstant);
+          const count = remainingCounts.get(date) ?? 0;
           const freeCount = t("week.freeCount", { count });
           return <button
             key={date}
@@ -379,9 +380,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         </thead>
         <tbody>
           {slots.map((slot) => {
-            const past = selectedDate
-              ? isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant)
-              : false;
+            const visibleSlotStartsAt = selectedDate
+              ? Date.parse(zonedDateTime(selectedDate, slot, data.grid.timeZone))
+              : Number.NaN;
+            const past = visibleSlotStartsAt < currentInstant.getTime();
             const outside = isOutside(slot);
             return <tr key={slot} data-testid={`slot-row-${slot}`} data-slot={slot}
               data-state={outside ? "outside" : past ? "past" : "remaining"}
@@ -390,7 +392,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
               {slot}
             </th>
             {data.courts.map((court) => renderCell(
-              court, slot, selectedDate, selectedAllocations, data.grid.slotMinutes, data.grid.timeZone, language, t,
+              court, slot, selectedDate, visibleSlotStartsAt, selectedAllocations, data.grid.slotMinutes, data.grid.timeZone, language, t,
               () => {
                 setSuccess(undefined);
                 if (selectedDate) setBookingSelection({ date: selectedDate, slot, courtId: court.id });
@@ -519,6 +521,7 @@ function renderCell(
   court: PublicCourt,
   slot: string,
   date: string | undefined,
+  visibleSlotStartsAt: number,
   allocations: Allocation[],
   slotMinutes: number,
   timeZone: string,
@@ -533,7 +536,6 @@ function renderCell(
   drag: { selected: boolean; start: (pointerType: string) => void; extend: () => void }
 ) {
   const cellClass = "border-structural border-b";
-  const visibleSlotStartsAt = date ? Date.parse(zonedDateTime(date, slot, timeZone)) : Number.NaN;
   const allocation = allocations.find((entry) => entry.courtId === court.id
     && (formatTime(entry.startsAt, timeZone) === slot
       || (isFirstVisibleSlot && Date.parse(entry.startsAt) < visibleSlotStartsAt
@@ -607,8 +609,6 @@ function currentLineOffset(currentTime: string, slots: string[], slotMinutes: nu
   return (row + into / slotMinutes) * slotHeight;
 }
 
-// Bringing the slot into view would take the page with it and pull the navigation out from under
-// whoever is reaching for it, so the plan travels inside its own frame wherever it has one.
 function scrollToSlot(plan: HTMLDivElement | null, slot?: string) {
   const target = slot ? plan?.querySelector(`[data-slot="${slot}"]`) : undefined;
   if (!plan || !(target instanceof HTMLElement)) return;
