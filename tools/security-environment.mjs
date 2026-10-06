@@ -499,7 +499,7 @@ export async function startSecurityEnvironment(runId, image, selection) {
           }) });
       } catch {}
       let cleanupFailed = false;
-      try { removeOwnedSecurityEnvironment(runId, identity); }
+      try { removeOwnedSecurityEnvironment(runId, identity, { startupFailure: true }); }
       catch { cleanupFailed = true; }
       try {
         Object.defineProperty(failure, "startupDiagnostics", { value: startupDiagnostics, configurable: true });
@@ -1673,7 +1673,7 @@ export function recoverSecurityEnvironment(runId, expected) {
   removeOwnedSecurityEnvironment(runId, expected);
 }
 
-function removeOwnedSecurityEnvironment(runId, expected) {
+function removeOwnedSecurityEnvironment(runId, expected, { startupFailure = false } = {}) {
   const recorded = existsSync(securityStateFile(runId)) ? readSecurityEnvironment(runId) : undefined;
   const command = recorded?.immutableImages ? executeReusableSecurityCommand : execute;
   const resources = securityProjectResources(runId, command);
@@ -1692,7 +1692,9 @@ function removeOwnedSecurityEnvironment(runId, expected) {
         throw new Error("Immutable SECURITY cleanup runtime identity changed");
       }
     }
-    assertSecurityRuntimeBinding(resources, recorded.immutableRuntime, { allowMissing: true });
+    if (startupFailure !== true || recorded.immutableRuntime !== undefined || Object.hasOwn(recorded, "immutableRuntime")) {
+      assertSecurityRuntimeBinding(resources, recorded.immutableRuntime, { allowMissing: true });
+    }
   }
   removeSecurityResources(resources, command);
   if (!recorded?.immutableImages) removeSecurityImage(securityFixturesImageTag(runId));

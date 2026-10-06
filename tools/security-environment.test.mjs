@@ -4,7 +4,7 @@ import { zapVersion } from "./security-passive-deployment.mjs";
 import { openApiFuzzPolicy, openApiFuzzVersion } from "./security-openapi-fuzz.mjs";
 import { readFileSync, writeFileSync, symlinkSync, realpathSync, mkdtempSync, mkdirSync, chmodSync, lstatSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createResourceEvidence, writeNativeEvidence, retainResourceEvidenceFailure } from "./security-resource-runtime.mjs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -180,7 +180,7 @@ test("given immutable SECURITY assessment runtime drift, when the actual asynchr
   }
 });
 
-function prebuiltRecoveryHarness({ drift = false, foreign = false, proofFailure = false, replacement = false, configDrift = false, limitDrift = false } = {}) {
+function prebuiltRecoveryHarness({ drift = false, foreign = false, proofFailure = false, replacement = false, configDrift = false, limitDrift = false, missingRuntime = false } = {}) {
   const source = readFileSync(new URL("./security-environment.mjs", import.meta.url), "utf8");
   const body = source.slice(source.indexOf("function removeOwnedSecurityEnvironment("),
     source.indexOf("\nfunction removeSecurityImage("));
@@ -200,7 +200,7 @@ function prebuiltRecoveryHarness({ drift = false, foreign = false, proofFailure 
   resources[0].name = "/courtside-security-run-0001-app-1";
   resources[0].config = { Image: image, Env: ["LANG=C"], Entrypoint: ["java"], User: "10001:10001", Labels: resources[0].labels };
   resources[0].hostConfig = { Memory: 1024 * 1024 * 1024, ReadonlyRootfs: true };
-  recorded.immutableRuntime = securityRuntimeBinding(resources);
+  if (!missingRuntime) recorded.immutableRuntime = securityRuntimeBinding(resources);
   if (replacement) resources[0].id = "e".repeat(64);
   if (configDrift) resources[0].config.Env.push("JAVA_TOOL_OPTIONS=-Xmx4g");
   if (limitDrift) resources[0].hostConfig.Memory *= 2;
@@ -215,8 +215,53 @@ function prebuiltRecoveryHarness({ drift = false, foreign = false, proofFailure 
     securityFixturesImageTag: () => "unused", rmSync: () => events.push("remove-state") };
   vm.createContext(context);
   vm.runInContext(body + "\nthis.remove = removeOwnedSecurityEnvironment;", context);
-  return { events, run: () => context.remove("run-0001", expected) };
+  return { events, resources, recorded, expected, remove: context.remove, run: () => context.remove("run-0001", expected) };
 }
+
+test("given owned prebuilt SECURITY startup without a persisted runtime snapshot, when actual cleanup receives explicit startup failure context, then remove owned resources and retain imported images", () => {
+  // given
+  const harness = prebuiltRecoveryHarness({ missingRuntime: true });
+  // when
+  assert.doesNotThrow(() => harness.remove("run-0001", harness.expected, { startupFailure: true }));
+  // then
+  assert.deepEqual(harness.events, ["proof", "remove-resources", "remove-state", "remove-state"]);
+  assert.ok(!harness.events.includes("remove-image"));
+});
+
+test("given missing persisted SECURITY runtime, when normal recovery or nonboolean startup context is used, then reject before resource removal", () => {
+  // given
+  for (const context of [undefined, { startupFailure: false }, { startupFailure: "true" }, { startupFailure: 1 }]) {
+    const harness = prebuiltRecoveryHarness({ missingRuntime: true });
+    harness.recorded.startupFailure = true;
+    // when / then
+    assert.throws(() => harness.remove("run-0001", harness.expected, context), /retained runtime is missing/);
+    assert.deepEqual(harness.events, ["proof"]);
+  }
+});
+
+test("given present SECURITY snapshots that are null malformed or undefined, when startup failure cleanup runs, then retain the persisted binding guard", () => {
+  // given
+  for (const value of [null, {}, [], "malformed", undefined]) {
+    const harness = prebuiltRecoveryHarness();
+    harness.recorded.immutableRuntime = value;
+    // when / then
+    assert.throws(() => harness.remove("run-0001", harness.expected, { startupFailure: true }), /retained runtime is missing/);
+    assert.deepEqual(harness.events, ["proof"]);
+  }
+});
+
+test("given startup failure context with a retained snapshot or foreign proof, when actual cleanup runs, then still reject runtime image ownership and source drift", () => {
+  // given
+  for (const scenario of [{ replacement: true }, { configDrift: true }, { limitDrift: true },
+    { missingRuntime: true, drift: true }, { missingRuntime: true, foreign: true }, { missingRuntime: true, proofFailure: true }]) {
+    const harness = prebuiltRecoveryHarness(scenario);
+    // when / then
+    assert.throws(() => harness.remove("run-0001", harness.expected, { startupFailure: true }));
+    assert.ok(!harness.events.includes("remove-resources"));
+    assert.ok(!harness.events.includes("remove-state"));
+    assert.ok(!harness.events.includes("remove-image"));
+  }
+});
 
 test("given same-image SECURITY replacement or effective configuration drift, when the actual recovery producer runs, then refuse before removing any resource or state", () => {
   // given
@@ -444,7 +489,7 @@ test("given flattened settings or alternative Spring configuration sources, when
   }
 });
 
-function startupFailureHarness({ captureFailure = false, cleanupFailure = false, portConflict = false, prebuilt = false, successful = false } = {}) {
+function startupFailureHarness({ captureFailure = false, cleanupFailure = false, portConflict = false, prebuilt = false, successful = false, actualCleanup = false } = {}) {
   const source = readFileSync(new URL("./security-environment.mjs", import.meta.url), "utf8");
   const start = source.indexOf("export async function startSecurityEnvironment(");
   const end = source.indexOf("\nexport function fixtureImageBase", start);
@@ -455,6 +500,7 @@ function startupFailureHarness({ captureFailure = false, cleanupFailure = false,
   const environment = securityEnvironment("run-0001", `sha256:${"a".repeat(64)}`);
   const commandEvents = [];
   const states = [];
+  const nativeResources = [];
   const context = { events, failure, process: { env: {}, stdout: { write: () => {} } },
     stateRoot: "/private/security", root: "/repo", join, chmodSync: () => {},
     assertSecurityStartAvailable: () => {}, securityProjectResources: () => events.includes("startup-succeeded")
@@ -497,10 +543,76 @@ function startupFailureHarness({ captureFailure = false, cleanupFailure = false,
     verifySecurityEnvironment: () => { if (successful) return { runId: "run-0001" }; throw new Error("must not verify after failure"); },
     writeIdentity: () => events.push("identity"), securityEnvironmentReadyMessage: () => "ready" };
   vm.createContext(context);
+  if (actualCleanup) {
+    const files = new Map();
+    context.dirname = dirname;
+    context.assertSecurityStartAvailable = assertSecurityStartAvailable;
+    context.assertSecurityRuntimeBinding = assertSecurityRuntimeBinding;
+    context.securityProject = securityProject;
+    context.securityReservationArgs = securityReservationArgs;
+    context.securityProjectResources = () => nativeResources;
+    context.existsSync = path => files.has(path);
+    context.mkdirSync = () => {};
+    context.readFileSync = path => files.get(path);
+    context.writeFileSync = (path, bytes) => { files.set(path, bytes); states.push(JSON.parse(bytes)); };
+    context.rmSync = path => { files.delete(path); events.push("remove-state"); };
+    context.removeSecurityImage = () => events.push("remove-image");
+    context.securityFixturesImageTag = securityFixturesImageTag;
+    context.inspectReusableImages = () => ({ productionImageID: environment.COURTSIDE_SECURITY_IMAGE,
+      fixturesImageID: "sha256:" + "b".repeat(64), sourceCommit: "c".repeat(40),
+      runtimeImageIDs: { production: environment.COURTSIDE_SECURITY_IMAGE, fixtures: "sha256:" + "b".repeat(64) } });
+    context.executeReusableSecurityCommand = (_command, args) => {
+      if (args[0] === "create") {
+        const labels = {};
+        args.forEach((value, index) => {
+          if (value === "--label") {
+            const pair = args[index + 1], separator = pair.indexOf("=");
+            labels[pair.slice(0, separator)] = pair.slice(separator + 1);
+          }
+        });
+        nativeResources.push({ type: "container", id: "9".repeat(64), labels,
+          reference: environment.COURTSIDE_SECURITY_IMAGE, image: environment.COURTSIDE_SECURITY_IMAGE,
+          config: {}, hostConfig: {} });
+        events.push("reserve");
+      } else if (args.includes("up")) {
+        nativeResources.push(securityContainerFixture(environment));
+        events.push("startup-failed");
+        throw failure;
+      } else if (args[0] === "rm") {
+        assert.deepEqual(Array.from(args.slice(2)), nativeResources.map(item => item.id));
+        nativeResources.length = 0;
+        events.push("cleanup");
+      }
+      return "";
+    };
+    const stateBody = source.slice(source.indexOf("export function securityStateFile("),
+      source.indexOf("\nexport function mergeSecurityProcessEnvironment(")).replaceAll("export function", "function");
+    const reservationBody = source.slice(source.indexOf("function reserveSecurityEnvironment("),
+      source.indexOf("\nexport function recoverSecurityEnvironment("));
+    const cleanupBody = source.slice(source.indexOf("function removeOwnedSecurityEnvironment("),
+      source.indexOf("\nfunction removeSecurityImage("));
+    const removalBody = source.slice(source.indexOf("function removeSecurityResources("), source.indexOf("\nasync function main("));
+    vm.runInContext(stateBody + "\n" + reservationBody + "\n" + cleanupBody + "\n" + removalBody, context);
+  }
   vm.runInContext(body + "\nthis.start = startSecurityEnvironment;", context);
-  return { failure, events, commandEvents, captureAttempts, states, run: () => context.start("run-0001", `sha256:${"a".repeat(64)}`,
+  return { failure, events, commandEvents, captureAttempts, states, nativeResources, run: () => context.start("run-0001", `sha256:${"a".repeat(64)}`,
     prebuilt ? { fixturesImage: `sha256:${"b".repeat(64)}`, sourceCommit: "c".repeat(40) } : undefined) };
 }
+
+test("given integrated prebuilt SECURITY startup failure before runtime persistence, when the actual catch invokes actual cleanup, then retain primary diagnostics remove owned resources and never declare ready", async () => {
+  // given
+  const harness = startupFailureHarness({ prebuilt: true, actualCleanup: true });
+  // when / then
+  await assert.rejects(harness.run(), error => error === harness.failure);
+  assert.equal(harness.failure.startupCleanup, "passed");
+  assert.equal(harness.failure.startupDiagnostics.outcome, "captured");
+  assert.equal(harness.nativeResources.length, 0);
+  assert.ok(harness.events.indexOf("capture") < harness.events.indexOf("cleanup"));
+  assert.ok(!harness.events.includes("identity"));
+  assert.ok(!harness.events.includes("remove-image"));
+  assert.ok(harness.states.every(state => !Object.hasOwn(state, "immutableRuntime")));
+  assert.ok(harness.states.every(state => !Object.hasOwn(state, "startupFailure")));
+});
 
 test("given complete prebuilt SECURITY selection, when the actual startup producer succeeds, then use no-build pull-never and retain identity without building fixtures", async () => {
   // given

@@ -732,6 +732,15 @@ for (const mode of ["delayed", "never", "timeout"]) {
       return JSON.parse(native.stdout)[0];
     } });
     h.options.wait = async milliseconds => new Promise(resolve => setTimeout(resolve, Math.min(milliseconds, 25)));
+    if (mode === "delayed") {
+      let elapsed = 0;
+      h.options.monotonicNow = () => elapsed;
+      h.options.wait = async milliseconds => {
+        const interval = Math.min(milliseconds, 25);
+        await new Promise(resolve => setTimeout(resolve, interval));
+        elapsed += interval;
+      };
+    }
     h.options.outerDeadlineMilliseconds = Date.now() + 1000;
     // when
     const effects = await observeResourceEffects(h.options);
