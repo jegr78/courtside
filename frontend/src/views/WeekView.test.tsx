@@ -1711,7 +1711,10 @@ it("given fresh allocations and the same clock, when the selected day refreshes,
   }]);
 
   // when
-  await act(async () => window.dispatchEvent(new Event("focus")));
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+    await Promise.resolve();
+  });
 
   // then
   await waitFor(() => expect(screen.getByTestId("day-free-count-2026-08-10"))
