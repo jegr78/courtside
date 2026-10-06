@@ -315,7 +315,8 @@ jobs:
             frontend/node/node tools/courtside.mjs security "$BASE_RUN_ID" "$TARGET_IMAGE"
           )
           frontend/node/node tools/courtside.mjs security-seed "$BASE_RUN_ID" "$TARGET_IMAGE" \
-            --state "$BASE_ROOT/build/security/$BASE_RUN_ID/environment.json"
+            --state "$BASE_ROOT/build/security/$BASE_RUN_ID/environment.json" \
+            --compose-root "$BASE_ROOT"
           (
             cd "$BASE_ROOT"
             frontend/node/node tools/courtside.mjs security-run "$BASE_RUN_ID" active \

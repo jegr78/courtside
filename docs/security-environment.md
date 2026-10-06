@@ -9,6 +9,9 @@
 
 Startup builds the seeder's image from the candidate that was handed to it, so the assessment data is written through the candidate's own domain services while the candidate image carries no seeder of its own. That image is removed with the rest of the run. The fixture classes it adds come from `target/fixtures-classes`, so package the checkout before starting a run against a published candidate.
 
+The fixture overlay is owned by the application's UID and GID. Host-side staging files and
+directories can retain private permissions without blocking the non-root application loader.
+
 The candidate image carries one piece of assessment instrumentation of its own: a filter that answers every request with the host and scheme the application observed, which is how the passive suite proves the proxy canonicalises them. It is bound to `COURTSIDE_ENVIRONMENT=SECURITY`, which is an operator's variable rather than a mechanism a club cannot reach, so `security-risks.md` records what that residue costs. `NonProductionProfileTest` bounds it: a shipped source that selects a Spring profile or a condition on `courtside.environment` has to be this one, and the packaging's own exclusion list is what the test reads to decide which packages are not shipped.
 
 ## Prepare the images
@@ -26,6 +29,8 @@ are pinned. A digest written here as well would be a second copy that nothing bu
 The command creates a random shared password, a seed fingerprint, a random instance fingerprint and a private state file below `build/security/run-0001`. It prints the synthetic credential once for the operator. The password never appears in a tracked file or command argument.
 
 Startup atomically reserves the run ID in Docker before Compose can create resources. The instance fingerprint binds that reservation, private state, manifests, containers and networks; another workspace cannot reuse or clean up the same run ID.
+
+Before cleanup after a startup failure, the runner attempts to retain the exact owned seeder's bounded stdout, stderr and exit/OOM state in private `startup-diagnostics-attempt<N>` directories below the run directory. A refused or incomplete capture never replaces the startup error or prevents owned cleanup; these logs may contain private data and must not be published.
 
 Each run gets its own Compose project, networks, containers and dynamically allocated loopback TLS port. Both application networks are Docker-internal. The application and scanners attached only to these networks have no routed Internet or private-network access.
 
@@ -97,6 +102,54 @@ The safe suite writes `passive-deployment.json` and `passive-deployment.md` besi
 A missing or malformed report, foreign scanner origin, URL credential, query string, concrete identifier, unclassified route, binary textual match, unknown rule or unsupported rule evidence makes the run incomplete instead of creating a candidate that cannot be reproduced. The validator recomputes finding and rule-evidence relationships when retained evidence is read. Response data is never retained. An alert leaves the run incomplete until a record resolves it: a disposition in [`passive-alert-dispositions.json`](../security/passive-alert-dispositions.json) that names the same rule, method, route template, risk, confidence, scanner version and rule-specific observation, or, through such a record, an acceptance in [`exceptions.json`](../security/exceptions.json) that has not expired. A louder risk or a different observation on the same route is a new alert and stays a candidate.
 
 The active suite writes `authorization-matrix.json`, `authenticated-zap.json` and `openapi-fuzz.json`. It creates all role sessions outside the scanners and passes credentials only through stdin to mode-`0600` files in container tmpfs. The gateway applies a suite-specific method allowlist and stops forwarding when its request or generated-body budget is exhausted. Schemathesis writable files live on three tmpfs mounts whose combined capacity stays below the generated-data contract. The ZAP policy disables every passive rule except the isolated canary and every active rule except the two IDs in [`security/zap-authenticated-policy.json`](../security/zap-authenticated-policy.json). The Schemathesis policy in [`security/openapi-fuzz-policy.json`](../security/openapi-fuzz-policy.json) fixes its image, seed, phases, examples, workers, required input classes and explicit operation exclusions. The runtime route inventory comes from the assessment-only Actuator mappings endpoint and never enters scanner traffic. Run the safe profile separately for the full passive baseline.
+
+The destructive suite writes version-2 `resource-abuse.json`. Its complete primary-key snapshots
+protect all existing rows and columns, including authentication, audit and import data. A changed
+whole-database fingerprint is not by itself a corruption finding: a real booking legitimately adds
+allocations, participants, an audit event and mail bookkeeping. Only effects correlated with the
+private request journal and the actual application response may qualify. Unknown schema, missing
+attribution or unsupported authentication data remains incomplete; a proven protected mutation
+fails even when a circuit breaker stopped the workload early. Previous version-1 attempts remain
+historical evidence and are not relabelled as version-2 qualification.
+
+An internal, resource-limited mail sink accepts STARTTLS deliveries only to `@example.org`. Each
+instance receives a private relay certificate and Java truststore, without a heap override or a
+trust-all setting. No relay port is published. Message-ID, calendar booking UID, recipient and
+slot times correlate each confirmation with its booking; the sink's receipt timestamp supplies the
+handover observation instead of the sender-controlled Date header. Malformed MIME, duplicate or
+missing receipts and exhausted mailbox capacity cannot establish a passing effect.
+The sink's actual image ID, run identity and backend endpoint must match the recorded instance;
+a matching image reference string alone does not establish a trusted receipt producer.
+
+Authentication projections decode the actual stored JDBC session bytes in a bounded, offline
+fixture container derived from the candidate. Native roles, the password factor and its timestamp,
+erased credentials and observed request times constrain the allowed session changes. A missing
+decoder or unsupported serialized attribute cannot qualify. The gateway's own bounded receipt
+attributes its oversized-body rejection separately from application login-rate bookkeeping.
+
+Before pressure, the native booking listener, effective DELETE completion policy and Spring Modulith
+2.1.1 JDBC V2 repository bind asynchronous publication settlement. The candidate and decoder must
+carry identical JDBC library bytes; legacy or overridden repository configuration is unsupported.
+A causally matched PUBLISHED or PROCESSING publication with its original timestamp and one attempt
+remains incomplete until later actual snapshots prove its deletion and mail handover. Wrong,
+duplicate, foreign or protected publication changes fail immediately.
+
+Cleanup follows effect validation and selects only newly created, validated booking IDs, never
+notes. It checks target rows and cascades inside a locked transaction and verifies a separate
+post-cleanup snapshot. Recovery restarts the same application container without reseeding and polls
+its native health with bounded commands inside the existing run deadline. Only a running, healthy
+container with unchanged identity permits the recovery snapshot; identity drift, OOM and terminal
+states fail, while absent state or deadline exhaustion remains incomplete. Effects, cleanup and
+recovery have separate outcomes and fingerprints. Missing race
+coverage, zero requests or an early clean interruption remains incomplete rather than a pass.
+
+Raw snapshots, session projections, relay keys and the operation journal contain private data.
+Keep them in mode-`0700` instance directories with mode-`0600` files under ignored `build/security`;
+never upload them with normalized assessment reports. Retained relay assets belong to their
+original instance and are not reused by a fresh instance with the same run ID. Native inputs persist
+before pressure under the same bounded evidence budget as later observations, including on early
+failure. Use the exact
+`security-reset` confirmation above to remove retained private evidence after its review.
 
 To replay an OpenAPI candidate, keep its protected `openapi-fuzz.json`, start a fresh environment with the recorded application image, and run the recorded active profile against the unchanged image, policy, OpenAPI digest and seed. Locate the new counterexample by operation, mode, check, case ID and request locations, then compare its structural `reason`. The reproduction digest matches only when those structural inputs match. Concrete query, path and body values are deliberately not retained; replay regenerates them from the pinned scanner and seed. The same exact status disagreement, public instance pointer and missing public properties, or media-type classification validates the structural defect. Never copy a discarded raw Schemathesis report into retained evidence.
 

@@ -295,8 +295,6 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
-// The base leg keeps its own compose on purpose, so an image needing a setting only the candidate's
-// compose grants stops it. That stop is deliberate: nothing is compared without both toolchains.
 test("given a paired comparison, when both sides run, then they assess the candidate revision's target", () => {
   // given
   const comparison = jobIn(build, "tool-update-comparison");
@@ -311,6 +309,7 @@ test("given a paired comparison, when both sides run, then they assess the candi
     "a tool that detects what a branch repairs cannot pass against the application it repairs, so "
     + "the one target both toolchains share is built from the candidate, not from the base.");
   assert.equal(comparison.match(/--qualification "\$QUALIFICATION"/g)?.length, 2);
+  assert.match(comparison, /--compose-root "\$BASE_ROOT"/);
   assert.match(comparison, /QUALIFICATION="\$GITHUB_WORKSPACE\/build\/uat-smoke/);
   assert.doesNotMatch(comparison, /cp deploy\/compose\.security\.yaml/,
     "the base run reads its own compose file. It declares the mounts that supply the assessment "

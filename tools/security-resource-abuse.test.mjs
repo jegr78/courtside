@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -7,10 +8,51 @@ import { test } from "node:test";
 import {
   evaluateResourceSignals, evaluateSafetyLimits, resourceAbuseGatewayDigest, resourceAbusePolicy,
   resourceAbusePolicyDigest, resourceAbusePolicyFileDigest, resourceAbuseScriptDigest,
+  resourceAbuseIntegrityDigest, resourceAbuseReceiptParserDigest,
   runResourceAbuseAssessment, validateResourceAbuseEvidence
 } from "./security-resource-abuse.mjs";
 
 const digest = `sha256:${"a".repeat(64)}`;
+
+test("given the integrity implementation graph, when binding evidence, then native decoding dates and orchestration contribute to its identity", () => {
+  // given
+  const paths = ["security-resource-integrity.mjs", "security-resource-cleanup.mjs",
+    "security-resource-state.mjs", "security-resource-journal.mjs", "security-mail-observation.mjs",
+    "security-mail-capture.mjs", "security-resource-dates.mjs", "security-resource-auth.mjs",
+    "security-resource-runtime.mjs", "security-environment.mjs", "security-passive-deployment.mjs",
+    "security-startup-diagnostics.mjs",
+    "fixture-artifact.mjs", "../Dockerfile.fixtures",
+    "../src/main/java/org/courtside/securityassessment/SecuritySessionAttributeProjection.java",
+    "../src/main/java/org/courtside/securityassessment/SecurityPublicationPolicyProjection.java"];
+  const hash = createHash("sha256");
+  for (const path of paths) hash.update(path).update("\0").update(readFileSync(new URL(`./${path}`, import.meta.url))).update("\0");
+  // when
+  const actual = resourceAbuseIntegrityDigest();
+  // then
+  assert.equal(actual, `sha256:${hash.digest("hex")}`);
+});
+
+test("given missing actual snapshot capture, when retaining an incomplete execution, then keep null instead of inventing a fingerprint", async () => {
+  // given
+  const execution = successfulExecution();
+  execution.stateBefore = null;
+  execution.stateAfter = null;
+  execution.integrity = { effects: "incomplete", cleanup: "incomplete", recovery: "incomplete" };
+  execution.stateAfterCleanup = null;
+  execution.stateAfterRecovery = null;
+  // when
+  const result = await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000), runAbuse: async () => execution
+  });
+  // then
+  assert.equal(result.outcome, "incomplete");
+  assert.equal(result.stateBefore, null);
+  assert.equal(result.stateAfter, null);
+  assert.throws(() => validateResourceAbuseEvidence({ ...result, outcome: "passed",
+    integrity: { effects: "passed", cleanup: "passed", recovery: "passed" },
+    stateAfterCleanup: digest, stateAfterRecovery: digest }));
+});
 const plan = {
   profile: "destructive", environment: "SECURITY", selectedTests: ["CSA-RES-001"],
   targetFingerprint: digest, budgets: { requests: 50000, concurrency: 50, generatedDataMegabytes: 500 }
@@ -36,6 +78,13 @@ function successfulExecution() {
     safetyLimitViolation: { violated: false, reason: null, sampleSequence: null },
     stateBefore: digest,
     stateAfter: digest,
+    stateAfterCleanup: digest,
+    stateAfterRecovery: digest,
+    integrity: { effects: "passed", cleanup: "passed", recovery: "passed" },
+    integrityModuleDigest: resourceAbuseIntegrityDigest(),
+    receiptParserDigest: resourceAbuseReceiptParserDigest(),
+    journalDigest: digest,
+    integrityEvidenceDigest: digest,
     competingWrites: { successful: 1, rejected: 9, partialOperations: 0,
       duplicateBookings: 1, duplicateResponses: 9, duplicateFailures: 0,
       toctouCreated: 0, toctouSkipped: 1 },
@@ -91,10 +140,78 @@ test("given a complete destructive execution, when retaining evidence, then reco
 
   // then
   assert.equal(result.outcome, "passed");
+  assert.equal(result.schemaVersion, 2);
   assert.equal(result.requestCount, 640);
   assert.equal(validateResourceAbuseEvidence(result), true);
   const retained = JSON.parse(readFileSync(join(evidenceDirectory, "resource-abuse.json"), "utf8"));
   assert.equal(retained.policyDigest, resourceAbusePolicyDigest());
+});
+
+test("given causally proven booking effects, when the complete snapshot changed, then judge protected integrity instead of whole-dump equality", async () => {
+  // given
+  const execution = successfulExecution();
+  execution.stateAfter = `sha256:${"b".repeat(64)}`;
+  execution.integrity = { effects: "passed", cleanup: "passed", recovery: "passed" };
+  // when
+  const result = await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000),
+    runAbuse: async () => execution
+  });
+  // then
+  assert.equal(result.outcome, "passed");
+});
+
+test("given missing phase proof or a protected mutation, when evaluating a bounded execution, then neither unchanged dumps nor a breaker can produce approval", async () => {
+  // given
+  const executions = [successfulExecution(), successfulExecution(), successfulExecution()];
+  delete executions[0].integrity;
+  executions[1].integrity = { effects: "incomplete", cleanup: "incomplete", recovery: "incomplete" };
+  executions[2].integrity = { effects: "failed", cleanup: "incomplete", recovery: "incomplete" };
+  // when
+  const results = [];
+  for (const execution of executions) results.push(await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000),
+    runAbuse: async () => execution
+  }));
+  // then
+  assert.deepEqual(results.map(({ outcome }) => outcome), ["incomplete", "incomplete", "failed"]);
+});
+
+test("given forged passing phase evidence, when validating its schema, then reject missing snapshots and incomplete or failed phases", async () => {
+  // given
+  const result = await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000),
+    runAbuse: async () => successfulExecution()
+  });
+  const forgeries = [
+    { ...result, stateAfterCleanup: null },
+    { ...result, stateAfterRecovery: null },
+    { ...result, integrity: { ...result.integrity, effects: "incomplete" } },
+    { ...result, integrity: { ...result.integrity, cleanup: "failed" } },
+    { ...result, integrity: { ...result.integrity, recovery: "incomplete" } }
+  ];
+  // when / then
+  for (const forged of forgeries) assert.throws(() => validateResourceAbuseEvidence(forged), /invalid/);
+});
+
+test("given unbound integrity artifacts, when evaluating apparently passing phases, then withhold approval", async () => {
+  // given
+  const executions = [successfulExecution(), successfulExecution(), successfulExecution()];
+  executions[0].integrityModuleDigest = `sha256:${"b".repeat(64)}`;
+  executions[1].receiptParserDigest = `sha256:${"b".repeat(64)}`;
+  delete executions[2].journalDigest;
+  // when
+  const results = [];
+  for (const execution of executions) results.push(await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000),
+    runAbuse: async () => execution
+  }));
+  // then
+  assert.deepEqual(results.map(({ outcome }) => outcome), ["incomplete", "incomplete", "incomplete"]);
 });
 
 test("given inconsistent competing writes, when evaluating the run, then the assessment fails", async () => {
@@ -221,6 +338,59 @@ test("given a circuit breaker stops before competing writes, when evaluating the
   assert.equal(result.outcome, "incomplete");
 });
 
+test("given an early breaker after one winning write, when no loser or duplicate replay was observed yet, then clean partial coverage is incomplete", async () => {
+  // given
+  const execution = successfulExecution();
+  execution.samples[0].appCpuPercent = 85;
+  execution.samples[1].appCpuPercent = 86;
+  execution.circuitBreaker = { tripped: true, reason: "app-cpu", sampleSequence: 2 };
+  execution.competingWrites.rejected = 0;
+  execution.competingWrites.duplicateResponses = 1;
+  execution.scenarios = execution.scenarios.map((scenario) => ({ ...scenario, outcome: "incomplete" }));
+  // when
+  const result = await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")), maxRequests: 1000,
+    attempt: 1, deadline: new Date(Date.now() + 60_000), runAbuse: async () => execution
+  });
+  // then
+  assert.equal(result.outcome, "incomplete");
+});
+
+test("given interruption before any request or resource sample, when retaining evidence, then represent the missing coverage without losing the attempt", async () => {
+  // given
+  const execution = successfulExecution();
+  execution.requestCount = 0;
+  execution.samples = [];
+  execution.competingWrites = { successful: 0, rejected: 0, partialOperations: 0,
+    duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0 };
+  execution.scenarios = execution.scenarios.map((scenario) => ({ ...scenario, outcome: "incomplete" }));
+  // when
+  const result = await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")), maxRequests: 1000,
+    attempt: 1, deadline: new Date(Date.now() + 60_000), runAbuse: async () => execution
+  });
+  // then
+  assert.equal(result.outcome, "incomplete");
+  assert.equal(result.requestCount, 0);
+  assert.deepEqual(result.samples, []);
+  assert.equal(validateResourceAbuseEvidence(result), true);
+  assert.throws(() => validateResourceAbuseEvidence({ ...result, outcome: "passed" }), /invalid/);
+});
+
+test("given passing scenario labels without observed race coverage, when evaluating the run, then never qualify an unobserved scenario", async () => {
+  // given
+  const execution = successfulExecution();
+  execution.competingWrites = { successful: 0, rejected: 0, partialOperations: 0,
+    duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0 };
+  // when
+  const result = await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")), maxRequests: 1000,
+    attempt: 1, deadline: new Date(Date.now() + 60_000), runAbuse: async () => execution
+  });
+  // then
+  assert.equal(result.outcome, "incomplete");
+});
+
 test("given a breaker and a proven integrity violation, when evaluating the run, then the assessment fails", async () => {
   // given
   const execution = successfulExecution();
@@ -325,13 +495,16 @@ test("given the destructive k6 profile, when inspecting it, then every curated a
   assert.match(script, /\/api\/booking-series`/);
   assert.match(script, /confirmedStarts/);
   assert.match(script,
-    /http\.post\(`\$\{target\}\/api\/public\/participant-members`[\s\S]*?query: "Member2"[\s\S]*?"X-XSRF-TOKEN": token/);
+    /journalPost\(`\$\{target\}\/api\/public\/participant-members`[\s\S]*?query: "Member2"[\s\S]*?"X-XSRF-TOKEN": token/);
   assert.match(script, /if \(!failedToken\)[\s\S]*captureCookies\(session, failedSessionCookies\)/);
-  assert.match(script, /http\.post\(`\$\{target\}\/api\/session`[\s\S]*captureCookies\(response, failedSessionCookies\)/);
+  assert.match(script, /journalPost\(`\$\{target\}\/api\/session`[\s\S]*captureCookies\(response, failedSessionCookies\)/);
   assert.match(script, /case 0:[\s\S]*competingOccupancy\(\)[\s\S]*case 5:[\s\S]*failedLogin\(\)/);
+  assert.match(script, /const clock = slotPlan\.clock/);
+  assert.match(script, /resourceSlotPlan\(__ENV\.COURTSIDE_SECURITY_DATE_PLAN\)/);
+  assert.doesNotMatch(script, /const clock = Date\.now\(\)/);
   assert.match(script, /attackStartsAt: Date\.now\(\) \+ policy\.warmupSeconds \* 1000/);
   assert.match(script, /scenarioFixturesReady\("series-and-rule-cost", \(\) => Boolean\(courtId\)\)/);
-  assert.match(script, /if \(__ITER === 0\) \{[\s\S]*authenticate\(\);[\s\S]*loadBookingInputs\(\);[\s\S]*\}[\s\S]*switch \(__ITER/);
+  assert.match(script, /export function resourceAbuse\(run\) \{[\s\S]*useSetupSession\(run\);[\s\S]*switch \(__ITER/);
   assert.equal(resourceAbusePolicy.stages.at(-1).target, 0);
   assert.equal(resourceAbusePolicy.stages[0].target, 12);
   assert.equal(resourceAbusePolicy.scenarios.length, 8);
@@ -354,7 +527,7 @@ test("given every request the assessment script makes, when it is read against t
     Object.keys(item).map((method) => `${method.toUpperCase()} ${path}`)));
 
   // when
-  const issued = [...script.matchAll(/http\.(get|post|put|del|patch)\(`\$\{target\}(\/api\/[^`]*)`/g)]
+  const issued = [...script.matchAll(/journal(Get|Post)\(`\$\{target\}(\/api\/[^`]*)`/g)]
     .map(([, verb, url]) => ({
       method: verb === "del" ? "DELETE" : verb.toUpperCase(),
       path: url.split("?")[0].replaceAll(/\$\{[^}]*\}/g, "{id}")

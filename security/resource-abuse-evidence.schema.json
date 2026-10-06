@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:courtside:security:resource-abuse-evidence:v1",
+  "$id": "urn:courtside:security:resource-abuse-evidence:v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "testIds", "targetFingerprint", "image", "policyDigest", "policyFileDigest", "scriptDigest", "gatewayDigest", "attempt", "scenarios", "samples", "circuitBreaker", "safetyLimitViolation", "stateBefore", "stateAfter", "competingWrites", "recovery", "requestCount", "generatedDataMegabytes", "runtimeHardened", "outcome"],
+  "required": ["schemaVersion", "testIds", "targetFingerprint", "image", "policyDigest", "policyFileDigest", "scriptDigest", "gatewayDigest", "integrityModuleDigest", "receiptParserDigest", "journalDigest", "integrityEvidenceDigest", "attempt", "scenarios", "samples", "circuitBreaker", "safetyLimitViolation", "stateBefore", "stateAfter", "stateAfterCleanup", "stateAfterRecovery", "integrity", "competingWrites", "recovery", "requestCount", "generatedDataMegabytes", "runtimeHardened", "outcome"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "testIds": { "const": ["CSA-RES-001"] },
     "targetFingerprint": { "$ref": "#/$defs/digest" },
     "image": { "type": "string", "pattern": "^grafana/k6:2\\.3\\.0@sha256:[a-f0-9]{64}$" },
@@ -13,6 +13,10 @@
     "policyFileDigest": { "$ref": "#/$defs/digest" },
     "scriptDigest": { "$ref": "#/$defs/digest" },
     "gatewayDigest": { "$ref": "#/$defs/digest" },
+    "integrityModuleDigest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+    "receiptParserDigest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+    "journalDigest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+    "integrityEvidenceDigest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
     "attempt": { "type": "integer", "minimum": 1 },
     "scenarios": { "type": "array", "minItems": 8, "maxItems": 8, "items": {
       "type": "object", "additionalProperties": false, "required": ["id", "outcome"],
@@ -21,7 +25,7 @@
         "outcome": { "enum": ["passed", "failed", "incomplete"] }
       }
     } },
-    "samples": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/sample" } },
+    "samples": { "type": "array", "items": { "$ref": "#/$defs/sample" } },
     "circuitBreaker": { "type": "object", "additionalProperties": false,
       "required": ["tripped", "reason", "sampleSequence"], "properties": {
         "tripped": { "type": "boolean" },
@@ -36,8 +40,17 @@
         "sampleSequence": { "type": ["integer", "null"], "minimum": 1 }
       }
     },
-    "stateBefore": { "$ref": "#/$defs/digest" },
-    "stateAfter": { "$ref": "#/$defs/digest" },
+    "stateBefore": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+    "stateAfter": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+    "stateAfterCleanup": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+    "stateAfterRecovery": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+    "integrity": { "type": "object", "additionalProperties": false,
+      "required": ["effects", "cleanup", "recovery"], "properties": {
+        "effects": { "$ref": "#/$defs/outcome" },
+        "cleanup": { "$ref": "#/$defs/outcome" },
+        "recovery": { "$ref": "#/$defs/outcome" }
+      }
+    },
     "competingWrites": { "type": "object", "additionalProperties": false,
       "required": ["successful", "rejected", "partialOperations", "duplicateBookings", "duplicateResponses", "duplicateFailures", "toctouCreated", "toctouSkipped"], "properties": {
         "successful": { "type": "integer", "minimum": 0 },
@@ -58,11 +71,31 @@
         "domainIntegrity": { "$ref": "#/$defs/outcome" }
       }
     },
-    "requestCount": { "type": "integer", "minimum": 1 },
+    "requestCount": { "type": "integer", "minimum": 0 },
     "generatedDataMegabytes": { "type": "number", "minimum": 0 },
     "runtimeHardened": { "type": "boolean" },
     "outcome": { "$ref": "#/$defs/outcome" }
   },
+  "allOf": [{
+    "if": { "properties": { "outcome": { "const": "passed" } } },
+    "then": { "properties": {
+      "samples": { "type": "array", "minItems": 1 },
+      "requestCount": { "type": "integer", "minimum": 1 },
+      "stateBefore": { "$ref": "#/$defs/digest" },
+      "stateAfter": { "$ref": "#/$defs/digest" },
+      "stateAfterCleanup": { "$ref": "#/$defs/digest" },
+      "stateAfterRecovery": { "$ref": "#/$defs/digest" },
+      "integrity": { "type": "object", "properties": {
+        "effects": { "const": "passed" },
+        "cleanup": { "const": "passed" },
+        "recovery": { "const": "passed" }
+      } },
+      "integrityModuleDigest": { "$ref": "#/$defs/digest" },
+      "receiptParserDigest": { "$ref": "#/$defs/digest" },
+      "journalDigest": { "$ref": "#/$defs/digest" },
+      "integrityEvidenceDigest": { "$ref": "#/$defs/digest" }
+    } }
+  }],
   "$defs": {
     "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
     "outcome": { "enum": ["passed", "failed", "incomplete"] },

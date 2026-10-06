@@ -18,7 +18,6 @@ function all(source, pattern) {
   return [...new Set([...source.matchAll(pattern)].map((match) => match[1]))].sort();
 }
 
-// What Spring's ForwardedHeaderFilter reads under forward-headers-strategy: framework.
 const FRAMEWORK_FORWARDED_HEADERS = ["Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Port",
   "X-Forwarded-Prefix", "X-Forwarded-Proto", "X-Forwarded-Ssl"];
 
@@ -38,14 +37,12 @@ const java = sources.join("\n");
 const schema = repositoryFiles("src/main/resources/db/migration", ".sql").join("\n");
 const javaFile = (name) => repositoryFile(`src/main/java/org/courtside/${name}.java`);
 const contract = repositoryFile("deploy/container-contract.md");
-// Markdown wraps its lines, so a phrase may be split anywhere a space is.
 const prose = contract.replace(/\s+/g, " ");
 
 function escaped(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// A bare substring would let "port 80" stand for "port 8080".
 function states(text, value) {
   return new RegExp(`(?<![\\w/.-])${escaped(value)}(?![\\w/-])`).test(text);
 }
@@ -104,6 +101,23 @@ function flattenedVariables(yaml) {
 }
 
 const bound = flattenedVariables(properties);
+
+test("given privately extracted application layers, when building the production image, then grant only app readability before fixture checks and the non-root user", () => {
+  // given
+  const lines = dockerfile.split("\n");
+  const copies = lines.map((line, index) => ({ line, index })).filter(({ line }) => /^COPY\s/.test(line));
+  const grants = lines.map((line, index) => ({ line, index })).filter(({ line }) => /\bchmod\b/.test(line));
+  const fixtureCheck = lines.findIndex((line) => /recorded=0;/.test(line));
+  const runtimeUser = lines.findIndex((line) => line === "USER 10001:10001");
+  // when / then
+  assert.equal(grants.length, 1, "the production image needs one scoped readability grant");
+  assert.match(grants[0].line, /^(?:RUN |\s+)chmod -R a\+rX \/app(?:; \\)?\s*$/);
+  assert.ok(copies.length > 0);
+  assert.ok(copies.every(({ index }) => index < grants[0].index));
+  assert.ok(grants[0].index < fixtureCheck && fixtureCheck < runtimeUser);
+  assert.ok(copies.every(({ line }) => !/--chown\b/.test(line)), "application copies retain default root ownership");
+  assert.doesNotMatch(dockerfile, /\bchown\b[^\n]*\/app\b/);
+});
 
 test("given the image, when the contract describes its process, then it states the user, port, memory and logs",
   () => {

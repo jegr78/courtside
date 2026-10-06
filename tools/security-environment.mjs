@@ -1,12 +1,24 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { passiveScannerOrigin, runOwnedProcess } from "./security-passive-deployment.mjs";
-import { evaluateResourceSignals, evaluateSafetyLimits } from "./security-resource-abuse.mjs";
+import { evaluateResourceSignals, evaluateSafetyLimits, resourceAbuseIntegrityDigest } from "./security-resource-abuse.mjs";
 import { fixtureImagePlan, stageFixtureClasses } from "./fixture-artifact.mjs";
+import { createSecurityMailCertificate, securityMailTrustPlan } from "./security-mail-capture.mjs";
+import { resourceStateCatalogSql, resourceStateSnapshotSql, parseResourceState } from "./security-resource-state.mjs";
+import { captureResourceState } from "./security-resource-state.mjs";
+import { parseResourceJournal } from "./security-resource-journal.mjs";
+import { resourceDatePlan } from "./security-resource-dates.mjs";
+import { captureSecurityMailBaseline } from "./security-mail-observation.mjs";
+import { resourceIntegritySnapshotFingerprint } from "./security-resource-integrity.mjs";
+import { observeResourceEffects, cleanupAndRecoverResourceRuntime, createResourceEvidence,
+  writeNativeEvidence, retainResourceEvidenceFailure } from "./security-resource-runtime.mjs";
+import { captureResourceAuthentication, resourceSessionProjectionClassPaths } from "./security-resource-auth.mjs";
+import { captureSecurityStartupDiagnostics } from "./security-startup-diagnostics.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
@@ -32,6 +44,150 @@ export function securityProject(runId) {
   return `courtside-security-${runId}`;
 }
 
+export function resourceAuthenticationPolicy(runtime, application, classpathText) {
+  const securityLibraries = typeof classpathText === "string" && Buffer.byteLength(classpathText) <= 1048576
+    ? [...classpathText.matchAll(/^- "BOOT-INF\/lib\/spring-security-core-([^"\r\n]+)\.jar"$/gm)] : [];
+  if (securityLibraries.length !== 1 || !/^7\.\d+\.\d+$/.test(securityLibraries[0][1])) {
+    throw new Error("The candidate password-factor implementation is unverified");
+  }
+  const environment = new Map();
+  for (const entry of runtime?.Config?.Env ?? []) {
+    if (typeof entry !== "string" || !entry.includes("=")) throw new Error("Authentication environment is incomplete");
+    const index = entry.indexOf("=");
+    const name = entry.slice(0, index);
+    if (environment.has(name)) throw new Error("Authentication environment is ambiguous");
+    environment.set(name, entry.slice(index + 1));
+  }
+  if ([...environment.keys()].some(name => name === "SPRING_APPLICATION_JSON" || name.startsWith("SPRING_CONFIG_")
+      || name.startsWith("SPRING_SESSION_") || name.startsWith("SPRING_SECURITY_"))
+      || /-D(?:spring|courtside)\./.test(environment.get("JAVA_TOOL_OPTIONS") ?? "")) {
+    throw new Error("Authentication configuration overrides are unsupported");
+  }
+  const value = raw => {
+    if (typeof raw === "number") return String(raw);
+    if (typeof raw !== "string") throw new Error("Candidate authentication configuration is incomplete");
+    const expression = /^\$\{([A-Z_]+):([^{}]+)\}$/.exec(raw);
+    if (expression) return environment.get(expression[1]) ?? expression[2];
+    if (raw.includes("${")) throw new Error("Candidate authentication configuration is unsupported");
+    return raw;
+  };
+  const integer = raw => {
+    const text = value(raw);
+    if (!/^[1-9]\d*$/.test(text) || !Number.isSafeInteger(Number(text))) throw new Error("Invalid authentication integer");
+    return Number(text);
+  };
+  const duration = raw => {
+    const match = /^([1-9]\d*)(ms|s|m|h|d)$/.exec(value(raw));
+    if (!match) throw new Error("Invalid authentication duration");
+    const milliseconds = Number(match[1]) * { ms: 1, s: 1000, m: 60000, h: 3600000, d: 86400000 }[match[2]];
+    if (!Number.isSafeInteger(milliseconds)) throw new Error("Invalid authentication duration");
+    return milliseconds;
+  };
+  const session = application?.courtside?.session;
+  const login = application?.courtside?.["login-protection"];
+  const inactivity = duration(application?.spring?.session?.timeout);
+  if (inactivity % 1000 || value(application?.server?.servlet?.session?.cookie?.secure) !== "true") {
+    throw new Error("The assessed authentication cookie policy is unsupported");
+  }
+  return {
+    sessionPolicy: { inactivitySeconds: inactivity / 1000,
+      absoluteLifetimeMilliseconds: duration(session?.["absolute-lifetime"]),
+      concurrentLimit: integer(session?.["concurrent-limit"]), cookieName: "__Host-SESSION", browserFamily: "OTHER",
+      passwordFactorRequired: true },
+    loginPolicy: { proofMode: "http-bounded-v1",
+      address: { maxFailures: integer(login?.address?.["max-failures"]),
+        windowMilliseconds: duration(login?.address?.window), blockMilliseconds: duration(login?.address?.block) },
+      global: { threshold: integer(login?.global?.threshold), windowMilliseconds: duration(login?.global?.window) } }
+  };
+}
+
+export function resourcePublicationPolicy(runtime, application, classpathText) {
+  const reject = () => { throw new Error("Resource-abuse publication configuration unsupported"); };
+  const config = runtime?.Config;
+  if (!config || !Array.isArray(config.Env) || !Array.isArray(config.Entrypoint)
+      || ![null, undefined].includes(config.Cmd) && (!Array.isArray(config.Cmd) || config.Cmd.length)) reject();
+  const entrypoint = config.Entrypoint;
+  const flags = ["--sun-misc-unsafe-memory-access=deny", "-XX:MaxRAMPercentage=50.0", "-XX:MaxRAMPercentage=75.0", "-XX:+ExitOnOutOfMemoryError"];
+  if (!["java", "/opt/java/openjdk/bin/java"].includes(entrypoint[0])
+      || entrypoint.at(-1) !== "org.springframework.boot.loader.launch.JarLauncher"
+      || !entrypoint.slice(1, -1).every(flag => flags.includes(flag))
+      || new Set(entrypoint.slice(1, -1)).size !== entrypoint.length - 2
+      || entrypoint.filter(flag => flag.startsWith("-XX:MaxRAMPercentage=")).length > 1) reject();
+  const names = new Set();
+  const trustOptions = "-Djavax.net.ssl.trustStore=/trust/mail.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=PKCS12";
+  for (const entry of config.Env) {
+    if (typeof entry !== "string" || !entry.includes("=")) reject();
+    const [rawName] = entry.split("=");
+    const name = rawName.toUpperCase().replace(/[.-]/g, "_");
+    const value = entry.slice(rawName.length + 1);
+    if (names.has(name)) reject();
+    names.add(name);
+    if (name.startsWith("SPRING_") && !["SPRING_DATASOURCE_URL", "SPRING_DATASOURCE_USERNAME", "SPRING_DATASOURCE_PASSWORD"].includes(name)) reject();
+    if (["JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS"].includes(name)
+        && value !== "" && !(name === "JAVA_TOOL_OPTIONS" && value === trustOptions)) reject();
+  }
+  const events = application?.spring?.modulith?.events;
+  if (!events || typeof events["completion-mode"] !== "string" || events["completion-mode"].toUpperCase() !== "DELETE"
+      || Object.keys(application).some(key => /^spring[._-]/i.test(key))
+      || [application.spring, application.spring.modulith, events].some(value =>
+        !value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => key.includes(".")))
+      || ["config", "profiles", "main"].some(key => Object.hasOwn(application.spring, key))) reject();
+  const jdbc = events.jdbc;
+  if (jdbc !== undefined && (!jdbc || typeof jdbc !== "object" || Array.isArray(jdbc)
+      || Object.keys(jdbc).some(key => !["use-legacy-structure", "schema-initialization"].includes(key))
+      || Object.hasOwn(jdbc, "use-legacy-structure") && jdbc["use-legacy-structure"] !== false)) reject();
+  if (jdbc?.["schema-initialization"] !== undefined) {
+    const initialization = jdbc["schema-initialization"];
+    if (!initialization || typeof initialization !== "object" || Array.isArray(initialization)
+        || Object.keys(initialization).length !== 1 || initialization.enabled !== false) reject();
+  }
+  const libraries = typeof classpathText === "string" && Buffer.byteLength(classpathText) <= 1048576
+    ? classpathText.split(/\r?\n/).filter(line => line.includes("spring-modulith-events-jdbc")) : [];
+  if (libraries.length !== 1 || libraries[0] !== '- "BOOT-INF/lib/spring-modulith-events-jdbc-2.1.1.jar"') reject();
+  return { completionMode: "DELETE", repositoryMode: "JDBC_V2",
+    repositoryJarPath: "/app/BOOT-INF/lib/spring-modulith-events-jdbc-2.1.1.jar" };
+}
+
+export function resourcePublicationProjection(projectionOutput, policy) {
+  if (typeof projectionOutput !== "string" || Buffer.byteLength(projectionOutput) > 4096) {
+    throw new Error("Resource-abuse publication projection incomplete");
+  }
+  let projection;
+  try { projection = JSON.parse(projectionOutput); }
+  catch { throw new Error("Resource-abuse publication projection unsupported"); }
+  if (!projection || Object.keys(projection).sort().join(",") !== "eventType,listenerId,repositoryClassDigest,repositoryMode"
+      || projectionOutput.trim() !== JSON.stringify(projection)
+      || projection.repositoryMode !== policy.repositoryMode
+      || !/^sha256:[a-f0-9]{64}$/.test(projection.repositoryClassDigest ?? "")
+      || projection.eventType !== "org.courtside.shared.BookingConfirmed"
+      || typeof projection.listenerId !== "string" || !projection.listenerId.trim()
+      || projection.listenerId.length > 512 || /[^\x20-\x7e]/.test(projection.listenerId)) {
+    throw new Error("Resource-abuse publication projection unsupported");
+  }
+  return projection;
+}
+
+export function resourceSessionDecoderPlan(environment, attempt, image) {
+  const runId = environment.COURTSIDE_SECURITY_RUN_ID;
+  const project = securityProject(runId);
+  if (!Number.isSafeInteger(attempt) || attempt < 1 || !/^sha256:[a-f0-9]{64}$/.test(image)) {
+    throw new Error("The session decoder requires an immutable owned fixture image");
+  }
+  for (const name of ["COURTSIDE_SECURITY_SEED_FINGERPRINT", "COURTSIDE_SECURITY_INSTANCE_FINGERPRINT"]) {
+    if (!/^sha256:[a-f0-9]{64}$/.test(environment[name] ?? "")) throw new Error("The session decoder identity is incomplete");
+  }
+  const name = `courtside-security-decoder-${runId}-${attempt}`;
+  return { name, args: ["run", "-d", "--pull", "never", "--name", name,
+    "--network", "none", "--read-only", "--user", "10001:10001", "--cap-drop", "ALL",
+    "--security-opt", "no-new-privileges:true", "--memory", "256m", "--memory-swap", "256m",
+    "--cpus", "0.25", "--pids-limit", "32", "--tmpfs", "/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777",
+    "--label", `com.docker.compose.project=${project}`, "--label", "org.courtside.environment=SECURITY",
+    "--label", `org.courtside.security.run-id=${runId}`,
+    "--label", `org.courtside.security.seed-fingerprint=${environment.COURTSIDE_SECURITY_SEED_FINGERPRINT}`,
+    "--label", `org.courtside.security.instance-fingerprint=${environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT}`,
+    "--entrypoint", "sh", image, "-c", "exec sleep 3600"] };
+}
+
 export function securityComposeArgs(runId) {
   return ["compose", "-p", securityProject(runId), "-f", composeFile];
 }
@@ -46,27 +202,49 @@ export function securitySeedImageTag(runId) {
   return `courtside:security-seed-${runId}`;
 }
 
-// Compose reads only the names its own file interpolates, and any other key of the recorded file
-// would reach the docker child as PATH or DOCKER_HOST and decide which executable runs.
-function interpolatedSecurityNames() {
-  return new Set([...readFileSync(composeFile, "utf8").matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)/g)]
+function interpolatedSecurityNames(file = composeFile) {
+  return new Set([...readFileSync(file, "utf8").matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)/g)]
     .map(([, name]) => name));
 }
 
-export function securitySeedPlan(runId, image, recorded) {
+function seedComposeFile(composeRoot) {
+  if (composeRoot === undefined) return composeFile;
+  if (!isAbsolute(composeRoot)) throw new Error("The compose checkout root must be absolute");
+  if (resolve(composeRoot) !== composeRoot || realpathSync(composeRoot) !== composeRoot
+      || !lstatSync(composeRoot).isDirectory()) {
+    throw new Error("The compose checkout root must be canonical");
+  }
+  const file = join(composeRoot, "deploy", "compose.security.yaml");
+  if (realpathSync(file) !== file || !lstatSync(file).isFile()) {
+    throw new Error("The compose checkout file must be canonical and regular");
+  }
+  return file;
+}
+
+export function securitySeedPlan(runId, image, recorded, { composeRoot } = {}) {
   if (recorded.COURTSIDE_SECURITY_RUN_ID !== runId) {
     throw new Error("The recorded environment belongs to a different security run");
   }
   if (recorded.COURTSIDE_SECURITY_IMAGE !== image) {
     throw new Error("The recorded environment assesses a different candidate image");
   }
-  const interpolated = interpolatedSecurityNames();
+  const file = seedComposeFile(composeRoot);
+  const interpolated = interpolatedSecurityNames(file);
+  const environment = Object.fromEntries([...Object.entries(recorded),
+    ["COURTSIDE_SECURITY_FIXTURES_IMAGE", securitySeedImageTag(runId)]]
+    .filter(([name]) => interpolated.has(name)));
+  if (composeRoot !== undefined) {
+    for (const [, name, operator] of readFileSync(file, "utf8").matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)(:\?|\?)/g)) {
+      if (!(name in environment) || typeof environment[name] !== "string"
+          || (operator === ":?" && environment[name] === "")) {
+        throw new Error("The recorded environment is missing a required compose value");
+      }
+    }
+  }
   return {
     command: "docker",
-    args: [...securityComposeArgs(runId), "run", "--rm", "--no-deps", "-T", "seeder"],
-    environment: Object.fromEntries([...Object.entries(recorded),
-      ["COURTSIDE_SECURITY_FIXTURES_IMAGE", securitySeedImageTag(runId)]]
-      .filter(([name]) => interpolated.has(name)))
+    args: ["compose", "-p", securityProject(runId), "-f", file, "run", "--rm", "--no-deps", "-T", "seeder"],
+    environment
   };
 }
 
@@ -80,6 +258,8 @@ export function securityEnvironment(runId, image, password = randomBytes(24).toS
   const instanceFingerprint = `sha256:${randomBytes(32).toString("hex")}`;
   return {
     COURTSIDE_SECURITY_RUN_ID: runId,
+    COURTSIDE_SECURITY_MAIL_DIRECTORY: join(stateRoot, runId, `mail-${instanceFingerprint.slice(7)}`),
+    COURTSIDE_SECURITY_MAIL_USER: `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`,
     COURTSIDE_SECURITY_IMAGE: image,
     COURTSIDE_SECURITY_FIXTURES_IMAGE: securityFixturesImageTag(runId),
     COURTSIDE_SECURITY_HTTPS_PORT: String(httpsPort),
@@ -226,18 +406,42 @@ export async function startSecurityEnvironment(runId, image) {
     reserveSecurityEnvironment(environment);
     writeState(runId, environment);
     try {
+      if (attempt === 1) {
+        const certificate = createSecurityMailCertificate(environment.COURTSIDE_SECURITY_MAIL_DIRECTORY);
+        const trust = securityMailTrustPlan(environment.COURTSIDE_SECURITY_MAIL_DIRECTORY, image,
+          environment.COURTSIDE_SECURITY_MAIL_USER, { runId,
+            seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+            instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT });
+        execute(trust.command, trust.args, { ...process.env, ...environment });
+        chmodSync(join(environment.COURTSIDE_SECURITY_MAIL_DIRECTORY, "mail.p12"), 0o444);
+        environment = { ...environment, COURTSIDE_SECURITY_MAIL_CERTIFICATE_FINGERPRINT: certificate.fingerprint };
+        writeState(runId, environment);
+      }
       buildSecurityFixturesImage(runId, image);
       execute("docker", [...securityComposeArgs(runId), "up", "-d", "--wait"],
         { ...process.env, ...environment });
       break;
     } catch (failure) {
       const output = `${failure.stderr ?? ""}`;
-      removeOwnedSecurityEnvironment(runId, {
-        runId,
+      const identity = { runId,
         seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
-        instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
-      });
-      if (attempt === 3 || !/address already in use|port is already allocated/i.test(output)) throw failure;
+        instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT };
+      let startupDiagnostics = { outcome: "incomplete", reason: "startup-capture-failed" };
+      try {
+        startupDiagnostics = captureSecurityStartupDiagnostics({ directory: join(stateRoot, runId), attempt, identity,
+          command: (args, { timeoutMilliseconds, outputLimitBytes }) => spawnSync("docker", args, {
+            cwd: root, env: { ...process.env, ...environment }, timeout: timeoutMilliseconds,
+            maxBuffer: outputLimitBytes, stdio: ["ignore", "pipe", "pipe"]
+          }) });
+      } catch {}
+      let cleanupFailed = false;
+      try { removeOwnedSecurityEnvironment(runId, identity); }
+      catch { cleanupFailed = true; }
+      try {
+        Object.defineProperty(failure, "startupDiagnostics", { value: startupDiagnostics, configurable: true });
+        Object.defineProperty(failure, "startupCleanup", { value: cleanupFailed ? "failed" : "passed", configurable: true });
+      } catch {}
+      if (cleanupFailed || attempt === 3 || !/address already in use|port is already allocated/i.test(output)) throw failure;
       environment = { ...environment, COURTSIDE_SECURITY_HTTPS_PORT: String(await availableLoopbackPort()) };
     }
   }
@@ -268,33 +472,48 @@ export function assertFixtureImageDerivation(candidate, fixtures) {
   }
 }
 
-// The seeder writes the assessment data through the candidate's own domain services, so it is built
-// from the candidate rather than named beside it; a bare image ID is not a reference a build accepts.
-function buildSecurityFixturesImage(runId, image, tag = securityFixturesImageTag(runId)) {
-  stageFixtureClasses();
-  const plan = fixtureImagePlan(tag, fixtureImageBase(inspectImage(image)));
-  execute(plan.command, plan.args);
-  assertFixtureImageDerivation(inspectImage(image), inspectImage(tag));
+function buildSecurityFixturesImage(runId, image, tag = securityFixturesImageTag(runId), {
+  stageClasses = stageFixtureClasses, inspect = inspectImage, executeBuild = execute
+} = {}) {
+  stageClasses(root);
+  const plan = fixtureImagePlan(tag, fixtureImageBase(inspect(image)));
+  executeBuild(plan.command, plan.args);
+  assertFixtureImageDerivation(inspect(image), inspect(tag));
 }
 
-export function seedSecurityEnvironment(runId, image, stateFile) {
+export function seedSecurityEnvironment(runId, image, stateFile, options = {}, {
+  resources = securityProjectResources,
+  execute: executeSeed = execute,
+  stageClasses = stageFixtureClasses,
+  inspect = inspectImage,
+  buildFixtures = (id, candidate, tag) => buildSecurityFixturesImage(id, candidate, tag,
+    { stageClasses, inspect, executeBuild: executeSeed }),
+  removeImage = removeSecurityImage
+} = {}) {
+  seedComposeFile(options.composeRoot);
+  if (options.composeRoot !== undefined) {
+    const expected = join(options.composeRoot, "build", "security", runId, "environment.json");
+    if (stateFile !== expected || realpathSync(stateFile) !== expected || !lstatSync(stateFile).isFile()) {
+      throw new Error("The recorded state must belong to the compose checkout and run");
+    }
+  }
   const recorded = JSON.parse(readFileSync(resolve(stateFile), "utf8"));
-  const plan = securitySeedPlan(runId, image, recorded);
-  const resources = securityProjectResources(runId);
-  if (resources.length === 0) {
+  const plan = securitySeedPlan(runId, image, recorded, options);
+  const ownedResources = resources(runId);
+  if (ownedResources.length === 0) {
     throw new Error("No security environment of this run is running");
   }
-  assertSecurityRecoveryOwnership(resources, {
+  assertSecurityRecoveryOwnership(ownedResources, {
     runId,
     seedFingerprint: recorded.COURTSIDE_SECURITY_SEED_FINGERPRINT,
     instanceFingerprint: recorded.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
   });
   const tag = plan.environment.COURTSIDE_SECURITY_FIXTURES_IMAGE;
   try {
-    buildSecurityFixturesImage(runId, image, tag);
-    execute(plan.command, plan.args, { ...process.env, ...plan.environment });
+    buildFixtures(runId, image, tag);
+    executeSeed(plan.command, plan.args, { ...process.env, ...plan.environment });
   } finally {
-    removeSecurityImage(tag);
+    removeImage(tag);
   }
   process.stdout.write(`Security environment ${runId} carries the synthetic assessment dataset\n`);
 }
@@ -863,14 +1082,35 @@ export async function runResourceAbuse(plan, stopFile, limits) {
   const scanner = `courtside-security-k6-${plan.runId}-${limits.attempt}`;
   const deadline = Date.now() + limits.timeoutMilliseconds;
   const command = async (args, options = {}) => runOwnedProcess("docker", args, {
-    timeoutMilliseconds: Math.max(1, deadline - Date.now()), stopFile, environment,
-    acceptedExitCodes: options.acceptedExitCodes ?? [0], outputLimitBytes: options.outputLimitBytes ?? 1024 * 1024
+    timeoutMilliseconds: Math.max(1, Math.min(deadline - Date.now(), options.timeoutMilliseconds ?? Infinity)), stopFile, environment,
+    acceptedExitCodes: options.acceptedExitCodes ?? [0], outputLimitBytes: options.outputLimitBytes ?? 1024 * 1024,
+    ...(options.input === undefined ? {} : { input: options.input })
   });
   const samples = [];
   let scannerStarted = false;
+  let decoder;
+  let privateDirectory;
+  let evidenceHandle;
+  let pressure;
+  let earlyError = false;
+  let privateWriteFailure;
+  const evidenceLimitBytes = plan.budgets.evidenceMegabytes * 1024 * 1024;
+  const privateRecord = (name, value) => {
+    const bytes = typeof value === "string" ? value : JSON.stringify(value);
+    writeNativeEvidence(evidenceHandle, { name, value, bound: Buffer.byteLength(bytes) + 1 });
+  };
   let breaker = { tripped: false, reason: null, sampleSequence: null };
   let safetyLimitViolation = { violated: false, reason: null, sampleSequence: null };
   try {
+    const parent = join(stateRoot, plan.runId, "resource-abuse");
+    mkdirSync(parent, { recursive: true, mode: 0o700 });
+    for (const path of [stateRoot, join(stateRoot, plan.runId), parent]) {
+      const directory = lstatSync(path);
+      if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error("Resource-abuse private directory invalid");
+    }
+    chmodSync(parent, 0o700);
+    privateDirectory = join(parent, `attempt-${limits.attempt}`);
+    evidenceHandle = createResourceEvidence({ directory: privateDirectory, maximumBytes: evidenceLimitBytes });
     await command(securityAssessmentReservationArgs(environment, limits.attempt));
     await command([...securityComposeArgs(plan.runId), "--profile", "assessment", "up", "-d", "--wait",
       "scanner-gateway"]);
@@ -891,14 +1131,96 @@ export async function runResourceAbuse(plan, stopFile, limits) {
     const scannerDigests = await mountedFileDigests(scanner,
       ["/scripts/resource-abuse.js", "/scripts/policy.json"], command);
     const gatewayDigests = await mountedFileDigests(gateway,
-      ["/opt/courtside/security-request-gateway.py"], command);
-    const stateBefore = await securityDomainStateFingerprint(plan.runId, stopFile, Math.max(1, deadline - Date.now()));
+      ["/opt/courtside/security-request-gateway.py", "/opt/courtside/security-mail-receipt.py"], command);
+    const app = `${securityProject(plan.runId)}-app-1`;
+    const appRuntime = JSON.parse((await command(["inspect", app, "--format", "{{json .}}"])).stdout);
+    const candidate = JSON.parse((await command(["image", "inspect", environment.COURTSIDE_SECURITY_IMAGE,
+      "--format", "{{json .}}"])).stdout);
+    if (!scannerRuntimeOwned(appRuntime, environment) || !/^sha256:[a-f0-9]{64}$/.test(candidate.Id)
+        || appRuntime.Image !== candidate.Id || appRuntime.Config?.Image !== environment.COURTSIDE_SECURITY_IMAGE
+        || !candidate.Config || !appRuntime.Config
+        || ["Entrypoint", "Cmd", "User"].some(field =>
+          JSON.stringify(appRuntime.Config[field] ?? null) !== JSON.stringify(candidate.Config[field] ?? null))) {
+      throw new Error("Resource-abuse candidate identity mismatch");
+    }
+    const fixture = JSON.parse((await command(["image", "inspect", environment.COURTSIDE_SECURITY_FIXTURES_IMAGE,
+      "--format", "{{json .}}"])).stdout);
+    assertFixtureImageDerivation(candidate, fixture);
+    const decoderPlan = resourceSessionDecoderPlan(environment, limits.attempt, fixture.Id);
+    const sourceAddress = gatewayRuntime.NetworkSettings.Networks[`${securityProject(plan.runId)}_scanner-upstream`]?.IPAddress;
+    if (typeof sourceAddress !== "string" || !/^(?:\d{1,3}\.){3}\d{1,3}$/.test(sourceAddress)
+        || sourceAddress.split(".").some(part => Number(part) > 255)) throw new Error("Resource-abuse gateway source unavailable");
+    const applicationText = (await command(["exec", app, "cat", "/app/BOOT-INF/classes/application.yaml"])).stdout;
+    const classpathText = (await command(["exec", app, "cat", "/app/BOOT-INF/classpath.idx"],
+      { outputLimitBytes: 1024 * 1024 })).stdout;
+    const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
+    const application = yaml.load(applicationText);
+    const publicationPolicy = resourcePublicationPolicy(appRuntime, application, classpathText);
+    const authenticationPolicy = resourceAuthenticationPolicy(appRuntime, application, classpathText);
+    authenticationPolicy.loginPolicy.sourceAddress = sourceAddress;
+    let runtimeBinding = null;
+    let publicationBinding = null;
+    try {
+      decoder = decoderPlan.name;
+      await command(decoderPlan.args);
+      const classDigests = await mountedFileDigests(decoder, resourceSessionProjectionClassPaths, command);
+      runtimeBinding = { sourceDigest: `sha256:${createHash("sha256").update(readFileSync(join(root,
+        "src/main/java/org/courtside/securityassessment/SecuritySessionAttributeProjection.java"))).digest("hex")}`, classDigests };
+    } catch { }
+    if (runtimeBinding) {
+      try {
+        const helperClass = "/app/BOOT-INF/classes/org/courtside/securityassessment/SecurityPublicationPolicyProjection.class";
+        const listenerClass = "/app/BOOT-INF/classes/org/courtside/notification/internal/BookingMailer.class";
+        const eventClass = "/app/BOOT-INF/classes/org/courtside/shared/BookingConfirmed.class";
+        const candidateClasses = await mountedFileDigests(app, [listenerClass, eventClass, publicationPolicy.repositoryJarPath], command);
+        const decoderClasses = await mountedFileDigests(decoder, [helperClass, listenerClass, eventClass, publicationPolicy.repositoryJarPath], command);
+        if ([listenerClass, eventClass, publicationPolicy.repositoryJarPath].some(path => candidateClasses[path] !== decoderClasses[path])) {
+          throw new Error("Resource-abuse publication class mismatch");
+        }
+        const projectionOutput = (await command(["exec", "-w", "/app", decoder, "/opt/java/openjdk/bin/java",
+          "--sun-misc-unsafe-memory-access=deny",
+          "-Dloader.main=org.courtside.securityassessment.SecurityPublicationPolicyProjection",
+          "-cp", ".", "org.springframework.boot.loader.launch.PropertiesLauncher"],
+        { outputLimitBytes: 4096, timeoutMilliseconds: 10000 })).stdout;
+        const projection = resourcePublicationProjection(projectionOutput, publicationPolicy);
+        publicationBinding = {
+          sourceDigest: `sha256:${createHash("sha256").update(readFileSync(join(root,
+            "src/main/java/org/courtside/securityassessment/SecurityPublicationPolicyProjection.java"))).digest("hex")}`,
+          helperClassDigest: decoderClasses[helperClass],
+          candidateRepositoryJarDigest: candidateClasses[publicationPolicy.repositoryJarPath],
+          decoderRepositoryJarDigest: decoderClasses[publicationPolicy.repositoryJarPath], candidateClassDigest: candidateClasses[listenerClass],
+          decoderClassDigest: decoderClasses[listenerClass], eventClassDigest: candidateClasses[eventClass],
+          decoderEventClassDigest: decoderClasses[eventClass], projection
+        };
+      } catch { }
+    }
+    privateRecord("decoder-binding-native.json", { fixtureId: fixture.Id, candidateId: candidate.Id,
+      applicationDigest: `sha256:${createHash("sha256").update(applicationText).digest("hex")}`,
+      classpathDigest: `sha256:${createHash("sha256").update(classpathText).digest("hex")}`, runtimeBinding, publicationBinding });
+    if (!runtimeBinding || !publicationBinding) throw new Error("Resource-abuse publication native binding incomplete");
+    const before = await captureResourceState(command, securityComposeArgs(plan.runId));
+    privateRecord("before-native.json", before);
+    const stateBefore = resourceIntegritySnapshotFingerprint(before);
+    const mailBaseline = await captureSecurityMailBaseline({ runId: plan.runId, command, identity: {
+      seedFingerprint: environment.COURTSIDE_SECURITY_SEED_FINGERPRINT,
+      instanceFingerprint: environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT
+    } });
+    privateRecord("mail-baseline-native.json", mailBaseline);
+    const startedAt = new Date().toISOString();
+    const datePlan = resourceDatePlan(before, Date.now());
     let result;
     let failure;
-    command(["exec", "-e", `COURTSIDE_SECURITY_SHARED_PASSWORD=${environment.COURTSIDE_SECURITY_SHARED_PASSWORD}`,
-      "-e", `COURTSIDE_SECURITY_RUN_ID=${plan.runId}`, scanner, "k6", "run", "/scripts/resource-abuse.js"],
+    pressure = command(["exec", "-e", `COURTSIDE_SECURITY_SHARED_PASSWORD=${environment.COURTSIDE_SECURITY_SHARED_PASSWORD}`,
+      "-e", `COURTSIDE_SECURITY_RUN_ID=${plan.runId}`,
+      "-e", `COURTSIDE_SECURITY_DATE_PLAN=${JSON.stringify(datePlan)}`, scanner, "k6", "run", "/scripts/resource-abuse.js"],
     { acceptedExitCodes: [0, 99], outputLimitBytes: 4 * 1024 * 1024 })
-      .then((value) => { result = value; }, (error) => { failure = error; });
+      .then((value) => {
+        result = value;
+        privateRecord("journal-native.log", `${value.stdout ?? ""}\n${value.stderr ?? ""}`);
+      }, (error) => {
+        failure = error;
+        privateRecord("journal-native.log", String(error?.message ?? ""));
+      }).catch(() => { privateWriteFailure = true; failure ??= new Error("Resource-abuse private evidence incomplete"); });
     while (!result && !failure && !breaker.tripped && !safetyLimitViolation.violated) {
       await new Promise((resolveWait) => setTimeout(resolveWait,
         limits.policy.circuitBreakers.sampleIntervalMilliseconds));
@@ -915,15 +1237,70 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       if (!result && !failure) await command(["kill", scanner]);
     } else {
       while (!result && !failure) await new Promise((resolveWait) => setTimeout(resolveWait, 50));
-      if (failure) throw failure;
     }
-    const summary = await containerFileExists(scanner, "/results/summary.json", command)
-      ? JSON.parse((await command(["exec", scanner, "cat", "/results/summary.json"])).stdout) : null;
-    const occupancy = await bookingRaceResult(plan.runId, summary, command);
-    await cleanupResourceAbuseBookings(plan.runId, command);
-    const stateAfter = await securityDomainStateFingerprint(plan.runId, stopFile, Math.max(1, deadline - Date.now()));
-    const recovery = await recoverAfterResourceAbuse(plan.runId, stateBefore, stateAfter, command);
-    const metrics = await scannerGatewayMetrics(gateway, command);
+    await pressure;
+    if (privateWriteFailure) throw new Error("Resource-abuse private evidence incomplete");
+    const rawJournal = result ? `${result.stdout ?? ""}\n${result.stderr ?? ""}` : String(failure?.message ?? "");
+    const journal = parseResourceJournal(rawJournal, { accounts: before.tables.user_account.rows });
+    if (failure) journal.complete = false;
+    let metrics = { requests: 0, requestBytes: 0 };
+    let telemetryComplete = false;
+    try { metrics = await scannerGatewayMetrics(gateway, command); telemetryComplete = true; }
+    catch { }
+    journal.gatewayBodyRejections = Array.isArray(metrics.bodyLimitReceipts) ? metrics.bodyLimitReceipts : [];
+    journal.gatewayBodyRejectionsComplete = metrics.bodyLimitReceiptsComplete === true;
+    if (journal.operations.some(operation => operation.kind === "gatewayRejectedBody")
+        && !journal.gatewayBodyRejectionsComplete) journal.complete = false;
+    const endedAt = new Date().toISOString();
+    const manager = before.tables.user_account.rows.filter(row => row.username === "security.manager.1");
+    const contract = { schemaVersion: 1, managerAccountId: manager.length === 1 ? manager[0].id : null,
+      interval: { startedAt, endedAt }, mailEnabled: true, publicationListeners: [],
+      publicationLifecycle: publicationBinding ? {
+        completionMode: publicationPolicy.completionMode, repositoryMode: publicationBinding.projection.repositoryMode,
+        listenerId: publicationBinding.projection.listenerId, eventType: publicationBinding.projection.eventType
+      } : null,
+      authentication: { ownedSessionPrimaryIds: [], loginSubjects: [], ...authenticationPolicy } };
+    const effects = await observeResourceEffects({ runId: plan.runId, attempt: limits.attempt, command, outerDeadlineMilliseconds: deadline,
+      composeArgs: securityComposeArgs(plan.runId), before, contract, journal, mailBaseline,
+      evidenceHandle, evidenceDirectory: privateDirectory, evidenceLimitBytes,
+      projectAuthentication: ({ snapshot, command: projectionCommand }) => captureResourceAuthentication({ before, effects: snapshot,
+        journal, sourceAddress, ...authenticationPolicy, runtimeBinding, decoderContainer: decoder }, projectionCommand) });
+    const phases = await cleanupAndRecoverResourceRuntime({ effects });
+    let summary = null;
+    try {
+      if (await containerFileExists(scanner, "/results/summary.json", command)) {
+        summary = JSON.parse((await command(["exec", scanner, "cat", "/results/summary.json"])).stdout);
+        if (!Array.isArray(summary?.checks)) summary = null;
+      }
+    } catch { }
+    const occupancy = { successful: 0, rejected: 0, partialOperations: 0,
+      duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0 };
+    if (effects.outcome === "passed") {
+      const validated = new Set(effects.integrity?.validatedBookingIdHashes ?? []);
+      const newBooking = operation => operation.status === 201 && typeof operation.responseBookingId === "string"
+        && validated.has(`sha256:${createHash("sha256").update(JSON.stringify(operation.responseBookingId)).digest("hex")}`);
+      const prefix = `security-${plan.runId}-`;
+      const bookings = journal.operations.filter(operation => operation.kind === "createBooking");
+      const competition = bookings.filter(operation => operation.request.idempotencyKey?.startsWith(prefix)
+        && /^\d+-\d+$/.test(operation.request.idempotencyKey.slice(prefix.length)));
+      occupancy.successful = new Set(competition.filter(newBooking).map(operation => operation.responseBookingId)).size;
+      occupancy.rejected = competition.filter(operation => [409, 422].includes(operation.status)).length;
+      occupancy.partialOperations = competition.filter(operation => ![201, 409, 422].includes(operation.status)).length;
+      const duplicates = bookings.filter(operation => operation.request.idempotencyKey === `${prefix}duplicate`);
+      occupancy.duplicateBookings = new Set(duplicates.filter(newBooking).map(operation => operation.responseBookingId)).size;
+      occupancy.duplicateResponses = duplicates.filter(newBooking).length;
+      occupancy.duplicateFailures = duplicates.filter(operation => !newBooking(operation)).length;
+      const series = journal.operations.filter(operation => operation.kind === "createSeries");
+      occupancy.toctouCreated = series.reduce((count, operation) => count + (operation.seriesResult?.bookingIds?.length ?? 0), 0);
+      occupancy.toctouSkipped = series.reduce((count, operation) => count + (operation.seriesResult?.skipped?.length ?? 0), 0);
+    }
+    const integrity = { effects: effects.outcome, cleanup: phases.cleanup?.outcome ?? "incomplete",
+      recovery: phases.recovery?.outcome ?? "incomplete" };
+    const integrityEvidenceDigest = phases.integrityEvidenceDigest ?? effects.integrityEvidenceDigest ?? null;
+    const stateAfter = effects.integrity?.afterFingerprint ?? effects.afterFingerprint ?? null;
+    const recoveryOutcome = integrity.recovery;
+    const recovery = { health: recoveryOutcome, restart: recoveryOutcome, database: recoveryOutcome,
+      domainIntegrity: recoveryOutcome };
     return {
       runtimeHardened,
       requestCount: metrics.requests,
@@ -934,7 +1311,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
         const missingCheck = requiredChecks.some((name) => !observedNames.has(`${id}:${name}`));
         const fixtureFailed = checks.some(({ name, fails }) => name.endsWith(":fixtures-ready") && fails > 0);
         const assertionFailed = checks.some(({ name, fails }) => !name.endsWith(":fixtures-ready") && fails > 0);
-        const outcome = missingCheck || fixtureFailed
+        const outcome = missingCheck || fixtureFailed || !telemetryComplete || Boolean(failure)
           || id === "login-rate-limit-boundary" && !summary.rateLimitedLogins ? "incomplete"
             : assertionFailed ? "failed" : "passed";
         return { id, outcome };
@@ -944,6 +1321,11 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       safetyLimitViolation,
       stateBefore,
       stateAfter,
+      stateAfterCleanup: phases.cleanup?.actualFingerprint ?? null,
+      stateAfterRecovery: phases.recovery?.actualFingerprint ?? null,
+      integrity, integrityEvidenceDigest, journalDigest: effects.journalDigest ?? null,
+      integrityModuleDigest: resourceAbuseIntegrityDigest(),
+      receiptParserDigest: gatewayDigests["/opt/courtside/security-mail-receipt.py"],
       competingWrites: occupancy,
       recovery,
       scannerImage: scannerRuntime.Config.Image,
@@ -951,17 +1333,33 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       mountedPolicyDigest: scannerDigests["/scripts/policy.json"],
       gatewayDigest: gatewayDigests["/opt/courtside/security-request-gateway.py"]
     };
+  } catch {
+    earlyError = true;
+    throw new Error("Resource-abuse observation incomplete");
   } finally {
     const cleanupFailures = [];
-    for (const resource of [scannerStarted ? scanner : null, gateway, reservation].filter(Boolean)) {
+    for (const resource of [decoder, scannerStarted ? scanner : null, gateway, reservation].filter(Boolean)) {
       try {
-        await runOwnedProcess("docker", ["rm", "-f", resource], {
+        const runtime = JSON.parse((await runOwnedProcess("docker", ["inspect", resource, "--format", "{{json .}}"], {
+          timeoutMilliseconds: 10_000, stopFile: "/dev/null/courtside-cleanup-stop-disabled", environment
+        })).stdout);
+        if (!scannerRuntimeOwned(runtime, environment)
+            || runtime.Config?.Labels?.["com.docker.compose.project"] !== securityProject(plan.runId)
+            || !/^[a-f0-9]{64}$/.test(runtime.Id)) {
+          cleanupFailures.push(resource);
+          continue;
+        }
+        await runOwnedProcess("docker", ["rm", "-f", runtime.Id], {
           timeoutMilliseconds: 10_000, stopFile: "/dev/null/courtside-cleanup-stop-disabled", environment
         });
-      } catch (failure) {
-        if (await containerExistsForCleanup(resource, environment)) cleanupFailures.push(`${resource}: ${failure.message}`);
+      } catch {
+        try { if (await containerExistsForCleanup(resource, environment)) cleanupFailures.push(resource); }
+        catch { cleanupFailures.push(resource); }
       }
     }
+    if (pressure) await pressure;
+    if (earlyError && evidenceHandle) retainResourceEvidenceFailure(evidenceHandle,
+      { runId: plan.runId, attempt: limits.attempt, phase: "environment" });
     if (cleanupFailures.length) throw new Error(`Resource-abuse cleanup was incomplete: ${cleanupFailures.join("; ")}`);
   }
 }
@@ -1022,43 +1420,6 @@ function parseDockerMegabytes(value) {
   if (!match) throw new Error("Docker memory telemetry is invalid");
   const factor = { KiB: 1 / 1024, MiB: 1, GiB: 1024 }[match[2]];
   return Number(match[1]) * factor;
-}
-
-async function bookingRaceResult(runId, summary, command) {
-  const value = (await command([...securityComposeArgs(runId), "exec", "-T", "db", "psql", "-At", "-F", "|",
-    "-U", "courtside", "-d", "courtside_security", "-c", `SELECT
-      (SELECT count(*) FROM booking WHERE note = 'Security occupancy ${runId}'),
-      (SELECT count(*) FROM booking WHERE idempotency_key = 'security-${runId}-duplicate'),
-      (SELECT count(*) FROM booking_series WHERE note = 'Security TOCTOU ${runId}')`])).stdout.trim();
-  const [successful, duplicateBookings, toctouCreated] = value.split("|").map(Number);
-  return { successful, rejected: summary?.rejectedOccupancy ?? 0,
-    partialOperations: summary?.partialOperations ?? 0,
-    duplicateBookings, duplicateResponses: summary?.duplicateResponses ?? 0,
-    duplicateFailures: summary?.duplicateFailures ?? 0,
-    toctouCreated, toctouSkipped: summary?.toctouSkipped ?? 0 };
-}
-
-async function cleanupResourceAbuseBookings(runId, command) {
-  await command([...securityComposeArgs(runId), "exec", "-T", "db", "psql", "-v", "ON_ERROR_STOP=1", "-U",
-    "courtside", "-d", "courtside_security", "-c",
-    `DELETE FROM booking WHERE note IN ('Security occupancy ${runId}', 'Security duplicate ${runId}',
-      'Security TOCTOU occupancy ${runId}');
-     DELETE FROM booking_series WHERE note = 'Security TOCTOU ${runId}'`]);
-}
-
-async function recoverAfterResourceAbuse(runId, stateBefore, stateAfter, command) {
-  const database = (await command([...securityComposeArgs(runId), "exec", "-T", "db", "pg_isready", "-U",
-    "courtside", "-d", "courtside_security"], { acceptedExitCodes: [0, 1] })).code === 0;
-  await command([...securityComposeArgs(runId), "run", "--rm", "--no-deps", "-T", "seeder"]);
-  await command([...securityComposeArgs(runId), "restart", "app"]);
-  await command([...securityComposeArgs(runId), "up", "-d", "--wait", "app", "proxy"]);
-  const health = verifySecurityEnvironment(runId).environment === "SECURITY";
-  return {
-    health: health ? "passed" : "failed",
-    restart: health ? "passed" : "failed",
-    database: database ? "passed" : "failed",
-    domainIntegrity: stateBefore === stateAfter ? "passed" : "failed"
-  };
 }
 
 export function authenticatedZapDiagnostic(output, sessionCookies) {

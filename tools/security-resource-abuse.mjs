@@ -6,8 +6,6 @@ import { createRequire } from "node:module";
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const evidenceSchema = JSON.parse(readFileSync(
   new URL("../security/resource-abuse-evidence.schema.json", import.meta.url), "utf8"));
-// Compiled on first use: security-environment.mjs imports this module, and that one loads on a
-// checkout where the validator has not been installed yet.
 let compiled;
 function validateSchema(evidence) {
   compiled ??= new (require("ajv/dist/2020").default)({ strict: true, allErrors: true })
@@ -37,6 +35,25 @@ export function resourceAbuseScriptDigest() {
 
 export function resourceAbuseGatewayDigest() {
   return `sha256:${createHash("sha256").update(gateway).digest("hex")}`;
+}
+
+export function resourceAbuseIntegrityDigest() {
+  const hash = createHash("sha256");
+  for (const path of ["security-resource-integrity.mjs", "security-resource-cleanup.mjs",
+    "security-resource-state.mjs", "security-resource-journal.mjs", "security-mail-observation.mjs",
+    "security-mail-capture.mjs", "security-resource-dates.mjs", "security-resource-auth.mjs",
+    "security-resource-runtime.mjs", "security-environment.mjs", "security-passive-deployment.mjs",
+    "security-startup-diagnostics.mjs",
+    "fixture-artifact.mjs", "../Dockerfile.fixtures",
+    "../src/main/java/org/courtside/securityassessment/SecuritySessionAttributeProjection.java",
+    "../src/main/java/org/courtside/securityassessment/SecurityPublicationPolicyProjection.java"]) {
+    hash.update(path).update("\0").update(readFileSync(new URL(`./${path}`, import.meta.url))).update("\0");
+  }
+  return `sha256:${hash.digest("hex")}`;
+}
+
+export function resourceAbuseReceiptParserDigest() {
+  return `sha256:${createHash("sha256").update(readFileSync(new URL("./security-mail-receipt.py", import.meta.url))).digest("hex")}`;
 }
 
 const signalProperties = [
@@ -94,35 +111,48 @@ export async function runResourceAbuseAssessment(plan, context) {
   const breakerConsistent = JSON.stringify(observedBreaker) === JSON.stringify(execution.circuitBreaker);
   const safetyConsistent = JSON.stringify(observedSafetyViolation) === JSON.stringify(execution.safetyLimitViolation);
   const recoveryOutcomes = Object.values(execution.recovery);
+  const integrity = execution.integrity ?? { effects: "incomplete", cleanup: "incomplete", recovery: "incomplete" };
+  const integrityOutcomes = [integrity.effects, integrity.cleanup, integrity.recovery];
   const competingObserved = execution.competingWrites.successful + execution.competingWrites.rejected
     + execution.competingWrites.partialOperations > 0;
   const duplicateObserved = execution.competingWrites.duplicateBookings
     + execution.competingWrites.duplicateResponses + execution.competingWrites.duplicateFailures > 0;
   const toctouObserved = execution.competingWrites.toctouCreated + execution.competingWrites.toctouSkipped > 0;
+  const competingIncomplete = execution.competingWrites.successful !== 1 || execution.competingWrites.rejected < 1;
+  const duplicateIncomplete = execution.competingWrites.duplicateBookings !== 1
+    || execution.competingWrites.duplicateResponses < 2;
+  const toctouIncomplete = execution.competingWrites.toctouCreated !== 0 || execution.competingWrites.toctouSkipped < 1;
   const artifactBound = execution.scannerImage === resourceAbusePolicy.image
     && execution.scriptDigest === resourceAbuseScriptDigest()
     && execution.mountedPolicyDigest === resourceAbusePolicyFileDigest()
-    && execution.gatewayDigest === resourceAbuseGatewayDigest();
-  const integrityFailed = competingObserved && (execution.competingWrites.successful !== 1
-      || execution.competingWrites.rejected < 1)
+    && execution.gatewayDigest === resourceAbuseGatewayDigest()
+    && execution.integrityModuleDigest === resourceAbuseIntegrityDigest()
+    && execution.receiptParserDigest === resourceAbuseReceiptParserDigest()
+    && /^sha256:[a-f0-9]{64}$/.test(execution.journalDigest ?? "")
+    && /^sha256:[a-f0-9]{64}$/.test(execution.integrityEvidenceDigest ?? "");
+  const integrityFailed = execution.competingWrites.successful > 1
+    || !observedBreaker.tripped && competingObserved && competingIncomplete
     || execution.competingWrites.partialOperations !== 0
-    || duplicateObserved && (execution.competingWrites.duplicateBookings !== 1
-      || execution.competingWrites.duplicateResponses < 2 || execution.competingWrites.duplicateFailures !== 0)
-    || toctouObserved && (execution.competingWrites.toctouCreated !== 0
-      || execution.competingWrites.toctouSkipped < 1)
+    || execution.competingWrites.duplicateBookings > 1 || execution.competingWrites.duplicateFailures !== 0
+    || !observedBreaker.tripped && duplicateObserved && duplicateIncomplete
+    || execution.competingWrites.toctouCreated > 0
+    || !observedBreaker.tripped && toctouObserved && toctouIncomplete
     || observedSafetyViolation.violated
-    || execution.stateBefore !== execution.stateAfter
+    || integrityOutcomes.includes("failed")
     || execution.scenarios.some(({ outcome }) => outcome === "failed")
     || recoveryOutcomes.includes("failed");
   const incomplete = !execution.runtimeHardened || !artifactBound || !breakerConsistent || !safetyConsistent
     || observedBreaker.tripped
+    || execution.samples.length === 0 || competingIncomplete || duplicateIncomplete || toctouIncomplete
     || execution.requestCount < 1 || execution.requestCount > context.maxRequests
     || execution.generatedDataMegabytes > plan.budgets.generatedDataMegabytes
     || execution.scenarios.some(({ outcome }) => outcome === "incomplete")
-    || recoveryOutcomes.includes("incomplete");
+    || recoveryOutcomes.includes("incomplete")
+    || integrityOutcomes.some((phase) => phase !== "passed")
+    || !execution.stateBefore || !execution.stateAfter || !execution.stateAfterCleanup || !execution.stateAfterRecovery;
   const outcome = integrityFailed ? "failed" : incomplete ? "incomplete" : "passed";
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     testIds: ["CSA-RES-001"],
     targetFingerprint: plan.targetFingerprint,
     image: resourceAbusePolicy.image,
@@ -130,13 +160,20 @@ export async function runResourceAbuseAssessment(plan, context) {
     policyFileDigest: execution.mountedPolicyDigest,
     scriptDigest: execution.scriptDigest,
     gatewayDigest: execution.gatewayDigest,
+    integrityModuleDigest: execution.integrityModuleDigest ?? null,
+    receiptParserDigest: execution.receiptParserDigest ?? null,
+    journalDigest: execution.journalDigest ?? null,
+    integrityEvidenceDigest: execution.integrityEvidenceDigest ?? null,
     attempt: context.attempt,
     scenarios: execution.scenarios,
     samples: execution.samples,
     circuitBreaker: observedBreaker,
     safetyLimitViolation: observedSafetyViolation,
-    stateBefore: execution.stateBefore,
-    stateAfter: execution.stateAfter,
+    stateBefore: execution.stateBefore ?? null,
+    stateAfter: execution.stateAfter ?? null,
+    stateAfterCleanup: execution.stateAfterCleanup ?? null,
+    stateAfterRecovery: execution.stateAfterRecovery ?? null,
+    integrity,
     competingWrites: execution.competingWrites,
     recovery: execution.recovery,
     requestCount: execution.requestCount,
