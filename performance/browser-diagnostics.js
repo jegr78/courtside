@@ -31,7 +31,12 @@ export function refusedResponse(response, target) {
 }
 
 export async function refusal(label, response) {
-  const problem = await response.json().catch(() => undefined);
+  let problem;
+  try {
+    problem = await response.json();
+  } catch {
+    problem = undefined;
+  }
   if (problem === null || typeof problem !== "object") {
     return `${label} returned status ${response.status()} without a readable problem body`;
   }

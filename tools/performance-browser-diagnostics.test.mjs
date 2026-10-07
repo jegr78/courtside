@@ -15,10 +15,9 @@ function response(status, body, method = "POST", url = `${target}/api/bookings`)
     status: () => status,
     url: () => url,
     request: () => ({ method: () => method }),
-    json: async () => {
-      if (body instanceof Error) throw body;
-      return body;
-    }
+    json: () => ({
+      then: (resolve, reject) => body instanceof Error ? reject(body) : resolve(body)
+    })
   };
 }
 
