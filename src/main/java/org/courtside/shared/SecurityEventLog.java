@@ -5,8 +5,6 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.event.Level;
 import org.slf4j.spi.LoggingEventBuilder;
 import org.springframework.stereotype.Component;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -98,10 +96,7 @@ public class SecurityEventLog {
     }
 
     private static @Nullable UUID currentAccountId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null
-                && authentication.getPrincipal() instanceof SecurityEventPrincipal principal
-                ? principal.securityEventAccountId() : null;
+        return SecurityEventPrincipal.currentAccountId().orElse(null);
     }
 
     private static void write(SecurityEvent event, @Nullable UUID accountId,

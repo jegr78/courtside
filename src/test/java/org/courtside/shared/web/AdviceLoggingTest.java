@@ -9,6 +9,7 @@ import org.courtside.shared.CodedDomainFailure;
 import org.courtside.shared.DomainFailure;
 import org.courtside.shared.ProblemType;
 import org.courtside.shared.SecurityEventLog;
+import org.courtside.shared.SecurityEventPrincipal;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,8 @@ import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import tools.jackson.core.JacksonException;
@@ -34,6 +37,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -104,7 +108,7 @@ class AdviceLoggingTest {
     }
 
     @Test
-    void givenACodedDomainFailure_whenItIsAnswered_thenItsStatusTypeAndViolationAreLoggedAtDebug() {
+    void givenACodedDomainFailure_whenItIsAnswered_thenItsStatusTypeAndViolationAreLoggedAtInfo() {
         // given
         DomainFailure failure = new ConflictFailure("card.label.taken", Map.of("field", "cardLabel"));
 
@@ -113,7 +117,9 @@ class AdviceLoggingTest {
 
         // then
         assertThat(domainAppender.list).singleElement().satisfies(event -> {
-            assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
+            assertThat(event.getLevel())
+                    .as("a refused request must reach the log at the default level")
+                    .isEqualTo(Level.INFO);
             assertThat(event.getFormattedMessage())
                     .contains("409 CONFLICT", "urn:courtside:error:test-failure-conflict",
                             "card.label.taken");
@@ -163,6 +169,50 @@ class AdviceLoggingTest {
                     .doesNotContain(rejectedLabel);
             assertThat(event.getThrowableProxy()).isNull();
         });
+    }
+
+    @Test
+    void givenASignedInAccount_whenItsRequestIsRefused_thenTheLineNamesTheAccountId() {
+        // given
+        UUID accountId = UUID.fromString("0e6c2d6a-6f1f-4f0a-9c55-3f3f5b1d2a10");
+        SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+                (SecurityEventPrincipal) () -> accountId, null, List.of()));
+        DomainFailure failure = new ConflictFailure("card.label.taken", Map.of("field", "cardLabel"));
+
+        // when
+        try {
+            new DomainFailureHandler(mock(ProblemTraceReference.class)).handleDomainFailure(failure);
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+
+        // then
+        assertThat(domainAppender.list).singleElement().satisfies(event -> assertThat(event.getKeyValuePairs())
+                .as("the refused request must be attributable to an account, never to a person")
+                .anySatisfy(pair -> {
+                    assertThat(pair.key).isEqualTo("account.id");
+                    assertThat(pair.value).isEqualTo(accountId.toString());
+                }));
+    }
+
+    @Test
+    void givenAContendedLockOrALostUpdate_whenTheyAreAnswered_thenTheUnavailableLockWarnsAndTheConflictInforms() {
+        // given
+        SharedExceptionHandler handler = new SharedExceptionHandler(mock(ProblemTraceReference.class),
+                mock(SecurityEventLog.class));
+
+        // when
+        handler.handleUnavailableDatabaseLock(new org.springframework.dao.PessimisticLockingFailureException("lock"));
+        handler.handleLostUpdate(new org.springframework.dao.OptimisticLockingFailureException("stale"));
+
+        // then
+        assertThat(sharedAppender.list).extracting(ILoggingEvent::getLevel, ILoggingEvent::getFormattedMessage)
+                .as("a 503 is an incident and a lost update is a refusal; neither may stay below INFO")
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(Level.WARN,
+                                "Answering 503 SERVICE_UNAVAILABLE for urn:courtside:error:database-lock-unavailable"),
+                        org.assertj.core.groups.Tuple.tuple(Level.INFO,
+                                "Answering 409 CONFLICT for urn:courtside:error:concurrent-modification"));
     }
 
     @Test
