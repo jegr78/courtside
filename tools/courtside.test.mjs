@@ -986,6 +986,33 @@ test("given the browser profile, when planning k6, then Chromium and the browser
   assert.ok(plan.args.some((argument) => argument.includes("p(75)")));
 });
 
+test("given a headless browser profile, when planning its launcher, then isolate browser data without changing the journey or TLS pin", () => {
+  // given
+  const options = parseArguments(["perf-run", "browser", "--confirm", "courtside-perf"]);
+  // when
+  const plan = performanceRunPlan(options, "/results", "/root.crt", "test-run", "test-pin");
+  const image = plan.args.findIndex(argument => /^grafana\/k6:.*-with-browser@sha256:/.test(argument));
+  // then
+  assert.equal(plan.args[plan.args.indexOf("--entrypoint") + 1], "/bin/sh");
+  assert.ok(plan.args.includes("K6_BROWSER_EXECUTABLE_PATH=/tmp/courtside-browser-runtime/chromium"));
+  assert.deepEqual(plan.args.slice(image + 1, image + 3), ["/scripts/browser-entrypoint.sh", "run"]);
+  assert.ok(plan.args.includes("K6_BROWSER_ARGS=no-sandbox,ignore-certificate-errors-spki-list=test-pin"));
+  assert.ok(plan.args.includes("/scripts/browser.js"));
+});
+
+test("given a protocol profile, when planning its runner, then leave its native k6 entrypoint unchanged", () => {
+  // given
+  const options = parseArguments(["perf-run", "baseline", "--confirm", "courtside-perf"]);
+  // when
+  const plan = performanceRunPlan(options, "/results", "/root.crt", "test-run");
+  const image = plan.args.findIndex(argument => /^grafana\/k6:.*@sha256:/.test(argument));
+  // then
+  assert.equal(plan.args.includes("--entrypoint"), false);
+  assert.equal(plan.args.some(argument => argument.startsWith("K6_BROWSER_EXECUTABLE_PATH=")), false);
+  assert.equal(plan.args[image + 1], "run");
+  assert.ok(plan.args.includes("/scripts/protocol.js"));
+});
+
 test("given distinct localhost and proxy certificates, when probing performance identity, then the browser target supplies the TLS pin", () => {
   // given
   const options = parseArguments(["perf-run", "browser", "--confirm", "courtside-perf"]);

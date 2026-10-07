@@ -1162,6 +1162,7 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       ...(browserRun ? [
         "-e", "HOME=/tmp",
         "-e", "K6_BROWSER_HEADLESS=true",
+        "-e", "K6_BROWSER_EXECUTABLE_PATH=/tmp/courtside-browser-runtime/chromium",
         "-e", `K6_BROWSER_ARGS=no-sandbox,ignore-certificate-errors-spki-list=${certificatePin}`
       ] : []),
       ...(options.remoteWrite ? [
@@ -1173,7 +1174,9 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       "-v", `${perfStateFile}:/run/courtside/perf.json:ro`,
       "-v", `${certificateFile}:/certs/root.crt:ro`,
       "-v", `${resultDirectory}:/results`,
+      ...(browserRun ? ["--entrypoint", "/bin/sh"] : []),
       image,
+      ...(browserRun ? ["/scripts/browser-entrypoint.sh"] : []),
       "run", "--log-output=file=/results/k6.log", ...(options.remoteWrite ? ["--out", "experimental-prometheus-rw"] : []),
       "--tag", `testid=${runId}`, "--tag", `profile=${options.profile}`,
       "--summary-trend-stats", "avg,min,med,max,p(50),p(75),p(90),p(95),p(99)",
