@@ -34,6 +34,19 @@ https://localhost:443 {
 	tls internal
 	encode zstd gzip
 
+	log {
+		output stdout
+		format filter {
+			wrap json
+			request>uri regexp \?.*$ ""
+			request>headers delete
+			request>tls delete
+			request>remote_ip ip_mask 16 32
+			request>client_ip ip_mask 16 32
+			resp_headers delete
+		}
+	}
+
 	request_body {
 		max_size 2MB
 	}
