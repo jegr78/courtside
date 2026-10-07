@@ -308,6 +308,19 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   }, [clock, data, refreshDate, report, selectedDate]);
 
   useEffect(() => {
+    const now = currentInstant.getTime();
+    let nextStart = Number.POSITIVE_INFINITY;
+    for (const slots of weekSlotGeometry.values()) {
+      for (const slot of slots) {
+        if (slot.startsAt > now && slot.startsAt < nextStart) nextStart = slot.startsAt;
+      }
+    }
+    if (!Number.isFinite(nextStart)) return;
+    const timeout = window.setTimeout(() => setCurrentInstant(clock()), nextStart - now + 1);
+    return () => window.clearTimeout(timeout);
+  }, [clock, currentInstant, weekSlotGeometry]);
+
+  useEffect(() => {
     const moved = () => { memberMoved.current = true; };
     const events = ["pointerdown", "wheel", "touchstart", "keydown"] as const;
     for (const event of events) window.addEventListener(event, moved, { capture: true, passive: true });
