@@ -52,14 +52,7 @@ async function cancelBooking(page, bookingId) {
   await cancellation.waitFor({ state: "detached" });
 }
 
-export default async function () {
-  const page = await browser.newPage();
-  const started = Date.now();
-  let bookingId;
-  let journeyPassed = false;
-  let step = "open sign-in";
-  browserErrors.add(0);
-  unexpectedServerErrors.add(0);
+function observe(page) {
   page.on("requestfailed", (request) => {
     const description = failedRequest(request, target);
     if (!description) return;
@@ -84,7 +77,20 @@ export default async function () {
       technicalErrors.add(true);
     }
   });
+}
+
+export default async function () {
+  const started = Date.now();
+  let page;
+  let bookingId;
+  let journeyPassed = false;
+  let step = "open browser page";
+  browserErrors.add(0);
+  unexpectedServerErrors.add(0);
   try {
+    page = await browser.newPage();
+    observe(page);
+    step = "open sign-in";
     await page.goto(`${target}/login`, { waitUntil: "networkidle" });
     await page.getByTestId("login-view").waitFor();
     await page.getByTestId("username").fill(username());
@@ -125,7 +131,7 @@ export default async function () {
   } catch (error) {
     browserErrors.add(1);
     technicalErrors.add(true);
-    report(journeyFailure(step, error, Date.now() - started, page.url(), target));
+    report(journeyFailure(step, error, Date.now() - started, page?.url() ?? "", target));
   } finally {
     if (bookingId) {
       try {
@@ -138,7 +144,7 @@ export default async function () {
     }
     browserJourneySuccess.add(journeyPassed);
     browserJourneyDuration.add(Date.now() - started);
-    await page.close();
+    if (page) await page.close();
   }
 }
 

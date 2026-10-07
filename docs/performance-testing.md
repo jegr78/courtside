@@ -352,7 +352,8 @@ functional E2E suite.
 A run that fails says why in `k6.log`. Every unexpected response is written once per request,
 status and problem type, with the violation codes, rejected fields and the `traceId` that finds
 the refusal in the server's trace. A failed browser journey names its step, page, VU and
-iteration; every failed request and console error of the browser is written as it happens.
+iteration; every failed request, console error and response of 400 or above in the browser is
+written as it happens.
 
 Browser reports retain p75 LCP, INP, and CLS against the contract budgets, failed browser requests
 and console errors, the complete-journey success rate, and average journey duration. Their profile
@@ -478,5 +479,6 @@ requires `/api/source` to identify a versioned UAT build. The fixed two-VU, two-
 the HTML shell and one generated asset, PWA manifest, public configuration, booking grid and CSRF
 cookie creation. It also proves that Swagger UI, OpenAPI and Actuator return `404` through the public
 ingress. Its sanitized HTML and JSON reports contain aggregate measurements, the pass and fail
-count of every check and build identity, but not the supplied hostname. Stop sharing with `Ctrl+C` in the attached `uat share` terminal; the
-performance command never changes Funnel or UAT lifecycle state.
+count of every check and build identity, but not the supplied hostname. Stop sharing with `Ctrl+C`
+in the attached `uat share` terminal; the performance command never changes Funnel or UAT lifecycle
+state.

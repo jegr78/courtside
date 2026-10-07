@@ -44,5 +44,6 @@ export async function refusal(label, response) {
 }
 
 export function journeyFailure(step, error, elapsedMilliseconds, pageUrl, target) {
-  return `Browser journey failed at ${step} after ${elapsedMilliseconds} ms on ${pathOf(pageUrl, target) || "/"} : ${bounded(String(error))}`;
+  const page = pageUrl ? pathOf(pageUrl, target) || "/" : "no page";
+  return `Browser journey failed at ${step} after ${elapsedMilliseconds} ms on ${page} : ${bounded(String(error))}`;
 }
