@@ -253,14 +253,15 @@ function browserLauncherFixture(context) {
   const source = readFileSync(fileURLToPath(new URL("../performance/chromium-headless.sh", import.meta.url)), "utf8");
   writeFileSync(native, '#!/bin/sh\nprintf "%s\\n" "$XDG_DATA_HOME" "$HOME" "$@"\n', { mode: 0o700 });
   writeFileSync(launcher, source.replace("exec /usr/bin/chromium", `exec "${native}"`)
-    .replaceAll("/tmp/.pki/nssdb", legacy), { mode: 0o700 });
+    .replaceAll("/tmp/.pki/nssdb", legacy)
+    .replaceAll("/tmp/k6browser-data-", root + "/k6browser-data-"), { mode: 0o700 });
   context.after(() => {
     for (const profile of profiles) rmSync(profile, { recursive: true, force: true });
     rmSync(root, { recursive: true, force: true });
   });
   const profilePath = () => {
     for (let attempt = 0; attempt < 10; attempt++) {
-      const profile = `/tmp/k6browser-data-${randomInt(0, 2 ** 32)}`;
+      const profile = join(root, `k6browser-data-${randomInt(0, 2 ** 32)}`);
       try {
         mkdirSync(profile, { mode: 0o700 });
         profiles.push(profile);
