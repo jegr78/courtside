@@ -39,7 +39,7 @@ $env:JAVA_HOME = "C:\path\to\temurin-25"
 | `node tools/courtside.mjs uat --db-port` | Starts UAT and exposes PostgreSQL on loopback port 5433. |
 | `node tools/courtside.mjs uat share` | Starts UAT when needed and shares it temporarily through Tailscale Funnel. |
 | `node tools/courtside.mjs uat-stop` | Stops UAT without deleting its database or local CA. |
-| `node tools/courtside.mjs uat-logs` | Follows all UAT container logs, including the proxy's access log without query strings, headers or full client addresses. |
+| `node tools/courtside.mjs uat-logs` | Follows all UAT container logs, including the proxy's access and error entries without query strings, headers or full client addresses. |
 | `node tools/courtside.mjs uat-db-shell` | Opens `psql` inside the private UAT database container. |
 | `node tools/courtside.mjs uat-cert [file]` | Exports the UAT root certificate and prints trust instructions. |
 | `node tools/courtside.mjs uat-backup [file]` | Creates a portable compressed PostgreSQL dump. |

@@ -31,6 +31,22 @@ test("given the performance and UAT proxies, when a request is served, then it i
   }
 });
 
+test("given a request the upstream fails, when the proxy logs the error, then the error entry is filtered as well", () => {
+  for (const { name, source } of proxies) {
+    // given
+    const globalOptions = source.slice(0, source.indexOf("\n}\n"));
+
+    // when
+    const log = globalOptions.match(/\n\tlog default \{\n([\s\S]*?)\n\t\}/)?.[1];
+
+    // then
+    assert.ok(log, `${name} must filter the default logger, which carries a failed request's error entry`);
+    assert.match(log, /request>uri regexp \\\?\.\*\$ ""/, `${name} must drop the query string from error entries`);
+    assert.match(log, /request>headers delete/, `${name} must drop request headers from error entries`);
+    assert.match(log, /request>remote_ip ip_mask/, `${name} must mask the remote address in error entries`);
+  }
+});
+
 test("given the production proxy, when it is read, then it keeps no access log", () => {
   // when
   const production = readFileSync(new URL("../deploy/Caddyfile", import.meta.url), "utf8");
