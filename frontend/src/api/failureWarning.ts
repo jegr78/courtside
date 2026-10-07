@@ -9,6 +9,7 @@ function describe(failure: unknown): string {
   if (failure instanceof ApiError) {
     return failure.problem?.type ? `status ${failure.status} ${failure.problem.type}` : `status ${failure.status}`;
   }
+  if (failure instanceof SyntaxError) return failure.name;
   if (failure instanceof Error) return `${failure.name}: ${failure.message}`.slice(0, 200);
   return typeof failure;
 }

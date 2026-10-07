@@ -37,3 +37,14 @@ it("given something thrown that is no error, when warning about it, then only it
   // then
   expect(warn).toHaveBeenCalledWith("Booking refresh failed: object");
 });
+
+it("given a response that is not JSON, when warning about it, then no excerpt of the body is named", () => {
+  // given
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+  // when
+  warnAbout("Session refresh failed", new SyntaxError("Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON"));
+
+  // then
+  expect(warn).toHaveBeenCalledWith("Session refresh failed: SyntaxError");
+});
