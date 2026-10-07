@@ -1692,6 +1692,45 @@ it("given unchanged opening hours, when opening a booking dialog, then visible s
   expect(freeSlot(2, "13:00")).toHaveAttribute("data-state", "free");
 });
 
+it("given unchanged calendar labels, when opening a booking dialog, then the browser default zone resolves at most once per render", async () => {
+  // given
+  const commits = vi.fn();
+  render(<Profiler id="week" onRender={commits}><WeekView today={clubInstant("12:00")} /></Profiler>);
+  const slot = await findFreeSlot(1, "13:00");
+  commits.mockClear();
+  const constructors = vi.spyOn(Intl, "DateTimeFormat");
+
+  // when
+  await userEvent.click(slot);
+  await screen.findByTestId("booking-dialog");
+
+  // then
+  const defaults = constructors.mock.calls.filter(([locale, options]) => locale === undefined && options === undefined);
+  expect(defaults.length).toBeLessThanOrEqual(commits.mock.calls.length);
+  expect(screen.getByTestId("day-selector-2026-08-10")).toHaveTextContent("Mon");
+});
+
+it("given calendar labels in the browser default zone, when that zone changes before the next render, then their labels follow the new zone", async () => {
+  // given
+  const NativeFormatter = Intl.DateTimeFormat;
+  let zone = "Europe/Berlin";
+  vi.spyOn(Intl, "DateTimeFormat").mockImplementation(function (locales, options) {
+    return new NativeFormatter(locales, options ?? { timeZone: zone });
+  });
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "13:00");
+  expect(screen.getByTestId("day-selector-2026-08-10")).toHaveTextContent("Mon");
+
+  // when
+  zone = "America/Los_Angeles";
+  await userEvent.click(slot);
+  await screen.findByTestId("booking-dialog");
+
+  // then
+  expect(screen.getByTestId("day-selector-2026-08-10")).toHaveTextContent("Sun");
+  expect(screen.getByTestId("day-selector-2026-08-10")).toHaveAccessibleName(/Sunday/);
+});
+
 it("given unchanged allocations, when opening a booking dialog, then their local time boundaries are not formatted again for each cell", async () => {
   // given
   render(<WeekView today={clubInstant("12:00")} />);

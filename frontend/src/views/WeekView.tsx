@@ -243,6 +243,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
 
   const dragSpan = drag ? bookableSpan(drag.courtId, drag.anchor, drag.head) : [];
   const language = i18n.resolvedLanguage ?? i18n.language;
+  const calendarTimeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
   useEffect(() => {
     if (!drag) return;
     const finish = () => {
@@ -347,7 +348,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 id="occupancy-heading" data-testid="occupancy-heading" className="text-2xl font-bold">{t("week.title")}</h2>
-        {days.length > 0 && hasCourts && <p className="text-muted text-sm">{formatWeekRange(days, language)}</p>}
+        {days.length > 0 && hasCourts && <p className="text-muted text-sm">{formatWeekRange(days, language, calendarTimeZone)}</p>}
       </div>
       {(!data || hasCourts) && <div className="desktop-week-controls flex gap-2">
         <input data-testid="week-date" type="date" value={selectedDate ?? ""} disabled={!data} onChange={(event) => selectDate(event.target.value)} aria-label={t("week.chooseDate")} className="desktop-week-date form-control rounded-lg border px-2" />
@@ -374,13 +375,13 @@ export function WeekView({ today, clock = systemClock, canBook = true,
             key={date}
             type="button"
             data-testid={`day-selector-${date}`}
-            aria-label={`${formatDayLong(day, language)}, ${freeCount}`}
+            aria-label={`${formatDayLong(day, language, calendarTimeZone)}, ${freeCount}`}
             aria-pressed={selectedDate === date}
             className="week-day-option border-structural rounded-xl border px-3 py-2 text-left hover:border-(--club-primary) aria-pressed:border-(--club-primary) aria-pressed:bg-(--club-accent)/15"
             onClick={() => setSelectedDate(date)}
           >
-            <span className="block text-sm font-semibold">{formatWeekday(day, language)}</span>
-            <span className="text-muted font-value text-sm">{formatDayMonth(day, language)}</span>
+            <span className="block text-sm font-semibold">{formatWeekday(day, language, calendarTimeZone)}</span>
+            <span className="text-muted font-value text-sm">{formatDayMonth(day, language, calendarTimeZone)}</span>
             <span data-testid={`day-free-count-${date}`} data-free-count={count}
               className="text-muted mt-1 block text-xs">{freeCount}</span>
           </button>;
@@ -729,19 +730,19 @@ function localDate(timestamp: string, timeZone: string): string | undefined {
   return dateInTimeZoneValue(new Date(timestamp), timeZone);
 }
 
-function formatWeekday(date: Date, language: string): string {
-  return dateTimeFormatter(language, { weekday: "short" }).format(date);
+function formatWeekday(date: Date, language: string, timeZone: string): string {
+  return dateTimeFormatter(language, { weekday: "short", timeZone }).format(date);
 }
 
-function formatDayMonth(date: Date, language: string): string {
-  return dateTimeFormatter(language, { day: "2-digit", month: "2-digit" }).format(date);
+function formatDayMonth(date: Date, language: string, timeZone: string): string {
+  return dateTimeFormatter(language, { day: "2-digit", month: "2-digit", timeZone }).format(date);
 }
 
-function formatDayLong(date: Date, language: string): string {
-  return dateTimeFormatter(language, { weekday: "long", month: "long", day: "numeric" }).format(date);
+function formatDayLong(date: Date, language: string, timeZone: string): string {
+  return dateTimeFormatter(language, { weekday: "long", month: "long", day: "numeric", timeZone }).format(date);
 }
 
-function formatWeekRange(days: Date[], language: string): string {
-  const formatter = dateTimeFormatter(language, { year: "numeric", month: "short", day: "numeric" });
+function formatWeekRange(days: Date[], language: string, timeZone: string): string {
+  const formatter = dateTimeFormatter(language, { year: "numeric", month: "short", day: "numeric", timeZone });
   return `${formatter.format(days[0])} – ${formatter.format(days[6])}`;
 }
