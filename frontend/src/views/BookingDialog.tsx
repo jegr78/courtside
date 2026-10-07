@@ -101,7 +101,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       await created();
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 409) {
-        await conflicted().catch((failure: unknown) => warnAbout("Court plan refresh after a conflict failed", failure));
+        await conflicted().catch((refreshFailure: unknown) =>
+          warnAbout("Court plan refresh after a conflict failed", refreshFailure));
       }
       if (failure instanceof ApiError && failure.problem) {
         const translated = translatedViolations(failure.problem, t);
