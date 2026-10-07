@@ -89,6 +89,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const { message: eligibilityError, report: reportEligibility, clear: clearEligibility } = useReportedFailure();
   const [bookingSelection, setBookingSelection] = useState<BookingSelection>();
   const [drag, setDrag] = useState<{ courtId: string; anchor: string; head: string }>();
+  const dragAnchor = useRef<{ courtId: string; anchor: string }>(undefined);
   const [cancellation, setCancellation] = useState<Allocation>();
   const planRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -212,10 +213,12 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     setCancellation(allocation);
   }, []);
   const beginDrag = useCallback((courtId: string, slot: string, pointerType: string) => {
-    if (pointerType === "mouse") setDrag({ courtId, anchor: slot, head: slot });
+    if (pointerType === "mouse") dragAnchor.current = { courtId, anchor: slot };
   }, []);
   const extendDrag = useCallback((courtId: string, slot: string) => {
-    setDrag((current) => current?.courtId === courtId ? { ...current, head: slot } : current);
+    const anchor = dragAnchor.current;
+    if (anchor?.courtId === courtId && anchor.anchor !== slot) setDrag({ ...anchor, head: slot });
+    else if (anchor?.courtId === courtId) setDrag(undefined);
   }, []);
 
   function isBookable(courtId: string, slot: string): boolean {
@@ -248,17 +251,25 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const language = i18n.resolvedLanguage ?? i18n.language;
   const calendarTimeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
   useEffect(() => {
-    if (!drag) return;
     const finish = () => {
+      dragAnchor.current = undefined;
+      if (!drag) return;
       setDrag(undefined);
-      // A pointer that never left its cell is a click, and that path is also the keyboard's.
       if (drag.head !== drag.anchor && dragSpan.length > 0 && selectedDate && data) {
         setBookingSelection({ date: selectedDate, slot: dragSpan[0], courtId: drag.courtId,
           durationMinutes: dragSpan.length * data.grid.slotMinutes });
       }
     };
+    const cancel = () => {
+      dragAnchor.current = undefined;
+      if (drag) setDrag(undefined);
+    };
     window.addEventListener("pointerup", finish);
-    return () => window.removeEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", cancel);
+    return () => {
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", cancel);
+    };
   });
 
   const slotHeight = data ? Math.max(32, data.grid.slotMinutes * 4 / 3) : 40;
@@ -530,12 +541,27 @@ export function WeekView({ today, clock = systemClock, canBook = true,
 }
 
 const DayPlanCell = memo(function DayPlanCell(props: DayPlanCellProps) {
+  const [pressed, setPressed] = useState<string>();
+  const cell = `${props.date}:${props.court.id}:${props.slot}`;
+  useEffect(() => {
+    if (!pressed) return;
+    const release = () => setPressed(undefined);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    return () => {
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+    };
+  }, [pressed]);
   return renderCell(props.court, props.slot, props.date, props.startsAt, props.allocations,
     props.grid.slotMinutes, props.grid.timeZone, props.locale, props.t,
     () => props.book(props.court.id, props.slot), props.cancel, props.past, props.outside,
     props.canBook, props.firstVisible, {
-      selected: props.selected,
-      start: (pointerType) => props.beginDrag(props.court.id, props.slot, pointerType),
+      selected: props.selected || pressed === cell,
+      start: (pointerType) => {
+        if (pointerType === "mouse") setPressed(cell);
+        props.beginDrag(props.court.id, props.slot, pointerType);
+      },
       extend: () => props.extendDrag(props.court.id, props.slot)
     });
 });

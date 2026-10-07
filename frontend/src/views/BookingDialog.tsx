@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError, api, type Allocation, type BookingGrid, type Problem, type PublicBookingCard, type PublicCourt, type PublicParticipantCard, type PublicParticipantMember } from "../api/client";
 import { idempotencyKey } from "../api/idempotency";
@@ -121,7 +121,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
 
   const fieldViolations = (field: string) => violations.filter((violation) => violation.field === field);
   const describedBy = (field: string) => fieldViolations(field).length > 0 ? `booking-${field}-errors` : undefined;
-  const durations = availableDurations(selection, grid, courtIds, allocations, maxBookingMinutes);
+  const durations = useMemo(() => availableDurations(selection, grid, courtIds, allocations, maxBookingMinutes),
+    [selection, grid, courtIds, allocations, maxBookingMinutes]);
   // A list emptied by the bound is a different thing from one emptied by an occupied court: the
   // second is the conflict the server reports on submit, and saying so is its job and not ours.
   const boundLeavesNoPeriod = maxBookingMinutes !== undefined && maxBookingMinutes !== null
@@ -129,8 +130,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const showsBound = maxBookingMinutes !== undefined && maxBookingMinutes !== null && !boundLeavesNoPeriod;
   const durationDescription = showsBound ? "booking-duration-bound booking-duration-hint" : "booking-duration-hint";
   const selectedDuration = durations.includes(durationMinutes) ? durationMinutes : durations[0] ?? grid.slotMinutes;
-  const period = bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration);
-  // The booker takes a slot too, which is what BookingWriter counts, so an empty dialog stands at one.
+  const period = useMemo(() => bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration),
+    [selection.date, selection.slot, grid.timeZone, selectedDuration]);
   const chosenPlayers = 1 + selectedMembers.length
     + guestNames.filter((name) => name.trim()).length
     + participantCardIds.filter(Boolean).length;

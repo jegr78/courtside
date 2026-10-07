@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "../api/client";
 import i18n from "../i18n";
 import { WeekView } from "./WeekView";
+import { BookingDialog } from "./BookingDialog";
 import * as clubZone from "../time/clubZone";
 
 const courts = [
@@ -1886,4 +1887,99 @@ it("given a resolved free slot, when starting a mouse selection, then its past c
   // then
   expect(past).not.toHaveBeenCalled();
   expect(slot).toHaveAttribute("data-state", "selected");
+});
+
+it("given a free slot, when pressing and releasing the mouse without dragging, then only the cell changes until the click opens the dialog", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "13:00");
+  await act(async () => {});
+  const dates = vi.spyOn(clubZone, "dateInTimeZoneValue");
+
+  // when
+  fireEvent.pointerDown(slot, { pointerType: "mouse" });
+  expect(slot).toHaveAttribute("data-state", "selected");
+  fireEvent.pointerUp(window, { pointerType: "mouse" });
+
+  // then
+  expect(slot).toHaveAttribute("data-state", "free");
+  expect(dates).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("booking-dialog")).toBeNull();
+  await userEvent.click(slot);
+  expect(await screen.findByTestId("booking-dialog")).toBeVisible();
+});
+
+it("given a mouse selection that the browser cancels, when entering another cell and releasing later, then no stale selection opens a dialog", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "13:00");
+  fireEvent.pointerDown(slot, { pointerType: "mouse" });
+
+  // when
+  fireEvent.pointerCancel(slot, { pointerType: "mouse" });
+  fireEvent.pointerEnter(freeSlot(1, "13:30"), { pointerType: "mouse" });
+  fireEvent.pointerUp(window, { pointerType: "mouse" });
+
+  // then
+  expect(screen.queryByTestId("booking-dialog")).toBeNull();
+  expect(slot).toHaveAttribute("data-state", "free");
+  await userEvent.click(slot);
+  expect(await screen.findByTestId("booking-dialog")).toBeVisible();
+});
+
+it("given a loaded booking dialog, when editing its extra fields, then its unchanged time and duration models stay resolved", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  await userEvent.click(await findFreeSlot(1, "13:00"));
+  await waitFor(() => expect(screen.getByTestId("booking-card"))
+    .toHaveValue("55555555-5555-5555-5555-555555555555"));
+  const times = vi.spyOn(clubZone, "bookingTimeSlot");
+  const instants = vi.spyOn(clubZone, "zonedDateTime");
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-more-summary"));
+  await userEvent.type(screen.getByTestId("booking-note"), "Clay court");
+
+  // then
+  expect(times).not.toHaveBeenCalled();
+  expect(instants).not.toHaveBeenCalled();
+  expect(screen.getByTestId("booking-note")).toHaveValue("Clay court");
+  expect(screen.getByTestId("booking-period")).toHaveTextContent("Aug 10, 2026, 1:00 PM – 1:30 PM");
+});
+
+it("given a retained dialog model, when its court, occupancy, hours, bound, zone, date or language changes, then its choices and period follow the new inputs", async () => {
+  // given
+  const grid = await api.bookingGrid();
+  const existing = await api.allocations("2026-08-10");
+  const occupancy = [{ ...existing[0], courtId: courts[1].id,
+    startsAt: "2026-08-10T13:30:00+02:00", endsAt: "2026-08-10T14:00:00+02:00" }];
+  const selection = { date: "2026-08-10", slot: "13:00", courtId: courts[0].id };
+  const props = { selection, grid, courts, allocations: occupancy, canChooseSeveralCourts: true,
+    closed: vi.fn(), created: vi.fn(async () => {}), conflicted: vi.fn(async () => {}) };
+  const { rerender } = render(<BookingDialog {...props} />);
+  await waitFor(() => expect(screen.getByTestId("booking-card"))
+    .toHaveValue("55555555-5555-5555-5555-555555555555"));
+
+  // when / then
+  await userEvent.selectOptions(screen.getByTestId("booking-duration"), "60");
+  expect(screen.getByTestId("booking-period")).toHaveTextContent("1:00 PM – 2:00 PM");
+  await userEvent.click(screen.getByTestId(`booking-court-${courts[1].id}`));
+  expect(screen.getByTestId("booking-duration").querySelectorAll("option")).toHaveLength(1);
+  expect(screen.getByTestId("booking-duration")).toHaveValue("30");
+  rerender(<BookingDialog {...props} allocations={[]} maxBookingMinutes={30} />);
+  expect(screen.getByTestId("booking-duration").querySelectorAll("option")).toHaveLength(1);
+  const earlierClose = { ...grid, openingHours: grid.openingHours.map((hours) =>
+    hours.dayOfWeek === "MONDAY" ? { ...hours, closesAt: "14:00:00" } : hours) };
+  rerender(<BookingDialog {...props} grid={earlierClose} allocations={[]} />);
+  expect(screen.getByTestId("booking-duration").querySelectorAll("option")).toHaveLength(2);
+  rerender(<BookingDialog {...props} grid={earlierClose} allocations={occupancy} />);
+  expect(screen.getByTestId("booking-duration").querySelectorAll("option")).toHaveLength(1);
+  rerender(<BookingDialog {...props} grid={earlierClose} allocations={[]} />);
+  expect(screen.getByTestId("booking-period")).toHaveTextContent("1:00 PM – 2:00 PM");
+  rerender(<BookingDialog {...props} grid={{ ...earlierClose, timeZone: "America/Los_Angeles" }} allocations={[]} />);
+  expect(screen.getByTestId("booking-period")).toHaveTextContent("1:00 PM – 2:00 PM");
+  rerender(<BookingDialog {...props} selection={{ ...selection, date: "2026-08-11" }} allocations={[]} />);
+  expect(screen.getByTestId("booking-period")).toHaveTextContent("Aug 11, 2026, 1:00 PM – 2:00 PM");
+  await act(async () => { await i18n.changeLanguage("de"); });
+  expect(screen.getByTestId("booking-period")).toHaveTextContent("13:00");
 });
