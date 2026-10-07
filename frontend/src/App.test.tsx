@@ -5,7 +5,7 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { useMemo, type ReactNode } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, AppRoutes } from "./App";
-import { api, type SessionStatus } from "./api/client";
+import { api, ApiError, type SessionStatus } from "./api/client";
 import { ClubConfigurationProvider } from "./club/ClubConfigurationProvider";
 import { Preferences } from "./components/Preferences";
 import i18n from "./i18n";
@@ -466,6 +466,21 @@ describe("App build identity", () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     await i18n.changeLanguage("en");
+  });
+
+  it("given the session cannot be refreshed at startup, when the app opens, then the failure is named in the console", async () => {
+    // given
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(api, "session").mockRejectedValue(new ApiError(503, {
+      type: "urn:courtside:error:database-lock-unavailable", title: "Busy", status: 503
+    }));
+
+    // when
+    render(<RoutedShell initialEntries={["/my-bookings"]}><App /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("offline-status")).toBeVisible();
+    expect(warn).toHaveBeenCalledWith("Session refresh failed: status 503 urn:courtside:error:database-lock-unavailable");
   });
 
   it("given a member's cached bookings, when the app opens offline, then the header names the club they came from", async () => {

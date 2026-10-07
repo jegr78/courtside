@@ -24,6 +24,7 @@ import { LoginView } from "./views/LoginView";
 import { MyBookingsPage } from "./views/MyBookingsPage";
 import { MyMessagesView } from "./views/MyMessagesView";
 import { AccountSecurityView } from "./views/AccountSecurityView";
+import { warnAbout } from "./api/failureWarning";
 
 const DEFAULT_DOCUMENTATION_URL = "https://jegr78.github.io/courtside/";
 
@@ -160,7 +161,10 @@ export function App() {
       setSource(value);
       setIdentityStatus("available");
     })
-    .catch(() => setIdentityStatus("unavailable")), []);
+    .catch((failure: unknown) => {
+      warnAbout("Build identity unavailable", failure);
+      setIdentityStatus("unavailable");
+    }), []);
 
   // The account's language is applied before the session is published, so the signed-in navigation
   // is painted once instead of moving its links out from under whoever is already reaching for one.
@@ -191,7 +195,8 @@ export function App() {
     };
     const startupInvalidations = sessionInvalidations.current;
     void Promise.all([
-      refreshSession().catch(async () => {
+      refreshSession().catch(async (failure: unknown) => {
+        warnAbout("Session refresh failed", failure);
         setOffline(true);
         const member = await offlineMemberState();
         if (startupInvalidations !== sessionInvalidations.current) return;
@@ -221,7 +226,10 @@ export function App() {
       loadClub();
       void (source ? Promise.resolve() : identify())
         .then(() => refreshSession())
-        .catch(() => setOffline(true));
+        .catch((failure: unknown) => {
+          warnAbout("Session refresh failed", failure);
+          setOffline(true);
+        });
     };
     window.addEventListener("offline", wentOffline);
     window.addEventListener("online", cameOnline);

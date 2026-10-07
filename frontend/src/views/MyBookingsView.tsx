@@ -9,6 +9,7 @@ import { SuccessFeedback } from "../components/SuccessFeedback";
 import { formatBookingPeriod, formatDateTime } from "../time/clubZone";
 import { CancelDialog, MoveDialog } from "./AppointmentDialogs";
 
+import { warnAbout } from "../api/failureWarning";
 function offlineBookingGrid(): BookingGrid {
   return {
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", slotMinutes: 30, openingWeeks: [], openingHours: []
@@ -85,7 +86,10 @@ export function MyBookingsView({ now, offline = false }: {
     if (offline) return;
     void api.bookingEligibility()
       .then((eligibility) => setMaxBookingMinutes(eligibility.maxBookingMinutes ?? undefined))
-      .catch(() => setMaxBookingMinutes(undefined));
+      .catch((failure: unknown) => {
+        warnAbout("Booking eligibility unavailable", failure);
+        setMaxBookingMinutes(undefined);
+      });
   }, [offline]);
 
   async function loadNextPage<T>(
