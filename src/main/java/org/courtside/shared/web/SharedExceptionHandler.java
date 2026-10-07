@@ -9,6 +9,7 @@ import org.courtside.shared.DuplicateItemException;
 import org.courtside.shared.SecurityEventLog;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
+import org.slf4j.event.Level;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -431,7 +432,10 @@ class SharedExceptionHandler {
     // Never the exception: its message embeds the rejected value, a password on some endpoints.
     private void logAnswered(ProblemDetail problem) {
         traceReference.addTo(problem);
-        log.debug("Answering {} for {}", HttpStatusCode.valueOf(problem.getStatus()), problem.getType());
+        HttpStatusCode status = HttpStatusCode.valueOf(problem.getStatus());
+        Level level = status.is5xxServerError() ? Level.WARN
+                : status.value() == HttpStatus.CONFLICT.value() ? Level.INFO : Level.DEBUG;
+        log.atLevel(level).log("Answering {} for {}", status, problem.getType());
     }
 
     private void logAnswered(ProblemDetail problem, List<String> fields) {

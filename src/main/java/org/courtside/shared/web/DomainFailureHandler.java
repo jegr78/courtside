@@ -3,6 +3,8 @@ package org.courtside.shared.web;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.courtside.shared.DomainFailure;
+import org.courtside.shared.SecurityEventPrincipal;
+import org.slf4j.spi.LoggingEventBuilder;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.ProblemDetail;
@@ -34,9 +36,11 @@ class DomainFailureHandler {
     private static void logAnswered(DomainFailure failure, ProblemDetail body) {
         if (failure.getStatusCode().is5xxServerError()) {
             log.warn("Answering {} for {}", failure.getStatusCode(), body.getType(), failure);
-        } else if (log.isDebugEnabled()) {
-            log.debug("Answering {} for {}: {}", failure.getStatusCode(), body.getType(),
-                    failure.violationCodes());
+            return;
         }
+        LoggingEventBuilder entry = log.atInfo();
+        SecurityEventPrincipal.currentAccountId()
+                .ifPresent(accountId -> entry.addKeyValue("account.id", accountId.toString()));
+        entry.log("Answering {} for {}: {}", failure.getStatusCode(), body.getType(), failure.violationCodes());
     }
 }
