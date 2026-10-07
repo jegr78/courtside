@@ -49,12 +49,15 @@ function parameters(name, account) {
 
 const reportedFailures = {};
 
+function reportOnce(requestKey, response) {
+  const signature = outcomeSignature(requestKey, response);
+  if (reportedFailures[signature]) return;
+  reportedFailures[signature] = true;
+  console.error(unexpectedOutcome(requestKey, response));
+}
+
 function record(response, name, expected) {
-  const signature = outcomeSignature(name, response);
-  if (!expected && !reportedFailures[signature]) {
-    reportedFailures[signature] = true;
-    console.error(unexpectedOutcome(name, response));
-  }
+  if (!expected) reportOnce(name, response);
   technicalErrors.add(!expected);
   serverErrors.add(response.status >= 500 ? 1 : 0);
   check(response, { [`${name} expected outcome`]: () => expected });

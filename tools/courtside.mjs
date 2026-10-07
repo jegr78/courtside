@@ -1114,13 +1114,19 @@ export function performanceContainerLogPlan(stdout) {
 
 function retainContainerLogs(resultDirectory) {
   const file = join(resultDirectory, "containers.log");
-  const output = openSync(file, "w", 0o600);
+  let output;
   try {
+    output = openSync(file, "w", 0o600);
     runInteractive(performanceContainerLogPlan(output));
   } catch (error) {
-    writeFileSync(file, `Container logs unavailable: ${error.message}\n`, { flag: "a" });
+    const reason = `Container logs unavailable: ${error.message}\n`;
+    try {
+      writeFileSync(file, reason, { flag: "a", mode: 0o600 });
+    } catch {
+      process.stderr.write(reason);
+    }
   } finally {
-    closeSync(output);
+    if (output !== undefined) closeSync(output);
   }
 }
 

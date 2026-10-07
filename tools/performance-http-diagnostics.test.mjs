@@ -33,6 +33,18 @@ test("given a response without a JSON body, when describing the outcome, then th
   assert.equal(description, "GET /api/courts returned unexpected status 502 without a readable problem body");
 });
 
+test("given a request that timed out, when describing the outcome, then the transport error code and text are named", () => {
+  // given
+  const timedOut = { ...response(0), error: "request timeout", error_code: 1050 };
+  const refused = { ...response(0), error: "dial: connection refused", error_code: 1212 };
+  // when
+  const description = unexpectedOutcome("POST /api/bookings", timedOut);
+  // then
+  assert.equal(description, "POST /api/bookings returned unexpected status 0 error_code=1050 request timeout");
+  assert.notEqual(outcomeSignature("POST /api/bookings", timedOut), outcomeSignature("POST /api/bookings", refused),
+    "a different transport failure on the same request must still be reported");
+});
+
 test("given two refusals of one request with different problem types, when signing them, then they stay distinguishable", () => {
   // when
   const unavailable = outcomeSignature("POST /api/bookings", response(409, { type: "urn:courtside:error:court-unavailable" }));

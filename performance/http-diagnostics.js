@@ -16,12 +16,14 @@ export function problemParts(problem) {
 }
 
 export function outcomeSignature(requestKey, response) {
+  if (response.status === 0) return `${requestKey} 0 ${response.error_code}`;
   return `${requestKey} ${response.status} ${problemOf(response)?.type ?? "-"}`;
 }
 
 export function unexpectedOutcome(requestKey, response) {
-  const problem = problemOf(response);
   const prefix = `${requestKey} returned unexpected status ${response.status}`;
+  if (response.status === 0) return `${prefix} error_code=${response.error_code} ${response.error}`;
+  const problem = problemOf(response);
   if (!problem) return `${prefix} without a readable problem body`;
   return [prefix, ...problemParts(problem)].join(" ");
 }

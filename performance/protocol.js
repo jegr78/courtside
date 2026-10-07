@@ -52,6 +52,13 @@ let bookingCardId;
 let courtIds;
 const reportedFailures = {};
 
+function reportOnce(requestKey, response) {
+  const signature = outcomeSignature(requestKey, response);
+  if (reportedFailures[signature]) return;
+  reportedFailures[signature] = true;
+  console.error(unexpectedOutcome(requestKey, response));
+}
+
 function username() {
   return `member${String(__VU).padStart(4, "0")}`;
 }
@@ -73,11 +80,7 @@ function record(response, expectedStatuses, metric) {
     .replace(/^\/api\/bookings\/[^/]+$/, "/api/bookings/:id");
   const requestKey = `${response.request.method} ${requestPath}`;
   check(response, { [`${requestKey} status ${expectedStatuses.join(" or ")}`]: () => expected });
-  const signature = outcomeSignature(requestKey, response);
-  if (!expected && !reportedFailures[signature]) {
-    reportedFailures[signature] = true;
-    console.error(unexpectedOutcome(requestKey, response));
-  }
+  if (!expected) reportOnce(requestKey, response);
   return expected;
 }
 
