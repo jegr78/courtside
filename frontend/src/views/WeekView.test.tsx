@@ -1776,17 +1776,16 @@ it("given an occupied cell, when the display language changes, then its retained
 
 it("given unchanged slot geometry, when fresh allocations arrive, then their row instants stay resolved while occupancy updates", async () => {
   // given
+  vi.useFakeTimers({ shouldAdvanceTime: true });
   const now = clubInstant("12:00");
   render(<WeekView today={now} clock={() => now} />);
   await findFreeSlot(1, "13:00");
+  await act(async () => {});
   const instants = vi.spyOn(clubZone, "zonedDateTime");
   vi.mocked(api.allocations).mockResolvedValue([]);
 
   // when
-  await act(async () => {
-    window.dispatchEvent(new Event("focus"));
-    await Promise.resolve();
-  });
+  await vi.advanceTimersByTimeAsync(60_000);
   await waitFor(() => expect(screen.queryByTestId("allocation")).toBeNull());
 
   // then
