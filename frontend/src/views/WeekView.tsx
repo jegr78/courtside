@@ -15,7 +15,7 @@ import { CancellationDialog } from "./CancellationDialog";
 import { contrastColor } from "./cardColors";
 import {
   addDays, calendarDayNumber, dateInTimeZone, dateInTimeZoneValue, formatBookingTimeRange,
-  formatDate, formatTime, isPastSlot, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes,
+  formatDate, formatTime, isValidZonedDateTime, parseDate, startOfWeek, timeToMinutes,
   weekDays, zonedDateTime
 } from "../time/clubZone";
 import { hoursOn } from "../time/openingHours";
@@ -166,9 +166,11 @@ export function WeekView({ today, clock = systemClock, canBook = true,
 
   const grid = data?.grid;
   const loadedDays = data?.days;
-  const weekSlotGeometry = useMemo(() => grid && loadedDays
-    ? new Map(loadedDays.map((day) => [formatDate(day), resolveGridSlots(day, grid)]))
-    : new Map<string, GridSlot[]>(), [grid, loadedDays]);
+  const weekSlotGeometry = useMemo(() => {
+    if (!grid || !loadedDays) return new Map<string, GridSlot[]>();
+    const offsetsByInstant = new Map<string, number>();
+    return new Map(loadedDays.map((day) => [formatDate(day), resolveGridSlots(day, grid, offsetsByInstant)]));
+  }, [grid, loadedDays]);
   const allocationBoundaries = useMemo(() => data
     ? new Map([...data.allocations].map(([date, allocations]) => [date, allocations.map((allocation) => ({
       allocation,
@@ -218,7 +220,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
 
   function isBookable(courtId: string, slot: string): boolean {
     if (!data || !selectedDate || isOutside(slot)) return false;
-    if (isPastSlot(selectedDate, slot, data.grid.timeZone, currentInstant)) return false;
+    const startsAt = slotStarts.get(slot);
+    if (startsAt === undefined || startsAt < currentInstant.getTime()) return false;
     return !isOccupied(selectedBoundaries, courtId, slot);
   }
 
@@ -687,7 +690,7 @@ function scrollToStart(plan: HTMLDivElement | null) {
   if (typeof plan.scrollTo === "function") plan.scrollTo(0, 0);
 }
 
-function resolveGridSlots(day: Date, grid: BookingGrid): GridSlot[] {
+function resolveGridSlots(day: Date, grid: BookingGrid, offsetsByInstant: Map<string, number>): GridSlot[] {
   const hours = hoursOn(grid, formatDate(day));
   if (!hours?.opensAt || !hours.closesAt) {
     return [];
@@ -700,7 +703,7 @@ function resolveGridSlots(day: Date, grid: BookingGrid): GridSlot[] {
   });
   return slots.flatMap((time) => {
     try {
-      return [{ time, startsAt: Date.parse(zonedDateTime(formatDate(day), time, grid.timeZone)) }];
+      return [{ time, startsAt: Date.parse(zonedDateTime(formatDate(day), time, grid.timeZone, offsetsByInstant)) }];
     } catch (failure) {
       if (failure instanceof RangeError) return [];
       throw failure;

@@ -1,11 +1,11 @@
 import { dateTimeFormatter } from "./dateTimeFormatter";
 
-export function zonedDateTime(date: string, time: string, timeZone: string): string {
+export function zonedDateTime(date: string, time: string, timeZone: string, offsetsByInstant?: Map<string, number>): string {
   const wallClock = Date.parse(`${date}T${time}:00Z`);
   const offsets = new Set([
-    offsetAt(new Date(wallClock - 86_400_000), timeZone),
-    offsetAt(new Date(wallClock), timeZone),
-    offsetAt(new Date(wallClock + 86_400_000), timeZone)
+    offsetAt(new Date(wallClock - 86_400_000), timeZone, offsetsByInstant),
+    offsetAt(new Date(wallClock), timeZone, offsetsByInstant),
+    offsetAt(new Date(wallClock + 86_400_000), timeZone, offsetsByInstant)
   ]);
   const match = [...offsets]
     .map((offset) => ({ instant: new Date(wallClock - offset), offset }))
@@ -40,15 +40,19 @@ function localDateTime(instant: Date, timeZone: string): string {
   return `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}`;
 }
 
-function offsetAt(instant: Date, timeZone: string): number {
+function offsetAt(instant: Date, timeZone: string, offsetsByInstant?: Map<string, number>): number {
+  const key = JSON.stringify([timeZone, instant.getTime()]);
+  const known = offsetsByInstant?.get(key);
+  if (known !== undefined) return known;
   const parts = dateTimeFormatter("en-US", {
     timeZone, timeZoneName: "longOffset", hour: "2-digit"
   }).formatToParts(instant);
   const label = parts.find((part) => part.type === "timeZoneName")?.value.replace("GMT", "") || "";
-  if (!label) return 0;
-  const [hours, minutes] = label.slice(1).split(":").map(Number);
+  const [hours, minutes] = label ? label.slice(1).split(":").map(Number) : [0, 0];
   const magnitude = (hours * 60 + (minutes || 0)) * 60_000;
-  return label.startsWith("-") ? -magnitude : magnitude;
+  const offset = label.startsWith("-") ? -magnitude : magnitude;
+  offsetsByInstant?.set(key, offset);
+  return offset;
 }
 
 function offsetLabel(offset: number): string {
