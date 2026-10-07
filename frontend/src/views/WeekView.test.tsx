@@ -1856,3 +1856,34 @@ it("given a delayed allocation refresh, when the clock crosses a slot boundary, 
     .toHaveAttribute("data-free-count", "36"));
   expect(screen.getByTestId("day-free-count-2026-08-11")).toHaveAttribute("data-free-count", "56");
 });
+
+it("given a complete week of slots, when resolving its geometry, then shared offset probes run once per instant and zone", async () => {
+  // given
+  const parts = vi.spyOn(Intl.DateTimeFormat.prototype, "formatToParts");
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+  await findFreeSlot(1, "13:00");
+  await act(async () => {});
+
+  // then
+  const offsets = parts.mock.contexts.filter((formatter) =>
+    (formatter as Intl.DateTimeFormat).resolvedOptions().timeZoneName === "longOffset");
+  expect(offsets.length).toBeLessThanOrEqual(9 * 28);
+  expect(screen.getByTestId("day-free-count-2026-08-10")).toHaveAttribute("data-free-count", "38");
+  expect(screen.getByTestId("day-free-count-2026-08-11")).toHaveAttribute("data-free-count", "56");
+});
+
+it("given a resolved free slot, when starting a mouse selection, then its past check uses the retained instant", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "13:00");
+  const past = vi.spyOn(clubZone, "isPastSlot");
+
+  // when
+  fireEvent.pointerDown(slot, { pointerType: "mouse" });
+
+  // then
+  expect(past).not.toHaveBeenCalled();
+  expect(slot).toHaveAttribute("data-state", "selected");
+});

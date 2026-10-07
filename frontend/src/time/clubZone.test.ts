@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { bookingTimeSlot, formatBookingPeriod, formatDateRange, isPastSlot, isValidZonedDateTime, zonedDateTime } from "./clubZone";
 
 const localTimeIn = (isoInstant: string, timeZone: string) =>
@@ -161,4 +161,53 @@ it("given the same date twice, when formatting it as a range, then it reads as t
 
   // then
   expect(single).toBe("May 13, 2026");
+});
+
+it("given several zones and transition dates in one calculation, when reusing offset probes, then each result retains its original instant or gap", () => {
+  // given
+  const offsets = new Map<string, number>();
+  const cases = [
+    ["2026-08-10", "08:00", "Europe/Berlin"],
+    ["2026-08-10", "08:00", "America/Los_Angeles"],
+    ["2026-08-10", "08:00", "UTC"],
+    ["2026-03-29", "02:30", "Europe/Berlin"],
+    ["2026-03-29", "03:30", "Europe/Berlin"],
+    ["2026-10-25", "02:30", "Europe/Berlin"],
+    ["2026-10-25", "03:30", "Europe/Berlin"],
+    ["2026-10-04", "02:00", "Australia/Lord_Howe"],
+    ["2026-04-05", "01:45", "Australia/Lord_Howe"],
+    ["2011-12-30", "12:00", "Pacific/Apia"]
+  ] as const;
+
+  // when / then
+  for (const [date, time, zone] of cases) {
+    let original: string;
+    try {
+      original = zonedDateTime(date, time, zone);
+    } catch (failure) {
+      expect(failure).toBeInstanceOf(RangeError);
+      expect(() => zonedDateTime(date, time, zone, offsets)).toThrow(RangeError);
+      continue;
+    }
+    expect(zonedDateTime(date, time, zone, offsets)).toBe(original);
+  }
+  expect([...offsets.values()].every((offset) => typeof offset === "number")).toBe(true);
+});
+
+it("given repeated zero-offset probes, when the same instant is resolved within one calculation, then the offset formatter is not called again", () => {
+  // given
+  const offsets = new Map<string, number>();
+  zonedDateTime("2026-08-10", "08:00", "UTC", offsets);
+  const parts = vi.spyOn(Intl.DateTimeFormat.prototype, "formatToParts");
+
+  // when
+  try {
+    expect(zonedDateTime("2026-08-10", "08:00", "UTC", offsets)).toBe("2026-08-10T08:00:00+00:00");
+
+    // then
+    expect(parts.mock.contexts.filter((formatter) =>
+      (formatter as Intl.DateTimeFormat).resolvedOptions().timeZoneName === "longOffset")).toHaveLength(0);
+  } finally {
+    parts.mockRestore();
+  }
 });
