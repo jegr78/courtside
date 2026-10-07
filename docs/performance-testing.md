@@ -312,7 +312,9 @@ PostgreSQL has no host port by default. Use `perf --db-port` to expose it tempor
 `127.0.0.1:5434`, or use `perf-db-shell` without exposing it. The reset command requires the exact
 project name and removes only the performance containers, volumes, local CA, and credential state.
 Dev, UAT, and their Funnel configuration are not addressed by any performance command. The same
-Node command plans and Docker Compose files are used on macOS, Linux, and Windows.
+Node command plans and Docker Compose files are used on macOS, Linux, and Windows. Against a rootless
+Docker daemon the relay and k6 containers run as container root, which that daemon maps to the
+host user who owns the private credentials; any other UID would land on an unrelated sub-UID.
 
 Protocol runs use the pinned official k6 image and write a self-contained `report.html`, the raw
 `raw-summary.json`, and a schema-validated `summary.json` below

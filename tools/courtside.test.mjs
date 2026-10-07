@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { containerIdentity } from "./mail-relay-certificate.mjs";
 import vm from "node:vm";
 import {
   assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
@@ -643,7 +644,7 @@ test("given the browser profile, when planning k6, then Chromium and the browser
   assert.ok(plan.args.includes("HOME=/tmp"));
   const target = plan.args.find(argument => argument.startsWith("PERF_TARGET=")).slice("PERF_TARGET=".length);
   assert.equal(target, new URL(target).origin);
-  if (process.platform !== "win32") assert.ok(plan.args.includes(`${process.getuid()}:${process.getgid()}`));
+  if (process.platform !== "win32") assert.ok(plan.args.includes(containerIdentity()));
   assert.equal(plan.args[plan.args.indexOf("--network") + 1], "courtside-perf_load");
   assert.equal(plan.args.includes("--privileged"), false);
   assert.equal(plan.args.includes("seccomp=unconfined"), false);
@@ -699,7 +700,7 @@ test("given a private credentials file, when planning k6, then the container run
   const funnelPlan = funnelPerformanceRunPlan(funnel, "/tmp/funnel-result", "test-run");
 
   // then
-  const expected = `${process.getuid()}:${process.getgid()}`;
+  const expected = containerIdentity();
   assert.equal(plan.args[plan.args.indexOf("--user") + 1], expected);
   assert.equal(funnelPlan.args[funnelPlan.args.indexOf("--user") + 1], expected);
 });
