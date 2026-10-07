@@ -8,7 +8,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { localRequest, newBootstrapPassword } from "./courtside.mjs";
 import {
-  createMailCertificate, createMailCertificateDirectory, currentHostIdentity
+  containerIdentity, createMailCertificate, createMailCertificateDirectory
 } from "./mail-relay-certificate.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -344,7 +344,7 @@ async function execute() {
     COURTSIDE_RESTORE_IMAGE: image,
     COURTSIDE_RESTORE_ADMIN_PASSWORD: password,
     COURTSIDE_RESTORE_MAIL_CERT_DIR: mailCertificateDirectory,
-    COURTSIDE_RESTORE_MAIL_USER: currentHostIdentity()
+    COURTSIDE_RESTORE_MAIL_USER: containerIdentity()
   };
   const startedAt = Date.now();
   mkdirSync(build, { recursive: true });

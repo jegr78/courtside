@@ -22,3 +22,15 @@ export function createMailCertificateDirectory(parent = tmpdir(), prefix = "cour
 export function currentHostIdentity(runtime = process) {
   return `${runtime.getuid?.() ?? 0}:${runtime.getgid?.() ?? 0}`;
 }
+
+export function dockerIsRootless(run = spawnSync) {
+  const result = run("docker", ["info", "--format", "{{json .SecurityOptions}}"], { encoding: "utf8" });
+  return !result.error && result.status === 0 && /name=rootless/.test(result.stdout ?? "");
+}
+
+let rootlessDaemon;
+
+// Rootless Docker maps container root to the host user; any other UID lands on an unrelated sub-UID.
+export function containerIdentity(runtime = process, rootless = rootlessDaemon ??= dockerIsRootless()) {
+  return rootless ? "0:0" : currentHostIdentity(runtime);
+}

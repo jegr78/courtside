@@ -131,7 +131,7 @@ test("given private database archives, when mail TLS is configured, then the mai
   assert.match(runner, /mailCertificateDirectory = createMailCertificateDirectory\(tmpdir\(\), "courtside-restore-mail-"\)/);
   assert.match(source("./mail-relay-certificate.mjs"), /chmodSync\(key, 0o600\)/);
   assert.match(runner, /COURTSIDE_RESTORE_MAIL_CERT_DIR: mailCertificateDirectory/);
-  assert.match(runner, /COURTSIDE_RESTORE_MAIL_USER: currentHostIdentity\(\)/);
+  assert.match(runner, /COURTSIDE_RESTORE_MAIL_USER: containerIdentity\(\)/);
   assert.doesNotMatch(runner, /COURTSIDE_RESTORE_MAIL_CERT_DIR: privateDirectory/);
   assert.match(restoreCompose, /user: \$\{COURTSIDE_RESTORE_MAIL_USER\}/);
 });

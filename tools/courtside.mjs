@@ -23,7 +23,7 @@ import {
   recoverSecurityRun, requestEmergencyStop, securityRunContract
 } from "./security-runner.mjs";
 import { fixtureImagePlan, stageFixtureClasses } from "./fixture-artifact.mjs";
-import { createMailCertificate, currentHostIdentity } from "./mail-relay-certificate.mjs";
+import { containerIdentity, createMailCertificate } from "./mail-relay-certificate.mjs";
 import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
 import { isGitHubLogin } from "./nightly-failure-tracker.mjs";
 
@@ -991,7 +991,7 @@ function startPerformance(options) {
 }
 
 export function performanceRelaySettings(directory = perfMailDirectory) {
-  return { COURTSIDE_PERF_MAIL_CERT_DIR: directory, COURTSIDE_PERF_MAIL_USER: currentHostIdentity() };
+  return { COURTSIDE_PERF_MAIL_CERT_DIR: directory, COURTSIDE_PERF_MAIL_USER: containerIdentity() };
 }
 
 // Issuing is the starting command's job alone: a stop that reissued would replace what the relay serves.
@@ -1046,7 +1046,7 @@ export function perfResetPlan() {
 }
 
 export function containerUserArguments(platform = process.platform) {
-  return platform === "win32" ? [] : ["--user", `${process.getuid()}:${process.getgid()}`];
+  return platform === "win32" ? [] : ["--user", containerIdentity()];
 }
 
 export function performanceVersion() {
