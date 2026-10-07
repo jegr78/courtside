@@ -14,6 +14,8 @@ test("given a current-week slot, when preparing a booking, then expand the guest
   const page = {
     locator(selector) {
       if (selector === 'div[data-testid="free-slot"]') return { nth: () => ({ waitFor: async () => {} }) };
+      if (selector === '[data-testid="booking-card"] option') return { nth: () => ({ waitFor: async () => actions.push("cards") }) };
+      if (selector === 'details[data-testid="booking-more"][open]') return { waitFor: async () => actions.push("more:open") };
       assert.match(selector, /button.*free-slot.*:not\(\[disabled\]\)/);
       return { count: async () => 1, nth: () => ({ click: async () => actions.push("slot"), waitFor: async () => {} }) };
     },
@@ -21,14 +23,16 @@ test("given a current-week slot, when preparing a booking, then expand the guest
       return {
         click: async () => actions.push(id),
         waitFor: async () => actions.push(`${id}:visible`),
-        fill: async (value) => actions.push(`${id}:${value}`)
+        fill: async (value) => actions.push(`${id}:${value}`),
+        inputValue: async () => "Browser Test Guest"
       };
     }
   };
   // when
   await prepareBrowserBooking(page, 1);
   // then
-  assert.deepEqual(actions, ["slot", "booking-more-summary", "guest-name:visible", "guest-name:Browser Test Guest"]);
+  assert.deepEqual(actions, ["slot", "cards", "booking-more-summary", "more:open", "guest-name:visible", "guest-name:Browser Test Guest"],
+    "the dialog must have its cards before the summary is clicked, and be open before the guest is entered");
 });
 
 test("given no remaining current-week slot, when preparing a booking, then use next week only as a fallback", async () => {
@@ -41,7 +45,7 @@ test("given no remaining current-week slot, when preparing a booking, then use n
       : { count: async () => nextWeek ? 1 : 0, nth: () => ({ click: async () => actions.push("slot"), waitFor: async () => {} }), waitFor: async () => {} },
     getByTestId: (id) => ({
       click: async () => { actions.push(id); if (id === "week-next") nextWeek = true; },
-      waitFor: async () => {}, fill: async () => {}
+      waitFor: async () => {}, fill: async () => {}, inputValue: async () => "Browser Test Guest"
     })
   };
   // when
@@ -54,7 +58,7 @@ test("given an inaccessible guest field, when preparing a booking, then fail rat
   // given
   let filled = false;
   const page = {
-    locator: () => ({ count: async () => 1, nth: () => ({ click: async () => {}, waitFor: async () => {} }) }),
+    locator: () => ({ count: async () => 1, waitFor: async () => {}, nth: () => ({ click: async () => {}, waitFor: async () => {} }) }),
     getByTestId: () => ({ click: async () => {}, waitFor: async () => { throw new Error("Guest field is hidden"); },
       fill: async () => { filled = true; } })
   };
@@ -83,7 +87,7 @@ test("given Monday after closing and a Tuesday slot, when preparing a booking, t
       return { waitFor: async () => {}, nth: () => ({ waitFor: async () => {} }) };
     },
     getByTestId: id => ({ click: async () => { actions.push(id); if (id === "week-next") throw new Error("Skipped Tuesday"); },
-      waitFor: async () => {}, fill: async () => {} })
+      waitFor: async () => {}, fill: async () => {}, inputValue: async () => "Browser Test Guest" })
   };
   // when
   await prepareBrowserBooking(page, 2);
@@ -109,8 +113,9 @@ test("given delayed eligibility rendering, when searching slots, then wait for n
     if (selector === 'div[data-testid="free-slot"]') return { nth: () => ({ waitFor: async options => {
       assert.equal(options.state, "detached"); eligible = true;
     } }) };
-    return { count: async () => { assert.equal(eligible, true); return 1; }, nth: () => ({ click: async () => {} }) };
-  }, getByTestId: () => ({ click: async () => {}, waitFor: async () => {}, fill: async () => {} }) };
+    return { count: async () => { assert.equal(eligible, true); return 1; }, nth: () => ({ click: async () => {}, waitFor: async () => {} }),
+      waitFor: async () => {} };
+  }, getByTestId: () => ({ click: async () => {}, waitFor: async () => {}, fill: async () => {}, inputValue: async () => "Browser Test Guest" }) };
   // when
   await prepareBrowserBooking(page, 1);
   // then
@@ -126,9 +131,10 @@ test("given a delayed next-week grid, when no current-week slot remains, then wa
     if (selector.includes("day-selector-")) return { count: async () => 0,
       nth: () => ({ getAttribute: async () => "day-selector-2026-10-05" }) };
     return { count: async () => { if (nextWeek) assert.equal(loaded, true); return nextWeek ? 1 : 0; },
-      nth: () => ({ click: async () => {} }) };
+      nth: () => ({ click: async () => {}, waitFor: async () => {} }), waitFor: async () => {} };
   }, getByTestId: id => ({ click: async () => { if (id === "week-next") nextWeek = true; },
-    waitFor: async () => { if (id === "day-selector-2026-10-12") loaded = true; }, fill: async () => {} }) };
+    waitFor: async () => { if (id === "day-selector-2026-10-12") loaded = true; }, fill: async () => {},
+    inputValue: async () => "Browser Test Guest" }) };
   // when
   await prepareBrowserBooking(page, 1);
   // then
@@ -164,4 +170,32 @@ test("given a browser that cannot open a page, when a journey starts, then the f
   assert.ok(metrics.get("browser_errors").includes(1));
   assert.ok(logged.some(line => line.startsWith("vu=2 iteration=7 Browser journey failed at open browser page after ") && line.includes(" on no page : ")),
     `the failure must name its step, got ${JSON.stringify(logged)}`);
+});
+
+test("given a summary click that leaves the details closed, when preparing a booking, then fail before entering a guest", async () => {
+  // given
+  let filled = false;
+  const page = {
+    locator(selector) {
+      if (selector === 'details[data-testid="booking-more"][open]') return { waitFor: async () => {
+        throw new Error("waiting for details[data-testid=booking-more][open]: timed out");
+      } };
+      return { count: async () => 1, waitFor: async () => {}, nth: () => ({ click: async () => {}, waitFor: async () => {} }) };
+    },
+    getByTestId: () => ({ click: async () => {}, waitFor: async () => {}, fill: async () => { filled = true; },
+      inputValue: async () => "" })
+  };
+  // when / then
+  await assert.rejects(prepareBrowserBooking(page, 1), /booking-more.*open/);
+  assert.equal(filled, false, "a guest typed into closed details never reaches the dialog");
+});
+
+test("given a fill that does not reach the guest field, when preparing a booking, then fail instead of submitting without the guest", async () => {
+  // given
+  const page = {
+    locator: () => ({ count: async () => 1, waitFor: async () => {}, nth: () => ({ click: async () => {}, waitFor: async () => {} }) }),
+    getByTestId: () => ({ click: async () => {}, waitFor: async () => {}, fill: async () => {}, inputValue: async () => "" })
+  };
+  // when / then
+  await assert.rejects(prepareBrowserBooking(page, 1), /guest field holds "" after entering "Browser Test Guest"/);
 });
