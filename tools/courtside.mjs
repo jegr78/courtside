@@ -7,7 +7,7 @@ import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { BlockList, createConnection, createServer, isIP } from "node:net";
 import { availableParallelism, totalmem } from "node:os";
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
@@ -1120,11 +1120,8 @@ function retainContainerLogs(resultDirectory) {
     runInteractive(performanceContainerLogPlan(output));
   } catch (error) {
     const reason = `Container logs unavailable: ${error.message}\n`;
-    try {
-      writeFileSync(file, reason, { flag: "a", mode: 0o600 });
-    } catch {
-      process.stderr.write(reason);
-    }
+    if (output === undefined) process.stderr.write(reason);
+    else writeSync(output, reason);
   } finally {
     if (output !== undefined) closeSync(output);
   }
