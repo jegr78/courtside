@@ -107,6 +107,7 @@
     { "path": "tools/prerelease-changelog.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/problem-type-messages.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/production-architecture.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/proxy-access-log.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/published-release-tags.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/published-release-tags.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/pwa-policy.test.mjs", "profiles": ["tooling"], "test": true },

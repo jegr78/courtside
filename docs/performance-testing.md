@@ -242,11 +242,13 @@ node tools/courtside.mjs perf-reset courtside-perf
 ```
 
 `perf` verifies the source, builds the local image, and starts PostgreSQL 18, the application, a
-Mailpit relay, and a dedicated Caddy boundary. The application is available at
-`https://localhost:9443`; its local CA is intentionally disposable. The CLI generates one shared
-password, stores it only in the ignored `build/perf-environment.json` with owner-only permissions
-where supported, and creates the accounts `member0001` through `member1000`. Account `member1000`
-is reserved for contention workloads.
+Mailpit relay, and a dedicated Caddy boundary. The boundary logs every request as JSON with its
+method, path, status and duration, without query string, headers or a full client address, and
+filters its error entries the same way. The application is available at `https://localhost:9443`;
+its local CA is intentionally disposable. The CLI generates one shared password, stores it only in
+the ignored `build/perf-environment.json` with owner-only permissions where supported, and creates
+the accounts `member0001` through `member1000`. Account `member1000` is reserved for contention
+workloads.
 
 ### What a run pays for mail
 

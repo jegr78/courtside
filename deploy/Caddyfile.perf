@@ -1,5 +1,16 @@
 {
 	auto_https disable_redirects
+	log default {
+		output stdout
+		format filter {
+			wrap json
+			request>uri regexp \?.*$ ""
+			request>headers delete
+			request>tls delete
+			request>remote_ip ip_mask 16 32
+			request>client_ip ip_mask 16 32
+		}
+	}
 }
 
 http://:80 {
@@ -33,6 +44,19 @@ http://:80 {
 https://localhost:443, https://proxy:443 {
 	tls internal
 	encode zstd gzip
+
+	log {
+		output stdout
+		format filter {
+			wrap json
+			request>uri regexp \?.*$ ""
+			request>headers delete
+			request>tls delete
+			request>remote_ip ip_mask 16 32
+			request>client_ip ip_mask 16 32
+			resp_headers delete
+		}
+	}
 
 	header {
 		+Content-Security-Policy "base-uri 'none'; frame-ancestors 'none'"
