@@ -552,6 +552,22 @@ it("given the plan remains open, when one minute passes, then its current-time s
   await waitFor(() => expect(screen.getByTestId("current-time-line")).toHaveAttribute("aria-label", "Current time 12:16"));
 });
 
+it("given a slot that starts in ten seconds, when it starts, then it is no longer offered without waiting for the minute refresh", async () => {
+  // given
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  let now = new Date("2026-08-10T12:29:50+02:00");
+  render(<WeekView clock={() => now} />);
+  expect(await findFreeSlot(1, "12:30")).toHaveAttribute("data-state", "free");
+
+  // when
+  now = new Date("2026-08-10T12:30:01+02:00");
+  await vi.advanceTimersByTimeAsync(15_000);
+
+  // then
+  await waitFor(() => expect(freeSlot(1, "12:30")).toHaveAttribute("data-state", "past"));
+  expect(freeSlot(1, "12:30")).toBeDisabled();
+});
+
 it("given the plan is open, when the refresh interval elapses and focus returns, then the selected day is refreshed", async () => {
   // given
   vi.useFakeTimers({ shouldAdvanceTime: true });
