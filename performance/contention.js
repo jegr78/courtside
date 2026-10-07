@@ -1,6 +1,7 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
+import { outcomeSignature, unexpectedOutcome } from "./http-diagnostics.js";
 
 const contract = JSON.parse(open("/scripts/contract.json"));
 const credentials = JSON.parse(open("/run/courtside/perf.json"));
@@ -46,7 +47,14 @@ function parameters(name, account) {
   };
 }
 
+const reportedFailures = {};
+
 function record(response, name, expected) {
+  const signature = outcomeSignature(name, response);
+  if (!expected && !reportedFailures[signature]) {
+    reportedFailures[signature] = true;
+    console.error(unexpectedOutcome(name, response));
+  }
   technicalErrors.add(!expected);
   serverErrors.add(response.status >= 500 ? 1 : 0);
   check(response, { [`${name} expected outcome`]: () => expected });
@@ -54,7 +62,7 @@ function record(response, name, expected) {
 }
 
 function requireSuccess(response, name) {
-  if (!record(response, name, response.status === 200)) throw new Error(`${name} failed with status ${response.status}`);
+  if (!record(response, name, response.status === 200)) throw new Error(unexpectedOutcome(name, response));
   return response;
 }
 

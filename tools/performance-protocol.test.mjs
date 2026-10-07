@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
+import * as httpDiagnostics from "../performance/http-diagnostics.js";
 
 const source = readFileSync(new URL("../performance/protocol.js", import.meta.url), "utf8");
 const contract = JSON.parse(readFileSync(new URL("../performance/contract.json", import.meta.url), "utf8"));
@@ -9,6 +10,7 @@ const contract = JSON.parse(readFileSync(new URL("../performance/contract.json",
 function protocol({ loginStatuses = [200], cancellationStatus = 204, refreshStatus = 200 } = {}) {
   const requests = [];
   const checks = [];
+  const logged = [];
   const metrics = new Map();
   let now = Date.UTC(2026, 0, 1);
   let bookingId = 0;
@@ -41,7 +43,7 @@ function protocol({ loginStatuses = [200], cancellationStatus = 204, refreshStat
     },
     check: (response, predicates) => { for (const [name, predicate] of Object.entries(predicates)) checks.push({ name, passed: predicate(response) }); },
     group: (name, action) => action(), sleep: seconds => { now += seconds * 1000; },
-    Counter: Metric, Rate: Metric, Trend: Metric, Date: Clock, console: { error() {} },
+    Counter: Metric, Rate: Metric, Trend: Metric, Date: Clock, console: { error: line => logged.push(line) }, ...httpDiagnostics,
     open: path => JSON.stringify(path.endsWith("contract.json") ? contract : { password: "test-password" }),
     __ENV: { PERF_PROFILE: "smoke", PERF_RUN_ID: "test-run", PERF_TARGET: "https://proxy:443" },
     __VU: 21, __ITER: 0
@@ -49,7 +51,7 @@ function protocol({ loginStatuses = [200], cancellationStatus = 204, refreshStat
   const executable = source.replace(/^import .*;\n/gm, "").replace("export const options", "globalThis.options")
     .replace("export default function ()", "globalThis.iteration = function ()").replace("export function handleSummary", "function handleSummary");
   runInNewContext(executable, context);
-  return { requests, checks, metrics, options: context.options,
+  return { requests, checks, metrics, logged, options: context.options,
     iterate: iteration => { context.__ITER = iteration; context.iteration(); },
     advanceDay: () => { now += 86_400_000; } };
 }
@@ -96,6 +98,8 @@ test("given a failed cancellation, when normalizing labels, then the failure rem
     { name: "DELETE /api/bookings/:id status 204", passed: false });
   assert.equal(run.metrics.get("technical_errors").at(-1), true);
   assert.equal(run.metrics.get("unexpected_server_errors").at(-1), 1);
+  assert.ok(run.logged.includes("DELETE /api/bookings/:id returned unexpected status 500 without a problem type"),
+    `the failed cancellation must be described in the run log, got ${JSON.stringify(run.logged)}`);
 });
 
 test("given refused login attempts, when authentication eventually succeeds, then retries and elapsed time are measured separately", () => {
