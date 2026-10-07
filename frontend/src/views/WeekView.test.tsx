@@ -1692,6 +1692,69 @@ it("given unchanged opening hours, when opening a booking dialog, then visible s
   expect(freeSlot(2, "13:00")).toHaveAttribute("data-state", "free");
 });
 
+it("given unchanged allocations, when opening a booking dialog, then their local time boundaries are not formatted again for each cell", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "13:00");
+  const times = vi.spyOn(clubZone, "formatTime");
+
+  // when
+  await userEvent.click(slot);
+  await screen.findByTestId("booking-dialog");
+
+  // then
+  expect(times.mock.calls.filter(([timestamp]) => timestamp === "2026-08-10T18:00:00+02:00"
+    || timestamp === "2026-08-10T19:00:00+02:00")).toHaveLength(0);
+  expect(freeSlot(2, "13:00")).toHaveAttribute("data-state", "free");
+});
+
+it("given an unchanged occupied cell, when opening a booking dialog elsewhere, then its displayed period is not recomputed", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const slot = await findFreeSlot(1, "13:00");
+  const periods = vi.spyOn(clubZone, "formatBookingTimeRange");
+
+  // when
+  await userEvent.click(slot);
+  await screen.findByTestId("booking-dialog");
+
+  // then
+  expect(periods.mock.calls.filter(([startsAt]) => startsAt === "2026-08-10T18:00:00+02:00")).toHaveLength(0);
+  expect(screen.getByTestId("allocation")).toHaveTextContent("6:00 PM");
+});
+
+it("given an occupied cell, when the display language changes, then its retained period follows the new locale", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("allocation");
+
+  // when
+  await act(async () => { await i18n.changeLanguage("de"); });
+
+  // then
+  expect(screen.getByTestId("allocation")).toHaveTextContent("18:00");
+});
+
+it("given unchanged slot geometry, when fresh allocations arrive, then their row instants stay resolved while occupancy updates", async () => {
+  // given
+  const now = clubInstant("12:00");
+  render(<WeekView today={now} clock={() => now} />);
+  await findFreeSlot(1, "13:00");
+  const instants = vi.spyOn(clubZone, "zonedDateTime");
+  vi.mocked(api.allocations).mockResolvedValue([]);
+
+  // when
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+    await Promise.resolve();
+  });
+  await waitFor(() => expect(screen.queryByTestId("allocation")).toBeNull());
+
+  // then
+  expect(instants.mock.calls.filter(([, time]) => time === "08:00")).toHaveLength(0);
+  expect(freeSlot(1, "18:00")).toHaveAttribute("data-state", "free");
+});
+
 it("given several courts on the same row, when opening a booking dialog, then each row resolves its instant at most once per render", async () => {
   // given
   const commits = vi.fn();
