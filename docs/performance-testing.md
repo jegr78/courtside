@@ -318,7 +318,8 @@ host user who owns the private credentials; any other UID would land on an unrel
 
 Protocol runs use the pinned official k6 image and write a self-contained `report.html`, the raw
 `raw-summary.json`, and a schema-validated `summary.json` below
-`build/performance/<profile>/<timestamp>`:
+`build/performance/<profile>/<timestamp>`. The same directory holds `k6.log`, the k6 output of the
+run, and `containers.log`, the application, proxy and database logs captured after k6 has stopped:
 
 ```text
 node tools/courtside.mjs perf-run smoke
@@ -347,6 +348,11 @@ week through language-neutral test hooks, creates a booking through the real bro
 CSRF token, verifies the allocation, reloads the PWA, and proves that the session remains active.
 The booking is cancelled during cleanup. This complements rather than replaces Playwright's
 functional E2E suite.
+
+A run that fails says why in `k6.log`. Every unexpected response is written once per request,
+status and problem type, with the violation codes, rejected fields and the `traceId` that finds
+the refusal in the server's trace. A failed browser journey names its step, page, VU and
+iteration; every failed request and console error of the browser is written as it happens.
 
 Browser reports retain p75 LCP, INP, and CLS against the contract budgets, failed browser requests
 and console errors, the complete-journey success rate, and average journey duration. Their profile
@@ -471,6 +477,6 @@ The command accepts only a bare public HTTPS origin on port 443. Before creating
 requires `/api/source` to identify a versioned UAT build. The fixed two-VU, two-minute journey checks
 the HTML shell and one generated asset, PWA manifest, public configuration, booking grid and CSRF
 cookie creation. It also proves that Swagger UI, OpenAPI and Actuator return `404` through the public
-ingress. Its sanitized HTML and JSON reports contain aggregate measurements and build identity, but
-not the supplied hostname. Stop sharing with `Ctrl+C` in the attached `uat share` terminal; the
+ingress. Its sanitized HTML and JSON reports contain aggregate measurements, the pass and fail
+count of every check and build identity, but not the supplied hostname. Stop sharing with `Ctrl+C` in the attached `uat share` terminal; the
 performance command never changes Funnel or UAT lifecycle state.

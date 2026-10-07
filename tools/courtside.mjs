@@ -1100,12 +1100,28 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       "-v", `${certificateFile}:/certs/root.crt:ro`,
       "-v", `${resultDirectory}:/results`,
       image,
-      "run", ...(options.remoteWrite ? ["--out", "experimental-prometheus-rw"] : []),
+      "run", "--log-output=file=/results/k6.log", ...(options.remoteWrite ? ["--out", "experimental-prometheus-rw"] : []),
       "--tag", `testid=${runId}`, "--tag", `profile=${options.profile}`,
       "--summary-trend-stats", "avg,min,med,max,p(50),p(75),p(90),p(95),p(99)",
       browserRun ? "/scripts/browser.js" : options.profile === "contention" ? "/scripts/contention.js" : "/scripts/protocol.js"
     ]
   };
+}
+
+export function performanceContainerLogPlan(stdout) {
+  return { ...perfComposePlan(["logs", "--no-color", "--timestamps", "app", "proxy", "db"]), stdout };
+}
+
+function retainContainerLogs(resultDirectory) {
+  const file = join(resultDirectory, "containers.log");
+  const output = openSync(file, "w", 0o600);
+  try {
+    runInteractive(performanceContainerLogPlan(output));
+  } catch (error) {
+    writeFileSync(file, `Container logs unavailable: ${error.message}\n`, { flag: "a" });
+  } finally {
+    closeSync(output);
+  }
 }
 
 export function funnelPerformanceRunPlan(options, resultDirectory, runId = "test-run") {
@@ -1157,6 +1173,8 @@ async function runPerformance(options) {
   } catch (error) {
     runFailure = error;
   }
+  retainContainerLogs(resultDirectory);
+  process.stdout.write(`k6 and container logs: ${resultDirectory}\n`);
   const rawSummary = join(resultDirectory, "raw-summary.json");
   if (!existsSync(rawSummary)) {
     rmSync(certificateFile, { force: true });
