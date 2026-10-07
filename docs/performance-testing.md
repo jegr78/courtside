@@ -376,8 +376,9 @@ than a general instruction to accept invalid certificates.
 
 The browser journey uses the earliest enabled slot on its VU's dedicated court, checking the
 selected day and the remaining current-week days before a single next-week fallback. It fails
-explicitly if neither week offers an enabled slot. It expands the additional booking
-fields and waits for the guest input to be visible before filling it. This keeps the UI request
+explicitly if neither week offers an enabled slot. It waits for the dialog's booking cards,
+because their arrival moves the dialog, then expands the additional booking fields, requires them
+to be open, fills the guest input and reads the value back before submitting. This keeps the UI request
 within the fixture card's advance window and includes the required second participant without
 bypassing the UI or weakening booking rules. The journey awaits the eligibility response and its
 interactive rendering before searching; a week switch awaits a date selector from the newly
