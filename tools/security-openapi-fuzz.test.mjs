@@ -870,3 +870,29 @@ test("given the native reserve, when every native case needs its one retry, then
   assert.ok(worstCase <= openApiFuzzPolicy.nativeRequestReserve,
     `${worstCase} native requests must fit the ${openApiFuzzPolicy.nativeRequestReserve} reserve`);
 });
+
+test("given operations whose own limiters advertise long waits, when Schemathesis selects operations, then none of them reaches it", () => {
+  // given
+  const limited = Object.keys(openApiFuzzPolicy.longRetryAfterOperations);
+  const inventory = buildOpenApiFuzzInventory(api);
+
+  // when
+  const generated = inventory.filter(({ modes }) => modes.includes("positive")).map(({ operationId }) => operationId);
+
+  // then
+  assert.ok(limited.length > 0);
+  for (const operationId of limited) {
+    assert.ok(inventory.some((entry) => entry.operationId === operationId), `${operationId} is in the contract`);
+    assert.ok(!generated.includes(operationId),
+      `${operationId} would let rate-limit auto wait up to three minutes on its own limiter`);
+  }
+});
+
+test("given a long-wait operation that turned read-only, when inventorying fuzz coverage, then the inventory refuses it", () => {
+  // given
+  const changed = structuredClone(api);
+  changed.paths["/api/account-recovery/password"].post["x-courtside-state-invariant"] = true;
+
+  // when / then
+  assert.throws(() => buildOpenApiFuzzInventory(changed), /requestPasswordReset.*own limiter/);
+});

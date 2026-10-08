@@ -49,5 +49,15 @@
     "createImportPreview": "Multipart parser abuse is covered by the curated CSA-IMPORT-001 cases.",
     "executeImportPreview": "Import execution is stateful and remains covered by deterministic import integration tests."
   },
+  "longRetryAfterOperations": {
+    "logIn": "login address and account limits",
+    "reauthenticate": "credential-proof limits",
+    "requestPasswordReset": "account-recovery mail limits",
+    "redeemPasswordReset": "account-recovery redemption limits",
+    "requestUsernameReminder": "account-recovery mail limits",
+    "changeInitialPassword": "credential-proof limits",
+    "changeOwnPassword": "credential-proof limits",
+    "requestAccountCredentials": "credential issue limits"
+  },
   "positiveMutationRationale": "Valid mutations are covered by packaged journeys and the authorization matrix; generated mutation traffic is restricted to rejected inputs so state preservation remains attributable."
 }

@@ -72,6 +72,10 @@ export function buildOpenApiFuzzInventory(api, policy = openApiFuzzPolicy) {
         ...(mutation ? { positive: policy.positiveMutationRationale } : {}),
         ...(inputs ? {} : { negative: "The operation has no request input to invalidate." })
       };
+      if (modes.includes("positive") && policy.longRetryAfterOperations?.[operation.operationId]) {
+        throw new Error(`${operation.operationId} answers 429 from its own limiter with a Retry-After`
+          + " that Schemathesis would wait for");
+      }
       return operationCoverage(operation.operationId, method, path, modes, excludedModes);
     }));
   const ids = inventory.map(({ operationId }) => operationId);
