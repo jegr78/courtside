@@ -2,7 +2,7 @@ import { browser } from "k6/browser";
 import { check } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
 import { prepareBrowserBooking } from "./browser-journey.js";
-import { consoleFailure, failedRequest, journeyFailure, refusal, refusedResponse } from "./browser-diagnostics.js";
+import { consoleFailure, consoleWarning, failedRequest, journeyFailure, refusal, refusedResponse } from "./browser-diagnostics.js";
 
 const contract = JSON.parse(open("/scripts/contract.json"));
 const credentials = JSON.parse(open("/run/courtside/perf.json"));
@@ -67,6 +67,8 @@ function observe(page) {
       browserErrors.add(1);
       technicalErrors.add(true);
     }
+    const warning = consoleWarning(message);
+    if (warning) report(warning);
   });
   page.on("response", (response) => {
     browserRequests.add(1);

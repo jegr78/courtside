@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  consoleFailure, failedRequest, journeyFailure, refusal, refusedResponse
+  consoleFailure, consoleWarning, failedRequest, journeyFailure, refusal, refusedResponse
 } from "../performance/browser-diagnostics.js";
 
 const target = "https://proxy";
@@ -55,6 +55,22 @@ test("given a console error, when describing it, then its text is kept and bound
 test("given a console warning, when describing it, then it is not a failure", () => {
   // when / then
   assert.equal(consoleFailure({ type: () => "warning", text: () => "deprecated" }), undefined);
+});
+
+test("given a console warning, when describing it as a warning, then its bounded text is named", () => {
+  // given
+  const message = { type: () => "warning", text: () => `booking dialog refresh: status 503 ${"x".repeat(600)}` };
+  // when
+  const description = consoleWarning(message);
+  // then
+  assert.match(description, /^console warning: booking dialog refresh: status 503 x+/);
+  assert.ok(description.length <= 330, "an unbounded console message must not flood the run log");
+});
+
+test("given a console error, when describing it as a warning, then it is left to the failure path", () => {
+  // when / then
+  assert.equal(consoleWarning({ type: () => "error", text: () => "boom" }), undefined,
+    "an error is counted by the failure path and must not be written twice");
 });
 
 test("given a refused booking, when describing the response, then status, problem type, violation codes and trace are named", async () => {

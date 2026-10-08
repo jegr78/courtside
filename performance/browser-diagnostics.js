@@ -25,6 +25,11 @@ export function consoleFailure(message) {
   return `console error: ${bounded(message.text())}`;
 }
 
+export function consoleWarning(message) {
+  if (message.type() !== "warning") return undefined;
+  return `console warning: ${bounded(message.text())}`;
+}
+
 export function refusedResponse(response, target) {
   if (response.status() < 400) return undefined;
   return `response ${response.status()}: ${response.request().method()} ${pathOf(response.url(), target)}`;
