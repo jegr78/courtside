@@ -432,7 +432,7 @@ export function readSecurityEnvironment(runId) {
 
 export function mergeSecurityProcessEnvironment(security, host = process.env) {
   const selected = Object.fromEntries(Object.entries(security)
-    .filter(([name]) => name.startsWith("COURTSIDE_SECURITY_")));
+    .filter(([name]) => name.startsWith("COURTSIDE_")));
   return { ...host, ...selected };
 }
 

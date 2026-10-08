@@ -1298,6 +1298,21 @@ test("given security state and a host toolchain, when launching owned commands, 
   assert.equal(environment.COURTSIDE_SECURITY_RUN_ID, "run-0001");
 });
 
+test("given a recorded security environment, when launching owned commands, then every deployment value it recorded reaches them", () => {
+  // given
+  const recorded = securityEnvironment("relay-run-0001", `sha256:${"a".repeat(64)}`);
+
+  // when
+  const environment = mergeSecurityProcessEnvironment({ ...recorded, PATH: "state-must-not-control-tools" },
+    { PATH: "/trusted/bin" });
+
+  // then
+  for (const [name, value] of Object.entries(recorded)) {
+    assert.equal(environment[name], value, `${name} is part of the recorded deployment and must reach Compose`);
+  }
+  assert.equal(environment.PATH, "/trusted/bin", "the record must never select the host's tools");
+});
+
 test("given a disposable security identity, when configuring the relay, then private trust assets belong to that run and the local non-root owner", () => {
   // given
   const image = `sha256:${"a".repeat(64)}`;
