@@ -365,6 +365,10 @@ page once when that happens on its first page load, writes the failed request wi
 the reload in `browser_verifier_reloads` instead of `browser_errors`. Any later failure, including a
 second verifier change, counts as a browser error.
 
+The journey reads the created booking's id from the `Location` header of the 201 response rather
+than from its body, because Chromium can fail to serve a response body over the DevTools protocol
+after the response has arrived. A 201 without a `Location` fails the journey.
+
 Browser reports retain p75 LCP, INP, and CLS against the contract budgets, failed browser requests
 and console errors, the complete-journey success rate, and average journey duration. Their profile
 and metrics remain distinct from protocol results. Since a full browser run is resource-intensive
