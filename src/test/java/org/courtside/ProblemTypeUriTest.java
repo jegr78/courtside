@@ -93,6 +93,8 @@ class ProblemTypeUriTest {
             "urn:courtside:error:opening-week-incomplete",
             "urn:courtside:error:operational-log-cursor-unknown",
             "urn:courtside:error:operational-log-range-invalid",
+            "urn:courtside:error:operation-capacity-exhausted",
+            "urn:courtside:error:request-rate-limited",
             "urn:courtside:error:weekly-opening-hours-rejected",
             "urn:courtside:error:membership-type-inactive",
             "urn:courtside:error:membership-type-name-taken",
