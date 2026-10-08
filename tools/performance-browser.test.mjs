@@ -507,3 +507,66 @@ test("given a certificate verifier change again after the reload, when the journ
   assert.deepEqual(harness.metrics.get("browser_errors").filter(value => value > 0), [1, 1],
     "a second verifier change is a browser error like any other failed request");
 });
+
+function bookingSubmissionHarness(location) {
+  const selectors = [];
+  class Metric {
+    add() {}
+  }
+  const element = { waitFor: async () => {}, fill: async () => {}, click: async () => {} };
+  const response = url => ({
+    status: () => url.endsWith("/api/bookings") ? 201 : 200,
+    json: async () => {
+      if (url.endsWith("/api/bookings")) {
+        throw new Error("getting response body: fetching response body: No data found for resource with given identifier (-32000)");
+      }
+      return {};
+    },
+    headerValue: async name => name.toLowerCase() === "location" ? location : null
+  });
+  const page = {
+    on: () => {}, goto: async () => {}, reload: async () => {},
+    getByTestId: () => element,
+    waitForResponse: async url => response(url),
+    locator: selector => {
+      selectors.push(selector);
+      return { waitFor: async () => { throw new Error("stop after locating the own booking"); } };
+    },
+    url: () => "https://proxy/", close: async () => {}
+  };
+  const context = {
+    browser: { newPage: async () => page },
+    check: () => true, Counter: Metric, Rate: Metric, Trend: Metric,
+    open: path => JSON.stringify(path.endsWith("contract.json") ? contract : { password: "test-password" }),
+    console: { error: () => {} }, Date,
+    __ENV: { PERF_TARGET: "https://proxy" }, __VU: 2, __ITER: 22,
+    ...browserDiagnostics, prepareBrowserBooking: async () => {}
+  };
+  runInNewContext(browserSource.replace(/^import .*;\n/gm, "").replace("export const options", "globalThis.options")
+    .replace("export default async function", "globalThis.iteration = async function")
+    .replace("export function handleSummary", "function handleSummary"), context);
+  return { selectors, run: () => context.iteration() };
+}
+
+test("given a created booking whose response body the browser cannot fetch, when the journey submits it, then it finds the booking by its location header", async () => {
+  // given
+  const harness = bookingSubmissionHarness("/api/bookings/f2b6c1d4-0000-4000-8000-000000000042");
+
+  // when
+  await harness.run();
+
+  // then
+  assert.ok(harness.selectors.includes('[data-testid="own-allocation"][data-booking-id="f2b6c1d4-0000-4000-8000-000000000042"]'),
+    `the journey must look for the created booking by the id in its location, got ${JSON.stringify(harness.selectors)}`);
+});
+
+test("given a created booking without a location header, when the journey submits it, then the journey fails at the submission", async () => {
+  // given
+  const harness = bookingSubmissionHarness(null);
+
+  // when
+  await harness.run();
+
+  // then
+  assert.deepEqual(harness.selectors, [], "without a location the journey must not look for any booking");
+});

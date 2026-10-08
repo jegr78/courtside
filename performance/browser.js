@@ -130,8 +130,9 @@ export default async function () {
     await page.getByTestId("booking-submit").click();
     const response = await bookingResponsePromise;
     if (response.status() !== 201) throw new Error(await refusal("the booking UI", response));
-    bookingId = (await response.json()).id;
-    if (!bookingId) throw new Error("The booking UI returned no booking id");
+    // The Location header needs no body fetch, which Chromium can fail to serve after a 201.
+    bookingId = ((await response.headerValue("location")) ?? "").match(/\/api\/bookings\/([^/?#]+)$/)?.[1];
+    if (!bookingId) throw new Error("The booking UI returned no booking location");
     step = "show own booking";
     const ownAllocation = page.locator(`[data-testid="own-allocation"][data-booking-id="${bookingId}"]`);
     await ownAllocation.waitFor();
