@@ -824,7 +824,8 @@ for (const [name, answer, typed] of [
     // then
     const read = harness.calls.find(call => call.path === "/api/public/booking-grid");
     assert.ok(!read.cookie.includes("__Host-SESSION="), "address pressure spends the address budget, never an account's");
-    assert.equal(harness.counters.address_admission_refusals ?? 0, typed ? 1 : 0);
+    assert.equal(harness.counters.address_admission_refusals ?? 0, typed ? 1 : 0,
+      "only an address-budget refusal proves the read pressure went over that budget");
     const check = harness.backend.checks.find(entry => entry.name === "admission-pressure:answered-or-typed-refusal");
     assert.equal(check.pass, answer.type !== "urn:courtside:error:request-rate-limited" || answer.retry !== null);
   });
