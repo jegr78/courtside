@@ -97,6 +97,99 @@ export function evaluateSafetyLimits(samples, limits) {
   return { violated: false, reason: null, sampleSequence: null };
 }
 
+const admissionProblemTypes = ["urn:courtside:error:request-rate-limited",
+  "urn:courtside:error:operation-capacity-exhausted"];
+const raceScenarios = ["competing-court-occupancy", "duplicate-delivery", "participant-capacity"];
+const integrityScenarios = [...raceScenarios, "preview-mutation-race"];
+
+function admissionRefusal(operation) {
+  return operation.status === 429 && admissionProblemTypes.includes(operation.problemType)
+    && Number.isSafeInteger(operation.retryAfterSeconds) && operation.retryAfterSeconds >= 1;
+}
+
+function escaped(value) {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function scenarioOperations(operations, runId) {
+  const id = escaped(runId);
+  const keyed = (pattern) => operations.filter((operation) => operation.kind === "createBooking"
+    && pattern.test(operation.request?.idempotencyKey ?? ""));
+  return {
+    "competing-court-occupancy": keyed(new RegExp(`^security-${id}-\\d+-\\d+$`)),
+    "duplicate-delivery": keyed(new RegExp(`^security-${id}-duplicate$`)),
+    "participant-capacity": keyed(new RegExp(`^security-capacity-${id}-\\d+-\\d+$`)),
+    "preview-mutation-race": [...keyed(new RegExp(`^security-${id}-toctou$`)), ...operations.filter((operation) =>
+      operation.kind === "createSeries"
+      || operation.kind === "previewSeries" && operation.request?.occurrenceCount === 1)],
+    "series-and-rule-cost": operations.filter((operation) => operation.kind === "previewSeries"
+      && operation.request?.occurrenceCount === 200)
+  };
+}
+
+function raceExercised(operations) {
+  const answered = operations.filter((operation) => operation.status !== 429)
+    .map((operation) => [Date.parse(operation.startedAt), Date.parse(operation.endedAt)])
+    .toSorted(([left], [right]) => left - right);
+  let latestEnd = -Infinity;
+  for (const [startedAt, endedAt] of answered) {
+    if (startedAt < latestEnd) return true;
+    latestEnd = Math.max(latestEnd, endedAt);
+  }
+  return false;
+}
+
+export function resourceAdmissionPolicy(runtime, application) {
+  const overrides = (runtime?.Config?.Env ?? []).filter((entry) =>
+    /^COURTSIDE_(?:ADMISSION|LOGIN)_/.test(String(entry).split("=")[0]));
+  if (overrides.length) throw new Error("The assessed target overrides shipped admission or login defaults");
+  return { enforced: application?.courtside?.admission != null };
+}
+
+export function resourceCompetingWrites(operations, runId, validatedBookingIdHashes) {
+  const newBooking = (operation) => operation.status === 201 && typeof operation.responseBookingId === "string"
+    && validatedBookingIdHashes.has(`sha256:${createHash("sha256")
+      .update(JSON.stringify(operation.responseBookingId)).digest("hex")}`);
+  const byScenario = scenarioOperations(operations, runId);
+  const competition = byScenario["competing-court-occupancy"];
+  const duplicates = byScenario["duplicate-delivery"];
+  const series = operations.filter((operation) => operation.kind === "createSeries");
+  return {
+    successful: new Set(competition.filter(newBooking).map((operation) => operation.responseBookingId)).size,
+    rejected: competition.filter((operation) => [409, 422].includes(operation.status)).length,
+    partialOperations: competition.filter((operation) => ![201, 409, 422].includes(operation.status)
+      && !admissionRefusal(operation)).length,
+    duplicateBookings: new Set(duplicates.filter(newBooking).map((operation) => operation.responseBookingId)).size,
+    duplicateResponses: duplicates.filter(newBooking).length,
+    duplicateFailures: duplicates.filter((operation) => !newBooking(operation) && !admissionRefusal(operation)).length,
+    toctouCreated: series.reduce((count, operation) => count + (operation.seriesResult?.bookingIds?.length ?? 0), 0),
+    toctouSkipped: series.reduce((count, operation) => count + (operation.seriesResult?.skipped?.length ?? 0), 0),
+    admissionRefused: integrityScenarios.flatMap((id) => byScenario[id]).filter(admissionRefusal).length
+  };
+}
+
+export function resourceScenarioOutcomes({ scenarios, summary, telemetryComplete, failed, operations, runId,
+  admissionEnforced }) {
+  const byScenario = scenarioOperations(operations ?? [], runId);
+  return scenarios.map(({ id, checks: requiredChecks }) => {
+    const checks = summary?.checks?.filter(({ name }) => name.startsWith(`${id}:`)) ?? [];
+    const observedNames = new Set(checks.map(({ name }) => name));
+    const missingCheck = requiredChecks.some((name) => !observedNames.has(`${id}:${name}`));
+    const fixtureFailed = checks.some(({ name, fails }) => name.endsWith(":fixtures-ready") && fails > 0);
+    const assertionFailed = checks.some(({ name, fails }) => !name.endsWith(":fixtures-ready") && fails > 0);
+    const scenarioOperationsOf = byScenario[id] ?? [];
+    const refused = integrityScenarios.includes(id) && scenarioOperationsOf.some(admissionRefusal);
+    const raceMissing = raceScenarios.includes(id) && !raceExercised(scenarioOperationsOf);
+    const pressureUnrefused = id === "series-and-rule-cost" && admissionEnforced
+      && !scenarioOperationsOf.some(admissionRefusal);
+    const outcome = missingCheck || fixtureFailed || !telemetryComplete || failed
+      || id === "login-rate-limit-boundary" && !summary.rateLimitedLogins
+      || refused || raceMissing || pressureUnrefused ? "incomplete"
+      : assertionFailed ? "failed" : "passed";
+    return { id, outcome };
+  });
+}
+
 export async function runResourceAbuseAssessment(plan, context) {
   assertDestructivePlan(plan, context);
   const execution = await context.runAbuse(plan, {
@@ -147,6 +240,7 @@ export async function runResourceAbuseAssessment(plan, context) {
     || execution.requestCount < 1 || execution.requestCount > context.maxRequests
     || execution.generatedDataMegabytes > plan.budgets.generatedDataMegabytes
     || execution.scenarios.some(({ outcome }) => outcome === "incomplete")
+    || execution.competingWrites.admissionRefused > 0
     || recoveryOutcomes.includes("incomplete")
     || integrityOutcomes.some((phase) => phase !== "passed")
     || !execution.stateBefore || !execution.stateAfter || !execution.stateAfterCleanup || !execution.stateAfterRecovery;

@@ -511,7 +511,7 @@ test("given actual protected drift before cleanup or during effects, when export
         recovery: phases.recovery?.outcome ?? "incomplete" },
       recovery: { health: "incomplete", restart: "incomplete", database: "incomplete", domainIntegrity: "incomplete" },
       competingWrites: { successful: 0, rejected: 0, partialOperations: 0, duplicateBookings: 0,
-        duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0 },
+        duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0, admissionRefused: 0 },
       scannerImage: resourceAbusePolicy.image, scriptDigest: resourceAbuseScriptDigest(),
       mountedPolicyDigest: resourceAbusePolicyFileDigest(), gatewayDigest: resourceAbuseGatewayDigest(),
       integrityModuleDigest: resourceAbuseIntegrityDigest(), receiptParserDigest: resourceAbuseReceiptParserDigest(),

@@ -15,7 +15,7 @@ import {
   inspectPassiveSecurityRuntime, readSecurityEnvironment, readSecurityIdentity, readSecurityProxyCa,
   recoverSecurityEnvironment, runAuthenticatedZap, runOpenApiFuzzer, runPassiveZap, runResourceAbuse,
   resetSecurityLoginAttempts, securityDomainStateFingerprint,
-  securityProject, securityStateRoot, seedSecurityEnvironment,
+  securityProject, securityStateRoot, seedSecurityEnvironment, shippedLoginAddressMaxFailures,
   startSecurityEnvironment, stopSecurityEnvironment, verifySecurityEnvironment, verifySecurityEnvironmentForAssessment
 } from "./security-environment.mjs";
 import {
@@ -762,7 +762,7 @@ async function execute(options) {
         ...context,
         ca,
         sharedPassword: securityEnvironment.COURTSIDE_SECURITY_SHARED_PASSWORD,
-        maxAddressFailures: Number(securityEnvironment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES)
+        maxAddressFailures: shippedLoginAddressMaxFailures()
       }),
       resetLoginAttempts: async (selectedPlan, context) => resetSecurityLoginAttempts(selectedPlan.runId,
         context.stopFile, Math.max(1, context.deadline.getTime() - Date.now())),

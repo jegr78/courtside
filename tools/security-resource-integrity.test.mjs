@@ -263,7 +263,8 @@ function scriptFixtureStates(journal, clock) {
   input.contract.authentication.loginPolicy = { proofMode: "http-bounded-v1", sourceAddress,
     address: { maxFailures: 5, windowMilliseconds: 60000, blockMilliseconds: 60000 }, global: { windowMilliseconds: 60000 } };
   input.after.tables.login_attempt_limit.rows.push(row("login_attempt_limit", { scope: "GLOBAL", subject_hash: globalHash,
-    attempt_count: 1, window_started_at: login.startedAt }));
+    attempt_count: journal.operations.filter((operation) => operation.kind === "login").length,
+    window_started_at: login.startedAt }));
   input.journal.gatewayBodyRejectionsComplete = true;
   input.journal.gatewayBodyRejections = [{ operationId: gateway.id, method: gateway.method, path: gateway.path,
     status: 413, bodyBytes: gateway.request.bodyBytes, contentType: gateway.request.contentType,
@@ -2101,7 +2102,7 @@ test("given a native rejection outside the actual HTTP interval, when its timest
 });
 
 for (const clock of [start, "2026-12-01T10:00:00.000Z"]) {
-  test(`given the actual k6 source and journal parser at ${clock}, when shared-session TOCTOU and the oversized probe are compared against fixture states, then all normalized operation contracts qualify together`, (t) => {
+  test(`given the actual k6 source and journal parser at ${clock}, when the TOCTOU session and the oversized probe are compared against fixture states, then all normalized operation contracts qualify together`, (t) => {
     // given
     const harness = actualScriptHarness(clock);
     const run = harness.setup();

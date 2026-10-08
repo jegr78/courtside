@@ -9,6 +9,7 @@ import {
   evaluateResourceSignals, evaluateSafetyLimits, resourceAbuseGatewayDigest, resourceAbusePolicy,
   resourceAbusePolicyDigest, resourceAbusePolicyFileDigest, resourceAbuseScriptDigest,
   resourceAbuseIntegrityDigest, resourceAbuseReceiptParserDigest,
+  resourceAdmissionPolicy, resourceCompetingWrites, resourceScenarioOutcomes,
   runResourceAbuseAssessment, validateResourceAbuseEvidence
 } from "./security-resource-abuse.mjs";
 
@@ -87,7 +88,7 @@ function successfulExecution() {
     integrityEvidenceDigest: digest,
     competingWrites: { successful: 1, rejected: 9, partialOperations: 0,
       duplicateBookings: 1, duplicateResponses: 9, duplicateFailures: 0,
-      toctouCreated: 0, toctouSkipped: 1 },
+      toctouCreated: 0, toctouSkipped: 1, admissionRefused: 0 },
     scannerImage: resourceAbusePolicy.image,
     scriptDigest: resourceAbuseScriptDigest(),
     mountedPolicyDigest: resourceAbusePolicyFileDigest(),
@@ -322,7 +323,7 @@ test("given a circuit breaker stops before competing writes, when evaluating the
   execution.circuitBreaker = { tripped: true, reason: "app-cpu", sampleSequence: 2 };
   execution.competingWrites = { successful: 0, rejected: 0, partialOperations: 0,
     duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0,
-    toctouCreated: 0, toctouSkipped: 0 };
+    toctouCreated: 0, toctouSkipped: 0, admissionRefused: 0 };
   execution.scenarios = execution.scenarios.map((scenario) => ({ ...scenario, outcome: "incomplete" }));
 
   // when
@@ -362,7 +363,7 @@ test("given interruption before any request or resource sample, when retaining e
   execution.requestCount = 0;
   execution.samples = [];
   execution.competingWrites = { successful: 0, rejected: 0, partialOperations: 0,
-    duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0 };
+    duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0, admissionRefused: 0 };
   execution.scenarios = execution.scenarios.map((scenario) => ({ ...scenario, outcome: "incomplete" }));
   // when
   const result = await runResourceAbuseAssessment(plan, {
@@ -381,7 +382,7 @@ test("given passing scenario labels without observed race coverage, when evaluat
   // given
   const execution = successfulExecution();
   execution.competingWrites = { successful: 0, rejected: 0, partialOperations: 0,
-    duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0 };
+    duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0, admissionRefused: 0 };
   // when
   const result = await runResourceAbuseAssessment(plan, {
     evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")), maxRequests: 1000,
@@ -479,6 +480,155 @@ test("given an active or unbounded plan, when resource abuse is requested, then 
   }), /request budget/);
 });
 
+const runId = "run-example";
+const refusal = { status: 429, problemType: "urn:courtside:error:request-rate-limited", retryAfterSeconds: 1 };
+
+function bookingOperation(id, key, startedAt, endedAt, answer) {
+  return { id, kind: "createBooking", startedAt, endedAt, request: { idempotencyKey: key },
+    responseBookingId: null, ...answer };
+}
+
+function raceOperations() {
+  return [
+    bookingOperation("1:1", `security-${runId}-1-0`, "2026-10-08T10:00:00.000Z", "2026-10-08T10:00:00.300Z",
+      { status: 201, responseBookingId: "30000000-0000-0000-0000-000000000001" }),
+    bookingOperation("2:1", `security-${runId}-2-0`, "2026-10-08T10:00:00.010Z", "2026-10-08T10:00:00.200Z",
+      { status: 409, problemType: "urn:courtside:error:court-unavailable" }),
+    bookingOperation("3:1", `security-${runId}-duplicate`, "2026-10-08T10:00:00.000Z", "2026-10-08T10:00:00.300Z",
+      { status: 201, responseBookingId: "30000000-0000-0000-0000-000000000002" }),
+    bookingOperation("4:1", `security-${runId}-duplicate`, "2026-10-08T10:00:00.020Z", "2026-10-08T10:00:00.310Z",
+      { status: 201, responseBookingId: "30000000-0000-0000-0000-000000000002" }),
+    bookingOperation("5:1", `security-capacity-${runId}-5-0`, "2026-10-08T10:00:00.000Z", "2026-10-08T10:00:00.100Z",
+      { status: 400, problemType: "urn:courtside:error:participants-invalid" }),
+    bookingOperation("6:1", `security-capacity-${runId}-6-0`, "2026-10-08T10:00:00.050Z", "2026-10-08T10:00:00.150Z",
+      { status: 400, problemType: "urn:courtside:error:participants-invalid" })
+  ];
+}
+
+function scenarioInput(operations, admissionEnforced = false) {
+  return { scenarios: resourceAbusePolicy.scenarios, runId, admissionEnforced, telemetryComplete: true,
+    failed: false, operations,
+    summary: { rateLimitedLogins: 3, checks: resourceAbusePolicy.scenarios.flatMap(({ id, checks }) =>
+      checks.map((check) => ({ name: `${id}:${check}`, passes: 1, fails: 0 }))) } };
+}
+
+function outcomeOf(outcomes, id) {
+  return outcomes.find((scenario) => scenario.id === id).outcome;
+}
+
+test("given overlapping integrity requests and no refusal, when judging scenarios, then every scenario passes", () => {
+  // when
+  const outcomes = resourceScenarioOutcomes(scenarioInput(raceOperations()));
+
+  // then
+  assert.deepEqual(outcomes.filter(({ outcome }) => outcome !== "passed"), []);
+});
+
+test("given an admission refusal inside an integrity scenario, when judging scenarios, then only that scenario is incomplete", () => {
+  // given
+  const operations = raceOperations();
+  operations.push(bookingOperation("7:1", `security-${runId}-duplicate`, "2026-10-08T10:00:01.000Z",
+    "2026-10-08T10:00:01.010Z", refusal));
+
+  // when
+  const outcomes = resourceScenarioOutcomes(scenarioInput(operations));
+
+  // then
+  assert.equal(outcomeOf(outcomes, "duplicate-delivery"), "incomplete",
+    "a refused replay never reached the code whose integrity the scenario judges");
+  assert.equal(outcomeOf(outcomes, "competing-court-occupancy"), "passed");
+});
+
+test("given integrity requests that never overlapped, when judging scenarios, then the race was not exercised", () => {
+  // given
+  const operations = raceOperations();
+  operations[1] = { ...operations[1], startedAt: "2026-10-08T10:00:02.000Z", endedAt: "2026-10-08T10:00:02.100Z" };
+
+  // when
+  const outcomes = resourceScenarioOutcomes(scenarioInput(operations));
+
+  // then
+  assert.equal(outcomeOf(outcomes, "competing-court-occupancy"), "incomplete",
+    "sequential competitors prove a conflict check, not a race");
+});
+
+test("given enforced admission, when the over-budget series pressure saw no typed refusal, then it is incomplete", () => {
+  // given
+  const preview = (id, answer) => ({ id, kind: "previewSeries", startedAt: "2026-10-08T10:00:30.000Z",
+    endedAt: "2026-10-08T10:00:30.200Z", request: { occurrenceCount: 200 }, ...answer });
+  const answered = [...raceOperations(), preview("9:1", { status: 200 })];
+  const refused = [...answered, preview("9:2", refusal)];
+  const untyped = [...answered, preview("9:2", { status: 429, problemType: null, retryAfterSeconds: null })];
+
+  // when / then
+  assert.equal(outcomeOf(resourceScenarioOutcomes(scenarioInput(answered, false)), "series-and-rule-cost"), "passed",
+    "a target without admission control has nothing to refuse");
+  assert.equal(outcomeOf(resourceScenarioOutcomes(scenarioInput(answered, true)), "series-and-rule-cost"),
+    "incomplete", "pressure that was never refused never went over the budget it is meant to exceed");
+  assert.equal(outcomeOf(resourceScenarioOutcomes(scenarioInput(untyped, true)), "series-and-rule-cost"),
+    "incomplete", "a bare 429 is not the typed refusal with Retry-After");
+  assert.equal(outcomeOf(resourceScenarioOutcomes(scenarioInput(refused, true)), "series-and-rule-cost"), "passed");
+});
+
+test("given a failing integrity assertion, when judging scenarios, then the scenario fails", () => {
+  // given
+  const input = scenarioInput(raceOperations());
+  input.summary.checks.find(({ name }) => name === "competing-court-occupancy:serialized").fails = 1;
+
+  // when / then
+  assert.equal(outcomeOf(resourceScenarioOutcomes(input), "competing-court-occupancy"), "failed");
+});
+
+test("given refused integrity writes, when counting competing writes, then they are neither partial nor duplicate failures", () => {
+  // given
+  const operations = [...raceOperations(),
+    bookingOperation("7:1", `security-${runId}-7-0`, "2026-10-08T10:00:01.000Z", "2026-10-08T10:00:01.010Z", refusal),
+    bookingOperation("8:1", `security-${runId}-duplicate`, "2026-10-08T10:00:01.000Z", "2026-10-08T10:00:01.010Z",
+      { ...refusal, problemType: "urn:courtside:error:operation-capacity-exhausted" }),
+    bookingOperation("9:1", `security-${runId}-9-0`, "2026-10-08T10:00:01.000Z", "2026-10-08T10:00:01.010Z",
+      { status: 429, problemType: null, retryAfterSeconds: null })];
+  const validated = new Set(["30000000-0000-0000-0000-000000000001", "30000000-0000-0000-0000-000000000002"]
+    .map((id) => `sha256:${createHash("sha256").update(JSON.stringify(id)).digest("hex")}`));
+
+  // when
+  const writes = resourceCompetingWrites(operations, runId, validated);
+
+  // then
+  assert.deepEqual(writes, { successful: 1, rejected: 1, partialOperations: 1, duplicateBookings: 1,
+    duplicateResponses: 2, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0, admissionRefused: 2 },
+  "a typed refusal is counted apart, while a bare 429 stays a partial operation");
+});
+
+test("given refused competing writes, when evaluating the run, then the assessment is incomplete and never blames integrity", async () => {
+  // given
+  const execution = successfulExecution();
+  execution.competingWrites.admissionRefused = 3;
+
+  // when
+  const result = await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")), maxRequests: 1000,
+    attempt: 1, deadline: new Date(Date.now() + 60_000), runAbuse: async () => execution
+  });
+
+  // then
+  assert.equal(result.outcome, "incomplete");
+  assert.equal(result.competingWrites.admissionRefused, 3);
+});
+
+test("given the assessed target, when it overrides shipped login or admission defaults, then the run refuses to qualify it", () => {
+  // given
+  const runtime = (...entries) => ({ Config: { Env: ["COURTSIDE_COOKIE_SECURE=true", ...entries] } });
+
+  // when / then
+  assert.deepEqual(resourceAdmissionPolicy(runtime(), { courtside: { admission: { account: {} } } }), { enforced: true });
+  assert.deepEqual(resourceAdmissionPolicy(runtime(), { courtside: {} }), { enforced: false });
+  for (const override of ["COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES=5", "COURTSIDE_LOGIN_GLOBAL_THRESHOLD=20",
+    "COURTSIDE_ADMISSION_ACCOUNT_BURST=100000"]) {
+    assert.throws(() => resourceAdmissionPolicy(runtime(override), { courtside: {} }), /shipped/,
+      `${override} would qualify a configuration no club installs`);
+  }
+});
+
 test("given the destructive k6 profile, when inspecting it, then every curated abuse class stays gateway-bound", () => {
   // given
   const script = readFileSync(new URL("../security/resource-abuse.js", import.meta.url), "utf8");
@@ -498,13 +648,13 @@ test("given the destructive k6 profile, when inspecting it, then every curated a
     /journalPost\(`\$\{target\}\/api\/public\/participant-members`[\s\S]*?query: "Member2"[\s\S]*?"X-XSRF-TOKEN": token/);
   assert.match(script, /if \(!failedToken\)[\s\S]*captureCookies\(session, failedSessionCookies\)/);
   assert.match(script, /journalPost\(`\$\{target\}\/api\/session`[\s\S]*captureCookies\(response, failedSessionCookies\)/);
-  assert.match(script, /case 0:[\s\S]*competingOccupancy\(\)[\s\S]*case 5:[\s\S]*failedLogin\(\)/);
+  assert.match(script, /case 0:[\s\S]*boundedRead\("\/api\/public\/booking-grid"\)[\s\S]*case 5:[\s\S]*failedLogin\(\)/);
   assert.match(script, /const clock = slotPlan\.clock/);
   assert.match(script, /resourceSlotPlan\(__ENV\.COURTSIDE_SECURITY_DATE_PLAN\)/);
   assert.doesNotMatch(script, /const clock = Date\.now\(\)/);
   assert.match(script, /attackStartsAt: Date\.now\(\) \+ policy\.warmupSeconds \* 1000/);
   assert.match(script, /scenarioFixturesReady\("series-and-rule-cost", \(\) => Boolean\(courtId\)\)/);
-  assert.match(script, /export function resourceAbuse\(run\) \{[\s\S]*useSetupSession\(run\);[\s\S]*switch \(__ITER/);
+  assert.match(script, /export function resourceAbuse\(run\) \{[\s\S]*useSetupSession\(run, null\);[\s\S]*switch \(__ITER/);
   assert.equal(resourceAbusePolicy.stages.at(-1).target, 0);
   assert.equal(resourceAbusePolicy.stages[0].target, 12);
   assert.equal(resourceAbusePolicy.scenarios.length, 8);
@@ -514,6 +664,66 @@ test("given the destructive k6 profile, when inspecting it, then every curated a
   }
   assert.match(script, /preview_mutation:[\s\S]*exec: "previewMutation"/);
   assert.match(script, /request_body:[\s\S]*exec: "requestBodyLimit"/);
+});
+
+test("given the destructive k6 profile, when separating integrity from pressure, then each integrity race has its own session and none shares the pressure", () => {
+  // given
+  const script = readFileSync(new URL("../security/resource-abuse.js", import.meta.url), "utf8");
+  const exported = (name) => new RegExp(`export function ${name}\\(run\\) \\{([\\s\\S]*?)\\n\\}`).exec(script)?.[1] ?? "";
+
+  // when
+  const sessions = ["competingOccupancyRace", "duplicateDeliveryRace", "participantCapacityRace", "previewMutation",
+    "seriesPressure"].map((name) => /useSetupSession\(run, "([a-z]+)"\)/.exec(exported(name))?.[1]);
+
+  // then
+  assert.equal(new Set(sessions).size, 5, `every scenario signs in on its own session: ${sessions}`);
+  assert.match(script, /const sessionNames = \[[^\]]*\];/);
+  assert.match(exported("resourceAbuse"), /useSetupSession\(run, null\)/, "pressure runs anonymously");
+  for (const race of ["competingOccupancyRace", "duplicateDeliveryRace", "participantCapacityRace"]) {
+    assert.match(exported(race), /awaitTick\(\);/, `${race} fires on a shared tick so its requests overlap`);
+  }
+  for (const integrity of ["competingOccupancy", "duplicateDelivery", "participantCapacity"]) {
+    const body = new RegExp(`function ${integrity}\\(\\) \\{([\\s\\S]*?)\\n\\}`).exec(script)[1];
+    assert.ok(body.indexOf("if (refusedIntegrityRequest(response)) return;") < body.indexOf("check(response"),
+      `${integrity} must not judge a request admission refused`);
+  }
+});
+
+test("given the destructive k6 profile, when warming up, then pressure exercises its paths at a low rate instead of sleeping", () => {
+  // given
+  const script = readFileSync(new URL("../security/resource-abuse.js", import.meta.url), "utf8");
+
+  // when
+  const pressure = /export function resourceAbuse\(run\) \{([\s\S]*?)\n\}/.exec(script)[1];
+
+  // then
+  assert.doesNotMatch(pressure, /return;/, "no warm-up branch skips the iteration");
+  assert.match(pressure, /sleep\(Date\.now\(\) < run\.attackStartsAt \? 1 : 0\.1\);$/);
+});
+
+test("given the shipped account budget, when sizing the destructive scenarios, then integrity stays within it and series pressure exceeds it", () => {
+  // given
+  const application = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml").load(
+    readFileSync(new URL("../src/main/resources/application.yaml", import.meta.url), "utf8"));
+  const shipped = (value, fallback) => Number(/:(\d+)\}$/.exec(String(value ?? ""))?.[1] ?? fallback);
+  const perSecond = shipped(application.courtside?.admission?.account?.["per-second"], 20);
+  const burst = shipped(application.courtside?.admission?.account?.burst, 200);
+  const { racers, tickSeconds, rounds } = resourceAbusePolicy.integrity;
+  const bookingWriteCost = 2;
+  const seriesCost = 10;
+
+  // when
+  const integrityPerSecond = 3 * racers * bookingWriteCost / tickSeconds;
+  const toctouCost = 2 * seriesCost + bookingWriteCost;
+  const pressurePerSecond = resourceAbusePolicy.seriesPressure.vus / 0.2 * seriesCost;
+
+  // then
+  assert.ok(integrityPerSecond <= perSecond, `${integrityPerSecond} tokens a second must fit ${perSecond}`);
+  assert.ok(integrityPerSecond * rounds * tickSeconds + toctouCost <= burst + perSecond * rounds * tickSeconds);
+  assert.ok(pressurePerSecond > 2 * perSecond, "series pressure must go clearly over the account budget");
+  assert.ok(resourceAbusePolicy.seriesPressure.startSeconds
+    >= resourceAbusePolicy.warmupSeconds + rounds * tickSeconds + burst / perSecond,
+  "the account bucket refills between the integrity races and the pressure that drains it");
 });
 
 test("given every request the assessment script makes, when it is read against the contract, "

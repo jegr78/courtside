@@ -52,7 +52,7 @@
       }
     },
     "competingWrites": { "type": "object", "additionalProperties": false,
-      "required": ["successful", "rejected", "partialOperations", "duplicateBookings", "duplicateResponses", "duplicateFailures", "toctouCreated", "toctouSkipped"], "properties": {
+      "required": ["successful", "rejected", "partialOperations", "duplicateBookings", "duplicateResponses", "duplicateFailures", "toctouCreated", "toctouSkipped", "admissionRefused"], "properties": {
         "successful": { "type": "integer", "minimum": 0 },
         "rejected": { "type": "integer", "minimum": 0 },
         "partialOperations": { "type": "integer", "minimum": 0 },
@@ -60,7 +60,8 @@
         "duplicateResponses": { "type": "integer", "minimum": 0 },
         "duplicateFailures": { "type": "integer", "minimum": 0 },
         "toctouCreated": { "type": "integer", "minimum": 0 },
-        "toctouSkipped": { "type": "integer", "minimum": 0 }
+        "toctouSkipped": { "type": "integer", "minimum": 0 },
+        "admissionRefused": { "type": "integer", "minimum": 0 }
       }
     },
     "recovery": { "type": "object", "additionalProperties": false,
