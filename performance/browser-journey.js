@@ -1,3 +1,5 @@
+const GUEST_NAME = "Browser Test Guest";
+
 export async function prepareBrowserBooking(page, courtNumber) {
   await page.locator('div[data-testid="free-slot"]').nth(0).waitFor({ state: "detached" });
   const selector = `button[data-testid="free-slot"][data-court-number="${courtNumber}"]:not([disabled])`;
@@ -10,9 +12,15 @@ export async function prepareBrowserBooking(page, courtNumber) {
     if (!await selectAvailableDay(page, selector)) throw new Error("No enabled booking slot in the bounded two-week search");
   }
   await page.locator(selector).nth(0).click();
+  // The loaded cards add the player count line, which shifts the centred dialog under a pending click.
+  await page.locator('[data-testid="booking-card"] option').nth(0).waitFor({ state: "attached" });
   await page.getByTestId("booking-more-summary").click();
-  await page.getByTestId("guest-name").waitFor({ state: "visible" });
-  await page.getByTestId("guest-name").fill("Browser Test Guest");
+  await page.locator('details[data-testid="booking-more"][open]').waitFor();
+  const guest = page.getByTestId("guest-name");
+  await guest.waitFor({ state: "visible" });
+  await guest.fill(GUEST_NAME);
+  const entered = await guest.inputValue();
+  if (entered !== GUEST_NAME) throw new Error(`The guest field holds ${JSON.stringify(entered)} after entering "${GUEST_NAME}"`);
 }
 
 async function selectAvailableDay(page, selector) {
