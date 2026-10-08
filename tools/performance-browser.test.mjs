@@ -446,3 +446,64 @@ test("given another browser home, when launching Chromium, then refuse an unveri
   assert.equal(result.stdout, "");
   assert.equal(existsSync(profile + "/courtside-data"), false);
 });
+
+function verifierChangeHarness({ again = false } = {}) {
+  const metrics = new Map();
+  const logged = [];
+  const events = [];
+  class Metric {
+    constructor(name) { this.name = name; metrics.set(name, []); }
+    add(value) { metrics.get(this.name).push(value); }
+  }
+  const handlers = {};
+  const verifierChange = { method: () => "GET", url: () => "https://proxy/assets/index-example.css",
+    failure: () => ({ errorText: "net::ERR_CERT_VERIFIER_CHANGED" }) };
+  const page = {
+    on: (event, handler) => { handlers[event] = handler; },
+    goto: async () => { events.push("goto"); handlers.requestfailed(verifierChange); },
+    reload: async () => { events.push("reload"); if (again) handlers.requestfailed(verifierChange); },
+    getByTestId: () => ({ waitFor: async () => { throw new Error("stop after the sign-in page"); } }),
+    url: () => "https://proxy/login", close: async () => {}
+  };
+  const context = {
+    browser: { newPage: async () => page },
+    check: () => true, Counter: Metric, Rate: Metric, Trend: Metric,
+    open: path => JSON.stringify(path.endsWith("contract.json") ? contract : { password: "test-password" }),
+    console: { error: line => logged.push(line) }, Date,
+    __ENV: { PERF_TARGET: "https://proxy" }, __VU: 2, __ITER: 22,
+    ...browserDiagnostics, prepareBrowserBooking: async () => {}
+  };
+  runInNewContext(browserSource.replace(/^import .*;\n/gm, "").replace("export const options", "globalThis.options")
+    .replace("export default async function", "globalThis.iteration = async function")
+    .replace("export function handleSummary", "function handleSummary"), context);
+  return { metrics, logged, events, run: () => context.iteration() };
+}
+
+test("given a certificate verifier change on the first page load, when the journey opens sign-in, then it reloads once and counts the reload, not an error", async () => {
+  // given
+  const harness = verifierChangeHarness();
+
+  // when
+  await harness.run();
+
+  // then
+  assert.deepEqual(harness.events, ["goto", "reload"], "the first page load must be repeated exactly once");
+  assert.deepEqual(harness.metrics.get("browser_verifier_reloads"), [1], "the reload must stay visible as its own count");
+  assert.deepEqual(harness.metrics.get("browser_errors").filter(value => value > 0), [1],
+    "only the journey's own failure counts; the verifier change on the first load does not");
+  assert.ok(harness.logged.some(line => line.startsWith("vu=2 iteration=22 request failed: GET /assets/index-example.css net::ERR_CERT_VERIFIER_CHANGED")
+    && line.includes("reloading once")), `the change must stay in the run log, got ${JSON.stringify(harness.logged)}`);
+});
+
+test("given a certificate verifier change again after the reload, when the journey opens sign-in, then that failure counts as a browser error", async () => {
+  // given
+  const harness = verifierChangeHarness({ again: true });
+
+  // when
+  await harness.run();
+
+  // then
+  assert.deepEqual(harness.events, ["goto", "reload"], "the page is reloaded only once");
+  assert.deepEqual(harness.metrics.get("browser_errors").filter(value => value > 0), [1, 1],
+    "a second verifier change is a browser error like any other failed request");
+});
