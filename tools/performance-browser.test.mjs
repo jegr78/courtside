@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { prepareBrowserBooking } from "../performance/browser-journey.js";
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+import * as browserDiagnostics from "../performance/browser-diagnostics.js";
+
+const browserSource = readFileSync(new URL("../performance/browser.js", import.meta.url), "utf8");
+const contract = JSON.parse(readFileSync(new URL("../performance/contract.json", import.meta.url), "utf8"));
 
 test("given a current-week slot, when preparing a booking, then expand the guest field before entering a participant", async () => {
   // given
@@ -127,4 +133,35 @@ test("given a delayed next-week grid, when no current-week slot remains, then wa
   await prepareBrowserBooking(page, 1);
   // then
   assert.equal(loaded, true);
+});
+
+test("given a browser that cannot open a page, when a journey starts, then the failure counts and names its step", async () => {
+  // given
+  const metrics = new Map();
+  const logged = [];
+  class Metric {
+    constructor(name) { this.name = name; metrics.set(name, []); }
+    add(value) { metrics.get(this.name).push(value); }
+  }
+  const context = {
+    browser: { newPage: async () => { throw new Error("creating new page in browser context: timed out after 30s"); } },
+    check: () => true, Counter: Metric, Rate: Metric, Trend: Metric,
+    open: path => JSON.stringify(path.endsWith("contract.json") ? contract : { password: "test-password" }),
+    console: { error: line => logged.push(line) }, Date,
+    __ENV: { PERF_TARGET: "https://proxy" }, __VU: 2, __ITER: 7,
+    ...browserDiagnostics, prepareBrowserBooking: async () => {}
+  };
+  runInNewContext(browserSource.replace(/^import .*;\n/gm, "").replace("export const options", "globalThis.options")
+    .replace("export default async function", "globalThis.iteration = async function")
+    .replace("export function handleSummary", "function handleSummary"), context);
+
+  // when
+  await context.iteration();
+
+  // then
+  assert.deepEqual(metrics.get("browser_journey_success"), [false],
+    "a journey whose page never opened must count as a failed journey");
+  assert.ok(metrics.get("browser_errors").includes(1));
+  assert.ok(logged.some(line => line.startsWith("vu=2 iteration=7 Browser journey failed at open browser page after ") && line.includes(" on no page : ")),
+    `the failure must name its step, got ${JSON.stringify(logged)}`);
 });

@@ -1,6 +1,7 @@
 import http from "k6/http";
 import { check, group, sleep } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
+import { outcomeSignature, unexpectedOutcome } from "./http-diagnostics.js";
 
 const contract = JSON.parse(open("/scripts/contract.json"));
 const credentials = JSON.parse(open("/run/courtside/perf.json"));
@@ -51,6 +52,13 @@ let bookingCardId;
 let courtIds;
 const reportedFailures = {};
 
+function reportOnce(requestKey, response) {
+  const signature = outcomeSignature(requestKey, response);
+  if (reportedFailures[signature]) return;
+  reportedFailures[signature] = true;
+  console.error(unexpectedOutcome(requestKey, response));
+}
+
 function username() {
   return `member${String(__VU).padStart(4, "0")}`;
 }
@@ -72,10 +80,7 @@ function record(response, expectedStatuses, metric) {
     .replace(/^\/api\/bookings\/[^/]+$/, "/api/bookings/:id");
   const requestKey = `${response.request.method} ${requestPath}`;
   check(response, { [`${requestKey} status ${expectedStatuses.join(" or ")}`]: () => expected });
-  if (!expected && !reportedFailures[requestKey]) {
-    reportedFailures[requestKey] = true;
-    console.error(`${requestKey} returned unexpected status ${response.status}`);
-  }
+  if (!expected) reportOnce(requestKey, response);
   return expected;
 }
 

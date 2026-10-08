@@ -2,6 +2,7 @@ import { browser } from "k6/browser";
 import { check } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
 import { prepareBrowserBooking } from "./browser-journey.js";
+import { consoleFailure, failedRequest, journeyFailure, refusal, refusedResponse } from "./browser-diagnostics.js";
 
 const contract = JSON.parse(open("/scripts/contract.json"));
 const credentials = JSON.parse(open("/run/courtside/perf.json"));
@@ -34,6 +35,10 @@ export const options = {
   }
 };
 
+function report(description) {
+  console.error(`vu=${__VU} iteration=${__ITER} ${description}`);
+}
+
 function username() {
   return `member${String(__VU).padStart(4, "0")}`;
 }
@@ -47,58 +52,73 @@ async function cancelBooking(page, bookingId) {
   await cancellation.waitFor({ state: "detached" });
 }
 
-export default async function () {
-  const page = await browser.newPage();
-  const started = Date.now();
-  let bookingId;
-  let journeyPassed = false;
-  browserErrors.add(0);
-  unexpectedServerErrors.add(0);
+function observe(page) {
   page.on("requestfailed", (request) => {
-    const path = request.url().replace(target, "").split("?")[0];
-    const expectedEmptyMutation = request.failure()?.errorText === "net::ERR_ABORTED"
-      && ((request.method() === "POST" && path === "/api/session")
-        || (request.method() === "DELETE" && path.startsWith("/api/bookings/")));
-    if (expectedEmptyMutation) return;
+    const description = failedRequest(request, target);
+    if (!description) return;
+    report(description);
     browserErrors.add(1);
     technicalErrors.add(true);
   });
   page.on("console", (message) => {
-    if (message.type() === "error") {
+    const description = consoleFailure(message);
+    if (description) {
+      report(description);
       browserErrors.add(1);
       technicalErrors.add(true);
     }
   });
   page.on("response", (response) => {
     browserRequests.add(1);
+    const description = refusedResponse(response, target);
+    if (description) report(description);
     if (response.status() >= 500) {
       unexpectedServerErrors.add(1);
       technicalErrors.add(true);
     }
   });
+}
+
+export default async function () {
+  const started = Date.now();
+  let page;
+  let bookingId;
+  let journeyPassed = false;
+  let step = "open browser page";
+  browserErrors.add(0);
+  unexpectedServerErrors.add(0);
   try {
+    page = await browser.newPage();
+    observe(page);
+    step = "open sign-in";
     await page.goto(`${target}/login`, { waitUntil: "networkidle" });
     await page.getByTestId("login-view").waitFor();
     await page.getByTestId("username").fill(username());
     await page.getByTestId("password").fill(credentials.password);
+    step = "sign in";
     const eligibilityResponsePromise = page.waitForResponse(`${target}/api/booking-eligibility`);
     await page.getByTestId("login-submit").click();
     const eligibilityResponse = await eligibilityResponsePromise;
-    if (eligibilityResponse.status() !== 200) throw new Error(`Booking eligibility returned status ${eligibilityResponse.status()}`);
+    if (eligibilityResponse.status() !== 200) throw new Error(await refusal("booking eligibility", eligibilityResponse));
     await eligibilityResponse.json();
+    step = "open court plan";
     await page.getByTestId("court-plan-view").waitFor();
     await page.getByTestId("week-grid").waitFor();
+    step = "prepare booking";
     await prepareBrowserBooking(page, __VU);
+    step = "submit booking";
     const bookingResponsePromise = page.waitForResponse(`${target}/api/bookings`);
     await page.getByTestId("booking-submit").click();
     const response = await bookingResponsePromise;
-    if (response.status() !== 201) throw new Error(`The booking UI returned status ${response.status()}`);
+    if (response.status() !== 201) throw new Error(await refusal("the booking UI", response));
     bookingId = (await response.json()).id;
     if (!bookingId) throw new Error("The booking UI returned no booking id");
+    step = "show own booking";
     const ownAllocation = page.locator(`[data-testid="own-allocation"][data-booking-id="${bookingId}"]`);
     await ownAllocation.waitFor();
     await page.reload({ waitUntil: "networkidle" });
     await page.getByTestId("court-plan-view").waitFor();
+    step = "cancel booking";
     await page.getByTestId("my-bookings-link").click();
     const cancellation = page.locator(`[data-testid="personal-cancel"][data-booking-id="${bookingId}"]`);
     await cancellation.waitFor();
@@ -111,19 +131,20 @@ export default async function () {
   } catch (error) {
     browserErrors.add(1);
     technicalErrors.add(true);
-    console.error(`Browser journey failed: ${error}`);
+    report(journeyFailure(step, error, Date.now() - started, page?.url() ?? "", target));
   } finally {
     if (bookingId) {
       try {
         await cancelBooking(page, bookingId);
-      } catch {
+      } catch (error) {
+        report(journeyFailure(`clean up booking ${bookingId}`, error, Date.now() - started, page.url(), target));
         browserErrors.add(1);
         technicalErrors.add(true);
       }
     }
     browserJourneySuccess.add(journeyPassed);
     browserJourneyDuration.add(Date.now() - started);
-    await page.close();
+    if (page) await page.close();
   }
 }
 

@@ -1,6 +1,7 @@
 import http from "k6/http";
 import { check, group, sleep } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
+import { checkOutcomes } from "./http-diagnostics.js";
 
 const contract = JSON.parse(open("/scripts/contract.json"));
 const profile = contract.profiles["funnel-smoke"];
@@ -99,6 +100,7 @@ function retainedSummary(data) {
   ];
   return {
     state: data.state,
+    checks: checkOutcomes(data.root_group),
     metrics: Object.fromEntries(names.filter(name => data.metrics[name]).map(name => [name, data.metrics[name]]))
   };
 }

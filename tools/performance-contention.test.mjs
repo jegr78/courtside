@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
+import * as httpDiagnostics from "../performance/http-diagnostics.js";
 import { buildPerformanceResult, parseArguments, performanceRunPlan, validatePerformanceResult } from "./courtside.mjs";
 
 const scriptPath = new URL("../performance/contention.js", import.meta.url);
@@ -10,6 +11,7 @@ const contract = JSON.parse(readFileSync(new URL("../performance/contract.json",
 function contention({ conflictType = "urn:courtside:error:court-unavailable", cancellationStatus = 204, environment = "PERFORMANCE", duplicateWinners = false } = {}) {
   const metrics = new Map();
   const requests = [];
+  const logged = [];
   const checks = [];
   let cookies = {};
   let occupied = false;
@@ -55,7 +57,7 @@ function contention({ conflictType = "urn:courtside:error:court-unavailable", ca
       }
       context.__VU = 1;
     },
-    Counter: Metric, Rate: Metric, Trend: Metric,
+    Counter: Metric, Rate: Metric, Trend: Metric, console: { error: line => logged.push(line) }, ...httpDiagnostics,
     open: path => JSON.stringify(path.endsWith("contract.json") ? contract : { password: "test-password" }),
     __ENV: { PERF_PROFILE: "contention", PERF_RUN_ID: "test-run", PERF_TARGET: "https://proxy:443" }, __VU: 1
   };
@@ -64,7 +66,7 @@ function contention({ conflictType = "urn:courtside:error:court-unavailable", ca
     .replace("export function setup", "globalThis.setup = function setup")
     .replace("export default function", "globalThis.iteration = function")
     .replace("export function handleSummary", "function handleSummary"), context);
-  return { metrics, requests, checks, options: context.options,
+  return { metrics, requests, checks, logged, options: context.options,
     setup: () => { data = context.setup(); return data; }, run: () => context.iteration(data) };
 }
 
@@ -121,6 +123,9 @@ test("given an unrelated conflict and failed cleanup, when booking contention ru
   assert.equal(run.metrics.get("booking_cancellations").reduce((sum, value) => sum + value, 0), 0);
   assert.equal(run.metrics.get("technical_errors").some(Boolean), true);
   assert.equal(run.metrics.get("unexpected_server_errors").includes(1), true);
+  assert.ok(run.logged.some(line => line.startsWith("POST /api/bookings returned unexpected status 409 urn:courtside:error:booking-rules-violated")),
+    `an unrelated conflict must name its problem type in the run log, got ${JSON.stringify(run.logged)}`);
+  assert.ok(run.logged.includes("DELETE /api/bookings/:id returned unexpected status 500 without a problem type"));
 });
 
 test("given a persistent environment marker, when setting up contention, then authentication and booking never start", () => {

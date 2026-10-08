@@ -18,7 +18,7 @@ import {
   runLifecyclePlans, startProcesses,
   superviseFunnel, terminate,
   terminateChildren, uatComposeArgs, uatResetPlans, perfComposeArgs, perfComposePlan, perfResetPlan,
-  writePrivateFile, performanceRunPlan, performanceIdentityRequest, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
+  writePrivateFile, performanceRunPlan, performanceContainerLogPlan, performanceIdentityRequest, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
   funnelPerformanceRunPlan, localRequest, validateFunnelTarget, validatePerformanceResult,
   redactUatDiagnostics, resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference,
@@ -685,6 +685,33 @@ test("given a finished performance run, when planning its logs, then they can be
   assert.equal(capturePlan.args.includes("--follow"), false);
   assert.ok(capturePlan.args.includes("--no-color"));
   assert.ok(capturePlan.args.includes("logs"));
+});
+
+test("given a local performance run, when planning k6, then its log is written beside the result", () => {
+  // given
+  const protocol = parseArguments(["perf-run", "peak", "--confirm", "courtside-perf"]);
+  const browser = parseArguments(["perf-run", "browser", "--confirm", "courtside-perf"]);
+
+  // when
+  const protocolPlan = performanceRunPlan(protocol, "/tmp/performance-result", "/tmp/performance-root.crt");
+  const browserPlan = performanceRunPlan(browser, "/tmp/performance-result", "/tmp/performance-root.crt", "test-run", "test-pin");
+
+  // then
+  for (const plan of [protocolPlan, browserPlan]) {
+    assert.ok(plan.args.includes("--log-output=file=/results/k6.log"),
+      "a failed run must leave its k6 log in the result directory, not only in a terminal");
+    assert.ok(plan.args.indexOf("--log-output=file=/results/k6.log") > plan.args.indexOf("run"));
+  }
+});
+
+test("given a finished performance run, when planning its container logs, then application, proxy and database are captured once", () => {
+  // when
+  const plan = performanceContainerLogPlan(7);
+
+  // then
+  assert.equal(plan.stdout, 7);
+  assert.deepEqual(plan.args.slice(plan.args.indexOf("logs")), ["logs", "--no-color", "--timestamps", "app", "proxy", "db"]);
+  assert.equal(plan.args.includes("--follow"), false);
 });
 
 test("given a private credentials file, when planning k6, then the container runs as the user that owns it", () => {

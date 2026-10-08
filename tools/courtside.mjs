@@ -7,7 +7,7 @@ import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { BlockList, createConnection, createServer, isIP } from "node:net";
 import { availableParallelism, totalmem } from "node:os";
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
@@ -1100,12 +1100,31 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       "-v", `${certificateFile}:/certs/root.crt:ro`,
       "-v", `${resultDirectory}:/results`,
       image,
-      "run", ...(options.remoteWrite ? ["--out", "experimental-prometheus-rw"] : []),
+      "run", "--log-output=file=/results/k6.log", ...(options.remoteWrite ? ["--out", "experimental-prometheus-rw"] : []),
       "--tag", `testid=${runId}`, "--tag", `profile=${options.profile}`,
       "--summary-trend-stats", "avg,min,med,max,p(50),p(75),p(90),p(95),p(99)",
       browserRun ? "/scripts/browser.js" : options.profile === "contention" ? "/scripts/contention.js" : "/scripts/protocol.js"
     ]
   };
+}
+
+export function performanceContainerLogPlan(stdout) {
+  return { ...perfComposePlan(["logs", "--no-color", "--timestamps", "app", "proxy", "db"]), stdout };
+}
+
+function retainContainerLogs(resultDirectory) {
+  const file = join(resultDirectory, "containers.log");
+  let output;
+  try {
+    output = openSync(file, "w", 0o600);
+    runInteractive(performanceContainerLogPlan(output));
+  } catch (error) {
+    const reason = `Container logs unavailable: ${error.message}\n`;
+    if (output === undefined) process.stderr.write(reason);
+    else writeSync(output, reason);
+  } finally {
+    if (output !== undefined) closeSync(output);
+  }
 }
 
 export function funnelPerformanceRunPlan(options, resultDirectory, runId = "test-run") {
@@ -1157,6 +1176,8 @@ async function runPerformance(options) {
   } catch (error) {
     runFailure = error;
   }
+  retainContainerLogs(resultDirectory);
+  process.stdout.write(`k6 and container logs: ${resultDirectory}\n`);
   const rawSummary = join(resultDirectory, "raw-summary.json");
   if (!existsSync(rawSummary)) {
     rmSync(certificateFile, { force: true });
