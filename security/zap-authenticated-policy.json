@@ -18,7 +18,8 @@
     "maxDurationMinutes": 2,
     "maxDepth": 3,
     "maxChildren": 50,
-    "minimumUrlsPerRole": 1
+    "minimumUrlsPerRole": 1,
+    "threadCount": 1
   },
   "active": {
     "roles": ["MEMBER", "ADMIN"],
@@ -28,7 +29,8 @@
     "maxRuleDurationMinutes": 1,
     "maxScanDurationMinutes": 5,
     "maxAlertsPerRule": 10,
-    "threadsPerHost": 2,
+    "threadsPerHost": 1,
+    "delayInMilliseconds": 100,
     "queryParametersOnly": true
   },
   "canary": {

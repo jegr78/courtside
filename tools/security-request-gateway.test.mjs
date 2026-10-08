@@ -210,3 +210,40 @@ for (const fixture of [
     }
   });
 }
+
+test("given upstream refusals, when the gateway relays them, then only a typed admission refusal is counted", async () => {
+  // given
+  const answers = [
+    [429, "application/problem+json", { type: "urn:courtside:error:request-rate-limited" }],
+    [429, "application/problem+json", { type: "urn:courtside:error:operation-capacity-exhausted" }],
+    [429, "application/problem+json", { type: "urn:courtside:error:login-rate-limited" }],
+    [429, "text/plain", null],
+    [200, "application/json", { type: "urn:courtside:error:request-rate-limited" }]
+  ];
+  let answered = 0;
+  const upstream = createServer((req, response) => {
+    const [status, contentType, body] = answers[answered++];
+    const payload = body ? JSON.stringify(body) : "";
+    response.writeHead(status, { "Content-Type": contentType, "Content-Length": String(Buffer.byteLength(payload)) });
+    response.end(payload);
+  });
+  upstream.listen(0, "127.0.0.1");
+  await once(upstream, "listening");
+  const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-admission-"));
+  const { gatewayProcess, port } = await startGateway(directory, upstream.address().port);
+  try {
+    // when
+    const statuses = [];
+    for (let index = 0; index < answers.length; index++) statuses.push(await send(port, "GET"));
+
+    // then
+    assert.deepEqual(statuses, [429, 429, 429, 429, 200]);
+    const metrics = JSON.parse(readFileSync(join(directory, "metrics"), "utf8"));
+    assert.equal(metrics.admissionRefusals, 2,
+      "a login limit, an untyped 429 and a success carrying the type are not admission refusals");
+  } finally {
+    gatewayProcess.kill();
+    await once(gatewayProcess, "exit");
+    await new Promise(resolve => upstream.close(resolve));
+  }
+});

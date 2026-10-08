@@ -155,7 +155,7 @@ jobs:
       parseRobotsTxt: false
       parseSitemapXml: false
       parseSVNEntries: false
-      threadCount: ${authenticatedZapPolicy.active.threadsPerHost}
+      threadCount: ${authenticatedZapPolicy.spider.threadCount}
     tests:
       - name: authenticated coverage
         type: stats
@@ -208,6 +208,8 @@ ${rules}
       context: courtside-${role.toLowerCase()}
       policy: courtside-curated
       url: http://scanner-gateway:8090/api/my/bookings?limit=1
+      delayInMs: ${authenticatedZapPolicy.active.delayInMilliseconds}
+      threadPerHost: ${authenticatedZapPolicy.active.threadsPerHost}
 ` : ""}  - type: requestor
     requests:
       - url: http://scanner-gateway:8090/api/my/bookings?limit=1
@@ -343,7 +345,8 @@ export function validateAuthenticatedZapEvidence(evidence) {
       || evidence.requestCount > authenticatedZapPolicy.requestLimit + authenticatedZapPolicy.roles.length * 3) {
     throw new Error("Authenticated ZAP evidence contradicts its pinned policy");
   }
-  const derived = evidence.candidates.some(({ state }) => state === "candidate") ? "incomplete" : "passed";
+  const derived = evidence.candidates.some(({ state }) => state === "candidate") || evidence.admissionRefusals > 0
+    ? "incomplete" : "passed";
   if (evidence.outcome !== derived) throw new Error("Authenticated ZAP evidence outcome is inconsistent");
   const expectedTransitions = ["validated", "remediation-in-progress", "fixed", "retest-passed"];
   const reference = "authenticated-zap.json#scanner-canary";
@@ -428,6 +431,9 @@ export async function runAuthenticatedZapAssessment(plan, context) {
         ? "Authenticated ZAP plan digest does not match the executed plans"
         : "Authenticated ZAP coverage or runtime controls are incomplete");
     }
+    if (!Number.isSafeInteger(scanner.admissionRefusals) || scanner.admissionRefusals < 0) {
+      throw new Error("Authenticated ZAP did not count the admission refusals its gateway relayed");
+    }
     const retestMetadata = scanner.canaryRetest;
     const retestTimestamps = retestMetadata && [retestMetadata.detectedAt,
       retestMetadata.remediationStartedAt, retestMetadata.fixedAt,
@@ -483,8 +489,9 @@ export async function runAuthenticatedZapAssessment(plan, context) {
       canaryRetest,
       lifecycleProof,
       requestCount,
+      admissionRefusals: scanner.admissionRefusals,
       generatedDataMegabytes: scanner.generatedDataMegabytes ?? 0,
-      outcome: unresolved ? "incomplete" : "passed"
+      outcome: unresolved || scanner.admissionRefusals > 0 ? "incomplete" : "passed"
     };
     validateAuthenticatedZapEvidence(evidence);
     retainAuthenticatedZapEvidence(context.evidenceDirectory, evidence);

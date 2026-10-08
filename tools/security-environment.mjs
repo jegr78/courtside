@@ -955,7 +955,8 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
       memory: 128 * 1024 * 1024, nanoCpus: 500_000_000, pids: 64,
       networks: [`${securityProject(plan.runId)}_scanner-client`, `${securityProject(plan.runId)}_scanner-upstream`]
     });
-    const primaryRequestCount = await zapRequestCount(gateway, command);
+    const primaryMetrics = await scannerGatewayMetrics(gateway, command);
+    const primaryRequestCount = primaryMetrics.requests;
     const retestRequestBudget = remainingScannerRequestBudget(limits.maxRequests, primaryRequestCount);
     const remediationStartedAt = new Date().toISOString();
     await command(["rm", "-f", gateway]);
@@ -1008,6 +1009,7 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
     const planDigest = `sha256:${createHash("sha256").update(JSON.stringify(executedPlans)).digest("hex")}`;
     if (planDigest !== limits.planDigest) throw new Error("Authenticated ZAP plan digest changed during execution");
     return { reports, requestCount, runtimeHardened, roles: Object.keys(limits.sessions), planDigest,
+      admissionRefusals: primaryMetrics.admissionRefusals,
       generatedDataMegabytes: generatedBytes / (1024 * 1024),
       canaryRetest: {
         report: JSON.parse(retestReportText), requestCount: retestRequestCount,
@@ -1635,7 +1637,7 @@ async function zapRequestCount(gateway, command) {
 async function scannerGatewayMetrics(gateway, command) {
   const raw = (await command(["exec", gateway, "cat", "/tmp/security-gateway-metrics"])).stdout.trim();
   const metrics = JSON.parse(raw);
-  const integers = [metrics.requests, metrics.requestBytes, metrics.upstreamErrors];
+  const integers = [metrics.requests, metrics.requestBytes, metrics.upstreamErrors, metrics.admissionRefusals];
   if (!integers.every((value) => Number.isSafeInteger(value) && value >= 0)
       || ![metrics.requestP95Milliseconds, metrics.errorRate].every((value) => Number.isFinite(value) && value >= 0)
       || metrics.errorRate > 1) {

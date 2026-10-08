@@ -24,11 +24,14 @@ CANARY_PATH = "/__security/zap-canary"
 MAX_TARGET_BYTES = int(os.environ.get("COURTSIDE_SECURITY_MAX_TARGET_BYTES", "8192"))
 MAX_GENERATED_BYTES = int(os.environ["COURTSIDE_SECURITY_MAX_GENERATED_BYTES"])
 METRICS_PATH = "/tmp/security-gateway-metrics"
+ADMISSION_PROBLEM_TYPES = frozenset({"urn:courtside:error:request-rate-limited",
+                                     "urn:courtside:error:operation-capacity-exhausted"})
 counter_lock = threading.Lock()
 concurrency = threading.BoundedSemaphore(MAX_CONCURRENCY)
 request_count = 0
 request_bytes = 0
 upstream_errors = 0
+admission_refusals = 0
 latencies = collections.deque(maxlen=2048)
 upstream_outcomes = collections.deque(maxlen=2048)
 body_limit_receipts = []
@@ -109,6 +112,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 self.reject(502)
                 return
             self.record_upstream(response_status, started)
+            if admission_refusal(response.status, response.getheader("Content-Type"), payload):
+                self.record_admission_refusal()
             self.send_response(response.status)
             for name, value in response.getheaders():
                 if name.lower() not in {"connection", "content-length", "transfer-encoding"}:
@@ -146,7 +151,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         error_rate = sum(upstream_outcomes) / len(upstream_outcomes) if upstream_outcomes else 0
         with open(temporary, "w", encoding="ascii") as output:
             json.dump({"requests": request_count, "requestBytes": request_bytes,
-                       "upstreamErrors": upstream_errors, "requestP95Milliseconds": p95,
+                       "upstreamErrors": upstream_errors, "admissionRefusals": admission_refusals,
+                       "requestP95Milliseconds": p95,
                        "errorRate": error_rate, "bodyLimitReceipts": body_limit_receipts,
                        "bodyLimitReceiptsComplete": body_limit_receipts_complete}, output, separators=(",", ":"))
         os.replace(temporary, METRICS_PATH)
@@ -180,8 +186,24 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 upstream_errors += 1
             self.write_metrics()
 
+    def record_admission_refusal(self):
+        global admission_refusals
+        with counter_lock:
+            admission_refusals += 1
+            self.write_metrics()
+
     def log_message(self, format, *args):
         return
+
+
+def admission_refusal(status, content_type, payload):
+    if status != 429 or not (content_type or "").lower().startswith("application/problem+json"):
+        return False
+    try:
+        problem = json.loads(payload)
+    except ValueError:
+        return False
+    return isinstance(problem, dict) and problem.get("type") in ADMISSION_PROBLEM_TYPES
 
 
 def canonical_target_path(path):
