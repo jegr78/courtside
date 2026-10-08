@@ -183,10 +183,10 @@ export function resourceScenarioOutcomes({ scenarios, summary, telemetryComplete
     const raceMissing = raceScenarios.includes(id) && !raceExercised(scenarioOperationsOf);
     const pressureUnrefused = id === "series-and-rule-cost" && admissionEnforced
       && !scenarioOperationsOf.some(admissionRefusal);
-    const outcome = missingCheck || fixtureFailed || !telemetryComplete || failed
-      || id === "login-rate-limit-boundary" && !summary.rateLimitedLogins
-      || refused || raceMissing || pressureUnrefused ? "incomplete"
-      : assertionFailed ? "failed" : "passed";
+    const outcome = missingCheck || fixtureFailed || !telemetryComplete || failed ? "incomplete"
+      : assertionFailed ? "failed"
+        : id === "login-rate-limit-boundary" && !summary.rateLimitedLogins
+          || refused || raceMissing || pressureUnrefused ? "incomplete" : "passed";
     return { id, outcome };
   });
 }

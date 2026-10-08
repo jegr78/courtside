@@ -580,6 +580,23 @@ test("given a failing integrity assertion, when judging scenarios, then the scen
   assert.equal(outcomeOf(resourceScenarioOutcomes(input), "competing-court-occupancy"), "failed");
 });
 
+test("given a failing integrity assertion beside a refusal and a missed race, when judging scenarios, then the failure wins", () => {
+  // given
+  const operations = raceOperations();
+  operations[5] = { ...operations[5], startedAt: "2026-10-08T10:00:02.000Z", endedAt: "2026-10-08T10:00:02.100Z" };
+  operations.push(bookingOperation("7:1", `security-capacity-${runId}-7-0`, "2026-10-08T10:00:03.000Z",
+    "2026-10-08T10:00:03.010Z", refusal));
+  const input = scenarioInput(operations);
+  input.summary.checks.find(({ name }) => name === "participant-capacity:card-unavailable").fails = 1;
+
+  // when / then
+  assert.equal(outcomeOf(resourceScenarioOutcomes(input), "participant-capacity"), "failed",
+    "an overbooked card is an integrity failure whatever else the race met");
+  input.telemetryComplete = false;
+  assert.equal(outcomeOf(resourceScenarioOutcomes(input), "participant-capacity"), "incomplete",
+    "missing telemetry still means nothing about the run can be judged");
+});
+
 test("given refused integrity writes, when counting competing writes, then they are neither partial nor duplicate failures", () => {
   // given
   const operations = [...raceOperations(),
