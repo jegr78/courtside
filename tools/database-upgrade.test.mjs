@@ -382,6 +382,23 @@ test("given more dated nightlies than retention keeps, when an upgrade origin is
       + "earliest origin that survives the run");
   });
 
+test("given a retained nightly whose commit this checkout lacks, when an upgrade origin is chosen, then it still "
+  + "holds its retention slot and is never chosen", () => {
+    // given
+    const tags = ["nightly-20261007-1111111", "nightly-20261007-2222222", "nightly-20261008-ffffff1",
+      "nightly-20261008-3333333", "nightly-20261008-4444444", "nightly-20261008-5555555", "nightly-20261008-6666666",
+      "nightly-20261008-7777777"];
+    const known = { 1111111: 1, 2222222: 2, 3333333: 3, 4444444: 4, 5555555: 5, 6666666: 6, 7777777: 7 };
+    const history = { committedAt: (ref) => known[ref] ?? Number.POSITIVE_INFINITY, unchangedSince: (ref) => ref in known };
+
+    // when
+    const [origin] = nightlyUpgradeOrigins("example/courtside", tags, history);
+
+    // then
+    assert.equal(origin.ref, "2222222",
+      "the unknown nightly is one of the seven retention keeps, so the window ends one known commit earlier");
+  });
+
 test("given a history where a shipped migration was corrected, when git is asked, then only origins before an "
   + "addition qualify and commit time orders them", () => {
   // given
@@ -416,6 +433,8 @@ test("given a history where a shipped migration was corrected, when git is asked
     assert.ok(!afterCorrection.unchangedSince(added), "Flyway would refuse V1's changed checksum");
     assert.ok(afterCorrection.unchangedSince(corrected));
     assert.ok(!afterCorrection.unchangedSince("0000000"), "a commit this checkout lacks is never an origin");
+    assert.equal(afterCorrection.committedAt("0000000"), Number.POSITIVE_INFINITY,
+      "a commit this checkout lacks ranks as newest instead of stopping the selection");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

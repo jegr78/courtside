@@ -117,7 +117,10 @@ export function nightlyUpgradeOrigins(repository, tags, history) {
 // Flyway refuses a database whose applied migration changed, which a correction before the first release may do.
 export function gitHistory(candidate, cwd = root) {
   return {
-    committedAt: (ref) => Number(run("git", ["show", "-s", "--format=%ct", ref], { cwd }).stdout.trim()),
+    committedAt: (ref) => {
+      const shown = run("git", ["show", "-s", "--format=%ct", ref], { allowFailure: true, cwd });
+      return shown.status === 0 ? Number(shown.stdout.trim()) : Number.POSITIVE_INFINITY;
+    },
     unchangedSince: (ref) => run("git", ["diff", "--quiet", "--diff-filter=MDR", ref, candidate, "--",
       "src/main/resources/db/migration", originVerification], { allowFailure: true, cwd }).status === 0
   };
