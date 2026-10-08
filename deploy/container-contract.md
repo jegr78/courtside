@@ -249,6 +249,10 @@ they name a file on the host, in the container the path it is mounted at. The
 
 | Variable | Default |
 |---|---|
+| `COURTSIDE_ADMISSION_ACCOUNT_BURST` | `200` |
+| `COURTSIDE_ADMISSION_ACCOUNT_PER_SECOND` | `20` |
+| `COURTSIDE_ADMISSION_ADDRESS_BURST` | `600` |
+| `COURTSIDE_ADMISSION_ADDRESS_PER_SECOND` | `60` |
 | `COURTSIDE_APP_TLS_CERTIFICATE` | unset |
 | `COURTSIDE_APP_TLS_KEY` | unset |
 | `COURTSIDE_APP_TLS_MODE` | `plaintext` |

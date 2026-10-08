@@ -189,6 +189,24 @@ class ApiContractCoverageTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void everyOperationAHandlerServesDocumentsTheAnswerToAnExhaustedBudget() {
+        // when
+        TreeSet<String> silent = new TreeSet<>();
+        paths().forEach((path, methods) -> operationsOf(methods).forEach((method, operation) -> {
+            String operationName = method.toUpperCase() + " " + path;
+            if (!NOT_BACKED_BY_A_HANDLER.contains(operationName) && !responsesOf(operation).containsKey("429")) {
+                silent.add(operationName);
+            }
+        }));
+
+        // then
+        assertThat(silent)
+                .as("admission control refuses any handled request beyond its client's budget or its class's"
+                        + " capacity with 429, so every such operation has to say so")
+                .isEmpty();
+    }
+
+    @Test
     void everyOperationWithARequestBodyDocumentsTheAnswerToAnUnsupportedContentType() {
         // when
         TreeSet<String> silent = new TreeSet<>();

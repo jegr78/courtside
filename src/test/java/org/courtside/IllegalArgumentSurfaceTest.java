@@ -28,7 +28,8 @@ class IllegalArgumentSurfaceTest {
             "org/courtside/dataexchange/internal/MemberNumber.java",
             "org/courtside/shared/CodedDomainFailure.java",
             "org/courtside/shared/ProblemType.java",
-            "org/courtside/shared/TimeSlot.java");
+            "org/courtside/shared/TimeSlot.java",
+            "org/courtside/shared/web/RequestBudget.java");
 
     @Test
     void whenReadingEveryIllegalArgumentExceptionThrown_thenEachSitsInAValueType() throws IOException {

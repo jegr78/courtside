@@ -520,6 +520,19 @@ event instead of an instance-wide lockout an anonymous caller could hold closed.
 client-address header before the application sees it, and the reference deployment publishes no
 application port that could bypass that assertion.
 
+Admission control decides whether a handled request may run before any service or database work.
+Every caller spends a token budget: a signed-in account its own, a caller without an account the
+budget of its client address. An operation costs what its class in the resource demand inventory
+costs, from 1 token for ordinary work to 20 for exports and imports. Demanding classes such as
+series, exports, imports, log search and logo normalization also run only as often in parallel as
+their class allows. Booking writes are deliberately not capped in parallel, so a busy booking
+morning is decided by the database rather than refused. A request beyond its budget answers `429`
+`urn:courtside:error:request-rate-limited`, one beyond its class's capacity `429`
+`urn:courtside:error:operation-capacity-exhausted`, both with `Retry-After`. The browser waits once
+for a read it is told to retry within five seconds and shows any other refusal. A budget that starts
+refusing writes one security event, not one per refused request. The instance refuses to start when
+a demanding class has no admission decision or its cost exceeds every budget.
+
 The application sets `Content-Security-Policy`, `X-Content-Type-Options: nosniff`,
 `X-Frame-Options: DENY` and `Referrer-Policy: strict-origin-when-cross-origin` on its own responses.
 For secure requests, Spring Security also sets `Strict-Transport-Security`. Caddy repeats nosniff,

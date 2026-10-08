@@ -3102,7 +3102,12 @@ components:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     RateLimited:
-      description: Too many requests for the protected operation.
+      description: |
+        Too many requests. Every handled operation can answer this when the caller has spent its
+        request budget (`urn:courtside:error:request-rate-limited`) or when the operation's class
+        is already running as often as the instance allows
+        (`urn:courtside:error:operation-capacity-exhausted`). Protected operations add their own
+        types, such as `urn:courtside:error:login-rate-limited`.
       headers:
         Retry-After:
           description: Seconds until another attempt may be made.
@@ -3139,6 +3144,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SourceOffer" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/openapi.yaml:
     get:
@@ -3155,6 +3162,8 @@ paths:
           content:
             application/yaml:
               schema: { type: string }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/session:
     get:
@@ -3167,6 +3176,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/SessionStatus" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
     post:
       tags: [session]
       operationId: logIn
@@ -3492,6 +3503,8 @@ paths:
                 items: { $ref: "#/components/schemas/AccountSession" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     delete:
       tags: [account]
       operationId: endOwnSessions
@@ -3507,6 +3520,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/account/sessions/{sessionHandle}:
     delete:
@@ -3535,6 +3550,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/account/locale:
     put:
@@ -3562,6 +3579,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/account/messages:
     get:
@@ -3584,6 +3603,8 @@ paths:
                 items: { $ref: "#/components/schemas/MessageChoice" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       tags: [account-messages]
       operationId: chooseOwnMessages
@@ -3611,6 +3632,8 @@ paths:
           $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/public/courts:
     get:
@@ -3626,6 +3649,8 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/PublicCourt" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/public/opening-hours:
     get:
@@ -3641,6 +3666,8 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/OpeningHours" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/public/booking-grid:
     get:
@@ -3654,6 +3681,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/BookingGrid" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/public/config:
     get:
@@ -3667,6 +3696,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ClubConfig" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/public/config/logo:
     get:
@@ -3692,6 +3723,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/public/config/icon:
     get:
@@ -3727,6 +3760,8 @@ paths:
             image/png: { schema: { type: string, format: binary } }
         "400":
           $ref: "#/components/responses/Invalid"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /manifest.webmanifest:
     get:
@@ -3740,6 +3775,8 @@ paths:
           content:
             application/manifest+json:
               schema: { $ref: "#/components/schemas/WebManifest" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/public/booking-cards:
     get:
@@ -3760,6 +3797,8 @@ paths:
                 items: { $ref: "#/components/schemas/PublicBookingCard" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/public/booking-card-legend:
     get:
@@ -3776,6 +3815,8 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/BookingCardLegendEntry" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/public/participant-cards:
     get:
@@ -3793,6 +3834,8 @@ paths:
                 items: { $ref: "#/components/schemas/PublicParticipantCard" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/public/participant-members:
     post:
@@ -3835,6 +3878,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/bookings:
     get:
@@ -3860,6 +3905,8 @@ paths:
                 items: { $ref: "#/components/schemas/Allocation" }
         "400":
           $ref: "#/components/responses/Invalid"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     post:
       tags: [bookings]
       operationId: createBooking
@@ -3912,6 +3959,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/booking-eligibility:
     get:
@@ -3929,6 +3978,8 @@ paths:
               schema: { $ref: "#/components/schemas/BookingEligibility" }
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/bookings/{id}:
     delete:
@@ -3968,6 +4019,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/my/bookings:
     get:
@@ -4011,6 +4064,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/my/participations:
     get:
@@ -4049,6 +4104,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/my/participations/{bookingId}:
     delete:
@@ -4078,6 +4135,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/managed/bookings:
     get:
@@ -4125,6 +4184,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/managed/bookings/{id}:
     get:
@@ -4155,6 +4216,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/booking-series-preview:
     post:
@@ -4185,6 +4248,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/booking-series:
     post:
@@ -4219,6 +4284,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/booking-series/{id}:
     delete:
@@ -4267,6 +4334,8 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/booking-series/{id}/move/preview:
     post:
@@ -4309,6 +4378,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/booking-series/{id}/move:
     post:
@@ -4357,6 +4428,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/courts:
     get:
@@ -4375,6 +4448,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     post:
       tags: [admin-courts]
       operationId: createCourt
@@ -4408,6 +4483,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/courts/{id}:
     get:
@@ -4433,6 +4510,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       tags: [admin-courts]
       operationId: changeCourt
@@ -4471,6 +4550,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/courts/{id}/active:
     put:
@@ -4507,6 +4588,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/booking-cards:
     get:
@@ -4525,6 +4608,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     post:
       tags: [admin-booking-cards]
       operationId: createBookingCard
@@ -4558,6 +4643,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/booking-cards/{id}:
     get:
@@ -4583,6 +4670,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       tags: [admin-booking-cards]
       operationId: changeBookingCard
@@ -4621,6 +4710,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/booking-cards/{id}/active:
     put:
@@ -4657,6 +4748,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/participant-cards:
     get:
@@ -4675,6 +4768,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     post:
       tags: [admin-participant-cards]
       operationId: createParticipantCard
@@ -4708,6 +4803,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/participant-cards/{id}:
     get:
@@ -4733,6 +4830,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       tags: [admin-participant-cards]
       operationId: changeParticipantCard
@@ -4771,6 +4870,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/participant-cards/{id}/active:
     put:
@@ -4807,6 +4908,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/membership-types:
     get:
@@ -4825,6 +4928,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     post:
       tags: [admin-membership-types]
       operationId: createMembershipType
@@ -4858,6 +4963,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/membership-types/{id}:
     get:
@@ -4883,6 +4990,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       tags: [admin-membership-types]
       operationId: changeMembershipType
@@ -4921,6 +5030,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/membership-types/{id}/active:
     put:
@@ -4957,6 +5068,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/roster:
     post:
@@ -4994,6 +5107,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/roster-search:
     post:
@@ -5039,6 +5154,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/roster/{personId}:
     get:
@@ -5070,6 +5187,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       tags: [admin-roster]
       operationId: changePerson
@@ -5117,6 +5236,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/roster/{personId}/account:
     post:
@@ -5177,6 +5298,8 @@ paths:
           $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/roster/{personId}/account/roles:
     put:
@@ -5230,6 +5353,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/roster/{personId}/account/username:
     put:
@@ -5282,6 +5407,8 @@ paths:
           $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/roster/{personId}/account/locale:
     put:
@@ -5322,6 +5449,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/roster/{personId}/account/credentials:
     post:
@@ -5417,6 +5546,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/sessions:
     delete:
@@ -5437,6 +5568,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/roster/{personId}/account/active:
     put:
@@ -5487,6 +5620,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/roster/{personId}/membership:
     put:
@@ -5559,6 +5694,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     delete:
       tags: [admin-roster]
       operationId: removeMembership
@@ -5599,6 +5736,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/import/encodings:
     get:
@@ -5624,6 +5763,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/import/sources:
     get:
@@ -5644,6 +5785,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     post:
       tags: [admin-import]
       operationId: createImportSource
@@ -5678,6 +5821,8 @@ paths:
           $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/import/sources/{id}:
     get:
@@ -5703,6 +5848,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       tags: [admin-import]
       operationId: changeImportSource
@@ -5746,6 +5893,8 @@ paths:
           $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     delete:
       tags: [admin-import]
       operationId: deleteImportSource
@@ -5781,6 +5930,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/import/sources/{sourceId}/references:
     get:
@@ -5821,6 +5972,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     post:
       tags: [admin-import-references]
       operationId: linkExternalReference
@@ -5871,6 +6024,8 @@ paths:
           $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/import/sources/{sourceId}/references/{referenceId}:
     delete:
@@ -5910,6 +6065,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/import/sources/{sourceId}/previews:
     post:
@@ -5997,6 +6154,8 @@ paths:
           $ref: "#/components/responses/PayloadTooLarge"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/import/previews/{id}:
     get:
@@ -6026,6 +6185,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/import/previews/{id}/execution:
     post:
@@ -6086,6 +6247,8 @@ paths:
           $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/import/sources/{sourceId}/runs:
     get:
@@ -6117,6 +6280,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/rule-sets:
     get:
@@ -6135,6 +6300,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     post:
       tags: [admin-rule-sets]
       operationId: createRuleSet
@@ -6168,6 +6335,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/rule-types:
     get:
@@ -6186,6 +6355,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/rule-sets/{id}:
     get:
@@ -6211,6 +6382,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       tags: [admin-rule-sets]
       operationId: changeRuleSet
@@ -6249,6 +6422,8 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/rule-sets/{id}/active:
     put:
@@ -6285,6 +6460,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/opening-hours:
     get:
@@ -6303,6 +6480,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       tags: [admin-opening-hours]
       operationId: setWeeklyOpeningHours
@@ -6339,6 +6518,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/opening-hours/schedule:
     get:
@@ -6357,6 +6538,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/opening-hours/schedule/{effectiveFrom}:
     delete:
@@ -6387,6 +6570,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/config:
     get:
@@ -6403,6 +6588,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       tags: [admin-config]
       operationId: changeClubConfig
@@ -6431,6 +6618,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/config/logo:
     put:
@@ -6469,6 +6658,8 @@ paths:
           $ref: "#/components/responses/PayloadTooLarge"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     delete:
       tags: [admin-config]
       operationId: deleteClubLogo
@@ -6486,6 +6677,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
   /api/admin/rule-sets/{id}/rules:
     get:
       tags: [admin-rule-sets]
@@ -6512,6 +6705,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/rule-sets/{id}/rules/{ruleType}:
     put:
@@ -6554,6 +6749,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     delete:
       tags: [admin-rule-sets]
       operationId: removeRule
@@ -6581,6 +6778,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/impact/courts/{courtId}:
     get:
@@ -6608,6 +6807,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/impact/booking-cards/{cardId}:
     get:
@@ -6635,6 +6836,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/impact/opening-hours/{day}:
     get:
@@ -6676,6 +6879,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/reports/facility-utilisation:
     get:
@@ -6708,6 +6913,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/statistics/range:
     get:
@@ -6731,6 +6938,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -6773,6 +6982,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -6803,6 +7014,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -6838,6 +7051,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -6866,6 +7081,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -6941,6 +7158,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/audit:
     get:
@@ -7004,6 +7223,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/audit/search:
     post:
@@ -7036,6 +7257,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/operational-logs/search:
     post:
@@ -7072,6 +7295,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/export/roster:
     post:
@@ -7150,6 +7375,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/export/bookings:
     post:
@@ -7220,6 +7447,8 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/admin/export/person/{personId}:
     post:
@@ -7266,3 +7495,5 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"

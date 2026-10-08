@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-02",
+  "reviewedAt": "2026-10-08",
   "sources": {
     "openapi": "src/main/resources/api/openapi.yaml",
     "scheduledFiles": [
@@ -154,18 +154,20 @@
       ],
       "growthDrivers": "Argon2id memory and CPU work, a bounded HIBP range response, and credential delivery work dominate these paths.",
       "inputOrDataBound": "Passwords and account fields have contract limits; HIBP responses stop at 256 KiB and their request deadline defaults to three seconds.",
-      "concurrencyOrRateBound": "Password verification admits two concurrent operations per application instance; login addresses and credential issuance also have persisted rate windows.",
+      "concurrencyOrRateBound": "Password verification admits two concurrent operations per application instance; login addresses and credential issuance also have persisted rate windows. Each handled request also spends 5 tokens of its caller's request budget.",
       "executionModel": "Verification and password policy run synchronously in the request; committed credential events hand mail to the asynchronous event listener.",
       "failureBehavior": "Capacity exhaustion returns a typed 429, HIBP unavailability refuses a new password, and a failed transaction stores no partial credential change.",
       "consumerTimeoutBehavior": "The HIBP dependency has its own deadline. The reference proxy adds no arbitrary response deadline; a caller retry remains subject to rate and transaction rules.",
       "productionPaths": [
         "src/main/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
         "src/main/java/org/courtside/identity/internal/LoginAttemptFilter.java",
-        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java"
+        "src/main/java/org/courtside/identity/internal/SecurityConfiguration.java",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/identity/LoginAttemptProtectionTest.java#givenPasswordVerificationCapacityIsOccupied_whenItBecomesFree_thenLoginRecoversImmediately",
-        "src/test/java/org/courtside/identity/PasswordHashingTest.java#whenHashingAPassword_thenTheParametersAreTheOnesTheInventoryRecords"
+        "src/test/java/org/courtside/identity/PasswordHashingTest.java#whenHashingAPassword_thenTheParametersAreTheOnesTheInventoryRecords",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
       ]
     },
     {
@@ -177,18 +179,20 @@
       ],
       "growthDrivers": "CSV decoding, matching and change application grow with the uploaded rows and the existing rows linked to that source.",
       "inputOrDataBound": "The application accepts at most 8 MiB directly and the reference proxy at most 2 MiB; preview execution can touch only rows retained from that bounded upload.",
-      "concurrencyOrRateBound": "A database advisory lock serializes execution per import source; different sources may execute concurrently within the application and database resource limits.",
+      "concurrencyOrRateBound": "Admission control runs one import operation at a time per instance and charges 20 tokens of the caller's request budget; a database advisory lock additionally serializes execution per import source.",
       "executionModel": "Preview and execution are synchronous transactions. Execution locks its source and affected person rows in a deterministic order before applying changes.",
       "failureBehavior": "Malformed uploads fail before a preview is stored; stale, expired or competing executions fail transactionally without a partial roster sync.",
       "consumerTimeoutBehavior": "The reference proxy adds no response deadline. Disconnect is not a rollback promise, so the preview identity and actor binding make a later retry observable and safe.",
       "productionPaths": [
         "src/main/java/org/courtside/dataexchange/PreviewService.java",
         "src/main/java/org/courtside/dataexchange/ExecutionService.java",
-        "src/main/resources/application.yaml"
+        "src/main/resources/application.yaml",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnExecutedSnapshot_whenTheIdenticalFileIsUploadedAndExecutedAgain_thenNothingChanges",
-        "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnOlderPreviewOfTheSameSource_whenANewerOneIsExecuted_thenTheOlderCannotRun"
+        "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnOlderPreviewOfTheSameSource_whenANewerOneIsExecuted_thenTheOlderCannotRun",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
       ]
     },
     {
@@ -199,16 +203,18 @@
       ],
       "growthDrivers": "Reading, validating, sorting and filtering retained JSONL records grows with the bounded rotated log files.",
       "inputOrDataBound": "One request reads at most 10 MiB and 50,000 records from at most ten fixed files, returns at most 100 entries and bounds every filter and stored message.",
-      "concurrencyOrRateBound": "Only administrators may search; there is no separate rate gate, so the application deployment memory and CPU limits bound concurrent scans.",
+      "concurrencyOrRateBound": "Only administrators may search; admission control runs one search at a time per instance and charges 10 tokens of the caller's request budget.",
       "executionModel": "The read is synchronous, state invariant and uses only the collector's read-only named volume; it never calls Docker or an arbitrary source.",
       "failureBehavior": "Missing or stale collector evidence returns UNAVAILABLE; malformed or over-bound retained data is skipped and marks the result incomplete.",
       "consumerTimeoutBehavior": "The scan has fixed byte and record ceilings. The reference proxy adds no separate response deadline, and a retry performs the same bounded read.",
       "productionPaths": [
-        "src/main/java/org/courtside/operations/internal/OperationalLogService.java"
+        "src/main/java/org/courtside/operations/internal/OperationalLogService.java",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/operations/internal/OperationalLogServiceTest.java#givenACorruptStoredLine_whenSearching_thenItIsSkippedAndTheResultIsMarkedIncomplete",
-        "src/test/java/org/courtside/operations/internal/OperationalLogServiceTest.java#givenAnOversizedCollectorStatus_whenSearching_thenItIsRejectedWithoutReadingRecords"
+        "src/test/java/org/courtside/operations/internal/OperationalLogServiceTest.java#givenAnOversizedCollectorStatus_whenSearching_thenItIsRejectedWithoutReadingRecords",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
       ]
     },
     {
@@ -220,16 +226,18 @@
       ],
       "growthDrivers": "Availability checks and allocation writes grow with requested courts, while participant validation grows with the bounded request body.",
       "inputOrDataBound": "One request names at most 999 distinct courts and the reference proxy caps the complete body at 2 MiB; configured slot and rule limits also apply.",
-      "concurrencyOrRateBound": "There is no request-rate gate; deterministic database locks, the five-second lock wait and deployment resource limits bound competing writers.",
+      "concurrencyOrRateBound": "Each write spends 2 tokens of its caller's request budget and is otherwise not capped in parallel, so a busy booking morning is decided by deterministic database locks and the five-second lock wait rather than refused.",
       "executionModel": "The synchronous transaction authorizes, validates rules, locks courts in order and stores one booking plus its allocations before publishing events.",
       "failureBehavior": "A conflict or validation failure rolls back the complete booking; an idempotency key returns the original result or rejects a changed replay.",
       "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller uncertain about the outcome can repeat the same idempotency key without creating another booking.",
       "productionPaths": [
-        "src/main/java/org/courtside/booking/BookingService.java"
+        "src/main/java/org/courtside/booking/BookingService.java",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/BookingServiceTest.java#givenAnIdempotentReplay_whenCreating_thenOnlyThePersistedBookingIsCounted",
-        "src/test/java/org/courtside/booking/BookingConcurrencyTest.java#givenAnUncommittedBookingForTheSlot_whenASecondSessionBooksTheSameSlot_thenItWaitsForTheFirstAndIsRejected"
+        "src/test/java/org/courtside/booking/BookingConcurrencyTest.java#givenAnUncommittedBookingForTheSlot_whenASecondSessionBooksTheSameSlot_thenItWaitsForTheFirstAndIsRejected",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
       ]
     },
     {
@@ -254,7 +262,7 @@
       ],
       "growthDrivers": "Collection queries grow with courts, cards, members, import history, rule sets, audit history or one day of occupied court slots in the club database.",
       "inputOrDataBound": "Roster pages stop at 200, participant search at 20 and filtered audit search scans at most 2,500 candidate events per request; one occupancy response spans one day and at most 999 courts. Several configuration and import-history lists have no row ceiling beyond tenant data.",
-      "concurrencyOrRateBound": "Read authorization and deployment resources apply, but these queries have no dedicated request-rate or concurrency gate.",
+      "concurrencyOrRateBound": "Each read spends 2 tokens of its caller's request budget; the queries have no separate concurrency gate.",
       "executionModel": "Each operation is a synchronous read-only request; paged operations use a stable cursor while deliberately small configuration lists return together.",
       "failureBehavior": "Invalid cursors, limits and dates return typed failures. Query failure produces no mutation and no successful partial collection response.",
       "consumerTimeoutBehavior": "The reference proxy sets no response deadline. These reads are repeatable after a caller disconnects and carry no server-side continuation contract.",
@@ -262,12 +270,14 @@
         "src/main/java/org/courtside/booking/BookingService.java",
         "src/main/java/org/courtside/audit/internal/AuditService.java",
         "src/main/java/org/courtside/dataexchange/ExecutionService.java",
-        "src/main/java/org/courtside/member/RosterService.java"
+        "src/main/java/org/courtside/member/RosterService.java",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/audit/internal/AuditSearchBudgetTest.java#givenNoTextMatch_whenTheScanBudgetIsReached_thenThePageSaysItIsIncomplete",
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnEmptyDay_whenLoadingThePublicGrid_thenItsQueryBudgetIsStable",
-        "src/test/java/org/courtside/member/web/RosterAdminControllerTest.java#givenMorePeopleThanTheLimit_whenListingTheRoster_thenTheCursorNamesTheLastEntry"
+        "src/test/java/org/courtside/member/web/RosterAdminControllerTest.java#givenMorePeopleThanTheLimit_whenListingTheRoster_thenTheCursorNamesTheLastEntry",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
       ]
     },
     {
@@ -282,17 +292,19 @@
       ],
       "growthDrivers": "Schedule expansion, rule evaluation and row locking grow with occurrences and the distinct courts selected for a series.",
       "inputOrDataBound": "A series expands to at most 200 occurrences, lasts at most 1,440 minutes per occurrence and names at most 999 distinct courts.",
-      "concurrencyOrRateBound": "There is no separate request-rate gate; database locks, the five-second lock wait and the application container budget bound concurrent writers.",
+      "concurrencyOrRateBound": "Admission control runs at most two series operations at a time per instance and charges 10 tokens of the caller's request budget; database locks and the five-second lock wait bound competing writers.",
       "executionModel": "Previews are synchronous reads. Create, move and cancel use transactions and acquire shared booking rows in the repository-wide order.",
       "failureBehavior": "An over-limit schedule is rejected before calendar work; lock or rule failure rolls the transaction back and reports a typed domain or contention response.",
       "consumerTimeoutBehavior": "The reference proxy adds no response deadline. A disconnected caller may not know the commit outcome, so mutations use their stored series identity and transactional state on retry.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/series/SeriesRule.java",
-        "src/main/java/org/courtside/booking/series/SeriesService.java"
+        "src/main/java/org/courtside/booking/series/SeriesService.java",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/series/SeriesPreviewTest.java#givenARuleExpandingPastTheOccurrenceLimit_whenPreviewing_thenItIsRejectedBeforeAnyCalendarQuery",
-        "src/test/java/org/courtside/booking/series/SeriesQueryBudgetTest.java#givenASeriesSize_whenMeasuringMovePreviewAndMove_thenStableRuleQueriesStayBounded"
+        "src/test/java/org/courtside/booking/series/SeriesQueryBudgetTest.java#givenASeriesSize_whenMeasuringMovePreviewAndMove_thenStableRuleQueriesStayBounded",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
       ]
     },
     {
@@ -311,7 +323,7 @@
       ],
       "growthDrivers": "Roster export grows with matching members, subject access with one person's retained history, booking export and reporting with allocations in the selected period, and statistics with allocations, members, accounts and messages in the period plus one progression bucket per week or month of it.",
       "inputOrDataBound": "Booking export and utilisation report periods stop at 366 days and subject access stops at one person. Statistics periods stop at 36,525 days in the years 0001 to 9999, so the progression answers at most about 1,200 monthly buckets. Open time is computed per weekday and per daylight-saving change rather than per day. Each allocation is clipped to the period before it is split into days and open hours, so that splitting is bounded by the period even though an allocation itself has no length ceiling. Every statistics read runs under a 30-second statement timeout. Roster and retained person history have no row ceiling beyond the club's own data set.",
-      "concurrencyOrRateBound": "These administrator-only synchronous reads have no per-operation concurrency gate; container, database pool and deployment resource limits are the outer bound.",
+      "concurrencyOrRateBound": "Admission control runs at most two of these administrator reads at a time per instance and charges 20 tokens of the caller's request budget; statistics reads also stop at their 30-second statement timeout.",
       "executionModel": "The application reads and renders each response synchronously; roster pagination uses pages of 200 internally before constructing one response file.",
       "failureBehavior": "Invalid periods and encodings fail before export; a database or rendering failure returns no successful file rather than a partial application state change.",
       "consumerTimeoutBehavior": "The reference proxy sets no shorter response timeout. Client cancellation can discard the response but is not claimed to cancel every database or rendering step.",
@@ -324,14 +336,16 @@
         "src/main/java/org/courtside/booking/internal/BookingStatisticsService.java",
         "src/main/java/org/courtside/member/internal/MembershipStatisticsService.java",
         "src/main/java/org/courtside/identity/internal/AccountStatisticsService.java",
-        "src/main/java/org/courtside/notification/internal/MessageStatisticsService.java"
+        "src/main/java/org/courtside/notification/internal/MessageStatisticsService.java",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenMoreThan366Days_whenReportingUtilisation_thenThePeriodLimitIsReturned",
         "src/test/java/org/courtside/dataexchange/internal/RosterExportServiceTest.java#givenMorePeopleThanOnePageHolds_whenTheRosterIsExported_thenTheFileHoldsEveryOne",
         "src/test/java/org/courtside/reporting/StatisticsQueryBudgetTest.java#givenMoreBookingsCourtsAndARetiredCourt_whenReadingEverySection_thenTheStatementCountStaysTheSame",
         "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAHundredYearsAndADay_whenReadingUtilisation_thenThePeriodIsRefusedAsTooLong",
-        "src/test/java/org/courtside/reporting/web/StatisticsStatementTimeoutTest.java#givenEveryStatisticsRead_whenItQueriesTheDatabase_thenItsTransactionCarriesTheStatementTimeout"
+        "src/test/java/org/courtside/reporting/web/StatisticsStatementTimeoutTest.java#givenEveryStatisticsRead_whenItQueriesTheDatabase_thenItsTransactionCarriesTheStatementTimeout",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
       ]
     },
     {
@@ -342,16 +356,18 @@
       ],
       "growthDrivers": "Image decoding, normalization and hashing grow with compressed bytes and decoded pixel dimensions.",
       "inputOrDataBound": "The parser rejects input above 1 MiB before decoding and dimensions above 2,048 by 2,048; the reference proxy caps the complete request at 2 MiB.",
-      "concurrencyOrRateBound": "Only an administrator can invoke the synchronous operation; no separate image-normalization concurrency gate exists beyond deployment resources.",
+      "concurrencyOrRateBound": "Only an administrator can invoke it; admission control runs one normalization at a time per instance and charges 10 tokens of the caller's request budget.",
       "executionModel": "The request decodes and normalizes one PNG or JPEG in memory, hashes it and stores the bounded result in one transaction.",
       "failureBehavior": "Malformed, oversized or over-dimensioned images fail before configuration is replaced; active SVG content is not decoded as an accepted logo.",
       "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A failed or abandoned request cannot leave a partially replaced logo transaction.",
       "productionPaths": [
-        "src/main/java/org/courtside/config/internal/ClubLogo.java"
+        "src/main/java/org/courtside/config/internal/ClubLogo.java",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenMoreThanOneMebibyte_whenParsing_thenItIsRejectedBeforeDecoding",
-        "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenAnImageAboveTheDimensionLimit_whenParsing_thenItIsRejected"
+        "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenAnImageAboveTheDimensionLimit_whenParsing_thenItIsRejected",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
       ]
     },
     {
@@ -364,16 +380,18 @@
       ],
       "growthDrivers": "The affected-count query grows with future allocations for the court, booking card or weekday whose configuration may change.",
       "inputOrDataBound": "Visible identifiers are paged at 100 by the API; the accompanying affected count still spans all matching future allocations.",
-      "concurrencyOrRateBound": "These administrator-only reads have no per-operation rate gate and share the application and database resource limits.",
+      "concurrencyOrRateBound": "Admission control runs at most two impact reads at a time per instance and charges 5 tokens of the caller's request budget.",
       "executionModel": "Interactive impact previews synchronously execute one count and one bounded identifier page; announcement pages deliberately omit the count query.",
       "failureBehavior": "Unknown resources and invalid page sizes return typed failures; a query failure produces no configuration mutation because impact operations are read-only.",
       "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller that leaves loses the preview response and may safely repeat the read.",
       "productionPaths": [
-        "src/main/java/org/courtside/booking/internal/ImpactService.java"
+        "src/main/java/org/courtside/booking/internal/ImpactService.java",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnAnnouncementPage_whenReadingIt_thenItOmitsTheInteractiveCountQuery",
-        "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnInteractivePreview_whenReadingIt_thenItStillComputesTheAffectedCount"
+        "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnInteractivePreview_whenReadingIt_thenItStillComputesTheAffectedCount",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
       ]
     },
     {
@@ -384,15 +402,17 @@
       ],
       "growthDrivers": "Revocation touches the active sessions of every account and therefore grows with the club's signed-in population.",
       "inputOrDataBound": "Each account retains at most five concurrent sessions by default, but the administrator operation has no club-wide row ceiling.",
-      "concurrencyOrRateBound": "Only an administrator can invoke the synchronous operation; no separate per-operation rate or concurrency gate is installed.",
+      "concurrencyOrRateBound": "Only an administrator can invoke it; admission control runs one revocation at a time per instance and charges 5 tokens of the caller's request budget.",
       "executionModel": "One synchronous transactional database mutation revokes the stored sessions before the successful response is produced.",
       "failureBehavior": "A database failure rolls the transaction back; the operation cannot report success with only part of the selected session state committed.",
       "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller can repeat revocation safely because already-ended sessions stay ended.",
       "productionPaths": [
-        "src/main/java/org/courtside/identity/GlobalSessionAdministration.java"
+        "src/main/java/org/courtside/identity/GlobalSessionAdministration.java",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
       ],
       "evidence": [
-        "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenSeveralAccounts_whenAllSessionsAreEnded_thenTheCallingAdminAlsoLosesAuthority"
+        "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenSeveralAccounts_whenAllSessionsAreEnded_thenTheCallingAdminAlsoLosesAuthority",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
       ]
     },
     {

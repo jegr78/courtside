@@ -108,6 +108,25 @@ courtside:
     global:
       threshold: ${COURTSIDE_LOGIN_GLOBAL_THRESHOLD:100}
       window: ${COURTSIDE_LOGIN_GLOBAL_WINDOW:1m}
+  admission:
+    account:
+      burst: ${COURTSIDE_ADMISSION_ACCOUNT_BURST:200}
+      per-second: ${COURTSIDE_ADMISSION_ACCOUNT_PER_SECOND:20}
+    address:
+      burst: ${COURTSIDE_ADMISSION_ADDRESS_BURST:600}
+      per-second: ${COURTSIDE_ADMISSION_ADDRESS_PER_SECOND:60}
+    tracked-principals: 10000
+    classes:
+      password-and-credential-work: { cost: 5 }
+      booking-write: { cost: 2 }
+      tenant-scaled-reads: { cost: 2 }
+      booking-series: { cost: 10, concurrency: 2 }
+      administrative-impact-analysis: { cost: 5, concurrency: 2 }
+      bulk-report-and-export: { cost: 20, concurrency: 2 }
+      roster-import: { cost: 20, concurrency: 1 }
+      operational-log-search: { cost: 10, concurrency: 1 }
+      logo-normalization: { cost: 10, concurrency: 1 }
+      global-session-revocation: { cost: 5, concurrency: 1 }
   booking:
     series-horizon-months: 12
     reminder-sweep-interval: 5m
