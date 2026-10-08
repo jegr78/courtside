@@ -1,6 +1,7 @@
 import type { components } from "./schema";
 import { abortable } from "./abortable";
 import { clearPersonalBookingsOfflineData, notifyOtherClientsOfSessionChange } from "../offlineBookings";
+import { warnAbout } from "./failureWarning";
 
 export type SessionStatus = components["schemas"]["SessionStatus"];
 export type ClubConfig = components["schemas"]["ClubConfig"];
@@ -234,7 +235,7 @@ let reissuing: Promise<unknown> | undefined;
 // a refusal the sign-in form can only report as a rejected credential.
 async function reissuedCsrfToken(): Promise<string | undefined> {
   const pending = reissuing ??= fetch("/api/session", { credentials: "same-origin" })
-    .catch(() => undefined)
+    .catch((failure: unknown) => warnAbout("CSRF token reissue failed", failure))
     .finally(() => { reissuing = undefined; });
   await pending;
   return csrfToken();

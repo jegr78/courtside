@@ -602,6 +602,23 @@ it("given signing out cleared the token, when signing in again, then a fresh tok
   expect(sent).toBe("reissued-token");
 });
 
+it("given the token cannot be reissued, when writing, then the failure is named in the console", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=; Max-Age=0";
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  server.use(
+    http.get("/api/session", () => HttpResponse.error()),
+    http.post("/api/session", () => new HttpResponse(null, { status: 403 }))
+  );
+
+  // when
+  await api.login("doe.jane", "temporary-password").catch(() => undefined);
+
+  // then
+  expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^CSRF token reissue failed: TypeError/));
+  warn.mockRestore();
+});
+
 it("given a token cookie left empty, when writing, then a usable one is fetched first", async () => {
   // given
   document.cookie = "XSRF-TOKEN=";

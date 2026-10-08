@@ -10,6 +10,7 @@ import { Modal } from "../components/Modal";
 import { bookingTimeSlot, formatBookingPeriod, zonedDateTime } from "../time/clubZone";
 import { hoursOn } from "../time/openingHours";
 import { PERSON_SEARCH_DEBOUNCE_MS, PERSON_SEARCH_MIN_LENGTH } from "../person-search";
+import { warnAbout } from "../api/failureWarning";
 
 export interface BookingSelection {
   date: string;
@@ -100,7 +101,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       await created();
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 409) {
-        await conflicted().catch(() => undefined);
+        await conflicted().catch((refreshFailure: unknown) =>
+          warnAbout("Court plan refresh after a conflict failed", refreshFailure));
       }
       if (failure instanceof ApiError && failure.problem) {
         const translated = translatedViolations(failure.problem, t);
