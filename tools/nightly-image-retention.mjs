@@ -1,6 +1,8 @@
 import { pathToFileURL } from "node:url";
 
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
+export const retainedNightlyCount = 7;
+
 const datedTagPatterns = [
   /^nightly-\d{8}-[a-f0-9]{7}$/,
   /^booking-seed-nightly-\d{8}-[a-f0-9]{7}$/,
@@ -83,7 +85,7 @@ export function planNightlyImageRetention({ versions, manifests, now }) {
     .filter((tag) => pattern.test(tag))
     .map((tag) => ({ tag, updatedAt: timestamp(updatedAt, "version updatedAt").valueOf() })))
     .toSorted((left, right) => right.updatedAt - left.updatedAt || right.tag.localeCompare(left.tag))
-    .slice(0, 7)
+    .slice(0, retainedNightlyCount)
     .map(({ tag }) => tag));
   const keptDated = new Set(keptDatedTags);
   const byDigest = new Map(versions.map((version) => [version.digest, version]));

@@ -19,6 +19,7 @@ import {
   originFixture,
   originVerification
 } from "./courtside.upgrade-smoke.mjs";
+import { retainedNightlyCount } from "./nightly-image-retention.mjs";
 
 const releaseWorkflow = readFileSync(
   fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)),
@@ -361,6 +362,43 @@ test("given the retained dated nightlies, when the night rehearses an upgrade, t
       "without a dated nightly there is nothing to upgrade from");
   });
 
+test("given more dated nightlies than retention keeps, when an upgrade origin is chosen, then it is one retention "
+  + "will not delete during the run", () => {
+    // given
+    const tags = ["nightly", "nightly-candidate", "nightly-20261007-d0ba80a", "nightly-20261007-93a767d",
+      "nightly-20261007-c64503f", "nightly-20261007-e28098a", "nightly-20261007-e70aad1", "nightly-20261008-0fafd2f",
+      "nightly-20261008-1b088f5", "nightly-20261008-5744158", "nightly-20261008-6761d91", "nightly-20261008-69aec3f",
+      "nightly-20261008-70c3f7d", "nightly-20261008-bb1c226", "booking-seed-nightly-20261007-d0ba80a"];
+    const order = ["d0ba80a", "93a767d", "c64503f", "e28098a", "e70aad1", "70c3f7d", "1b088f5", "0fafd2f", "69aec3f",
+      "5744158", "6761d91", "bb1c226"];
+    const history = { committedAt: (ref) => order.indexOf(ref), unchangedSince: () => true };
+
+    // when
+    const [origin] = nightlyUpgradeOrigins("example/courtside", tags, history);
+
+    // then
+    assert.equal(origin.ref, order.at(-retainedNightlyCount),
+      "retention deletes every dated nightly older than the newest it keeps, so the oldest of those is the "
+      + "earliest origin that survives the run");
+  });
+
+test("given a retained nightly whose commit this checkout lacks, when an upgrade origin is chosen, then it still "
+  + "holds its retention slot and is never chosen", () => {
+    // given
+    const tags = ["nightly-20261007-1111111", "nightly-20261007-2222222", "nightly-20261008-ffffff1",
+      "nightly-20261008-3333333", "nightly-20261008-4444444", "nightly-20261008-5555555", "nightly-20261008-6666666",
+      "nightly-20261008-7777777"];
+    const known = { 1111111: 1, 2222222: 2, 3333333: 3, 4444444: 4, 5555555: 5, 6666666: 6, 7777777: 7 };
+    const history = { committedAt: (ref) => known[ref] ?? Number.POSITIVE_INFINITY, unchangedSince: (ref) => ref in known };
+
+    // when
+    const [origin] = nightlyUpgradeOrigins("example/courtside", tags, history);
+
+    // then
+    assert.equal(origin.ref, "2222222",
+      "the unknown nightly is one of the seven retention keeps, so the window ends one known commit earlier");
+  });
+
 test("given a history where a shipped migration was corrected, when git is asked, then only origins before an "
   + "addition qualify and commit time orders them", () => {
   // given
@@ -395,6 +433,8 @@ test("given a history where a shipped migration was corrected, when git is asked
     assert.ok(!afterCorrection.unchangedSince(added), "Flyway would refuse V1's changed checksum");
     assert.ok(afterCorrection.unchangedSince(corrected));
     assert.ok(!afterCorrection.unchangedSince("0000000"), "a commit this checkout lacks is never an origin");
+    assert.equal(afterCorrection.committedAt("0000000"), Number.POSITIVE_INFINITY,
+      "a commit this checkout lacks ranks as newest instead of stopping the selection");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

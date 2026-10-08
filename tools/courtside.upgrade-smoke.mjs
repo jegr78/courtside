@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { localRequest, newBootstrapPassword } from "./courtside.mjs";
+import { retainedNightlyCount } from "./nightly-image-retention.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const composeFile = join(root, "deploy", "compose.upgrade.yaml");
@@ -102,18 +103,24 @@ export function releaseUpgradeOrigins(repository, tags) {
 }
 
 export function nightlyUpgradeOrigins(repository, tags, history) {
+  // Retention deletes any dated nightly older than the newest it keeps, possibly while this run pulls it.
   const origin = tags
     .filter((tag) => /^nightly-\d{8}-[0-9a-f]{7,40}$/.test(tag))
     .map((tag) => ({ ref: tag.split("-").at(-1), image: `ghcr.io/${repository}:${tag}` }))
+    .sort((left, right) => history.committedAt(right.ref) - history.committedAt(left.ref))
+    .slice(0, retainedNightlyCount)
     .filter((candidate) => history.unchangedSince(candidate.ref))
-    .sort((left, right) => history.committedAt(left.ref) - history.committedAt(right.ref))[0];
+    .at(-1);
   return origin ? [origin] : [];
 }
 
 // Flyway refuses a database whose applied migration changed, which a correction before the first release may do.
 export function gitHistory(candidate, cwd = root) {
   return {
-    committedAt: (ref) => Number(run("git", ["show", "-s", "--format=%ct", ref], { cwd }).stdout.trim()),
+    committedAt: (ref) => {
+      const shown = run("git", ["show", "-s", "--format=%ct", ref], { allowFailure: true, cwd });
+      return shown.status === 0 ? Number(shown.stdout.trim()) : Number.POSITIVE_INFINITY;
+    },
     unchangedSince: (ref) => run("git", ["diff", "--quiet", "--diff-filter=MDR", ref, candidate, "--",
       "src/main/resources/db/migration", originVerification], { allowFailure: true, cwd }).status === 0
   };
