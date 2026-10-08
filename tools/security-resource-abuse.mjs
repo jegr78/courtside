@@ -43,6 +43,7 @@ export function resourceAbuseIntegrityDigest() {
     "security-resource-state.mjs", "security-resource-journal.mjs", "security-mail-observation.mjs",
     "security-mail-capture.mjs", "security-resource-dates.mjs", "security-resource-auth.mjs",
     "security-resource-runtime.mjs", "security-environment.mjs", "security-passive-deployment.mjs",
+    "security-resource-abuse.mjs",
     "security-startup-diagnostics.mjs",
     "fixture-artifact.mjs", "../Dockerfile.fixtures",
     "../src/main/java/org/courtside/securityassessment/SecuritySessionAttributeProjection.java",
