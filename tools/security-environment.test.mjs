@@ -1313,6 +1313,15 @@ test("given a recorded security environment, when launching owned commands, then
   assert.equal(environment.PATH, "/trusted/bin", "the record must never select the host's tools");
 });
 
+test("given the security runner's source, when a command reads the recorded state, then the state goes through the merge", () => {
+  // given
+  const runner = readFileSync(new URL("./security-environment.mjs", import.meta.url), "utf8");
+
+  // when / then
+  assert.doesNotMatch(runner, /\.\.\.process\.env,\s*\.\.\.readSecurityEnvironment\(/,
+    "a recorded state spread over the host environment could select PATH or the Docker host");
+});
+
 test("given a disposable security identity, when configuring the relay, then private trust assets belong to that run and the local non-root owner", () => {
   // given
   const image = `sha256:${"a".repeat(64)}`;
