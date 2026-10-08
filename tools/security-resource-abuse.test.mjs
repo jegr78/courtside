@@ -684,8 +684,8 @@ test("given the destructive k6 profile, when separating integrity from pressure,
   }
   for (const integrity of ["competingOccupancy", "duplicateDelivery", "participantCapacity"]) {
     const body = new RegExp(`function ${integrity}\\(\\) \\{([\\s\\S]*?)\\n\\}`).exec(script)[1];
-    assert.ok(body.indexOf("if (refusedIntegrityRequest(response)) return;") < body.indexOf("check(response"),
-      `${integrity} must not judge a request admission refused`);
+    const skip = body.indexOf("if (refusedIntegrityRequest(response)) return;");
+    assert.ok(skip >= 0 && skip < body.indexOf("check(response"), `${integrity} must not judge a request admission refused`);
   }
 });
 

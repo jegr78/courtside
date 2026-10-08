@@ -750,7 +750,7 @@ test("given admission refusals during the integrity races, when the script meets
     .map(([name, count]) => [name, { values: { count } }])), root_group: {} });
   const result = parseResourceJournal(harness.messages.join("\n"), { accounts });
   // then
-  assert.equal(harness.counters.integrity_admission_refusals, 4);
+  assert.equal(harness.counters.integrity_admission_refusals, 4, "each integrity scenario counted the refusal it met");
   assert.deepEqual(harness.backend.checks.filter(check => /^(competing-court-occupancy|duplicate-delivery|participant-capacity|preview-mutation-race):(?!fixtures-ready)/
     .test(check.name)), [], "a refused request is neither a passed nor a failed integrity check");
   assert.ok(result.operations.filter(operation => operation.status === 429).every(operation =>
