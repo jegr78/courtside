@@ -199,3 +199,42 @@ test("given a fill that does not reach the guest field, when preparing a booking
   // when / then
   await assert.rejects(prepareBrowserBooking(page, 1), /guest field holds "" after entering "Browser Test Guest"/);
 });
+
+test("given a console warning on the page, when a journey runs, then the run log keeps it without counting an error", async () => {
+  // given
+  const metrics = new Map();
+  const logged = [];
+  class Metric {
+    constructor(name) { this.name = name; metrics.set(name, []); }
+    add(value) { metrics.get(this.name).push(value); }
+  }
+  const handlers = {};
+  const page = {
+    on: (event, handler) => { handlers[event] = handler; },
+    goto: async () => {
+      handlers.console({ type: () => "warning", text: () => "identity refresh: status 503" });
+      throw new Error("stop after the warning");
+    },
+    url: () => "about:blank", close: async () => {}
+  };
+  const context = {
+    browser: { newPage: async () => page },
+    check: () => true, Counter: Metric, Rate: Metric, Trend: Metric,
+    open: path => JSON.stringify(path.endsWith("contract.json") ? contract : { password: "test-password" }),
+    console: { error: line => logged.push(line) }, Date,
+    __ENV: { PERF_TARGET: "https://proxy" }, __VU: 3, __ITER: 4,
+    ...browserDiagnostics, prepareBrowserBooking: async () => {}
+  };
+  runInNewContext(browserSource.replace(/^import .*;\n/gm, "").replace("export const options", "globalThis.options")
+    .replace("export default async function", "globalThis.iteration = async function")
+    .replace("export function handleSummary", "function handleSummary"), context);
+
+  // when
+  await context.iteration();
+
+  // then
+  assert.ok(logged.includes("vu=3 iteration=4 console warning: identity refresh: status 503"),
+    `a swallowed frontend failure must reach the run log, got ${JSON.stringify(logged)}`);
+  assert.deepEqual(metrics.get("browser_errors").filter(value => value > 0), [1],
+    "only the failed journey counts; the warning itself is not a browser error");
+});

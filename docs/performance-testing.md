@@ -353,7 +353,8 @@ A run that fails says why in `k6.log`. Every unexpected response is written once
 status and problem type, with the violation codes, rejected fields and the `traceId` that finds
 the refusal in the server's trace. A failed browser journey names its step, page, VU and
 iteration; every failed request, console error and response of 400 or above in the browser is
-written as it happens.
+written as it happens. Console warnings are written too, so a failure the frontend handled without
+breaking the journey still leaves a line, but they do not count as browser errors.
 
 Browser reports retain p75 LCP, INP, and CLS against the contract budgets, failed browser requests
 and console errors, the complete-journey success rate, and average journey duration. Their profile
