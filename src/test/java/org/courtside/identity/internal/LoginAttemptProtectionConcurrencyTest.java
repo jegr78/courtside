@@ -55,4 +55,26 @@ class LoginAttemptProtectionConcurrencyTest extends AbstractIntegrationTest {
         // then
         assertThat(results).filteredOn(Optional::isPresent).hasSize(1);
     }
+
+    @Test
+    void givenABlockedAddress_whenItsBlockIsRead_thenTheBlockIsReportedAndNothingIsCounted() {
+        // given
+        protection.registerAttempt("192.0.2.41");
+        protection.registerAttempt("192.0.2.41");
+        protection.registerAttempt("192.0.2.41");
+        long before = attemptCount();
+
+        // when
+        Optional<LoginBlock> block = protection.loginBlock("192.0.2.41");
+        Optional<LoginBlock> unblocked = protection.loginBlock("192.0.2.42");
+
+        // then
+        assertThat(block).as("a blocked address is told so by the read alone").isPresent();
+        assertThat(unblocked).isEmpty();
+        assertThat(attemptCount()).as("reading a block records no attempt").isEqualTo(before);
+    }
+
+    private long attemptCount() {
+        return jdbc.sql("SELECT COALESCE(SUM(attempt_count), 0) FROM login_attempt_limit").query(Long.class).single();
+    }
 }

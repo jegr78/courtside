@@ -115,6 +115,22 @@ class LoginAttemptProtection {
         return Optional.empty();
     }
 
+    @Transactional(readOnly = true)
+    Optional<LoginBlock> loginBlock(String address) {
+        return retryAfter(Scope.ADDRESS, normalizeAddress(address));
+    }
+
+    @Transactional(readOnly = true)
+    Optional<LoginBlock> credentialBlock(String accountId, String address) {
+        return retryAfter(Scope.ACCOUNT, "credential-account:" + accountId)
+                .or(() -> anonymousCredentialBlock(address));
+    }
+
+    @Transactional(readOnly = true)
+    Optional<LoginBlock> anonymousCredentialBlock(String address) {
+        return retryAfter(Scope.ADDRESS, "credential-address:" + normalizeAddress(address));
+    }
+
     private Optional<LoginBlock> retryAfter(String address) {
         Instant now = clock.instant();
         return retryAfter(Scope.ADDRESS, address);
