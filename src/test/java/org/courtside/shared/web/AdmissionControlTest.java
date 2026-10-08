@@ -138,14 +138,12 @@ class AdmissionControlTest {
         assertThatThrownBy(() -> control.preHandle(request(), new MockHttpServletResponse(), operation("previewSeries")))
                 .isInstanceOf(OperationCapacityExhaustedException.class);
 
-        // when
-        boolean admitted = true;
-        for (int request = 0; request < 20; request++) {
-            admitted &= control.preHandle(request(), new MockHttpServletResponse(), operation("unknownOperation"));
-        }
-
-        // then
-        assertThat(admitted).as("a request the class refused spent none of the twenty tokens").isTrue();
+        // when / then
+        assertThatCode(() -> {
+            for (int request = 0; request < 20; request++) {
+                control.preHandle(request(), new MockHttpServletResponse(), operation("unknownOperation"));
+            }
+        }).as("a request the class refused spent none of the twenty tokens").doesNotThrowAnyException();
     }
 
     @Test
