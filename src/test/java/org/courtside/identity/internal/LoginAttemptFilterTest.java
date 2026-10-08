@@ -108,7 +108,7 @@ class LoginAttemptFilterTest {
     }
 
     @Test
-    void givenPasswordVerificationSucceeds_whenTheResponseCompletes_thenTheAddressLimitIsCleared()
+    void givenPasswordVerificationSucceeds_whenTheResponseCompletes_thenOnlyItsOwnAttemptIsReleased()
             throws Exception {
         // given
         LoginVerificationCapacity capacity = capacity(1);
@@ -125,7 +125,7 @@ class LoginAttemptFilterTest {
         filter(capacity).doFilter(request, new MockHttpServletResponse(), chain);
 
         // then
-        verify(protection).clear("login:192.0.2.10");
+        verify(protection).releaseSuccessfulAttempt("login:192.0.2.10");
     }
 
     @Test
@@ -144,7 +144,7 @@ class LoginAttemptFilterTest {
         filter(capacity).doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), chain);
 
         // then
-        verify(protection, never()).clear(anyString());
+        verify(protection, never()).releaseSuccessfulAttempt(anyString());
         verify(protection, never()).clearCredentialAccountAttempt(anyString());
     }
 

@@ -70,7 +70,7 @@ class LoginAttemptFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             if (response.getStatus() >= 200 && response.getStatus() < 300) {
                 if (login) {
-                    protection.clear(loginAddress);
+                    protection.releaseSuccessfulAttempt(loginAddress);
                 } else {
                     accountId.ifPresent(protection::clearCredentialAccountAttempt);
                 }

@@ -194,22 +194,39 @@ class LoginAttemptProtectionTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAFailureFollowedBySuccess_whenAnotherFailureOccurs_thenTheCountersStartAgain()
+    void givenAFailureFollowedByAnotherAccountsSuccess_whenFailuresContinue_thenTheAddressLimitStillCloses()
             throws Exception {
         // given
-        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
-        UserAccount account = new UserAccount(
-                jane, "doe.jane", passwordEncoder.encode("correct-horse"), Set.of(Role.MEMBER), "de");
-        account.enable();
-        accounts.save(account);
-        failLogin("doe.jane", "192.0.2.20");
+        enabledMember("doe.jane", "correct-horse");
+        failLogin("roe.john", "192.0.2.20");
         mockMvc.perform(login("doe.jane", "correct-horse", "192.0.2.20"))
                 .andExpect(status().isOk());
+        failLogin("roe.john", "192.0.2.20");
 
         // when / then
-        failLogin("doe.jane", "192.0.2.20");
-        mockMvc.perform(login("doe.jane", "wrong", "192.0.2.20"))
-                .andExpect(status().isUnauthorized());
+        mockMvc.perform(login("roe.john", "wrong", "192.0.2.20"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:login-rate-limited"));
+    }
+
+    @Test
+    void givenOnlySuccessfulSignIns_whenOneAddressRepeatsThem_thenItIsNeverLimited() throws Exception {
+        // given
+        enabledMember("doe.jane", "correct-horse");
+
+        // when / then
+        for (int attempt = 0; attempt < 4; attempt++) {
+            mockMvc.perform(login("doe.jane", "correct-horse", "192.0.2.21"))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    private void enabledMember(String username, String password) {
+        Person jane = persons.save(new Person("Jane", "Doe", "jane.doe@example.org"));
+        UserAccount account = new UserAccount(
+                jane, username, passwordEncoder.encode(password), Set.of(Role.MEMBER), "de");
+        account.enable();
+        accounts.save(account);
     }
 
     @Test
