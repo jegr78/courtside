@@ -1843,6 +1843,9 @@ it("given fresh allocations and the same clock, when the selected day refreshes,
     showGenericOccupancy: true, participantCount: 2
   }]);
 
+  await act(async () => {});
+  const loadsBefore = vi.mocked(api.allocations).mock.calls.length;
+
   // when
   await act(async () => {
     window.dispatchEvent(new Event("focus"));
@@ -1850,7 +1853,11 @@ it("given fresh allocations and the same clock, when the selected day refreshes,
   });
 
   // then
-  await waitFor(() => expect(screen.getByTestId("day-free-count-2026-08-10"))
+  await waitFor(() => expect(vi.mocked(api.allocations).mock.calls.slice(loadsBefore),
+    "the focus must reload the selected day; no call means no refresh listener was attached")
+    .toEqual([["2026-08-10"]]));
+  await waitFor(() => expect(screen.getByTestId("day-free-count-2026-08-10"),
+    "the reloaded day must replace the plan's occupancy")
     .toHaveAttribute("data-free-count", "37"));
   expect(screen.getByTestId("day-free-count-2026-08-11")).toHaveAttribute("data-free-count", "56");
 });
