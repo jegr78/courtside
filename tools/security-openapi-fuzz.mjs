@@ -4,7 +4,10 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 import { apiDocumentPath } from "./security-api-document.mjs";
 import { createCandidate } from "./security-triage.mjs";
-import { authorizationRequest, SecurityCookieJar } from "./security-authorization.mjs";
+import { setTimeout as delay } from "node:timers/promises";
+import {
+  admissionRefused, authorizationRequest, SecurityCookieJar, sendPacedByAdmission
+} from "./security-authorization.mjs";
 
 const methods = new Set(["get", "post", "put", "patch", "delete"]);
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
@@ -33,6 +36,26 @@ export const openApiFuzzPolicy = Object.freeze(JSON.parse(readFileSync(
 // image rather than written beside it, where the two could drift apart unnoticed.
 export const openApiFuzzVersion = openApiFuzzPolicy.image.slice(
   openApiFuzzPolicy.image.indexOf(":") + 1, openApiFuzzPolicy.image.indexOf("@"));
+
+export function schemathesisConfiguration(client, policy = openApiFuzzPolicy) {
+  return `headers = { Cookie = ${JSON.stringify(client.header())}, X-XSRF-TOKEN = ${JSON.stringify(client.csrfToken())} }\n`
+    + `rate-limit = ${JSON.stringify(policy.rateLimit)}\n`
+    + `\n[phases.coverage]\nunexpected-methods = ${JSON.stringify(policy.unexpectedMethods)}\n`
+    + Object.entries(policy.expectedStatuses).map(([check, statuses]) =>
+      `\n[checks.${check}]\nexpected-statuses = ${JSON.stringify(statuses)}\n`).join("");
+}
+
+function nativeSender(context, send) {
+  const wait = context.wait ?? ((milliseconds) => delay(milliseconds));
+  let requestCount = 0;
+  return {
+    send: (...request) => sendPacedByAdmission(() => {
+      requestCount++;
+      return send(...request);
+    }, wait, { retries: 1 }),
+    requestCount: () => requestCount
+  };
+}
 
 export function openApiFuzzPolicyDigest(policy = openApiFuzzPolicy) {
   return `sha256:${createHash("sha256").update(JSON.stringify(policy)).digest("hex")}`;
@@ -289,22 +312,25 @@ export async function runOpenApiImportCases(plan, fixture, context) {
   const cases = securityImportCases();
   const results = [];
   let generatedBytes = 0;
+  const sender = nativeSender(context, context.request ?? ((probe) => authorizationRequest(plan.target,
+    fixture.client, probe, {
+      ca: context.ca, signal: context.signal, csrf: true,
+      timeoutMilliseconds: context.timeoutMilliseconds
+    })));
   for (const entry of cases) {
     const probe = multipartProbe(fixture.sourceId, entry.id, entry.content);
     generatedBytes += probe.body.length;
-    const response = await authorizationRequest(plan.target, fixture.client,
-      probe, {
-        ca: context.ca, signal: context.signal, csrf: true,
-        timeoutMilliseconds: context.timeoutMilliseconds
-      });
+    const response = await sender.send(probe);
     const passed = response.status === entry.status
       && (!entry.problemType || response.problemType === entry.problemType)
       && (entry.observation !== "row-level-rejection" || response.json?.rowErrors?.length > 0);
+    const refused = admissionRefused(response);
     results.push({ id: entry.id, status: response.status,
       ...(response.problemType ? { problemType: response.problemType } : {}),
-      observation: entry.observation, outcome: passed ? "passed" : "incomplete" });
+      observation: refused ? "admission-refused" : entry.observation,
+      outcome: passed && !refused ? "passed" : "incomplete" });
   }
-  return { cases: results, requestCount: cases.length, generatedBytes };
+  return { cases: results, requestCount: sender.requestCount(), generatedBytes };
 }
 
 export async function runOpenApiInputCases(plan, fixture, context) {
@@ -328,17 +354,19 @@ export async function runOpenApiInputCases(plan, fixture, context) {
   ];
   const results = [];
   let generatedBytes = 0;
+  const sender = nativeSender(context, context.request ?? ((probe, options) => authorizationRequest(plan.target,
+    fixture.client, probe, { ca: context.ca, timeoutMilliseconds: context.timeoutMilliseconds, ...options })));
   for (const entry of cases) {
     generatedBytes += Buffer.byteLength(entry.body ?? "") + Buffer.byteLength(entry.path);
-    const response = await authorizationRequest(plan.target, fixture.client, {
+    const response = await sender.send({
       method: entry.method,
       path: entry.path,
       headers: { ...(entry.body !== undefined ? { "content-type": "application/json" } : {}),
         ...(entry.headers ?? {}) },
       ...(entry.body !== undefined ? { body: entry.body } : {})
-    }, { ca: context.ca, csrf: entry.method !== "GET", timeoutMilliseconds: context.timeoutMilliseconds,
-      acceptConnectionReset: entry.id === "oversized-body" });
-    const typed = response.status >= 400 && response.status < 500
+    }, { csrf: entry.method !== "GET", acceptConnectionReset: entry.id === "oversized-body" });
+    const refused = admissionRefused(response);
+    const typed = !refused && response.status >= 400 && response.status < 500
       && /^urn:courtside:error:[a-z0-9-]+$/.test(response.problemType ?? "");
     const proxyRejected = entry.expectedStatus === 413
       && (response.status === 413 || response.transportError === "connection-reset");
@@ -346,10 +374,10 @@ export async function runOpenApiInputCases(plan, fixture, context) {
       ...(response.status ? { status: response.status } : {}),
       ...(response.transportError ? { transportError: response.transportError } : {}),
       ...(response.problemType ? { problemType: response.problemType } : {}),
-      observation: proxyRejected ? "proxy-size-rejection" : "typed-input-rejection",
+      observation: refused ? "admission-refused" : proxyRejected ? "proxy-size-rejection" : "typed-input-rejection",
       outcome: typed || proxyRejected ? "passed" : "incomplete" });
   }
-  return { cases: results, requestCount: cases.length, generatedBytes };
+  return { cases: results, requestCount: sender.requestCount(), generatedBytes };
 }
 
 // A schema that only says "string" accepts "invalid", so corrupting such a parameter would assert a
@@ -365,12 +393,13 @@ export async function runOpenApiMutationCases(plan, fixture, context) {
     .filter(({ modes }) => !modes.includes("positive") && modes.includes("negative"));
   const results = [];
   let generatedBytes = 0;
-  const send = context.request ?? ((probe) => authorizationRequest(plan.target, fixture.client, probe, {
-    ca: context.ca,
-    signal: context.signal,
-    csrf: true,
-    timeoutMilliseconds: context.timeoutMilliseconds
-  }));
+  const sender = nativeSender(context, context.request ?? ((probe) => authorizationRequest(plan.target,
+    fixture.client, probe, {
+      ca: context.ca,
+      signal: context.signal,
+      csrf: true,
+      timeoutMilliseconds: context.timeoutMilliseconds
+    })));
   for (const operation of operations) {
     const definition = api.paths[operation.path][operation.method.toLowerCase()];
     const parameters = [...(api.paths[operation.path].parameters ?? []), ...(definition.parameters ?? [])];
@@ -396,14 +425,16 @@ export async function runOpenApiMutationCases(plan, fixture, context) {
       if (constrained !== undefined) probe.path = `${path}?${constrained}=invalid`;
     }
     generatedBytes += Buffer.byteLength(probe.path) + Buffer.byteLength(probe.body ?? "");
-    const response = await send(probe);
-    const passed = response.status >= 400 && response.status < 500
+    const response = await sender.send(probe);
+    const refused = admissionRefused(response);
+    const passed = !refused && response.status >= 400 && response.status < 500
       && /^urn:courtside:error:[a-z0-9-]+$/.test(response.problemType ?? "");
     results.push({ operationId: operation.operationId, method: operation.method, path: operation.path,
       status: response.status, ...(response.problemType ? { problemType: response.problemType } : {}),
-      observation: "invalid-mutation-rejected", outcome: passed ? "passed" : "incomplete" });
+      observation: refused ? "admission-refused" : "invalid-mutation-rejected",
+      outcome: passed ? "passed" : "incomplete" });
   }
-  return { cases: results, requestCount: results.length, generatedBytes };
+  return { cases: results, requestCount: sender.requestCount(), generatedBytes };
 }
 
 export function validateOpenApiFuzzEvidence(evidence, inventory = buildOpenApiFuzzInventory(api)) {

@@ -21,6 +21,7 @@ import { captureResourceAuthentication, resourceSessionProjectionClassPaths } fr
 import { captureSecurityStartupDiagnostics } from "./security-startup-diagnostics.mjs";
 import { inspectReusableImages, verifyReusableImages } from "./immutable-image-reuse.mjs";
 import { attemptStep, failureReason } from "./failure-reason.mjs";
+import { schemathesisConfiguration } from "./security-openapi-fuzz.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
@@ -1084,8 +1085,7 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
       throw new Error("The mounted OpenAPI document differs from the planned contract");
     }
     fixture = await limits.prepareFixtures();
-    const config = `headers = { Cookie = ${JSON.stringify(fixture.client.header())}, X-XSRF-TOKEN = ${JSON.stringify(fixture.client.csrfToken())} }\n`
-      + `\n[phases.coverage]\nunexpected-methods = ${JSON.stringify(limits.policy.unexpectedMethods)}\n`;
+    const config = schemathesisConfiguration(fixture.client, limits.policy);
     await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/courtside-schemathesis.toml"],
       { input: config });
     await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/sitecustomize.py"],

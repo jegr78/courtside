@@ -35,7 +35,12 @@
     "unsupported_method",
     "allow_header_conformance"
   ],
-  "nativeRequestReserve": 80,
+  "rateLimit": "auto",
+  "expectedStatuses": {
+    "positive_data_acceptance": ["2xx", "401", "403", "404", "409", "5xx"],
+    "negative_data_rejection": ["400", "401", "403", "404", "405", "406", "409", "415", "422", "428", "5xx"]
+  },
+  "nativeRequestReserve": 160,
   "excludedOperations": {
     "getApiDocument": "The SECURITY deployment does not expose its source contract through the assessed proxy.",
     "logIn": "Authentication enumeration and rate limiting are covered by CSA-AUTHN-001.",
