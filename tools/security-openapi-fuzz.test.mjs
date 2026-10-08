@@ -13,8 +13,11 @@ import {
   openApiFuzzPolicy,
   openApiFuzzPolicyDigest,
   openApiSpecificationDigest,
+  runOpenApiImportCases,
+  runOpenApiInputCases,
   runOpenApiMutationCases,
   runOpenApiFuzzAssessment,
+  schemathesisConfiguration,
   runtimeOperations,
   securityImportCases,
   securityImportSourceRequest,
@@ -754,4 +757,142 @@ test("given a negative case whose body the contract still accepts, when it is an
   assert.deepEqual(normalized.counterexamples.map(({ bodyConforms }) => bodyConforms), [false]);
   assert.deepEqual(normalized.dispositions.map(({ disposition }) => disposition),
     ["negative-case-carried-valid-data"]);
+});
+
+const admissionRefusal = { status: 429, problemType: "urn:courtside:error:request-rate-limited", retryAfterSeconds: 1 };
+
+test("given a refusal that survived Schemathesis' own retries, when normalizing either mode, then it is a counterexample and never a disposition", () => {
+  // given
+  const inventory = buildOpenApiFuzzInventory(api);
+  const operation = inventory.find((candidate) => candidate.operationId === "searchRoster");
+  const events = (mode, check) => [
+    { LoadingFinished: { statistic: { operations: { total: 1, selected: 1 } } } },
+    { ScenarioFinished: { status: "failure", recorder: { label: `${operation.method} ${operation.path}`,
+      cases: { one: { value: { method: operation.method, meta: { generation: { mode } } } } },
+      checks: { one: [{ name: check, status: "failure", failure_info: {
+        reason: { kind: "status", observedStatus: 429, expectedStatuses: ["2xx"] } } }] } } } }
+  ];
+
+  for (const [mode, check] of [["positive", "positive_data_acceptance"], ["negative", "negative_data_rejection"],
+    ["negative", "status_code_conformance"]]) {
+    // when
+    const normalized = normalizeSchemathesisEvents(events(mode, check), [operation], mode, 1);
+
+    // then
+    assert.equal(normalized.dispositions.length, 0, `a ${mode} ${check} 429 must not be explained away`);
+    assert.equal(normalized.counterexamples.length, 1);
+    assert.equal(normalized.operationResults[0].outcome, "incomplete");
+  }
+});
+
+test("given the fuzz policy, when rendering the Schemathesis configuration, then it paces by Retry-After and expects no 429 from a data check", () => {
+  // given
+  const client = { header: () => "__Host-SESSION=one", csrfToken: () => "token" };
+
+  // when
+  const configuration = schemathesisConfiguration(client, openApiFuzzPolicy);
+
+  // then
+  const firstTable = configuration.indexOf("\n[");
+  assert.ok(configuration.indexOf('rate-limit = "auto"\n') > -1
+    && configuration.indexOf('rate-limit = "auto"\n') < firstTable,
+  "rate-limit is a top-level key and must precede every table");
+  for (const check of ["positive_data_acceptance", "negative_data_rejection"]) {
+    const section = new RegExp(`\\n\\[checks\\.${check}\\]\\nexpected-statuses = (\\[[^\\]]*\\])\\n`).exec(configuration);
+    assert.ok(section, `${check} carries explicit expected statuses`);
+    const statuses = JSON.parse(section[1]);
+    assert.ok(statuses.length > 0 && !statuses.includes("429"),
+      `${check} must not accept a 429 that survived the retries`);
+    assert.deepEqual(statuses, openApiFuzzPolicy.expectedStatuses[check]);
+  }
+  assert.match(configuration, /^headers = \{ Cookie = "__Host-SESSION=one", X-XSRF-TOKEN = "token" \}\n/);
+});
+
+test("given admission refusals on native cases, when one paced retry is answered, then the case keeps its own verdict", async () => {
+  // given
+  const sent = [];
+  const waits = [];
+  const fixture = { client: {} };
+
+  // when
+  const result = await runOpenApiMutationCases({ target: "https://127.0.0.1:9443" }, fixture, {
+    ca: "certificate", timeoutMilliseconds: 1_000,
+    wait: async (milliseconds) => { waits.push(milliseconds); },
+    request: async (probe) => {
+      sent.push(probe);
+      return sent.length % 2 === 1 ? admissionRefusal
+        : { status: 400, problemType: "urn:courtside:error:validation-failed" };
+    }
+  });
+
+  // then
+  assert.equal(result.cases.every(({ outcome }) => outcome === "passed"), true);
+  assert.equal(sent.length, result.cases.length * 2);
+  assert.equal(result.requestCount, sent.length, "every retry is counted against the native budget");
+  assert.equal(waits.every((milliseconds) => milliseconds === 1000), true);
+});
+
+test("given a refusal that survives the paced retry, when running native cases, then every class records it as incomplete", async () => {
+  // given
+  const fixture = { client: {}, sourceId: "00000000-0000-0000-0000-000000000001" };
+  let sent = 0;
+  const context = { ca: "certificate", timeoutMilliseconds: 1_000, wait: async () => {},
+    request: async () => { sent++; return admissionRefusal; } };
+
+  // when
+  const mutation = await runOpenApiMutationCases({ target: "https://127.0.0.1:9443" }, fixture, context);
+  const input = await runOpenApiInputCases({ target: "https://127.0.0.1:9443" }, fixture, context);
+  const imports = await runOpenApiImportCases({ target: "https://127.0.0.1:9443" }, fixture, context);
+
+  // then
+  for (const [kind, result] of [["mutation", mutation], ["input", input], ["import", imports]]) {
+    for (const entry of result.cases) {
+      assert.equal(entry.outcome, "incomplete", `a refused ${kind} case was never answered by its handler`);
+      assert.equal(entry.observation, "admission-refused");
+    }
+  }
+  assert.equal(sent, (mutation.cases.length + input.cases.length + imports.cases.length) * 2,
+    "a native case retries a refusal exactly once");
+  assert.equal(mutation.requestCount + input.requestCount + imports.requestCount, sent);
+});
+
+test("given the native reserve, when every native case needs its one retry, then the reserve still covers the fixture", () => {
+  // given
+  const inventory = buildOpenApiFuzzInventory(api);
+  const mutationCases = inventory.filter(({ modes }) => !modes.includes("positive") && modes.includes("negative")).length;
+  const fixtureRequests = 4;
+
+  // when
+  const worstCase = fixtureRequests + (securityImportCases().length + openApiFuzzPolicy.inputClasses.length
+    + mutationCases) * 2;
+
+  // then
+  assert.ok(worstCase <= openApiFuzzPolicy.nativeRequestReserve,
+    `${worstCase} native requests must fit the ${openApiFuzzPolicy.nativeRequestReserve} reserve`);
+});
+
+test("given operations whose own limiters advertise long waits, when Schemathesis selects operations, then none of them reaches it", () => {
+  // given
+  const limited = Object.keys(openApiFuzzPolicy.longRetryAfterOperations);
+  const inventory = buildOpenApiFuzzInventory(api);
+
+  // when
+  const generated = inventory.filter(({ modes }) => modes.includes("positive")).map(({ operationId }) => operationId);
+
+  // then
+  assert.ok(limited.length > 0);
+  for (const operationId of limited) {
+    assert.ok(inventory.some((entry) => entry.operationId === operationId), `${operationId} is in the contract`);
+    assert.ok(!generated.includes(operationId),
+      `${operationId} would let rate-limit auto wait up to three minutes on its own limiter`);
+  }
+});
+
+test("given a long-wait operation that turned read-only, when inventorying fuzz coverage, then the inventory refuses it", () => {
+  // given
+  const changed = structuredClone(api);
+  changed.paths["/api/account-recovery/password"].post["x-courtside-state-invariant"] = true;
+
+  // when / then
+  assert.throws(() => buildOpenApiFuzzInventory(changed), /requestPasswordReset.*own limiter/);
 });

@@ -35,7 +35,12 @@
     "unsupported_method",
     "allow_header_conformance"
   ],
-  "nativeRequestReserve": 80,
+  "rateLimit": "auto",
+  "expectedStatuses": {
+    "positive_data_acceptance": ["2xx", "401", "403", "404", "409", "5xx"],
+    "negative_data_rejection": ["400", "401", "403", "404", "405", "406", "409", "415", "422", "428", "5xx"]
+  },
+  "nativeRequestReserve": 160,
   "excludedOperations": {
     "getApiDocument": "The SECURITY deployment does not expose its source contract through the assessed proxy.",
     "logIn": "Authentication enumeration and rate limiting are covered by CSA-AUTHN-001.",
@@ -43,6 +48,16 @@
     "changeInitialPassword": "The bootstrap-only transition is covered by packaged browser security journeys.",
     "createImportPreview": "Multipart parser abuse is covered by the curated CSA-IMPORT-001 cases.",
     "executeImportPreview": "Import execution is stateful and remains covered by deterministic import integration tests."
+  },
+  "longRetryAfterOperations": {
+    "logIn": "login address and account limits",
+    "reauthenticate": "credential-proof limits",
+    "requestPasswordReset": "account-recovery mail limits",
+    "redeemPasswordReset": "account-recovery redemption limits",
+    "requestUsernameReminder": "account-recovery mail limits",
+    "changeInitialPassword": "credential-proof limits",
+    "changeOwnPassword": "credential-proof limits",
+    "requestAccountCredentials": "credential issue limits"
   },
   "positiveMutationRationale": "Valid mutations are covered by packaged journeys and the authorization matrix; generated mutation traffic is restricted to rejected inputs so state preservation remains attributable."
 }

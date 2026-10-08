@@ -70,6 +70,8 @@ export const resourceIntegrityLimits = Object.freeze({
   nodes: 1000000, bookings: 256, ownedSessions: 512, loginSubjects: 8
 });
 
+const admissionProblemTypes = ["urn:courtside:error:request-rate-limited",
+  "urn:courtside:error:operation-capacity-exhausted"];
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const confirmedType = "booking.booking.confirmed";
 const publicationType = "org.courtside.shared.BookingConfirmed";
@@ -890,6 +892,7 @@ function compare(input) {
     const creationWindows = new Map();
     const logins = [];
     const emptySeries = [];
+    const refusedBookings = [];
     const operationIds = new Set();
     for (const operation of operations) {
       if (!record(operation) || typeof operation.id !== "string" || !operation.id
@@ -917,7 +920,11 @@ function compare(input) {
           attributionComplete = false;
         }
       } else if (operation.kind === "createBooking") {
-        if (operation.status !== 201) continue;
+        if (operation.status !== 201) {
+          if (operation.status === 429 && admissionProblemTypes.includes(operation.problemType)
+              && typeof operation.request?.idempotencyKey === "string") refusedBookings.push(operation);
+          continue;
+        }
         const request = operation.request;
         if (!record(request) || !uuid.test(operation.responseBookingId)
             || !uuid.test(operation.actorAccountId) || !uuid.test(request.cardId)
@@ -965,6 +972,12 @@ function compare(input) {
         report("operation-kind-unsupported", "incomplete");
         attributionComplete = false;
       }
+    }
+    for (const operation of refusedBookings) {
+      if (requests.has(canonical([operation.actorAccountId, operation.request.idempotencyKey]))) continue;
+      const created = currentRows("booking").find((booking) => booking.booked_by === operation.actorAccountId
+        && booking.idempotency_key === operation.request.idempotencyKey);
+      if (created) finding("refused-request-created-booking", "failed", "booking", created);
     }
     if (journalValid) validateGatewayBodyRejections(journal, operations.filter((entry) => operationIds.has(entry.id)), report);
     for (const operation of emptySeries) validateEmptySeries(operation, { operations: operations.filter((entry) => operationIds.has(entry.id)),

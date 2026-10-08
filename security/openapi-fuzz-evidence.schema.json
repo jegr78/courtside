@@ -166,7 +166,7 @@
         "status": { "type": "integer", "minimum": 100, "maximum": 599 },
         "transportError": { "enum": ["connection-reset"] },
         "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$", "maxLength": 100 },
-        "observation": { "enum": ["typed-input-rejection", "proxy-size-rejection"] },
+        "observation": { "enum": ["typed-input-rejection", "proxy-size-rejection", "admission-refused"] },
         "outcome": { "$ref": "#/$defs/outcome" }
       }
     },
@@ -178,7 +178,7 @@
         "id": { "enum": ["invalid-utf8", "duplicate-columns", "oversized-cell", "conflicting-reference"] },
         "status": { "type": "integer", "minimum": 100, "maximum": 599 },
         "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$", "maxLength": 100 },
-        "observation": { "enum": ["typed-upload-rejection", "row-level-rejection"] },
+        "observation": { "enum": ["typed-upload-rejection", "row-level-rejection", "admission-refused"] },
         "outcome": { "$ref": "#/$defs/outcome" }
       }
     },
@@ -192,7 +192,7 @@
         "path": { "type": "string", "pattern": "^/", "maxLength": 200 },
         "status": { "type": "integer", "minimum": 100, "maximum": 599 },
         "problemType": { "type": "string", "pattern": "^urn:courtside:error:[a-z0-9-]+$", "maxLength": 100 },
-        "observation": { "const": "invalid-mutation-rejected" },
+        "observation": { "enum": ["invalid-mutation-rejected", "admission-refused"] },
         "outcome": { "$ref": "#/$defs/outcome" }
       }
     }

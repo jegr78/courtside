@@ -1,4 +1,5 @@
 import https from "node:https";
+import { setTimeout as delay } from "node:timers/promises";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -191,7 +192,31 @@ export async function executeOperationMatrix(matrix, send, beforeOperation = asy
   return results;
 }
 
+export const admissionProblemTypes = Object.freeze([
+  "urn:courtside:error:request-rate-limited", "urn:courtside:error:operation-capacity-exhausted"]);
+
+export function admissionRefused(response) {
+  return response?.status === 429 && admissionProblemTypes.includes(response.problemType);
+}
+
+export async function sendPacedByAdmission(send, wait, { retries = 2, maxWaitSeconds = 5 } = {}) {
+  let response = await send();
+  for (let retry = 0; retry < retries && admissionRefused(response)
+      && Number.isSafeInteger(response.retryAfterSeconds) && response.retryAfterSeconds >= 0
+      && response.retryAfterSeconds <= maxWaitSeconds; retry += 1) {
+    await wait(response.retryAfterSeconds * 1000);
+    response = await send();
+  }
+  return response;
+}
+
+export function deriveAuthorizationOutcome(checks) {
+  return checks.some(({ outcome }) => outcome === "failed") ? "failed"
+    : checks.some(({ outcome }) => outcome === "incomplete") ? "incomplete" : "passed";
+}
+
 export function evaluateOperationResult(expected, response) {
+  if (admissionRefused(response)) return { outcome: "incomplete", observation: "admission-refused" };
   if (expected === "deny-unauthenticated") {
     const passed = response.status === 401
       && response.problemType === "urn:courtside:error:unauthenticated";
@@ -278,10 +303,10 @@ export async function executeObjectAuthorizationChecks(send, rosterListing) {
   // Refusing a booking somebody else holds has to read like refusing one nobody holds; the
   // difference between the two answers used to be what told a caller the identifier was real.
   const sameAnswer = ({ status, problemType }) => `${status} ${problemType}`;
+  const sameAsUnknown = (refusal) => admissionRefused(unknown) || sameAnswer(refusal) === sameAnswer(unknown);
   checks.push(objectCheck("existence-not-disclosed", horizontalCancel,
-    [horizontalCancel, managedDetail, seriesCancel]
-      .every((refusal) => sameAnswer(refusal) === sameAnswer(unknown)),
-    "refusal-indistinguishable-from-unknown-identifier"));
+    [[horizontalCancel, sameAsUnknown], [managedDetail, sameAsUnknown], [seriesCancel, sameAsUnknown],
+      [unknown, () => true]], "refusal-indistinguishable-from-unknown-identifier"));
   const adminDetail = await send("ADMIN", {
     method: "GET", path: `/api/managed/bookings/${standalone.id}`, headers: {}
   });
@@ -297,14 +322,14 @@ export async function executeObjectAuthorizationChecks(send, rosterListing) {
     }) });
   const rosterAfter = await send("ADMIN", rosterListing(200));
   const memberAfter = rosterAfter.json?.entries?.find(({ personId }) => personId === member.personId);
-  const assignmentRejected = typedResponse(massAssignment, 400, "urn:courtside:error:validation-failed")
-    && rosterAfter.status === 200
+  const memberUnchanged = (response) => response.status === 200
     && memberAfter?.enabled === member.enabled
     && memberAfter?.accountId === member.accountId
     && memberAfter?.membershipTypeId === member.membershipTypeId
     && JSON.stringify(memberAfter?.roles) === JSON.stringify(member.roles);
-  checks.push(objectCheck("mass-assignment", massAssignment, assignmentRejected,
-    "unbound-account-fields-rejected"));
+  checks.push(objectCheck("mass-assignment", massAssignment,
+    [[massAssignment, (response) => typedResponse(response, 400, "urn:courtside:error:validation-failed")],
+      [rosterAfter, memberUnchanged]], "unbound-account-fields-rejected"));
   const bookingsAfter = await send("MEMBER_OWNER", { method: "GET", path: "/api/my/bookings?limit=100", headers: {} });
   checks.push(objectCheck("rejected-attacks-preserve-bookings", bookingsAfter,
     bookingsAfter.status === 200 && bookingState(bookingsAfter.json?.items) === bookingSnapshot,
@@ -316,10 +341,18 @@ function typedResponse(response, status, problemType) {
   return response.status === status && response.problemType === problemType;
 }
 
-function objectCheck(id, response, passed, secureObservation) {
-  return { id, status: response.status, outcome: passed ? "passed" : "failed",
+function answeredVerdict(parts) {
+  if (parts.some(([response, holds]) => !admissionRefused(response) && !holds(response))) return "failed";
+  return parts.some(([response]) => admissionRefused(response)) ? "incomplete" : "passed";
+}
+
+function objectCheck(id, response, expectation, secureObservation) {
+  const parts = Array.isArray(expectation) ? expectation : [[response, () => expectation]];
+  const outcome = answeredVerdict(parts);
+  return { id, status: response.status, outcome,
     ...(response.problemType ? { problemType: response.problemType } : {}),
-    observation: passed ? secureObservation : `${id}-mismatch` };
+    observation: outcome === "incomplete" ? "admission-refused" : outcome === "passed" ? secureObservation
+      : `${id}-mismatch` };
 }
 
 function bookingState(items) {
@@ -438,12 +471,11 @@ export async function executeSecondaryIdentityChecks(send, password, beforeLogin
     const session = await send(client, { method: "GET", path: "/api/session", headers: {} });
     const admin = await send(client, listing, { csrf: listing.method !== "GET" });
     const expectedAdminStatus = role === "ADMIN" ? 200 : 403;
-    const passed = session.status === 200 && session.json?.roles?.length === 1
-      && session.json.roles[0] === role && admin.status === expectedAdminStatus
-      && (role === "ADMIN" || admin.problemType === "urn:courtside:error:access-denied");
-    checks.push({ actor: role, sessionStatus: session.status, adminStatus: admin.status,
-      outcome: passed ? "passed" : "failed", observation: passed
-        ? "independent-identity-boundary-proven" : "independent-identity-boundary-mismatch" });
+    checks.push({ actor: role, sessionStatus: session.status, adminStatus: admin.status, ...identityOutcome([
+      [session, (response) => response.status === 200 && response.json?.roles?.length === 1
+        && response.json.roles[0] === role],
+      [admin, (response) => response.status === expectedAdminStatus
+        && (role === "ADMIN" || response.problemType === "urn:courtside:error:access-denied")]]) });
   }
   const managerRoles = ["MEMBER", "SPORT_DIRECTOR", "TRAINER", "YOUTH_DIRECTOR"];
   for (let index = 1; index <= 2; index += 1) {
@@ -453,15 +485,20 @@ export async function executeSecondaryIdentityChecks(send, password, beforeLogin
     const session = await send(client, { method: "GET", path: "/api/session", headers: {} });
     const managed = await send(client, { method: "GET", path: "/api/managed/bookings?limit=1", headers: {} });
     const admin = await send(client, listing, { csrf: listing.method !== "GET" });
-    const passed = session.status === 200
-      && JSON.stringify(session.json?.roles?.toSorted()) === JSON.stringify(managerRoles)
-      && managed.status === 200 && typedResponse(admin, 403, "urn:courtside:error:access-denied");
     checks.push({ actor: `MANAGER_COMBINATION_${index}`, sessionStatus: session.status,
-      managedStatus: managed.status, adminStatus: admin.status, outcome: passed ? "passed" : "failed",
-      observation: passed ? "independent-identity-boundary-proven"
-        : "independent-identity-boundary-mismatch" });
+      managedStatus: managed.status, adminStatus: admin.status, ...identityOutcome([
+        [session, (response) => response.status === 200
+          && JSON.stringify(response.json?.roles?.toSorted()) === JSON.stringify(managerRoles)],
+        [managed, (response) => response.status === 200],
+        [admin, (response) => typedResponse(response, 403, "urn:courtside:error:access-denied")]]) });
   }
   return checks;
+}
+
+function identityOutcome(parts) {
+  const outcome = answeredVerdict(parts);
+  return { outcome, observation: outcome === "incomplete" ? "admission-refused" : outcome === "passed"
+    ? "independent-identity-boundary-proven" : "independent-identity-boundary-mismatch" };
 }
 
 async function failedLogin(send, client, path, username, password) {
@@ -520,15 +557,20 @@ export function validateAuthorizationEvidence(evidence, matrix) {
   }
   if (evidence.identityChecks.some((check) => {
     const manager = check.actor.startsWith("MANAGER_COMBINATION_");
+    if (check.observation === "admission-refused") {
+      return check.outcome !== "incomplete"
+        || ![check.sessionStatus, check.adminStatus, check.managedStatus].includes(429);
+    }
+    if (check.observation === "independent-identity-boundary-mismatch") return check.outcome !== "failed";
     const expectedAdminStatus = check.actor === "ADMIN" ? 200 : 403;
     return check.sessionStatus !== 200 || check.adminStatus !== expectedAdminStatus
       || (manager && check.managedStatus !== 200) || check.outcome !== "passed";
   })) throw new Error("The authorization evidence contains an invalid independent identity result");
   const checks = [...evidence.results, ...evidence.identityChecks, ...evidence.objectChecks, ...evidence.boundaryChecks,
     evidence.timing, evidence.bruteForce];
-  const derivedOutcome = checks.some(({ outcome }) => outcome === "failed") ? "failed"
-    : checks.some(({ outcome }) => outcome === "incomplete") ? "incomplete" : "passed";
-  if (evidence.outcome !== derivedOutcome) throw new Error("The authorization evidence outcome is inconsistent");
+  if (evidence.outcome !== deriveAuthorizationOutcome(checks)) {
+    throw new Error("The authorization evidence outcome is inconsistent");
+  }
   const minimumRequests = evidence.results.length + evidence.identityChecks.length * 2
     + evidence.objectChecks.length + evidence.boundaryChecks.length
     + evidence.timing.samplesPerClass * 2 + evidence.bruteForce.attemptsBeforeLimit + 1;
@@ -558,7 +600,8 @@ export async function runAuthorizationAssessment(plan, context) {
     throw new Error("The authorization suite requires the configured address failure limit");
   }
   let requestCount = 0;
-  const send = async (client, probe, options = {}) => {
+  const wait = context.wait ?? ((milliseconds) => delay(milliseconds, undefined, { signal: control.signal }));
+  const send = async (client, probe, options = {}) => sendPacedByAdmission(() => {
     control.beforeRequest();
     if (++requestCount > context.maxRequests) throw new Error("The authorization request budget was exceeded");
     return authorizationRequest(plan.target, client, probe, {
@@ -567,7 +610,7 @@ export async function runAuthorizationAssessment(plan, context) {
       timeoutMilliseconds: control.remainingMilliseconds(),
       ...options
     });
-  };
+  }, wait);
   const request = (client, probe, options = {}) => executeAuthorizationProbe(send, client, probe, options);
   try {
     const clients = Object.fromEntries(authorizationActors.map((actor) => [actor, new SecurityCookieJar()]));
@@ -620,8 +663,8 @@ export async function runAuthorizationAssessment(plan, context) {
       timing: authentication.timing,
       bruteForce: authentication.bruteForce,
       requestCount,
-      outcome: [...results, ...identityChecks, ...objectChecks, ...boundaryChecks, authentication.timing,
-        authentication.bruteForce].some((result) => result.outcome === "failed") ? "failed" : "passed"
+      outcome: deriveAuthorizationOutcome([...results, ...identityChecks, ...objectChecks, ...boundaryChecks,
+        authentication.timing, authentication.bruteForce])
     };
     validateAuthorizationEvidence(evidence, matrix);
     retainAuthorizationEvidence(context.evidenceDirectory, evidence, plan.budgets.evidenceMegabytes);
@@ -718,8 +761,10 @@ export function authorizationRequest(origin, client, probe, options = {}) {
         }
         const problemType = /application\/problem\+json/i.test(response.headers["content-type"] ?? "")
           ? json?.type : undefined;
+        const retryAfter = response.headers["retry-after"];
         resolve({ status: response.statusCode, elapsedMilliseconds: performance.now() - startedAt,
           ...(problemType ? { problemType } : {}),
+          ...(/^\d{1,9}$/.test(retryAfter ?? "") ? { retryAfterSeconds: Number(retryAfter) } : {}),
           ...(json ? { json } : {}),
           ...(response.headers["x-courtside-observed-host"]
             ? { observedHost: response.headers["x-courtside-observed-host"] } : {}),

@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync, symlinkSync, realpathSync, mkdtempSync, mk
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createResourceEvidence, writeNativeEvidence, retainResourceEvidenceFailure } from "./security-resource-runtime.mjs";
+import { resourceAdmissionPolicy, resourceCompetingWrites, resourceScenarioOutcomes } from "./security-resource-abuse.mjs";
 import { attemptStep, failureReason } from "./failure-reason.mjs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -23,6 +24,7 @@ import {
   prometheusMetric,
   remainingScannerRequestBudget,
   resourceAuthenticationPolicy,
+  shippedLoginAddressMaxFailures,
   resourcePublicationPolicy,
   resourcePublicationProjection,
   resourceSessionDecoderPlan,
@@ -730,6 +732,7 @@ function resourceIntegrationHarness({ processFailure = false, effectsOutcome = "
     },
     writeNativeEvidence: privateRoot ? writeNativeEvidence : (handle, entry) => writes.push(entry),
     retainResourceEvidenceFailure, attemptStep, failureReason,
+    resourceAdmissionPolicy, resourceCompetingWrites, resourceScenarioOutcomes,
     securityProject, securityComposeArgs, securityAssessmentReservationArgs, resourceSessionDecoderPlan, resourceAuthenticationPolicy, resourcePublicationPolicy, resourcePublicationProjection,
     readSecurityEnvironment: () => environment, mergeSecurityProcessEnvironment,
     scannerRuntimeOwned: value => !value.foreign, scannerRuntimeHardened: () => true,
@@ -765,7 +768,7 @@ function resourceIntegrationHarness({ processFailure = false, effectsOutcome = "
         integrity: { beforeFingerprint: digest, afterFingerprint: digest,
           validatedBookingIdHashes: [bookingId, duplicateId].map(id => `sha256:${createHash("sha256").update(JSON.stringify(id)).digest("hex")}`) },
         competingWrites: { successful: 999, rejected: 1, partialOperations: 0, duplicateBookings: 1,
-          duplicateResponses: 2, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 1 } }; },
+          duplicateResponses: 2, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 1, admissionRefused: 0 } }; },
     cleanupAndRecoverResourceRuntime: async ({ effects }) => { events.push("cleanup-recovery"); return { outcome: effects.outcome,
       cleanup: { outcome: effects.outcome, actualFingerprint: effects.outcome === "passed" ? digest : null },
       recovery: recoveryProof ?? { outcome: effects.outcome, actualFingerprint: effects.outcome === "passed" ? digest : null },
@@ -1156,6 +1159,31 @@ test("given a reused run identifier, when reserving a fresh security instance, t
   assert.ok(second.COURTSIDE_SECURITY_MAIL_DIRECTORY.endsWith(second.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT.slice(7)));
 });
 
+test("given the security Compose file, when reading the assessed target, then it keeps the shipped login and admission defaults", () => {
+  // given
+  const { app } = securityServices();
+
+  // when
+  const overrides = Object.keys(app.environment)
+    .filter((name) => name.startsWith("COURTSIDE_LOGIN_") || name.startsWith("COURTSIDE_ADMISSION_"));
+
+  // then
+  assert.deepEqual(overrides, [], "the run qualifies the limits a club installs, not tighter ones");
+});
+
+test("given the shipped application configuration, when the authorization suite needs the login limit, then it reads the shipped default", () => {
+  // given
+  const application = yaml.load(readFileSync(new URL("../src/main/resources/application.yaml", import.meta.url), "utf8"));
+  const declared = application.courtside["login-protection"].address["max-failures"];
+
+  // when
+  const limit = shippedLoginAddressMaxFailures();
+
+  // then
+  assert.equal(`\${COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES:${limit}}`, declared);
+  assert.ok(Number.isSafeInteger(limit) && limit >= 1);
+});
+
 test("given the security Compose file, when reading the assessed target, then it runs no fixture component", () => {
   // given
   const { app, seeder } = securityServices();
@@ -1368,7 +1396,8 @@ test("given a security run, when deriving its identity, then secrets and seed id
   assert.equal(environment.COURTSIDE_SECURITY_FIXTURES_IMAGE, "courtside:security-fixtures-run-0001");
   assert.equal(environment.COURTSIDE_SECURITY_SHARED_PASSWORD, "synthetic-password-value");
   assert.equal(environment.COURTSIDE_SECURITY_HTTPS_PORT, "23456");
-  assert.equal(environment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES, "5");
+  assert.equal("COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES" in environment, false,
+    "the assessed target runs the login limit a club installs");
   assert.match(environment.COURTSIDE_SECURITY_SEED_FINGERPRINT, /^sha256:[a-f0-9]{64}$/);
   assert.match(environment.COURTSIDE_SECURITY_INSTANCE_FINGERPRINT, /^sha256:[a-f0-9]{64}$/);
 });
@@ -1968,6 +1997,7 @@ test("given an environment recorded for another run or image, when the candidate
 test("given a recorded environment, when the candidate seeds it, then only what compose reads is handed on", () => {
   // given
   const recorded = recordedEnvironment({
+    COURTSIDE_SECURITY_HTTPS_PORT: "23456",
     COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES: "5",
     PATH: "/tmp/attacker",
     DOCKER_HOST: "tcp://attacker.invalid:2375"
@@ -1977,8 +2007,10 @@ test("given a recorded environment, when the candidate seeds it, then only what 
   const plan = securitySeedPlan("compare-base-1-1", recorded.COURTSIDE_SECURITY_IMAGE, recorded);
 
   // then
-  assert.equal(plan.environment.COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES, "5",
+  assert.equal(plan.environment.COURTSIDE_SECURITY_HTTPS_PORT, "23456",
     "compose refuses to interpolate its own required name");
+  assert.equal("COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES" in plan.environment, false,
+    "a login override an earlier run recorded no longer reaches the target");
   for (const name of ["PATH", "DOCKER_HOST"]) {
     assert.equal(name in plan.environment, false,
       `${name} from the recorded file would decide which executable the docker call runs`);

@@ -24,6 +24,9 @@ import {
   recentProofRenewalMilliseconds,
   SecurityCookieJar,
   authorizationRequest,
+  deriveAuthorizationOutcome,
+  executeSecondaryIdentityChecks,
+  sendPacedByAdmission,
   validateAuthorizationEvidence
 } from "./security-authorization.mjs";
 
@@ -686,3 +689,272 @@ test("given a contract that spells the roster listing differently, when the prob
   assert.throws(() => rosterListingProbe({ paths: { "/api/admin/roster": { get: {
     operationId: "listRoster", ...page } } } }, 1), /declares no limit/);
 });
+
+const rateLimited = { status: 429, problemType: "urn:courtside:error:request-rate-limited", retryAfterSeconds: 1 };
+
+test("given an admission refusal, when evaluating any expectation, then the case is incomplete and never passed", () => {
+  // given
+  const capacity = { status: 429, problemType: "urn:courtside:error:operation-capacity-exhausted", retryAfterSeconds: 1 };
+
+  // when / then
+  for (const expected of ["allow", "deny-forbidden", "deny-unauthenticated"]) {
+    for (const refusal of [rateLimited, capacity]) {
+      assert.deepEqual(evaluateOperationResult(expected, refusal),
+        { outcome: "incomplete", observation: "admission-refused" },
+        `an admission refusal of a ${expected} case must not be read as its authorization answer`);
+    }
+  }
+  assert.equal(evaluateOperationResult("deny-forbidden", { status: 429 }).outcome, "failed",
+    "a 429 without an admission problem type is not an admission refusal");
+});
+
+test("given typed admission refusals, when sending through the paced sender, then it honours Retry-After at most twice", async () => {
+  // given
+  const answers = [rateLimited, { ...rateLimited, retryAfterSeconds: 2 }, rateLimited, { status: 200 }];
+  const waits = [];
+  let sent = 0;
+
+  // when
+  const response = await sendPacedByAdmission(async () => answers[sent++], async (milliseconds) => {
+    waits.push(milliseconds);
+  });
+
+  // then
+  assert.equal(sent, 3, "the first send and two retries are the bound");
+  assert.deepEqual(waits, [1000, 2000], "each retry waits for the Retry-After the refusal named");
+  assert.equal(response.problemType, "urn:courtside:error:request-rate-limited",
+    "a refusal that survives both retries is returned as the observation");
+});
+
+test("given refusals the pacer must not wait for, when sending, then it returns them without a retry", async () => {
+  // given
+  const cases = [
+    { status: 429, retryAfterSeconds: 1 },
+    { status: 429, problemType: "urn:courtside:error:login-rate-limited", retryAfterSeconds: 1 },
+    { ...rateLimited, retryAfterSeconds: 6 },
+    { status: 429, problemType: "urn:courtside:error:request-rate-limited" }
+  ];
+
+  for (const answer of cases) {
+    let sent = 0;
+    const waits = [];
+
+    // when
+    const response = await sendPacedByAdmission(async () => { sent++; return answer; },
+      async (milliseconds) => { waits.push(milliseconds); });
+
+    // then
+    assert.equal(sent, 1, `${JSON.stringify(answer)} must not be retried`);
+    assert.deepEqual(waits, []);
+    assert.equal(response, answer);
+  }
+});
+
+test("given a target that refuses with Retry-After, when probing it, then the response carries the advertised delay", async (t) => {
+  // given
+  const server = await startAnsweringServer((incoming, outgoing) => {
+    outgoing.writeHead(429, { "content-type": "application/problem+json", "retry-after": "3" });
+    outgoing.end(JSON.stringify({ type: "urn:courtside:error:request-rate-limited", status: 429 }));
+  });
+  t.after(server.close);
+
+  // when
+  const response = await authorizationRequest(server.origin, new SecurityCookieJar(),
+    { method: "GET", path: "/api/my/bookings", headers: {} }, { ca: server.ca });
+
+  // then
+  assert.equal(response.retryAfterSeconds, 3);
+  assert.equal(response.problemType, "urn:courtside:error:request-rate-limited");
+});
+
+test("given an admission refusal inside an object attack, when checking object boundaries, then no check that saw it passes", async () => {
+  // given
+  const standaloneId = "10000000-0000-0000-0000-000000000001";
+  const personId = "30000000-0000-0000-0000-000000000001";
+  const bookings = { items: [
+    { id: standaloneId, seriesId: null, status: "CONFIRMED" },
+    { id: "10000000-0000-0000-0000-000000000002", seriesId: "20000000-0000-0000-0000-000000000001",
+      status: "CONFIRMED" }
+  ] };
+  const roster = { entries: [{ personId, username: "security.member.1", firstName: "Jane",
+    lastName: "Doe", email: "jane.doe@example.org", enabled: true, roles: ["MEMBER"],
+    accountId: "40000000-0000-0000-0000-000000000001", membershipTypeId: null }] };
+  let rosterReads = 0;
+
+  // when
+  const checks = await executeObjectAuthorizationChecks(async (actor, probe) => {
+    if (probe.path === "/api/my/bookings?limit=100") return { status: 200, json: bookings };
+    if (probe.path.startsWith("/api/admin/roster?") && rosterReads++ === 0) return { status: 200, json: roster };
+    if (probe.path.startsWith("/api/admin/roster?")) return rateLimited;
+    if (probe.method === "PUT") return { status: 400, problemType: "urn:courtside:error:validation-failed" };
+    if (probe.path === `/api/managed/bookings/${standaloneId}` && actor === "MEMBER_NON_OWNER") return rateLimited;
+    if (actor === "ADMIN") return { status: 200 };
+    return { status: 404, problemType: "urn:courtside:error:booking-not-found" };
+  }, (limit) => ({ method: "GET", path: `/api/admin/roster?limit=${limit}`, headers: {} }));
+
+  // then
+  const check = (id) => checks.find((candidate) => candidate.id === id);
+  for (const id of ["horizontal-managed-detail", "existence-not-disclosed", "mass-assignment"]) {
+    assert.equal(check(id).outcome, "incomplete", `${id} saw an admission refusal and cannot be proven`);
+    assert.equal(check(id).observation, "admission-refused");
+  }
+  assert.equal(check("horizontal-booking-cancel").outcome, "passed",
+    "a check that never met a refusal keeps its own answer");
+});
+
+test("given an answered probe that breaks a boundary beside a refused one, when checking object boundaries, then the failure stays failed", async () => {
+  // given
+  const standaloneId = "10000000-0000-0000-0000-000000000001";
+  const personId = "30000000-0000-0000-0000-000000000001";
+  const bookings = { items: [
+    { id: standaloneId, seriesId: null, status: "CONFIRMED" },
+    { id: "10000000-0000-0000-0000-000000000002", seriesId: "20000000-0000-0000-0000-000000000001",
+      status: "CONFIRMED" }
+  ] };
+  const roster = { entries: [{ personId, username: "security.member.1", firstName: "Jane",
+    lastName: "Doe", email: "jane.doe@example.org", enabled: true, roles: ["MEMBER"],
+    accountId: "40000000-0000-0000-0000-000000000001", membershipTypeId: null }] };
+  let rosterReads = 0;
+
+  // when
+  const checks = await executeObjectAuthorizationChecks(async (actor, probe) => {
+    if (probe.path === "/api/my/bookings?limit=100") return { status: 200, json: bookings };
+    if (probe.path.startsWith("/api/admin/roster?") && rosterReads++ === 0) return { status: 200, json: roster };
+    if (probe.path.startsWith("/api/admin/roster?")) return rateLimited;
+    if (probe.method === "PUT") return { status: 200 };
+    if (probe.path === `/api/bookings/${standaloneId}` && actor === "MEMBER_NON_OWNER") return { status: 204 };
+    if (probe.path === `/api/managed/bookings/${standaloneId}` && actor === "MEMBER_NON_OWNER") return rateLimited;
+    if (actor === "ADMIN") return { status: 200 };
+    return { status: 404, problemType: "urn:courtside:error:booking-not-found" };
+  }, (limit) => ({ method: "GET", path: `/api/admin/roster?limit=${limit}`, headers: {} }));
+
+  // then
+  const check = (id) => checks.find((candidate) => candidate.id === id);
+  assert.equal(check("existence-not-disclosed").outcome, "failed",
+    "a non-owner cancel that was answered differently from an unknown identifier discloses existence");
+  assert.equal(check("mass-assignment").outcome, "failed",
+    "an accepted field injection fails even though the read that would confirm it was refused");
+  assert.equal(check("horizontal-managed-detail").outcome, "incomplete");
+});
+
+test("given an answered identity probe that crosses its boundary beside a refused one, when executing identity checks, then it fails", async () => {
+  // given
+  const send = async (client, probe) => {
+    if (probe.method === "POST") return { status: 200 };
+    if (probe.path === "/api/session" && client.signedIn) return rateLimited;
+    if (probe.path === "/api/session") {
+      client.signedIn = true;
+      client.update(["__Host-XSRF-TOKEN=token"]);
+      return { status: 200 };
+    }
+    if (probe.path.startsWith("/api/managed/")) return rateLimited;
+    return { status: 200 };
+  };
+
+  // when
+  const checks = await executeSecondaryIdentityChecks(send, "secret", async () => {},
+    () => ({ method: "GET", path: "/api/admin/roster?limit=1", headers: {} }));
+
+  // then
+  for (const check of checks.filter(({ actor }) => actor !== "ADMIN")) {
+    assert.equal(check.outcome, "failed", `${check.actor} reached the administrative listing`);
+    assert.equal(check.observation, "independent-identity-boundary-mismatch");
+  }
+  assert.equal(checks.find(({ actor }) => actor === "ADMIN").outcome, "incomplete");
+});
+
+test("given admission refusals during identity checks, when executing them, then the identity is incomplete", async () => {
+  // given
+  const send = async (client, probe) => {
+    if (probe.method === "POST") return { status: 200 };
+    if (probe.path === "/api/session" && client.signedIn) return rateLimited;
+    if (probe.path === "/api/session") {
+      client.signedIn = true;
+      client.update(["__Host-XSRF-TOKEN=token"]);
+      return { status: 200 };
+    }
+    return rateLimited;
+  };
+
+  // when
+  const checks = await executeSecondaryIdentityChecks(send, "secret", async () => {},
+    () => ({ method: "GET", path: "/api/admin/roster?limit=1", headers: {} }));
+
+  // then
+  assert.equal(checks.length, 9);
+  for (const check of checks) {
+    assert.equal(check.outcome, "incomplete", `${check.actor} was refused before its boundary answered`);
+    assert.equal(check.observation, "admission-refused");
+  }
+});
+
+test("given authorization evidence with admission refusals, when validating it, then incomplete is the only consistent outcome", async () => {
+  // given
+  const matrix = buildOperationAuthorizationMatrix({ paths: {
+    "/api/public/example": { get: { operationId: "readExample", security: [] } }
+  } });
+  const evidence = await minimalEvidence();
+  evidence.results[0] = { ...evidence.results[0], status: 429,
+    problemType: "urn:courtside:error:request-rate-limited", outcome: "incomplete", observation: "admission-refused" };
+  evidence.identityChecks[0] = { ...evidence.identityChecks[0], sessionStatus: 429, outcome: "incomplete",
+    observation: "admission-refused" };
+
+  // when / then
+  assert.equal(deriveAuthorizationOutcome([...evidence.results, ...evidence.identityChecks]), "incomplete");
+  assert.doesNotThrow(() => validateAuthorizationEvidence({ ...evidence, outcome: "incomplete" }, matrix));
+  assert.throws(() => validateAuthorizationEvidence({ ...evidence, outcome: "passed" }, matrix),
+    /outcome is inconsistent/, "evidence with a refused case must not claim to have passed");
+  evidence.identityChecks[0] = { ...evidence.identityChecks[0], sessionStatus: 200 };
+  assert.throws(() => validateAuthorizationEvidence({ ...evidence, outcome: "incomplete" }, matrix),
+    /independent identity/, "an incomplete identity needs a refusal status behind it");
+  evidence.identityChecks[0] = { ...evidence.identityChecks[0], sessionStatus: 429, adminStatus: 200,
+    outcome: "failed", observation: "independent-identity-boundary-mismatch" };
+  assert.doesNotThrow(() => validateAuthorizationEvidence({ ...evidence, outcome: "failed" }, matrix),
+    "a crossed boundary beside a refused probe is retained as the failure it is");
+  evidence.identityChecks[0] = { ...evidence.identityChecks[0], outcome: "passed" };
+  assert.throws(() => validateAuthorizationEvidence({ ...evidence, outcome: "incomplete" }, matrix),
+    /independent identity/, "a mismatch never reads as a pass");
+});
+
+async function minimalEvidence() {
+  const results = authorizationActors.map((actor) => ({
+    operationId: "readExample", actor, expected: "allow", status: 200, outcome: "passed",
+    observation: "authorization-gate-passed"
+  }));
+  const identityChecks = ["MEMBER", "TRAINER", "SPORT_DIRECTOR", "YOUTH_DIRECTOR", "GROUNDSKEEPER",
+    "TREASURER", "ADMIN"].map((actor) => ({ actor, sessionStatus: 200,
+    adminStatus: actor === "ADMIN" ? 200 : 403, outcome: "passed",
+    observation: "independent-identity-boundary-proven" }));
+  identityChecks.push(...[1, 2].map((index) => ({ actor: `MANAGER_COMBINATION_${index}`,
+    sessionStatus: 200, managedStatus: 200, adminStatus: 403, outcome: "passed",
+    observation: "independent-identity-boundary-proven" })));
+  return {
+    schemaVersion: 1, testIds: ["CSA-AUTHN-001", "CSA-AUTHZ-001"], targetFingerprint: `sha256:${"a".repeat(64)}`,
+    specificationDigest: `sha256:${"b".repeat(64)}`, results, identityChecks,
+    objectChecks: (await producedObjectCheckIds())
+      .map((id) => ({ id, status: 200, outcome: "passed", observation: "boundary-proven" })),
+    boundaryChecks: [],
+    timing: { outcome: "passed", samplesPerClass: 12, medianKnownMilliseconds: 20, medianUnknownMilliseconds: 21,
+      medianRelativeDifference: 0.05 },
+    bruteForce: { outcome: "passed", attemptsBeforeLimit: 20, status: 429,
+      problemType: "urn:courtside:error:login-rate-limited",
+      observation: "encoded-and-canonical-login-share-rate-limit" },
+    requestCount: 100, outcome: "passed"
+  };
+}
+
+async function startAnsweringServer(answer) {
+  const directory = mkdtempSync(join(tmpdir(), "courtside-authorization-"));
+  const created = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "1",
+    "-keyout", "key.pem", "-out", "cert.pem", "-subj", "/CN=localhost",
+    "-addext", "subjectAltName=DNS:localhost"], { cwd: directory, encoding: "utf8" });
+  if (created.status !== 0) throw new Error(`openssl could not create a test certificate: ${created.stderr}`);
+  const certificate = readFileSync(join(directory, "cert.pem"));
+  const server = createServer({ key: readFileSync(join(directory, "key.pem")), cert: certificate }, answer);
+  await new Promise((ready) => server.listen(0, "127.0.0.1", ready));
+  return {
+    origin: `https://localhost:${server.address().port}`,
+    ca: certificate,
+    close: () => { server.closeAllConnections(); return new Promise((closed) => server.close(closed)); }
+  };
+}

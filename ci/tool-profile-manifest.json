@@ -165,6 +165,7 @@
     { "path": "tools/security-openapi-fuzz.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/security-openapi-fuzz.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-passive-deployment.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/security-schemathesis-configuration.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/security-passive-deployment.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/security-request-gateway.py", "profiles": ["full"], "test": false },
     { "path": "tools/security-request-gateway.test.mjs", "profiles": ["tooling"], "test": true },

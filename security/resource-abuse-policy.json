@@ -7,6 +7,9 @@
     { "duration": "15s", "target": 0 }
   ],
   "warmupSeconds": 5,
+  "integrity": { "racers": 4, "rounds": 6, "tickSeconds": 2 },
+  "seriesPressure": { "vus": 3, "startSeconds": 30, "durationSeconds": 20 },
+  "addressPressure": { "rate": 120, "durationSeconds": 20, "startSeconds": 20, "preAllocatedVUs": 10, "maxVUs": 20 },
   "interruptGraceMilliseconds": 1000,
   "scenarios": [
     { "id": "argon2-login-pressure", "checks": ["failed-login-rejected"] },
@@ -16,6 +19,7 @@
     { "id": "duplicate-delivery", "checks": ["fixtures-ready", "replay-returns-original"] },
     { "id": "participant-capacity", "checks": ["fixtures-ready", "card-unavailable"] },
     { "id": "series-and-rule-cost", "checks": ["fixtures-ready", "maximum-preview-controlled"] },
+    { "id": "admission-pressure", "checks": ["answered-or-typed-refusal"] },
     { "id": "preview-mutation-race", "checks": ["fixtures-ready", "preview-is-creatable", "stale-preview-fails-closed"] }
   ],
   "circuitBreakers": {

@@ -6,7 +6,8 @@ import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { passiveScannerOrigin, runOwnedProcess } from "./security-passive-deployment.mjs";
-import { evaluateResourceSignals, evaluateSafetyLimits, resourceAbuseIntegrityDigest } from "./security-resource-abuse.mjs";
+import { evaluateResourceSignals, evaluateSafetyLimits, resourceAbuseIntegrityDigest, resourceAdmissionPolicy,
+  resourceCompetingWrites, resourceScenarioOutcomes } from "./security-resource-abuse.mjs";
 import { fixtureImagePlan, stageFixtureClasses } from "./fixture-artifact.mjs";
 import { createSecurityMailCertificate, securityMailTrustPlan } from "./security-mail-capture.mjs";
 import { resourceStateCatalogSql, resourceStateSnapshotSql, parseResourceState } from "./security-resource-state.mjs";
@@ -21,6 +22,7 @@ import { captureResourceAuthentication, resourceSessionProjectionClassPaths } fr
 import { captureSecurityStartupDiagnostics } from "./security-startup-diagnostics.mjs";
 import { inspectReusableImages, verifyReusableImages } from "./immutable-image-reuse.mjs";
 import { attemptStep, failureReason } from "./failure-reason.mjs";
+import { schemathesisConfiguration } from "./security-schemathesis-configuration.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
@@ -42,6 +44,15 @@ export function securityProject(runId) {
     throw new Error("The security run ID must contain 6 to 48 lowercase letters, digits, or hyphens");
   }
   return `courtside-security-${runId}`;
+}
+
+export function shippedLoginAddressMaxFailures() {
+  const application = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml")
+    .load(readFileSync(join(root, "src/main/resources/application.yaml"), "utf8"));
+  const declared = /^\$\{COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES:([1-9]\d*)\}$/
+    .exec(String(application?.courtside?.["login-protection"]?.address?.["max-failures"] ?? ""));
+  if (!declared) throw new Error("The shipped login address limit is undeclared");
+  return Number(declared[1]);
 }
 
 export function resourceAuthenticationPolicy(runtime, application, classpathText) {
@@ -271,7 +282,6 @@ export function securityEnvironment(runId, image, password = randomBytes(24).toS
     COURTSIDE_SECURITY_SHARED_PASSWORD: password,
     COURTSIDE_SECURITY_SEED_FINGERPRINT: seedFingerprint,
     COURTSIDE_SECURITY_INSTANCE_FINGERPRINT: instanceFingerprint,
-    COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES: "5",
     COURTSIDE_SECURITY_MAX_REQUESTS: "1",
     COURTSIDE_SECURITY_MAX_CONCURRENCY: "1"
   };
@@ -954,7 +964,8 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
       memory: 128 * 1024 * 1024, nanoCpus: 500_000_000, pids: 64,
       networks: [`${securityProject(plan.runId)}_scanner-client`, `${securityProject(plan.runId)}_scanner-upstream`]
     });
-    const primaryRequestCount = await zapRequestCount(gateway, command);
+    const primaryMetrics = await scannerGatewayMetrics(gateway, command);
+    const primaryRequestCount = primaryMetrics.requests;
     const retestRequestBudget = remainingScannerRequestBudget(limits.maxRequests, primaryRequestCount);
     const remediationStartedAt = new Date().toISOString();
     await command(["rm", "-f", gateway]);
@@ -1007,6 +1018,7 @@ export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, re
     const planDigest = `sha256:${createHash("sha256").update(JSON.stringify(executedPlans)).digest("hex")}`;
     if (planDigest !== limits.planDigest) throw new Error("Authenticated ZAP plan digest changed during execution");
     return { reports, requestCount, runtimeHardened, roles: Object.keys(limits.sessions), planDigest,
+      admissionRefusals: primaryMetrics.admissionRefusals,
       generatedDataMegabytes: generatedBytes / (1024 * 1024),
       canaryRetest: {
         report: JSON.parse(retestReportText), requestCount: retestRequestCount,
@@ -1084,8 +1096,7 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
       throw new Error("The mounted OpenAPI document differs from the planned contract");
     }
     fixture = await limits.prepareFixtures();
-    const config = `headers = { Cookie = ${JSON.stringify(fixture.client.header())}, X-XSRF-TOKEN = ${JSON.stringify(fixture.client.csrfToken())} }\n`
-      + `\n[phases.coverage]\nunexpected-methods = ${JSON.stringify(limits.policy.unexpectedMethods)}\n`;
+    const config = schemathesisConfiguration(fixture.client, limits.policy);
     await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/courtside-schemathesis.toml"],
       { input: config });
     await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/sitecustomize.py"],
@@ -1270,6 +1281,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
     const application = yaml.load(applicationText);
     const publicationPolicy = resourcePublicationPolicy(appRuntime, application, classpathText);
     const authenticationPolicy = resourceAuthenticationPolicy(appRuntime, application, classpathText);
+    const admission = resourceAdmissionPolicy(appRuntime, application);
     authenticationPolicy.loginPolicy.sourceAddress = sourceAddress;
     const stepFailures = {};
     let publicationBinding = null;
@@ -1402,27 +1414,11 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       projectAuthentication: ({ snapshot, command: projectionCommand }) => captureResourceAuthentication({ before, effects: snapshot,
         journal, sourceAddress, ...authenticationPolicy, runtimeBinding, decoderContainer: decoder }, projectionCommand) });
     const phases = await cleanupAndRecoverResourceRuntime({ effects });
-    const occupancy = { successful: 0, rejected: 0, partialOperations: 0,
-      duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0 };
-    if (effects.outcome === "passed") {
-      const validated = new Set(effects.integrity?.validatedBookingIdHashes ?? []);
-      const newBooking = operation => operation.status === 201 && typeof operation.responseBookingId === "string"
-        && validated.has(`sha256:${createHash("sha256").update(JSON.stringify(operation.responseBookingId)).digest("hex")}`);
-      const prefix = `security-${plan.runId}-`;
-      const bookings = journal.operations.filter(operation => operation.kind === "createBooking");
-      const competition = bookings.filter(operation => operation.request.idempotencyKey?.startsWith(prefix)
-        && /^\d+-\d+$/.test(operation.request.idempotencyKey.slice(prefix.length)));
-      occupancy.successful = new Set(competition.filter(newBooking).map(operation => operation.responseBookingId)).size;
-      occupancy.rejected = competition.filter(operation => [409, 422].includes(operation.status)).length;
-      occupancy.partialOperations = competition.filter(operation => ![201, 409, 422].includes(operation.status)).length;
-      const duplicates = bookings.filter(operation => operation.request.idempotencyKey === `${prefix}duplicate`);
-      occupancy.duplicateBookings = new Set(duplicates.filter(newBooking).map(operation => operation.responseBookingId)).size;
-      occupancy.duplicateResponses = duplicates.filter(newBooking).length;
-      occupancy.duplicateFailures = duplicates.filter(operation => !newBooking(operation)).length;
-      const series = journal.operations.filter(operation => operation.kind === "createSeries");
-      occupancy.toctouCreated = series.reduce((count, operation) => count + (operation.seriesResult?.bookingIds?.length ?? 0), 0);
-      occupancy.toctouSkipped = series.reduce((count, operation) => count + (operation.seriesResult?.skipped?.length ?? 0), 0);
-    }
+    const occupancy = effects.outcome === "passed"
+      ? resourceCompetingWrites(journal.operations, plan.runId, new Set(effects.integrity?.validatedBookingIdHashes ?? []))
+      : { successful: 0, rejected: 0, partialOperations: 0, duplicateBookings: 0, duplicateResponses: 0,
+        duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0,
+        admissionRefused: resourceCompetingWrites(journal.operations, plan.runId, new Set()).admissionRefused };
     const integrity = { effects: effects.outcome, cleanup: phases.cleanup?.outcome ?? "incomplete",
       recovery: phases.recovery?.outcome ?? "incomplete" };
     const integrityEvidenceDigest = phases.integrityEvidenceDigest ?? effects.integrityEvidenceDigest ?? null;
@@ -1434,17 +1430,9 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       runtimeHardened,
       requestCount: metrics.requests,
       generatedDataMegabytes: metrics.requestBytes / (1024 * 1024),
-      scenarios: limits.policy.scenarios.map(({ id, checks: requiredChecks }) => {
-        const checks = summary?.checks?.filter(({ name }) => name.startsWith(`${id}:`)) ?? [];
-        const observedNames = new Set(checks.map(({ name }) => name));
-        const missingCheck = requiredChecks.some((name) => !observedNames.has(`${id}:${name}`));
-        const fixtureFailed = checks.some(({ name, fails }) => name.endsWith(":fixtures-ready") && fails > 0);
-        const assertionFailed = checks.some(({ name, fails }) => !name.endsWith(":fixtures-ready") && fails > 0);
-        const outcome = missingCheck || fixtureFailed || !telemetryComplete || Boolean(failure)
-          || id === "login-rate-limit-boundary" && !summary.rateLimitedLogins ? "incomplete"
-            : assertionFailed ? "failed" : "passed";
-        return { id, outcome };
-      }),
+      scenarios: resourceScenarioOutcomes({ scenarios: limits.policy.scenarios, summary, telemetryComplete,
+        failed: Boolean(failure), operations: journal.operations, runId: plan.runId,
+        admissionEnforced: admission.enforced }),
       samples,
       circuitBreaker: breaker,
       safetyLimitViolation,
@@ -1635,7 +1623,7 @@ async function zapRequestCount(gateway, command) {
 async function scannerGatewayMetrics(gateway, command) {
   const raw = (await command(["exec", gateway, "cat", "/tmp/security-gateway-metrics"])).stdout.trim();
   const metrics = JSON.parse(raw);
-  const integers = [metrics.requests, metrics.requestBytes, metrics.upstreamErrors];
+  const integers = [metrics.requests, metrics.requestBytes, metrics.upstreamErrors, metrics.admissionRefusals];
   if (!integers.every((value) => Number.isSafeInteger(value) && value >= 0)
       || ![metrics.requestP95Milliseconds, metrics.errorRate].every((value) => Number.isFinite(value) && value >= 0)
       || metrics.errorRate > 1) {

@@ -13,8 +13,11 @@ import {
 } from "./security-authenticated-zap.mjs";
 import { zapImage } from "./security-passive-deployment.mjs";
 import { mkdtempSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 
 const run = {
   runId: "run-0001",
@@ -121,7 +124,7 @@ test("given isolated role sessions and a canary-only scan, when assessing, then 
     authenticateRole: async (role) => ({ cookieHeader: `__Host-SESSION=secret-${role}`, requestCount: 3 }),
     runZap: async (_selectedPlan, input) => ({
       reports: [report], requestCount: 70, runtimeHardened: true,
-      roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
+      roles: Object.keys(input.sessions), generatedDataMegabytes: 0, admissionRefusals: 0,
       planDigest: authenticatedZapPlanDigest(),
       canaryRetest: { report: { site: [] }, requestCount: 1, ...canaryRetestChronology }
     })
@@ -183,7 +186,7 @@ test("given the seeded canary remains after remediation, when assessing, then th
     authenticateRole: async (role) => ({ cookieHeader: `__Host-SESSION=secret-${role}`, requestCount: 3 }),
     runZap: async (_selectedPlan, input) => ({
       reports: [report], requestCount: 70, runtimeHardened: true,
-      roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
+      roles: Object.keys(input.sessions), generatedDataMegabytes: 0, admissionRefusals: 0,
       planDigest: authenticatedZapPlanDigest(),
       canaryRetest: { report, requestCount: 1, ...canaryRetestChronology }
     })
@@ -208,11 +211,68 @@ test("given a changed executed plan, when assessing, then the evidence fails clo
     authenticateRole: async (role) => ({ cookieHeader: `__Host-SESSION=secret-${role}`, requestCount: 3 }),
     runZap: async (_selectedPlan, input) => ({
       reports: [], requestCount: 70, runtimeHardened: true,
-      roles: Object.keys(input.sessions), generatedDataMegabytes: 0,
+      roles: Object.keys(input.sessions), generatedDataMegabytes: 0, admissionRefusals: 0,
       planDigest: `sha256:${"b".repeat(64)}`,
       canaryRetest: { detected: false, report: { site: [] }, requestCount: 1, ...canaryRetestChronology }
     })
   }), /plan digest/);
+});
+
+test("given the shipped account budget, when rendering an active role plan, then the scanner paces itself within it", () => {
+  // given
+  const application = yaml.load(readFileSync(new URL("../src/main/resources/application.yaml", import.meta.url), "utf8"));
+  const shipped = /:(\d+)\}$/.exec(String(application.courtside?.admission?.account?.["per-second"] ?? ""))?.[1];
+  const accountPerSecond = Number(shipped ?? 20);
+
+  // when
+  const member = renderAuthenticatedZapPlan("MEMBER", "__Host-SESSION=synthetic; __Host-XSRF-TOKEN=synthetic");
+
+  // then
+  const { threadsPerHost, delayInMilliseconds } = authenticatedZapPolicy.active;
+  assert.ok(threadsPerHost * 1000 / delayInMilliseconds * 2 <= accountPerSecond,
+    "an active scan at its fastest stays within the account budget for reads that cost two tokens");
+  const activeScan = member.slice(member.lastIndexOf("  - type: activeScan\n"));
+  assert.match(activeScan, new RegExp(`\\n      delayInMs: ${delayInMilliseconds}\\n`));
+  assert.match(activeScan, new RegExp(`\\n      threadPerHost: ${threadsPerHost}\\n`));
+  assert.match(member, new RegExp(`\\n      threadCount: ${authenticatedZapPolicy.spider.threadCount}\\n`));
+  assert.equal(authenticatedZapPolicy.spider.threadCount, 1);
+});
+
+test("given relayed admission refusals, when assessing, then a refused attack cannot read as a passed scan", async () => {
+  // given
+  const evidenceDirectory = mkdtempSync(join(tmpdir(), "courtside-zap-evidence-"));
+  const plan = {
+    profile: "active", environment: "SECURITY", runId: "run-0001",
+    target: "https://localhost:9443", targetFingerprint: run.targetFingerprint,
+    selectedTests: ["CSA-AUTHN-001", "CSA-AUTHZ-001", "CSA-DAST-001"]
+  };
+  const report = { site: [{ alerts: [{ pluginid: "10037", name: "Server header", instances: [{
+    uri: "http://scanner-gateway:8090/__security/zap-canary", method: "GET"
+  }] }] }] };
+  const context = (admissionRefusals) => ({
+    evidenceDirectory,
+    stopFile: join(evidenceDirectory, "STOP"),
+    deadline: new Date(Date.now() + 60_000),
+    attempt: 1,
+    maxRequests: 1000,
+    authenticateRole: async (role) => ({ cookieHeader: `__Host-SESSION=secret-${role}`, requestCount: 3 }),
+    runZap: async (_selectedPlan, input) => ({
+      reports: [report], requestCount: 70, runtimeHardened: true,
+      roles: Object.keys(input.sessions), generatedDataMegabytes: 0, admissionRefusals,
+      planDigest: authenticatedZapPlanDigest(),
+      canaryRetest: { report: { site: [] }, requestCount: 1, ...canaryRetestChronology }
+    })
+  });
+
+  // when
+  const evidence = await runAuthenticatedZapAssessment(plan, context(3));
+
+  // then
+  assert.equal(evidence.outcome, "incomplete", "three attacks were refused before any rule could judge them");
+  assert.equal(evidence.admissionRefusals, 3);
+  assert.throws(() => validateAuthenticatedZapEvidence({ ...evidence, outcome: "passed" }), /outcome is inconsistent/);
+  await assert.rejects(runAuthenticatedZapAssessment(plan, context(undefined)), /admission refusals/,
+    "a scan whose refusals were not counted cannot be judged");
 });
 
 test("given a scanner budget above policy, when assessing, then execution is rejected", async () => {

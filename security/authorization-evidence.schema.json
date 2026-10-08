@@ -144,7 +144,8 @@
             "typed-access-denied",
             "forbidden-boundary-mismatch",
             "authorization-gate-passed",
-            "authorized-actor-rejected"
+            "authorized-actor-rejected",
+            "admission-refused"
           ]
         }
       }
@@ -205,15 +206,22 @@
           ]
         },
         "sessionStatus": {
-          "const": 200
+          "enum": [
+            200,
+            429
+          ]
         },
         "managedStatus": {
-          "const": 200
+          "enum": [
+            200,
+            429
+          ]
         },
         "adminStatus": {
           "enum": [
             200,
-            403
+            403,
+            429
           ]
         },
         "outcome": {
@@ -222,7 +230,8 @@
         "observation": {
           "enum": [
             "independent-identity-boundary-proven",
-            "independent-identity-boundary-mismatch"
+            "independent-identity-boundary-mismatch",
+            "admission-refused"
           ]
         }
       }

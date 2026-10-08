@@ -310,10 +310,9 @@ for (const clock of ["2026-07-01T23:59:59.000Z", "2026-12-01T23:59:59.000Z"]) {
     const run = harness.setup();
     // when
     harness.advance(Date.parse(clock) + 86400000);
-    harness.context.api.resourceAbuse(run);
-    harness.context.api.previewMutation(run);
-    harness.context.__ITER = 3;
-    harness.context.api.resourceAbuse(run);
+    harness.fork(1).context.api.competingOccupancyRace(run);
+    harness.fork(2).context.api.previewMutation(run);
+    harness.fork(3).context.api.seriesPressure(run);
     // then
     const creates = harness.calls.filter(call => call.path === "/api/bookings");
     assert.equal(JSON.parse(creates[0].body).startsAt, plan.slots["3"].startsAt);
@@ -365,8 +364,7 @@ test("given a maximum-cost preview containing blocked occurrences, when journall
   harness.backend.blockedCostPreview = true;
   harness.advance(run.attackStartsAt + 1);
   // when
-  harness.context.__ITER = 3;
-  harness.context.api.resourceAbuse(run);
+  harness.context.api.seriesPressure(run);
   harness.context.api.handleSummary({ metrics: Object.fromEntries(Object.entries(harness.counters)
     .map(([name, count]) => [name, { values: { count } }])), root_group: {} });
   const raw = harness.messages.join("\n");
@@ -415,7 +413,7 @@ function scriptHarness(shared = null, vu = 1) {
   const context = {
     __ENV: { COURTSIDE_SECURITY_SHARED_PASSWORD: "private-password", COURTSIDE_SECURITY_RUN_ID: "run-example",
       COURTSIDE_SECURITY_DATE_PLAN: backend.plan === null ? undefined : JSON.stringify(backend.plan) },
-    __VU: vu, __ITER: 0, open: () => JSON.stringify(policy), sleep: () => {},
+    __VU: vu, __ITER: 0, open: () => JSON.stringify(policy), sleep: () => {}, exec: { scenario: { name: "setup" } },
     check: (value, checks) => {
       const outcomes = Object.entries(checks).map(([name, predicate]) => ({ name, pass: predicate(value) }));
       backend.checks.push(...outcomes);
@@ -464,6 +462,8 @@ function scriptHarness(shared = null, vu = 1) {
       if (!authorized) return respond(401);
       if (parameters?.headers?.["X-XSRF-TOKEN"] !== "private-auth-token") return respond(403);
     }
+    if (backend.refusePaths?.includes(path)) return respond(429, { type: backend.refusalType },
+      {}, backend.refusalRetry === null ? {} : { "Retry-After": backend.refusalRetry ?? "1" });
     if (path === "/api/bookings") {
       const payload = JSON.parse(body);
       if (payload.participants?.length === 3) return respond(400, { type: "urn:courtside:error:participants-invalid",
@@ -493,7 +493,9 @@ function scriptHarness(shared = null, vu = 1) {
     get: (url, parameters) => send("GET", url, null, parameters),
     post: (url, body, parameters) => send("POST", url, body, parameters), expectedStatuses: () => {} };
   vm.createContext(context);
-  vm.runInContext(source + "\nthis.api = { options, setup, resourceAbuse, previewMutation, requestBodyLimit, handleSummary };", context);
+  vm.runInContext(source + "\nthis.api = { options, setup, resourceAbuse, previewMutation, requestBodyLimit, handleSummary,"
+    + " competingOccupancyRace, duplicateDeliveryRace, participantCapacityRace, seriesPressure, addressPressure };",
+  context);
   return { context, messages, calls, counters, backend,
     setup: () => JSON.parse(JSON.stringify(scriptHarness(backend, 0).context.api.setup())),
     fork: id => scriptHarness(backend, id), advance: value => { backend.now = value; } };
@@ -504,14 +506,13 @@ test("given the actual k6 script across midnight, when replay and capacity reque
   const harness = scriptHarness();
   const run = harness.setup();
   harness.advance(Date.parse(endedAt) + 6000);
+  const duplicate = harness.fork(1);
   // when
-  harness.context.__ITER = 1;
-  harness.context.api.resourceAbuse(run);
+  duplicate.context.api.duplicateDeliveryRace(run);
   harness.advance(Date.parse(endedAt) + 86_400_000);
-  harness.context.__ITER = 9;
-  harness.context.api.resourceAbuse(run);
-  harness.context.__ITER = 2;
-  harness.context.api.resourceAbuse(run);
+  duplicate.context.__ITER = 1;
+  duplicate.context.api.duplicateDeliveryRace(run);
+  harness.fork(2).context.api.participantCapacityRace(run);
   harness.context.api.handleSummary({ metrics: Object.fromEntries(Object.entries(harness.counters)
     .map(([name, count]) => [name, { values: { count } }])), root_group: {} });
   const result = parseResourceJournal(harness.messages.join("\n"), { accounts });
@@ -549,7 +550,8 @@ test("given the actual TOCTOU scenario, when series creation runs, then every PO
   assert.deepEqual(result.findings, []);
   assert.equal(result.operations.length, harness.calls.length);
   assert.ok(result.operations.some(operation => operation.kind === "createSeries"));
-  assert.equal(result.operations.filter(operation => operation.kind === "login").length, 1);
+  assert.equal(result.operations.filter(operation => operation.kind === "login").length, 5,
+    "setup signs one session in for each integrity scenario and one for the series pressure");
   assert.equal(result.operations.find(operation => operation.kind === "gatewayRejectedBody")?.status, 413);
   const bodyProbe = result.operations.find(operation => operation.kind === "gatewayRejectedBody");
   const bodyCall = harness.calls.find(call => call.path === "/api/session" && call.body?.startsWith("x"));
@@ -579,8 +581,20 @@ test("given the instrumented script, when k6 reads its options, then scenarios a
   // when
   const options = JSON.parse(JSON.stringify(harness.context.api.options));
   // then
+  const race = (exec) => ({ executor: "per-vu-iterations", exec, vus: policy.integrity.racers,
+    iterations: policy.integrity.rounds, startTime: `${policy.warmupSeconds}s`,
+    maxDuration: `${policy.integrity.rounds * policy.integrity.tickSeconds + 10}s` });
   assert.deepEqual(options, { scenarios: {
     resource_abuse: { executor: "ramping-vus", exec: "resourceAbuse", startVUs: 0, stages: policy.stages },
+    competing_occupancy: race("competingOccupancyRace"),
+    duplicate_delivery: race("duplicateDeliveryRace"),
+    participant_capacity: race("participantCapacityRace"),
+    address_pressure: { executor: "constant-arrival-rate", exec: "addressPressure", rate: policy.addressPressure.rate,
+      timeUnit: "1s", duration: `${policy.addressPressure.durationSeconds}s`,
+      startTime: `${policy.addressPressure.startSeconds}s`, preAllocatedVUs: policy.addressPressure.preAllocatedVUs,
+      maxVUs: policy.addressPressure.maxVUs },
+    series_pressure: { executor: "constant-vus", exec: "seriesPressure", vus: policy.seriesPressure.vus,
+      startTime: `${policy.seriesPressure.startSeconds}s`, duration: `${policy.seriesPressure.durationSeconds}s` },
     preview_mutation: { executor: "shared-iterations", exec: "previewMutation", vus: 1, iterations: 1,
       startTime: "1s", maxDuration: "15s" },
     request_body: { executor: "shared-iterations", exec: "requestBodyLimit", vus: 1, iterations: 1,
@@ -593,13 +607,13 @@ test("given separate failed-login cookies, when pressure precedes another bookin
   const harness = scriptHarness();
   const run = harness.setup();
   harness.advance(Date.parse(endedAt) + 6000);
+  const duplicate = harness.fork(2);
   // when
-  harness.context.__ITER = 1;
-  harness.context.api.resourceAbuse(run);
+  duplicate.context.api.duplicateDeliveryRace(run);
   harness.context.__ITER = 5;
   harness.context.api.resourceAbuse(run);
-  harness.context.__ITER = 9;
-  harness.context.api.resourceAbuse(run);
+  duplicate.context.__ITER = 1;
+  duplicate.context.api.duplicateDeliveryRace(run);
   harness.context.api.handleSummary({ metrics: Object.fromEntries(Object.entries(harness.counters)
     .map(([name, count]) => [name, { values: { count } }])), root_group: {} });
   const result = parseResourceJournal(harness.messages.join("\n"), { accounts });
@@ -617,8 +631,8 @@ test("given journal limits under continued load, when a VU exceeds its recording
   harness.advance(Date.parse(endedAt) + 6000);
   // when
   for (let index = 0; index < 710; index++) {
-    harness.context.__ITER = 1 + index * 8;
-    harness.context.api.resourceAbuse(run);
+    harness.context.__ITER = index;
+    harness.context.api.duplicateDeliveryRace(run);
   }
   harness.context.api.handleSummary({ metrics: Object.fromEntries(Object.entries(harness.counters)
     .map(([name, count]) => [name, { values: { count } }])), root_group: {} });
@@ -648,67 +662,70 @@ test("given a request interrupted before its response, when summary still runs, 
     if (url.endsWith("/api/bookings")) throw new Error("Synthetic transport interruption");
     return post(url, ...arguments_);
   };
-  harness.context.__ITER = 1;
   // when
-  assert.throws(() => harness.context.api.resourceAbuse(run), /Synthetic transport interruption/);
+  assert.throws(() => harness.context.api.duplicateDeliveryRace(run), /Synthetic transport interruption/);
   harness.context.api.handleSummary({ metrics: Object.fromEntries(Object.entries(harness.counters)
     .map(([name, count]) => [name, { values: { count } }])), root_group: {} });
   const result = parseResourceJournal(harness.messages.join("\n"), { accounts });
   // then
-  assert.equal(harness.counters.journal_started, 8);
-  assert.equal(harness.counters.journal_finished, 7);
+  assert.equal(harness.counters.journal_started, 20, "five setup sign-ins of three requests, four fixture reads and one booking");
+  assert.equal(harness.counters.journal_finished, 19);
   assert.equal(result.complete, false);
   assert.ok(result.findings.includes("journal-capture-incomplete"));
   t.diagnostic(JSON.stringify({ proof: "interrupted-k6-journal", started: harness.counters.journal_started,
     finished: harness.counters.journal_finished, complete: result.complete, findings: result.findings }));
 });
 
-test("given twelve booking VUs and the five-session application limit, when contention and login pressure run, then every booking reuses the one real setup session", t => {
+test("given four racers per integrity scenario and the five-session application limit, when races and login pressure run, then each scenario keeps its own setup session", t => {
   // given
   const harness = scriptHarness();
   const run = harness.setup();
   harness.advance(run.attackStartsAt + 1);
-  const vus = Array.from({ length: 12 }, (_, index) => harness.fork(index + 1));
-  // when
-  for (const vu of vus) {
-    vu.context.api.resourceAbuse(structuredClone(run));
-    vu.context.__ITER = 5;
-    vu.context.api.resourceAbuse(structuredClone(run));
-    vu.context.__ITER = 1;
-    vu.context.api.resourceAbuse(structuredClone(run));
+  const racers = { competingOccupancyRace: [], duplicateDeliveryRace: [], participantCapacityRace: [] };
+  let vu = 0;
+  for (const scenario of Object.keys(racers)) {
+    for (let racer = 0; racer < 4; racer++) racers[scenario].push(harness.fork(++vu));
   }
-  const preview = harness.fork(13);
-  preview.context.api.previewMutation(structuredClone(run));
+  const pressure = Array.from({ length: 12 }, () => harness.fork(++vu));
+  // when
+  for (const [scenario, forks] of Object.entries(racers)) {
+    for (const fork of forks) fork.context.api[scenario](structuredClone(run));
+  }
+  for (const fork of pressure) {
+    fork.context.__ITER = 5;
+    fork.context.api.resourceAbuse(structuredClone(run));
+  }
+  harness.fork(++vu).context.api.previewMutation(structuredClone(run));
   harness.context.api.handleSummary({ metrics: Object.fromEntries(Object.entries(harness.counters)
     .map(([name, count]) => [name, { values: { count } }])), root_group: {} });
   const logins = harness.calls.filter(call => call.path === "/api/session" && call.method === "POST");
   const successful = logins.filter(call => call.status === 200);
-  const writes = harness.calls.filter(call => call.path === "/api/bookings");
+  const sessionOf = call => /__Host-SESSION=([^;]+)/.exec(call.cookie)?.[1];
+  const writesBy = forks => harness.calls.filter(call => call.path === "/api/bookings"
+    && forks.some(fork => fork.context.__VU === call.vu));
   const result = parseResourceJournal(harness.messages.join("\n"), { accounts });
   // then
   assert.equal(harness.backend.maxSessions, 5);
-  assert.equal(successful.length, 1);
-  assert.equal(successful[0].vu, 0);
-  assert.equal(harness.backend.sessions.size, 1);
-  assert.deepEqual(result.ownedSessionIds, [...harness.backend.sessions.values()]);
-  assert.equal(result.operations.find(operation => operation.kind === "login" && operation.status === 200).responseSessionId,
-    [...harness.backend.sessions.values()][0]);
+  assert.equal(successful.length, 5, "every session is signed in by setup before any pressure");
+  assert.ok(successful.every(call => call.vu === 0));
+  assert.equal(harness.backend.sessions.size, 5, "no sign-in evicts a session the application limit would drop");
+  assert.deepEqual(result.ownedSessionIds, [...harness.backend.sessions.values()].sort());
+  const scenarioSessions = Object.values(racers).map(forks => new Set(writesBy(forks).map(sessionOf)));
+  assert.ok(scenarioSessions.every(sessions => sessions.size === 1), "the racers of one scenario share its session");
+  assert.equal(new Set(scenarioSessions.flatMap(sessions => [...sessions])).size, 3,
+    "no two integrity scenarios share a session");
   assert.equal(logins.filter(call => call.status === 401).length, 12);
-  assert.equal(new Set(writes.map(call => /__Host-SESSION=([^;]+)/.exec(call.cookie)?.[1])).size, 1);
-  assert.ok(writes.every(call => [201, 409].includes(call.status)));
-  assert.ok(writes.every(call => call.parameters.headers["X-XSRF-TOKEN"] === "private-auth-token"));
-  assert.equal(harness.counters.successful_occupancy, 1);
-  assert.equal(harness.counters.rejected_occupancy, 11);
-  assert.equal(harness.counters.duplicate_responses, 12);
   assert.ok(logins.filter(call => call.status === 401).every(call => call.parameters.jar && !call.cookie.includes("__Host-SESSION=")));
+  assert.equal(harness.counters.successful_occupancy, 1);
+  assert.equal(harness.counters.rejected_occupancy, 3);
+  assert.equal(harness.counters.duplicate_responses, 4);
   assert.equal(result.captureComplete, true);
-  assert.equal(result.operations.filter(operation => operation.kind === "login" && operation.status === 200)[0].accountId, manager);
-  assert.equal(result.operations.find(operation => operation.kind === "login" && operation.status === 200).username,
-    "security.manager.1");
-  for (const vu of vus) {
+  assert.ok(result.operations.filter(operation => operation.kind === "login" && operation.status === 200)
+    .every(operation => operation.accountId === manager && operation.username === "security.manager.1"));
+  for (const fork of pressure) {
     const login = result.operations.find(operation => operation.kind === "login" && operation.status === 401
-      && operation.vu === vu.context.__VU);
-    assert.equal(login.username, `security.member.${(vu.context.__VU % 3) + 1}`);
+      && operation.vu === fork.context.__VU);
+    assert.equal(login.username, `security.member.${(fork.context.__VU % 3) + 1}`);
     assert.equal(login.requestSessionId, login.sessionId);
   }
   assert.deepEqual(result.loginUsernames, ["security.manager.1", "security.member.1", "security.member.2", "security.member.3"]);
@@ -716,11 +733,103 @@ test("given twelve booking VUs and the five-session application limit, when cont
   const raw = harness.messages.join("\n");
   assert.ok(!raw.includes("private-password") && !raw.includes("private-token") && !raw.includes("private-auth-token"));
   assert.ok([...harness.backend.sessions.keys()].every(cookie => !raw.includes(cookie)));
-  t.diagnostic(JSON.stringify({ proof: "shared-setup-authorization", bookingVus: vus.length,
-    successfulLogins: successful.length, survivingSessions: harness.backend.sessions.size,
-    contentionWinners: harness.counters.successful_occupancy, contentionLosers: harness.counters.rejected_occupancy,
-    duplicateResponses: harness.counters.duplicate_responses, failedLogins: 12, captureComplete: result.captureComplete }));
+  t.diagnostic(JSON.stringify({ proof: "separate-setup-sessions", racers: vu, successfulLogins: successful.length,
+    survivingSessions: harness.backend.sessions.size, contentionWinners: harness.counters.successful_occupancy,
+    contentionLosers: harness.counters.rejected_occupancy, duplicateResponses: harness.counters.duplicate_responses,
+    failedLogins: 12, captureComplete: result.captureComplete }));
 });
+
+test("given admission refusals during the integrity races, when the script meets them, then it records them without judging the race", () => {
+  // given
+  const harness = scriptHarness();
+  const run = harness.setup();
+  harness.advance(run.attackStartsAt + 1);
+  harness.backend.refusePaths = ["/api/bookings", "/api/booking-series-preview"];
+  harness.backend.refusalType = "urn:courtside:error:request-rate-limited";
+  // when
+  harness.fork(1).context.api.competingOccupancyRace(run);
+  harness.fork(2).context.api.duplicateDeliveryRace(run);
+  harness.fork(3).context.api.participantCapacityRace(run);
+  harness.fork(4).context.api.previewMutation(run);
+  harness.context.api.handleSummary({ metrics: Object.fromEntries(Object.entries(harness.counters)
+    .map(([name, count]) => [name, { values: { count } }])), root_group: {} });
+  const result = parseResourceJournal(harness.messages.join("\n"), { accounts });
+  // then
+  assert.equal(harness.counters.integrity_admission_refusals, 4, "each integrity scenario counted the refusal it met");
+  assert.deepEqual(harness.backend.checks.filter(check => /^(competing-court-occupancy|duplicate-delivery|participant-capacity|preview-mutation-race):(?!fixtures-ready)/
+    .test(check.name)), [], "a refused request is neither a passed nor a failed integrity check");
+  assert.ok(result.operations.filter(operation => operation.status === 429).every(operation =>
+    operation.problemType === "urn:courtside:error:request-rate-limited" && operation.retryAfterSeconds === 1));
+  assert.equal(result.complete, true);
+});
+
+for (const [name, type, retry, passes] of [
+  ["a typed refusal with Retry-After", "urn:courtside:error:operation-capacity-exhausted", "1", true],
+  ["a typed refusal without Retry-After", "urn:courtside:error:request-rate-limited", null, false],
+  ["a 429 of another kind", "urn:courtside:error:login-rate-limited", "1", false]
+]) {
+  test(`given ${name}, when the series pressure meets it, then only the typed admission answer passes`, () => {
+    // given
+    const harness = scriptHarness();
+    const run = harness.setup();
+    harness.backend.refusePaths = ["/api/booking-series-preview"];
+    harness.backend.refusalType = type;
+    harness.backend.refusalRetry = retry;
+    // when
+    harness.context.api.seriesPressure(run);
+    // then
+    const check = harness.backend.checks.find(entry => entry.name === "series-and-rule-cost:maximum-preview-controlled");
+    assert.equal(check.pass, passes, `${name} ${passes ? "is" : "is not"} the refusal the pressure is meant to provoke`);
+    assert.equal(harness.counters.pressure_admission_refusals ?? 0, passes ? 1 : 0);
+  });
+}
+
+test("given one VU reused by a later scenario, when that scenario runs, then it signs requests with its own session", () => {
+  // given
+  const harness = scriptHarness();
+  const run = harness.setup();
+  const reused = harness.fork(1);
+  // when
+  reused.context.exec.scenario.name = "competing_occupancy";
+  reused.context.api.competingOccupancyRace(run);
+  reused.context.exec.scenario.name = "preview_mutation";
+  reused.context.api.previewMutation(run);
+  // then
+  const session = call => /__Host-SESSION=([^;]+)/.exec(call.cookie)?.[1];
+  const occupancy = harness.calls.find(call => call.path === "/api/bookings");
+  const preview = harness.calls.find(call => call.path === "/api/booking-series-preview");
+  assert.equal(session(occupancy), run.sessions.occupancy.cookies["__Host-SESSION"]);
+  assert.equal(session(preview), run.sessions.toctou.cookies["__Host-SESSION"],
+    "a VU k6 hands to another scenario must not keep the session of the one it ran before");
+});
+
+for (const [name, answer, typed] of [
+  ["a typed request-rate-limited refusal", { type: "urn:courtside:error:request-rate-limited", retry: "1" }, true],
+  ["a capacity refusal", { type: "urn:courtside:error:operation-capacity-exhausted", retry: "1" }, false],
+  ["a refusal without Retry-After", { type: "urn:courtside:error:request-rate-limited", retry: null }, false]
+]) {
+  test(`given ${name}, when the address pressure meets it, then only a typed budget refusal counts`, () => {
+    // given
+    const harness = scriptHarness();
+    const run = harness.setup();
+    const reused = harness.fork(1);
+    reused.context.exec.scenario.name = "competing_occupancy";
+    reused.context.api.competingOccupancyRace(run);
+    harness.backend.refusePaths = ["/api/public/booking-grid"];
+    harness.backend.refusalType = answer.type;
+    harness.backend.refusalRetry = answer.retry;
+    // when
+    reused.context.exec.scenario.name = "address_pressure";
+    reused.context.api.addressPressure();
+    // then
+    const read = harness.calls.find(call => call.path === "/api/public/booking-grid");
+    assert.ok(!read.cookie.includes("__Host-SESSION="), "address pressure spends the address budget, never an account's");
+    assert.equal(harness.counters.address_admission_refusals ?? 0, typed ? 1 : 0,
+      "only an address-budget refusal proves the read pressure went over that budget");
+    const check = harness.backend.checks.find(entry => entry.name === "admission-pressure:answered-or-typed-refusal");
+    assert.equal(check.pass, answer.type !== "urn:courtside:error:request-rate-limited" || answer.retry !== null);
+  });
+}
 
 for (const failure of ["refused-login", "wrong-identity"]) {
   test(`given ${failure} during shared authentication, when setup prepares booking traffic, then it fails before any domain mutation`, () => {
