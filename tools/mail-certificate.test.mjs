@@ -83,6 +83,26 @@ test("given a rotation, when the helper reacts, then it waits for an event and n
       "a fixed sleep would publish a half-written pair or a stale one, depending on its length");
   });
 
+test("given a round that arms its watch, when it reads the store, then the watch already exists",
+  () => {
+    // given
+    const round = helper.slice(helper.indexOf("while true; do"));
+
+    // when
+    const waits = round.search(/until registered "\$watcher"/);
+    const reads = round.search(/^ {2}publish$/m);
+
+    // then
+    assert.ok(waits >= 0 && waits < reads,
+      "inotifyd arms in the background, so a pair written before its watches exist wakes nobody");
+    assert.match(helper, /anon_inode:inotify/,
+      "only the watcher's own inotify descriptor says how many watches it holds");
+    assert.match(round, /until registered[^\n]*; do\n {4}kill -0 "\$watcher" 2>\/dev\/null \|\| break/,
+      "inotifyd exits when a directory vanished while arming, and would never finish registering");
+    assert.match(round, /kill -0 "\$watcher" 2>\/dev\/null; then\n {4}read -r _ <&3/,
+      "a watcher that died holds the pipe open for nobody, and the read would wait forever");
+  });
+
 test("given the shipped plan, when the mail server loads it, then it reads the published pair", () => {
   // given
   const base = deploymentFile("mail/base.ndjson");

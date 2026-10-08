@@ -173,6 +173,15 @@ watches() {
   find "$watched" -type d 2>/dev/null | sed 's/$/:wynd/'
 }
 
+# inotifyd starts in the background, and a write that lands before its watches exist wakes nobody.
+registered() {
+  for descriptor in /proc/"$1"/fd/*; do
+    [ "$(readlink "$descriptor" 2>/dev/null)" = "anon_inode:inotify" ] || continue
+    [ "$(grep -c '^inotify wd:' "/proc/$1/fdinfo/${descriptor##*/}")" -ge "$2" ] && return 0
+  done
+  return 1
+}
+
 while true; do
   # Re-armed each round because an issuer's directory appears only with the first order it fills,
   # and inotify watches the directories that existed when it started.
@@ -181,10 +190,19 @@ while true; do
   # shellcheck disable=SC2086
   inotifyd - $armed >&3 2>/dev/null &
   watcher=$!
+  # inotifyd exits when a directory vanished while it armed, which ends this wait as well.
+  until registered "$watcher" "$(printf '%s\n' "$armed" | grep -c .)"; do
+    kill -0 "$watcher" 2>/dev/null || break
+    sleep 0.1
+  done
   publish
-  # A directory that appeared while this round was arming carries its events to nobody, so the round
-  # ends here rather than on an event that will never arrive.
-  [ "$armed" = "$(watches)" ] && read -r _ <&3
+  # A directory that appeared or vanished while this round was arming carries its events to nobody,
+  # so the round ends here rather than on an event that will never arrive.
+  if [ "$armed" = "$(watches)" ] && kill -0 "$watcher" 2>/dev/null; then
+    read -r _ <&3
+  else
+    sleep 1
+  fi
   kill "$watcher" 2>/dev/null
   wait "$watcher" 2>/dev/null
 done
