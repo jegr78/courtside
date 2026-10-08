@@ -802,6 +802,67 @@ test("given an admission refusal inside an object attack, when checking object b
     "a check that never met a refusal keeps its own answer");
 });
 
+test("given an answered probe that breaks a boundary beside a refused one, when checking object boundaries, then the failure stays failed", async () => {
+  // given
+  const standaloneId = "10000000-0000-0000-0000-000000000001";
+  const personId = "30000000-0000-0000-0000-000000000001";
+  const bookings = { items: [
+    { id: standaloneId, seriesId: null, status: "CONFIRMED" },
+    { id: "10000000-0000-0000-0000-000000000002", seriesId: "20000000-0000-0000-0000-000000000001",
+      status: "CONFIRMED" }
+  ] };
+  const roster = { entries: [{ personId, username: "security.member.1", firstName: "Jane",
+    lastName: "Doe", email: "jane.doe@example.org", enabled: true, roles: ["MEMBER"],
+    accountId: "40000000-0000-0000-0000-000000000001", membershipTypeId: null }] };
+  let rosterReads = 0;
+
+  // when
+  const checks = await executeObjectAuthorizationChecks(async (actor, probe) => {
+    if (probe.path === "/api/my/bookings?limit=100") return { status: 200, json: bookings };
+    if (probe.path.startsWith("/api/admin/roster?") && rosterReads++ === 0) return { status: 200, json: roster };
+    if (probe.path.startsWith("/api/admin/roster?")) return rateLimited;
+    if (probe.method === "PUT") return { status: 200 };
+    if (probe.path === `/api/bookings/${standaloneId}` && actor === "MEMBER_NON_OWNER") return { status: 204 };
+    if (probe.path === `/api/managed/bookings/${standaloneId}` && actor === "MEMBER_NON_OWNER") return rateLimited;
+    if (actor === "ADMIN") return { status: 200 };
+    return { status: 404, problemType: "urn:courtside:error:booking-not-found" };
+  }, (limit) => ({ method: "GET", path: `/api/admin/roster?limit=${limit}`, headers: {} }));
+
+  // then
+  const check = (id) => checks.find((candidate) => candidate.id === id);
+  assert.equal(check("existence-not-disclosed").outcome, "failed",
+    "a non-owner cancel that was answered differently from an unknown identifier discloses existence");
+  assert.equal(check("mass-assignment").outcome, "failed",
+    "an accepted field injection fails even though the read that would confirm it was refused");
+  assert.equal(check("horizontal-managed-detail").outcome, "incomplete");
+});
+
+test("given an answered identity probe that crosses its boundary beside a refused one, when executing identity checks, then it fails", async () => {
+  // given
+  const send = async (client, probe) => {
+    if (probe.method === "POST") return { status: 200 };
+    if (probe.path === "/api/session" && client.signedIn) return rateLimited;
+    if (probe.path === "/api/session") {
+      client.signedIn = true;
+      client.update(["__Host-XSRF-TOKEN=token"]);
+      return { status: 200 };
+    }
+    if (probe.path.startsWith("/api/managed/")) return rateLimited;
+    return { status: 200 };
+  };
+
+  // when
+  const checks = await executeSecondaryIdentityChecks(send, "secret", async () => {},
+    () => ({ method: "GET", path: "/api/admin/roster?limit=1", headers: {} }));
+
+  // then
+  for (const check of checks.filter(({ actor }) => actor !== "ADMIN")) {
+    assert.equal(check.outcome, "failed", `${check.actor} reached the administrative listing`);
+    assert.equal(check.observation, "independent-identity-boundary-mismatch");
+  }
+  assert.equal(checks.find(({ actor }) => actor === "ADMIN").outcome, "incomplete");
+});
+
 test("given admission refusals during identity checks, when executing them, then the identity is incomplete", async () => {
   // given
   const send = async (client, probe) => {
@@ -812,7 +873,7 @@ test("given admission refusals during identity checks, when executing them, then
       client.update(["__Host-XSRF-TOKEN=token"]);
       return { status: 200 };
     }
-    return { status: 403, problemType: "urn:courtside:error:access-denied" };
+    return rateLimited;
   };
 
   // when
@@ -846,6 +907,13 @@ test("given authorization evidence with admission refusals, when validating it, 
   evidence.identityChecks[0] = { ...evidence.identityChecks[0], sessionStatus: 200 };
   assert.throws(() => validateAuthorizationEvidence({ ...evidence, outcome: "incomplete" }, matrix),
     /independent identity/, "an incomplete identity needs a refusal status behind it");
+  evidence.identityChecks[0] = { ...evidence.identityChecks[0], sessionStatus: 429, adminStatus: 200,
+    outcome: "failed", observation: "independent-identity-boundary-mismatch" };
+  assert.doesNotThrow(() => validateAuthorizationEvidence({ ...evidence, outcome: "failed" }, matrix),
+    "a crossed boundary beside a refused probe is retained as the failure it is");
+  evidence.identityChecks[0] = { ...evidence.identityChecks[0], outcome: "passed" };
+  assert.throws(() => validateAuthorizationEvidence({ ...evidence, outcome: "incomplete" }, matrix),
+    /independent identity/, "a mismatch never reads as a pass");
 });
 
 async function minimalEvidence() {

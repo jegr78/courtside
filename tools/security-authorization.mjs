@@ -303,10 +303,10 @@ export async function executeObjectAuthorizationChecks(send, rosterListing) {
   // Refusing a booking somebody else holds has to read like refusing one nobody holds; the
   // difference between the two answers used to be what told a caller the identifier was real.
   const sameAnswer = ({ status, problemType }) => `${status} ${problemType}`;
+  const sameAsUnknown = (refusal) => admissionRefused(unknown) || sameAnswer(refusal) === sameAnswer(unknown);
   checks.push(objectCheck("existence-not-disclosed", horizontalCancel,
-    [horizontalCancel, managedDetail, seriesCancel]
-      .every((refusal) => sameAnswer(refusal) === sameAnswer(unknown)),
-    "refusal-indistinguishable-from-unknown-identifier", [managedDetail, seriesCancel, unknown]));
+    [[horizontalCancel, sameAsUnknown], [managedDetail, sameAsUnknown], [seriesCancel, sameAsUnknown],
+      [unknown, () => true]], "refusal-indistinguishable-from-unknown-identifier"));
   const adminDetail = await send("ADMIN", {
     method: "GET", path: `/api/managed/bookings/${standalone.id}`, headers: {}
   });
@@ -322,14 +322,14 @@ export async function executeObjectAuthorizationChecks(send, rosterListing) {
     }) });
   const rosterAfter = await send("ADMIN", rosterListing(200));
   const memberAfter = rosterAfter.json?.entries?.find(({ personId }) => personId === member.personId);
-  const assignmentRejected = typedResponse(massAssignment, 400, "urn:courtside:error:validation-failed")
-    && rosterAfter.status === 200
+  const memberUnchanged = (response) => response.status === 200
     && memberAfter?.enabled === member.enabled
     && memberAfter?.accountId === member.accountId
     && memberAfter?.membershipTypeId === member.membershipTypeId
     && JSON.stringify(memberAfter?.roles) === JSON.stringify(member.roles);
-  checks.push(objectCheck("mass-assignment", massAssignment, assignmentRejected,
-    "unbound-account-fields-rejected", [rosterAfter]));
+  checks.push(objectCheck("mass-assignment", massAssignment,
+    [[massAssignment, (response) => typedResponse(response, 400, "urn:courtside:error:validation-failed")],
+      [rosterAfter, memberUnchanged]], "unbound-account-fields-rejected"));
   const bookingsAfter = await send("MEMBER_OWNER", { method: "GET", path: "/api/my/bookings?limit=100", headers: {} });
   checks.push(objectCheck("rejected-attacks-preserve-bookings", bookingsAfter,
     bookingsAfter.status === 200 && bookingState(bookingsAfter.json?.items) === bookingSnapshot,
@@ -341,11 +341,18 @@ function typedResponse(response, status, problemType) {
   return response.status === status && response.problemType === problemType;
 }
 
-function objectCheck(id, response, passed, secureObservation, related = []) {
-  const refused = [response, ...related].some(admissionRefused);
-  return { id, status: response.status, outcome: refused ? "incomplete" : passed ? "passed" : "failed",
+function answeredVerdict(parts) {
+  if (parts.some(([response, holds]) => !admissionRefused(response) && !holds(response))) return "failed";
+  return parts.some(([response]) => admissionRefused(response)) ? "incomplete" : "passed";
+}
+
+function objectCheck(id, response, expectation, secureObservation) {
+  const parts = Array.isArray(expectation) ? expectation : [[response, () => expectation]];
+  const outcome = answeredVerdict(parts);
+  return { id, status: response.status, outcome,
     ...(response.problemType ? { problemType: response.problemType } : {}),
-    observation: refused ? "admission-refused" : passed ? secureObservation : `${id}-mismatch` };
+    observation: outcome === "incomplete" ? "admission-refused" : outcome === "passed" ? secureObservation
+      : `${id}-mismatch` };
 }
 
 function bookingState(items) {
@@ -464,11 +471,11 @@ export async function executeSecondaryIdentityChecks(send, password, beforeLogin
     const session = await send(client, { method: "GET", path: "/api/session", headers: {} });
     const admin = await send(client, listing, { csrf: listing.method !== "GET" });
     const expectedAdminStatus = role === "ADMIN" ? 200 : 403;
-    const passed = session.status === 200 && session.json?.roles?.length === 1
-      && session.json.roles[0] === role && admin.status === expectedAdminStatus
-      && (role === "ADMIN" || admin.problemType === "urn:courtside:error:access-denied");
-    checks.push({ actor: role, sessionStatus: session.status, adminStatus: admin.status,
-      ...identityOutcome(passed, [session, admin]) });
+    checks.push({ actor: role, sessionStatus: session.status, adminStatus: admin.status, ...identityOutcome([
+      [session, (response) => response.status === 200 && response.json?.roles?.length === 1
+        && response.json.roles[0] === role],
+      [admin, (response) => response.status === expectedAdminStatus
+        && (role === "ADMIN" || response.problemType === "urn:courtside:error:access-denied")]]) });
   }
   const managerRoles = ["MEMBER", "SPORT_DIRECTOR", "TRAINER", "YOUTH_DIRECTOR"];
   for (let index = 1; index <= 2; index += 1) {
@@ -478,18 +485,19 @@ export async function executeSecondaryIdentityChecks(send, password, beforeLogin
     const session = await send(client, { method: "GET", path: "/api/session", headers: {} });
     const managed = await send(client, { method: "GET", path: "/api/managed/bookings?limit=1", headers: {} });
     const admin = await send(client, listing, { csrf: listing.method !== "GET" });
-    const passed = session.status === 200
-      && JSON.stringify(session.json?.roles?.toSorted()) === JSON.stringify(managerRoles)
-      && managed.status === 200 && typedResponse(admin, 403, "urn:courtside:error:access-denied");
     checks.push({ actor: `MANAGER_COMBINATION_${index}`, sessionStatus: session.status,
-      managedStatus: managed.status, adminStatus: admin.status, ...identityOutcome(passed, [session, managed, admin]) });
+      managedStatus: managed.status, adminStatus: admin.status, ...identityOutcome([
+        [session, (response) => response.status === 200
+          && JSON.stringify(response.json?.roles?.toSorted()) === JSON.stringify(managerRoles)],
+        [managed, (response) => response.status === 200],
+        [admin, (response) => typedResponse(response, 403, "urn:courtside:error:access-denied")]]) });
   }
   return checks;
 }
 
-function identityOutcome(passed, responses) {
-  if (responses.some(admissionRefused)) return { outcome: "incomplete", observation: "admission-refused" };
-  return { outcome: passed ? "passed" : "failed", observation: passed
+function identityOutcome(parts) {
+  const outcome = answeredVerdict(parts);
+  return { outcome, observation: outcome === "incomplete" ? "admission-refused" : outcome === "passed"
     ? "independent-identity-boundary-proven" : "independent-identity-boundary-mismatch" };
 }
 
@@ -553,6 +561,7 @@ export function validateAuthorizationEvidence(evidence, matrix) {
       return check.outcome !== "incomplete"
         || ![check.sessionStatus, check.adminStatus, check.managedStatus].includes(429);
     }
+    if (check.observation === "independent-identity-boundary-mismatch") return check.outcome !== "failed";
     const expectedAdminStatus = check.actor === "ADMIN" ? 200 : 403;
     return check.sessionStatus !== 200 || check.adminStatus !== expectedAdminStatus
       || (manager && check.managedStatus !== 200) || check.outcome !== "passed";
