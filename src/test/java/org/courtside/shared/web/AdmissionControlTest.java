@@ -12,7 +12,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.method.HandlerMethod;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -38,9 +41,13 @@ class AdmissionControlTest {
     }
 
     private AdmissionControl control(int accountBurst, Integer seriesConcurrency) {
-        AdmissionProperties properties = ShippedAdmission.withClass(
+        return control(accountBurst, seriesConcurrency, Duration.ZERO);
+    }
+
+    private AdmissionControl control(int accountBurst, Integer seriesConcurrency, Duration bulkheadWait) {
+        AdmissionProperties properties = ShippedAdmission.withBulkheadWait(ShippedAdmission.withClass(
                 ShippedAdmission.withAccountBurst(ShippedAdmission.defaults(), accountBurst),
-                "booking-series", new AdmissionProperties.DemandClass(10, seriesConcurrency));
+                "booking-series", new AdmissionProperties.DemandClass(10, seriesConcurrency)), bulkheadWait);
         return new AdmissionControl(AdmissionPlan.load(properties, JsonMapper.builder().build()),
                 new RequestBudgets(100, now::get), properties, securityEvents);
     }
@@ -126,6 +133,49 @@ class AdmissionControlTest {
                 .as("completion returns the permit")
                 .doesNotThrowAnyException();
         verify(securityEvents).controlRefused(JANE, SecurityEventLog.ControlRefusal.OPERATION_CAPACITY);
+    }
+
+    @Test
+    void givenAnAccountsOwnRequestHoldsItsPlace_whenItSendsAnotherOfTheClass_thenTheSecondWaitsAndRunsAfterIt()
+            throws Exception {
+        // given
+        AdmissionControl control = control(30, 2, Duration.ofSeconds(5));
+        signIn(JANE);
+        HttpServletRequest first = request();
+        control.preHandle(first, new MockHttpServletResponse(), operation("previewSeries"));
+        var principal = SecurityContextHolder.getContext().getAuthentication();
+
+        // when
+        CompletableFuture<Boolean> second = CompletableFuture.supplyAsync(() -> {
+            SecurityContextHolder.getContext().setAuthentication(principal);
+            try {
+                return control.preHandle(request(), new MockHttpServletResponse(), operation("createSeries"));
+            } catch (Exception failure) {
+                throw new IllegalStateException(failure);
+            } finally {
+                SecurityContextHolder.clearContext();
+            }
+        });
+        Thread.sleep(200);
+        boolean admittedWhileTheFirstRuns = second.isDone();
+        control.afterCompletion(first, new MockHttpServletResponse(), operation("previewSeries"), null);
+
+        // then
+        assertThat(admittedWhileTheFirstRuns).as("the second request waits for the account's own place").isFalse();
+        assertThat(second.get(5, TimeUnit.SECONDS)).as("and runs once the first completes").isTrue();
+    }
+
+    @Test
+    void givenAnAccountsOwnRequestKeepsItsPlace_whenTheWaitRunsOut_thenTheSecondIsRefused() throws Exception {
+        // given
+        AdmissionControl control = control(30, 2, Duration.ofMillis(100));
+        signIn(JANE);
+        control.preHandle(request(), new MockHttpServletResponse(), operation("previewSeries"));
+
+        // when / then
+        assertThatThrownBy(() -> control.preHandle(request(), new MockHttpServletResponse(), operation("createSeries")))
+                .as("the wait is bounded, so a stuck request cannot hold its caller's next one forever")
+                .isInstanceOf(OperationCapacityExhaustedException.class);
     }
 
     @Test

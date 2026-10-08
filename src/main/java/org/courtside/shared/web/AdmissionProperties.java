@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+import java.time.Duration;
 import java.util.Map;
 
 @Validated
@@ -13,6 +14,7 @@ import java.util.Map;
 record AdmissionProperties(@NotNull @Valid Limit account,
                            @NotNull @Valid Limit address,
                            @Min(1) int trackedPrincipals,
+                           @NotNull Duration bulkheadWait,
                            @NotNull Map<String, @NotNull @Valid DemandClass> classes) {
 
     record Limit(@Min(1) int burst, @Min(1) int perSecond) {

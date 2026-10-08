@@ -28,7 +28,12 @@ final class ShippedAdmission {
 
     static AdmissionProperties withAccountBurst(AdmissionProperties properties, int burst) {
         return new AdmissionProperties(new AdmissionProperties.Limit(burst, properties.account().perSecond()),
-                properties.address(), properties.trackedPrincipals(), properties.classes());
+                properties.address(), properties.trackedPrincipals(), properties.bulkheadWait(), properties.classes());
+    }
+
+    static AdmissionProperties withBulkheadWait(AdmissionProperties properties, java.time.Duration wait) {
+        return new AdmissionProperties(properties.account(), properties.address(), properties.trackedPrincipals(),
+                wait, properties.classes());
     }
 
     static AdmissionProperties withClass(AdmissionProperties properties, String demandClass,
@@ -40,6 +45,6 @@ final class ShippedAdmission {
             classes.put(demandClass, decision);
         }
         return new AdmissionProperties(properties.account(), properties.address(), properties.trackedPrincipals(),
-                classes);
+                properties.bulkheadWait(), classes);
     }
 }

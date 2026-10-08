@@ -10,6 +10,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,6 +22,7 @@ class AdmissionControl implements HandlerInterceptor {
     private final RequestBudgets budgets;
     private final RequestBudget accountBudget;
     private final RequestBudget addressBudget;
+    private final Duration bulkheadWait;
     private final SecurityEventLog securityEvents;
 
     AdmissionControl(AdmissionPlan plan, RequestBudgets budgets, AdmissionProperties properties,
@@ -29,6 +31,7 @@ class AdmissionControl implements HandlerInterceptor {
         this.budgets = budgets;
         this.accountBudget = properties.account().budget();
         this.addressBudget = properties.address().budget();
+        this.bulkheadWait = properties.bulkheadWait();
         this.securityEvents = securityEvents;
     }
 
@@ -51,7 +54,7 @@ class AdmissionControl implements HandlerInterceptor {
         });
         if (admission.bulkhead().isPresent()) {
             Bulkhead bulkhead = admission.bulkhead().orElseThrow();
-            if (!bulkhead.tryEnter(principal)) {
+            if (!bulkhead.tryEnter(principal, bulkheadWait)) {
                 budgets.refund(principal, budget, admission.cost());
                 securityEvents.controlRefused(account.orElse(null), SecurityEventLog.ControlRefusal.OPERATION_CAPACITY);
                 throw new OperationCapacityExhaustedException();

@@ -528,7 +528,8 @@ a caller without an account that of its client address, where an IPv6 address co
 An operation costs what its class in the resource demand inventory costs, from 1 token for ordinary
 work to 20 for exports and imports. Demanding classes such as series, exports, imports, log search
 and logo normalization also run only as often in parallel as their class allows, and one principal
-holds at most one of those places at a time. Booking writes are deliberately not capped in
+holds at most one of those places at a time: a principal's further requests of that class wait up to
+five seconds for it, so a page that asks for several reports at once gets them one after another. Booking writes are deliberately not capped in
 parallel, so a busy booking morning is decided by the database rather than refused. A request beyond
 its budget answers `429` `urn:courtside:error:request-rate-limited`, one beyond its class's capacity
 `429` `urn:courtside:error:operation-capacity-exhausted` and keeps its tokens; both carry
