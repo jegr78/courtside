@@ -1984,6 +1984,7 @@ test("given a native decoder failure, when the run stops, then the private evide
     // then
     assert.deepEqual(JSON.parse(readFileSync(join(directory, "decoder-binding-native.json"), "utf8")).failures,
       { decoderBinding: { name: "Error", message: "private decoder failure" } }, "the binding step keeps why it is missing");
+    assert.ok(readdirSync(directory).includes("failure-reason-native.json"), "an incomplete step must leave failure-reason-native.json behind");
     assert.deepEqual(JSON.parse(readFileSync(join(directory, "failure-reason-native.json"), "utf8")),
       { name: "Error", message: "Resource-abuse publication native binding incomplete" },
       "the catch-all keeps the error it replaces with its incomplete code");
@@ -1999,6 +2000,7 @@ test("given a snapshot that fails before pressure, when the run stops, then the 
     // when
     await assert.rejects(harness.run(), error => error.message === "Resource-abuse observation incomplete");
     // then
+    assert.ok(readdirSync(directory).includes("failure-reason-native.json"), "an incomplete step must leave failure-reason-native.json behind");
     assert.deepEqual(JSON.parse(readFileSync(join(directory, "failure-reason-native.json"), "utf8")),
       { name: "Error", message: "private snapshot failure" }, "an incomplete run must not need a rerun to learn why");
     assert.doesNotMatch(readFileSync(join(directory, "failure.json"), "utf8"), /private snapshot failure/);
@@ -2014,6 +2016,7 @@ test("given missing telemetry and a malformed scanner summary, when the run fini
     // when
     await harness.run().catch(() => {});
     // then
+    assert.ok(readdirSync(directory).includes("step-failures-native.json"), "an incomplete step must leave step-failures-native.json behind");
     const failures = JSON.parse(readFileSync(join(directory, "step-failures-native.json"), "utf8"));
     assert.deepEqual(failures.gatewayTelemetry, { name: "Error", message: "private metrics failure" },
       "missing telemetry keeps why it could not be read");

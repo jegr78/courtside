@@ -837,6 +837,7 @@ test("given a restart command that fails, when recovery is incomplete, then the 
   const result = await cleanupAndRecoverResourceRuntime({ effects });
   // then
   assert.equal(result.outcome, "incomplete");
+  assert.ok(readdirSync(h.directory).includes("failure-reason-native.json"), "an incomplete step must leave failure-reason-native.json behind");
   const reason = JSON.parse(readFileSync(join(h.directory, "failure-reason-native.json"), "utf8"));
   assert.equal(typeof reason.name, "string", "the recovery that stopped must name the error that stopped it");
   assert.ok(reason.message.length > 0 && reason.message.length <= 201, "the reason is kept and bounded");
@@ -850,6 +851,7 @@ test("given an evidence budget that stops the observation, when effects are inco
   const effects = await observeResourceEffects(h.options);
   // then
   assert.equal(effects.outcome, "incomplete");
+  assert.ok(readdirSync(h.directory).includes("failure-reason-native.json"), "an incomplete step must leave failure-reason-native.json behind");
   assert.deepEqual(JSON.parse(readFileSync(join(h.directory, "failure-reason-native.json"), "utf8")),
     { name: "Error", message: "evidence-budget-exceeded" }, "an observation that ran out of budget says so");
 });
@@ -932,6 +934,7 @@ test("given an early failure with a reason, when retaining it, then the private 
     reason: { name: "Error", message: "Owned security process failed (1): no such container" } });
   // then
   assert.equal(result.outcome, "incomplete");
+  assert.ok(readdirSync(h.directory).includes("failure-reason-native.json"), "an incomplete step must leave failure-reason-native.json behind");
   assert.deepEqual(JSON.parse(readFileSync(join(h.directory, "failure-reason-native.json"), "utf8")),
     { name: "Error", message: "Owned security process failed (1): no such container" },
     "an incomplete observation must keep why it stopped instead of only that it stopped");

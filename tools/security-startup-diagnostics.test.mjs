@@ -256,6 +256,7 @@ test("given a capture command that throws, when capture fails, then the private 
     // then
     assert.equal(result.cause, "unexpected-failure", "the shared result names the kind of failure without its text");
     assert.equal(JSON.stringify(result).includes("ExampleSecret"), false);
+    assert.ok(readdirSync(f.input.directory).includes("failure-reason.json"), "a failed capture must leave its reason behind");
     const reason = JSON.parse(readFileSync(join(f.input.directory, "failure-reason.json"), "utf8"));
     assert.deepEqual(reason, { name: "Error", message: "ExampleSecret" },
       "the private evidence must say why the capture is incomplete");
