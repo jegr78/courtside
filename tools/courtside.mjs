@@ -28,6 +28,7 @@ import { immutableImageSelection, inspectReusableImages, verifyReusableImages,
   assertPerformanceReuse, resetPerformanceReuse, boundedImageCommand, cleanupPerformanceRunner,
   assertPerformanceStateOwnership } from "./immutable-image-reuse.mjs";
 import { runOwnedProcess } from "./security-passive-deployment.mjs";
+import { failureReason } from "./failure-reason.mjs";
 import { containerIdentity, createMailCertificate } from "./mail-relay-certificate.mjs";
 import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
 import { isGitHubLogin } from "./nightly-failure-tracker.mjs";
@@ -1357,17 +1358,20 @@ async function runFunnelPerformance(options) {
   if (runFailure) throw runFailure;
 }
 
-async function remoteJsonRequest(origin, path) {
+export async function remoteJsonRequest(origin, path,
+  { resolve = resolvePublicFunnelAddresses, request = pinnedJsonRequest } = {}) {
   const target = new URL(origin);
-  const addresses = await resolvePublicFunnelAddresses(target.hostname);
+  const addresses = await resolve(target.hostname);
+  const failures = [];
   for (const address of addresses) {
     try {
-      return await pinnedJsonRequest(target, path, address);
-    } catch {
-      continue;
+      return await request(target, path, address);
+    } catch (error) {
+      const { name, message } = failureReason(error);
+      failures.push(`${address.address} ${name}: ${message}`);
     }
   }
-  throw new Error("The Funnel target could not be reached through a validated public address");
+  throw new Error(`The Funnel target could not be reached through a validated public address: ${failures.join("; ")}`);
 }
 
 function pinnedJsonRequest(target, path, resolvedAddress) {

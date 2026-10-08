@@ -3,6 +3,7 @@ export const securityMailObservationSource = Object.freeze({
   commit: "ae3d9e20e410bf2af1c1b7292bc3b8491b41b30a",
   imageDigest: "sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d"
 });
+import { failureCode } from "./failure-reason.mjs";
 
 export const securityMailObservationLimits = Object.freeze({
   messages: 100, rawBytes: 262144, totalRawBytes: 4 * 1024 * 1024,
@@ -188,8 +189,8 @@ export async function captureSecurityMailBaseline({ runId, command, identity } =
     const findings = messages.length === limits.messages ? ["mail-capacity-reached"] : [];
     return { status: findings.length ? "incomplete" : "complete", runId,
       messageIds: messages.map(({ id }) => id), findings, identity: ctx.identity, runtimeBinding: ctx.runtimeBinding };
-  } catch {
-    return { status: "incomplete", messageIds: [], findings: ["mail-baseline-incomplete"] };
+  } catch (failure) {
+    return { status: "incomplete", messageIds: [], findings: ["mail-baseline-incomplete"], causes: [failureCode(failure)] };
   }
 }
 
@@ -221,8 +222,9 @@ function fingerprint(messages) {
 export async function observeSecurityMail({ runId, command, baseline, identity } = {}) {
   const receipts = [];
   const findings = new Set();
+  const causes = new Set();
   const finish = () => ({ status: findings.size ? "incomplete" : "complete", receipts,
-    findings: [...findings] });
+    findings: [...findings], ...(causes.size ? { causes: [...causes] } : {}) });
   if (!validBaseline(baseline, runId) || identity !== undefined && (!validIdentity(identity)
     || identity.seedFingerprint !== baseline.identity.seedFingerprint
     || identity.instanceFingerprint !== baseline.identity.instanceFingerprint)) {
@@ -256,15 +258,17 @@ export async function observeSecurityMail({ runId, command, baseline, identity }
         const parsed = json(await output(ctx, ["exec", "-i", `${ctx.project}-scanner-gateway-1`,
           "python3", "/opt/courtside/security-mail-receipt.py"], limits.receiptBytes, raw));
         receipts.push(receipt(parsed, message));
-      } catch {
+      } catch (failure) {
         findings.add("mail-message-incomplete");
+        causes.add(failureCode(failure));
       }
     }
     if (fingerprint(messages) !== fingerprint(await mailbox(ctx))) findings.add("mail-snapshot-changed");
     await trustedSink(ctx, baseline.runtimeBinding);
-  } catch {
+  } catch (failure) {
     receipts.splice(0, receipts.length);
     findings.add("mail-observation-incomplete");
+    causes.add(failureCode(failure));
   }
   const counts = new Map();
   const bookings = new Map();

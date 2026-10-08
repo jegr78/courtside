@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync, symlinkSync, realpathSync, mkdtempSync, mk
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createResourceEvidence, writeNativeEvidence, retainResourceEvidenceFailure } from "./security-resource-runtime.mjs";
+import { attemptStep, failureReason } from "./failure-reason.mjs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
@@ -522,6 +523,7 @@ function startupFailureHarness({ captureFailure = false, cleanupFailure = false,
         events.push("startup-failed"); throw failure;
       }
     },
+    failureReason,
     captureSecurityStartupDiagnostics: input => {
       events.push("capture");
       captureAttempts.push(input.attempt);
@@ -727,7 +729,7 @@ function resourceIntegrationHarness({ processFailure = false, effectsOutcome = "
       return {};
     },
     writeNativeEvidence: privateRoot ? writeNativeEvidence : (handle, entry) => writes.push(entry),
-    retainResourceEvidenceFailure,
+    retainResourceEvidenceFailure, attemptStep, failureReason,
     securityProject, securityComposeArgs, securityAssessmentReservationArgs, resourceSessionDecoderPlan, resourceAuthenticationPolicy, resourcePublicationPolicy, resourcePublicationProjection,
     readSecurityEnvironment: () => environment, mergeSecurityProcessEnvironment,
     scannerRuntimeOwned: value => !value.foreign, scannerRuntimeHardened: () => true,
@@ -1969,4 +1971,55 @@ test("given the security Compose file, when the run samples the meter registry, 
   assert.match(compose, /MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus,mappings/);
   assert.match(compose, /COURTSIDE_PERFORMANCE_TELEMETRY_ENABLED: "true"/);
   assert.match(environment, /id: "meter-registry-separation"[\s\S]*?meters === "200" && metersFromOutside === "404"/);
+});
+
+test("given a native decoder failure, when the run stops, then the private evidence names the failed step and the stopping error", async () => {
+  // given
+  const privateRoot = mkdtempSync(join(tmpdir(), "courtside-retention-"));
+  const harness = resourceIntegrationHarness({ privateRoot, decoderFailure: true });
+  const directory = join(privateRoot, "run-0001", "resource-abuse", "attempt-1");
+  try {
+    // when
+    await assert.rejects(harness.run(), /^Error: Resource-abuse observation incomplete$/);
+    // then
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, "decoder-binding-native.json"), "utf8")).failures,
+      { decoderBinding: { name: "Error", message: "private decoder failure" } }, "the binding step keeps why it is missing");
+    assert.ok(readdirSync(directory).includes("failure-reason-native.json"), "an incomplete step must leave failure-reason-native.json behind");
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, "failure-reason-native.json"), "utf8")),
+      { name: "Error", message: "Resource-abuse publication native binding incomplete" },
+      "the catch-all keeps the error it replaces with its incomplete code");
+  } finally { rmSync(privateRoot, { recursive: true, force: true }); }
+});
+
+test("given a snapshot that fails before pressure, when the run stops, then the private failure reason keeps the original error", async () => {
+  // given
+  const privateRoot = mkdtempSync(join(tmpdir(), "courtside-retention-"));
+  const harness = resourceIntegrationHarness({ privateRoot, earlyFailure: "before" });
+  const directory = join(privateRoot, "run-0001", "resource-abuse", "attempt-1");
+  try {
+    // when
+    await assert.rejects(harness.run(), error => error.message === "Resource-abuse observation incomplete");
+    // then
+    assert.ok(readdirSync(directory).includes("failure-reason-native.json"), "an incomplete step must leave failure-reason-native.json behind");
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, "failure-reason-native.json"), "utf8")),
+      { name: "Error", message: "private snapshot failure" }, "an incomplete run must not need a rerun to learn why");
+    assert.doesNotMatch(readFileSync(join(directory, "failure.json"), "utf8"), /private snapshot failure/);
+  } finally { rmSync(privateRoot, { recursive: true, force: true }); }
+});
+
+test("given missing telemetry and a malformed scanner summary, when the run finishes, then the private evidence names both failed reads", async () => {
+  // given
+  const privateRoot = mkdtempSync(join(tmpdir(), "courtside-retention-"));
+  const harness = resourceIntegrationHarness({ privateRoot, missingTelemetry: true, malformedSummary: true });
+  const directory = join(privateRoot, "run-0001", "resource-abuse", "attempt-1");
+  try {
+    // when
+    await harness.run().catch(() => {});
+    // then
+    assert.ok(readdirSync(directory).includes("step-failures-native.json"), "an incomplete step must leave step-failures-native.json behind");
+    const failures = JSON.parse(readFileSync(join(directory, "step-failures-native.json"), "utf8"));
+    assert.deepEqual(failures.gatewayTelemetry, { name: "Error", message: "private metrics failure" },
+      "missing telemetry keeps why it could not be read");
+    assert.equal(failures.scannerSummary?.name, "SyntaxError", "a malformed summary keeps the parse failure");
+  } finally { rmSync(privateRoot, { recursive: true, force: true }); }
 });

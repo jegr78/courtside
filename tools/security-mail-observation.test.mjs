@@ -237,6 +237,31 @@ test("given command failures containing secrets, when collection fails, then ret
   assert.doesNotMatch(JSON.stringify(result), /password|private-token|jane@example/);
 });
 
+test("given a failed baseline collection, when it is reported, then it names the failure without its text", async () => {
+  // given
+  const secret = harness({ failure: "password=private-token To: jane@example.org" });
+  const coded = harness({ failure: "mail-list-incomplete" });
+  // when
+  const fromText = await captureSecurityMailBaseline({ runId, command: secret.command, identity });
+  const fromCode = await captureSecurityMailBaseline({ runId, command: coded.command, identity });
+  // then
+  assert.deepEqual(fromText.causes, ["Error"], "a failure with free text is named by its type alone");
+  assert.deepEqual(fromCode.causes, ["mail-list-incomplete"], "a failure the module coded keeps its code");
+  assert.doesNotMatch(JSON.stringify(fromText), /password|private-token|jane@example/);
+});
+
+test("given a failed collection after a valid baseline, when observing mail, then it names the failure without its text", async () => {
+  // given
+  const baseline = await harness().baseline();
+  const failing = harness({ failure: "password=private-token To: jane@example.org" });
+  // when
+  const result = await observeSecurityMail({ runId, command: failing.command, baseline });
+  // then
+  assert.equal(result.status, "incomplete");
+  assert.deepEqual(result.causes, ["Error"], "the observation says it failed on an error instead of only that it failed");
+  assert.doesNotMatch(JSON.stringify(result), /password|private-token|jane@example/);
+});
+
 test("given native message summaries with missing creation times, when collecting mail, then never substitute the sender date or current time", async () => {
   // given
   for (const Created of [undefined, "", "2099-02-30T12:00:00Z", "2026-10-08T25:00:00Z", "not-a-date"]) {

@@ -829,6 +829,45 @@ test("given native command errors containing secrets, when cleanup or restart fa
   }
 });
 
+test("given a restart command that fails, when recovery is incomplete, then the native record keeps the failure while the proof stays sanitized", async () => {
+  // given
+  const h = await harness(fixture(), { restartFailure: true });
+  const effects = await observeResourceEffects(h.options);
+  // when
+  const result = await cleanupAndRecoverResourceRuntime({ effects });
+  // then
+  assert.equal(result.outcome, "incomplete");
+  assert.ok(readdirSync(h.directory).includes("failure-reason-native.json"), "an incomplete step must leave failure-reason-native.json behind");
+  const reason = JSON.parse(readFileSync(join(h.directory, "failure-reason-native.json"), "utf8"));
+  assert.equal(typeof reason.name, "string", "the recovery that stopped must name the error that stopped it");
+  assert.ok(reason.message.length > 0 && reason.message.length <= 201, "the reason is kept and bounded");
+  assert.doesNotMatch(readFileSync(join(h.directory, "failure.json"), "utf8"), /example-secret|private recovery/);
+});
+
+test("given an evidence budget that stops the observation, when effects are incomplete, then the native record says which limit stopped it", async () => {
+  // given
+  const h = await harness(); h.options.evidenceLimitBytes = 16384;
+  // when
+  const effects = await observeResourceEffects(h.options);
+  // then
+  assert.equal(effects.outcome, "incomplete");
+  assert.ok(readdirSync(h.directory).includes("failure-reason-native.json"), "an incomplete step must leave failure-reason-native.json behind");
+  assert.deepEqual(JSON.parse(readFileSync(join(h.directory, "failure-reason-native.json"), "utf8")),
+    { name: "Error", message: "evidence-budget-exceeded" }, "an observation that ran out of budget says so");
+});
+
+test("given a session projection that throws, when observing effects, then the retained projection names the failure without its text", async () => {
+  // given
+  const h = await harness();
+  h.options.projectAuthentication = async () => { throw new TypeError("session_id=ExampleSession"); };
+  // when
+  await observeResourceEffects(h.options);
+  // then
+  const projection = readFileSync(join(h.directory, "sessions-001.json"), "utf8");
+  assert.equal(JSON.parse(projection).cause, "TypeError", "an empty session projection must say why it is empty");
+  assert.doesNotMatch(projection, /ExampleSession/);
+});
+
 test("given a rejected whole native decoder result, when observing effects, then keep its failure dominant without exposing private diagnostics", async () => {
   // given
   const h = await harness();
@@ -884,6 +923,35 @@ test("given a native baseline before pressure, when a later command fails, then 
   assert.equal(statSync(h.directory).mode & 0o777, 0o700);
   for (const name of readdirSync(h.directory)) assert.equal(statSync(join(h.directory, name)).mode & 0o777, 0o600);
   assert.throws(() => writeNativeEvidence(handle, { name: "k6-stderr.log", value: "late", bound: 100 }));
+});
+
+test("given an early failure with a reason, when retaining it, then the private record keeps the error name and message", async () => {
+  // given
+  const h = await harness();
+  const handle = createResourceEvidence({ directory: h.directory, maximumBytes: h.options.evidenceLimitBytes });
+  // when
+  const result = retainResourceEvidenceFailure(handle, { runId, attempt: 1, phase: "environment",
+    reason: { name: "Error", message: "Owned security process failed (1): no such container" } });
+  // then
+  assert.equal(result.outcome, "incomplete");
+  assert.ok(readdirSync(h.directory).includes("failure-reason-native.json"), "an incomplete step must leave failure-reason-native.json behind");
+  assert.deepEqual(JSON.parse(readFileSync(join(h.directory, "failure-reason-native.json"), "utf8")),
+    { name: "Error", message: "Owned security process failed (1): no such container" },
+    "an incomplete observation must keep why it stopped instead of only that it stopped");
+  assert.doesNotMatch(readFileSync(join(h.directory, "failure.json"), "utf8"), /no such container/,
+    "the reason stays in the native record and out of the sanitized failure proof");
+  assert.equal(statSync(join(h.directory, "failure-reason-native.json")).mode & 0o777, 0o600);
+});
+
+test("given a reason that is not a bounded name and message, when retaining a failure, then no reason record is written", async () => {
+  // given
+  const h = await harness();
+  const handle = createResourceEvidence({ directory: h.directory, maximumBytes: h.options.evidenceLimitBytes });
+  // when
+  retainResourceEvidenceFailure(handle, { runId, attempt: 1, phase: "environment", reason: { name: "Error", message: "x".repeat(400) } });
+  // then
+  assert.equal(readdirSync(h.directory).includes("failure-reason-native.json"), false,
+    "only a reason already bounded by failureReason may enter the evidence");
 });
 
 test("given a persisted native evidence handle, when observing and recovering, then adopt its single budget and include the early inputs in the phase chain", async () => {

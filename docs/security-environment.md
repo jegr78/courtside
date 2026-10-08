@@ -148,7 +148,11 @@ Keep them in mode-`0700` instance directories with mode-`0600` files under ignor
 never upload them with normalized assessment reports. Retained relay assets belong to their
 original instance and are not reused by a fresh instance with the same run ID. Native inputs persist
 before pressure under the same bounded evidence budget as later observations, including on early
-failure. Use the exact
+failure. A step that ends incomplete keeps its error name and a message cut to 200 characters in the
+private evidence: `failure-reason-native.json` for the run, `step-failures-native.json` for telemetry
+and the scanner summary, `failures` in `decoder-binding-native.json`, and `failure-reason.json` beside
+the startup diagnostics. Assessment results that leave the private directory carry only a stable
+code or the error's type. Use the exact
 `security-reset` confirmation above to remove retained private evidence after its review.
 
 To replay an OpenAPI candidate, keep its protected `openapi-fuzz.json`, start a fresh environment with the recorded application image, and run the recorded active profile against the unchanged image, policy, OpenAPI digest and seed. Locate the new counterexample by operation, mode, check, case ID and request locations, then compare its structural `reason`. The reproduction digest matches only when those structural inputs match. Concrete query, path and body values are deliberately not retained; replay regenerates them from the pinned scanner and seed. The same exact status disagreement, public instance pointer and missing public properties, or media-type classification validates the structural defect. Never copy a discarded raw Schemathesis report into retained evidence.

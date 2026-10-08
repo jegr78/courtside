@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 import { resourceIntegritySnapshotFingerprint, resourceSessionAttributeDigest } from "./security-resource-integrity.mjs";
+import { failureCode } from "./failure-reason.mjs";
 
 const classRoot = "/app/BOOT-INF/classes/org/courtside/securityassessment/SecuritySessionAttributeProjection";
 export const resourceSessionProjectionClassPaths = Object.freeze([
@@ -24,10 +25,11 @@ const object = (value) => value !== null && typeof value === "object" && !Array.
 const exact = (value, keys) => object(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
 
 class EvidenceRejection extends Error {
-  constructor(code, outcome = "incomplete") {
+  constructor(code, outcome = "incomplete", cause = undefined) {
     super(code);
     this.code = code;
     this.outcome = outcome;
+    this.failureCause = cause;
   }
 }
 
@@ -203,7 +205,7 @@ function validateBinding(binding) {
 async function output(command, args, options) {
   let result;
   try { result = await command(args, options); }
-  catch { throw new EvidenceRejection("session-decoder-execution-incomplete"); }
+  catch (failure) { throw new EvidenceRejection("session-decoder-execution-incomplete", "incomplete", failureCode(failure)); }
   requireEvidence(result && (result.exitCode === undefined || result.exitCode === 0)
     && !result.truncated && !result.timedOut
     && (result.code === undefined || result.code === 0) && typeof result.stdout === "string"
@@ -321,7 +323,7 @@ function sessionPlan(input, owned) {
       "authentication-session-attributes-incomplete");
     for (const attribute of entry.attributes) {
       try { resourceSessionAttributeDigest(attribute.attribute_bytes); }
-      catch { throw new EvidenceRejection("authentication-session-attribute-bytes-incomplete"); }
+      catch (failure) { throw new EvidenceRejection("authentication-session-attribute-bytes-incomplete", "incomplete", failureCode(failure)); }
     }
   }
   return { plan, ownedPrimary: [...ownedPrimary].sort() };
@@ -366,7 +368,7 @@ export async function captureResourceAuthentication(options, command) {
     try {
       resourceIntegritySnapshotFingerprint(input.before);
       resourceIntegritySnapshotFingerprint(input.effects);
-    } catch { throw new EvidenceRejection("authentication-snapshot-incomplete"); }
+    } catch (failure) { throw new EvidenceRejection("authentication-snapshot-incomplete", "incomplete", failureCode(failure)); }
     const { journal, owned } = prepareJournal(input);
     const { plan, ownedPrimary } = sessionPlan(input, owned);
     const runtimeBinding = await mountedBinding(input, command);
@@ -393,6 +395,8 @@ export async function captureResourceAuthentication(options, command) {
     return { schemaVersion: 1, outcome: error instanceof EvidenceRejection ? error.outcome : "incomplete",
       journal: null, authentication: null, ownedSessionIds: [], loginUsernames: [],
       runtimeBinding: null, runtimeDigest: null, privateProof: null,
-      findings: [{ code: error instanceof EvidenceRejection ? error.code : "authentication-evidence-incomplete" }] };
+      findings: [error instanceof EvidenceRejection
+        ? { code: error.code, ...(error.failureCause ? { cause: error.failureCause } : {}) }
+        : { code: "authentication-evidence-incomplete", cause: failureCode(error) }] };
   }
 }
