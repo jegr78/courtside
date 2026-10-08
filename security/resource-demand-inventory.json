@@ -308,12 +308,34 @@
       ]
     },
     {
-      "id": "bulk-report-and-export",
+      "id": "bulk-export",
       "kind": "demanding",
       "entryPoints": [
         "exportBookings",
         "exportPersonData",
-        "exportRoster",
+        "exportRoster"
+      ],
+      "growthDrivers": "Roster export grows with matching members, subject access with one person's retained history, and booking export with allocations in the selected period.",
+      "inputOrDataBound": "Booking export periods stop at 366 days and subject access stops at one person. Roster and retained person history have no row ceiling beyond the club's own data set.",
+      "concurrencyOrRateBound": "Admission control runs at most two exports at a time per instance, one per caller, and charges 20 tokens of the caller's request budget.",
+      "executionModel": "The application reads and renders each response synchronously; roster pagination uses pages of 200 internally before constructing one response file.",
+      "failureBehavior": "Invalid periods and encodings fail before export; a database or rendering failure returns no successful file rather than a partial application state change.",
+      "consumerTimeoutBehavior": "The reference proxy sets no shorter response timeout. Client cancellation can discard the response but is not claimed to cancel every database or rendering step.",
+      "productionPaths": [
+        "src/main/java/org/courtside/dataexchange/internal/BookingExportService.java",
+        "src/main/java/org/courtside/dataexchange/internal/RosterExportService.java",
+        "src/main/java/org/courtside/dataexchange/internal/SubjectAccessService.java",
+        "src/main/java/org/courtside/shared/web/AdmissionControl.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/dataexchange/internal/RosterExportServiceTest.java#givenMorePeopleThanOnePageHolds_whenTheRosterIsExported_thenTheFileHoldsEveryOne",
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
+      ]
+    },
+    {
+      "id": "statistics-reads",
+      "kind": "demanding",
+      "entryPoints": [
         "facilityUtilisation",
         "readStatisticsRange",
         "readUtilisationStatistics",
@@ -321,17 +343,14 @@
         "readMemberStatistics",
         "readMessageStatistics"
       ],
-      "growthDrivers": "Roster export grows with matching members, subject access with one person's retained history, booking export and reporting with allocations in the selected period, and statistics with allocations, members, accounts and messages in the period plus one progression bucket per week or month of it.",
-      "inputOrDataBound": "Booking export and utilisation report periods stop at 366 days and subject access stops at one person. Statistics periods stop at 36,525 days in the years 0001 to 9999, so the progression answers at most about 1,200 monthly buckets. Open time is computed per weekday and per daylight-saving change rather than per day. Each allocation is clipped to the period before it is split into days and open hours, so that splitting is bounded by the period even though an allocation itself has no length ceiling. Every statistics read runs under a 30-second statement timeout. Roster and retained person history have no row ceiling beyond the club's own data set.",
-      "concurrencyOrRateBound": "Admission control runs at most two of these administrator reads at a time per instance and charges 20 tokens of the caller's request budget; statistics reads also stop at their 30-second statement timeout.",
-      "executionModel": "The application reads and renders each response synchronously; roster pagination uses pages of 200 internally before constructing one response file.",
-      "failureBehavior": "Invalid periods and encodings fail before export; a database or rendering failure returns no successful file rather than a partial application state change.",
+      "growthDrivers": "Utilisation reports grow with allocations in the selected period, and statistics with allocations, members, accounts and messages in the period plus one progression bucket per week or month of it.",
+      "inputOrDataBound": "Utilisation report periods stop at 366 days. Statistics periods stop at 36,525 days in the years 0001 to 9999, so the progression answers at most about 1,200 monthly buckets. Open time is computed per weekday and per daylight-saving change rather than per day. Each allocation is clipped to the period before it is split into days and open hours, so that splitting is bounded by the period even though an allocation itself has no length ceiling. Every statistics read runs under a 30-second statement timeout.",
+      "concurrencyOrRateBound": "Admission control runs at most two of these administrator reads at a time per instance, one per caller with the caller's further reads waiting their turn, and charges 5 tokens of the caller's request budget; statistics reads also stop at their 30-second statement timeout.",
+      "executionModel": "The application computes and returns each report synchronously; a statistics page asks for its sections separately.",
+      "failureBehavior": "Invalid periods fail before any query; a database failure returns no partial report and changes no application state.",
       "consumerTimeoutBehavior": "The reference proxy sets no shorter response timeout. Client cancellation can discard the response but is not claimed to cancel every database or rendering step.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/FacilityUtilisationService.java",
-        "src/main/java/org/courtside/dataexchange/internal/BookingExportService.java",
-        "src/main/java/org/courtside/dataexchange/internal/RosterExportService.java",
-        "src/main/java/org/courtside/dataexchange/internal/SubjectAccessService.java",
         "src/main/java/org/courtside/reporting/internal/StatisticsService.java",
         "src/main/java/org/courtside/booking/internal/BookingStatisticsService.java",
         "src/main/java/org/courtside/member/internal/MembershipStatisticsService.java",
@@ -341,7 +360,6 @@
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/web/FacilityUtilisationControllerTest.java#givenMoreThan366Days_whenReportingUtilisation_thenThePeriodLimitIsReturned",
-        "src/test/java/org/courtside/dataexchange/internal/RosterExportServiceTest.java#givenMorePeopleThanOnePageHolds_whenTheRosterIsExported_thenTheFileHoldsEveryOne",
         "src/test/java/org/courtside/reporting/StatisticsQueryBudgetTest.java#givenMoreBookingsCourtsAndARetiredCourt_whenReadingEverySection_thenTheStatementCountStaysTheSame",
         "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAHundredYearsAndADay_whenReadingUtilisation_thenThePeriodIsRefusedAsTooLong",
         "src/test/java/org/courtside/reporting/web/StatisticsStatementTimeoutTest.java#givenEveryStatisticsRead_whenItQueriesTheDatabase_thenItsTransactionCarriesTheStatementTimeout",

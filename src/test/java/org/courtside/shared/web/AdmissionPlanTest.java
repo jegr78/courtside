@@ -26,13 +26,22 @@ class AdmissionPlanTest {
                 Map.entry("searchRoster", Optional.empty()),
                 Map.entry("previewSeries", Optional.of(2)),
                 Map.entry("exportBookings", Optional.of(2)),
+                Map.entry("readUtilisationStatistics", Optional.of(2)),
                 Map.entry("uploadClubLogo", Optional.of(1)),
                 Map.entry("courtImpact", Optional.of(2)),
                 Map.entry("endAllSessions", Optional.of(1)));
-        Map<String, Integer> costByOperation = Map.of(
-                "changeOwnPassword", 5, "executeImportPreview", 20, "searchOperationalLogs", 10,
-                "createBooking", 2, "searchRoster", 2, "previewSeries", 10, "exportBookings", 20,
-                "uploadClubLogo", 10, "courtImpact", 5, "endAllSessions", 5);
+        Map<String, Integer> costByOperation = Map.ofEntries(
+                Map.entry("changeOwnPassword", 5),
+                Map.entry("executeImportPreview", 20),
+                Map.entry("searchOperationalLogs", 10),
+                Map.entry("createBooking", 2),
+                Map.entry("searchRoster", 2),
+                Map.entry("previewSeries", 10),
+                Map.entry("exportBookings", 20),
+                Map.entry("readUtilisationStatistics", 5),
+                Map.entry("uploadClubLogo", 10),
+                Map.entry("courtImpact", 5),
+                Map.entry("endAllSessions", 5));
 
         // when
         AdmissionPlan plan = load(ShippedAdmission.defaults());

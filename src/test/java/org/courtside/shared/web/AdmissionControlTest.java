@@ -197,6 +197,31 @@ class AdmissionControlTest {
     }
 
     @Test
+    void givenTheShippedBudgets_whenAnAdministratorOpensTheOverviewAndTheStatisticsAndChangesThePeriod_thenNothingIsRefused()
+            throws Exception {
+        // given
+        AdmissionProperties shipped = ShippedAdmission.defaults();
+        AdmissionControl control = new AdmissionControl(AdmissionPlan.load(shipped, JsonMapper.builder().build()),
+                new RequestBudgets(100, now::get), shipped, securityEvents);
+        signIn(JANE);
+        List<String> overview = List.of("readUtilisationStatistics", "readBookingStatistics", "readMemberStatistics");
+        List<String> statistics = List.of("readStatisticsRange", "readUtilisationStatistics", "readBookingStatistics",
+                "readMemberStatistics", "readMessageStatistics");
+
+        // when / then
+        assertThatCode(() -> {
+            for (List<String> page : List.of(overview, statistics, statistics, statistics)) {
+                for (String operation : page) {
+                    HttpServletRequest request = request();
+                    control.preHandle(request, new MockHttpServletResponse(), reportOperation(operation));
+                    control.afterCompletion(request, new MockHttpServletResponse(), reportOperation(operation), null);
+                }
+            }
+        }).as("a board looking at its figures at human speed never meets its own budget")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void givenAnUnclassifiedHandler_whenRequested_thenItCostsOneTokenAndHasNoBulkhead() throws Exception {
         // given
         AdmissionControl control = control(20, 1);
@@ -212,6 +237,27 @@ class AdmissionControlTest {
         assertThat(admitted).as("twenty tokens admit twenty unclassified requests, all in parallel").isTrue();
         assertThatThrownBy(() -> control.preHandle(request(), new MockHttpServletResponse(), operation("unknownOperation")))
                 .isInstanceOf(RequestRateLimitedException.class);
+    }
+
+    private static HandlerMethod reportOperation(String name) throws NoSuchMethodException {
+        return new HandlerMethod(new ReportOperations(), ReportOperations.class.getDeclaredMethod(name));
+    }
+
+    static class ReportOperations {
+        void readStatisticsRange() {
+        }
+
+        void readUtilisationStatistics() {
+        }
+
+        void readBookingStatistics() {
+        }
+
+        void readMemberStatistics() {
+        }
+
+        void readMessageStatistics() {
+        }
     }
 
     static class Operations {

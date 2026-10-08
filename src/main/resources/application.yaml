@@ -116,14 +116,15 @@ courtside:
       burst: ${COURTSIDE_ADMISSION_ADDRESS_BURST:600}
       per-second: ${COURTSIDE_ADMISSION_ADDRESS_PER_SECOND:60}
     tracked-principals: 50000
-    bulkhead-wait: 5s
+    bulkhead-wait: 15s
     classes:
       password-and-credential-work: { cost: 5 }
       booking-write: { cost: 2 }
       tenant-scaled-reads: { cost: 2 }
       booking-series: { cost: 10, concurrency: 2 }
       administrative-impact-analysis: { cost: 5, concurrency: 2 }
-      bulk-report-and-export: { cost: 20, concurrency: 2 }
+      statistics-reads: { cost: 5, concurrency: 2 }
+      bulk-export: { cost: 20, concurrency: 2 }
       roster-import: { cost: 20, concurrency: 1 }
       operational-log-search: { cost: 10, concurrency: 1 }
       logo-normalization: { cost: 10, concurrency: 1 }
