@@ -493,3 +493,31 @@ for (const flag of ["truncated", "timedOut"]) {
     });
   }
 }
+
+test("given a decoder command that throws, when authentication is captured, then the finding names the failure without its text", async () => {
+  // given
+  const input = fixture();
+  const command = async () => { throw new Error("Owned security process failed (1): session_id=ExampleSession"); };
+  // when
+  const result = await captureResourceAuthentication(input, command);
+  // then
+  assert.equal(result.outcome, "incomplete");
+  assert.deepEqual(result.findings, [{ code: "session-decoder-execution-incomplete", cause: "Error" }],
+    "an incomplete capture names what stopped the decoder");
+  assert.doesNotMatch(JSON.stringify(result), /ExampleSession/, "the decoder's output must not reach the finding");
+});
+
+test("given an unexpected failure inside capture, when it is reported, then the finding names its error type", async () => {
+  // given
+  const input = fixture();
+  const native = executor(input);
+  const command = async (args, options) => args.includes("sha256sum") ? native.command(args, options)
+    : { get stdout() { throw new RangeError("ExampleDetail"); } };
+  // when
+  const result = await captureResourceAuthentication(input, command);
+  // then
+  assert.equal(result.outcome, "incomplete");
+  assert.deepEqual(result.findings, [{ code: "authentication-evidence-incomplete", cause: "RangeError" }],
+    "an error the capture did not expect is named by its type");
+  assert.doesNotMatch(JSON.stringify(result), /ExampleDetail/);
+});

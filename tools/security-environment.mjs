@@ -20,6 +20,7 @@ import { observeResourceEffects, cleanupAndRecoverResourceRuntime, createResourc
 import { captureResourceAuthentication, resourceSessionProjectionClassPaths } from "./security-resource-auth.mjs";
 import { captureSecurityStartupDiagnostics } from "./security-startup-diagnostics.mjs";
 import { inspectReusableImages, verifyReusableImages } from "./immutable-image-reuse.mjs";
+import { attemptStep, failureReason } from "./failure-reason.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
@@ -497,7 +498,9 @@ export async function startSecurityEnvironment(runId, image, selection) {
             cwd: root, env: { ...process.env, ...environment }, timeout: timeoutMilliseconds,
             maxBuffer: outputLimitBytes, stdio: ["ignore", "pipe", "pipe"]
           }) });
-      } catch {}
+      } catch (error) {
+        startupDiagnostics = { ...startupDiagnostics, cause: failureReason(error).name };
+      }
       let cleanupFailed = false;
       try { removeOwnedSecurityEnvironment(runId, identity, { startupFailure: true }); }
       catch { cleanupFailed = true; }
@@ -1197,7 +1200,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
   let privateDirectory;
   let evidenceHandle;
   let pressure;
-  let earlyError = false;
+  let earlyError = null;
   let privateWriteFailure;
   const evidenceLimitBytes = plan.budgets.evidenceMegabytes * 1024 * 1024;
   const privateRecord = (name, value) => {
@@ -1268,9 +1271,9 @@ export async function runResourceAbuse(plan, stopFile, limits) {
     const publicationPolicy = resourcePublicationPolicy(appRuntime, application, classpathText);
     const authenticationPolicy = resourceAuthenticationPolicy(appRuntime, application, classpathText);
     authenticationPolicy.loginPolicy.sourceAddress = sourceAddress;
-    let runtimeBinding = null;
+    const stepFailures = {};
     let publicationBinding = null;
-    try {
+    const runtimeBinding = await attemptStep(stepFailures, "decoderBinding", async () => {
       decoder = decoderPlan.name;
       await command(decoderPlan.args);
       if (immutableImages) {
@@ -1285,11 +1288,11 @@ export async function runResourceAbuse(plan, stopFile, limits) {
         classDigests[path] !== `sha256:${immutableImages.helperClassDigests?.[path]}`)) {
         throw new Error("Immutable SECURITY decoder helper bytes changed");
       }
-      runtimeBinding = { sourceDigest: `sha256:${createHash("sha256").update(readFileSync(join(root,
+      return { sourceDigest: `sha256:${createHash("sha256").update(readFileSync(join(root,
         "src/main/java/org/courtside/securityassessment/SecuritySessionAttributeProjection.java"))).digest("hex")}`, classDigests };
-    } catch { }
+    }) ?? null;
     if (runtimeBinding) {
-      try {
+      publicationBinding = await attemptStep(stepFailures, "publicationBinding", async () => {
         const helperClass = "/app/BOOT-INF/classes/org/courtside/securityassessment/SecurityPublicationPolicyProjection.class";
         const listenerClass = "/app/BOOT-INF/classes/org/courtside/notification/internal/BookingMailer.class";
         const eventClass = "/app/BOOT-INF/classes/org/courtside/shared/BookingConfirmed.class";
@@ -1307,7 +1310,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
           "-cp", ".", "org.springframework.boot.loader.launch.PropertiesLauncher"],
         { outputLimitBytes: 4096, timeoutMilliseconds: 10000 })).stdout;
         const projection = resourcePublicationProjection(projectionOutput, publicationPolicy);
-        publicationBinding = {
+        return {
           sourceDigest: `sha256:${createHash("sha256").update(readFileSync(join(root,
             "src/main/java/org/courtside/securityassessment/SecurityPublicationPolicyProjection.java"))).digest("hex")}`,
           helperClassDigest: decoderClasses[helperClass],
@@ -1316,11 +1319,12 @@ export async function runResourceAbuse(plan, stopFile, limits) {
           decoderClassDigest: decoderClasses[listenerClass], eventClassDigest: candidateClasses[eventClass],
           decoderEventClassDigest: decoderClasses[eventClass], projection
         };
-      } catch { }
+      }) ?? null;
     }
     privateRecord("decoder-binding-native.json", { fixtureId: fixture.Id, candidateId: candidate.Id,
       applicationDigest: `sha256:${createHash("sha256").update(applicationText).digest("hex")}`,
-      classpathDigest: `sha256:${createHash("sha256").update(classpathText).digest("hex")}`, runtimeBinding, publicationBinding });
+      classpathDigest: `sha256:${createHash("sha256").update(classpathText).digest("hex")}`, runtimeBinding, publicationBinding,
+      ...(Object.keys(stepFailures).length ? { failures: { ...stepFailures } } : {}) });
     if (!runtimeBinding || !publicationBinding) throw new Error("Resource-abuse publication native binding incomplete");
     const before = await captureResourceState(command, securityComposeArgs(plan.runId));
     privateRecord("before-native.json", before);
@@ -1367,10 +1371,18 @@ export async function runResourceAbuse(plan, stopFile, limits) {
     const rawJournal = result ? `${result.stdout ?? ""}\n${result.stderr ?? ""}` : String(failure?.message ?? "");
     const journal = parseResourceJournal(rawJournal, { accounts: before.tables.user_account.rows });
     if (failure) journal.complete = false;
-    let metrics = { requests: 0, requestBytes: 0 };
-    let telemetryComplete = false;
-    try { metrics = await scannerGatewayMetrics(gateway, command); telemetryComplete = true; }
-    catch { }
+    const observedMetrics = await attemptStep(stepFailures, "gatewayTelemetry", () => scannerGatewayMetrics(gateway, command));
+    const telemetryComplete = observedMetrics !== undefined;
+    const metrics = observedMetrics ?? { requests: 0, requestBytes: 0 };
+    const summary = await attemptStep(stepFailures, "scannerSummary", async () => {
+      if (!await containerFileExists(scanner, "/results/summary.json", command)) return null;
+      const parsed = JSON.parse((await command(["exec", scanner, "cat", "/results/summary.json"])).stdout);
+      return Array.isArray(parsed?.checks) ? parsed : null;
+    }) ?? null;
+    if (stepFailures.gatewayTelemetry || stepFailures.scannerSummary) {
+      privateRecord("step-failures-native.json", { gatewayTelemetry: stepFailures.gatewayTelemetry ?? null,
+        scannerSummary: stepFailures.scannerSummary ?? null });
+    }
     journal.gatewayBodyRejections = Array.isArray(metrics.bodyLimitReceipts) ? metrics.bodyLimitReceipts : [];
     journal.gatewayBodyRejectionsComplete = metrics.bodyLimitReceiptsComplete === true;
     if (journal.operations.some(operation => operation.kind === "gatewayRejectedBody")
@@ -1390,13 +1402,6 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       projectAuthentication: ({ snapshot, command: projectionCommand }) => captureResourceAuthentication({ before, effects: snapshot,
         journal, sourceAddress, ...authenticationPolicy, runtimeBinding, decoderContainer: decoder }, projectionCommand) });
     const phases = await cleanupAndRecoverResourceRuntime({ effects });
-    let summary = null;
-    try {
-      if (await containerFileExists(scanner, "/results/summary.json", command)) {
-        summary = JSON.parse((await command(["exec", scanner, "cat", "/results/summary.json"])).stdout);
-        if (!Array.isArray(summary?.checks)) summary = null;
-      }
-    } catch { }
     const occupancy = { successful: 0, rejected: 0, partialOperations: 0,
       duplicateBookings: 0, duplicateResponses: 0, duplicateFailures: 0, toctouCreated: 0, toctouSkipped: 0 };
     if (effects.outcome === "passed") {
@@ -1457,8 +1462,8 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       mountedPolicyDigest: scannerDigests["/scripts/policy.json"],
       gatewayDigest: gatewayDigests["/opt/courtside/security-request-gateway.py"]
     };
-  } catch {
-    earlyError = true;
+  } catch (failure) {
+    earlyError = failureReason(failure);
     throw new Error("Resource-abuse observation incomplete");
   } finally {
     const cleanupFailures = [];
@@ -1485,7 +1490,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
     }
     if (pressure) await pressure;
     if (earlyError && evidenceHandle) retainResourceEvidenceFailure(evidenceHandle,
-      { runId: plan.runId, attempt: limits.attempt, phase: "environment" });
+      { runId: plan.runId, attempt: limits.attempt, phase: "environment", reason: earlyError });
     if (cleanupFailures.length) throw new Error(`Resource-abuse cleanup was incomplete: ${cleanupFailures.join("; ")}`);
   }
 }

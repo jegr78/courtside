@@ -25,7 +25,7 @@ import {
   writePrivateFile, performanceRunPlan, performanceContainerLogPlan, performanceIdentityRequest, buildPerformanceResult, comparePerformanceResults, performanceBaselinePlan,
   performanceImagePlans, performanceStartupSummary, performanceRelayCertificate, performanceRelaySettings,
   funnelPerformanceRunPlan, localRequest, validateFunnelTarget, validatePerformanceResult,
-  redactUatDiagnostics, resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference,
+  redactUatDiagnostics, remoteJsonRequest, resolvePublicFunnelAddresses, uatStartupSummary, uatImageReference,
   uatInstance, uatStateFile, uatSmokeEnvironment, repositoryFromRemote, uatBookingSeedCandidate, uatBookingSeedPlans,
   validateNode, validatePublicAddress
 } from "./courtside.mjs";
@@ -2184,4 +2184,19 @@ test("given a run-scoped instance, when the smoke composes the UAT, then it runs
   assert.equal(resolved.COURTSIDE_UAT_IMAGE, "courtside:uat-gate-7",
     "Compose would otherwise fall back to the shared courtside:uat-local and recreate the app from it");
   assert.equal(uatSmokeEnvironment(undefined, {}, () => undefined).COURTSIDE_UAT_IMAGE, "courtside:uat-local");
+});
+
+test("given every public Funnel address failing, when the identity is requested, then the error names each address with its reason", async () => {
+  // given
+  const resolve = async () => [{ address: "203.0.113.10", family: 4 }, { address: "2001:db8::10", family: 6 }];
+  const request = async (_target, _path, { address }) => {
+    throw address.includes(":") ? new Error("connect ETIMEDOUT") : new Error("certificate has expired");
+  };
+  // when / then
+  await assert.rejects(remoteJsonRequest("https://courtside.example.org", "/api/source", { resolve, request }), (error) => {
+    assert.match(error.message, /^The Funnel target could not be reached through a validated public address: /);
+    assert.match(error.message, /203\.0\.113\.10 Error: certificate has expired/, "each address keeps why it failed");
+    assert.match(error.message, /2001:db8::10 Error: connect ETIMEDOUT/, "a later address does not hide an earlier reason");
+    return true;
+  });
 });

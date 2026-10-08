@@ -197,8 +197,10 @@ test("given failed log collection after ownership validation, when capture is in
     const result = await captureSecurityStartupFailure({ ...f.input, command });
     // then
     assert.equal(result.outcome, "incomplete");
-    assert.deepEqual(readdirSync(f.input.directory), ["seeder-state.json"]);
+    assert.deepEqual(readdirSync(f.input.directory).sort(), ["failure-reason.json", "seeder-state.json"]);
     assert.equal(JSON.parse(readFileSync(join(f.input.directory, "seeder-state.json"), "utf8")).exitCode, 1);
+    assert.deepEqual(JSON.parse(readFileSync(join(f.input.directory, "failure-reason.json"), "utf8")),
+      { name: "Error", message: "command-incomplete" }, "the refused log command is named, not its output");
     assert.equal(JSON.stringify(result).includes("ExampleSecret"), false);
   } finally { f.close(); }
 });
@@ -244,3 +246,32 @@ for (const refusal of [{ exitCode: 1 }, { status: 1 }, { signal: "SIGKILL" }, { 
     } finally { f.close(); }
   });
 }
+
+test("given a capture command that throws, when capture fails, then the private evidence keeps the reason and the result names only the step", async () => {
+  // given
+  const f = fixture();
+  try {
+    // when
+    const result = await captureSecurityStartupFailure({ ...f.input, command: () => { throw new Error("ExampleSecret"); } });
+    // then
+    assert.equal(result.cause, "unexpected-failure", "the shared result names the kind of failure without its text");
+    assert.equal(JSON.stringify(result).includes("ExampleSecret"), false);
+    const reason = JSON.parse(readFileSync(join(f.input.directory, "failure-reason.json"), "utf8"));
+    assert.deepEqual(reason, { name: "Error", message: "ExampleSecret" },
+      "the private evidence must say why the capture is incomplete");
+    assert.equal(statSync(join(f.input.directory, "failure-reason.json")).mode & 0o777, 0o600);
+  } finally { f.close(); }
+});
+
+test("given native output over the bound, when capture fails, then the result names the bounded step", async () => {
+  // given
+  const f = fixture();
+  const command = (args, options) => args[0] === "inspect" ? f.command(args, options)
+    : { exitCode: 0, stdout: Buffer.alloc(200000), stderr: Buffer.alloc(0) };
+  try {
+    // when
+    const result = await captureSecurityStartupFailure({ ...f.input, command });
+    // then
+    assert.equal(result.cause, "command-incomplete", "a step that failed on its own bound is named by that step's code");
+  } finally { f.close(); }
+});

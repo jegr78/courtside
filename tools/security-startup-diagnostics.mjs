@@ -1,10 +1,13 @@
 import { constants, closeSync, fstatSync, lstatSync, mkdirSync, openSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, parse, resolve } from "node:path";
+import { failureReason } from "./failure-reason.mjs";
 
 const byteBudget = 262144;
 const streamLimit = 122880;
 const lifetimeMilliseconds = 20000;
-const incomplete = () => Object.freeze({ outcome: "incomplete", reason: "startup-diagnostics-incomplete" });
+const failureCodes = new Set(["directory-invalid", "deadline-exhausted", "command-incomplete", "inspect-incomplete",
+  "container-invalid", "budget-exhausted", "directory-replaced", "file-invalid"]);
+const incomplete = (cause = "input-invalid") => Object.freeze({ outcome: "incomplete", reason: "startup-diagnostics-incomplete", cause });
 const inspection = '[{"Id":{{json .Id}},"Name":{{json .Name}},"Config":{"Labels":{{json .Config.Labels}}},'
   + '"State":{"Status":{{json .State.Status}},"Running":{{json .State.Running}},'
   + '"ExitCode":{{json .State.ExitCode}},"OOMKilled":{{json .State.OOMKilled}}}}]';
@@ -40,15 +43,17 @@ function resultBytes(result, limit) {
 }
 
 export function captureSecurityStartupDiagnostics({ directory, attempt, identity, command } = {}) {
+  let evidenceDirectory;
+  let evidenceBinding;
   try {
     if (!identity || typeof identity.runId !== "string" || !/^[a-z0-9][a-z0-9-]{5,47}$/.test(identity.runId)
       || ![identity.seedFingerprint, identity.instanceFingerprint].every(value => typeof value === "string"
         && /^sha256:[a-f0-9]{64}$/.test(value))
       || !Number.isInteger(attempt) || attempt < 1 || attempt > 3 || typeof command !== "function") return incomplete();
     const directoryBinding = privateDirectory(directory, identity.runId);
-    const evidenceDirectory = join(directory, `startup-diagnostics-attempt${attempt}`);
+    evidenceDirectory = join(directory, `startup-diagnostics-attempt${attempt}`);
     mkdirSync(evidenceDirectory, { mode: 0o700 });
-    const evidenceBinding = lstatSync(evidenceDirectory);
+    evidenceBinding = lstatSync(evidenceDirectory);
     const deadline = performance.now() + lifetimeMilliseconds;
     const invoke = (args, limit) => {
       const remaining = Math.floor(deadline - performance.now());
@@ -106,5 +111,20 @@ export function captureSecurityStartupDiagnostics({ directory, attempt, identity
     retain("stdout.bin", logs.stdout);
     retain("stderr.bin", logs.stderr);
     return Object.freeze({ outcome: "captured" });
-  } catch { return incomplete(); }
+  } catch (failure) {
+    if (evidenceBinding) retainFailureReason(evidenceDirectory, evidenceBinding, failure);
+    return incomplete(failure instanceof Error && failureCodes.has(failure.message) ? failure.message : "unexpected-failure");
+  }
+}
+
+function retainFailureReason(evidenceDirectory, evidenceBinding, failure) {
+  try {
+    const target = lstatSync(evidenceDirectory);
+    if (!target.isDirectory() || target.isSymbolicLink() || target.dev !== evidenceBinding.dev
+      || target.ino !== evidenceBinding.ino || (target.mode & 0o777) !== 0o700) return;
+    const fd = openSync(join(evidenceDirectory, "failure-reason.json"), constants.O_WRONLY | constants.O_CREAT
+      | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+    try { writeFileSync(fd, `${JSON.stringify(failureReason(failure))}\n`); }
+    finally { closeSync(fd); }
+  } catch { return; }
 }

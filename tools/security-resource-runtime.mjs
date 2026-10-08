@@ -7,6 +7,7 @@ import { compareResourceIntegrity, resourceIntegritySnapshotFingerprint,
   resourcePublicationLifecycleIsNativeDelete } from "./security-resource-integrity.mjs";
 import { planResourceCleanup, verifyResourceCleanup, verifyResourceCleanupPrecondition } from "./security-resource-cleanup.mjs";
 import { observeSecurityMail } from "./security-mail-observation.mjs";
+import { failureCode, failureReason } from "./failure-reason.mjs";
 
 export const resourceRuntimeLimits = Object.freeze({ evidenceBytes: 200 * 1024 * 1024,
   snapshotBytes: 32 * 1024 * 1024, journalBytes: 8 * 1024 * 1024, proofBytes: 262144,
@@ -16,7 +17,7 @@ export const resourceRuntimeLimits = Object.freeze({ evidenceBytes: 200 * 1024 *
 const handles = new WeakMap();
 const evidenceHandles = new WeakMap();
 const nativeEvidenceNames = new Set(["before-native.json", "mail-baseline-native.json", "journal-native.log",
-  "decoder-binding-native.json", "k6-stdout.log", "k6-stderr.log"]);
+  "decoder-binding-native.json", "step-failures-native.json", "k6-stdout.log", "k6-stderr.log"]);
 const limits = resourceRuntimeLimits;
 const hash = value => `sha256:${createHash("sha256").update(value).digest("hex")}`;
 const combine = outcomes => outcomes.includes("failed") ? "failed" : outcomes.every(outcome => outcome === "passed") ? "passed" : "incomplete";
@@ -59,8 +60,13 @@ export function retainResourceEvidenceFailure(handle, options = {}) {
   const ctx = state.ctx ?? { evidence: state.evidence, findings: new Set(), outcome: "incomplete", integrity: null,
     runId: typeof options.runId === "string" && /^[a-z0-9][a-z0-9-]{5,47}$/.test(options.runId) ? options.runId : null,
     attempt: Number.isSafeInteger(options.attempt) && options.attempt > 0 ? options.attempt : null };
-  failure(ctx, phase);
+  failure(ctx, phase, options.reason);
   return summary(ctx, phase);
+}
+
+function boundedReason(reason) {
+  return typeof reason?.name === "string" && reason.name.length <= 64
+    && typeof reason.message === "string" && reason.message.length <= 201;
 }
 
 function privateEvidence(directory, maximumBytes) {
@@ -176,9 +182,13 @@ function summary(ctx, phase, extra = {}) {
     runtimeDigest: ctx.runtimeDigest ?? null, evidence: ctx.evidence.summary(), ...extra };
 }
 
-function failure(ctx, phase) {
+function failure(ctx, phase, reason) {
   ctx.findings.add(`runtime-${phase}-incomplete`);
   if (ctx.outcome !== "failed") ctx.outcome = "incomplete";
+  if (boundedReason(reason) && !ctx.evidence.summary().files.some(file => file.name === "failure-reason-native.json")) {
+    try { ctx.evidence.write("failure-reason-native.json", { name: reason.name, message: reason.message }, 1024, true); }
+    catch { ctx.findings.add("failure-reason-retention-incomplete"); }
+  }
   try {
     if (ctx.evidence.summary().files.some(file => file.name === "failure.json")) return;
     ctx.evidence.write("failure.json", { schemaVersion: 1, runId: ctx.runId, attempt: ctx.attempt,
@@ -202,7 +212,7 @@ async function sessions(ctx, snapshot) {
       return { ...structuredClone(result), complete: false, observations: [], outcome: result?.outcome === "failed" ? "failed" : "incomplete" };
     }
     return { ...structuredClone(result), complete, observations: structuredClone(observations) };
-  } catch { return { complete: false, observations: [] }; }
+  } catch (error) { return { complete: false, observations: [], cause: failureCode(error) }; }
 }
 
 function additions(before, after, table) {
@@ -306,14 +316,14 @@ export async function observeResourceEffects(options = {}) {
     result.integrityEvidenceDigest = ctx.integrityEvidenceDigest;
     handles.set(result, ctx);
     return result;
-  } catch {
+  } catch (error) {
     if (!ctx) {
       const state = evidenceHandles.get(options.evidenceHandle);
       if (state && !state.adopted) return retainResourceEvidenceFailure(options.evidenceHandle,
-        { runId: options.runId, attempt: options.attempt, phase: "context" });
+        { runId: options.runId, attempt: options.attempt, phase: "context", reason: failureReason(error) });
       return { schemaVersion: 1, phase: "effects", outcome: "incomplete", findings: ["runtime-context-incomplete"] };
     }
-    failure(ctx, "effects");
+    failure(ctx, "effects", failureReason(error));
     return summary(ctx, "effects");
   }
 }
@@ -457,7 +467,7 @@ export async function cleanupAndRecoverResourceRuntime({ effects } = {}) {
       if (ctx.recoveryStatus) ctx.recoveryStatus.status = known ? code : "recovery-command-incomplete";
       ctx.outcome = combine([cleanup.outcome, recovery.outcome]);
     }
-    failure(ctx, "recovery");
+    failure(ctx, "recovery", failureReason(error));
     return summary(ctx, "recovery", { cleanup, recovery });
   }
 }
