@@ -16,6 +16,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
+import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -80,6 +81,17 @@ class SharedExceptionHandler {
                 "The request took longer than this instance allows; ask for less at once");
         problem.setType(URI.create("urn:courtside:error:statement-timeout"));
         problem.setTitle("Statement timed out");
+        problem.setProperty("retryable", false);
+        logAnswered(problem);
+        return problem;
+    }
+
+    @ExceptionHandler(TransactionTimedOutException.class)
+    ProblemDetail handleTransactionTimeout(TransactionTimedOutException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                "The request took longer than this instance allows; nothing it changed was kept");
+        problem.setType(URI.create("urn:courtside:error:transaction-timeout"));
+        problem.setTitle("Transaction timed out");
         problem.setProperty("retryable", false);
         logAnswered(problem);
         return problem;

@@ -118,6 +118,19 @@ class SharedExceptionHandlerTest {
                 SecurityEventLog.ControlRefusal.REQUEST_VALIDATION);
     }
 
+    @Test
+    void givenATransactionPastItsDeadline_whenAnsweringIt_thenItIsATypedServiceUnavailableWithoutTheCause() {
+        // when
+        ProblemDetail problem = handler().handleTransactionTimeout(
+                new org.springframework.transaction.TransactionTimedOutException("Transaction timed out: deadline was Thu"));
+
+        // then
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+        assertThat(problem.getType().toString()).isEqualTo("urn:courtside:error:transaction-timeout");
+        assertThat(problem.getDetail()).as("the framework's message names internals and never reaches a client")
+                .doesNotContain("deadline was");
+    }
+
     private static SharedExceptionHandler handler() {
         return new SharedExceptionHandler(mock(ProblemTraceReference.class),
                 mock(org.courtside.shared.SecurityEventLog.class));

@@ -19,6 +19,7 @@ import org.courtside.member.MemberRepository;
 import org.courtside.member.MemberService;
 import org.courtside.member.RosterService;
 import org.springframework.stereotype.Service;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -37,7 +38,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, timeoutString = DatabaseDeadlines.REPORT)
 public class PreviewService {
 
     private final ImportPreviewRepository previews;
@@ -51,7 +52,7 @@ public class PreviewService {
     private final ImportProperties properties;
     private final Clock clock;
 
-    @Transactional
+    @Transactional(timeoutString = DatabaseDeadlines.REPORT)
     public PreviewSummary create(UUID sourceId, SnapshotMode mode, String encoding,
                                  SnapshotUpload upload, UUID accountId) {
         byte[] content = requiredUpload(upload).content();

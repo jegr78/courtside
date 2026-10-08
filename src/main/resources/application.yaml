@@ -55,6 +55,9 @@ courtside:
   environment: ${COURTSIDE_ENVIRONMENT:PRODUCTION}
   database:
     lock-timeout: ${COURTSIDE_DB_LOCK_TIMEOUT:5s}
+    statement-timeout: ${COURTSIDE_DB_STATEMENT_TIMEOUT:15s}
+    request-transaction-timeout: ${COURTSIDE_DB_REQUEST_TRANSACTION_TIMEOUT:30s}
+    report-transaction-timeout: ${COURTSIDE_DB_REPORT_TRANSACTION_TIMEOUT:120s}
     identity:
       mode: ${COURTSIDE_DB_IDENTITY_MODE:shared}
       runtime-username: ${COURTSIDE_DB_RUNTIME_USERNAME:}

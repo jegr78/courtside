@@ -8,6 +8,7 @@ import org.courtside.member.MembershipStatistics;
 import org.courtside.notification.MessageStatistics;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -18,7 +19,7 @@ import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, timeoutString = DatabaseDeadlines.REPORT)
 public class StatisticsService {
 
     // A read over a long period must give its connection back rather than hold it indefinitely.

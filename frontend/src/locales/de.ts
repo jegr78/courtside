@@ -988,6 +988,7 @@ const de = {
   "error.type.request-rate-limited": "Zu viele Anfragen auf einmal. Bitte warte kurz und versuche es erneut.",
   "error.type.undeclared-parameter": "Die Seite hat eine Anfrage gesendet, die Courtside nicht verarbeiten kann. Lade die Seite neu und versuche es erneut.",
   "error.type.statement-timeout": "Das hat zu lange gedauert. Wähle einen kürzeren Zeitraum.",
+  "error.type.transaction-timeout": "Das hat länger gedauert, als Courtside zulässt, und es wurde nichts geändert. Bitte versuche es mit weniger auf einmal.",
   "error.type.facility-utilisation-period-invalid": "Für diesen Zeitraum lässt sich keine Auslastung berechnen. Prüfe Beginn und Ende.",
   "error.type.statistics-period-invalid": "Für diesen Zeitraum lassen sich keine Statistiken berechnen. Prüfe Beginn und Ende.",
   "error.type.idempotency-key-reused": "Die Seite hat eine Anfrage gesendet, die Courtside nicht verarbeiten kann. Lade die Seite neu und versuche es erneut.",

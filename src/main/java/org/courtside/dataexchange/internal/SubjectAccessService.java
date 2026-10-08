@@ -16,6 +16,7 @@ import org.courtside.member.MemberService;
 import org.courtside.notification.PersonMessageHistory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -51,7 +52,7 @@ public class SubjectAccessService {
 
     // Writing, although every read in it is a read: answering is itself a processing activity, and
     // the entry that records it has to commit with the answer that caused it.
-    @Transactional
+    @Transactional(timeoutString = DatabaseDeadlines.REPORT)
     public SubjectAccessRecord answerFor(UUID personId) {
         if (personId == null) {
             throw new SubjectAccessPersonNotFoundException("A subject access answer needs a person");

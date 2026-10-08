@@ -21,6 +21,7 @@ import org.courtside.member.RosterSyncOutcome;
 import org.courtside.member.RosterService;
 import org.courtside.member.RosterSyncService;
 import org.springframework.stereotype.Service;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -41,7 +42,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, timeoutString = DatabaseDeadlines.REPORT)
 public class ExecutionService {
 
     private final ImportPreviewRepository previews;
@@ -56,7 +57,7 @@ public class ExecutionService {
     private final ObjectMapper json;
     private final Clock clock;
 
-    @Transactional
+    @Transactional(timeoutString = DatabaseDeadlines.REPORT)
     public RunOutcome execute(UUID previewId, boolean confirmRemovals, UUID accountId) {
         UUID executingAccountId = requiredAccountId(accountId);
         // The id is read as a scalar so the entity is not in the persistence context yet: a second

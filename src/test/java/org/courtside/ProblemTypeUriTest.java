@@ -127,6 +127,7 @@ class ProblemTypeUriTest {
             "urn:courtside:error:database-lock-unavailable",
             "urn:courtside:error:empty-parameter",
             "urn:courtside:error:statement-timeout",
+            "urn:courtside:error:transaction-timeout",
             "urn:courtside:error:internal-error",
             "urn:courtside:error:malformed-request-body",
             "urn:courtside:error:method-not-supported",
