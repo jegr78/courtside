@@ -167,7 +167,7 @@
       "evidence": [
         "src/test/java/org/courtside/identity/LoginAttemptProtectionTest.java#givenPasswordVerificationCapacityIsOccupied_whenItBecomesFree_thenLoginRecoversImmediately",
         "src/test/java/org/courtside/identity/PasswordHashingTest.java#whenHashingAPassword_thenTheParametersAreTheOnesTheInventoryRecords",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
     {
@@ -192,7 +192,7 @@
       "evidence": [
         "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnExecutedSnapshot_whenTheIdenticalFileIsUploadedAndExecutedAgain_thenNothingChanges",
         "src/test/java/org/courtside/dataexchange/ExecutionServiceTest.java#givenAnOlderPreviewOfTheSameSource_whenANewerOneIsExecuted_thenTheOlderCannotRun",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
     {
@@ -214,7 +214,7 @@
       "evidence": [
         "src/test/java/org/courtside/operations/internal/OperationalLogServiceTest.java#givenACorruptStoredLine_whenSearching_thenItIsSkippedAndTheResultIsMarkedIncomplete",
         "src/test/java/org/courtside/operations/internal/OperationalLogServiceTest.java#givenAnOversizedCollectorStatus_whenSearching_thenItIsRejectedWithoutReadingRecords",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
     {
@@ -237,7 +237,7 @@
       "evidence": [
         "src/test/java/org/courtside/booking/BookingServiceTest.java#givenAnIdempotentReplay_whenCreating_thenOnlyThePersistedBookingIsCounted",
         "src/test/java/org/courtside/booking/BookingConcurrencyTest.java#givenAnUncommittedBookingForTheSlot_whenASecondSessionBooksTheSameSlot_thenItWaitsForTheFirstAndIsRejected",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
     {
@@ -277,7 +277,7 @@
         "src/test/java/org/courtside/audit/internal/AuditSearchBudgetTest.java#givenNoTextMatch_whenTheScanBudgetIsReached_thenThePageSaysItIsIncomplete",
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnEmptyDay_whenLoadingThePublicGrid_thenItsQueryBudgetIsStable",
         "src/test/java/org/courtside/member/web/RosterAdminControllerTest.java#givenMorePeopleThanTheLimit_whenListingTheRoster_thenTheCursorNamesTheLastEntry",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
     {
@@ -304,7 +304,7 @@
       "evidence": [
         "src/test/java/org/courtside/booking/series/SeriesPreviewTest.java#givenARuleExpandingPastTheOccurrenceLimit_whenPreviewing_thenItIsRejectedBeforeAnyCalendarQuery",
         "src/test/java/org/courtside/booking/series/SeriesQueryBudgetTest.java#givenASeriesSize_whenMeasuringMovePreviewAndMove_thenStableRuleQueriesStayBounded",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
     {
@@ -345,7 +345,7 @@
         "src/test/java/org/courtside/reporting/StatisticsQueryBudgetTest.java#givenMoreBookingsCourtsAndARetiredCourt_whenReadingEverySection_thenTheStatementCountStaysTheSame",
         "src/test/java/org/courtside/reporting/web/StatisticsControllerTest.java#givenAHundredYearsAndADay_whenReadingUtilisation_thenThePeriodIsRefusedAsTooLong",
         "src/test/java/org/courtside/reporting/web/StatisticsStatementTimeoutTest.java#givenEveryStatisticsRead_whenItQueriesTheDatabase_thenItsTransactionCarriesTheStatementTimeout",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
     {
@@ -367,7 +367,7 @@
       "evidence": [
         "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenMoreThanOneMebibyte_whenParsing_thenItIsRejectedBeforeDecoding",
         "src/test/java/org/courtside/config/internal/ClubLogoTest.java#givenAnImageAboveTheDimensionLimit_whenParsing_thenItIsRejected",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
     {
@@ -391,7 +391,7 @@
       "evidence": [
         "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnAnnouncementPage_whenReadingIt_thenItOmitsTheInteractiveCountQuery",
         "src/test/java/org/courtside/booking/internal/ImpactServicePageTest.java#givenAnInteractivePreview_whenReadingIt_thenItStillComputesTheAffectedCount",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
     {
@@ -412,7 +412,7 @@
       ],
       "evidence": [
         "src/test/java/org/courtside/identity/AdminRecentAuthenticationTest.java#givenSeveralAccounts_whenAllSessionsAreEnded_thenTheCallingAdminAlsoLosesAuthority",
-        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass"
+        "src/test/java/org/courtside/shared/web/AdmissionPlanTest.java#whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead"
       ]
     },
     {

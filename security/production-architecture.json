@@ -72,6 +72,7 @@
       "src/main/java/org/courtside/operations/internal/OperationalLogCollector.java",
       "src/main/java/org/courtside/rules/web/RuleAdminController.java",
       "src/main/java/org/courtside/shared/ProblemType.java",
+      "src/main/java/org/courtside/shared/web/ClientAddress.java",
       "src/main/java/org/courtside/shared/web/ContainerErrorController.java",
       "src/main/java/org/courtside/shared/web/QueryString.java",
       "src/main/java/org/courtside/shared/web/SharedExceptionHandler.java",
