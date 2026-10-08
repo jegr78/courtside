@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { apiDocumentPath } from "./security-api-document.mjs";
 import { createCandidate } from "./security-triage.mjs";
 import { setTimeout as delay } from "node:timers/promises";
+import { schemathesisConfiguration } from "./security-schemathesis-configuration.mjs";
 import {
   admissionRefused, authorizationRequest, SecurityCookieJar, sendPacedByAdmission
 } from "./security-authorization.mjs";
@@ -36,14 +37,6 @@ export const openApiFuzzPolicy = Object.freeze(JSON.parse(readFileSync(
 // image rather than written beside it, where the two could drift apart unnoticed.
 export const openApiFuzzVersion = openApiFuzzPolicy.image.slice(
   openApiFuzzPolicy.image.indexOf(":") + 1, openApiFuzzPolicy.image.indexOf("@"));
-
-export function schemathesisConfiguration(client, policy = openApiFuzzPolicy) {
-  return `headers = { Cookie = ${JSON.stringify(client.header())}, X-XSRF-TOKEN = ${JSON.stringify(client.csrfToken())} }\n`
-    + `rate-limit = ${JSON.stringify(policy.rateLimit)}\n`
-    + `\n[phases.coverage]\nunexpected-methods = ${JSON.stringify(policy.unexpectedMethods)}\n`
-    + Object.entries(policy.expectedStatuses).map(([check, statuses]) =>
-      `\n[checks.${check}]\nexpected-statuses = ${JSON.stringify(statuses)}\n`).join("");
-}
 
 function nativeSender(context, send) {
   const wait = context.wait ?? ((milliseconds) => delay(milliseconds));
@@ -1023,3 +1016,5 @@ function multipartProbe(sourceId, id, content) {
       Buffer.from(`\r\n--${boundary}--\r\n`)
     ]) };
 }
+
+export { schemathesisConfiguration };

@@ -22,7 +22,7 @@ import { captureResourceAuthentication, resourceSessionProjectionClassPaths } fr
 import { captureSecurityStartupDiagnostics } from "./security-startup-diagnostics.mjs";
 import { inspectReusableImages, verifyReusableImages } from "./immutable-image-reuse.mjs";
 import { attemptStep, failureReason } from "./failure-reason.mjs";
-import { schemathesisConfiguration } from "./security-openapi-fuzz.mjs";
+import { schemathesisConfiguration } from "./security-schemathesis-configuration.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
