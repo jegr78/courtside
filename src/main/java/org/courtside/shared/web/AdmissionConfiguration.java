@@ -14,10 +14,14 @@ import tools.jackson.databind.ObjectMapper;
 class AdmissionConfiguration {
 
     @Bean
-    AdmissionControl admissionControl(AdmissionProperties properties, ObjectMapper json,
+    RequestBudgets requestBudgets(AdmissionProperties properties) {
+        return new RequestBudgets(properties.trackedPrincipals(), System::nanoTime);
+    }
+
+    @Bean
+    AdmissionControl admissionControl(AdmissionProperties properties, ObjectMapper json, RequestBudgets budgets,
                                       SecurityEventLog securityEvents) {
-        return new AdmissionControl(AdmissionPlan.load(properties, json),
-                new RequestBudgets(properties.trackedPrincipals(), System::nanoTime), properties, securityEvents);
+        return new AdmissionControl(AdmissionPlan.load(properties, json), budgets, properties, securityEvents);
     }
 
     @Bean

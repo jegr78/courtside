@@ -115,7 +115,7 @@ courtside:
     address:
       burst: ${COURTSIDE_ADMISSION_ADDRESS_BURST:600}
       per-second: ${COURTSIDE_ADMISSION_ADDRESS_PER_SECOND:60}
-    tracked-principals: 10000
+    tracked-principals: 50000
     classes:
       password-and-credential-work: { cost: 5 }
       booking-write: { cost: 2 }

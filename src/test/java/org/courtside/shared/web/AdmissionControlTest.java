@@ -13,7 +13,6 @@ import org.springframework.web.method.HandlerMethod;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -28,6 +27,7 @@ class AdmissionControlTest {
 
     private static final UUID JANE = UUID.fromString("6b1f3c2e-0d4a-4f7e-9a51-2c8e5d7f9a01");
     private static final UUID JOHN = UUID.fromString("7c2a4d3f-1e5b-4a8f-8b62-3d9f6e8a0b12");
+    private static final UUID MARY = UUID.fromString("8d3b5e4a-2f6c-4b9a-9c73-4eaf7f9b1c23");
 
     private final AtomicLong now = new AtomicLong();
     private final SecurityEventLog securityEvents = mock(SecurityEventLog.class);
@@ -38,18 +38,9 @@ class AdmissionControlTest {
     }
 
     private AdmissionControl control(int accountBurst, Integer seriesConcurrency) {
-        AdmissionProperties properties = new AdmissionProperties(
-                new AdmissionProperties.Limit(accountBurst, 1), new AdmissionProperties.Limit(100, 1), 100,
-                Map.of("booking-series", new AdmissionProperties.DemandClass(10, seriesConcurrency),
-                        "booking-write", new AdmissionProperties.DemandClass(1, null),
-                        "password-and-credential-work", new AdmissionProperties.DemandClass(1, null),
-                        "tenant-scaled-reads", new AdmissionProperties.DemandClass(1, null),
-                        "administrative-impact-analysis", new AdmissionProperties.DemandClass(1, 2),
-                        "bulk-report-and-export", new AdmissionProperties.DemandClass(1, 2),
-                        "roster-import", new AdmissionProperties.DemandClass(1, 1),
-                        "operational-log-search", new AdmissionProperties.DemandClass(1, 1),
-                        "logo-normalization", new AdmissionProperties.DemandClass(1, 1),
-                        "global-session-revocation", new AdmissionProperties.DemandClass(1, 1)));
+        AdmissionProperties properties = ShippedAdmission.withClass(
+                ShippedAdmission.withAccountBurst(ShippedAdmission.defaults(), accountBurst),
+                "booking-series", new AdmissionProperties.DemandClass(10, seriesConcurrency));
         return new AdmissionControl(AdmissionPlan.load(properties, JsonMapper.builder().build()),
                 new RequestBudgets(100, now::get), properties, securityEvents);
     }
@@ -91,8 +82,9 @@ class AdmissionControlTest {
     @Test
     void givenOneAccountSpentItsBudget_whenAnotherAccountRequests_thenTheOtherIsAdmitted() throws Exception {
         // given
-        AdmissionControl control = control(10, null);
+        AdmissionControl control = control(20, null);
         signIn(JANE);
+        control.preHandle(request(), new MockHttpServletResponse(), operation("previewSeries"));
         control.preHandle(request(), new MockHttpServletResponse(), operation("previewSeries"));
 
         // when
@@ -105,41 +97,71 @@ class AdmissionControlTest {
     }
 
     @Test
-    void givenABulkheadIsOccupied_whenTheSameClassIsRequested_thenItIsRefusedUntilThePermitReturns() throws Exception {
+    void givenABulkheadPermitHeldByOneAccount_whenTheClassIsRequestedAgain_thenOnlyAnotherAccountMayTakeTheOther()
+            throws Exception {
         // given
-        AdmissionControl control = control(1000, 1);
+        AdmissionControl control = control(30, 2);
         signIn(JANE);
-        HttpServletRequest first = request();
-        control.preHandle(first, new MockHttpServletResponse(), operation("previewSeries"));
+        HttpServletRequest janesPreview = request();
+        control.preHandle(janesPreview, new MockHttpServletResponse(), operation("previewSeries"));
 
         // when / then
         assertThatThrownBy(() -> control.preHandle(request(), new MockHttpServletResponse(), operation("createSeries")))
-                .as("every operation of the class shares its bulkhead")
+                .as("one account holds at most one permit of a class, so it cannot occupy the class alone")
+                .isInstanceOf(OperationCapacityExhaustedException.class);
+        signIn(JOHN);
+        HttpServletRequest johnsSeries = request();
+        assertThatCode(() -> control.preHandle(johnsSeries, new MockHttpServletResponse(), operation("createSeries")))
+                .as("another account takes the second permit")
+                .doesNotThrowAnyException();
+        signIn(MARY);
+        assertThatThrownBy(() -> control.preHandle(request(), new MockHttpServletResponse(), operation("previewSeries")))
+                .as("both permits are taken")
                 .isInstanceOf(OperationCapacityExhaustedException.class);
         assertThatCode(() -> control.preHandle(request(), new MockHttpServletResponse(), operation("createBooking")))
                 .as("another class is not held up by it")
                 .doesNotThrowAnyException();
-        control.afterCompletion(first, new MockHttpServletResponse(), operation("previewSeries"), null);
-        assertThatCode(() -> control.preHandle(request(), new MockHttpServletResponse(), operation("createSeries")))
+        control.afterCompletion(janesPreview, new MockHttpServletResponse(), operation("previewSeries"), null);
+        assertThatCode(() -> control.preHandle(request(), new MockHttpServletResponse(), operation("previewSeries")))
                 .as("completion returns the permit")
                 .doesNotThrowAnyException();
         verify(securityEvents).controlRefused(JANE, SecurityEventLog.ControlRefusal.OPERATION_CAPACITY);
     }
 
     @Test
-    void givenAnUnclassifiedHandler_whenRequested_thenItCostsOneTokenAndHasNoBulkhead() throws Exception {
+    void givenAFullBulkhead_whenItRefusesARequest_thenTheRequestKeepsItsTokens() throws Exception {
         // given
-        AdmissionControl control = control(10, 1);
+        AdmissionControl control = control(20, 1);
+        signIn(JOHN);
+        control.preHandle(request(), new MockHttpServletResponse(), operation("previewSeries"));
         signIn(JANE);
+        assertThatThrownBy(() -> control.preHandle(request(), new MockHttpServletResponse(), operation("previewSeries")))
+                .isInstanceOf(OperationCapacityExhaustedException.class);
 
         // when
         boolean admitted = true;
-        for (int request = 0; request < 10; request++) {
+        for (int request = 0; request < 20; request++) {
             admitted &= control.preHandle(request(), new MockHttpServletResponse(), operation("unknownOperation"));
         }
 
         // then
-        assertThat(admitted).as("ten tokens admit ten unclassified requests, all in parallel").isTrue();
+        assertThat(admitted).as("a request the class refused spent none of the twenty tokens").isTrue();
+    }
+
+    @Test
+    void givenAnUnclassifiedHandler_whenRequested_thenItCostsOneTokenAndHasNoBulkhead() throws Exception {
+        // given
+        AdmissionControl control = control(20, 1);
+        signIn(JANE);
+
+        // when
+        boolean admitted = true;
+        for (int request = 0; request < 20; request++) {
+            admitted &= control.preHandle(request(), new MockHttpServletResponse(), operation("unknownOperation"));
+        }
+
+        // then
+        assertThat(admitted).as("twenty tokens admit twenty unclassified requests, all in parallel").isTrue();
         assertThatThrownBy(() -> control.preHandle(request(), new MockHttpServletResponse(), operation("unknownOperation")))
                 .isInstanceOf(RequestRateLimitedException.class);
     }

@@ -3103,7 +3103,7 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
     RateLimited:
       description: |
-        Too many requests. Every handled operation can answer this when the caller has spent its
+        Too many requests. Every operation a handler serves can answer this when the caller has spent its
         request budget (`urn:courtside:error:request-rate-limited`) or when the operation's class
         is already running as often as the instance allows
         (`urn:courtside:error:operation-capacity-exhausted`). Protected operations add their own

@@ -1,90 +1,99 @@
 package org.courtside.shared.web;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.context.properties.bind.Binder;
-import org.springframework.boot.env.YamlPropertySourceLoader;
-import org.springframework.core.env.StandardEnvironment;
-import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AdmissionPlanTest {
 
-    private static AdmissionProperties shippedDefaults() throws IOException {
-        StandardEnvironment environment = new StandardEnvironment();
-        new YamlPropertySourceLoader().load("application", new ClassPathResource("application.yaml"))
-                .forEach(environment.getPropertySources()::addLast);
-        return Binder.get(environment).bind("courtside.admission", AdmissionProperties.class).get();
-    }
-
-    private static AdmissionProperties without(AdmissionProperties properties, String demandClass) {
-        Map<String, AdmissionProperties.DemandClass> classes = new HashMap<>(properties.classes());
-        classes.remove(demandClass);
-        return new AdmissionProperties(properties.account(), properties.address(), properties.trackedPrincipals(),
-                classes);
-    }
-
-    private static AdmissionProperties with(AdmissionProperties properties, String demandClass,
-                                            AdmissionProperties.DemandClass decision) {
-        Map<String, AdmissionProperties.DemandClass> classes = new HashMap<>(properties.classes());
-        classes.put(demandClass, decision);
-        return new AdmissionProperties(properties.account(), properties.address(), properties.trackedPrincipals(),
-                classes);
+    private static AdmissionPlan load(AdmissionProperties properties) {
+        return AdmissionPlan.load(properties, JsonMapper.builder().build());
     }
 
     @Test
-    void givenTheShippedDefaults_whenLoadingThePlan_thenOperationsTakeTheirInventoryClass() throws IOException {
+    void whenLoadingTheShippedPlan_thenEveryDemandingClassHasItsDecidedCostAndBulkhead() {
+        // given
+        Map<String, Optional<Integer>> concurrencyByOperation = Map.ofEntries(
+                Map.entry("changeOwnPassword", Optional.empty()),
+                Map.entry("executeImportPreview", Optional.of(1)),
+                Map.entry("searchOperationalLogs", Optional.of(1)),
+                Map.entry("createBooking", Optional.empty()),
+                Map.entry("searchRoster", Optional.empty()),
+                Map.entry("previewSeries", Optional.of(2)),
+                Map.entry("exportBookings", Optional.of(2)),
+                Map.entry("uploadClubLogo", Optional.of(1)),
+                Map.entry("courtImpact", Optional.of(2)),
+                Map.entry("endAllSessions", Optional.of(1)));
+        Map<String, Integer> costByOperation = Map.of(
+                "changeOwnPassword", 5, "executeImportPreview", 20, "searchOperationalLogs", 10,
+                "createBooking", 2, "searchRoster", 2, "previewSeries", 10, "exportBookings", 20,
+                "uploadClubLogo", 10, "courtImpact", 5, "endAllSessions", 5);
+
         // when
-        AdmissionPlan plan = AdmissionPlan.load(shippedDefaults(), JsonMapper.builder().build());
+        AdmissionPlan plan = load(ShippedAdmission.defaults());
 
         // then
-        assertThat(plan.of("previewSeries").demandClass()).isEqualTo("booking-series");
-        assertThat(plan.of("previewSeries").cost()).isEqualTo(10);
-        assertThat(plan.of("previewSeries").bulkhead()).as("series work is bounded in parallel").isPresent();
-        assertThat(plan.of("createBooking").cost()).isEqualTo(2);
-        assertThat(plan.of("createBooking").bulkhead())
-                .as("booking writes are bounded by their cost and their locks, not by refusing a busy morning")
-                .isEmpty();
+        costByOperation.forEach((operation, cost) -> assertThat(plan.of(operation).cost())
+                .as("%s costs what its class decides", operation).isEqualTo(cost));
+        concurrencyByOperation.forEach((operation, concurrency) -> assertThat(plan.of(operation).bulkhead().isPresent())
+                .as("%s is bounded in parallel exactly when its class decides so", operation)
+                .isEqualTo(concurrency.isPresent()));
         assertThat(plan.of("getBookingGrid").cost()).as("an ordinary operation costs one").isEqualTo(1);
+        assertThat(plan.of("getBookingGrid").bulkhead()).isEmpty();
     }
 
     @Test
-    void givenADemandingClassWithoutADecision_whenLoadingThePlan_thenTheInstanceRefusesToStart() throws IOException {
+    void givenADemandingClassWithoutADecision_whenLoadingThePlan_thenTheInstanceRefusesToStart() {
         // given
-        AdmissionProperties properties = without(shippedDefaults(), "roster-import");
+        AdmissionProperties properties = ShippedAdmission.withClass(ShippedAdmission.defaults(), "roster-import", null);
 
         // when / then
-        assertThatThrownBy(() -> AdmissionPlan.load(properties, JsonMapper.builder().build()))
+        assertThatThrownBy(() -> load(properties))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("roster-import");
     }
 
     @Test
-    void givenADecisionForNoClassification_whenLoadingThePlan_thenTheInstanceRefusesToStart() throws IOException {
+    void givenADecisionForNoClassification_whenLoadingThePlan_thenTheInstanceRefusesToStart() {
         // given
-        AdmissionProperties properties = with(shippedDefaults(), "roster-imports",
+        AdmissionProperties properties = ShippedAdmission.withClass(ShippedAdmission.defaults(), "roster-imports",
                 new AdmissionProperties.DemandClass(1, null));
 
         // when / then
-        assertThatThrownBy(() -> AdmissionPlan.load(properties, JsonMapper.builder().build()))
+        assertThatThrownBy(() -> load(properties))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("roster-imports");
     }
 
     @Test
-    void givenACostNoBurstCanHold_whenLoadingThePlan_thenTheInstanceRefusesToStart() throws IOException {
+    void givenADecisionForAClassNoRequestReaches_whenLoadingThePlan_thenTheInstanceRefusesToStart() {
         // given
-        AdmissionProperties properties = with(shippedDefaults(), "roster-import",
-                new AdmissionProperties.DemandClass(10_000, 1));
+        AdmissionProperties ordinary = ShippedAdmission.withClass(ShippedAdmission.defaults(), "ordinary-http",
+                new AdmissionProperties.DemandClass(3, null));
+        AdmissionProperties scheduled = ShippedAdmission.withClass(ShippedAdmission.defaults(), "scheduled-maintenance",
+                new AdmissionProperties.DemandClass(3, 1));
 
         // when / then
-        assertThatThrownBy(() -> AdmissionPlan.load(properties, JsonMapper.builder().build()))
+        assertThatThrownBy(() -> load(ordinary)).as("an ordinary class always costs one")
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("ordinary-http");
+        assertThatThrownBy(() -> load(scheduled)).as("a class without an HTTP operation is never admitted")
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("scheduled-maintenance");
+    }
+
+    @Test
+    void givenACostAboveABudgetsBurst_whenLoadingThePlan_thenTheInstanceRefusesToStart() {
+        // given
+        AdmissionProperties properties = ShippedAdmission.withClass(ShippedAdmission.withAccountBurst(
+                ShippedAdmission.defaults(), 15), "roster-import", new AdmissionProperties.DemandClass(20, 1));
+
+        // when / then
+        assertThatThrownBy(() -> load(properties))
+                .as("an account burst of fifteen could never admit an import costing twenty")
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("courtside.admission.classes.roster-import.cost");
     }

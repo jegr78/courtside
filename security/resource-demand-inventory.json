@@ -154,7 +154,7 @@
       ],
       "growthDrivers": "Argon2id memory and CPU work, a bounded HIBP range response, and credential delivery work dominate these paths.",
       "inputOrDataBound": "Passwords and account fields have contract limits; HIBP responses stop at 256 KiB and their request deadline defaults to three seconds.",
-      "concurrencyOrRateBound": "Password verification admits two concurrent operations per application instance; login addresses and credential issuance also have persisted rate windows. Each handled request also spends 5 tokens of its caller's request budget.",
+      "concurrencyOrRateBound": "Password verification admits two concurrent operations per application instance; login addresses and credential issuance also have persisted rate windows. Every operation here except the filter-handled sign-in also spends 5 tokens of its caller's request budget.",
       "executionModel": "Verification and password policy run synchronously in the request; committed credential events hand mail to the asynchronous event listener.",
       "failureBehavior": "Capacity exhaustion returns a typed 429, HIBP unavailability refuses a new password, and a failed transaction stores no partial credential change.",
       "consumerTimeoutBehavior": "The HIBP dependency has its own deadline. The reference proxy adds no arbitrary response deadline; a caller retry remains subject to rate and transaction rules.",

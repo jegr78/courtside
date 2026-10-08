@@ -12,7 +12,6 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.Semaphore;
 
 class AdmissionControl implements HandlerInterceptor {
 
@@ -41,23 +40,23 @@ class AdmissionControl implements HandlerInterceptor {
         }
         AdmissionPlan.Admission admission = plan.of(method.getMethod().getName());
         Optional<UUID> account = SecurityEventPrincipal.currentAccountId();
-        String principal = account.map(id -> "account:" + id).orElseGet(() -> "address:" + request.getRemoteAddr());
-        budgets.spend(principal, account.isPresent() ? accountBudget : addressBudget, admission.cost())
-                .ifPresent(refusal -> {
-                    if (refusal.first()) {
-                        securityEvents.controlTriggered(account.orElse(null),
-                                SecurityEventLog.ControlTrigger.REQUEST_BUDGET);
-                    }
-                    throw new RequestRateLimitedException(refusal.retryAfter());
-                });
+        String principal = account.map(id -> "account:" + id)
+                .orElseGet(() -> "address:" + ClientAddress.bucketOf(request.getRemoteAddr()));
+        RequestBudget budget = account.isPresent() ? accountBudget : addressBudget;
+        budgets.spend(principal, budget, admission.cost()).ifPresent(refusal -> {
+            if (refusal.first()) {
+                securityEvents.controlTriggered(account.orElse(null), SecurityEventLog.ControlTrigger.REQUEST_BUDGET);
+            }
+            throw new RequestRateLimitedException(refusal.retryAfter());
+        });
         if (admission.bulkhead().isPresent()) {
-            Semaphore bulkhead = admission.bulkhead().orElseThrow();
-            if (!bulkhead.tryAcquire()) {
-                securityEvents.controlRefused(account.orElse(null),
-                        SecurityEventLog.ControlRefusal.OPERATION_CAPACITY);
+            Bulkhead bulkhead = admission.bulkhead().orElseThrow();
+            if (!bulkhead.tryEnter(principal)) {
+                budgets.refund(principal, budget, admission.cost());
+                securityEvents.controlRefused(account.orElse(null), SecurityEventLog.ControlRefusal.OPERATION_CAPACITY);
                 throw new OperationCapacityExhaustedException();
             }
-            request.setAttribute(PERMIT, bulkhead);
+            request.setAttribute(PERMIT, new Permit(bulkhead, principal));
         }
         return true;
     }
@@ -65,9 +64,12 @@ class AdmissionControl implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler,
                                 @Nullable Exception failure) {
-        if (request.getAttribute(PERMIT) instanceof Semaphore bulkhead) {
+        if (request.getAttribute(PERMIT) instanceof Permit permit) {
             request.removeAttribute(PERMIT);
-            bulkhead.release();
+            permit.bulkhead().leave(permit.principal());
         }
+    }
+
+    private record Permit(Bulkhead bulkhead, String principal) {
     }
 }

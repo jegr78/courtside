@@ -890,3 +890,28 @@ it("given a read waiting on its request budget, when the page cancels it, then i
   expect(failure).toMatchObject({ name: "AbortError" });
   expect(requests).toBe(1);
 });
+
+it("given the token reissue is refused for the request budget, when signing in, then it waits once and signs in with the reissued token", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=; Max-Age=0";
+  let reissues = 0;
+  let sent: string | null = "absent";
+  server.use(
+    http.get("/api/session", () => {
+      if (++reissues === 1) return budgetRefusal("1");
+      document.cookie = "XSRF-TOKEN=reissued-token";
+      return HttpResponse.json(session);
+    }),
+    http.post("/api/session", ({ request }) => {
+      sent = request.headers.get("X-XSRF-TOKEN");
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+
+  // when
+  await api.login("doe.jane", "temporary-password");
+
+  // then
+  expect(reissues).toBe(2);
+  expect(sent).toBe("reissued-token");
+});

@@ -27,6 +27,9 @@ final class RequestBudgets {
     }
 
     synchronized Optional<Refusal> spend(String principal, RequestBudget budget, int cost) {
+        if (cost < 1) {
+            throw new IllegalStateException("A request must cost at least one token");
+        }
         long now = nanoTime.getAsLong();
         Bucket bucket = buckets.computeIfAbsent(principal, ignored -> new Bucket(budget.burst(), now));
         bucket.refill(budget, now);
@@ -40,6 +43,13 @@ final class RequestBudgets {
         bucket.refusing = true;
         return Optional.of(new Refusal(
                 Duration.ofNanos((long) Math.ceil(missing * NANOS_PER_SECOND / budget.perSecond())), first));
+    }
+
+    synchronized void refund(String principal, RequestBudget budget, int cost) {
+        Bucket bucket = buckets.get(principal);
+        if (bucket != null) {
+            bucket.tokens = Math.min(budget.burst(), bucket.tokens + cost);
+        }
     }
 
     synchronized int tracked() {

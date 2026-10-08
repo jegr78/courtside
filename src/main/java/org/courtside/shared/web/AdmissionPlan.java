@@ -1,5 +1,6 @@
 package org.courtside.shared.web;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -10,7 +11,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.Semaphore;
 
 final class AdmissionPlan {
 
@@ -34,7 +34,7 @@ final class AdmissionPlan {
                 throw new IllegalStateException("The resource demand inventory is missing from " + INVENTORY);
             }
             return from(json.readTree(source), properties);
-        } catch (IOException failure) {
+        } catch (IOException | JacksonException failure) {
             throw new IllegalStateException("The resource demand inventory cannot be read", failure);
         }
     }
@@ -44,14 +44,15 @@ final class AdmissionPlan {
         Set<String> known = new TreeSet<>();
         Set<String> undecided = new TreeSet<>();
         Map<String, Admission> byOperation = new HashMap<>();
-        for (JsonNode classification : inventory.get("classifications")) {
-            String id = classification.get("id").asString();
+        Set<String> admissible = new TreeSet<>();
+        for (JsonNode classification : required(inventory, "classifications")) {
+            String id = required(classification, "id").asString();
             known.add(id);
-            if (!"demanding".equals(classification.get("kind").asString())) {
+            if (!"demanding".equals(required(classification, "kind").asString())) {
                 continue;
             }
             Set<String> operations = new TreeSet<>();
-            classification.get("entryPoints").forEach(entry -> {
+            required(classification, "entryPoints").forEach(entry -> {
                 if (!entry.asString().contains("#")) {
                     operations.add(entry.asString());
                 }
@@ -59,6 +60,7 @@ final class AdmissionPlan {
             if (operations.isEmpty()) {
                 continue;
             }
+            admissible.add(id);
             AdmissionProperties.DemandClass decided = properties.classes().get(id);
             if (decided == null) {
                 undecided.add(id);
@@ -66,11 +68,10 @@ final class AdmissionPlan {
             }
             if (decided.cost() > smallestBurst) {
                 throw new IllegalStateException("courtside.admission.classes." + id
-                        + ".cost exceeds the smallest burst, so no request of that class could ever be admitted");
+                        + ".cost exceeds the burst of a request budget, so that budget could never admit it");
             }
-            Optional<Semaphore> bulkhead = Optional.ofNullable(decided.concurrency())
-                    .map(permits -> new Semaphore(permits));
-            Admission admission = new Admission(id, decided.cost(), bulkhead);
+            Admission admission = new Admission(id, decided.cost(),
+                    Optional.ofNullable(decided.concurrency()).map(Bulkhead::new));
             operations.forEach(operation -> byOperation.put(operation, admission));
         }
         if (!undecided.isEmpty()) {
@@ -83,9 +84,23 @@ final class AdmissionPlan {
             throw new IllegalStateException("courtside.admission.classes names no inventory classification: "
                     + unknown);
         }
+        Set<String> ineffective = new TreeSet<>(properties.classes().keySet());
+        ineffective.removeAll(admissible);
+        if (!ineffective.isEmpty()) {
+            throw new IllegalStateException("courtside.admission.classes decides classes no request reaches, "
+                    + "because they are ordinary or have no HTTP operation: " + ineffective);
+        }
         return new AdmissionPlan(byOperation);
     }
 
-    record Admission(String demandClass, int cost, Optional<Semaphore> bulkhead) {
+    private static JsonNode required(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            throw new IllegalStateException("The resource demand inventory lacks " + field);
+        }
+        return value;
+    }
+
+    record Admission(String demandClass, int cost, Optional<Bulkhead> bulkhead) {
     }
 }

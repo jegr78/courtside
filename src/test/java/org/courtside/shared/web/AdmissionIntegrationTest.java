@@ -6,6 +6,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -19,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(AdmissionIntegrationTest.FrozenAdmissionTime.class)
 @TestPropertySource(properties = {
         "courtside.admission.address.burst=20",
         "courtside.admission.address.per-second=1"})
@@ -80,5 +85,15 @@ class AdmissionIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.type").value("urn:courtside:error:request-rate-limited"));
         mockMvc.perform(get("/api/public/booking-grid").with(from("192.0.2.23")))
                 .andExpect(status().isOk());
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class FrozenAdmissionTime {
+
+        @Bean
+        @Primary
+        RequestBudgets frozenRequestBudgets(AdmissionProperties properties) {
+            return new RequestBudgets(properties.trackedPrincipals(), () -> 0L);
+        }
     }
 }

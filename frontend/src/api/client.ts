@@ -266,11 +266,20 @@ let reissuing: Promise<unknown> | undefined;
 // Signing out clears the token, so the write that follows would carry none and come back 403 —
 // a refusal the sign-in form can only report as a rejected credential.
 async function reissuedCsrfToken(): Promise<string | undefined> {
-  const pending = reissuing ??= fetch("/api/session", { credentials: "same-origin" })
+  const pending = reissuing ??= reissue()
     .catch((failure: unknown) => warnAbout("CSRF token reissue failed", failure))
     .finally(() => { reissuing = undefined; });
   await pending;
   return csrfToken();
+}
+
+async function reissue(): Promise<void> {
+  const response = await fetch("/api/session", { credentials: "same-origin" });
+  const wait = retryAfterSeconds(response);
+  if (response.status === 429 && wait !== undefined && wait <= LONGEST_ADMISSION_WAIT_SECONDS) {
+    await pause(wait * 1000);
+    await fetch("/api/session", { credentials: "same-origin" });
+  }
 }
 
 function csrfToken(): string | undefined {
