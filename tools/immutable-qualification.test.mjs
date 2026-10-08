@@ -44,8 +44,8 @@ for (const refusal of ["remoteHost", "remoteContext", "projectCollision"]) {
       // then
       assert.ok(calls.every(({ args: commandArgs }) => commandArgs[0] !== "compose"));
       if (refusal !== "projectCollision") assert.deepEqual(calls, []);
-      assert.equal(readFileSync(join(root, "build", "immutable-qualification", project, "container-logs.txt"), "utf8"),
-        "Container logs were unavailable before cleanup.\n");
+      assert.match(readFileSync(join(root, "build", "immutable-qualification", project, "container-logs.txt"), "utf8"),
+        /^Container logs were unavailable before cleanup: \S/, "the fallback must say why the logs are missing");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -462,6 +462,59 @@ for (const failedCheck of [undefined, "deployment", "authentication", "bookingPe
     }
   });
 }
+
+test("given a refused sign-in, when immutable smoke fails, then the attempt record keeps the assertion and the answer", async () => {
+  // given
+  const { runUatSmoke } = await import("./courtside.uat-smoke.mjs");
+  const root = mkdtempSync(join(tmpdir(), "immutable-failure-record-"));
+  const { execute } = lifecycleExecute({ root });
+  try {
+    // when
+    await assert.rejects(runUatSmoke({ args, environment: nativeEnvironment, repository: root, execute,
+      request: smokeRequest({ failedCheck: "authentication" }), platform: "linux", architecture: "x64" }));
+    // then
+    const attempt = JSON.parse(readFileSync(join(root, "build", "immutable-qualification", project, "attempt.json"), "utf8"));
+    assert.equal(attempt.status, "failed");
+    assert.equal(attempt.failure?.name, "AssertionError", `the record must name the failure, got ${JSON.stringify(attempt)}`);
+    assert.match(attempt.failure.message, /HTTP 403: \{"authenticated":true\}/,
+      "the record must carry the status and body the server answered");
+    assert.equal(existsSync(join(root, "build", "immutable-qualification", project, "qualification.json")), false,
+      "a failed immutable run must not leave a receipt");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("given a legacy UAT smoke that fails after start, when it stops, then the receipt says failed and the lifecycle output is kept", async () => {
+  // given
+  const { runUatSmoke } = await import("./courtside.uat-smoke.mjs");
+  const root = mkdtempSync(join(tmpdir(), "legacy-failure-record-"));
+  const legacyProject = "courtside-uat";
+  const execute = (command, commandArgs) => {
+    if (command === process.execPath) return { status: 0, stdout: `ran ${commandArgs[1]}\n`, stderr: "" };
+    if (commandArgs.includes("ps")) return { status: 1, stdout: "", stderr: "no such service: app" };
+    return { status: 0, stdout: "", stderr: "" };
+  };
+  try {
+    // when
+    await assert.rejects(runUatSmoke({ args: ["--confirm", legacyProject], environment: {}, repository: root,
+      execute, request: smokeRequest(), platform: "linux", architecture: "x64" }));
+    // then
+    const receiptPath = join(root, "build", "uat-smoke", "qualification.json");
+    assert.ok(existsSync(receiptPath), "a failed smoke must leave a receipt");
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+    assert.equal(receipt.status, "failed", "a failed smoke must leave a receipt that says so");
+    assert.match(receipt.failure?.message ?? "", /docker exited with status 1: no such service: app/,
+      `the receipt must carry the failure, got ${JSON.stringify(receipt)}`);
+    const lifecyclePath = join(root, "build", "uat-smoke", "lifecycle.log");
+    assert.ok(existsSync(lifecyclePath), "the start and reset output must be kept beside the evidence");
+    const lifecycle = readFileSync(lifecyclePath, "utf8");
+    assert.match(lifecycle, /ran uat\n/, "the start output must be kept beside the evidence");
+    assert.match(lifecycle, /ran uat-reset\n/, "the reset output must be kept beside the evidence");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 for (const mode of ["oversized", "stalled"]) {
   test(`given a ${mode} loopback response, when immutable HTTP is observed, then the response budget aborts it`, async () => {
