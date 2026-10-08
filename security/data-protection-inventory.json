@@ -1066,6 +1066,10 @@
         "level": "pseudonymous",
         "lifecycle": "account-cascade"
       },
+      "attempts": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
       "id": {
         "level": "operational",
         "lifecycle": "account-cascade"
@@ -1075,6 +1079,14 @@
         "lifecycle": "account-cascade"
       },
       "message_id": {
+        "level": "pseudonymous",
+        "lifecycle": "account-cascade"
+      },
+      "next_attempt_at": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
+      "parameters": {
         "level": "pseudonymous",
         "lifecycle": "account-cascade"
       },

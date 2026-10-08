@@ -1,13 +1,16 @@
 package org.courtside.notification.internal;
 
 import org.springframework.data.domain.Limit;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 interface MessageRecordRepository extends JpaRepository<MessageRecord, UUID> {
@@ -15,6 +18,10 @@ interface MessageRecordRepository extends JpaRepository<MessageRecord, UUID> {
     List<MessageRecord> findAllByIdIn(Collection<UUID> ids);
 
     List<MessageRecord> findByAccountIdOrderByQueuedAtAscQueuedSeqAsc(UUID accountId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT record FROM MessageRecord record WHERE record.id = :id")
+    Optional<MessageRecord> lockById(@Param("id") UUID id);
 
     @Query("""
             SELECT record.id FROM MessageRecord record

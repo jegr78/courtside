@@ -7,17 +7,11 @@
       "src/main/java/org/courtside/booking/internal/BookingReminderSchedule.java",
       "src/main/java/org/courtside/dataexchange/internal/PreviewExpirySchedule.java",
       "src/main/java/org/courtside/identity/internal/AgedSessionSweep.java",
-      "src/main/java/org/courtside/identity/internal/IdentityCleanupSchedule.java"
+      "src/main/java/org/courtside/identity/internal/IdentityCleanupSchedule.java",
+      "src/main/java/org/courtside/notification/internal/MailOutbox.java"
     ],
     "backgroundFiles": [
-      "src/main/java/org/courtside/booking/internal/ClosureAnnouncements.java",
-      "src/main/java/org/courtside/notification/internal/BookingMailer.java",
-      "src/main/java/org/courtside/notification/internal/CredentialMailer.java",
-      "src/main/java/org/courtside/notification/internal/DisplacementMailer.java",
-      "src/main/java/org/courtside/notification/internal/ParticipationMailer.java",
-      "src/main/java/org/courtside/notification/internal/PasswordResetCodeMailer.java",
-      "src/main/java/org/courtside/notification/internal/ReminderMailer.java",
-      "src/main/java/org/courtside/notification/internal/UsernameReminderMailer.java"
+      "src/main/java/org/courtside/booking/internal/ClosureAnnouncements.java"
     ],
     "listenerFiles": [
       "src/main/java/org/courtside/audit/internal/DomainEventWriter.java",
@@ -27,6 +21,13 @@
       "src/main/java/org/courtside/identity/internal/SignInFailureLog.java",
       "src/main/java/org/courtside/member/internal/RosterSecurityEventLog.java",
       "src/main/java/org/courtside/member/internal/ShippedMembershipTypeNaming.java",
+      "src/main/java/org/courtside/notification/internal/BookingMailer.java",
+      "src/main/java/org/courtside/notification/internal/CredentialMailer.java",
+      "src/main/java/org/courtside/notification/internal/DisplacementMailer.java",
+      "src/main/java/org/courtside/notification/internal/ParticipationMailer.java",
+      "src/main/java/org/courtside/notification/internal/PasswordResetCodeMailer.java",
+      "src/main/java/org/courtside/notification/internal/ReminderMailer.java",
+      "src/main/java/org/courtside/notification/internal/UsernameReminderMailer.java",
       "src/main/java/org/courtside/rules/internal/ShippedRuleSetNaming.java"
     ],
     "startupFiles": [
@@ -444,26 +445,32 @@
         "ClosureAnnouncements#on(FacilityEvent.OpeningHoursSet)",
         "CredentialMailer#on(CredentialsRequested)",
         "DisplacementMailer#on(BookingDisplaced)",
+        "MailOutbox#poll",
         "ParticipationMailer#on(ParticipantRecorded)",
         "ParticipationMailer#on(ParticipantWithdrew)",
         "PasswordResetCodeMailer#on(PasswordResetRequested)",
         "ReminderMailer#on(BookingReminderDue)",
         "UsernameReminderMailer#on(UsernameReminderRequested)"
       ],
-      "growthDrivers": "Mail work fans out with booking participants, reminders and displaced future bookings; relay latency holds worker threads during delivery.",
-      "inputOrDataBound": "A booking has at most twenty participant positions, closure discovery pages by 100, and each SMTP connect and read wait stops after ten seconds.",
-      "concurrencyOrRateBound": "Credential and booking mail use separate pools of at most four threads; closure announcements use at most two. Every queue holds 100 tasks and then applies caller-run backpressure.",
-      "executionModel": "Committed domain events enter dedicated bounded executors. Each mail handover and each closure page uses a new transaction outside the originating mutation.",
-      "failureBehavior": "Queue saturation runs work on the publishing thread instead of retaining unbounded tasks; delivery refusal or failure is recorded without undoing the committed booking change.",
-      "consumerTimeoutBehavior": "The originating HTTP response normally does not wait for asynchronous delivery. Under saturation, caller-run backpressure can extend it rather than silently drop a notification.",
+      "growthDrivers": "Mail work fans out with booking participants, reminders and displaced future bookings; every fanned-out message is one stored outbox row, and relay latency holds an outbox worker for one handover.",
+      "inputOrDataBound": "A booking has at most twenty participant positions, closure discovery pages by 100, a queued row carries identifiers only, and each SMTP connect and read wait stops after ten seconds.",
+      "concurrencyOrRateBound": "Two outbox workers hand messages over, each holding one database connection while it composes and sends; a wake-up beyond one pending pass is discarded because that pass finds its row. Closure announcements use at most two threads and a queue of 100 with caller-run backpressure.",
+      "executionModel": "Committed domain events reach their listeners through Spring Modulith's publication registry. A mail listener runs after commit and only stores a queued message_record row; the outbox workers claim due rows with FOR UPDATE SKIP LOCKED under a five-minute lease, compose and hand over in a new transaction and record the outcome. A scheduled pass every five seconds resumes what a restart or a retry left due. Each closure page runs in a new transaction outside the originating mutation.",
+      "failureBehavior": "A transport failure reschedules the row after 5, 15 and 45 seconds and fails it on the fourth attempt; a refused recipient, a vanished booking or an unreachable recipient settles it at once with its reason. No outcome undoes the committed change, and no message leaves the outbox without a settled row.",
+      "consumerTimeoutBehavior": "The originating HTTP response waits for the queued row insert after commit and never for the relay. A saturated closure-announcement queue runs paging on the publishing thread, which queues rows but hands no message over.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/BookingConfiguration.java",
         "src/main/java/org/courtside/booking/internal/ClosureAnnouncements.java",
+        "src/main/java/org/courtside/notification/internal/MailOutbox.java",
+        "src/main/java/org/courtside/notification/internal/MessageOutbox.java",
         "src/main/java/org/courtside/notification/internal/NotificationConfiguration.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/internal/ClosureAnnouncementExecutorCapacityTest.java#givenTheAnnouncementExecutor_whenReadingItsCapacityPolicy_thenTheQueueIsBoundedAndSaturationUsesCallerRuns",
-        "src/test/java/org/courtside/notification/internal/NotificationExecutorCapacityTest.java#givenTheMailExecutors_whenReadingTheirCapacityPolicy_thenQueuesAreBoundedAndSaturationUsesCallerRuns"
+        "src/test/java/org/courtside/notification/internal/MailOutboxTest.java#givenARelayThatHoldsEveryMessage_whenEventsArePublished_thenThePublisherReturnsWithTheMessagesQueued",
+        "src/test/java/org/courtside/notification/internal/MailOutboxTest.java#givenARelayThatStaysAway_whenTheRetriesComeDue_thenTheyAreSpacedBoundedAndCounted",
+        "src/test/java/org/courtside/notification/internal/MailOutboxTest.java#givenTwoPassesRunningAtOnce_whenTheyDrainTheSameRows_thenEveryMessageIsHandedOverExactlyOnce",
+        "src/test/java/org/courtside/notification/internal/NotificationExecutorCapacityTest.java#givenASaturatedOutboxExecutor_whenMoreWakeUpsArrive_thenNoneRunsOnTheCallersThread"
       ]
     },
     {

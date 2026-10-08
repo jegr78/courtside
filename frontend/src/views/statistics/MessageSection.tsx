@@ -28,6 +28,7 @@ export function MessageSection({ from, to }: { from?: string; to?: string }) {
               {STATES.map(([field, state]) => <th key={field} scope="col" className="py-2 pr-4 text-right font-semibold">
                 {t(`messages.state.${state}`)}
               </th>)}
+              <th scope="col" className="py-2 pr-4 text-right font-semibold">{t("admin.statistics.messages.retried")}</th>
             </tr>
           </thead>
           <tbody>
@@ -35,6 +36,8 @@ export function MessageSection({ from, to }: { from?: string; to?: string }) {
               <th scope="row" className="py-2 pr-4 font-normal">{t(`messages.kind.${kind.kind}`)}</th>
               {STATES.map(([field]) => <td key={field} data-testid={`statistics-message-${kind.kind}-${field}`}
                 className="font-value py-2 pr-4 text-right">{format.count(kind[field])}</td>)}
+              <td data-testid={`statistics-message-${kind.kind}-retried`}
+                className="font-value py-2 pr-4 text-right">{format.count(kind.retried)}</td>
             </tr>)}
           </tbody>
         </table>

@@ -23,6 +23,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -275,11 +276,11 @@ class MessageAdminControllerTest extends AbstractIntegrationTest {
     }
 
     private UUID queued(UUID accountId, MessageKind kind, String messageId) {
-        return records.save(new MessageRecord(accountId, kind, messageId, clock.instant())).getId();
+        return records.save(new MessageRecord(accountId, kind, messageId, clock.instant(), Map.of())).getId();
     }
 
     private void queuedAt(UUID accountId, String messageId, Instant at) {
-        records.save(new MessageRecord(accountId, MessageKind.CREDENTIALS_NEW_ACCOUNT, messageId, at));
+        records.save(new MessageRecord(accountId, MessageKind.CREDENTIALS_NEW_ACCOUNT, messageId, at, Map.of()));
     }
 
     private void handOver(UUID recordId) {

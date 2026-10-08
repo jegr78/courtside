@@ -154,6 +154,6 @@ class StatisticsController implements AdminStatisticsApi {
         return kinds.stream().map(kind -> new ApiMessageKindCount()
                 .kind(ApiMessageKind.fromValue(kind.kind().name()))
                 .queued(kind.queued()).handedOver(kind.handedOver())
-                .refused(kind.refused()).failed(kind.failed())).toList();
+                .refused(kind.refused()).failed(kind.failed()).retried(kind.retried())).toList();
     }
 }

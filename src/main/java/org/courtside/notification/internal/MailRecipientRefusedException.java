@@ -1,7 +1,7 @@
 package org.courtside.notification.internal;
 
 // The address does not exist, and it will not exist in five seconds either: this is the one failure
-// the ladder must not walk, because repeating it only holds the transaction open.
+// the outbox does not try again.
 class MailRecipientRefusedException extends RuntimeException {
 
     private final String diagnosis;

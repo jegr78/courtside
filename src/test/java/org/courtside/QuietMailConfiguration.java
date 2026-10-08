@@ -9,8 +9,6 @@ import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 
-// Nothing listens on the test relay, and a real attempt costs the handover's whole retry ladder on
-// the executor: 5, 15 and 45 seconds of sleeping for every account a test creates.
 @TestConfiguration(proxyBeanMethods = false)
 class QuietMailConfiguration {
 
@@ -25,14 +23,9 @@ class QuietMailConfiguration {
     }
 
     // On the caller's thread, so a message is written before the test method returns and the
-    // listener cannot race the truncation that follows it.
+    // outbox cannot race the truncation that follows it.
     @Bean
-    TaskExecutor credentialMailExecutor() {
-        return new SyncTaskExecutor();
-    }
-
-    @Bean
-    TaskExecutor bookingMailExecutor() {
+    TaskExecutor mailOutboxExecutor() {
         return new SyncTaskExecutor();
     }
 

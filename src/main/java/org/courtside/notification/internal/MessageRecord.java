@@ -11,8 +11,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.MessageState;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -50,13 +54,39 @@ class MessageRecord {
 
     private Instant settledAt;
 
-    MessageRecord(UUID accountId, MessageKind kind, String messageId, Instant queuedAt) {
+    @Column(nullable = false)
+    private int attempts;
+
+    private Instant nextAttemptAt;
+
+    @Getter(AccessLevel.NONE)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false)
+    private Map<String, String> parameters;
+
+    MessageRecord(UUID accountId, MessageKind kind, String messageId, Instant queuedAt,
+                  Map<String, String> parameters) {
         this.id = UUID.randomUUID();
         this.accountId = accountId;
         this.kind = kind;
         this.messageId = messageId;
         this.state = MessageState.QUEUED;
         this.queuedAt = queuedAt;
+        this.nextAttemptAt = queuedAt;
+        this.parameters = new HashMap<>(parameters);
+    }
+
+    Map<String, String> parameters() {
+        return Map.copyOf(parameters);
+    }
+
+    void attempted() {
+        attempts++;
+    }
+
+    void retryAt(Instant at, String reason) {
+        this.nextAttemptAt = at;
+        this.reason = reason;
     }
 
     void handedOver(Instant at) {
@@ -76,5 +106,7 @@ class MessageRecord {
         this.settledAt = at;
         this.reason = reason;
         this.statusCode = statusCode;
+        this.nextAttemptAt = null;
+        this.parameters = new HashMap<>();
     }
 }

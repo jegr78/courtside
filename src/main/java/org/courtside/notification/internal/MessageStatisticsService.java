@@ -29,8 +29,10 @@ class MessageStatisticsService implements MessageStatistics {
             throw new IllegalStateException("Message counts need a resolved period");
         }
         Map<MessageKind, Map<MessageState, Long>> counts = new EnumMap<>(MessageKind.class);
+        Map<MessageKind, Long> retried = new EnumMap<>(MessageKind.class);
         jdbc.sql("""
-                        SELECT kind, state, COUNT(*) AS messages
+                        SELECT kind, state, COUNT(*) AS messages,
+                               COUNT(*) FILTER (WHERE attempts > 1 OR (state = 'QUEUED' AND attempts > 0)) AS retried
                         FROM message_record
                         WHERE queued_at >= timezone(:zone, CAST(:from AS timestamp))
                           AND queued_at < timezone(:zone, CAST(:to AS timestamp) + interval '1 day')
@@ -40,16 +42,18 @@ class MessageStatisticsService implements MessageStatistics {
                 .param("from", from)
                 .param("to", to)
                 .query(rs -> {
-                    counts.computeIfAbsent(MessageKind.valueOf(rs.getString("kind")),
-                                    kind -> new EnumMap<>(MessageState.class))
+                    MessageKind kind = MessageKind.valueOf(rs.getString("kind"));
+                    counts.computeIfAbsent(kind, unused -> new EnumMap<>(MessageState.class))
                             .put(MessageState.valueOf(rs.getString("state")), rs.getLong("messages"));
+                    retried.merge(kind, rs.getLong("retried"), Long::sum);
                 });
         return Stream.of(MessageKind.values()).map(kind -> {
             Map<MessageState, Long> byState = counts.getOrDefault(kind, Map.of());
             return new KindCount(kind, byState.getOrDefault(MessageState.QUEUED, 0L),
                     byState.getOrDefault(MessageState.HANDED_OVER, 0L),
                     byState.getOrDefault(MessageState.REFUSED, 0L),
-                    byState.getOrDefault(MessageState.FAILED, 0L));
+                    byState.getOrDefault(MessageState.FAILED, 0L),
+                    retried.getOrDefault(kind, 0L));
         }).toList();
     }
 }

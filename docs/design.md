@@ -169,9 +169,10 @@ Repositories persist state and do not decide policy.
 State-changing services publish typed domain events. The audit listener runs before commit and
 writes its row in the same transaction. A covered change cannot commit without its audit event.
 
-Notification listeners run after commit through Spring Modulith's event publication registry.
-Incomplete publications remain available after a restart. A failed mail handover cannot roll back
-a booking that already committed.
+Notification listeners run after commit through Spring Modulith's event publication registry, which
+records the event in the committing transaction. Incomplete publications remain available after a
+restart. A mail listener only stores the message in the outbox and completes; it never talks to the
+relay. A failed mail handover cannot roll back a booking that already committed.
 
 Events contain identifiers and non-personal change descriptions. Free text, names and email
 addresses are not copied into audit payloads. Stored event payloads evolve additively.
@@ -492,13 +493,24 @@ confirmations, participant additions and withdrawals, displaced bookings and upc
 series sends no confirmation per occurrence. Displacement informs people but does not cancel the
 booking.
 
-Each attempted message has a `message_record` with account, kind, `Message-ID`, time and state. The
-states are `queued`, `handed_over`, `refused` and `failed`. `handed_over` means the relay accepted the
-message, not that a mailbox delivered it.
+Each message is a `message_record` with account, kind, `Message-ID`, time and state. The states are
+`queued`, `handed_over`, `refused` and `failed`. `handed_over` means the relay accepted the message,
+not that a mailbox delivered it.
 
-Temporary transport failures are retried. A definite recipient refusal is not. Failed publication
-remains outstanding for a later retry. Credential creation and handover share a transaction, so a
-credential the relay never accepted does not replace the stored one.
+`message_record` is the mail outbox. A listener stores a `queued` row holding identifiers only, and
+two outbox workers hand rows over. No request thread hands a message over, so a slow relay never
+lengthens a response. A worker claims a due row with `FOR UPDATE SKIP LOCKED` under a five-minute
+lease, composes it from the current data and hands it over under the `Message-ID` chosen when it was
+queued. A pass runs after every queued commit and every five seconds, which also resumes what a
+restart left queued. A worker that dies during a handover leaves its row to the next pass after the
+lease, which can send that message a second time under the same `Message-ID`.
+
+A transport failure reschedules the row after 5, 15 and 45 seconds and fails it on the fourth
+attempt. A definite recipient refusal is not retried. A message whose booking or recipient is gone
+by the time it is due fails at once. Every outcome stays on the row with its reason, and the message
+statistics count the messages that needed a retry. Credential creation and handover share a
+transaction, so a credential the relay never accepted does not replace the stored one, and no
+plaintext credential waits in the outbox.
 
 Members choose optional message kinds. No opt-out means enabled. Credentials, displacement and
 participant-addition notices cannot be disabled because no other product path replaces them.

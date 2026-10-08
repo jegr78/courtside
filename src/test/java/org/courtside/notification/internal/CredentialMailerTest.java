@@ -1,8 +1,10 @@
 package org.courtside.notification.internal;
 
 import org.courtside.config.ClubIdentity;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.courtside.config.CredentialValidity;
+import org.courtside.identity.Person;
+import org.courtside.identity.UserAccount;
+import org.courtside.identity.UserAccountRepository;
 import org.courtside.notification.MessageKind;
 import org.courtside.shared.CredentialIssuer;
 import org.courtside.shared.CredentialsRequested;
@@ -14,16 +16,20 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,20 +42,13 @@ class CredentialMailerTest {
 
     private final CredentialIssuer credentials = mock(CredentialIssuer.class);
     private final CredentialValidity validity = mock(CredentialValidity.class);
+    private final UserAccountRepository accounts = mock(UserAccountRepository.class);
     private final ClubIdentity club = mock(ClubIdentity.class);
-    private final MailDispatch dispatch = mock(MailDispatch.class);
-    private final MailProperties properties = new MailProperties(
-            "mail.example.org", 587, "noreply@example.org", "board@example.org", null, null, false);
+    private final MessageOutbox outbox = mock(MessageOutbox.class);
+    private final List<OutgoingMail> handedOver = new ArrayList<>();
 
-    private final MessageLog messages = mock(MessageLog.class);
-
-    // A credential is not declinable, so the choice is asked and always answers yes.
-    private final MessageChoices choices = new MessageChoices(mock(JdbcClient.class));
-
-    private final CredentialMailer mailer = new CredentialMailer(credentials, validity, club,
-            new MailTemplates(),
-            new RecordedHandover(dispatch, new MailHandover(gap -> { }), properties, choices, messages),
-            Clock.fixed(NOW, ZONE));
+    private final CredentialMailer mailer = new CredentialMailer(credentials, validity, accounts, club,
+            new MailTemplates(), outbox, Clock.fixed(NOW, ZONE));
 
     @Test
     void givenAnAccountWrittenToInEnglish_whenItsCredentialIsSent_thenTheMessageIsInEnglish() {
@@ -58,7 +57,7 @@ class CredentialMailerTest {
         issues("en");
 
         // when
-        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
+        compose(ACCOUNT, MessageKind.CREDENTIALS_NEW_ACCOUNT);
 
         // then — the club default is German, so only the account's own language can produce this
         assertThat(subjectSent()).isEqualTo("Example Tennis Club: Courtside account for Jane");
@@ -72,7 +71,7 @@ class CredentialMailerTest {
         issues("de");
 
         // when
-        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.PASSWORD_RESET));
+        compose(ACCOUNT, MessageKind.CREDENTIALS_PASSWORD_RESET);
 
         // then
         assertThat(subjectSent()).isEqualTo("Example Tennis Club: neue Zugangsdaten für Jane");
@@ -86,7 +85,7 @@ class CredentialMailerTest {
         issues(null);
 
         // when
-        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
+        compose(ACCOUNT, MessageKind.CREDENTIALS_NEW_ACCOUNT);
 
         // then
         assertThat(subjectSent()).isEqualTo("Example Tennis Club: Courtside-Konto für Jane");
@@ -102,40 +101,70 @@ class CredentialMailerTest {
         issuesTo(sibling, "John", "roe.john");
 
         // when
-        mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
-        mailer.on(new CredentialsRequested(sibling, CredentialsRequested.Reason.NEW_ACCOUNT));
+        compose(ACCOUNT, MessageKind.CREDENTIALS_NEW_ACCOUNT);
+        compose(sibling, MessageKind.CREDENTIALS_NEW_ACCOUNT);
 
         // then
-        ArgumentCaptor<String> subjects = ArgumentCaptor.forClass(String.class);
-        verify(dispatch, times(2)).send(eq(ADDRESS), subjects.capture(), anyString(), anyString());
-        assertThat(subjects.getAllValues())
+        assertThat(handedOver).extracting(OutgoingMail::address).containsOnly(ADDRESS);
+        assertThat(handedOver).extracting(OutgoingMail::subject)
                 .as("one inbox holds both, so the subject is what separates them")
                 .containsExactly("Example Tennis Club: Courtside-Konto für Jane",
                         "Example Tennis Club: Courtside-Konto für John");
     }
 
     private void issuesTo(UUID accountId, String firstName, String username) {
+        addressed(accountId, ADDRESS);
         handsOver(accountId, new IssuedCredential(ADDRESS, firstName, "de", username,
                 "a-credential", NOW.plus(Duration.ofDays(7))));
     }
 
     @Test
-    void givenTheTwoReasonsAMemberIsWrittenTo_whenTheyAreSent_thenTheRecordCarriesTheMessagesOwnName() {
-        // given
-        club("de");
-        issues("de");
-
+    void givenTheTwoReasonsAMemberIsWrittenTo_whenTheyAreQueued_thenTheRowCarriesTheMessagesOwnNameAndNoSecret() {
         // when
         mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.NEW_ACCOUNT));
         mailer.on(new CredentialsRequested(ACCOUNT, CredentialsRequested.Reason.PASSWORD_RESET));
 
         // then — the template's own key, so a later message joins without identity's vocabulary
         ArgumentCaptor<MessageKind> kinds = ArgumentCaptor.forClass(MessageKind.class);
-        verify(messages, times(2)).queued(eq(ACCOUNT), kinds.capture(), anyString());
+        ArgumentCaptor<Map<String, String>> parameters = parametersCaptor();
+        verify(outbox, org.mockito.Mockito.times(2)).queue(eq(ACCOUNT), kinds.capture(), parameters.capture());
         assertThat(kinds.getAllValues()).containsExactly(
                 MessageKind.CREDENTIALS_NEW_ACCOUNT, MessageKind.CREDENTIALS_PASSWORD_RESET);
-        assertThat(kinds.getAllValues()).extracting(MessageKind::templateKey)
-                .containsExactly("credentials.newAccount", "credentials.passwordReset");
+        assertThat(parameters.getAllValues())
+                .as("a credential is generated when the message is written, so nothing waits in the outbox")
+                .allSatisfy(stored -> assertThat(stored).isEmpty());
+        verify(credentials, never()).issueFor(any(), any(), any());
+    }
+
+    @Test
+    void givenAnAccountWithoutAnAddress_whenItsCredentialIsComposed_thenNothingIsIssuedAndTheReasonIsNamed() {
+        // given
+        club("de");
+        addressed(ACCOUNT, " ");
+
+        // when / then
+        assertThatThrownBy(() -> compose(ACCOUNT, MessageKind.CREDENTIALS_NEW_ACCOUNT))
+                .isInstanceOf(MessageUndeliverableException.class)
+                .satisfies(failure -> assertThat(((MessageUndeliverableException) failure).reason())
+                        .isEqualTo("RecipientUnreachable"));
+        verify(credentials, never()).issueFor(any(), any(), any());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static ArgumentCaptor<Map<String, String>> parametersCaptor() {
+        return (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+    }
+
+    private void compose(UUID accountId, MessageKind kind) {
+        mailer.compose(new QueuedMessage(accountId, kind, Map.of()), handedOver::add);
+    }
+
+    private void addressed(UUID accountId, String address) {
+        Person person = mock(Person.class);
+        when(person.getEmail()).thenReturn(address);
+        UserAccount account = mock(UserAccount.class);
+        when(account.getPerson()).thenReturn(person);
+        when(accounts.findById(accountId)).thenReturn(Optional.of(account));
     }
 
     private String subjectSent() {
@@ -146,12 +175,9 @@ class CredentialMailerTest {
         return handedOver().body();
     }
 
-    private Message handedOver() {
-        ArgumentCaptor<String> recipient = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-        verify(dispatch).send(recipient.capture(), subject.capture(), body.capture(), anyString());
-        return new Message(recipient.getValue(), subject.getValue(), body.getValue());
+    private OutgoingMail handedOver() {
+        assertThat(handedOver).as("exactly one message is handed over").hasSize(1);
+        return handedOver.getFirst();
     }
 
     private void club(String defaultLocale) {
@@ -161,6 +187,7 @@ class CredentialMailerTest {
     }
 
     private void issues(String recipientLocale) {
+        addressed(ACCOUNT, ADDRESS);
         when(validity.validFor(any())).thenReturn(Duration.ofDays(7));
         handsOver(ACCOUNT, new IssuedCredential(ADDRESS, "Jane", recipientLocale, "doe.jane",
                 "a-credential", NOW.plus(Duration.ofDays(7))));
@@ -172,8 +199,5 @@ class CredentialMailerTest {
             handOver.accept(issued);
             return null;
         }).when(credentials).issueFor(eq(accountId), any(), any());
-    }
-
-    private record Message(String recipient, String subject, String body) {
     }
 }

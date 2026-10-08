@@ -612,6 +612,7 @@ const de = {
   "admin.statistics.members.neverSignedIn": "Nie angemeldet",
   "admin.statistics.messages.heading": "Nachrichten",
   "admin.statistics.messages.empty": "In diesem Zeitraum hat Courtside keine Nachricht verschickt.",
+  "admin.statistics.messages.retried": "Erneut versucht",
   "admin.export.title": "Daten exportieren",
   "admin.export.explain": "Die Listen des Vereins als CSV-Datei. Trennzeichen und Zeichensatz entscheiden darüber, ob eure Tabellenkalkulation die Datei richtig öffnet.",
   "admin.export.bookings": "Buchungen eines Zeitraums",

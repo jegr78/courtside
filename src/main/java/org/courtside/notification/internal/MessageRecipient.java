@@ -1,8 +1,10 @@
 package org.courtside.notification.internal;
 
 import org.courtside.identity.UserAccount;
+import org.courtside.identity.UserAccountRepository;
 
 import java.util.Optional;
+import java.util.UUID;
 
 final class MessageRecipient {
 
@@ -15,5 +17,10 @@ final class MessageRecipient {
         return account.filter(UserAccount::isEnabled)
                 .filter(found -> found.getPerson().getEmail() != null
                         && !found.getPerson().getEmail().isBlank());
+    }
+
+    static UserAccount required(UserAccountRepository accounts, UUID accountId) {
+        return reachable(accounts.findById(accountId))
+                .orElseThrow(() -> new MessageUndeliverableException("RecipientUnreachable"));
     }
 }

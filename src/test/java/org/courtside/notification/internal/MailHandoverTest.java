@@ -9,9 +9,6 @@ import org.springframework.mail.MailSendException;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -22,8 +19,7 @@ class MailHandoverTest {
 
     private static final String MESSAGE_ID = "<message@courtside.test>";
 
-    private final List<Duration> gaps = new ArrayList<>();
-    private final MailHandover handover = new MailHandover(gaps::add);
+    private final MailHandover handover = new MailHandover();
 
     @Test
     void givenARecipientTheServerRejects_whenHandingOver_thenItIsNotTriedAgain() {
@@ -36,7 +32,6 @@ class MailHandoverTest {
             throw rejected("550 5.1.1 unknown recipient");
         })).isInstanceOf(MailRecipientRefusedException.class);
         assertThat(attempts).hasValue(1);
-        assertThat(gaps).isEmpty();
     }
 
     @Test
@@ -89,7 +84,7 @@ class MailHandoverTest {
     }
 
     @Test
-    void givenAServerThatAnswers_whenHandingOver_thenItIsTriedOnceAndNothingIsRepeated() {
+    void givenAServerThatAnswers_whenHandingOver_thenItIsTriedOnce() {
         // given
         AtomicInteger attempts = new AtomicInteger();
 
@@ -97,29 +92,11 @@ class MailHandoverTest {
         handover.attempt(MESSAGE_ID, attempts::incrementAndGet);
 
         // then
-        assertThat(attempts).hasValue(1);
-        assertThat(gaps).isEmpty();
+        assertThat(attempts).as("a message the relay accepted is not handed over again").hasValue(1);
     }
 
     @Test
-    void givenAServerRestarting_whenItAnswersOnTheSecondTry_thenTheMessageIsNotGivenUpOn() {
-        // given
-        AtomicInteger attempts = new AtomicInteger();
-
-        // when
-        handover.attempt(MESSAGE_ID, () -> {
-            if (attempts.incrementAndGet() < 2) {
-                throw new IllegalStateException("the server is restarting");
-            }
-        });
-
-        // then
-        assertThat(attempts).hasValue(2);
-        assertThat(gaps).containsExactly(Duration.ofSeconds(5));
-    }
-
-    @Test
-    void givenAServerThatStaysAway_whenTheGapsAreExhausted_thenTheHandoverFailsRatherThanReturning() {
+    void givenAServerThatIsAway_whenHandingOver_thenTheAttemptFailsOnceAndLeavesTheRetryToTheOutbox() {
         // given
         AtomicInteger attempts = new AtomicInteger();
 
@@ -127,14 +104,11 @@ class MailHandoverTest {
         assertThatThrownBy(() -> handover.attempt(MESSAGE_ID, () -> {
             attempts.incrementAndGet();
             throw new IllegalStateException("nothing is listening");
-        })).isInstanceOf(MailHandoverFailedException.class);
-
-        // then — four tries inside a minute, because a neighbour that is restarting is back by then
-        assertThat(attempts).hasValue(4);
-        assertThat(gaps).containsExactly(
-                Duration.ofSeconds(5), Duration.ofSeconds(15), Duration.ofSeconds(45));
-        assertThat(gaps.stream().reduce(Duration.ZERO, Duration::plus))
-                .isLessThan(Duration.ofMinutes(2));
+        })).isInstanceOf(MailHandoverFailedException.class)
+                .satisfies(failure -> assertThat(((MailHandoverFailedException) failure).diagnosis())
+                        .as("the diagnosis names what the mail library reported")
+                        .isEqualTo("IllegalStateException"));
+        assertThat(attempts).as("one attempt per claim, so no worker sleeps on a relay").hasValue(1);
     }
 
     @Test
@@ -144,7 +118,7 @@ class MailHandoverTest {
             throw new IllegalStateException("550 5.1.1 <jane.doe@example.org> recipient unknown");
         };
 
-        // when / then — the listener is async, so whatever escapes is logged with its whole chain
+        // when / then — whatever escapes may be logged with its whole chain
         assertThatThrownBy(() -> handover.attempt(MESSAGE_ID, rejecting))
                 .satisfies(failure -> assertThat(fullTrace(failure))
                         .as("no log line may carry a member's address")
