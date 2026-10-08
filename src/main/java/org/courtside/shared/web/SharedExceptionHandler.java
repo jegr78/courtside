@@ -16,6 +16,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
+import org.springframework.orm.jpa.JpaSystemException;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.http.HttpStatus;
@@ -88,11 +90,31 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(TransactionTimedOutException.class)
     ProblemDetail handleTransactionTimeout(TransactionTimedOutException exception) {
+        return transactionTimeout();
+    }
+
+    // Hibernate enforces the same deadline itself on find, flush and commit, and only says so in its message.
+    @ExceptionHandler({JpaSystemException.class, TransactionSystemException.class,
+            org.hibernate.TransactionException.class})
+    ProblemDetail handleJpaFailure(RuntimeException exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.hibernate.TransactionException
+                    && String.valueOf(cause.getMessage()).contains("timeout expired")) {
+                return transactionTimeout();
+            }
+        }
+        ProblemDetail problem = ContainerErrorController.problemFor(HttpStatus.INTERNAL_SERVER_ERROR);
+        traceReference.addTo(problem);
+        log.warn("Answering {} for {}", HttpStatus.INTERNAL_SERVER_ERROR, problem.getType(), exception);
+        return problem;
+    }
+
+    private ProblemDetail transactionTimeout() {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
-                "The request took longer than this instance allows; nothing it changed was kept");
+                "The request took longer than this instance allows; the work that ran out of time was rolled back");
         problem.setType(URI.create("urn:courtside:error:transaction-timeout"));
         problem.setTitle("Transaction timed out");
-        problem.setProperty("retryable", false);
+        problem.setProperty("retryable", true);
         logAnswered(problem);
         return problem;
     }

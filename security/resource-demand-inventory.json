@@ -483,7 +483,7 @@
       "concurrencyOrRateBound": "Spring's default single scheduling thread serializes these methods in this application; database and mail work retain their own transaction and delivery bounds.",
       "executionModel": "The in-process scheduler invokes each method on its configured cadence; cleanup uses transactions and reminders claim each booking before publishing events.",
       "failureBehavior": "A failed transactional sweep rolls back and remains eligible later; a claimed reminder commits before asynchronous delivery records its own outcome.",
-      "consumerTimeoutBehavior": "There is no HTTP consumer. A delayed or failed run is retried by the next fixed-delay or cron invocation rather than by extending an arbitrary timeout.",
+      "consumerTimeoutBehavior": "Each sweep allows its statements ten minutes, so an accumulated backlog cannot cancel the run that clears it. There is no HTTP consumer. A delayed or failed run is retried by the next fixed-delay or cron invocation rather than by extending an arbitrary timeout.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/BookingReminderSchedule.java",
         "src/main/java/org/courtside/dataexchange/internal/PreviewExpirySchedule.java",

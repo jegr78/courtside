@@ -19,8 +19,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 @TestPropertySource(properties = {
-        "courtside.database.statement-timeout=1s",
-        "courtside.database.request-transaction-timeout=1s"
+        "courtside.database.statement-timeout=2s",
+        "courtside.database.request-transaction-timeout=2s"
 })
 class DatabaseDeadlineIntegrationTest extends AbstractIntegrationTest {
 
@@ -61,7 +61,7 @@ class DatabaseDeadlineIntegrationTest extends AbstractIntegrationTest {
         // when
         Throwable failure = catchThrowable(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             insertProbe();
-            jdbc.sql("SELECT pg_sleep(3)").query(Object.class).list();
+            jdbc.sql("SELECT pg_sleep(5)").query(Object.class).list();
         }));
 
         // then
@@ -77,14 +77,14 @@ class DatabaseDeadlineIntegrationTest extends AbstractIntegrationTest {
         // when
         Throwable failure = catchThrowable(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             insertProbe();
-            jdbc.sql("SELECT pg_sleep(0.8)").query(Object.class).list();
-            pause(400);
+            jdbc.sql("SELECT pg_sleep(1)").query(Object.class).list();
+            pause(1500);
             jdbc.sql("SELECT 1").query(Integer.class).single();
         }));
 
         // then
         assertThat(failure).as("a request transaction ends at its deadline, not at its last statement's")
-                .isInstanceOfAny(TransactionTimedOutException.class, QueryTimeoutException.class);
+                .isInstanceOf(TransactionTimedOutException.class);
         assertThat(probes()).as("nothing the expired transaction wrote survives").isZero();
     }
 
@@ -96,8 +96,8 @@ class DatabaseDeadlineIntegrationTest extends AbstractIntegrationTest {
         // when / then
         assertThatCode(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             insertProbe();
-            jdbc.sql("SELECT pg_sleep(0.8)").query(Object.class).list();
-            pause(400);
+            jdbc.sql("SELECT pg_sleep(1)").query(Object.class).list();
+            pause(1500);
             jdbc.sql("SELECT 1").query(Integer.class).single();
         })).as("scheduled and startup work is not held to a request's deadline").doesNotThrowAnyException();
         assertThat(probes()).isEqualTo(1);
@@ -112,8 +112,8 @@ class DatabaseDeadlineIntegrationTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatCode(() -> declared.executeWithoutResult(status -> {
-            jdbc.sql("SELECT pg_sleep(0.8)").query(Object.class).list();
-            pause(400);
+            jdbc.sql("SELECT pg_sleep(1)").query(Object.class).list();
+            pause(1500);
             jdbc.sql("SELECT 1").query(Integer.class).single();
         })).as("a path that states a longer deadline keeps it").doesNotThrowAnyException();
     }
@@ -124,6 +124,27 @@ class DatabaseDeadlineIntegrationTest extends AbstractIntegrationTest {
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(interrupted);
+        }
+    }
+
+    @Test
+    void givenAMigrationLeftAConnectionWithoutATimeout_whenTheMigrationStrategyFinishes_thenEveryPooledConnectionHasItAgain(
+            @Autowired javax.sql.DataSource dataSource,
+            @Autowired org.springframework.boot.flyway.autoconfigure.FlywayMigrationStrategy strategy) throws Exception {
+        // given
+        RequestContextHolder.resetRequestAttributes();
+        try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+            statement.execute("SET statement_timeout TO 0");
+        }
+
+        // when
+        strategy.migrate(org.mockito.Mockito.mock(org.flywaydb.core.Flyway.class));
+
+        // then
+        for (int borrowed = 0; borrowed < 4; borrowed++) {
+            assertThat(jdbc.sql("SHOW statement_timeout").query(String.class).single())
+                    .as("no connection Flyway used goes back to the application without its timeout")
+                    .isEqualTo("2s");
         }
     }
 }

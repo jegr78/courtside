@@ -990,7 +990,7 @@ const en: Record<keyof typeof de, string> = {
   "error.type.request-rate-limited": "Too many requests at once. Please wait a moment and try again.",
   "error.type.undeclared-parameter": "The page sent a request Courtside cannot process. Reload the page and try again.",
   "error.type.statement-timeout": "This took too long to work out. Ask for a shorter period.",
-  "error.type.transaction-timeout": "This took longer than Courtside allows, and nothing was changed. Please try again with less at once.",
+  "error.type.transaction-timeout": "This took longer than Courtside allows and was not saved. Please try again.",
   "error.type.facility-utilisation-period-invalid": "No utilisation can be reported for this period. Check its start and end.",
   "error.type.statistics-period-invalid": "No statistics can be read for this period. Check its start and end.",
   "error.type.idempotency-key-reused": "The page sent a request Courtside cannot process. Reload the page and try again.",

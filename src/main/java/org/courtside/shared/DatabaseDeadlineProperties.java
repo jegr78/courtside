@@ -1,5 +1,6 @@
 package org.courtside.shared;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import org.hibernate.validator.constraints.time.DurationMax;
 import org.hibernate.validator.constraints.time.DurationMin;
@@ -13,5 +14,14 @@ import java.time.Duration;
 record DatabaseDeadlineProperties(
         @NotNull @DurationMin(seconds = 1) @DurationMax(minutes = 5) Duration statementTimeout,
         @NotNull @DurationMin(seconds = 1) @DurationMax(minutes = 5) Duration requestTransactionTimeout,
-        @NotNull @DurationMin(seconds = 1) @DurationMax(minutes = 30) Duration reportTransactionTimeout) {
+        @NotNull @DurationMin(seconds = 1) @DurationMax(minutes = 30) Duration reportTransactionTimeout,
+        @NotNull @DurationMin(seconds = 1) @DurationMax(hours = 1) Duration maintenanceStatementTimeout) {
+
+    @AssertTrue(message = "statement-timeout must not exceed request-transaction-timeout, "
+            + "which must not exceed report-transaction-timeout")
+    boolean isOrdered() {
+        return statementTimeout == null || requestTransactionTimeout == null || reportTransactionTimeout == null
+                || statementTimeout.compareTo(requestTransactionTimeout) <= 0
+                && requestTransactionTimeout.compareTo(reportTransactionTimeout) <= 0;
+    }
 }

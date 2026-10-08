@@ -9,6 +9,7 @@ import org.courtside.shared.IssuedResetCode;
 import org.courtside.shared.PasswordResetCodeIssuer;
 import org.courtside.shared.PasswordResetRedeemed;
 import org.courtside.shared.SecurityEventLog;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,6 +24,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class PasswordResetTokenService implements PasswordResetCodeIssuer {
 
+    private final DatabaseDeadlines deadlines;
     private final PasswordResetTokenRepository tokens;
     private final UserAccountRepository accounts;
     private final PasswordResetTokenValidity validity;
@@ -106,6 +108,7 @@ class PasswordResetTokenService implements PasswordResetCodeIssuer {
 
     @Transactional
     void deleteExpired() {
+        deadlines.allowMaintenanceStatements();
         tokens.deleteExpired(clock.instant());
     }
 }

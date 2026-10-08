@@ -13,7 +13,7 @@ final class RequestDeadlineTransactionManager extends JpaTransactionManager {
 
     RequestDeadlineTransactionManager(EntityManagerFactory entityManagerFactory, Duration requestTimeout) {
         super(entityManagerFactory);
-        this.requestTimeoutSeconds = Math.toIntExact(Math.max(1, requestTimeout.toSeconds()));
+        this.requestTimeoutSeconds = Math.toIntExact(Math.max(1, (requestTimeout.toMillis() + 999) / 1000));
     }
 
     // Startup, scheduled and executor work has no caller waiting, so only a request inherits the deadline.
