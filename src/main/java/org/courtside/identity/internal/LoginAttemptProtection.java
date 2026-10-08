@@ -127,9 +127,26 @@ class LoginAttemptProtection {
                 .map(until -> new LoginBlock(scope.name(), Duration.between(now, until)));
     }
 
+    // Clearing the bucket would let one valid account reset its address's failures against other accounts.
     @Transactional
-    void clear(String address) {
-        clear(Scope.ADDRESS, normalizeAddress(address));
+    void releaseSuccessfulAttempt(String address) {
+        String subjectHash = hash(normalizeAddress(address));
+        lock(Scope.ADDRESS, subjectHash);
+        jdbc.sql("""
+                        DELETE FROM login_attempt_limit
+                        WHERE scope = 'ADDRESS' AND subject_hash = :subjectHash AND attempt_count <= 1
+                        """)
+                .param("subjectHash", subjectHash)
+                .update();
+        jdbc.sql("""
+                        UPDATE login_attempt_limit
+                        SET attempt_count = attempt_count - 1,
+                            blocked_until = CASE WHEN attempt_count - 1 >= :maxFailures THEN blocked_until END
+                        WHERE scope = 'ADDRESS' AND subject_hash = :subjectHash
+                        """)
+                .param("subjectHash", subjectHash)
+                .param("maxFailures", properties.address().maxFailures())
+                .update();
     }
 
     @Transactional
