@@ -773,6 +773,48 @@ test("given a failed booking request, when a new booking persists, then rejected
   assert.equal(result.outcome, "failed");
 });
 
+function admissionRefusedBooking(input, key) {
+  const original = fixture(true).journal.operations[0];
+  const request = { ...original.request, idempotencyKey: key };
+  request.requestFingerprint = resourceBookingRequestFingerprint(request);
+  input.journal.operations.push({ ...original, id: `refused-${key}`, status: 429, responseBookingId: null,
+    problemType: "urn:courtside:error:request-rate-limited", retryAfterSeconds: 1, request });
+}
+
+test("given a booking key refused by admission, when no booking carries it, then the refusal left no effect", () => {
+  // given
+  const input = fixture(false);
+  admissionRefusedBooking(input, "security-run-example-refused");
+  // when
+  const result = compareResourceIntegrity(input);
+  // then
+  assert.equal(result.outcome, "passed", JSON.stringify(result.findings));
+});
+
+test("given a booking key only ever refused by admission, when a booking carries it, then integrity fails by name", () => {
+  // given
+  const input = fixture(true);
+  input.journal.operations[0].status = 429;
+  Object.assign(input.journal.operations[0], { responseBookingId: null,
+    problemType: "urn:courtside:error:operation-capacity-exhausted", retryAfterSeconds: 1 });
+  // when
+  const result = compareResourceIntegrity(input);
+  // then
+  assert.equal(result.outcome, "failed");
+  assert.ok(result.findings.some(({ code }) => code === "refused-request-created-booking"),
+    "a request the admission control refused must not have created the booking its key names");
+});
+
+test("given a replay refused by admission after its original succeeded, when the booking exists, then the original explains it", () => {
+  // given
+  const input = fixture(true);
+  admissionRefusedBooking(input, input.journal.operations[0].request.idempotencyKey);
+  // when
+  const result = compareResourceIntegrity(input);
+  // then
+  assert.equal(result.outcome, "passed", JSON.stringify(result.findings));
+});
+
 test("given a successful replay, when it returns the same ID and request, then only one set of effects is required", () => {
   // given
   const input = fixture(true);
