@@ -14,6 +14,8 @@ const browserJourneySuccess = new Rate("browser_journey_success");
 const browserJourneyDuration = new Trend("browser_journey_duration", true);
 const technicalErrors = new Rate("technical_errors");
 const unexpectedServerErrors = new Counter("unexpected_server_errors");
+const browserVerifierReloads = new Counter("browser_verifier_reloads");
+let firstPageLoad = { open: false, verifierChanged: false };
 
 export const options = {
   scenarios: {
@@ -56,6 +58,12 @@ function observe(page) {
   page.on("requestfailed", (request) => {
     const description = failedRequest(request, target);
     if (!description) return;
+    // A freshly started Chromium can change its certificate verifier while its first page loads.
+    if (firstPageLoad.open && request.failure()?.errorText === "net::ERR_CERT_VERIFIER_CHANGED") {
+      firstPageLoad.verifierChanged = true;
+      report(`${description} on the first page load; reloading once`);
+      return;
+    }
     report(description);
     browserErrors.add(1);
     technicalErrors.add(true);
@@ -93,7 +101,16 @@ export default async function () {
     page = await browser.newPage();
     observe(page);
     step = "open sign-in";
-    await page.goto(`${target}/login`, { waitUntil: "networkidle" });
+    firstPageLoad = { open: true, verifierChanged: false };
+    try {
+      await page.goto(`${target}/login`, { waitUntil: "networkidle" });
+    } finally {
+      firstPageLoad.open = false;
+    }
+    if (firstPageLoad.verifierChanged) {
+      browserVerifierReloads.add(1);
+      await page.reload({ waitUntil: "networkidle" });
+    }
     await page.getByTestId("login-view").waitFor();
     await page.getByTestId("username").fill(username());
     await page.getByTestId("password").fill(credentials.password);
