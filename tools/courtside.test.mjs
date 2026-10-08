@@ -227,6 +227,7 @@ test("given immutable PERFORMANCE HTTPS identity options, when the actual reques
 function immutablePerformanceHarness({ wrongSource = false, runnerFailure = false } = {}) {
   const text = readFileSync(new URL("./courtside.mjs", import.meta.url), "utf8");
   const body = text.slice(text.indexOf("async function runPerformance(options)"), text.indexOf("async function runFunnelPerformance(options)"));
+  const logs = text.slice(text.indexOf("function retainContainerLogs("), text.indexOf("export function funnelPerformanceRunPlan("));
   const events = [];
   const files = new Map();
   const state = { password: "private-test-password", immutableImages: { sourceCommit: "c".repeat(40) } };
@@ -235,7 +236,13 @@ function immutablePerformanceHarness({ wrongSource = false, runnerFailure = fals
     readPerformanceState: () => state, performanceRelaySettings: () => ({}),
     assertPerformanceReuse: () => { events.push("proof"); return { runtime: { oomKilled: false, restartCount: 0 } }; },
     mkdirSync: () => {}, perfComposePlan: (args) => ({ command: "docker", args, environment: {} }),
-    boundedImageCommand: (_execute, command, args) => { events.push({ command, args, bounded: true }); }, spawnSync: () => { throw new Error("Unexpected process closure"); },
+    performanceContainerLogPlan: (stdout) => ({ command: "docker", args: ["compose", "logs"], environment: {}, stdout }),
+    openSync: (file, flags, mode) => { events.push({ opened: file, flags, mode }); return 7; },
+    writeSync: (descriptor, text) => events.push({ written: descriptor, text }), closeSync: () => {},
+    boundedImageCommand: (_execute, command, args) => { events.push({ command, args, bounded: true }); }, spawnSync: (command, args, options) => {
+      if (!args.includes("logs")) throw new Error("Unexpected process closure");
+      events.push({ logs: true, options }); return { status: 0 };
+    },
     runInteractive: () => { events.push("unbounded"); files.set("raw-summary.json", "{}"); },
     localRequest: async (request) => { events.push({ identityRequest: request }); return { statusCode: 200, body: JSON.stringify({ environment: "PERFORMANCE", version: "1.2.3", commit: (wrongSource ? "d" : "c").repeat(40) }), certificatePin: "pin" }; },
     performanceIdentityRequest, parseJson: JSON.parse, assertPerformanceSource,
@@ -243,9 +250,10 @@ function immutablePerformanceHarness({ wrongSource = false, runnerFailure = fals
     runOwnedProcess: async (_command, _args, options) => { events.push({ runner: true, options }); if (runnerFailure) { await options.cleanup(); throw new Error("Runner refused"); } files.set("raw-summary.json", "{}"); },
     randomBytes: () => Buffer.from("owned-runner"), cleanupPerformanceRunner: () => events.push("runner-cleanup"),
     readFileSync: (file) => file.endsWith("contract.json") ? JSON.stringify({ profiles: { smoke: { limits: { maximumDuration: "1m" } } } }) : file.endsWith("root.crt") ? "trusted-ca" : files.get("raw-summary.json"),
-    existsSync: () => files.has("raw-summary.json"), writePrivateFile: () => events.push("private-proof"), writeFileSync: () => events.push("summary"), rmSync: () => {},
+    existsSync: () => files.has("raw-summary.json"),
+    writePrivateFile: () => events.push("private-proof"), writeFileSync: () => events.push("summary"), rmSync: () => {},
     buildPerformanceResult: () => ({}), validatePerformanceResult: () => {}, durationSeconds: () => 60 };
-  return { events, run: runInNewContext(`${body}; runPerformance`, context) };
+  return { events, run: runInNewContext(`${logs}${body}; runPerformance`, context) };
 }
 
 test("given proven immutable PERFORMANCE state, when the actual runner producer executes, then bound certificate and traffic commands and retain before-after runtime evidence", async () => {
@@ -266,6 +274,11 @@ test("given proven immutable PERFORMANCE state, when the actual runner producer 
   assert.equal(request.secure, true);
   assert.equal(request.ca, "trusted-ca");
   assert.equal(request.servername, "proxy");
+  const logs = harness.events.find(event => event?.logs);
+  assert.equal(logs?.options.timeout, 60000, "the container logs are read within a time bound like every other immutable command");
+  assert.equal(logs.options.stdio[1], 7, "the logs stream into the file, because a full run outgrows an in-memory bound");
+  assert.ok(harness.events.some(event => event?.opened?.endsWith("/containers.log") && event.mode === 0o600),
+    "the container logs are kept as a private file in the result directory");
 });
 
 test("given a different immutable PERFORMANCE source, when the actual producer observes TLS identity, then refuse before any traffic command", async () => {
@@ -285,6 +298,8 @@ test("given a failed immutable PERFORMANCE runner, when the actual producer abor
   assert.ok(harness.events.includes("runner-cleanup"));
   assert.ok(harness.events.includes("private-proof"));
   assert.ok(!harness.events.includes("summary"));
+  assert.ok(harness.events.some(event => event?.logs),
+    "a failed runner still leaves the container logs that explain it");
 });
 
 test("given an explicitly proven prebuilt PERF selection, when starting through the producer, then never execute a package or image build", async () => {

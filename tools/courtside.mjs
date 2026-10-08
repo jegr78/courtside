@@ -1189,12 +1189,21 @@ export function performanceContainerLogPlan(stdout) {
   return { ...perfComposePlan(["logs", "--no-color", "--timestamps", "app", "proxy", "db"]), stdout };
 }
 
-function retainContainerLogs(resultDirectory) {
+function retainContainerLogs(resultDirectory, state) {
   const file = join(resultDirectory, "containers.log");
   let output;
   try {
     output = openSync(file, "w", 0o600);
-    runInteractive(performanceContainerLogPlan(output));
+    const plan = performanceContainerLogPlan(output);
+    if (state?.immutableImages) {
+      // Written straight to the file: the proxy's access log outgrows any in-memory bound in a full run.
+      const result = spawnSync(plan.command, plan.args, { cwd: root, env: plan.environment, shell: false,
+        stdio: ["ignore", output, "pipe"], timeout: 60000, maxBuffer: 1024 * 1024 });
+      if (result.error) throw result.error;
+      if (result.status !== 0) throw new Error(`${plan.command} exited with ${result.status ?? result.signal}`);
+    } else {
+      runInteractive(plan);
+    }
   } catch (error) {
     const reason = `Container logs unavailable: ${error.message}\n`;
     if (output === undefined) process.stderr.write(reason);
@@ -1272,7 +1281,7 @@ async function runPerformance(options) {
   } catch (error) {
     runFailure = error;
   }
-  retainContainerLogs(resultDirectory);
+  retainContainerLogs(resultDirectory, state);
   process.stdout.write(`k6 and container logs: ${resultDirectory}\n`);
   if (state.immutableImages) {
     const after = assertPerformanceReuse(state, { root, environment: { ...process.env, ...performanceRelaySettings(),
