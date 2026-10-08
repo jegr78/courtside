@@ -88,6 +88,19 @@ record archive and image identities, platform and tool versions, and individual 
 credentials or target addresses. Provider-owned DNS, routing, reputation and delivery observations
 remain warnings or unknown; they never become software passes.
 
+The repository UAT smoke also accepts an existing local engine-native image ID and full source commit
+for isolated native Linux qualification. It verifies the clean source checkout, image filesystem,
+TLS source response, image and host architecture, and running image identity without building or
+pulling. Its deployment, authentication, booking-persistence and hardening receipt follows owned
+cleanup. This local identity is not a registry manifest digest or release-archive qualification.
+The isolated lifecycle does not use persistent UAT or host Funnel state.
+
+Explicit local PERFORMANCE and SECURITY starts reuse a production image and its separately
+selected fixture overlay. Their proof binds the clean source commit, actual parent layers,
+compiled application and helper bytes, and observed engine/runtime image identities. Seeding
+uses the retained fixture proof. Runtime image drift or foreign ownership refuses execution or
+cleanup. Imported images remain shared inputs and are retained after owned resource cleanup.
+
 Two interfaces are public compatibility contracts:
 
 1. documented environment variables used by the application and reference deployment;

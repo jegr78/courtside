@@ -130,6 +130,105 @@ access without publishing a port, use `uat-db-shell`. External clients use datab
 username `courtside`, password `courtside-uat`, and JDBC URL
 `jdbc:postgresql://127.0.0.1:5433/courtside`.
 
+### Immutable local image qualification
+
+The existing UAT smoke producer can qualify an already imported image on a native Linux host.
+It does not build, pull, publish, or substitute an image. The clean checkout must have the exact
+requested source commit. Image filesystem `git.properties`, image architecture, native host
+architecture and the running container image must agree. The selected engine-native image ID
+can differ from the observed container runtime image ID. Actual inspected metadata establishes
+that mapping; neither ID certifies an OCI config or registry manifest digest.
+
+The checkout and every evidence-directory ancestor, including ignored `build/` directories,
+must be operator-owned and protected from foreign writers. This path assumes trusted filesystem
+ancestors; it does not provide an adversarial no-follow guarantee for symlinks. Before native
+candidate execution, resolve the checkout and evidence paths, reject symlink ancestors, and
+verify ownership and private directory/file modes of `0700` and `0600`. The dedicated VM payload
+must contain regular files.
+
+Use a fresh `courtside-uat-qualification-<run>` project and four explicit, distinct ports. The
+persistent UAT ports are refused. All pinned Compose dependencies must already exist locally.
+The Docker endpoint must be the local default Unix socket.
+
+```bash
+COURTSIDE_UAT_HTTP_PORT=28081 COURTSIDE_UAT_HTTPS_PORT=28443 \
+COURTSIDE_UAT_SHARED_PORT=28083 COURTSIDE_OPERATIONAL_LOG_PORT=21515 \
+node tools/courtside.uat-smoke.mjs \
+  --confirm courtside-uat-qualification-example \
+  --image "sha256:<64-lowercase-hex>" --source-commit "<40-lowercase-hex>"
+```
+
+Replace both identity placeholders with the actual image ID and full source commit. This path
+runs the existing deployment, authentication, booking-persistence and hardening checks.
+It reserves its project, rejects existing or foreign resources and deletes only recorded owned
+resources. It never queries or changes host Tailscale Serve or Funnel state. Changed source,
+Compose configuration, ownership or image identity stops the lifecycle and refuses cleanup of
+unproven resources. Inspect the private ownership evidence before any manual recovery.
+
+The app and database each have a 1 GiB memory and swap ceiling, two CPUs and 256 PIDs. The native
+application entrypoint and its heap policy remain unchanged. Dependency limits remain bounded
+without removing the reference deployment's privilege or network restrictions. Each native
+command has a 60-second watchdog and bounded output.
+HTTP requests use loopback only, a 30-second absolute deadline and a 4 MiB response ceiling.
+HTTPS uses the owned proxy CA with certificate and hostname verification enabled.
+
+Private attempt, candidate, provenance and sanitized log artifacts are stored under
+`build/immutable-qualification/<project>/`. The directory is fresh per attempt and mode `0700`;
+JSON and log artifacts use `0600`. A passed `qualification.json` is written only after every
+check, certificate-reuse verification and owned cleanup succeeds. Existing UAT build and
+published-version paths are unchanged.
+
+### Immutable PERFORMANCE and SECURITY reuse
+
+Select two distinct, locally imported engine-native IDs and the exact full source commit.
+The fixture image must contain the complete production layer sequence plus exactly one fixture
+layer and preserve its native configuration. The proof compares actual image file hashes with
+the checkout's existing compiled and packaged artifacts, including the fixed SECURITY helpers.
+These artifacts must already exist. A dirty checkout, stale helper, changed application byte,
+remote engine or missing dependency refuses the explicit path.
+
+```bash
+node tools/courtside.mjs perf --image "sha256:<production-engine-id>" \
+  --fixtures-image "sha256:<fixture-engine-id>" --source-commit "<40-lowercase-hex>"
+node tools/courtside.mjs security example-run --image "sha256:<production-engine-id>" \
+  --fixtures-image "sha256:<fixture-engine-id>" --source-commit "<40-lowercase-hex>"
+node tools/courtside.mjs security-seed example-run "sha256:<production-engine-id>" \
+  --state build/security/example-run/environment.json
+```
+
+Each engine ID placeholder represents 64 lowercase hexadecimal characters after `sha256:`.
+Both flags are required together with the production selection. `--skip-verify` cannot be used
+with immutable reuse. Existing starts without this selection retain their build behavior.
+The explicit path never falls back to a build or pull. Its pinned dependencies and PERFORMANCE
+runner must also be available locally.
+
+PERFORMANCE retains the fixture proof, owned Compose override, resource identities and startup
+telemetry in private local state. `perf-run` checks actual runtime identity before and after
+traffic and compares the TLS source commit with the selected commit. `perf-reset courtside-perf`
+checks the retained proof and ownership before removing the project and reservation. SECURITY
+persists its selection in private run state; `security-seed` revalidates that proof and the app
+runtime instead of rebuilding a fixture. Recovery checks ownership and retained image mapping.
+Both lifecycles retain imported production and fixture images.
+
+Missing or corrupt PERFORMANCE state cannot select a legacy reset, stop, logs or DB-shell
+while an immutable override or reservation remains.
+Legacy PERFORMANCE starts are refused until the owned immutable reset succeeds; an override cannot bypass this refusal.
+SECURITY retains exact container IDs and effective Config/HostConfig and rejects same-image replacements or configuration drift before
+seed, verification and cleanup. UAT checks initial effective settings against rendered Compose;
+only the planned bootstrap app recreation may introduce its replacement container.
+
+Image proof has a 120-second monotonic budget with at most 256 commands, each limited to ten
+seconds and 4 MiB output. PERFORMANCE startup has a 180-second monotonic budget. SECURITY
+startup and seed commands have a 180-second watchdog. Existing resource caps, TLS deployment
+and network isolation remain in effect. A passing pure test is not native qualification;
+the selected production subject still needs the existing four-check qualification receipt.
+
+Probe cleanup has its own 30-second budget and verifies the exact CID and owner before removal.
+Proof failures retain their original error and write a private, non-qualifying cleanup receipt
+under `build/immutable-image-reuse-failures/`; the CLI reports the bounded cleanup outcome and
+whether that receipt was retained. Immutable PERFORMANCE TLS identity requests retain CA and
+hostname validation and enforce a 30-second absolute deadline and 4 MiB response limit.
+
 ### Sample booking history
 
 Run `node tools/courtside.mjs uat-seed-bookings` first. This is a read-only preview that reports

@@ -23,6 +23,11 @@ import {
   recoverSecurityRun, requestEmergencyStop, securityRunContract
 } from "./security-runner.mjs";
 import { fixtureImagePlan, stageFixtureClasses } from "./fixture-artifact.mjs";
+import { immutableImageSelection, inspectReusableImages, verifyReusableImages,
+  assertPerformanceReuseEmpty, preparePerformanceReuse, startPerformanceReuse,
+  assertPerformanceReuse, resetPerformanceReuse, boundedImageCommand, cleanupPerformanceRunner,
+  assertPerformanceStateOwnership } from "./immutable-image-reuse.mjs";
+import { runOwnedProcess } from "./security-passive-deployment.mjs";
 import { containerIdentity, createMailCertificate } from "./mail-relay-certificate.mjs";
 import { executeLocalCheck, localCheckPrerequisites } from "./local-check.mjs";
 import { isGitHubLogin } from "./nightly-failure-tracker.mjs";
@@ -61,7 +66,6 @@ const funnelPerformanceConfirmation = "courtside-uat-funnel";
 const perfStateFile = join(root, "build", "perf-environment.json");
 const perfMailDirectory = join(root, "build", "perf-mail");
 
-// The restore smoke tears its stack down in minutes; this one is left standing between runs.
 const PERF_MAIL_CERTIFICATE_DAYS = 30;
 const privateAddresses = new BlockList();
 [
@@ -107,11 +111,19 @@ export function parseArguments(argv) {
     target: undefined, baseline: undefined, output: undefined, runId: undefined, authorization: undefined,
     state: undefined,
     qualification: undefined,
-    attempt: undefined, image: undefined, planOnly: false, forceFull: false, rerun: false
+    attempt: undefined, image: undefined, fixturesImage: undefined, sourceCommit: undefined,
+    planOnly: false, forceFull: false, rerun: false
   };
+  let explicitImage = false;
   for (let index = 0; index < flags.length; index++) {
     const flag = flags[index];
-    if (flag === "--plan" && command === "check") {
+    if (["--image", "--fixtures-image", "--source-commit"].includes(flag)
+        && ["perf", "security"].includes(command)) {
+      const key = { "--image": "image", "--fixtures-image": "fixturesImage", "--source-commit": "sourceCommit" }[flag];
+      if (options[key] !== undefined) throw new Error("Duplicate immutable image selection");
+      options[key] = requiredOptionValue(flags, ++index, flag);
+      if (flag === "--image") explicitImage = true;
+    } else if (flag === "--plan" && command === "check") {
       options.planOnly = true;
     } else if (flag === "--full" && command === "check") {
       options.forceFull = true;
@@ -195,6 +207,10 @@ export function parseArguments(argv) {
     } else {
       throw new Error(`Unknown option for ${command}: ${flag}`);
     }
+  }
+  if (explicitImage || options.fixturesImage !== undefined || options.sourceCommit !== undefined) {
+    immutableImageSelection(options);
+    if (options.skipVerify) throw new Error("Immutable image reuse cannot select a build/verify option");
   }
   if (command === "status" && !options.environment) {
     throw new Error("status requires the environment 'dev', 'uat', or 'perf'");
@@ -356,12 +372,12 @@ export function perfComposeArgs(withDatabasePort = false, withTelemetry = false)
     ...(withTelemetry ? ["-f", perfTelemetryComposeFile] : [])];
 }
 
-// Compose treats a variable the file requires and the environment omits as an error, not as empty.
-export function perfComposePlan(trailing, { dbPort = false, telemetry = false, environment } = {}) {
+export function perfComposePlan(trailing, { dbPort = false, telemetry = false, environment, state = readPerformanceState() } = {}) {
   return {
     command: "docker",
-    args: [...perfComposeArgs(dbPort, telemetry), ...trailing],
-    environment: environment ?? { ...process.env, ...performanceRelaySettings() }
+    args: [...(state?.immutableImages ? state.immutableDeployment.compose : perfComposeArgs(dbPort, telemetry)), ...trailing],
+    environment: { ...(environment ?? { ...process.env, ...performanceRelaySettings() }),
+      ...(state?.immutableImages ? { COURTSIDE_PERF_SHARED_PASSWORD: state.password } : {}) }
   };
 }
 
@@ -580,7 +596,7 @@ async function main() {
       return;
     }
     validateNode();
-    if (["build", "verify", "dev", "dev-debug", "uat", "uat-share", "perf"].includes(options.command) && !options.version) {
+    if (["build", "verify", "dev", "dev-debug", "uat", "uat-share", "perf"].includes(options.command) && !options.version && !options.image) {
       validateJava();
     }
     if (!["build", "check", "help", "perf-compare", "security-plan", "security-report", "security-stop"].includes(options.command)) {
@@ -589,6 +605,11 @@ async function main() {
     await execute(options);
   } catch (failure) {
     process.stderr.write(`courtside: ${failure.message}\n`);
+    if (failure.imageProbeCleanup) {
+      const outcome = failure.imageProbeCleanup.outcome === "passed" ? "passed" : "failed";
+      const receipt = failure.imageProbeFailureReceipt ? "retained" : "unavailable";
+      process.stderr.write(`courtside: image probe cleanup: ${outcome}; private failure receipt ${receipt}\n`);
+    }
     process.exitCode = 1;
   }
 }
@@ -655,15 +676,24 @@ async function execute(options) {
     return;
   }
   if (options.command === "perf") {
-    startPerformance(options);
+    await startPerformance(options);
     return;
   }
   if (["perf-stop", "perf-logs", "perf-db-shell"].includes(options.command)) {
+    const state = readPerformanceState();
+    assertPerformanceStateOwnership(state, { root });
+    if (state?.immutableImages) assertPerformanceReuse(state, { root });
     runInteractive(lifecyclePlan(options.command, options));
     return;
   }
   if (options.command === "perf-reset") {
-    runInteractive(perfResetPlan());
+    const state = readPerformanceState();
+    assertPerformanceStateOwnership(state, { root });
+    if (state?.immutableImages) {
+      resetPerformanceReuse(state, { root, environment: { ...process.env, ...performanceRelaySettings(),
+        COURTSIDE_PERF_SHARED_PASSWORD: state.password } });
+      rmSync(state.immutableDeployment.override);
+    } else runInteractive(perfResetPlan());
     rmSync(perfStateFile, { force: true });
     rmSync(perfMailDirectory, { recursive: true, force: true });
     process.stdout.write("Performance data and local credentials removed.\n");
@@ -686,7 +716,8 @@ async function execute(options) {
     return;
   }
   if (options.command === "security") {
-    await startSecurityEnvironment(options.runId, options.image);
+    await startSecurityEnvironment(options.runId, options.image, options.fixturesImage
+      ? { fixturesImage: options.fixturesImage, sourceCommit: options.sourceCommit } : undefined);
     return;
   }
   if (options.command === "security-seed") {
@@ -702,8 +733,6 @@ async function execute(options) {
     return;
   }
   if (options.command === "security-run") {
-    // Loaded here rather than at the top: these five bind a schema validator as they load, and every
-    // other command of this tool has to start on a checkout where nothing has been installed yet.
     const {
       runPassiveDeploymentAssessment, runAuthorizationAssessment, renderAuthenticatedZapPlan,
       renderAuthenticatedZapCanaryRetestPlan,
@@ -881,8 +910,6 @@ export function uatStartupSummary(password, needsBootstrap, options) {
   ].join("\n") + "\n";
 }
 
-// Scanning the string for the host let any URL that merely contained it name a repository, so the
-// remote is parsed and its host has to be the one it claims to be.
 export function repositoryFromRemote(url) {
   const remote = (url ?? "").trim();
   const scp = /^(?:[^@/\s]+@)?(?<host>[^:/\s]+):(?<path>\S+)$/.exec(remote);
@@ -907,7 +934,6 @@ export function checkoutRepository() {
   return remote.status === 0 ? repositoryFromRemote(remote.stdout) : undefined;
 }
 
-// A fork qualifies the image it published, not the one this repository happens to be named after.
 export function uatImageReference(version, environment = process.env, checkout = checkoutRepository) {
   if (!version) return uatInstance(environment).image;
   const named = environment.GITHUB_REPOSITORY || checkout();
@@ -919,7 +945,6 @@ export function uatImageReference(version, environment = process.env, checkout =
   if (beyond.length > 0 || !isGitHubLogin(owner) || !/^[A-Za-z0-9._-]{1,100}$/.test(name ?? "")) {
     throw new Error(`Cannot name the image to qualify: '${named}' is not a GitHub repository`);
   }
-  // A registry takes a lowercase name, and a club's own is whatever they capitalised it as.
   return `ghcr.io/${owner.toLowerCase()}/${name.toLowerCase()}:${version}`;
 }
 
@@ -952,7 +977,6 @@ export function redactUatDiagnostics(value, secrets) {
     try {
       decoded = decodeURIComponent(raw);
     } catch {
-      // A malformed percent sequence still has its raw and safely encoded forms removed.
     }
     for (const representation of new Set([raw, encodeURIComponent(raw), decoded])) {
       redacted = redacted.split(representation).join("[REDACTED]");
@@ -969,32 +993,65 @@ function uatEnvironment(version, password) {
   };
 }
 
-function startPerformance(options) {
-  const state = readPerformanceState();
+export async function startPerformance(options, runtime = {}) {
+  const immutable = options.image !== undefined || options.fixturesImage !== undefined || options.sourceCommit !== undefined;
+  const injected = Object.keys(runtime).length !== 0;
+  const required = immutable
+    ? ["readState", "inspect", "assertEmpty", "relay", "prepare", "writeState", "start", "assertRuntime", "output"]
+    : ["readState", "assertStateOwnership", "run", "relay", "writeState", "extract", "stage", "output"];
+  if (injected && required.some((key) => typeof runtime[key] !== "function")) {
+    throw new Error("Performance execution seam is incomplete");
+  }
+  if (immutable) {
+    const selection = immutableImageSelection(options);
+    if (options.skipVerify) throw new Error("Immutable PERFORMANCE does not permit skipped source proof");
+    if ((runtime.readState ?? readPerformanceState)()) throw new Error("PERFORMANCE state already exists");
+    const proof = (runtime.inspect ?? inspectReusableImages)({ ...selection, root });
+    (runtime.assertEmpty ?? assertPerformanceReuseEmpty)({ root });
+    const password = newBootstrapPassword();
+    const environment = { ...process.env, COURTSIDE_PERF_SHARED_PASSWORD: password,
+      ...(runtime.relay ?? performanceRelayCertificate)() };
+    const deployment = (runtime.prepare ?? preparePerformanceReuse)(proof, { root, environment, telemetry: options.telemetry, dbPort: options.dbPort });
+    const record = { password, dbPort: options.dbPort, telemetry: options.telemetry,
+      immutableImages: proof, immutableDeployment: deployment };
+    const save = runtime.writeState ?? ((value) => writePrivateFile(perfStateFile, `${JSON.stringify(value, null, 2)}\n`));
+    save(record);
+    await (runtime.start ?? startPerformanceReuse)(deployment, { root, environment });
+    const observed = (runtime.assertRuntime ?? assertPerformanceReuse)(record, { root, environment });
+    record.immutableResources = observed.resources;
+    record.immutableStartup = observed.runtime;
+    save(record);
+    (runtime.output ?? ((message) => process.stdout.write(message)))(performanceStartupSummary(password, options));
+    return;
+  }
+  const run = runtime.run ?? runInteractive;
+  const state = (runtime.readState ?? readPerformanceState)();
+  if (state?.immutableImages || state?.immutableDeployment) throw new Error("Immutable PERFORMANCE requires owned reset before legacy start");
+  (runtime.assertStateOwnership ?? assertPerformanceStateOwnership)(state, { root });
   const password = state?.password ?? newBootstrapPassword();
   const environment = {
     ...process.env,
     COURTSIDE_PERF_SHARED_PASSWORD: password,
-    ...performanceRelayCertificate()
+    ...(runtime.relay ?? performanceRelayCertificate)()
   };
-  writePrivateFile(perfStateFile,
-    `${JSON.stringify({ password, dbPort: options.dbPort, telemetry: options.telemetry }, null, 2)}\n`);
-  runInteractive(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
-  extractApplicationLayers();
+  const record = { password, dbPort: options.dbPort, telemetry: options.telemetry };
+  if (runtime.writeState) runtime.writeState(record);
+  else writePrivateFile(perfStateFile, `${JSON.stringify(record, null, 2)}\n`);
+  run(processPlans(parseArguments([options.skipVerify ? "build" : "verify"])).single);
+  (runtime.extract ?? extractApplicationLayers)();
   const [productionImage, fixtureImage] = performanceImagePlans();
-  runInteractive(productionImage);
-  stageFixtureClasses();
-  runInteractive(fixtureImage);
-  runInteractive(perfComposePlan(["up", "-d", "--wait", "--force-recreate", "--remove-orphans"],
+  run(productionImage);
+  (runtime.stage ?? stageFixtureClasses)();
+  run(fixtureImage);
+  run(perfComposePlan(["up", "-d", "--wait", "--force-recreate", "--remove-orphans"],
     { dbPort: options.dbPort, telemetry: options.telemetry, environment }));
-  process.stdout.write(performanceStartupSummary(password, options));
+  (runtime.output ?? ((message) => process.stdout.write(message)))(performanceStartupSummary(password, options));
 }
 
 export function performanceRelaySettings(directory = perfMailDirectory) {
   return { COURTSIDE_PERF_MAIL_CERT_DIR: directory, COURTSIDE_PERF_MAIL_USER: containerIdentity() };
 }
 
-// Issuing is the starting command's job alone: a stop that reissued would replace what the relay serves.
 export function performanceRelayCertificate(directory = perfMailDirectory) {
   rmSync(directory, { recursive: true, force: true });
   mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -1033,12 +1090,19 @@ export function writePrivateFile(file, content, platform = process.platform, fil
 }
 
 function readPerformanceState() {
+  let state;
   try {
-    const state = JSON.parse(readFileSync(perfStateFile, "utf8"));
-    return typeof state.password === "string" && state.password.length >= 12 ? state : undefined;
-  } catch {
-    return undefined;
+    state = JSON.parse(readFileSync(perfStateFile, "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return undefined;
+    throw new Error("PERFORMANCE state is corrupt or unreadable", { cause: error });
   }
+  if (!state || typeof state !== "object" || Array.isArray(state)
+      || typeof state.password !== "string" || state.password.length < 12
+      || Boolean(state.immutableImages) !== Boolean(state.immutableDeployment)) {
+    throw new Error("PERFORMANCE state is corrupt or incomplete");
+  }
+  return state;
 }
 
 export function perfResetPlan() {
@@ -1063,12 +1127,22 @@ export function performanceImage(service) {
   return reference;
 }
 
-export function performanceIdentityRequest(ca) {
+export function performanceIdentityRequest(ca, { immutable = false } = {}) {
   const target = new URL(perfTarget);
-  return { secure: true, port: 9443, path: "/api/source", ca, servername: target.hostname, headers: { Host: target.host } };
+  return { secure: true, port: 9443, path: "/api/source", ca, servername: target.hostname, headers: { Host: target.host },
+    ...(immutable ? { absoluteDeadlineMilliseconds: 30000, responseLimitBytes: 4 * 1024 * 1024 } : {}) };
 }
 
-export function performanceRunPlan(options, resultDirectory, certificateFile, runId = "test-run", certificatePin) {
+export function assertPerformanceSource(source, state) {
+  if (source?.environment !== "PERFORMANCE") {
+    throw new Error("The target did not identify itself as the disposable PERFORMANCE environment");
+  }
+  if (state?.immutableImages && source.commit !== state.immutableImages.sourceCommit) {
+    throw new Error("Immutable PERFORMANCE runtime source does not match the selected commit");
+  }
+}
+
+export function performanceRunPlan(options, resultDirectory, certificateFile, runId = "test-run", certificatePin, state) {
   const contract = JSON.parse(readFileSync(join(root, "performance", "contract.json"), "utf8"));
   const browserRun = contract.profiles[options.profile].kind === "browser";
   if (browserRun && !certificatePin) {
@@ -1078,7 +1152,7 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
   return {
     command: "docker",
     args: [
-      "run", "--rm", ...containerUserArguments(), "--network", "courtside-perf_load",
+      "run", "--rm", ...(state?.immutableImages ? ["--pull=never"] : []), ...containerUserArguments(), "--network", "courtside-perf_load",
       "-e", `PERF_PROFILE=${options.profile}`,
       "-e", `PERF_RUN_ID=${runId}`,
       "-e", `PERF_TARGET=${perfTarget}`,
@@ -1088,6 +1162,7 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       ...(browserRun ? [
         "-e", "HOME=/tmp",
         "-e", "K6_BROWSER_HEADLESS=true",
+        "-e", "K6_BROWSER_EXECUTABLE_PATH=/tmp/courtside-browser-runtime/chromium",
         "-e", `K6_BROWSER_ARGS=no-sandbox,ignore-certificate-errors-spki-list=${certificatePin}`
       ] : []),
       ...(options.remoteWrite ? [
@@ -1099,7 +1174,9 @@ export function performanceRunPlan(options, resultDirectory, certificateFile, ru
       "-v", `${perfStateFile}:/run/courtside/perf.json:ro`,
       "-v", `${certificateFile}:/certs/root.crt:ro`,
       "-v", `${resultDirectory}:/results`,
+      ...(browserRun ? ["--entrypoint", "/bin/sh"] : []),
       image,
+      ...(browserRun ? ["/scripts/browser-entrypoint.sh"] : []),
       "run", "--log-output=file=/results/k6.log", ...(options.remoteWrite ? ["--out", "experimental-prometheus-rw"] : []),
       "--tag", `testid=${runId}`, "--tag", `profile=${options.profile}`,
       "--summary-trend-stats", "avg,min,med,max,p(50),p(75),p(90),p(95),p(99)",
@@ -1112,12 +1189,21 @@ export function performanceContainerLogPlan(stdout) {
   return { ...perfComposePlan(["logs", "--no-color", "--timestamps", "app", "proxy", "db"]), stdout };
 }
 
-function retainContainerLogs(resultDirectory) {
+function retainContainerLogs(resultDirectory, state) {
   const file = join(resultDirectory, "containers.log");
   let output;
   try {
     output = openSync(file, "w", 0o600);
-    runInteractive(performanceContainerLogPlan(output));
+    const plan = performanceContainerLogPlan(output);
+    if (state?.immutableImages) {
+      // Written straight to the file: the proxy's access log outgrows any in-memory bound in a full run.
+      const result = spawnSync(plan.command, plan.args, { cwd: root, env: plan.environment, shell: false,
+        stdio: ["ignore", output, "pipe"], timeout: 60000, maxBuffer: 1024 * 1024 });
+      if (result.error) throw result.error;
+      if (result.status !== 0) throw new Error(`${plan.command} exited with ${result.status ?? result.signal}`);
+    } else {
+      runInteractive(plan);
+    }
   } catch (error) {
     const reason = `Container logs unavailable: ${error.message}\n`;
     if (output === undefined) process.stderr.write(reason);
@@ -1155,6 +1241,8 @@ async function runPerformance(options) {
   if (!state) {
     throw new Error("Performance credentials are unavailable; run 'perf' first");
   }
+  const before = state.immutableImages ? assertPerformanceReuse(state, { root,
+    environment: { ...process.env, ...performanceRelaySettings(), COURTSIDE_PERF_SHARED_PASSWORD: state.password } }) : undefined;
   if (options.remoteWrite && !state.telemetry) {
     throw new Error("Prometheus remote write requires a performance environment started with --telemetry");
   }
@@ -1162,22 +1250,44 @@ async function runPerformance(options) {
   const runId = startedAt.replaceAll(":", "-");
   const resultDirectory = join(root, "build", "performance", options.profile, runId);
   const certificateFile = join(resultDirectory, "root.crt");
-  mkdirSync(resultDirectory, { recursive: true });
-  runInteractive(perfComposePlan(
-    ["cp", "proxy:/data/caddy/pki/authorities/local/root.crt", certificateFile]));
-  const identity = await localRequest(performanceIdentityRequest(readFileSync(certificateFile)));
+  mkdirSync(resultDirectory, { recursive: true, ...(state.immutableImages ? { mode: 0o700 } : {}) });
+  const certificatePlan = perfComposePlan(
+    ["cp", "proxy:/data/caddy/pki/authorities/local/root.crt", certificateFile], { state });
+  if (state.immutableImages) boundedImageCommand(spawnSync, certificatePlan.command, certificatePlan.args,
+    root, certificatePlan.environment);
+  else runInteractive(certificatePlan);
+  const identity = await localRequest(performanceIdentityRequest(readFileSync(certificateFile), { immutable: Boolean(state.immutableImages) }));
   const source = parseJson(identity.body);
-  if (identity.statusCode !== 200 || source.environment !== "PERFORMANCE") {
+  if (identity.statusCode !== 200) {
     throw new Error("The target did not identify itself as the disposable PERFORMANCE environment");
   }
+  assertPerformanceSource(source, state);
   let runFailure;
   try {
-    runInteractive(performanceRunPlan(options, resultDirectory, certificateFile, runId, identity.certificatePin));
+    const plan = performanceRunPlan(options, resultDirectory, certificateFile, runId, identity.certificatePin, state);
+    if (state.immutableImages) {
+      const contract = JSON.parse(readFileSync(join(root, "performance", "contract.json"), "utf8"));
+      const seconds = durationSeconds(contract.profiles[options.profile]?.limits?.maximumDuration);
+      if (!Number.isSafeInteger(seconds) || seconds < 1 || seconds > 7200) throw new Error("Immutable performance duration is outside its contract");
+      const owner = randomBytes(16).toString("hex");
+      const cidFile = join(resultDirectory, "runner.cid");
+      plan.args.splice(1, 0, "--cidfile", cidFile, "--label", `org.courtside.performance.run=${owner}`,
+        "--label", "com.docker.compose.project=courtside-perf");
+      await runOwnedProcess(plan.command, plan.args, { timeoutMilliseconds: (seconds + 120) * 1000,
+        outputLimitBytes: 4 * 1024 * 1024, stopFile: "/dev/null/courtside-performance-stop-disabled",
+        environment: plan.environment ?? process.env,
+        cleanup: async () => cleanupPerformanceRunner({ cidFile, owner, root, environment: plan.environment ?? process.env }) });
+    } else runInteractive(plan);
   } catch (error) {
     runFailure = error;
   }
-  retainContainerLogs(resultDirectory);
+  retainContainerLogs(resultDirectory, state);
   process.stdout.write(`k6 and container logs: ${resultDirectory}\n`);
+  if (state.immutableImages) {
+    const after = assertPerformanceReuse(state, { root, environment: { ...process.env, ...performanceRelaySettings(),
+      COURTSIDE_PERF_SHARED_PASSWORD: state.password } });
+    writePrivateFile(join(resultDirectory, "immutable-runtime.json"), `${JSON.stringify({ before, after }, null, 2)}\n`);
+  }
   const rawSummary = join(resultDirectory, "raw-summary.json");
   if (!existsSync(rawSummary)) {
     rmSync(certificateFile, { force: true });
@@ -1203,7 +1313,8 @@ async function runPerformance(options) {
     throw runFailure ?? error;
   }
   validatePerformanceResult(result);
-  writeFileSync(join(resultDirectory, "summary.json"), `${JSON.stringify(result, null, 2)}\n`);
+  if (state.immutableImages) writePrivateFile(join(resultDirectory, "summary.json"), `${JSON.stringify(result, null, 2)}\n`);
+  else writeFileSync(join(resultDirectory, "summary.json"), `${JSON.stringify(result, null, 2)}\n`);
   rmSync(certificateFile, { force: true });
   process.stdout.write(`Performance results: ${resultDirectory}\n`);
   if (runFailure) throw runFailure;
@@ -1835,8 +1946,6 @@ export function uatResetPlans(all, environment = process.env) {
   }
   return [
     { command: "docker", args: [...uatComposeArgs(false, environment), "down", "--remove-orphans"] },
-    // A reset states that nothing is left, so it also answers for an environment that never existed:
-    // without --force, docker refuses a volume it cannot find.
     { command: "docker", args: ["volume", "rm", "--force", `${uatInstance(environment).project}_db`] }
   ];
 }
@@ -2245,8 +2354,16 @@ function readPerformanceHealth(plan) {
 }
 
 export function localRequest({ secure, port, path, method = "GET", headers = {}, body, ca, servername,
-  probeDeadlineMilliseconds }) {
+  probeDeadlineMilliseconds, absoluteDeadlineMilliseconds, responseLimitBytes }) {
+  if (absoluteDeadlineMilliseconds !== undefined && (!Number.isSafeInteger(absoluteDeadlineMilliseconds)
+      || absoluteDeadlineMilliseconds < 1 || absoluteDeadlineMilliseconds > 30000)
+      || responseLimitBytes !== undefined && (!Number.isSafeInteger(responseLimitBytes)
+        || responseLimitBytes < 1 || responseLimitBytes > 4 * 1024 * 1024)) {
+    throw new Error("Identity request is outside its HTTP budget");
+  }
   return new Promise((resolveResponse, rejectResponse) => {
+    let deadline;
+    const reject = (error) => { clearTimeout(deadline); rejectResponse(error); };
     const request = (secure ? httpsRequest : httpRequest)({
       hostname: "127.0.0.1", port, path, method, headers: { Host: `localhost:${port}`, ...headers },
       ...(secure ? { rejectUnauthorized: true, servername: servername ?? "localhost", ca } : {})
@@ -2254,16 +2371,34 @@ export function localRequest({ secure, port, path, method = "GET", headers = {},
       const peerCertificate = secure ? response.socket.getPeerCertificate() : undefined;
       const certificatePin = peerCertificate?.raw ? certificatePublicKeyPin(peerCertificate.raw) : undefined;
       let responseBody = "";
+      let responseBytes = 0;
       response.setEncoding("utf8");
-      response.on("data", (chunk) => { responseBody += chunk; });
-      response.on("end", () => resolveResponse({
+      response.on("data", (chunk) => {
+        responseBytes += Buffer.byteLength(chunk);
+        if (responseLimitBytes !== undefined && responseBytes > responseLimitBytes) {
+          const error = new Error("Identity response exceeded its byte budget");
+          reject(error);
+          response.destroy();
+          request.destroy(error);
+        } else responseBody += chunk;
+      });
+      response.once("error", reject);
+      response.on("end", () => { clearTimeout(deadline); resolveResponse({
         statusCode: response.statusCode ?? 0, headers: response.headers, body: responseBody, certificatePin
-      }));
+      }); });
     });
     if (probeDeadlineMilliseconds) {
       request.setTimeout(probeDeadlineMilliseconds, () => request.destroy(new Error("Request timed out")));
     }
-    request.once("error", rejectResponse);
+    if (absoluteDeadlineMilliseconds !== undefined) {
+      deadline = setTimeout(() => {
+        const error = new Error("Identity request absolute deadline exceeded");
+        reject(error);
+        request.destroy(error);
+      }, absoluteDeadlineMilliseconds);
+    }
+    request.once("error", reject);
+    request.once("close", () => clearTimeout(deadline));
     if (body) request.write(body);
     request.end();
   });
@@ -2280,7 +2415,7 @@ function parseJson(value) {
 }
 
 function showHelp() {
-  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|contention|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> <IMAGE_DIGEST>\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json> [--compose-root <absolute-checkout>]\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
+  process.stdout.write(`Usage: node tools/courtside.mjs <command>\n\nCommands:\n  build\n  verify\n  check [--plan] [--full] [--rerun]\n  dev\n  dev-debug [--suspend]\n  dev-stop\n  dev-reset\n  uat [--version <tag>] [--skip-verify] [--db-port] [--no-credential-output]\n  uat share\n  uat-stop\n  uat-logs\n  uat-db-shell\n  uat-cert [file]\n  uat-backup [file]\n  uat-restore <file> --confirm courtside-uat\n  uat-reset courtside-uat [--all]\n  uat-seed-bookings [--confirm courtside-uat]\n  perf --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT> [--db-port] [--telemetry]\n  perf [--skip-verify] [--db-port] [--telemetry] [--no-credential-output]\n  perf-run <smoke|baseline|peak|stress|contention|soak|browser> [--confirm courtside-perf] [--fresh] [--remote-write]\n  perf-run funnel-smoke --target <https-origin> --confirm courtside-uat-funnel\n  perf-promote <summary.json> --confirm courtside-perf\n  perf-compare <summary.json> --baseline <baseline.json> --output <comparison.json>\n  perf-stop\n  perf-logs\n  perf-db-shell\n  perf-reset courtside-perf\n  security <RUN_ID> --image <ENGINE_ID> --fixtures-image <ENGINE_ID> --source-commit <COMMIT>\n  security <RUN_ID> <IMAGE_DIGEST> [--fixtures-image <ENGINE_ID> --source-commit <COMMIT>]\n  security-seed <RUN_ID> <IMAGE_DIGEST> --state <environment.json> [--compose-root <absolute-checkout>]\n  security-verify <RUN_ID>\n  security-plan <RUN_ID> <safe|active|destructive>\n  security-run <RUN_ID> <safe|active|destructive> --qualification <qualification.json> [--authorize <exact-authorization>]\n  security-report <RUN_ID> [--attempt <number>]\n  security-stop <RUN_ID>\n  security-cleanup <RUN_ID>\n  security-recover <RUN_ID> --attempt <number>\n  security-reset <RUN_ID> --confirm courtside-security-<RUN_ID>\n  status <dev|uat|perf> [--json]\n`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;

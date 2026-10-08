@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { randomInt } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { prepareBrowserBooking } from "../performance/browser-journey.js";
-import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import * as browserDiagnostics from "../performance/browser-diagnostics.js";
 
@@ -237,4 +242,207 @@ test("given a console warning on the page, when a journey runs, then the run log
     `a swallowed frontend failure must reach the run log, got ${JSON.stringify(logged)}`);
   assert.deepEqual(metrics.get("browser_errors").filter(value => value > 0), [1],
     "only the failed journey counts; the warning itself is not a browser error");
+});
+
+function browserLauncherFixture(context) {
+  const root = mkdtempSync(join(tmpdir(), "browser-launcher-"));
+  const profiles = [];
+  const native = join(root, "native-chromium");
+  const launcher = join(root, "launcher");
+  const legacy = join(root, "legacy-nssdb");
+  const source = readFileSync(fileURLToPath(new URL("../performance/chromium-headless.sh", import.meta.url)), "utf8");
+  writeFileSync(native, '#!/bin/sh\nprintf "%s\\n" "$XDG_DATA_HOME" "$HOME" "$@"\n', { mode: 0o700 });
+  writeFileSync(launcher, source.replace("exec /usr/bin/chromium", `exec "${native}"`)
+    .replaceAll("/tmp/.pki/nssdb", legacy)
+    .replaceAll("/tmp/k6browser-data-", root + "/k6browser-data-"), { mode: 0o700 });
+  context.after(() => {
+    for (const profile of profiles) rmSync(profile, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  });
+  const profilePath = () => {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const profile = join(root, `k6browser-data-${randomInt(0, 2 ** 32)}`);
+      try {
+        mkdirSync(profile, { mode: 0o700 });
+        profiles.push(profile);
+        return profile;
+      } catch (failure) {
+        if (failure.code !== "EEXIST") throw failure;
+      }
+    }
+    throw new Error("No private browser profile available");
+  };
+  const run = (args, environment = {}) => spawnSync("/bin/sh", [launcher, ...args], {
+    env: { ...process.env, HOME: "/tmp", ...environment }, encoding: "utf8", timeout: 1000
+  });
+  return { root, legacy, profiles, profilePath, run };
+}
+
+const browserFlags = ["--headless", "--disable-features=ExistingA,ExistingB", "--ignore-certificate-errors-spki-list=verified-pin"];
+const posixOnly = { skip: process.platform === "win32" };
+
+test("given two private k6 profiles, when launching Chromium, then preserve TLS and separate their XDG data directories", posixOnly, context => {
+  // given
+  const fixture = browserLauncherFixture(context);
+  const profiles = [fixture.profilePath(), fixture.profilePath()];
+  // when
+  const results = profiles.map(profile => fixture.run([...browserFlags, `--user-data-dir=${profile}`]));
+  // then
+  for (let index = 0; index < results.length; index++) {
+    const profile = profiles[index];
+    assert.equal(results[index].status, 0, results[index].stderr);
+    assert.deepEqual(results[index].stdout.trim().split("\n"), [profile + "/courtside-data", "/tmp",
+      ...browserFlags, `--user-data-dir=${profile}`,
+      "--disable-features=ExistingA,ExistingB,WebUIOmniboxPopup,WebUIOmniboxAimPopup"]);
+    assert.equal(statSync(profile + "/courtside-data").mode & 0o777, 0o700);
+  }
+  assert.notEqual(profiles[0], profiles[1]);
+});
+
+test("given missing or duplicate feature switches, when launching Chromium, then reject before creating runtime data", posixOnly, context => {
+  // given
+  const fixture = browserLauncherFixture(context);
+  const profile = fixture.profilePath();
+  // when
+  const missing = fixture.run(["--headless", `--user-data-dir=${profile}`]);
+  const duplicate = fixture.run([...browserFlags, "--disable-features=Other", `--user-data-dir=${profile}`]);
+  // then
+  assert.equal(missing.status, 64);
+  assert.equal(duplicate.status, 64);
+  assert.equal(missing.stdout + duplicate.stdout, "");
+  assert.equal(existsSync(profile + "/courtside-data"), false);
+});
+
+test("given a missing or foreign profile path, when launching Chromium, then refuse to use another data directory", posixOnly, context => {
+  // given
+  const fixture = browserLauncherFixture(context);
+  // when
+  const results = [fixture.run(browserFlags),
+    fixture.run([...browserFlags, `--user-data-dir=${fixture.root}`]),
+    fixture.run([...browserFlags, "--user-data-dir=/tmp/k6browser-data-123/../../foreign"])];
+  // then
+  for (const result of results) {
+    assert.equal(result.status, 64);
+    assert.equal(result.stdout, "");
+  }
+  assert.equal(existsSync(fixture.root + "/courtside-data"), false);
+});
+
+test("given duplicated or symlinked profiles, when launching Chromium, then reject before following their data paths", posixOnly, context => {
+  // given
+  const fixture = browserLauncherFixture(context);
+  const profile = fixture.profilePath();
+  const link = fixture.profilePath();
+  rmdirSync(link);
+  symlinkSync(fixture.root, link);
+  // when
+  const duplicate = fixture.run([...browserFlags, `--user-data-dir=${profile}`, `--user-data-dir=${profile}`]);
+  const symlink = fixture.run([...browserFlags, `--user-data-dir=${link}`]);
+  // then
+  assert.equal(duplicate.status, 64);
+  assert.equal(symlink.status, 64);
+  assert.equal(existsSync(profile + "/courtside-data"), false);
+  assert.equal(existsSync(fixture.root + "/courtside-data"), false);
+});
+
+test("given retained browser runtime data, when launching again, then preserve the data and refuse reuse", posixOnly, context => {
+  // given
+  const fixture = browserLauncherFixture(context);
+  const profile = fixture.profilePath();
+  mkdirSync(profile + "/courtside-data", { mode: 0o700 });
+  writeFileSync(profile + "/courtside-data/marker", "retained");
+  // when
+  const result = fixture.run([...browserFlags, `--user-data-dir=${profile}`]);
+  // then
+  assert.notEqual(result.status, 0);
+  assert.equal(result.stdout, "");
+  assert.equal(readFileSync(profile + "/courtside-data/marker", "utf8"), "retained");
+});
+
+test("given a legacy trust directory or broken link, when launching Chromium, then refuse shared certificate state", posixOnly, context => {
+  // given
+  const fixture = browserLauncherFixture(context);
+  const profile = fixture.profilePath();
+  mkdirSync(fixture.legacy, { mode: 0o700 });
+  // when
+  const directory = fixture.run([...browserFlags, `--user-data-dir=${profile}`]);
+  rmdirSync(fixture.legacy);
+  symlinkSync(fixture.root + "/missing", fixture.legacy);
+  const link = fixture.run([...browserFlags, `--user-data-dir=${profile}`]);
+  // then
+  assert.equal(directory.status, 64);
+  assert.equal(link.status, 64);
+  assert.equal(existsSync(profile + "/courtside-data"), false);
+});
+
+test("given command syntax inside an argument, when launching Chromium, then pass it literally without executing it", posixOnly, context => {
+  // given
+  const fixture = browserLauncherFixture(context);
+  const profile = fixture.profilePath();
+  const marker = fixture.root + "/executed";
+  const argument = `--label=$(touch ${marker})`;
+  // when
+  const result = fixture.run([...browserFlags, argument, `--user-data-dir=${profile}`]);
+  // then
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.split("\n").includes(argument));
+  assert.equal(existsSync(marker), false);
+});
+
+test("given a read-only launcher source, when the browser entrypoint starts, then copy it privately and forward the original k6 arguments", posixOnly, context => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "browser-entrypoint-"));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  const source = join(root, "source");
+  const runtime = join(root, "runtime");
+  const native = join(root, "k6");
+  const entrypoint = join(root, "entrypoint");
+  const launcher = readFileSync(fileURLToPath(new URL("../performance/chromium-headless.sh", import.meta.url)));
+  writeFileSync(source, launcher, { mode: 0o400 });
+  writeFileSync(native, '#!/bin/sh\nprintf "%s\\n" "$@"\n', { mode: 0o700 });
+  writeFileSync(entrypoint, readFileSync(fileURLToPath(new URL("../performance/browser-entrypoint.sh", import.meta.url)), "utf8")
+    .replaceAll("/tmp/courtside-browser-runtime", runtime)
+    .replace("/scripts/chromium-headless.sh", source)
+    .replace("exec /usr/bin/k6", `exec "${native}"`), { mode: 0o700 });
+  // when
+  const result = spawnSync("/bin/sh", [entrypoint, "run", "--tag", "testid=original", "/scripts/browser.js"],
+    { encoding: "utf8", timeout: 1000 });
+  // then
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.stdout.trim().split("\n"), ["run", "--tag", "testid=original", "/scripts/browser.js"]);
+  assert.equal(statSync(runtime).mode & 0o777, 0o700);
+  assert.equal(statSync(runtime + "/chromium").mode & 0o777, 0o700);
+  assert.deepEqual(readFileSync(runtime + "/chromium"), launcher);
+  assert.deepEqual(readFileSync(source), launcher);
+  assert.equal(statSync(source).mode & 0o777, 0o400);
+  const repeated = spawnSync("/bin/sh", [entrypoint, "run"], { encoding: "utf8", timeout: 1000 });
+  assert.notEqual(repeated.status, 0);
+  assert.equal(repeated.stdout, "");
+});
+
+test("given an existing nonnumeric profile, when launching Chromium, then refuse a directory not generated by k6", posixOnly, context => {
+  // given
+  const fixture = browserLauncherFixture(context);
+  const original = fixture.profilePath();
+  const profile = original + "invalid";
+  renameSync(original, profile);
+  fixture.profiles[fixture.profiles.indexOf(original)] = profile;
+  // when
+  const result = fixture.run([...browserFlags, `--user-data-dir=${profile}`]);
+  // then
+  assert.equal(result.status, 64);
+  assert.equal(result.stdout, "");
+  assert.equal(existsSync(profile + "/courtside-data"), false);
+});
+
+test("given another browser home, when launching Chromium, then refuse an unverified legacy trust location", posixOnly, context => {
+  // given
+  const fixture = browserLauncherFixture(context);
+  const profile = fixture.profilePath();
+  // when
+  const result = fixture.run([...browserFlags, `--user-data-dir=${profile}`], { HOME: "/different-browser-home" });
+  // then
+  assert.equal(result.status, 64);
+  assert.equal(result.stdout, "");
+  assert.equal(existsSync(profile + "/courtside-data"), false);
 });

@@ -41,7 +41,10 @@ manual until a dedicated runner provides stable resources. The Funnel profile is
 requires an operator to supervise `uat share` separately.
 
 Browser containers retain the UID and GID of the private credential owner and use `/tmp` as their
-home directory, since the image's default home belongs to another UID. The trusted loopback identity
+home directory, since the image's default home belongs to another UID. Each Chromium process uses a
+private XDG data directory inside its k6 profile. The fixed launcher retains k6's existing
+arguments and disabled features while suppressing Chromium's unused WebUI omnibox popups.
+Browser journeys, TLS pins, error gates and deployment resource budgets remain unchanged. The trusted loopback identity
 probe uses the browser target's hostname for SNI and HTTP Host, so Chromium receives that target's
 verified public-key pin rather than a distinct `localhost` certificate. TLS verification stays enabled.
 The target is a canonical HTTPS origin without an explicit default port, matching Chromium's
