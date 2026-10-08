@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
@@ -393,10 +393,10 @@ test("given a reservation command with incomplete output, when its actual owned 
   }
 });
 
-function smokeRequest({ failedCheck } = {}) {
+function smokeRequest({ failedCheck, session = "example", echoSession = false } = {}) {
   let authenticated = false;
   const csrf = "__Host-XSRF-TOKEN=example; Path=/; Secure; SameSite=Lax";
-  const cookie = "__Host-SESSION=example; Path=/; Secure; HttpOnly; SameSite=Lax";
+  const cookie = `__Host-SESSION=${session}; Path=/; Secure; HttpOnly; SameSite=Lax`;
   const csp = "base-uri 'none'; img-src 'self' https:;";
   return async ({ secure, port, path, method = "GET", body, headers = {} }) => {
     const response = (statusCode, responseBody = "", extra = {}) => ({ statusCode, body: responseBody,
@@ -418,7 +418,7 @@ function smokeRequest({ failedCheck } = {}) {
     if (path === "/api/session") {
       if (method === "POST") authenticated = true;
       return response(method === "POST" && failedCheck === "authentication" ? 403 : 200,
-        JSON.stringify({ authenticated }), { "set-cookie": [csrf, ...(authenticated ? [cookie] : [])],
+        JSON.stringify({ authenticated, ...(echoSession ? { echoed: session } : {}) }), { "set-cookie": [csrf, ...(authenticated ? [cookie] : [])],
           "strict-transport-security": "max-age=31536000", "x-robots-tag": "noindex, nofollow" });
     }
     if (path === "/api/account/initial-password") return response(204);
@@ -485,13 +485,39 @@ test("given a refused sign-in, when immutable smoke fails, then the attempt reco
   }
 });
 
+test("given a refusal that echoes the session cookie, when immutable smoke records it, then the record holds no session value", async () => {
+  // given
+  const { runUatSmoke } = await import("./courtside.uat-smoke.mjs");
+  const root = mkdtempSync(join(tmpdir(), "immutable-redaction-"));
+  const { execute } = lifecycleExecute({ root });
+  const session = "session-canary-7f3a";
+  try {
+    // when
+    await assert.rejects(runUatSmoke({ args, environment: nativeEnvironment, repository: root, execute,
+      request: smokeRequest({ failedCheck: "authentication", session, echoSession: true }), platform: "linux", architecture: "x64" }));
+    // then
+    const record = readFileSync(join(root, "build", "immutable-qualification", project, "attempt.json"), "utf8");
+    assert.doesNotMatch(record, new RegExp(session), "a session value the server set must never reach the evidence");
+    assert.match(record, /\[REDACTED\]/, "the echoed value must be visibly redacted, not dropped");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("given a legacy UAT smoke that fails after start, when it stops, then the receipt says failed and the lifecycle output is kept", async () => {
   // given
   const { runUatSmoke } = await import("./courtside.uat-smoke.mjs");
   const root = mkdtempSync(join(tmpdir(), "legacy-failure-record-"));
   const legacyProject = "courtside-uat";
+  mkdirSync(join(root, "build", "uat-smoke"), { recursive: true });
+  writeFileSync(join(root, "build", "uat-smoke", "qualification.json"), '{"schemaVersion":1,"status":"passed"}\n');
+  writeFileSync(join(root, "build", "uat-smoke", "lifecycle.log"), "$ courtside from an earlier run\n");
+  let staleReceiptBeforeFirstCommand;
   const execute = (command, commandArgs) => {
-    if (command === process.execPath) return { status: 0, stdout: `ran ${commandArgs[1]}\n`, stderr: "" };
+    if (command === process.execPath) {
+      staleReceiptBeforeFirstCommand ??= existsSync(join(root, "build", "uat-smoke", "qualification.json"));
+      return { status: 0, stdout: `ran ${commandArgs[1]}\n`, stderr: "" };
+    }
     if (commandArgs.includes("ps")) return { status: 1, stdout: "", stderr: "no such service: app" };
     return { status: 0, stdout: "", stderr: "" };
   };
@@ -511,6 +537,9 @@ test("given a legacy UAT smoke that fails after start, when it stops, then the r
     const lifecycle = readFileSync(lifecyclePath, "utf8");
     assert.match(lifecycle, /ran uat\n/, "the start output must be kept beside the evidence");
     assert.match(lifecycle, /ran uat-reset\n/, "the reset output must be kept beside the evidence");
+    assert.equal(staleReceiptBeforeFirstCommand, false, "an earlier receipt must be gone before this run does anything");
+    assert.equal(lifecycle.match(/^\$ courtside /gm).length, 3,
+      "the log holds this run only: the initial reset, the start and the final reset");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -19,7 +19,7 @@ function bounded(value, limit) {
 }
 
 function answered(response) {
-  return `HTTP ${response.statusCode}: ${bounded(response.body, 500)}`;
+  return `HTTP ${response.statusCode}: ${response.body ?? ""}`;
 }
 
 export async function runUatSmoke({ args = process.argv.slice(2), environment = process.env,
@@ -27,7 +27,16 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
   platform = process.platform, architecture = process.arch } = {}) {
   const root = repository;
   const immutable = immutableQualificationOptions(args, environment);
-  const request = suppliedRequest ?? (immutable ? immutableQualificationRequest : localRequest);
+  const send = suppliedRequest ?? (immutable ? immutableQualificationRequest : localRequest);
+  const observedTokens = new Set();
+  const request = async (options) => {
+    const response = await send(options);
+    for (const cookie of response.headers?.["set-cookie"] ?? []) {
+      const value = cookie.split(";", 1)[0].split("=").slice(1).join("=");
+      if (value) observedTokens.add(value);
+    }
+    return response;
+  };
   const selectedEnvironment = immutable ? { ...environment, COURTSIDE_UAT_PROJECT: immutable.project } : environment;
   const confirmation = args;
   const instance = uatInstance(selectedEnvironment);
@@ -70,7 +79,7 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
   function cli(args, environment = selectedEnvironment) {
     if (immutable) throw new Error("Immutable smoke cannot invoke the legacy lifecycle");
     const result = execute(process.execPath, [join(root, "tools", "courtside.mjs"), ...args], {
-      cwd: root, encoding: "utf8", env: environment, stdio: ["inherit", "pipe", "pipe"] });
+      cwd: root, encoding: "utf8", env: environment, stdio: ["inherit", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
     process.stdout.write(result.stdout ?? "");
     process.stderr.write(result.stderr ?? "");
     appendFileSync(join(build, "lifecycle.log"), redactUatDiagnostics(
@@ -80,7 +89,8 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
   }
 
   function secrets() {
-    return [password, permanentPassword, resetPassword, plaintextCredential, plaintextBody, ...cookies.values()];
+    return [password, permanentPassword, resetPassword, plaintextCredential, plaintextBody, ...cookies.values(),
+      ...observedTokens];
   }
 
   function failureRecord(failure) {
@@ -187,7 +197,11 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
   const cookies = new Map();
   let resetPassword;
 
-  if (!immutable) cli(["uat-reset", instance.project]);
+  if (!immutable) {
+    rmSync(join(build, "qualification.json"), { force: true });
+    rmSync(join(build, "lifecycle.log"), { force: true });
+    cli(["uat-reset", instance.project]);
+  }
 
   try {
     const startArguments = ["uat", "--no-credential-output", ...(version ? ["--version", version] : ["--skip-verify"])];

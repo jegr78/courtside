@@ -178,10 +178,11 @@ JSON and log artifacts use `0600`. A passed `qualification.json` is written only
 check, certificate-reuse verification and owned cleanup succeeds. A failed attempt records the
 failing assertion, with the status and bounded body the server answered, in `attempt.json`.
 
-The legacy smoke under `build/uat-smoke/` writes `qualification.json` in both outcomes: a failed
-run records `status: "failed"` and the redacted failure, so a stale passing receipt never
-survives it. It also keeps the redacted output of `uat` and `uat-reset` in `lifecycle.log`.
-Everything that reads the receipt requires `status: "passed"`.
+The legacy smoke under `build/uat-smoke/` removes an earlier `qualification.json` and
+`lifecycle.log` before it starts, and writes `qualification.json` in both outcomes: a failed run
+records `status: "failed"` and the redacted failure. It keeps the redacted output of `uat` and
+`uat-reset` in `lifecycle.log`. The local release gates and the passive security assessment
+accept only a receipt with `status: "passed"`.
 
 ### Immutable PERFORMANCE and SECURITY reuse
 
