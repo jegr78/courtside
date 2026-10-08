@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -13,12 +13,30 @@ import { createHash } from "node:crypto";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
+function bounded(value, limit) {
+  const text = String(value ?? "");
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
+}
+
+function answered(response) {
+  return `HTTP ${response.statusCode}: ${response.body ?? ""}`;
+}
+
 export async function runUatSmoke({ args = process.argv.slice(2), environment = process.env,
   execute = spawnSync, request: suppliedRequest, repository = repositoryRoot,
   platform = process.platform, architecture = process.arch } = {}) {
   const root = repository;
   const immutable = immutableQualificationOptions(args, environment);
-  const request = suppliedRequest ?? (immutable ? immutableQualificationRequest : localRequest);
+  const send = suppliedRequest ?? (immutable ? immutableQualificationRequest : localRequest);
+  const observedTokens = new Set();
+  const request = async (options) => {
+    const response = await send(options);
+    for (const cookie of response.headers?.["set-cookie"] ?? []) {
+      const value = cookie.split(";", 1)[0].split("=").slice(1).join("=");
+      if (value) observedTokens.add(value);
+    }
+    return response;
+  };
   const selectedEnvironment = immutable ? { ...environment, COURTSIDE_UAT_PROJECT: immutable.project } : environment;
   const confirmation = args;
   const instance = uatInstance(selectedEnvironment);
@@ -48,7 +66,7 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
   function run(command, args, options = {}) {
     const result = execute(command, args, {
       cwd: root, encoding: options.binary ? undefined : "utf8", env: options.environment ?? selectedEnvironment,
-      stdio: options.inherit ? "inherit" : "pipe",
+      stdio: "pipe",
       ...(immutable ? { shell: false, timeout: 60_000, maxBuffer: 4 * 1024 * 1024 } : {})
     });
     if (immutable && (result.truncated || result.timedOut || result.signal)) throw new Error("Immutable smoke command exceeded its bounds");
@@ -60,7 +78,24 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
 
   function cli(args, environment = selectedEnvironment) {
     if (immutable) throw new Error("Immutable smoke cannot invoke the legacy lifecycle");
-    run(process.execPath, [join(root, "tools", "courtside.mjs"), ...args], { inherit: true, environment });
+    const result = execute(process.execPath, [join(root, "tools", "courtside.mjs"), ...args], {
+      cwd: root, encoding: "utf8", env: environment, stdio: ["inherit", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
+    process.stdout.write(result.stdout ?? "");
+    process.stderr.write(result.stderr ?? "");
+    appendFileSync(join(build, "lifecycle.log"), redactUatDiagnostics(
+      `$ courtside ${args.join(" ")}\n${result.stdout ?? ""}${result.stderr ?? ""}`, secrets()), { mode: 0o600 });
+    if (result.error) throw result.error;
+    if (result.status !== 0) throw new Error(`courtside ${args[0]} exited with status ${result.status}`);
+  }
+
+  function secrets() {
+    return [password, permanentPassword, resetPassword, plaintextCredential, plaintextBody, ...cookies.values(),
+      ...observedTokens];
+  }
+
+  function failureRecord(failure) {
+    return { name: failure?.name ?? typeof failure,
+      message: bounded(redactUatDiagnostics(failure?.message ?? String(failure), secrets()), 2000) };
   }
 
   function composeRun(...args) {
@@ -107,13 +142,13 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
 
   async function logIn(jar, password) {
     const setup = await requestWithCookies(jar, { path: "/api/session" });
-    assert.equal(setup.statusCode, 200);
+    assert.equal(setup.statusCode, 200, answered(setup));
     const response = await requestWithCookies(jar, {
       path: "/api/session", method: "POST",
       headers: mutationHeaders(jar, { "Content-Type": "application/x-www-form-urlencoded" }),
       body: `username=admin&password=${encodeURIComponent(password)}`
     });
-    assert.equal(response.statusCode, 200);
+    assert.equal(response.statusCode, 200, answered(response));
     return response;
   }
 
@@ -125,7 +160,7 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
   }
 
   function assertPlaintextRefusal(response) {
-    assert.equal(response.statusCode, 400);
+    assert.equal(response.statusCode, 400, answered(response));
     assert.equal(response.body, "Plain HTTP is not accepted.");
     assert.equal(response.headers.location, undefined);
     assert.equal(response.headers["set-cookie"], undefined);
@@ -162,7 +197,11 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
   const cookies = new Map();
   let resetPassword;
 
-  if (!immutable) cli(["uat-reset", instance.project]);
+  if (!immutable) {
+    rmSync(join(build, "qualification.json"), { force: true });
+    rmSync(join(build, "lifecycle.log"), { force: true });
+    cli(["uat-reset", instance.project]);
+  }
 
   try {
     const startArguments = ["uat", "--no-credential-output", ...(version ? ["--version", version] : ["--skip-verify"])];
@@ -180,7 +219,7 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
     const localCa = composeRun("exec", "-T", "proxy", "cat", "/data/caddy/pki/authorities/local/root.crt");
     if (lifecycle) {
       const source = await request({ secure: true, port: instance.httpsPort, path: "/api/source", ca: localCa });
-      assert.equal(source.statusCode, 200);
+      assert.equal(source.statusCode, 200, answered(source));
       const offer = JSON.parse(source.body);
       assert.equal(offer.commit, immutable.sourceCommit);
       assert.equal(offer.environment, "UAT");
@@ -217,13 +256,13 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
         headers: { Accept: "text/html", "X-Forwarded-Proto": "https" }, body: plaintextBody
       })
     ]);
-    assert.equal(redirect.statusCode, 301);
+    assert.equal(redirect.statusCode, 301, answered(redirect));
     assert.equal(redirect.headers.location, `https://localhost:${instance.httpsPort}/login?from=smoke`);
     assert.equal(redirect.headers.server, undefined);
     assert.equal(redirect.headers.via, undefined);
     assert.equal(redirect.headers["cache-control"], "no-store");
     assert.match(redirect.headers["content-security-policy"], /base-uri 'none'/);
-    assert.equal(headRedirect.statusCode, 301);
+    assert.equal(headRedirect.statusCode, 301, answered(headRedirect));
     assert.equal(headRedirect.headers.location, `https://localhost:${instance.httpsPort}/courts?from=head`);
     assert.equal(headRedirect.body, "");
     assertPlaintextRefusal(hostileRedirect);
@@ -254,18 +293,18 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
       body: `username=admin&password=${password}`
     });
 
-    assert.equal(session.statusCode, 200);
-    assert.equal(frontend.statusCode, 200);
+    assert.equal(session.statusCode, 200, answered(session));
+    assert.equal(frontend.statusCode, 200, answered(frontend));
     assert.match(frontend.body, /<div id="root"><\/div>/);
-    assert.equal(apiUi.statusCode, 200);
+    assert.equal(apiUi.statusCode, 200, answered(apiUi));
     assert.match(apiUi.body, /Swagger UI/);
     assert.match(apiUi.headers["content-security-policy"], /base-uri 'none'/);
-    assert.equal(apiDocument.statusCode, 200);
+    assert.equal(apiDocument.statusCode, 200, answered(apiDocument));
     assert.match(apiDocument.body, /^openapi: 3\.1\.0/m);
-    assert.equal(sharedSession.statusCode, 200);
-    assert.equal(sharedApiUi.statusCode, 404);
-    assert.equal(sharedApiDocument.statusCode, 404);
-    assert.equal(sharedActuator.statusCode, 404);
+    assert.equal(sharedSession.statusCode, 200, answered(sharedSession));
+    assert.equal(sharedApiUi.statusCode, 404, answered(sharedApiUi));
+    assert.equal(sharedApiDocument.statusCode, 404, answered(sharedApiDocument));
+    assert.equal(sharedActuator.statusCode, 404, answered(sharedActuator));
     assert.equal(sharedSession.headers["strict-transport-security"], "max-age=31536000");
     assert.equal(sharedSession.headers["x-robots-tag"], "noindex, nofollow");
     assert.equal(sharedSession.headers.via, undefined);
@@ -273,7 +312,7 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
     assert.match(sharedSession.headers["content-security-policy"], /base-uri 'none'/);
     assert.doesNotMatch(sharedSession.headers["content-security-policy"], /(?:http:|data:)/);
     assertHostCookie(csrfCookie, "__Host-XSRF-TOKEN", { httpOnly: false });
-    assert.equal(login.statusCode, 200);
+    assert.equal(login.statusCode, 200, answered(login));
     assertHostCookie(login.headers["set-cookie"].find((cookie) => cookie.startsWith("__Host-SESSION=")),
       "__Host-SESSION", { httpOnly: true });
     [session, sharedSession, login].forEach(assertNoLegacyAuthenticationCookies);
@@ -286,18 +325,18 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
       headers: mutationHeaders(cookies, { "Content-Type": "application/json" }),
       body: JSON.stringify({ password: permanentPassword })
     });
-    assert.equal(passwordChange.statusCode, 204);
+    assert.equal(passwordChange.statusCode, 204, answered(passwordChange));
     cookies.clear();
     await logIn(cookies, permanentPassword);
 
     const courts = await requestWithCookies(cookies, { path: "/api/public/courts" });
     const cards = await requestWithCookies(cookies, { path: "/api/public/booking-cards" });
-    assert.equal(courts.statusCode, 200);
-    assert.equal(cards.statusCode, 200);
+    assert.equal(courts.statusCode, 200, answered(courts));
+    assert.equal(cards.statusCode, 200, answered(cards));
     const unsupportedMethod = await requestWithCookies(cookies, {
       path: "/api/public/courts", method: "QUERY", headers: mutationHeaders(cookies)
     });
-    assert.equal(unsupportedMethod.statusCode, 405, unsupportedMethod.body);
+    assert.equal(unsupportedMethod.statusCode, 405, answered(unsupportedMethod));
     assert.match(unsupportedMethod.headers["content-type"], /^application\/problem\+json/);
     assert.equal(unsupportedMethod.headers.allow, "GET");
     assert.equal(JSON.parse(unsupportedMethod.body).type, "urn:courtside:error:method-not-supported");
@@ -312,14 +351,14 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
         participants: [{ guestName: "John Roe" }]
       })
     });
-    assert.equal(booking.statusCode, 201, booking.body);
+    assert.equal(booking.statusCode, 201, answered(booking));
     const bookingId = JSON.parse(booking.body).id;
     const oversizedRequest = await requestWithCookies(cookies, {
       path: "/api/bookings", method: "POST",
       headers: mutationHeaders(cookies, { "Content-Type": "application/json", "Idempotency-Key": "uat-oversized-request" }),
       body: JSON.stringify({ padding: "x".repeat(2 * 1024 * 1024) })
     });
-    assert.equal(oversizedRequest.statusCode, 413);
+    assert.equal(oversizedRequest.statusCode, 413, answered(oversizedRequest));
     const sessionsBeforeRestart = composeRun("exec", "-T", "db", "psql", "-U", "courtside", "-d", "courtside", "-tAc", "select count(*) from spring_session");
 
     composeRun("restart", "app");
@@ -333,21 +372,21 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
     assert.equal(JSON.parse(persistedSession.body).authenticated, true,
       JSON.stringify({ sessionsBeforeRestart, sessionsAfterRestart, cookies: [...cookies.keys()], body: persistedSession.body }));
     const personalBookings = await requestWithCookies(cookies, { path: "/api/my/bookings" });
-    assert.equal(personalBookings.statusCode, 200);
+    assert.equal(personalBookings.statusCode, 200, answered(personalBookings));
     assert.match(personalBookings.body, new RegExp(bookingId));
 
     const hostileHeaders = await request({
       secure: false, port: instance.sharedPort, path: "/api/session",
       headers: { Host: "attacker.example", Forwarded: "host=attacker.example;proto=http", "X-Forwarded-Proto": "http" }
     });
-    assert.equal(hostileHeaders.statusCode, 200);
+    assert.equal(hostileHeaders.statusCode, 200, answered(hostileHeaders));
     assert.equal(hostileHeaders.headers["strict-transport-security"], "max-age=31536000");
     assert.doesNotMatch(hostileHeaders.body, /attacker\.example/);
 
     const logout = await requestWithCookies(cookies, {
       path: "/api/session/logout", method: "POST", headers: mutationHeaders(cookies)
     });
-    assert.equal(logout.statusCode, 204);
+    assert.equal(logout.statusCode, 204, answered(logout));
     assertHostCookie(logout.headers["set-cookie"].find((cookie) => cookie.startsWith("__Host-SESSION=")),
       "__Host-SESSION", { httpOnly: true, expired: true });
     assertNoLegacyAuthenticationCookies(logout);
@@ -401,21 +440,24 @@ export async function runUatSmoke({ args = process.argv.slice(2), environment = 
     originalFailure = failure;
     if (attempt) {
       attempt.status = "failed";
+      attempt.failure = failureRecord(failure);
       attempt.finishedAt = new Date().toISOString();
       persistAttempt();
+    } else {
+      writeFileSync(join(build, "qualification.json"),
+        `${JSON.stringify({ schemaVersion: 1, status: "failed", failure: failureRecord(failure) }, null, 2)}\n`, { mode: 0o600 });
     }
     try {
-      const secrets = [
-        password, permanentPassword, resetPassword, plaintextCredential, plaintextBody, ...cookies.values()
-      ];
       if (immutable && !lifecycle) {
-        writeFileSync(join(build, "container-logs.txt"), "Container logs were unavailable before cleanup.\n", { mode: 0o600 });
+        writeFileSync(join(build, "container-logs.txt"),
+          "Container logs were unavailable before cleanup: the immutable lifecycle had not started.\n", { mode: 0o600 });
       } else {
-        const logs = redactUatDiagnostics(composeRun("logs", "--no-color"), secrets);
+        const logs = redactUatDiagnostics(composeRun("logs", "--no-color"), secrets());
         writeFileSync(join(build, "container-logs.txt"), `${logs}\n`, immutable ? { mode: 0o600 } : undefined);
       }
-    } catch {
-      writeFileSync(join(build, "container-logs.txt"), "Container logs were unavailable before cleanup.\n", immutable ? { mode: 0o600 } : undefined);
+    } catch (logFailure) {
+      writeFileSync(join(build, "container-logs.txt"), `Container logs were unavailable before cleanup: ${
+        failureRecord(logFailure).name}: ${failureRecord(logFailure).message}\n`, immutable ? { mode: 0o600 } : undefined);
     }
     throw failure;
   } finally {
