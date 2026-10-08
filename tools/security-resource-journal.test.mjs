@@ -413,7 +413,7 @@ function scriptHarness(shared = null, vu = 1) {
   const context = {
     __ENV: { COURTSIDE_SECURITY_SHARED_PASSWORD: "private-password", COURTSIDE_SECURITY_RUN_ID: "run-example",
       COURTSIDE_SECURITY_DATE_PLAN: backend.plan === null ? undefined : JSON.stringify(backend.plan) },
-    __VU: vu, __ITER: 0, open: () => JSON.stringify(policy), sleep: () => {},
+    __VU: vu, __ITER: 0, open: () => JSON.stringify(policy), sleep: () => {}, exec: { scenario: { name: "setup" } },
     check: (value, checks) => {
       const outcomes = Object.entries(checks).map(([name, predicate]) => ({ name, pass: predicate(value) }));
       backend.checks.push(...outcomes);
@@ -494,7 +494,8 @@ function scriptHarness(shared = null, vu = 1) {
     post: (url, body, parameters) => send("POST", url, body, parameters), expectedStatuses: () => {} };
   vm.createContext(context);
   vm.runInContext(source + "\nthis.api = { options, setup, resourceAbuse, previewMutation, requestBodyLimit, handleSummary,"
-    + " competingOccupancyRace, duplicateDeliveryRace, participantCapacityRace, seriesPressure };", context);
+    + " competingOccupancyRace, duplicateDeliveryRace, participantCapacityRace, seriesPressure, addressPressure };",
+  context);
   return { context, messages, calls, counters, backend,
     setup: () => JSON.parse(JSON.stringify(scriptHarness(backend, 0).context.api.setup())),
     fork: id => scriptHarness(backend, id), advance: value => { backend.now = value; } };
@@ -588,6 +589,10 @@ test("given the instrumented script, when k6 reads its options, then scenarios a
     competing_occupancy: race("competingOccupancyRace"),
     duplicate_delivery: race("duplicateDeliveryRace"),
     participant_capacity: race("participantCapacityRace"),
+    address_pressure: { executor: "constant-arrival-rate", exec: "addressPressure", rate: policy.addressPressure.rate,
+      timeUnit: "1s", duration: `${policy.addressPressure.durationSeconds}s`,
+      startTime: `${policy.addressPressure.startSeconds}s`, preAllocatedVUs: policy.addressPressure.preAllocatedVUs,
+      maxVUs: policy.addressPressure.maxVUs },
     series_pressure: { executor: "constant-vus", exec: "seriesPressure", vus: policy.seriesPressure.vus,
       startTime: `${policy.seriesPressure.startSeconds}s`, duration: `${policy.seriesPressure.durationSeconds}s` },
     preview_mutation: { executor: "shared-iterations", exec: "previewMutation", vus: 1, iterations: 1,
@@ -776,6 +781,52 @@ for (const [name, type, retry, passes] of [
     const check = harness.backend.checks.find(entry => entry.name === "series-and-rule-cost:maximum-preview-controlled");
     assert.equal(check.pass, passes, `${name} ${passes ? "is" : "is not"} the refusal the pressure is meant to provoke`);
     assert.equal(harness.counters.pressure_admission_refusals ?? 0, passes ? 1 : 0);
+  });
+}
+
+test("given one VU reused by a later scenario, when that scenario runs, then it signs requests with its own session", () => {
+  // given
+  const harness = scriptHarness();
+  const run = harness.setup();
+  const reused = harness.fork(1);
+  // when
+  reused.context.exec.scenario.name = "competing_occupancy";
+  reused.context.api.competingOccupancyRace(run);
+  reused.context.exec.scenario.name = "preview_mutation";
+  reused.context.api.previewMutation(run);
+  // then
+  const session = call => /__Host-SESSION=([^;]+)/.exec(call.cookie)?.[1];
+  const occupancy = harness.calls.find(call => call.path === "/api/bookings");
+  const preview = harness.calls.find(call => call.path === "/api/booking-series-preview");
+  assert.equal(session(occupancy), run.sessions.occupancy.cookies["__Host-SESSION"]);
+  assert.equal(session(preview), run.sessions.toctou.cookies["__Host-SESSION"],
+    "a VU k6 hands to another scenario must not keep the session of the one it ran before");
+});
+
+for (const [name, answer, typed] of [
+  ["a typed request-rate-limited refusal", { type: "urn:courtside:error:request-rate-limited", retry: "1" }, true],
+  ["a capacity refusal", { type: "urn:courtside:error:operation-capacity-exhausted", retry: "1" }, false],
+  ["a refusal without Retry-After", { type: "urn:courtside:error:request-rate-limited", retry: null }, false]
+]) {
+  test(`given ${name}, when the address pressure meets it, then only a typed budget refusal counts`, () => {
+    // given
+    const harness = scriptHarness();
+    const run = harness.setup();
+    const reused = harness.fork(1);
+    reused.context.exec.scenario.name = "competing_occupancy";
+    reused.context.api.competingOccupancyRace(run);
+    harness.backend.refusePaths = ["/api/public/booking-grid"];
+    harness.backend.refusalType = answer.type;
+    harness.backend.refusalRetry = answer.retry;
+    // when
+    reused.context.exec.scenario.name = "address_pressure";
+    reused.context.api.addressPressure();
+    // then
+    const read = harness.calls.find(call => call.path === "/api/public/booking-grid");
+    assert.ok(!read.cookie.includes("__Host-SESSION="), "address pressure spends the address budget, never an account's");
+    assert.equal(harness.counters.address_admission_refusals ?? 0, typed ? 1 : 0);
+    const check = harness.backend.checks.find(entry => entry.name === "admission-pressure:answered-or-typed-refusal");
+    assert.equal(check.pass, answer.type !== "urn:courtside:error:request-rate-limited" || answer.retry !== null);
   });
 }
 

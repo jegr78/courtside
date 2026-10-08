@@ -181,8 +181,8 @@ export function resourceScenarioOutcomes({ scenarios, summary, telemetryComplete
     const scenarioOperationsOf = byScenario[id] ?? [];
     const refused = integrityScenarios.includes(id) && scenarioOperationsOf.some(admissionRefusal);
     const raceMissing = raceScenarios.includes(id) && !raceExercised(scenarioOperationsOf);
-    const pressureUnrefused = id === "series-and-rule-cost" && admissionEnforced
-      && !scenarioOperationsOf.some(admissionRefusal);
+    const pressureUnrefused = id === "admission-pressure" && admissionEnforced
+      && !(summary?.addressAdmissionRefusals > 0);
     const outcome = missingCheck || fixtureFailed || !telemetryComplete || failed ? "incomplete"
       : assertionFailed ? "failed"
         : id === "login-rate-limit-boundary" && !summary.rateLimitedLogins

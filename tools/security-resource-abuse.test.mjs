@@ -553,22 +553,32 @@ test("given integrity requests that never overlapped, when judging scenarios, th
     "sequential competitors prove a conflict check, not a race");
 });
 
-test("given enforced admission, when the over-budget series pressure saw no typed refusal, then it is incomplete", () => {
+test("given enforced admission, when the address pressure saw no typed refusal, then it is incomplete", () => {
   // given
-  const preview = (id, answer) => ({ id, kind: "previewSeries", startedAt: "2026-10-08T10:00:30.000Z",
-    endedAt: "2026-10-08T10:00:30.200Z", request: { occurrenceCount: 200 }, ...answer });
-  const answered = [...raceOperations(), preview("9:1", { status: 200 })];
-  const refused = [...answered, preview("9:2", refusal)];
-  const untyped = [...answered, preview("9:2", { status: 429, problemType: null, retryAfterSeconds: null })];
+  const refusedInput = (count, enforced) => {
+    const input = scenarioInput(raceOperations(), enforced);
+    input.summary.addressAdmissionRefusals = count;
+    return input;
+  };
 
   // when / then
-  assert.equal(outcomeOf(resourceScenarioOutcomes(scenarioInput(answered, false)), "series-and-rule-cost"), "passed",
+  assert.equal(outcomeOf(resourceScenarioOutcomes(refusedInput(0, false)), "admission-pressure"), "passed",
     "a target without admission control has nothing to refuse");
-  assert.equal(outcomeOf(resourceScenarioOutcomes(scenarioInput(answered, true)), "series-and-rule-cost"),
-    "incomplete", "pressure that was never refused never went over the budget it is meant to exceed");
-  assert.equal(outcomeOf(resourceScenarioOutcomes(scenarioInput(untyped, true)), "series-and-rule-cost"),
-    "incomplete", "a bare 429 is not the typed refusal with Retry-After");
-  assert.equal(outcomeOf(resourceScenarioOutcomes(scenarioInput(refused, true)), "series-and-rule-cost"), "passed");
+  assert.equal(outcomeOf(resourceScenarioOutcomes(refusedInput(0, true)), "admission-pressure"), "incomplete",
+    "address pressure that was never refused never went over the budget it is sized to exceed");
+  assert.equal(outcomeOf(resourceScenarioOutcomes(refusedInput(3, true)), "admission-pressure"), "passed");
+});
+
+test("given enforced admission, when the series cost pressure was never refused, then its typed answers suffice", () => {
+  // given
+  const operations = [...raceOperations(), { id: "9:1", kind: "previewSeries", status: 200,
+    startedAt: "2026-10-08T10:00:30.000Z", endedAt: "2026-10-08T10:00:30.200Z", request: { occurrenceCount: 200 } }];
+  const input = scenarioInput(operations, true);
+  input.summary.addressAdmissionRefusals = 1;
+
+  // when / then
+  assert.equal(outcomeOf(resourceScenarioOutcomes(input), "series-and-rule-cost"), "passed",
+    "a principal's queued series requests spend tokens only as fast as they finish, so a refusal is not owed");
 });
 
 test("given a failing integrity assertion, when judging scenarios, then the scenario fails", () => {
@@ -666,16 +676,16 @@ test("given the destructive k6 profile, when inspecting it, then every curated a
     /journalPost\(`\$\{target\}\/api\/public\/participant-members`[\s\S]*?query: "Member2"[\s\S]*?"X-XSRF-TOKEN": token/);
   assert.match(script, /if \(!failedToken\)[\s\S]*captureCookies\(session, failedSessionCookies\)/);
   assert.match(script, /journalPost\(`\$\{target\}\/api\/session`[\s\S]*captureCookies\(response, failedSessionCookies\)/);
-  assert.match(script, /case 0:[\s\S]*boundedRead\("\/api\/public\/booking-grid"\)[\s\S]*case 5:[\s\S]*failedLogin\(\)/);
+  assert.match(script, /export function addressPressure\(\) \{[\s\S]*\/api\/public\/booking-grid[\s\S]*jar: new http\.CookieJar\(\)/);
   assert.match(script, /const clock = slotPlan\.clock/);
   assert.match(script, /resourceSlotPlan\(__ENV\.COURTSIDE_SECURITY_DATE_PLAN\)/);
   assert.doesNotMatch(script, /const clock = Date\.now\(\)/);
   assert.match(script, /attackStartsAt: Date\.now\(\) \+ policy\.warmupSeconds \* 1000/);
   assert.match(script, /scenarioFixturesReady\("series-and-rule-cost", \(\) => Boolean\(courtId\)\)/);
-  assert.match(script, /export function resourceAbuse\(run\) \{[\s\S]*useSetupSession\(run, null\);[\s\S]*switch \(__ITER/);
+  assert.match(script, /export function resourceAbuse\(run\) \{[\s\S]*useSetupSession\(run, null\);[\s\S]*failedLogin\(\);/);
   assert.equal(resourceAbusePolicy.stages.at(-1).target, 0);
   assert.equal(resourceAbusePolicy.stages[0].target, 12);
-  assert.equal(resourceAbusePolicy.scenarios.length, 8);
+  assert.equal(resourceAbusePolicy.scenarios.length, 9);
   assert.equal(resourceAbusePolicy.scenarios.every(({ checks }) => checks.length > 0), true);
   for (const [name, trip] of Object.entries(resourceAbusePolicy.circuitBreakers.tripThresholds)) {
     assert.ok(trip < resourceAbusePolicy.circuitBreakers.safetyLimits[name]);
@@ -716,16 +726,22 @@ test("given the destructive k6 profile, when warming up, then pressure exercises
 
   // then
   assert.doesNotMatch(pressure, /return;/, "no warm-up branch skips the iteration");
-  assert.match(pressure, /sleep\(Date\.now\(\) < run\.attackStartsAt \? 1 : 0\.1\);$/);
+  assert.match(pressure, /sleep\(Date\.now\(\) < run\.attackStartsAt \? 1 : 0\.2\);$/);
 });
 
-test("given the shipped account budget, when sizing the destructive scenarios, then integrity stays within it and series pressure exceeds it", () => {
-  // given
+function shippedAdmission() {
   const application = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml").load(
     readFileSync(new URL("../src/main/resources/application.yaml", import.meta.url), "utf8"));
   const shipped = (value, fallback) => Number(/:(\d+)\}$/.exec(String(value ?? ""))?.[1] ?? fallback);
-  const perSecond = shipped(application.courtside?.admission?.account?.["per-second"], 20);
-  const burst = shipped(application.courtside?.admission?.account?.burst, 200);
+  const admission = application.courtside?.admission;
+  return { application,
+    account: { burst: shipped(admission?.account?.burst, 200), perSecond: shipped(admission?.account?.["per-second"], 20) },
+    address: { burst: shipped(admission?.address?.burst, 600), perSecond: shipped(admission?.address?.["per-second"], 60) } };
+}
+
+test("given the shipped account budget, when sizing the integrity races, then they stay within it", () => {
+  // given
+  const { account } = shippedAdmission();
   const { racers, tickSeconds, rounds } = resourceAbusePolicy.integrity;
   const bookingWriteCost = 2;
   const seriesCost = 10;
@@ -733,15 +749,54 @@ test("given the shipped account budget, when sizing the destructive scenarios, t
   // when
   const integrityPerSecond = 3 * racers * bookingWriteCost / tickSeconds;
   const toctouCost = 2 * seriesCost + bookingWriteCost;
-  const pressurePerSecond = resourceAbusePolicy.seriesPressure.vus / 0.2 * seriesCost;
 
   // then
-  assert.ok(integrityPerSecond <= perSecond, `${integrityPerSecond} tokens a second must fit ${perSecond}`);
-  assert.ok(integrityPerSecond * rounds * tickSeconds + toctouCost <= burst + perSecond * rounds * tickSeconds);
-  assert.ok(pressurePerSecond > 2 * perSecond, "series pressure must go clearly over the account budget");
+  assert.ok(integrityPerSecond <= account.perSecond, `${integrityPerSecond} tokens a second must fit ${account.perSecond}`);
+  assert.ok(integrityPerSecond * rounds * tickSeconds + toctouCost <= account.burst + account.perSecond * rounds * tickSeconds);
   assert.ok(resourceAbusePolicy.seriesPressure.startSeconds
-    >= resourceAbusePolicy.warmupSeconds + rounds * tickSeconds + burst / perSecond,
-  "the account bucket refills between the integrity races and the pressure that drains it");
+    >= resourceAbusePolicy.warmupSeconds + rounds * tickSeconds + account.burst / account.perSecond,
+  "the account bucket refills between the integrity races and the series cost pressure");
+});
+
+test("given the shipped address budget, when the arrival-rate pressure runs, then it is refused by arithmetic that holds under queueing", () => {
+  // given
+  const { address } = shippedAdmission();
+  const { rate, durationSeconds, startSeconds, preAllocatedVUs, maxVUs } = resourceAbusePolicy.addressPressure;
+  const readCost = 1;
+  const slowAnswerSeconds = 0.15;
+
+  // when
+  const offered = rate * durationSeconds * readCost;
+  const admittable = address.burst + address.perSecond * durationSeconds;
+  const refusedAtLeast = offered - admittable;
+
+  // then
+  assert.ok(refusedAtLeast >= 0.25 * offered,
+    `${offered} reads against ${admittable} admittable tokens must leave a quarter of them refused`);
+  assert.ok(maxVUs * (1 / slowAnswerSeconds) >= rate,
+    "the arrival rate holds even when every read takes 150 ms, because the executor starts reads on a clock");
+  assert.ok(preAllocatedVUs <= maxVUs);
+  assert.ok(startSeconds >= resourceAbusePolicy.stages[0].duration.replace("s", "") * 1,
+    "every failed-login VU fetched its anonymous token before the address budget is drained");
+  const vus = resourceAbusePolicy.stages[0].target + 3 * resourceAbusePolicy.integrity.racers
+    + resourceAbusePolicy.seriesPressure.vus + maxVUs + 2;
+  assert.ok(vus <= 50, `${vus} virtual users must fit the journal's VU bound`);
+  const pressureSeconds = resourceAbusePolicy.stages.reduce((total, { duration }) => total + Number(duration.replace("s", "")), 0);
+  assert.ok(pressureSeconds / 0.2 <= 700, "a failed-login VU stays inside its journal budget");
+});
+
+test("given the shipped session limit, when setup signs in its sessions, then it uses exactly as many as one account may hold", () => {
+  // given
+  const { application } = shippedAdmission();
+  const limit = Number(/^\$\{COURTSIDE_SESSION_MAX_CONCURRENT:(\d+)\}$/.exec(application.courtside.session["concurrent-limit"])[1]);
+  const script = readFileSync(new URL("../security/resource-abuse.js", import.meta.url), "utf8");
+
+  // when
+  const names = JSON.parse(/const sessionNames = (\[[^\]]*\]);/.exec(script)[1]);
+
+  // then
+  assert.equal(names.length, limit, "one more session would evict the first, one fewer leaves two scenarios sharing");
+  assert.equal(new Set(names).size, names.length);
 });
 
 test("given every request the assessment script makes, when it is read against the contract, "

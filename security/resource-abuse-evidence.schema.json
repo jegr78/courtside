@@ -18,10 +18,10 @@
     "journalDigest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
     "integrityEvidenceDigest": { "anyOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
     "attempt": { "type": "integer", "minimum": 1 },
-    "scenarios": { "type": "array", "minItems": 8, "maxItems": 8, "items": {
+    "scenarios": { "type": "array", "minItems": 9, "maxItems": 9, "items": {
       "type": "object", "additionalProperties": false, "required": ["id", "outcome"],
       "properties": {
-        "id": { "enum": ["argon2-login-pressure", "login-rate-limit-boundary", "request-body-limit", "competing-court-occupancy", "duplicate-delivery", "participant-capacity", "series-and-rule-cost", "preview-mutation-race"] },
+        "id": { "enum": ["argon2-login-pressure", "login-rate-limit-boundary", "request-body-limit", "competing-court-occupancy", "duplicate-delivery", "participant-capacity", "series-and-rule-cost", "preview-mutation-race", "admission-pressure"] },
         "outcome": { "enum": ["passed", "failed", "incomplete"] }
       }
     } },

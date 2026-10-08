@@ -297,12 +297,15 @@ and the runner refuses a candidate whose environment overrides either.
 Setup signs in one session for each integrity scenario and one for the series pressure before any
 pressure starts. Competing occupancy, duplicate delivery and participant capacity each run four
 racers that fire on a shared tick, which keeps the account inside its request budget and makes
-their requests overlap. A race whose answered requests never overlapped is incomplete. Pressure
-runs over budget on purpose: anonymous reads, failed logins and, after the integrity races have
-ended and the account budget has refilled, maximum series previews. A pressure answer passes only
-as success or as the typed refusal with `Retry-After`, never by status alone. When the candidate
-declares admission control, the series pressure must observe at least one typed
-`request-rate-limited` or `operation-capacity-exhausted` refusal. A typed admission refusal of an
+their requests overlap. A race whose answered requests never overlapped is incomplete. Failed
+logins press on the login limits. Anonymous reads start on a fixed clock at 120 a second for 20
+seconds, so they offer 2,400 tokens against the 1,800 the shipped address budget admits in that
+time however slowly the target answers. When the candidate declares admission control, that
+pressure must observe at least one typed `request-rate-limited` refusal with `Retry-After`. After
+the integrity races have ended and the account budget has refilled, maximum series previews add
+cost pressure; admission queues one principal's series requests, so they are not required to be
+refused. A pressure answer passes only as success or as the typed refusal with `Retry-After`,
+never by status alone. A typed admission refusal of an
 integrity request keeps that scenario and the run incomplete, so a refusal never reads as an
 integrity failure or as a pass. During warm-up the pressure runs its own paths once a second.
 

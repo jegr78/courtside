@@ -2,6 +2,7 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import { Counter } from "k6/metrics";
 import encoding from "k6/encoding";
+import exec from "k6/execution";
 
 const policy = JSON.parse(open("/scripts/policy.json"));
 const target = "http://scanner-gateway:8090";
@@ -19,10 +20,11 @@ const toctouCreated = new Counter("toctou_created");
 const toctouSkipped = new Counter("toctou_skipped");
 const integrityAdmissionRefusals = new Counter("integrity_admission_refusals");
 const pressureAdmissionRefusals = new Counter("pressure_admission_refusals");
+const addressAdmissionRefusals = new Counter("address_admission_refusals");
 const admissionProblemTypes = ["urn:courtside:error:request-rate-limited",
   "urn:courtside:error:operation-capacity-exhausted"];
 const sessionNames = ["occupancy", "duplicate", "capacity", "toctou", "pressure"];
-let authenticated = false;
+let boundScenario = null;
 let token;
 let courtId;
 let bookingCardId;
@@ -55,6 +57,10 @@ export const options = {
     competing_occupancy: raceScenario("competingOccupancyRace"),
     duplicate_delivery: raceScenario("duplicateDeliveryRace"),
     participant_capacity: raceScenario("participantCapacityRace"),
+    address_pressure: { executor: "constant-arrival-rate", exec: "addressPressure", rate: policy.addressPressure.rate,
+      timeUnit: "1s", duration: `${policy.addressPressure.durationSeconds}s`,
+      startTime: `${policy.addressPressure.startSeconds}s`, preAllocatedVUs: policy.addressPressure.preAllocatedVUs,
+      maxVUs: policy.addressPressure.maxVUs },
     series_pressure: { executor: "constant-vus", exec: "seriesPressure", vus: policy.seriesPressure.vus,
       startTime: `${policy.seriesPressure.startSeconds}s`, duration: `${policy.seriesPressure.durationSeconds}s` },
     preview_mutation: { executor: "shared-iterations", exec: "previewMutation", vus: 1, iterations: 1,
@@ -98,7 +104,7 @@ export function setup() {
 
 function useSetupSession(run, sessionName) {
   runSlots = run.slotPlan;
-  if (authenticated || !sessionName) return;
+  if (!sessionName || boundScenario === exec.scenario.name) return;
   const session = run.sessions?.[sessionName];
   const fixtures = run.fixtures;
   if (session?.username !== "security.manager.1" || typeof session.token !== "string" || !session.token
@@ -106,11 +112,12 @@ function useSetupSession(run, sessionName) {
       || !fixtures || ![fixtures.courtId, fixtures.bookingCardId, fixtures.participantCardId, fixtures.personId].every(Boolean)) {
     throw new Error("Resource booking setup incomplete");
   }
+  for (const name of Object.keys(sessionCookies)) delete sessionCookies[name];
   Object.assign(sessionCookies, session.cookies);
   token = session.token;
   actorUsername = session.username;
   ({ courtId, bookingCardId, participantCardId, personId } = fixtures);
-  authenticated = true;
+  boundScenario = exec.scenario.name;
 }
 
 function emitJournal(frame) {
@@ -291,7 +298,7 @@ function loadBookingInputs() {
 }
 
 function scenarioFixturesReady(scenarioId, fixturesReady) {
-  const ready = authenticated && fixturesReady();
+  const ready = boundScenario !== null && fixturesReady();
   check(null, { [`${scenarioId}:fixtures-ready`]: () => ready });
   return ready;
 }
@@ -372,10 +379,13 @@ function oversizedBody() {
       || typedAdmissionRefusal(value) });
 }
 
-function boundedRead(path) {
-  const response = journalGet(`${target}${path}`, { responseCallback: http.expectedStatuses(200, 429) });
-  if (typedAdmissionRefusal(response)) pressureAdmissionRefusals.add(1);
-  check(response, { "preview-mutation-race:availability-read-bounded": (value) => value.status === 200
+export function addressPressure() {
+  const response = http.get(`${target}/api/public/booking-grid`, { jar: new http.CookieJar(),
+    responseCallback: http.expectedStatuses(200, 429) });
+  if (typedAdmissionRefusal(response) && responseJson(response)?.type === "urn:courtside:error:request-rate-limited") {
+    addressAdmissionRefusals.add(1);
+  }
+  check(response, { "admission-pressure:answered-or-typed-refusal": (value) => value.status === 200
       || typedAdmissionRefusal(value) });
 }
 
@@ -496,21 +506,8 @@ function previewMutationRace() {
 
 export function resourceAbuse(run) {
   useSetupSession(run, null);
-  switch (__ITER % 8) {
-    case 0:
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-      boundedRead("/api/public/booking-grid");
-      break;
-    case 5:
-    case 6:
-    case 7:
-      failedLogin();
-      break;
-  }
-  sleep(Date.now() < run.attackStartsAt ? 1 : 0.1);
+  failedLogin();
+  sleep(Date.now() < run.attackStartsAt ? 1 : 0.2);
 }
 
 export function competingOccupancyRace(run) {
@@ -565,6 +562,7 @@ export function handleSummary(data) {
       rateLimitedLogins: data.metrics.rate_limited_logins?.values.count ?? 0,
       integrityAdmissionRefusals: data.metrics.integrity_admission_refusals?.values.count ?? 0,
       pressureAdmissionRefusals: data.metrics.pressure_admission_refusals?.values.count ?? 0,
+      addressAdmissionRefusals: data.metrics.address_admission_refusals?.values.count ?? 0,
       duplicateResponses: data.metrics.duplicate_responses?.values.count ?? 0,
       duplicateFailures: data.metrics.duplicate_failures?.values.count ?? 0,
       toctouCreated: data.metrics.toctou_created?.values.count ?? 0,
