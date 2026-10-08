@@ -137,6 +137,11 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                     new Boundary("nothing of the request itself: it answers a target the connector"
                             + " refused before any dispatch, and writes rather than reads",
                             List.of())),
+            Map.entry("org/courtside/shared/web/AdmissionControl.java",
+                    new Boundary("the dispatch and method, so only a handled request is admitted, the peer"
+                            + " address the anonymous budget counts, read as the login limit reads it,"
+                            + " and the permit this same request stored", List.of("getAttribute",
+                            "getDispatcherType", "getMethod", "getRemoteAddr"))),
             Map.entry("org/courtside/shared/web/ContainerErrorController.java",
                     new Boundary("the attributes the servlet container sets on an error dispatch;"
                             + " the address among them is the one the client asked for, echoed into"
