@@ -723,7 +723,7 @@ function responseHeader(output, name) {
 
 export async function inspectPassiveSecurityRuntime(plan, { control, stopFile }) {
   const project = securityProject(plan.runId);
-  const environment = { ...process.env, ...readSecurityEnvironment(plan.runId) };
+  const environment = mergeSecurityProcessEnvironment(readSecurityEnvironment(plan.runId));
   const inspect = async (service) => JSON.parse((await runSecurityCommand("docker",
     ["inspect", `${project}-${service}-1`, "--format", "{{json .}}"], environment, control, stopFile)).stdout);
   const app = await inspect("app");
@@ -791,7 +791,7 @@ export function evaluateRuntimeFilePermissions({
 }
 
 export async function runPassiveZap(plan, stopFile, limits) {
-  const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
+  const environment = { ...mergeSecurityProcessEnvironment(readSecurityEnvironment(plan.runId)),
     COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests),
     COURTSIDE_SECURITY_MAX_CONCURRENCY: String(plan.budgets.concurrency) };
   const attempt = limits.attempt;
@@ -890,7 +890,7 @@ export function remainingScannerRequestBudget(limit, consumed) {
 }
 
 export async function runAuthenticatedZap(plan, stopFile, limits, renderPlan, renderRetestPlan) {
-  const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
+  const environment = { ...mergeSecurityProcessEnvironment(readSecurityEnvironment(plan.runId)),
     COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests),
     COURTSIDE_SECURITY_MAX_CONCURRENCY: String(plan.budgets.concurrency),
     COURTSIDE_SECURITY_ALLOWED_METHODS: "GET,HEAD,OPTIONS",
@@ -1042,7 +1042,7 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
   if (limits.maxRequests <= limits.policy.nativeRequestReserve) {
     throw new Error("The OpenAPI fuzz request budget cannot reserve native fixture requests");
   }
-  const environment = { ...process.env, ...readSecurityEnvironment(plan.runId),
+  const environment = { ...mergeSecurityProcessEnvironment(readSecurityEnvironment(plan.runId)),
     COURTSIDE_SECURITY_MAX_REQUESTS: String(limits.maxRequests - limits.policy.nativeRequestReserve),
     COURTSIDE_SECURITY_MAX_CONCURRENCY: "1",
     COURTSIDE_SECURITY_ALLOWED_METHODS: relayableMethods(limits.policy).join(","),
@@ -1154,7 +1154,7 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
 }
 
 export async function securityDomainStateFingerprint(runId, stopFile, timeoutMilliseconds) {
-  const environment = { ...process.env, ...readSecurityEnvironment(runId) };
+  const environment = mergeSecurityProcessEnvironment(readSecurityEnvironment(runId));
   const dump = await runOwnedProcess("docker", [...securityComposeArgs(runId), "exec", "-T", "db", "pg_dump",
     "--data-only", "--column-inserts", "--no-owner", "--no-privileges",
     "--restrict-key=4f96f35005ce47c58f86e12cb61ab144",
@@ -1168,7 +1168,7 @@ export async function securityDomainStateFingerprint(runId, stopFile, timeoutMil
 }
 
 export async function resetSecurityLoginAttempts(runId, stopFile, timeoutMilliseconds) {
-  const environment = { ...process.env, ...readSecurityEnvironment(runId) };
+  const environment = mergeSecurityProcessEnvironment(readSecurityEnvironment(runId));
   await verifySecurityEnvironment(runId);
   await runOwnedProcess("docker", [...securityComposeArgs(runId), "exec", "-T", "db", "psql",
     "-v", "ON_ERROR_STOP=1", "-U", "courtside", "courtside_security", "-c",
