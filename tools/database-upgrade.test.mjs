@@ -19,6 +19,7 @@ import {
   originFixture,
   originVerification
 } from "./courtside.upgrade-smoke.mjs";
+import { retainedNightlyCount } from "./nightly-image-retention.mjs";
 
 const releaseWorkflow = readFileSync(
   fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)),
@@ -359,6 +360,26 @@ test("given the retained dated nightlies, when the night rehearses an upgrade, t
       "a migration corrected in place since aaaaaaa would fail Flyway's checksum, and 7e6adcc precedes 2a3b6f7");
     assert.deepEqual(nightlyUpgradeOrigins("example/courtside", ["nightly"], history), [],
       "without a dated nightly there is nothing to upgrade from");
+  });
+
+test("given more dated nightlies than retention keeps, when an upgrade origin is chosen, then it is one retention "
+  + "will not delete during the run", () => {
+    // given
+    const tags = ["nightly", "nightly-candidate", "nightly-20261007-d0ba80a", "nightly-20261007-93a767d",
+      "nightly-20261007-c64503f", "nightly-20261007-e28098a", "nightly-20261007-e70aad1", "nightly-20261008-0fafd2f",
+      "nightly-20261008-1b088f5", "nightly-20261008-5744158", "nightly-20261008-6761d91", "nightly-20261008-69aec3f",
+      "nightly-20261008-70c3f7d", "nightly-20261008-bb1c226", "booking-seed-nightly-20261007-d0ba80a"];
+    const order = ["d0ba80a", "93a767d", "c64503f", "e28098a", "e70aad1", "70c3f7d", "1b088f5", "0fafd2f", "69aec3f",
+      "5744158", "6761d91", "bb1c226"];
+    const history = { committedAt: (ref) => order.indexOf(ref), unchangedSince: () => true };
+
+    // when
+    const [origin] = nightlyUpgradeOrigins("example/courtside", tags, history);
+
+    // then
+    assert.equal(origin.ref, order.at(-retainedNightlyCount),
+      "retention deletes every dated nightly older than the newest it keeps, so the oldest of those is the "
+      + "earliest origin that survives the run");
   });
 
 test("given a history where a shipped migration was corrected, when git is asked, then only origins before an "
