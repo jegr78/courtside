@@ -126,6 +126,48 @@ const credentialProofOperationIds = new Set([
   "changeOwnPassword"
 ]);
 
+// Sensitive operations accept a full authentication proof for five minutes.
+export const recentProofRenewalMilliseconds = 4 * 60 * 1000;
+
+export function recentProofKeeper(renew, now = Date.now) {
+  const provenAt = new Map();
+  return {
+    proven(actor) {
+      provenAt.set(actor, now());
+    },
+    async beforeCase(actor) {
+      const at = provenAt.get(actor);
+      if (at === undefined || now() - at < recentProofRenewalMilliseconds) return;
+      await renew(actor);
+      provenAt.set(actor, now());
+    }
+  };
+}
+
+export function reauthenticateActor(request, clients, password) {
+  return async (actor) => {
+    const response = await request(clients[actor], { method: "POST", path: "/api/session/reauthentication",
+      headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) }, { csrf: true });
+    if (response.status !== 204) throw new Error(`Synthetic ${actor} reauthentication failed with ${response.status}`);
+  };
+}
+
+export function operationMatrixHooks({ clients, signIn, proofs, resetLoginAttempts }) {
+  return {
+    beforeOperation: async (operation) => {
+      if (!terminalOperationOrder.has(operation.operationId)) return;
+      for (const actor of authorizationActors.filter((candidate) => candidate !== "ANONYMOUS")) {
+        clients[actor] = new SecurityCookieJar();
+        await signIn(clients[actor], actor);
+      }
+    },
+    beforeCase: async (operation, actor) => {
+      if (credentialProofOperationIds.has(operation.operationId)) await resetLoginAttempts();
+      await proofs.beforeCase(actor);
+    }
+  };
+}
+
 export async function executeOperationMatrix(matrix, send, beforeOperation = async () => {},
                                              beforeCase = async () => {}) {
   const ordered = [...matrix].sort((left, right) =>
@@ -529,8 +571,16 @@ export async function runAuthorizationAssessment(plan, context) {
   const request = (client, probe, options = {}) => executeAuthorizationProbe(send, client, probe, options);
   try {
     const clients = Object.fromEntries(authorizationActors.map((actor) => [actor, new SecurityCookieJar()]));
+    const proofs = recentProofKeeper(reauthenticateActor(request, clients, context.sharedPassword), context.now);
+    const signIn = async (client, actor) => {
+      const response = await signInSecurityActor(request, client, actor, context.sharedPassword,
+        context.resetLoginAttempts);
+      if (client === clients[actor] && actor !== "INITIAL_PASSWORD") proofs.proven(actor);
+      return response;
+    };
+    const hooks = operationMatrixHooks({ clients, signIn, proofs, resetLoginAttempts: context.resetLoginAttempts });
     for (const actor of authorizationActors.filter((candidate) => candidate !== "ANONYMOUS")) {
-      await signInSecurityActor(request, clients[actor], actor, context.sharedPassword, context.resetLoginAttempts);
+      await signIn(clients[actor], actor);
     }
     const secondMember = new SecurityCookieJar();
     await signInSecurityUsername(request, secondMember, "security.member.2", context.sharedPassword, "MEMBER",
@@ -550,21 +600,12 @@ export async function runAuthorizationAssessment(plan, context) {
       request(objectClients[actor], probe, { csrf: probe.method !== "GET" }), rosterListing);
     const results = await executeOperationMatrix(matrix, async (operation, actor, probe) => {
       if (operation.operationId === "logIn") {
-        const client = actor === "ANONYMOUS" ? new SecurityCookieJar() : clients[actor];
-        const loginActor = actor === "ANONYMOUS" ? "MEMBER" : actor;
-        return signInSecurityActor(request, client, loginActor, context.sharedPassword, context.resetLoginAttempts);
+        if (actor === "ANONYMOUS") return signInSecurityActor(request, new SecurityCookieJar(), "MEMBER",
+          context.sharedPassword, context.resetLoginAttempts);
+        return signIn(clients[actor], actor);
       }
       return request(clients[actor], probe, { csrf: operation.mutation });
-    }, async (operation) => {
-      if (!terminalOperationOrder.has(operation.operationId)) return;
-      for (const actor of authorizationActors.filter((candidate) => candidate !== "ANONYMOUS")) {
-        clients[actor] = new SecurityCookieJar();
-        await signInSecurityActor(request, clients[actor], actor, context.sharedPassword,
-          context.resetLoginAttempts);
-      }
-    }, async (operation) => {
-      if (credentialProofOperationIds.has(operation.operationId)) await context.resetLoginAttempts();
-    });
+    }, hooks.beforeOperation, hooks.beforeCase);
     const authentication = await executeAuthenticationChecks(request, context.sharedPassword,
       context.resetLoginAttempts, context.maxAddressFailures);
     const evidence = {

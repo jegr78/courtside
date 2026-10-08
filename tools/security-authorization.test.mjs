@@ -18,6 +18,10 @@ import {
   loginTimingSampleOrder,
   executeObjectAuthorizationChecks,
   executeOperationMatrix,
+  operationMatrixHooks,
+  reauthenticateActor,
+  recentProofKeeper,
+  recentProofRenewalMilliseconds,
   SecurityCookieJar,
   authorizationRequest,
   validateAuthorizationEvidence
@@ -113,6 +117,107 @@ test("given one protected operation admits an anonymous actor, when executing th
   assert.equal(results.find(({ actor }) => actor === "ANONYMOUS").outcome, "failed");
   assert.ok(results.filter(({ actor }) => actor !== "ANONYMOUS")
     .every(({ outcome }) => outcome === "passed"));
+});
+
+test("given an actor proven at sign-in, when its cases pass the renewal margin, then it renews once and not before", async () => {
+  // given
+  let clock = 1_000;
+  const renewals = [];
+  const proofs = recentProofKeeper(async (actor) => renewals.push({ actor, at: clock }), () => clock);
+  proofs.proven("ADMIN");
+
+  // when
+  clock += recentProofRenewalMilliseconds - 1;
+  await proofs.beforeCase("ADMIN");
+  const beforeMargin = renewals.length;
+  clock += 1;
+  await proofs.beforeCase("ADMIN");
+  clock += 1;
+  await proofs.beforeCase("ADMIN");
+
+  // then
+  assert.equal(beforeMargin, 0, "a proof younger than the margin must not be renewed");
+  assert.deepEqual(renewals, [{ actor: "ADMIN", at: 1_000 + recentProofRenewalMilliseconds }],
+    "a proof at the margin is renewed exactly once, and the renewal counts as the new proof");
+  assert.ok(recentProofRenewalMilliseconds < 5 * 60 * 1000,
+    "the margin must lie under the application's five-minute reauthentication window");
+});
+
+test("given a matrix that runs past the margin, when an administrator reaches a sensitive operation, then its proof is renewed first", async () => {
+  // given
+  const matrix = buildOperationAuthorizationMatrix({ paths: {
+    "/api/admin/utilisation": { get: { operationId: "facilityUtilisation", security: [{ sessionCookie: [] }] } },
+    "/api/admin/accounts/{accountId}/sessions": { delete: { operationId: "endAccountSessions",
+      security: [{ sessionCookie: [], csrfToken: [] }],
+      parameters: [{ name: "accountId", in: "path", required: true, schema: { type: "string", format: "uuid" } }] } }
+  } });
+  let clock = 0;
+  const events = [];
+  const clients = Object.fromEntries(authorizationActors.map((actor) => [actor, new SecurityCookieJar()]));
+  const proofs = recentProofKeeper(async (actor) => events.push(`renew ${actor}`), () => clock);
+  const hooks = operationMatrixHooks({ clients, signIn: async () => {}, proofs, resetLoginAttempts: async () => {} });
+  proofs.proven("ADMIN");
+
+  // when
+  await executeOperationMatrix(matrix, async (operation, actor) => {
+    events.push(`${operation.operationId} ${actor}`);
+    clock += recentProofRenewalMilliseconds / 10;
+    return operation.expectations[actor] === "allow" ? { status: 204 }
+      : actor === "ANONYMOUS" ? { status: 401, problemType: "urn:courtside:error:unauthenticated" }
+        : { status: 403, problemType: "urn:courtside:error:access-denied" };
+  }, hooks.beforeOperation, hooks.beforeCase);
+
+  // then
+  const renewal = events.indexOf("renew ADMIN");
+  assert.ok(renewal >= 0, `the administrator's proof must be renewed once the matrix passes the margin, got ${events.join(", ")}`);
+  assert.equal(events[renewal + 1], "endAccountSessions ADMIN",
+    "the renewal comes directly before the administrator's case, so the sensitive operation sees a fresh proof");
+});
+
+test("given an actor that never signed in, when its cases run past the margin, then nothing renews it", async () => {
+  // given
+  let clock = 0;
+  const renewals = [];
+  const proofs = recentProofKeeper(async (actor) => renewals.push(actor), () => clock);
+
+  // when
+  clock += 2 * recentProofRenewalMilliseconds;
+  await proofs.beforeCase("ANONYMOUS");
+
+  // then
+  assert.deepEqual(renewals, [], "an anonymous or unproven actor has no proof to renew");
+});
+
+test("given a signed-in actor, when its proof is renewed, then it proves the password again with CSRF on its current client", async () => {
+  // given
+  const replaced = new SecurityCookieJar();
+  const clients = { ADMIN: new SecurityCookieJar() };
+  const requests = [];
+  const request = async (client, probe, options) => {
+    requests.push({ client, probe, options });
+    return { status: 204 };
+  };
+  const renew = reauthenticateActor(request, clients, "example-password");
+
+  // when
+  clients.ADMIN = replaced;
+  await renew("ADMIN");
+
+  // then
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].client, replaced, "the renewal must use the actor's current client, which carries the replacement cookie");
+  assert.deepEqual(requests[0].probe, { method: "POST", path: "/api/session/reauthentication",
+    headers: { "content-type": "application/json" }, body: JSON.stringify({ password: "example-password" }) });
+  assert.deepEqual(requests[0].options, { csrf: true }, "the reauthentication is a mutation and needs the CSRF token");
+});
+
+test("given a refused reauthentication, when an actor's proof is renewed, then the assessment stops with the status", async () => {
+  // given
+  const renew = reauthenticateActor(async () => ({ status: 401 }), { ADMIN: new SecurityCookieJar() }, "example-password");
+
+  // when / then
+  await assert.rejects(renew("ADMIN"), /Synthetic ADMIN reauthentication failed with 401/,
+    "a renewal that does not succeed must not let the matrix measure a stale proof");
 });
 
 test("given two members and an administrator, when substituting owned identifiers and fields, then state stays unchanged", async () => {
