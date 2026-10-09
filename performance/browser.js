@@ -130,8 +130,10 @@ export default async function () {
     await page.getByTestId("booking-submit").click();
     const response = await bookingResponsePromise;
     if (response.status() !== 201) throw new Error(await refusal("the booking UI", response));
-    // The Location header needs no body fetch, which Chromium can fail to serve after a 201.
-    bookingId = ((await response.headerValue("location")) ?? "").match(/\/api\/bookings\/([^/?#]+)$/)?.[1];
+    // The Location header needs no body fetch, which Chromium can fail to serve after a 201; k6 2.3.0's
+    // headerValue answers a [value, found] pair, so the header is read from the lower-cased allHeaders map.
+    const location = (await response.allHeaders())["location"];
+    bookingId = typeof location === "string" ? location.match(/\/api\/bookings\/([^/?#]+)$/)?.[1] : undefined;
     if (!bookingId) throw new Error("The booking UI returned no booking location");
     step = "show own booking";
     const ownAllocation = page.locator(`[data-testid="own-allocation"][data-booking-id="${bookingId}"]`);

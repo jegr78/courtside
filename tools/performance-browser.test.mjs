@@ -522,7 +522,10 @@ function bookingSubmissionHarness(location) {
       }
       return {};
     },
-    headerValue: async name => name.toLowerCase() === "location" ? location : null
+    // The shapes k6 2.3.0-with-browser returns for a 201 carrying a Location header.
+    headerValue: name => name.toLowerCase() === "location" && location ? [location, true] : ["", false],
+    headers: () => ({ "Content-Type": "application/json", ...(location ? { Location: location } : {}) }),
+    allHeaders: async () => ({ "content-type": "application/json", ...(location ? { location } : {}) })
   });
   const page = {
     on: () => {}, goto: async () => {}, reload: async () => {},

@@ -58,7 +58,8 @@ test("given a browser journey, when inspecting it, then the member workflow stay
   assert.doesNotMatch(bookingJourney, /page\.evaluate|fetch\(|http\.(?:get|post|put|patch|del)\(/);
   assert.match(browserScript, /getByTestId\("booking-submit"\)/);
   assert.match(browserScript, /waitForResponse/);
-  assert.match(browserScript, /response\.headerValue\("location"\)/);
+  assert.match(browserScript, /\(await response\.allHeaders\(\)\)\["location"\]/);
+  assert.doesNotMatch(browserScript, /headerValue\(/, "k6 2.3.0 answers headerValue with a [value, found] pair");
   assert.match(browserScript, /data-testid="own-allocation"/);
   assert.match(browserScript, /getByTestId\("my-bookings-link"\)/);
   assert.match(browserScript, /data-testid="personal-cancel"/);
