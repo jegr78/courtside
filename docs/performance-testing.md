@@ -358,10 +358,11 @@ written as it happens. Console warnings are written too, so a failure the fronte
 breaking the journey still leaves a line, but they do not count as browser errors.
 
 A freshly started Chromium can change its certificate verifier while its first page loads, and the
-requests in flight then fail with `net::ERR_CERT_VERIFIER_CHANGED`. The journey reloads the sign-in
-page once when that happens on its first page load, writes the failed request with a note, and counts
-the reload in `browser_verifier_reloads` instead of `browser_errors`. Any later failure, including a
-second verifier change, counts as a browser error.
+requests in flight, the sign-in document itself included, then fail with
+`net::ERR_CERT_VERIFIER_CHANGED`. The journey opens the sign-in page once more when that happens on
+its first page load, writes the failed request with a note, and counts the repeat in
+`browser_verifier_reloads` instead of `browser_errors`. Any later failure, including a second verifier
+change, counts as a browser error.
 
 The journey reads the created booking's id from the `Location` header of the 201 response rather
 than from its body, because Chromium can fail to serve a response body over the DevTools protocol

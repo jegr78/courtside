@@ -2166,3 +2166,29 @@ test("given the warm-up workload, when it runs, then it only reads anonymously i
   for (const path of harness.policy.targetWarmUp.paths) assert.ok(script.includes(path), `the warm-up skips ${path}`);
   assert.doesNotMatch(script, /-X|--data|-d |POST|PUT|DELETE/, "the warm-up must not change state");
 });
+
+test("given a gateway that has relayed nothing yet, when the real sampler watches the warm-up, then the missing gateway metrics do not stop it", async () => {
+  // given
+  const policy = JSON.parse(readFileSync(new URL("../security/resource-abuse-policy.json", import.meta.url), "utf8"));
+  let now = 0;
+  const command = async (args) => {
+    if (args.includes("/tmp/security-gateway-metrics")) {
+      throw new Error("cat: /tmp/security-gateway-metrics: No such file or directory");
+    }
+    if (args[0] === "stats") return { stdout: "20.5%|410MiB / 1GiB\n" };
+    if (args.includes("psql")) return { stdout: "3|0|1|41943040\n" };
+    if (args.includes("http://127.0.0.1:8080/actuator/prometheus")) {
+      return { stdout: ["hikaricp_connections_active{pool=\"HikariPool-1\"} 1.0",
+        "hikaricp_connections_pending{pool=\"HikariPool-1\"} 0.0",
+        "hikaricp_connections_max{pool=\"HikariPool-1\"} 10.0"].join("\n") };
+    }
+    return { stdout: "" };
+  };
+  // when
+  const result = await warmResourceTarget({ runId: "run-0001", gateway: "gateway", policy, command,
+    wait: async (milliseconds) => { now += milliseconds; }, clock: () => now });
+  // then
+  assert.equal(result.settled, true, "the warm-up must not depend on a gateway it deliberately bypasses");
+  assert.ok(result.samples.every(({ requestP95Milliseconds, errorRate }) => requestP95Milliseconds === 0 && errorRate === 0),
+    "no request passed the gateway, so it reports neither latency nor errors");
+});
