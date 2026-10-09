@@ -197,6 +197,7 @@ function applicationEvidence(project, environment) {
       'domain_event', jsonb_build_object('rows', (SELECT count(*) FROM domain_event)),
       'event_publication', jsonb_build_object('rows', (SELECT count(*) FROM event_publication)),
       'message_record', jsonb_build_object('rows', (SELECT count(*) FROM message_record),
+        'queued', (SELECT count(*) FROM message_record WHERE state = 'QUEUED'),
         'highestSequence', (SELECT max(queued_seq) FROM message_record)),
       'opening_hours', jsonb_build_object('rows', (SELECT count(*) FROM opening_hours)),
       'opening_hours_version', jsonb_build_object('rows', (SELECT count(*) FROM opening_hours_version),
@@ -219,7 +220,7 @@ async function waitForApplicationWrites(project, environment) {
     observed = JSON.parse(psql(project, environment, ["-Atc", `SELECT jsonb_build_object(
       'booking', (SELECT count(*) FROM booking),
       'domainEvent', (SELECT count(*) FROM domain_event),
-      'eventPublication', (SELECT count(*) FROM event_publication),
+      'queuedMessage', (SELECT count(*) FROM message_record WHERE state = 'QUEUED'),
       'settledMessage', (SELECT count(*) FROM message_record WHERE state <> 'QUEUED'),
       'session', (SELECT count(*) FROM spring_session),
       'storedLogo', (SELECT count(*) FROM club_config WHERE logo_content IS NOT NULL))`]).stdout.trim());
@@ -371,8 +372,8 @@ async function execute() {
     const applicationBefore = applicationEvidence(project, environment);
     assert.deepEqual(Object.keys(applicationBefore.tables).sort(), applicationStateTables,
       "application evidence does not name the required tables");
-    assert.ok(applicationBefore.tables.event_publication.rows > 0,
-      "application evidence contains no outstanding event publication");
+    assert.ok(applicationBefore.tables.message_record.queued > 0,
+      "application evidence contains no outstanding queued message");
     writeFileSync(join(build, "application-before.json"), `${JSON.stringify(applicationBefore, null, 2)}\n`);
     const applicationDump = compose(project, environment,
       ["exec", "-T", "db", "pg_dump", "-Fc", "--no-owner", "-U", "courtside", "courtside"],

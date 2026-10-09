@@ -107,8 +107,8 @@ test("given application-written state, when it is restored, then representative 
   assert.match(runner, /pg_sequences/);
   assert.match(runner, /restored application database differs from its backup source/);
   assert.match(runner, /compose\(project, environment, \["stop", "mail"\]\)/);
-  assert.match(runner, /event_publication\.rows > 0/);
-  assert.doesNotMatch(runner, /name !== "eventPublication"/);
+  assert.match(runner, /message_record\.queued > 0/);
+  assert.doesNotMatch(runner, /name !== "queuedMessage"/);
 });
 
 test("given a restored application database, when the image starts, then the written logo and booking remain readable", () => {
