@@ -90,7 +90,9 @@ class SharedExceptionHandler {
 
     @ExceptionHandler(TransactionTimedOutException.class)
     ProblemDetail handleTransactionTimeout(TransactionTimedOutException exception) {
-        return transactionTimeout();
+        ProblemDetail problem = transactionTimeout();
+        logAnswered(problem);
+        return problem;
     }
 
     // Hibernate enforces the same deadline itself on find, flush and commit, and only says so in its message.
@@ -100,7 +102,9 @@ class SharedExceptionHandler {
         for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
             if (cause instanceof org.hibernate.TransactionException
                     && String.valueOf(cause.getMessage()).contains("timeout expired")) {
-                return transactionTimeout();
+                ProblemDetail problem = transactionTimeout();
+                logAnswered(problem);
+                return problem;
             }
         }
         ProblemDetail problem = ContainerErrorController.problemFor(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -115,7 +119,6 @@ class SharedExceptionHandler {
         problem.setType(URI.create("urn:courtside:error:transaction-timeout"));
         problem.setTitle("Transaction timed out");
         problem.setProperty("retryable", true);
-        logAnswered(problem);
         return problem;
     }
 
