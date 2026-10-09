@@ -118,7 +118,8 @@ export function resourcePublicationPolicy(runtime, application, classpathText) {
   if (!config || !Array.isArray(config.Env) || !Array.isArray(config.Entrypoint)
       || ![null, undefined].includes(config.Cmd) && (!Array.isArray(config.Cmd) || config.Cmd.length)) reject();
   const entrypoint = config.Entrypoint;
-  const flags = ["--sun-misc-unsafe-memory-access=deny", "-XX:MaxRAMPercentage=50.0", "-XX:MaxRAMPercentage=75.0", "-XX:+ExitOnOutOfMemoryError"];
+  const flags = ["--sun-misc-unsafe-memory-access=deny", "-XX:MaxRAMPercentage=50.0", "-XX:MaxRAMPercentage=75.0", "-XX:+ExitOnOutOfMemoryError",
+    "-XX:TieredStopAtLevel=1"];
   if (!["java", "/opt/java/openjdk/bin/java"].includes(entrypoint[0])
       || entrypoint.at(-1) !== "org.springframework.boot.loader.launch.JarLauncher"
       || !entrypoint.slice(1, -1).every(flag => flags.includes(flag))

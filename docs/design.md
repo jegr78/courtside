@@ -570,6 +570,10 @@ any other refusal. A budget that starts refusing writes one security event, and 
 refusal writes one. The instance refuses to start when a demanding class has no admission decision,
 when a decision names a class no request reaches, or when a cost exceeds the burst of either budget.
 
+Budgets bound what requests cost, not what the JVM spends on itself. The image therefore compiles
+with C1 only: the optimizing C2 compiler would keep a one-CPU instance busy for minutes after every
+start, recompiling as traffic arrives, while C1 code serves a club's load with room to spare.
+
 The application sets `Content-Security-Policy`, `X-Content-Type-Options: nosniff`,
 `X-Frame-Options: DENY` and `Referrer-Policy: strict-origin-when-cross-origin` on its own responses.
 For secure requests, Spring Security also sets `Strict-Transport-Security`. Caddy repeats nosniff,

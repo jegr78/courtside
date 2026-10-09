@@ -425,6 +425,17 @@ test("given the actual native application YAML and approved diagnostic heap flag
   assert.equal(result.repositoryMode, "JDBC_V2");
 });
 
+test("given the shipped Dockerfile entrypoint, when publication policy binds, then every flag it starts the JVM with is supported", () => {
+  // given
+  const f = publicationPolicyFixture();
+  const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
+  f.runtime.Config.Entrypoint = JSON.parse(/^ENTRYPOINT (\[.*\])$/m.exec(dockerfile)[1]);
+  // when
+  const result = resourcePublicationPolicy(f.runtime, f.application, f.classpath);
+  // then
+  assert.equal(result.repositoryMode, "JDBC_V2", "the assessment must accept the image exactly as it ships");
+});
+
 for (const legacy of [undefined, false]) {
   test(`given native default or explicit legacy false ${legacy}, when publication policy binds, then only the closed JDBC V2 delete mode is accepted`, () => {
     // given

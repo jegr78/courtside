@@ -33,6 +33,8 @@ define.
 - The Java heap takes at most 50 percent of the container's memory limit, so set a limit. The
   reference deployment sets 1 GiB, leaving half for other JVM and process memory. The process exits
   on an `OutOfMemoryError` instead of running on degraded, so give it a restart policy.
+- The JVM compiles with the C1 compiler only. The optimizing C2 compiler would occupy a one-CPU
+  instance for its first minutes after every start, and a club's load does not need its peak code.
 - Logs go to standard output, one Elastic Common Schema JSON object per line.
 - `--collect-operational-logs` starts the bounded UDP collector instead of the web application. It
   listens on `COURTSIDE_OPERATIONAL_LOG_PORT`, accepts only the fixed application, database and

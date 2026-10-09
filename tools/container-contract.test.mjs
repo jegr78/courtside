@@ -153,6 +153,16 @@ test("given a one GiB application limit, when applying the image heap default, t
   assert.ok(entrypoint.includes("-XX:+ExitOnOutOfMemoryError"));
 });
 
+test("given the image, when its JVM starts, then it compiles with C1 only and the contract says so", () => {
+  // given
+  const entrypoint = JSON.parse(/^ENTRYPOINT (\[.*\])$/m.exec(dockerfile)[1]);
+
+  // when / then
+  assert.ok(entrypoint.includes("-XX:TieredStopAtLevel=1"),
+    "without C1-only compilation the JIT fills a one-CPU instance for its first seconds");
+  assertNamed(["C1 compiler only"], "the JIT mode");
+});
+
 test("given the image's health check, when the contract describes health, then it states the path, timing and body",
   () => {
     // given

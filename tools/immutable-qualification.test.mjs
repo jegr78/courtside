@@ -14,7 +14,7 @@ const args = ["--confirm", project, "--image", image, "--source-commit", sourceC
 const nativeEnvironment = { COURTSIDE_UAT_HTTP_PORT: "28081", COURTSIDE_UAT_HTTPS_PORT: "28443",
   COURTSIDE_UAT_SHARED_PORT: "28083", COURTSIDE_OPERATIONAL_LOG_PORT: "21515" };
 const nativeEntrypoint = ["java", "--sun-misc-unsafe-memory-access=deny", "-XX:MaxRAMPercentage=50.0",
-  "-XX:+ExitOnOutOfMemoryError", "org.springframework.boot.loader.launch.JarLauncher"];
+  "-XX:+ExitOnOutOfMemoryError", "-XX:TieredStopAtLevel=1", "org.springframework.boot.loader.launch.JarLauncher"];
 
 test("given explicit immutable smoke options, when the existing producer is invoked, then invalid selection fails before native commands", async () => {
   // given
