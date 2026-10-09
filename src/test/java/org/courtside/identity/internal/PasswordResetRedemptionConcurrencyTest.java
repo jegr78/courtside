@@ -173,6 +173,7 @@ class PasswordResetRedemptionConcurrencyTest extends AbstractIntegrationTest {
     // Bound to the transaction this test holds open: another test's contention would otherwise
     // release the wait early and leave it measuring a missing row rather than a guard.
     private int blockedByThisTransaction() {
+        jdbc.sql("SELECT pg_stat_clear_snapshot()").query().singleValue();
         return jdbc.sql("""
                         SELECT count(*) FROM pg_stat_activity
                         WHERE pid <> pg_backend_pid()
