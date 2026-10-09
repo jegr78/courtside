@@ -12,12 +12,12 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 |---|---|
 | `ANONYMOUS` | A caller without an authenticated Courtside session. |
 | `MEMBER` | An authenticated account holding the ordinary member role. |
-| `TRAINER` | An authenticated account holding the trainer role. |
+| `TRAINER` | An authenticated account holding the trainer role. The start-up warm-up passes this role without an account to preview a series. |
 | `SPORT_DIRECTOR` | An authenticated account holding the sport-director role. |
 | `YOUTH_DIRECTOR` | An authenticated account holding the youth-director role. |
 | `GROUNDSKEEPER` | An authenticated account holding the groundskeeper role. |
 | `TREASURER` | An authenticated account holding the treasurer role. |
-| `ADMIN` | An authenticated account holding the instance administrator role. |
+| `ADMIN` | An authenticated account holding the instance administrator role. The start-up warm-up passes this role without an account to write a booking it rolls back. |
 | `INITIAL_PASSWORD` | An authenticated account restricted to replacing its issued one-time password. |
 
 ## Resource attributes
@@ -171,11 +171,11 @@ Negative tests: `src/test/java/org/courtside/member/web/RosterAdminControllerTes
 
 ### Booking card role and state
 
-A booking card must be active and admit at least one actor role; ADMIN bypasses the card role list but not facility availability or invariant checks.
+A booking card must be active and admit at least one actor role; ADMIN bypasses the card role list but not facility availability or invariant checks. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.
 
 Attributes: `booking-card`, `booking-card-active`, `allowed-role`, `administrator-override`.
 
-Production: `src/main/java/org/courtside/booking/internal/CardEligibilityPolicy.java#requireEligible`, `src/main/java/org/courtside/booking/internal/BookingRuleGate.java#bookingEligibilityFor`, `src/main/java/org/courtside/booking/internal/BookingRuleGate.java#maxBookingMinutesFor`, `src/main/java/org/courtside/booking/internal/BookingRuleGate.java#requireCancellationAllowed`, `src/main/java/org/courtside/booking/internal/BookingRuleGate.java#restrictionsApplyTo`, `src/main/java/org/courtside/booking/BookingWriter.java#write/3`, `src/main/java/org/courtside/card/CardService.java#bookableCards`, `src/main/java/org/courtside/card/web/CardController.java#callerRoles`, `src/main/java/org/courtside/booking/series/SeriesService.java#create`, `src/main/java/org/courtside/booking/web/BookingController.java#getBookingEligibility`, `src/main/java/org/courtside/booking/web/BookingController.java#createBooking`, `src/main/java/org/courtside/booking/web/SeriesController.java#createSeries`, `src/main/java/org/courtside/booking/web/SeriesController.java#previewSeries`, `src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run`.
+Production: `src/main/java/org/courtside/booking/internal/CardEligibilityPolicy.java#requireEligible`, `src/main/java/org/courtside/booking/internal/BookingRuleGate.java#bookingEligibilityFor`, `src/main/java/org/courtside/booking/internal/BookingRuleGate.java#maxBookingMinutesFor`, `src/main/java/org/courtside/booking/internal/BookingRuleGate.java#requireCancellationAllowed`, `src/main/java/org/courtside/booking/internal/BookingRuleGate.java#restrictionsApplyTo`, `src/main/java/org/courtside/booking/BookingWriter.java#write/3`, `src/main/java/org/courtside/card/CardService.java#bookableCards`, `src/main/java/org/courtside/card/web/CardController.java#callerRoles`, `src/main/java/org/courtside/booking/series/SeriesService.java#create`, `src/main/java/org/courtside/booking/web/BookingController.java#getBookingEligibility`, `src/main/java/org/courtside/booking/web/BookingController.java#createBooking`, `src/main/java/org/courtside/booking/web/SeriesController.java#createSeries`, `src/main/java/org/courtside/booking/web/SeriesController.java#previewSeries`, `src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run`, `src/main/java/org/courtside/booking/internal/SeriesPreviewWarmUp.java#run`.
 
 Positive tests: `src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenTheRequiredRole_whenRequiringEligibility_thenTheCardIsReturned`.
 
@@ -183,11 +183,11 @@ Negative tests: `src/test/java/org/courtside/booking/internal/CardEligibilityPol
 
 ### Booking and participation ownership
 
-Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN and withdrawal removes only the current person's participation.
+Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN and withdrawal removes only the current person's participation. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.
 
 Attributes: `current-account`, `booking-owner`, `participant-person`, `administrator-override`.
 
-Production: `src/main/java/org/courtside/booking/BookingService.java#cancel`, `src/main/java/org/courtside/booking/BookingWriter.java#cancel`, `src/main/java/org/courtside/booking/Booking.java#withdrawParticipant`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireManagementAccess`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireRoleManagementAccess`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#managementRoles`, `src/main/java/org/courtside/booking/ParticipationService.java#withdraw`, `src/main/java/org/courtside/booking/web/BookingController.java#listPersonalBookings`, `src/main/java/org/courtside/booking/web/BookingController.java#listOwnParticipations`, `src/main/java/org/courtside/booking/web/BookingController.java#removeOwnParticipation`, `src/main/java/org/courtside/booking/web/BookingController.java#cancelBooking`.
+Production: `src/main/java/org/courtside/booking/BookingService.java#cancel`, `src/main/java/org/courtside/booking/BookingWriter.java#cancel`, `src/main/java/org/courtside/booking/Booking.java#withdrawParticipant`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireManagementAccess`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireRoleManagementAccess`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#managementRoles`, `src/main/java/org/courtside/booking/ParticipationService.java#withdraw`, `src/main/java/org/courtside/booking/web/BookingController.java#listPersonalBookings`, `src/main/java/org/courtside/booking/web/BookingController.java#listOwnParticipations`, `src/main/java/org/courtside/booking/web/BookingController.java#removeOwnParticipation`, `src/main/java/org/courtside/booking/web/BookingController.java#cancelBooking`, `src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run`.
 
 Positive tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid`.
 
@@ -207,11 +207,11 @@ Negative tests: `src/test/java/org/courtside/card/web/CardControllerTest.java#gi
 
 ### Managed booking scope
 
-Managed listings and details contain only bookings whose card names one of the actor roles as a managing role; ADMIN sees every card.
+Managed listings and details contain only bookings whose card names one of the actor roles as a managing role; ADMIN sees every card. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.
 
 Attributes: `booking-card`, `managing-role`, `administrator-override`.
 
-Production: `src/main/java/org/courtside/booking/BookingRepository.java#findUpcomingManagedBookingIds`, `src/main/java/org/courtside/booking/BookingRepository.java#findManagedBookingHistoryIds`, `src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#list`, `src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#get`, `src/main/java/org/courtside/booking/web/BookingController.java#listManagedAppointments`, `src/main/java/org/courtside/booking/web/BookingController.java#getManagedAppointment`.
+Production: `src/main/java/org/courtside/booking/BookingRepository.java#findUpcomingManagedBookingIds`, `src/main/java/org/courtside/booking/BookingRepository.java#findManagedBookingHistoryIds`, `src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#list`, `src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#get`, `src/main/java/org/courtside/booking/web/BookingController.java#listManagedAppointments`, `src/main/java/org/courtside/booking/web/BookingController.java#getManagedAppointment`, `src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run`.
 
 Positive tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOfficerAppointment_whenListingManagedAppointments_thenBothResponsibleRolesSeeIt`, `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenACardManagedByTrainers_whenATrainerOpensAnAppointmentOnIt_thenTheParticipantsAreShown`.
 

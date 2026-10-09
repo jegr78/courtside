@@ -169,6 +169,7 @@
       "compose:app:COURTSIDE_TRACING_SAMPLING_PROBABILITY",
       "compose:app:COURTSIDE_WARM_UP_DEADLINE",
       "compose:app:COURTSIDE_WARM_UP_ENABLED",
+      "compose:app:COURTSIDE_WARM_UP_ROUNDS",
       "compose:app:LOGGING_LEVEL_ORG_COURTSIDE",
       "compose:app:SPRING_DATASOURCE_PASSWORD",
       "compose:app:SPRING_DATASOURCE_USERNAME",
