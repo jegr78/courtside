@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 @TestPropertySource(properties = {
         "courtside.database.lock-timeout=1s",
-        "spring.datasource.hikari.connection-init-sql=SET statement_timeout TO 30000"
+        "courtside.database.statement-timeout=30s"
 })
 class DatabaseLockTimeoutIntegrationTest extends AbstractIntegrationTest {
 

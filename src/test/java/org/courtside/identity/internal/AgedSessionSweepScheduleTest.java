@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.config.CronTask;
@@ -41,7 +42,7 @@ class AgedSessionSweepScheduleTest {
 
         @Bean
         AgedSessionSweep agedSessionSweep() {
-            return new AgedSessionSweep(mock(JdbcClient.class),
+            return new AgedSessionSweep(mock(DatabaseDeadlines.class), mock(JdbcClient.class),
                     new CourtsideSessionProperties(Duration.ofHours(24), 5, Duration.ofMinutes(5)));
         }
     }

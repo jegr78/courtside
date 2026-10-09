@@ -7,6 +7,7 @@ import org.courtside.member.MemberService;
 import org.courtside.member.RosterService;
 import org.courtside.shared.CursorPage;
 import org.springframework.stereotype.Service;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.Charset;
@@ -19,7 +20,7 @@ import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, timeoutString = DatabaseDeadlines.REPORT)
 public class RosterExportService {
 
     static final int PAGE_SIZE = 200;

@@ -157,7 +157,7 @@
       "concurrencyOrRateBound": "Password verification admits two concurrent operations per application instance; login addresses and credential issuance also have persisted rate windows. Every operation here except the filter-handled sign-in also spends 5 tokens of its caller's request budget.",
       "executionModel": "Verification and password policy run synchronously in the request; committed credential events hand mail to the asynchronous event listener.",
       "failureBehavior": "Capacity exhaustion returns a typed 429, HIBP unavailability refuses a new password, and a failed transaction stores no partial credential change.",
-      "consumerTimeoutBehavior": "The HIBP dependency has its own deadline. The reference proxy adds no arbitrary response deadline; a caller retry remains subject to rate and transaction rules.",
+      "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The HIBP dependency has its own deadline. The reference proxy adds no arbitrary response deadline; a caller retry remains subject to rate and transaction rules.",
       "productionPaths": [
         "src/main/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
         "src/main/java/org/courtside/identity/internal/LoginAttemptFilter.java",
@@ -182,7 +182,7 @@
       "concurrencyOrRateBound": "Admission control runs one import operation at a time per instance and charges 20 tokens of the caller's request budget; a database advisory lock additionally serializes execution per import source.",
       "executionModel": "Preview and execution are synchronous transactions. Execution locks its source and affected person rows in a deterministic order before applying changes.",
       "failureBehavior": "Malformed uploads fail before a preview is stored; stale, expired or competing executions fail transactionally without a partial roster sync.",
-      "consumerTimeoutBehavior": "The reference proxy adds no response deadline. Disconnect is not a rollback promise, so the preview identity and actor binding make a later retry observable and safe.",
+      "consumerTimeoutBehavior": "The application rolls this request's transaction back after 120 seconds and cancels any statement after 15 seconds. The reference proxy adds no response deadline. Disconnect is not a rollback promise, so the preview identity and actor binding make a later retry observable and safe.",
       "productionPaths": [
         "src/main/java/org/courtside/dataexchange/PreviewService.java",
         "src/main/java/org/courtside/dataexchange/ExecutionService.java",
@@ -206,7 +206,7 @@
       "concurrencyOrRateBound": "Only administrators may search; admission control runs one search at a time per instance and charges 10 tokens of the caller's request budget.",
       "executionModel": "The read is synchronous, state invariant and uses only the collector's read-only named volume; it never calls Docker or an arbitrary source.",
       "failureBehavior": "Missing or stale collector evidence returns UNAVAILABLE; malformed or over-bound retained data is skipped and marks the result incomplete.",
-      "consumerTimeoutBehavior": "The scan has fixed byte and record ceilings. The reference proxy adds no separate response deadline, and a retry performs the same bounded read.",
+      "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The scan has fixed byte and record ceilings. The reference proxy adds no separate response deadline, and a retry performs the same bounded read.",
       "productionPaths": [
         "src/main/java/org/courtside/operations/internal/OperationalLogService.java",
         "src/main/java/org/courtside/shared/web/AdmissionControl.java"
@@ -229,7 +229,7 @@
       "concurrencyOrRateBound": "Each write spends 2 tokens of its caller's request budget and is otherwise not capped in parallel, so a busy booking morning is decided by deterministic database locks and the five-second lock wait rather than refused.",
       "executionModel": "The synchronous transaction authorizes, validates rules, locks courts in order and stores one booking plus its allocations before publishing events.",
       "failureBehavior": "A conflict or validation failure rolls back the complete booking; an idempotency key returns the original result or rejects a changed replay.",
-      "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller uncertain about the outcome can repeat the same idempotency key without creating another booking.",
+      "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The reference proxy sets no response deadline. A caller uncertain about the outcome can repeat the same idempotency key without creating another booking.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
         "src/main/java/org/courtside/shared/web/AdmissionControl.java"
@@ -265,7 +265,7 @@
       "concurrencyOrRateBound": "Each read spends 2 tokens of its caller's request budget; the queries have no separate concurrency gate.",
       "executionModel": "Each operation is a synchronous read-only request; paged operations use a stable cursor while deliberately small configuration lists return together.",
       "failureBehavior": "Invalid cursors, limits and dates return typed failures. Query failure produces no mutation and no successful partial collection response.",
-      "consumerTimeoutBehavior": "The reference proxy sets no response deadline. These reads are repeatable after a caller disconnects and carry no server-side continuation contract.",
+      "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The reference proxy sets no response deadline. These reads are repeatable after a caller disconnects and carry no server-side continuation contract.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/BookingService.java",
         "src/main/java/org/courtside/audit/internal/AuditService.java",
@@ -295,7 +295,7 @@
       "concurrencyOrRateBound": "Admission control runs at most two series operations at a time per instance and charges 10 tokens of the caller's request budget; database locks and the five-second lock wait bound competing writers.",
       "executionModel": "Previews are synchronous reads. Create, move and cancel use transactions and acquire shared booking rows in the repository-wide order.",
       "failureBehavior": "An over-limit schedule is rejected before calendar work; lock or rule failure rolls the transaction back and reports a typed domain or contention response.",
-      "consumerTimeoutBehavior": "The reference proxy adds no response deadline. A disconnected caller may not know the commit outcome, so mutations use their stored series identity and transactional state on retry.",
+      "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The reference proxy adds no response deadline. A disconnected caller may not know the commit outcome, so mutations use their stored series identity and transactional state on retry.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/series/SeriesRule.java",
         "src/main/java/org/courtside/booking/series/SeriesService.java",
@@ -320,7 +320,7 @@
       "concurrencyOrRateBound": "Admission control runs at most two exports at a time per instance, one per caller, and charges 20 tokens of the caller's request budget.",
       "executionModel": "The application reads and renders each response synchronously; roster pagination uses pages of 200 internally before constructing one response file.",
       "failureBehavior": "Invalid periods and encodings fail before export; a database or rendering failure returns no successful file rather than a partial application state change.",
-      "consumerTimeoutBehavior": "The reference proxy sets no shorter response timeout. Client cancellation can discard the response but is not claimed to cancel every database or rendering step.",
+      "consumerTimeoutBehavior": "The application rolls this request's transaction back after 120 seconds and cancels any statement after 15 seconds. The reference proxy sets no shorter response timeout. Client cancellation can discard the response but is not claimed to cancel every database or rendering step.",
       "productionPaths": [
         "src/main/java/org/courtside/dataexchange/internal/BookingExportService.java",
         "src/main/java/org/courtside/dataexchange/internal/RosterExportService.java",
@@ -348,7 +348,7 @@
       "concurrencyOrRateBound": "Admission control runs at most two of these administrator reads at a time per instance, one per caller with the caller's further reads waiting their turn, and charges 5 tokens of the caller's request budget; statistics reads also stop at their 30-second statement timeout.",
       "executionModel": "The application computes and returns each report synchronously; a statistics page asks for its sections separately.",
       "failureBehavior": "Invalid periods fail before any query; a database failure returns no partial report and changes no application state.",
-      "consumerTimeoutBehavior": "The reference proxy sets no shorter response timeout. Client cancellation can discard the response but is not claimed to cancel every database or rendering step.",
+      "consumerTimeoutBehavior": "The application rolls this request's transaction back after 120 seconds and cancels any statement after 15 seconds, or 30 for the statistics query. The reference proxy sets no shorter response timeout. Client cancellation can discard the response but is not claimed to cancel every database or rendering step.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/FacilityUtilisationService.java",
         "src/main/java/org/courtside/reporting/internal/StatisticsService.java",
@@ -377,7 +377,7 @@
       "concurrencyOrRateBound": "Only an administrator can invoke it; admission control runs one normalization at a time per instance and charges 10 tokens of the caller's request budget.",
       "executionModel": "The request decodes and normalizes one PNG or JPEG in memory, hashes it and stores the bounded result in one transaction.",
       "failureBehavior": "Malformed, oversized or over-dimensioned images fail before configuration is replaced; active SVG content is not decoded as an accepted logo.",
-      "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A failed or abandoned request cannot leave a partially replaced logo transaction.",
+      "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The reference proxy sets no response deadline. A failed or abandoned request cannot leave a partially replaced logo transaction.",
       "productionPaths": [
         "src/main/java/org/courtside/config/internal/ClubLogo.java",
         "src/main/java/org/courtside/shared/web/AdmissionControl.java"
@@ -401,7 +401,7 @@
       "concurrencyOrRateBound": "Admission control runs at most two impact reads at a time per instance and charges 5 tokens of the caller's request budget.",
       "executionModel": "Interactive impact previews synchronously execute one count and one bounded identifier page; announcement pages deliberately omit the count query.",
       "failureBehavior": "Unknown resources and invalid page sizes return typed failures; a query failure produces no configuration mutation because impact operations are read-only.",
-      "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller that leaves loses the preview response and may safely repeat the read.",
+      "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The reference proxy sets no response deadline. A caller that leaves loses the preview response and may safely repeat the read.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/ImpactService.java",
         "src/main/java/org/courtside/shared/web/AdmissionControl.java"
@@ -423,7 +423,7 @@
       "concurrencyOrRateBound": "Only an administrator can invoke it; admission control runs one revocation at a time per instance and charges 5 tokens of the caller's request budget.",
       "executionModel": "One synchronous transactional database mutation revokes the stored sessions before the successful response is produced.",
       "failureBehavior": "A database failure rolls the transaction back; the operation cannot report success with only part of the selected session state committed.",
-      "consumerTimeoutBehavior": "The reference proxy sets no response deadline. A caller can repeat revocation safely because already-ended sessions stay ended.",
+      "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The reference proxy sets no response deadline. A caller can repeat revocation safely because already-ended sessions stay ended.",
       "productionPaths": [
         "src/main/java/org/courtside/identity/GlobalSessionAdministration.java",
         "src/main/java/org/courtside/shared/web/AdmissionControl.java"
@@ -483,7 +483,7 @@
       "concurrencyOrRateBound": "Spring's default single scheduling thread serializes these methods in this application; database and mail work retain their own transaction and delivery bounds.",
       "executionModel": "The in-process scheduler invokes each method on its configured cadence; cleanup uses transactions and reminders claim each booking before publishing events.",
       "failureBehavior": "A failed transactional sweep rolls back and remains eligible later; a claimed reminder commits before asynchronous delivery records its own outcome.",
-      "consumerTimeoutBehavior": "There is no HTTP consumer. A delayed or failed run is retried by the next fixed-delay or cron invocation rather than by extending an arbitrary timeout.",
+      "consumerTimeoutBehavior": "Each sweep allows its statements ten minutes, so an accumulated backlog cannot cancel the run that clears it. There is no HTTP consumer. A delayed or failed run is retried by the next fixed-delay or cron invocation rather than by extending an arbitrary timeout.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/BookingReminderSchedule.java",
         "src/main/java/org/courtside/dataexchange/internal/PreviewExpirySchedule.java",

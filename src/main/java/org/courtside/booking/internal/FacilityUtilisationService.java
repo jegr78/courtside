@@ -6,6 +6,7 @@ import org.courtside.facility.FacilityService;
 import org.courtside.facility.OpeningSchedule;
 import org.courtside.shared.OpeningWindow;
 import org.springframework.stereotype.Service;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -21,7 +22,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, timeoutString = DatabaseDeadlines.REPORT)
 public class FacilityUtilisationService {
 
     private final CourtAllocationRepository allocations;

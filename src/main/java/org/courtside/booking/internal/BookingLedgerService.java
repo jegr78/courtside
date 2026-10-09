@@ -7,6 +7,7 @@ import org.courtside.card.CardService;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ class BookingLedgerService implements BookingLedger {
     private final ClubTimeZone clubTimeZone;
 
     @Override
+    @Transactional(readOnly = true, timeoutString = DatabaseDeadlines.REPORT)
     public List<Occupancy> confirmedBetween(LocalDate from, LocalDate to) {
         ReportingPeriod.validate(from, to);
         ZoneId zone = clubTimeZone.zoneId();

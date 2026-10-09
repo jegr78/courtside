@@ -1,6 +1,7 @@
 package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,12 +13,14 @@ import java.time.ZoneOffset;
 @RequiredArgsConstructor
 class LoginAttemptCleanup {
 
+    private final DatabaseDeadlines deadlines;
     private final JdbcClient jdbc;
     private final LoginProtectionProperties properties;
     private final Clock clock;
 
     @Transactional
     public void deleteExpiredAttempts() {
+        deadlines.allowMaintenanceStatements();
         jdbc.sql("DELETE FROM login_attempt_limit WHERE window_started_at < :cutoff")
                 .param("cutoff", clock.instant().minus(properties.retention()).atOffset(ZoneOffset.UTC))
                 .update();

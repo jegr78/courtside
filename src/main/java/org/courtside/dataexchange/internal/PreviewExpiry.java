@@ -2,6 +2,7 @@ package org.courtside.dataexchange.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,11 +14,13 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class PreviewExpiry {
 
+    private final DatabaseDeadlines deadlines;
     private final ImportPreviewRepository previews;
     private final Clock clock;
 
     @Transactional
     public void sweepNow() {
+        deadlines.allowMaintenanceStatements();
         sweep(clock.instant());
     }
 

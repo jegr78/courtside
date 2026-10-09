@@ -8,12 +8,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.ConnectionHolder;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import javax.sql.DataSource;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,7 +94,27 @@ class StatisticsStatementTimeoutTest extends AbstractIntegrationTest {
         // then
         assertThat(seen).as("every read runs its statements under the 30-second timeout").isEqualTo(Map.of(
                 "range", "30s", "utilisation", "30s", "bookings", "30s", "members", "30s", "messages", "30s"));
-        assertThat(statementTimeout()).as("the timeout is local to the read's transaction").isEqualTo("0");
+        assertThat(statementTimeout()).as("the longer timeout is local to the read's transaction")
+                .isEqualTo("15s");
+    }
+
+    @Test
+    void givenARequestReadingStatistics_whenItsTransactionRuns_thenItCarriesTheReportDeadlineInsteadOfTheRequestOne(
+            @Autowired DataSource dataSource) {
+        // given
+        long[] remainingSeconds = new long[1];
+        when(bookings.firstBookingOn()).thenAnswer(call -> {
+            remainingSeconds[0] = ((ConnectionHolder) TransactionSynchronizationManager.getResource(dataSource))
+                    .getTimeToLiveInSeconds();
+            return Optional.empty();
+        });
+
+        // when
+        statistics.range();
+
+        // then
+        assertThat(remainingSeconds[0]).as("a statistics read states the 120-second report deadline")
+                .isBetween(100L, 120L);
     }
 
     @Test

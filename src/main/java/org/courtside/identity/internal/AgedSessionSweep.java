@@ -1,6 +1,7 @@
 package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 class AgedSessionSweep {
 
+    private final DatabaseDeadlines deadlines;
     private final JdbcClient jdbc;
     private final CourtsideSessionProperties session;
 
@@ -18,6 +20,7 @@ class AgedSessionSweep {
     @Scheduled(cron = "${spring.session.jdbc.cleanup-cron}")
     @Transactional
     public void deleteSessionsPastTheirLifetime() {
+        deadlines.allowMaintenanceStatements();
         // The system clock, because creation_time is written from it.
         jdbc.sql("DELETE FROM spring_session WHERE creation_time <= :cutoff")
                 .param("cutoff", System.currentTimeMillis() - session.absoluteLifetime().toMillis())

@@ -176,6 +176,16 @@ a booking that already committed.
 Events contain identifiers and non-personal change descriptions. Free text, names and email
 addresses are not copied into audit payloads. Stored event payloads evolve additively.
 
+Every application connection cancels a statement after 15 seconds and gives up a contended lock
+after 5. Statistics reads allow 30 seconds per statement, scheduled sweeps ten minutes, and
+migrations run without a statement limit on connections the pool replaces afterwards. A transaction
+that begins while serving a request is checked against a 30-second deadline at each statement;
+statistics, exports, subject access and imports state 120. A deadline that fires rolls that
+transaction back and answers `503` `urn:courtside:error:statement-timeout` or
+`urn:courtside:error:transaction-timeout`; work an earlier transaction of the same request committed
+stays. Startup, scheduled and mail work has no caller waiting and is not held to the request
+deadline.
+
 PostgreSQL state remains the source of truth. Courtside does not use event sourcing or an external
 message broker. The database must enforce occupancy, and one club does not need another service for
 internal events.

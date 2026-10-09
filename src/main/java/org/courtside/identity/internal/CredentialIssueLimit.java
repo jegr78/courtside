@@ -2,6 +2,7 @@ package org.courtside.identity.internal;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.shared.SecurityEventLog;
+import org.courtside.shared.DatabaseDeadlines;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class CredentialIssueLimit implements CredentialIssuing {
 
+    private final DatabaseDeadlines deadlines;
     private final JdbcClient jdbc;
     private final CredentialIssueProperties properties;
     private final Clock clock;
@@ -49,6 +51,7 @@ class CredentialIssueLimit implements CredentialIssuing {
 
     @Transactional
     void deleteExpiredWindows() {
+        deadlines.allowMaintenanceStatements();
         jdbc.sql("DELETE FROM credential_issue_limit WHERE window_started_at < :cutoff")
                 .param("cutoff", clock.instant().minus(properties.retention()).atOffset(ZoneOffset.UTC))
                 .update();
