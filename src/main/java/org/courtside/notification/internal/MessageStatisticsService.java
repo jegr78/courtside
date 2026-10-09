@@ -32,7 +32,8 @@ class MessageStatisticsService implements MessageStatistics {
         Map<MessageKind, Long> retried = new EnumMap<>(MessageKind.class);
         jdbc.sql("""
                         SELECT kind, state, COUNT(*) AS messages,
-                               COUNT(*) FILTER (WHERE attempts > 1 OR (state = 'QUEUED' AND attempts > 0)) AS retried
+                               COUNT(*) FILTER (
+                                   WHERE attempts > 1 OR (state = 'QUEUED' AND reason IS NOT NULL)) AS retried
                         FROM message_record
                         WHERE queued_at >= timezone(:zone, CAST(:from AS timestamp))
                           AND queued_at < timezone(:zone, CAST(:to AS timestamp) + interval '1 day')
