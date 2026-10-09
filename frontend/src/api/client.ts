@@ -1,5 +1,5 @@
 import type { components } from "./schema";
-import { abortable } from "./abortable";
+import { abortable, abortReason } from "./abortable";
 import { clearPersonalBookingsOfflineData, notifyOtherClientsOfSessionChange } from "../offlineBookings";
 import { warnAbout } from "./failureWarning";
 
@@ -146,6 +146,11 @@ export class ApiError extends Error {
 }
 
 const ACCESS_DENIED = "urn:courtside:error:access-denied";
+const ADMISSION_REFUSALS = new Set([
+  "urn:courtside:error:request-rate-limited",
+  "urn:courtside:error:operation-capacity-exhausted"
+]);
+const LONGEST_ADMISSION_WAIT_SECONDS = 5;
 
 async function send(path: string, init: RequestInit, notifyUnauthorized: boolean,
                     announceSessionChange: boolean, maximumRequests = 2): Promise<Response> {
@@ -165,22 +170,49 @@ async function send(path: string, init: RequestInit, notifyUnauthorized: boolean
     response = await fetch(path, carrying(init, replacement));
     problem = await problemIn(response);
   }
+  const admissionWait = retryAfterSeconds(response);
+  if (!write && response.status === 429 && ADMISSION_REFUSALS.has(problem?.type ?? "")
+    && admissionWait !== undefined && admissionWait <= LONGEST_ADMISSION_WAIT_SECONDS) {
+    await pause(admissionWait * 1000, init.signal ?? undefined);
+    requestAttempts++;
+    response = await fetch(path, carrying(init, sent));
+    problem = await problemIn(response);
+  }
   if (!response.ok) {
     if (response.status === 401 && notifyUnauthorized) {
       await clearPersonalBookingsOfflineData();
       notifyOtherClientsOfSessionChange();
       window.dispatchEvent(new Event("courtside:unauthenticated"));
     }
-    const advice = response.headers.get("Retry-After");
-    const seconds = advice !== null && /^\d+$/.test(advice) ? Number(advice) : undefined;
-    throw new ApiError(response.status, problem,
-      seconds !== undefined && Number.isSafeInteger(seconds) ? seconds : undefined, requestAttempts);
+    throw new ApiError(response.status, problem, retryAfterSeconds(response), requestAttempts);
   }
   if (write) {
     await clearPersonalBookingsOfflineData();
     if (announceSessionChange) notifyOtherClientsOfSessionChange();
   }
   return response;
+}
+
+function retryAfterSeconds(response: Response): number | undefined {
+  const advice = response.headers.get("Retry-After");
+  const seconds = advice !== null && /^\d+$/.test(advice) ? Number(advice) : undefined;
+  return seconds !== undefined && Number.isSafeInteger(seconds) ? seconds : undefined;
+}
+
+function pause(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  if (!signal) return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+  signal.throwIfAborted();
+  return new Promise<void>((resolve, reject) => {
+    const cancel = () => {
+      clearTimeout(timer);
+      reject(abortReason(signal));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", cancel);
+      resolve();
+    }, milliseconds);
+    signal.addEventListener("abort", cancel, { once: true });
+  });
 }
 
 async function request<T>(path: string, init: RequestInit = {}, notifyUnauthorized = true,
@@ -234,11 +266,20 @@ let reissuing: Promise<unknown> | undefined;
 // Signing out clears the token, so the write that follows would carry none and come back 403 —
 // a refusal the sign-in form can only report as a rejected credential.
 async function reissuedCsrfToken(): Promise<string | undefined> {
-  const pending = reissuing ??= fetch("/api/session", { credentials: "same-origin" })
+  const pending = reissuing ??= reissue()
     .catch((failure: unknown) => warnAbout("CSRF token reissue failed", failure))
     .finally(() => { reissuing = undefined; });
   await pending;
   return csrfToken();
+}
+
+async function reissue(): Promise<void> {
+  const response = await fetch("/api/session", { credentials: "same-origin" });
+  const wait = retryAfterSeconds(response);
+  if (response.status === 429 && wait !== undefined && wait <= LONGEST_ADMISSION_WAIT_SECONDS) {
+    await pause(wait * 1000);
+    await fetch("/api/session", { credentials: "same-origin" });
+  }
 }
 
 function csrfToken(): string | undefined {

@@ -801,3 +801,117 @@ it("given the statistics range, when it is read, then the client asks the range 
   // then
   expect(range).toEqual({ firstBookingOn: "2024-04-12", today: "2026-09-26" });
 });
+
+function budgetRefusal(retryAfter: string, type = "urn:courtside:error:request-rate-limited") {
+  return HttpResponse.json({ type, title: "Too many requests", status: 429 },
+    { status: 429, headers: { "Content-Type": "application/problem+json", "Retry-After": retryAfter } });
+}
+
+const session = { authenticated: false, roles: [], passwordChangeRequired: false };
+
+it("given a read refused for the request budget, when loading, then the client waits as directed and asks once more", async () => {
+  // given
+  let requests = 0;
+  server.use(http.get("/api/session", () => ++requests === 1 ? budgetRefusal("1") : HttpResponse.json(session)));
+
+  // when
+  const answer = await api.session();
+
+  // then
+  expect(answer.authenticated).toBe(false);
+  expect(requests).toBe(2);
+});
+
+it("given a read refused again after waiting, when loading, then the second refusal reaches the caller", async () => {
+  // given
+  let requests = 0;
+  server.use(http.get("/api/session", () => {
+    requests++;
+    return budgetRefusal("1", "urn:courtside:error:operation-capacity-exhausted");
+  }));
+
+  // when
+  const failure = await api.session().catch((error: unknown) => error);
+
+  // then
+  expect(failure).toMatchObject({ status: 429, retryAfterSeconds: 1 });
+  expect(requests).toBe(2);
+});
+
+it("given a read told to wait longer than a member would, when loading, then the refusal reaches the caller at once", async () => {
+  // given
+  let requests = 0;
+  server.use(http.get("/api/session", () => {
+    requests++;
+    return budgetRefusal("30");
+  }));
+
+  // when
+  const failure = await api.session().catch((error: unknown) => error);
+
+  // then
+  expect(failure).toMatchObject({ status: 429, retryAfterSeconds: 30 });
+  expect(requests).toBe(1);
+});
+
+it("given a write refused for the request budget, when submitting, then it is not sent again", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=token";
+  let requests = 0;
+  server.use(http.post("/api/bookings", () => {
+    requests++;
+    return budgetRefusal("1");
+  }));
+
+  // when
+  const failure = await booking().catch((error: unknown) => error);
+
+  // then
+  expect(failure).toMatchObject({ status: 429 });
+  expect(requests).toBe(1);
+});
+
+it("given a read waiting on its request budget, when the page cancels it, then it stops without asking again", async () => {
+  // given
+  let requests = 0;
+  server.use(http.get("/api/session", () => {
+    requests++;
+    return budgetRefusal("5");
+  }));
+  const leaving = new AbortController();
+
+  // when
+  const pending = api.session(leaving.signal).catch((error: unknown) => error);
+  await vi.waitFor(() => expect(requests).toBe(1));
+  leaving.abort(new DOMException("Left the page", "AbortError"));
+  const failure = await pending;
+
+  // then
+  expect(failure).toMatchObject({ name: "AbortError" });
+  expect(requests).toBe(1);
+});
+
+it("given the token reissue is refused for the request budget, when signing in, then it waits once and signs in with the reissued token", async () => {
+  // given
+  document.cookie = "XSRF-TOKEN=; Max-Age=0";
+  let reissues = 0;
+  let sent: string | null = "absent";
+  server.use(
+    http.get("/api/session", () => {
+      if (++reissues === 1) return budgetRefusal("1");
+      document.cookie = "XSRF-TOKEN=reissued-token";
+      return HttpResponse.json(session);
+    }),
+    http.post("/api/session", ({ request }) => {
+      sent = request.headers.get("X-XSRF-TOKEN");
+      return new HttpResponse(null, { status: 204 });
+    })
+  );
+
+  // when
+  await api.login("doe.jane", "temporary-password");
+
+  // then
+  expect(reissues).toBe(2);
+  expect(sent).toBe("reissued-token");
+});

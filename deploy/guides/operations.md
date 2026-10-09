@@ -1195,6 +1195,10 @@ default.
 | `COURTSIDE_ACCEPTANCE_MAIL_USER` | *required with synthetic mail* | The `uid:gid` Mailpit runs as, one that can read that key. |
 | `COURTSIDE_ACCEPTANCE_MAIL_PORT` | `8025` | Host port on the loopback interface where Mailpit shows the messages it kept. |
 | `COURTSIDE_COOKIE_SECURE` | `true` | Forces host-bound `__Host-SESSION` and `__Host-XSRF-TOKEN` cookies with `Secure` and `Path=/`. Lower it only for local development or a controlled test environment; production refuses to start. HTTPS requests still receive the host-bound policy, while a plain HTTP request then uses the explicit `SESSION` / `XSRF-TOKEN` test names without `Secure`. |
+| `COURTSIDE_ADMISSION_ACCOUNT_BURST` | `200` | Request tokens a signed-in account holds when idle. Every handled request spends its operation's cost, from 1 for ordinary work to 20 for exports and imports; a request beyond the remaining tokens receives `429` `urn:courtside:error:request-rate-limited` with `Retry-After` before it reaches a service. |
+| `COURTSIDE_ADMISSION_ACCOUNT_PER_SECOND` | `20` | Tokens an account regains per second. The default lets a member work at any human pace and refuses an automated client long before it can occupy the instance. |
+| `COURTSIDE_ADMISSION_ADDRESS_BURST` | `600` | Request tokens one client address holds for requests without a signed-in account. It is larger than an account's because a clubhouse network can put many visitors behind one address. |
+| `COURTSIDE_ADMISSION_ADDRESS_PER_SECOND` | `60` | Tokens such an address regains per second. |
 | `COURTSIDE_LOGIN_ADDRESS_MAX_FAILURES` | `20` | Password-verification attempts allowed per login source, and independently per signed-in account and credential-proof source, within the window. The account limit prevents a stolen session from gaining a fresh budget by changing addresses; a successful proof clears that account's count but not the source's request-volume count. |
 | `COURTSIDE_LOGIN_ADDRESS_WINDOW` | `1m` | Counting window for each password-verification limit above. |
 | `COURTSIDE_LOGIN_ADDRESS_BLOCK` | `1m` | Temporary block duration after any password-verification limit above is reached. |

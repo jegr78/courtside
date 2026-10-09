@@ -63,6 +63,16 @@ an unknown username, whose dummy verification uses the current cost. An observer
 samples through network noise. Rate limiting bounds sampling, and successful login upgrades an old
 hash. Reconsider padding if measurements show a reliable distinction.
 
+## Request budgets bound each principal, not the whole instance
+
+Admission control gives every signed-in account and every client address or IPv6 /64 its own
+budget. A caller holding many accounts or many address prefixes gets one budget for each, so the
+total load it can send grows with what it controls; the per-class bulkheads still cap demanding work
+for the whole instance. The instance remembers 50,000 budgets and forgets the least recently seen
+first, so a caller cycling through more prefixes than that can return to a full budget. Visitors
+behind one clubhouse address share that address's budget until they sign in. Reconsider an
+instance-wide budget when production evidence shows sustained load from many principals at once.
+
 ## Account recovery exposes bounded availability and timing differences
 
 Known and unknown recovery subjects receive the same status, headers and body. Execution time can

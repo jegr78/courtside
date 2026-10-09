@@ -72,6 +72,7 @@
       "src/main/java/org/courtside/operations/internal/OperationalLogCollector.java",
       "src/main/java/org/courtside/rules/web/RuleAdminController.java",
       "src/main/java/org/courtside/shared/ProblemType.java",
+      "src/main/java/org/courtside/shared/web/ClientAddress.java",
       "src/main/java/org/courtside/shared/web/ContainerErrorController.java",
       "src/main/java/org/courtside/shared/web/QueryString.java",
       "src/main/java/org/courtside/shared/web/SharedExceptionHandler.java",
@@ -110,6 +111,10 @@
       { "target": "compose:proxy:COURTSIDE_MAIL_HOSTNAME", "productionPath": "deploy/compose.stalwart.yaml", "boundaryIds": ["proxy-acme"] }
     ],
     "nonTargetEnvironment": [
+      "compose:app:COURTSIDE_ADMISSION_ACCOUNT_BURST",
+      "compose:app:COURTSIDE_ADMISSION_ACCOUNT_PER_SECOND",
+      "compose:app:COURTSIDE_ADMISSION_ADDRESS_BURST",
+      "compose:app:COURTSIDE_ADMISSION_ADDRESS_PER_SECOND",
       "compose:app:COURTSIDE_APP_TLS_CERTIFICATE",
       "compose:app:COURTSIDE_APP_TLS_KEY",
       "compose:app:COURTSIDE_APP_TLS_MODE",

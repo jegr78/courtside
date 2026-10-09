@@ -262,6 +262,23 @@
                 <artifactId>maven-resources-plugin</artifactId>
                 <executions>
                     <execution>
+                        <id>ship-resource-demand-inventory</id>
+                        <phase>process-resources</phase>
+                        <goals><goal>copy-resources</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/admission</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/security</directory>
+                                    <filtering>false</filtering>
+                                    <includes>
+                                        <include>resource-demand-inventory.json</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>register-fixtures-for-tests</id>
                         <phase>process-test-resources</phase>
                         <goals><goal>copy-resources</goal></goals>
