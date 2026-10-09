@@ -104,12 +104,16 @@ export default async function () {
     firstPageLoad = { open: true, verifierChanged: false };
     try {
       await page.goto(`${target}/login`, { waitUntil: "networkidle" });
+    } catch (error) {
+      if (!String(error?.message ?? error).includes("net::ERR_CERT_VERIFIER_CHANGED")) throw error;
+      firstPageLoad.verifierChanged = true;
     } finally {
       firstPageLoad.open = false;
     }
+    // A change can abort the document itself, which leaves nothing to reload, so the sign-in is opened again.
     if (firstPageLoad.verifierChanged) {
       browserVerifierReloads.add(1);
-      await page.reload({ waitUntil: "networkidle" });
+      await page.goto(`${target}/login`, { waitUntil: "networkidle" });
     }
     await page.getByTestId("login-view").waitFor();
     await page.getByTestId("username").fill(username());

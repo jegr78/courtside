@@ -447,7 +447,7 @@ test("given another browser home, when launching Chromium, then refuse an unveri
   assert.equal(existsSync(profile + "/courtside-data"), false);
 });
 
-function verifierChangeHarness({ again = false } = {}) {
+function verifierChangeHarness({ again = false, navigation = false } = {}) {
   const metrics = new Map();
   const logged = [];
   const events = [];
@@ -458,10 +458,20 @@ function verifierChangeHarness({ again = false } = {}) {
   const handlers = {};
   const verifierChange = { method: () => "GET", url: () => "https://proxy/assets/index-example.css",
     failure: () => ({ errorText: "net::ERR_CERT_VERIFIER_CHANGED" }) };
+  const documentChange = { method: () => "GET", url: () => "https://proxy/login",
+    failure: () => ({ errorText: "net::ERR_CERT_VERIFIER_CHANGED" }) };
+  const change = navigation ? documentChange : verifierChange;
+  const fail = () => {
+    handlers.requestfailed(change);
+    if (navigation) {
+      throw new Error("navigating page: navigating frame to \"https://proxy/login\": net::ERR_CERT_VERIFIER_CHANGED");
+    }
+  };
+  let loads = 0;
   const page = {
     on: (event, handler) => { handlers[event] = handler; },
-    goto: async () => { events.push("goto"); handlers.requestfailed(verifierChange); },
-    reload: async () => { events.push("reload"); if (again) handlers.requestfailed(verifierChange); },
+    goto: async () => { events.push("goto"); if (++loads === 1 || again) fail(); },
+    reload: async () => { events.push("reload"); if (again) fail(); },
     getByTestId: () => ({ waitFor: async () => { throw new Error("stop after the sign-in page"); } }),
     url: () => "https://proxy/login", close: async () => {}
   };
@@ -487,7 +497,7 @@ test("given a certificate verifier change on the first page load, when the journ
   await harness.run();
 
   // then
-  assert.deepEqual(harness.events, ["goto", "reload"], "the first page load must be repeated exactly once");
+  assert.deepEqual(harness.events, ["goto", "goto"], "the first page load must be repeated exactly once");
   assert.deepEqual(harness.metrics.get("browser_verifier_reloads"), [1], "the reload must stay visible as its own count");
   assert.deepEqual(harness.metrics.get("browser_errors").filter(value => value > 0), [1],
     "only the journey's own failure counts; the verifier change on the first load does not");
@@ -503,9 +513,36 @@ test("given a certificate verifier change again after the reload, when the journ
   await harness.run();
 
   // then
-  assert.deepEqual(harness.events, ["goto", "reload"], "the page is reloaded only once");
+  assert.deepEqual(harness.events, ["goto", "goto"], "the page is loaded again only once");
   assert.deepEqual(harness.metrics.get("browser_errors").filter(value => value > 0), [1, 1],
     "a second verifier change is a browser error like any other failed request");
+});
+
+test("given the sign-in navigation itself fails on a verifier change, when the journey opens sign-in, then it navigates again once instead of failing", async () => {
+  // given
+  const harness = verifierChangeHarness({ navigation: true });
+
+  // when
+  await harness.run();
+
+  // then
+  assert.deepEqual(harness.events, ["goto", "goto"], "a navigation the verifier change aborted must be repeated once");
+  assert.deepEqual(harness.metrics.get("browser_verifier_reloads"), [1], "the repeat must stay visible as its own count");
+  assert.deepEqual(harness.metrics.get("browser_errors").filter(value => value > 0), [1],
+    "only the journey's own failure counts; the aborted first navigation does not");
+});
+
+test("given the repeated sign-in navigation fails again, when the journey opens sign-in, then the journey fails there", async () => {
+  // given
+  const harness = verifierChangeHarness({ navigation: true, again: true });
+
+  // when
+  await harness.run();
+
+  // then
+  assert.deepEqual(harness.events, ["goto", "goto"], "the navigation is repeated only once");
+  assert.ok(harness.logged.some(line => line.includes("failed at open sign-in") && line.includes("ERR_CERT_VERIFIER_CHANGED")),
+    `a second verifier change must fail the journey at sign-in, got ${JSON.stringify(harness.logged)}`);
 });
 
 function bookingSubmissionHarness(location) {
