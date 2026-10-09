@@ -658,9 +658,9 @@ The warm-up runs five rounds of these steps:
   cancelled inside a transaction the warm-up rolls back;
 - an Argon2id verification of a fixed password it hashed itself in memory.
 
-Nothing it does survives it. The rolled-back transaction never reaches the before-commit listeners
-that store audit events and outbox messages, and `courtside.bookings.created` counts committed
-bookings only. The reads open no session and attempt no sign-in. They spend at most 50 tokens of
+Nothing it does survives it in the database. The rolled-back transaction never reaches the
+before-commit listeners that store audit events and outbox messages, and `courtside.bookings.created`
+counts committed bookings only. Its reads do appear in the HTTP request metrics. The reads open no session and attempt no sign-in. They spend at most 50 tokens of
 the loopback address's request budget, an address no client behind the ingress shares.
 
 A step with nothing to exercise is skipped: the booking steps need an active court, a card that
