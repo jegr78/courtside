@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -211,13 +210,8 @@ class MailOutbox {
                 .orElseThrow(() -> new MessageUndeliverableException("NoComposer"));
     }
 
-    // Unreadable parameters compose as missing ones, which settles the row instead of claiming it forever.
     private static Map<String, String> parameters(String stored) {
-        try {
-            return JSON.readValue(stored, PARAMETERS);
-        } catch (JacksonException unreadable) {
-            return Map.of();
-        }
+        return JSON.readValue(stored, PARAMETERS);
     }
 
     private static Duration gapAfter(int attempts) {

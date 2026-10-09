@@ -15,6 +15,9 @@ ALTER TABLE message_record
         (state = 'QUEUED') = (next_attempt_at IS NOT NULL)),
     -- Booking and person ids are what a pending delivery reads, and a settled one needs none of them.
     ADD CONSTRAINT message_record_parameters_while_queued CHECK (
-        state = 'QUEUED' OR parameters = '{}'::jsonb);
+        state = 'QUEUED' OR parameters = '{}'::jsonb),
+    ADD CONSTRAINT message_record_parameters_named_strings CHECK (
+        jsonb_typeof(parameters) = 'object'
+        AND NOT jsonb_path_exists(parameters, '$.* ? (@.type() != "string")'));
 
 CREATE INDEX message_record_due_idx ON message_record (next_attempt_at) WHERE state = 'QUEUED';

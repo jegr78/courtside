@@ -10,6 +10,10 @@ import org.courtside.notification.MessageStatistics;
 import org.courtside.shared.UsernameReminderRequested;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
@@ -46,6 +50,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @Import(IdentityTestFixture.class)
+@ExtendWith(OutputCaptureExtension.class)
 class MailOutboxTest extends AbstractIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
@@ -325,6 +330,62 @@ class MailOutboxTest extends AbstractIntegrationTest {
         // then — somebody waiting at the sign-in page is served before a busy evening
         order.verify(records).lockById(credential);
         order.verify(records, org.mockito.Mockito.atLeastOnce()).lockById(booking);
+    }
+
+    @Test
+    void givenAClaimOfAKindThisBuildDoesNotKnow_whenItIsDelivered_thenItFailsWithItsReasonAndNothingIsSent() {
+        // given
+        UUID accountId = member("unknownkind");
+        UUID recordId = queuedRow(accountId, MessageKind.ACCOUNT_USERNAME_REMINDER, "<unknownkind@example.org>", "{}");
+        jdbc.sql("UPDATE message_record SET attempts = 1 WHERE id = :id").param("id", recordId).update();
+        MailOutbox.Claimed claimed = new MailOutbox.Claimed(recordId, accountId, "RETIRED_KIND",
+                java.util.Map.of(), "<unknownkind@example.org>", 1);
+
+        // when
+        outbox.deliver(claimed);
+
+        // then
+        verify(sender, never()).send(any(MimeMessage.class));
+        assertThat(jdbc.sql("SELECT state || ':' || coalesce(reason, '-') FROM message_record WHERE id = :id").param("id", recordId)
+                .query(String.class).single())
+                .as("a kind this build cannot compose is settled with its reason rather than claimed forever")
+                .isEqualTo("FAILED:UnknownKind");
+    }
+
+    @Test
+    void whenParametersThatAreNotNamedStringsAreStored_thenTheDatabaseRefusesThem() {
+        // given
+        UUID accountId = member("unreadable");
+
+        // when / then
+        for (String parameters : List.of("[1, 2]", "{\"bookingId\": 7}", "\"bookingId\"")) {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> queuedRow(accountId,
+                            MessageKind.BOOKING_CONFIRMED, "<unreadable@example.org>", parameters))
+                    .as("a row whose parameters no pass could read must never be stored: %s", parameters)
+                    .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
+                    .hasMessageContaining("message_record_parameters_named_strings");
+        }
+    }
+
+    @Test
+    void givenADatabaseThatFailsWhileAPassSettles_whenThePassRuns_thenItStopsWithTheMessageAndCauseChainLogged(
+            CapturedOutput output) {
+        // given
+        UUID accountId = member("stopped");
+        UUID recordId = queuedRow(accountId, MessageKind.ACCOUNT_USERNAME_REMINDER, "<stopped@example.org>", "{}");
+        doThrow(new QueryTimeoutException("statement cancelled", new java.sql.SQLException("cancelled")))
+                .when(records).lockById(recordId);
+
+        // when
+        outbox.deliverDue();
+
+        // then
+        verify(sender, never()).send(any(MimeMessage.class));
+        assertThat(states(List.of(accountId))).as("the row waits for the next pass").containsExactly("QUEUED");
+        assertThat(output.getOut())
+                .as("a pass that stops names the message and every cause type, not only a count")
+                .contains("Delivering queued messages stopped at <stopped@example.org>")
+                .contains(QueryTimeoutException.class.getName() + " <- " + java.sql.SQLException.class.getName());
     }
 
     private void runWakeUpsOnTheProductionPool() {

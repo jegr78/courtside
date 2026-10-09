@@ -222,7 +222,8 @@ a generated credential or reset code exists only in that transaction. `next_atte
 row is next due, `attempts` counts the claims made for it and `retries` the failed handovers that
 were scheduled again. On a `QUEUED` row, `reason` names the last failed attempt; on a settled row it
 names why the message failed or was refused. Settling a row clears both `parameters` and
-`next_attempt_at`, and CHECK constraints refuse a settled row that keeps either.
+`next_attempt_at`, and CHECK constraints refuse a settled row that keeps either, and `parameters`
+that are anything but an object of strings.
 
 `event_publication` is not domain data. Spring Modulith writes it so an event survives a listener
 that was not running, and Courtside neither reads nor migrates it by hand.
