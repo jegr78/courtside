@@ -21,7 +21,7 @@
       "class": "credential-protection",
       "owner": "club-operator",
       "storageBoundary": "The instance database, in user_account.password_hash. The salt and the parameters travel inside the encoding; there is no separate key.",
-      "permittedUse": "Encoding a replacement password, verifying a sign-in or recent full-authentication proof, and re-encoding a stored hash that sits below the current parameters. Never for a digest, an identifier or a signature.",
+      "permittedUse": "Encoding a replacement password, verifying a sign-in or recent full-authentication proof, re-encoding a stored hash that sits below the current parameters, and the start-up warm-up, which encodes and verifies a fixed password of its own in memory and never reads an account. Never for a digest, an identifier or a signature.",
       "rotation": "Raising the memory cost or the iteration count is the rotation, and a stored hash below either is re-encoded on its owner's next successful sign-in; storing that is best effort, so a database failure leaves the old hash in place rather than failing the login. Spring Security compares only those two, so changing the parallelism, the salt length or the hash length alone does not re-encode anything already stored, and existing hashes keep the parameters they were written with until one of the other two moves.",
       "revocation": "Issuing a new credential or choosing a new permanent password replaces the hash and ends every session of the account.",
       "recovery": "None is possible or needed: a hash is not recoverable by design, and a member who cannot sign in is given a new credential.",
@@ -40,6 +40,7 @@
         "src/main/java/org/courtside/identity/internal/AccountCredentialIssuer.java",
         "src/main/java/org/courtside/identity/internal/PasswordResetTokenService.java",
         "src/main/java/org/courtside/identity/internal/UnusablePassword.java",
+        "src/main/java/org/courtside/identity/internal/PasswordVerificationWarmUp.java",
         "src/main/java/org/courtside/**/*DataSeeder.java"
       ]
     },

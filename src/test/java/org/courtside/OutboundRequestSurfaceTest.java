@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,12 +19,18 @@ class OutboundRequestSurfaceTest {
             "WebClient.create", "WebClient.builder", "new RestTemplate", ".openConnection(",
             "new Socket(", "SocketChannel.open");
 
-    // The one system the instance calls out to, whose destination is configuration and never a request.
+    // The breach endpoint, whose destination is configuration and never a request, and the start-up
+    // warm-up, which reaches nothing but this instance's own port on the loopback address.
     private static final List<String> CALLS_OUT = List.of(
-            "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java");
+            "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
+            "org/courtside/shared/internal/LoopbackReadStep.java");
+
+    private static final Pattern DESTINATION = Pattern.compile(
+            "new URI\\(\\s*\"([^\"]*)\",\\s*null,\\s*\"([^\"]*)\"");
+    private static final Pattern ANY_URI = Pattern.compile("URI\\.create\\(|new URI\\(");
 
     @Test
-    void whenReadingEveryOutboundClient_thenOnlyTheConfiguredBreachEndpointIsReached() throws IOException {
+    void whenReadingEveryOutboundClient_thenOnlyTheBreachEndpointAndTheInstanceItselfAreReached() throws IOException {
         // given
         TreeSet<String> callers = new TreeSet<>();
 
@@ -53,6 +60,29 @@ class OutboundRequestSurfaceTest {
         // then
         assertThat(properties).contains("breachEndpoint");
         assertThat(defaults).contains("breach-endpoint: ${COURTSIDE_PASSWORD_BREACH_ENDPOINT:");
+    }
+
+    @Test
+    void whenReadingTheWarmUpClient_thenEveryDestinationIsTheLoopbackAddress() throws IOException {
+        // given
+        String source = Files.readString(
+                Path.of("src/main/java/org/courtside/shared/internal/LoopbackReadStep.java"));
+
+        // when
+        List<String> destinations = DESTINATION.matcher(source).results()
+                .map(match -> match.group(1) + "://" + match.group(2)).toList();
+
+        // then
+        assertThat(ANY_URI.matcher(source).results().count())
+                .as("every destination the warm-up builds must name its scheme and host in literals this test reads")
+                .isEqualTo(destinations.size());
+        assertThat(destinations)
+                .as("the warm-up may reach this instance's own port on the loopback address and nothing else")
+                .isNotEmpty()
+                .allMatch(destination -> destination.equals("http://127.0.0.1"));
+        assertThat(source)
+                .as("a proxy the platform configures must not stand between the instance and itself")
+                .contains(".proxy(HttpClient.Builder.NO_PROXY)");
     }
 
     private static boolean constructsAClient(Path source) {

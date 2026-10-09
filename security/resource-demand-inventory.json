@@ -28,7 +28,8 @@
       "src/main/java/org/courtside/notification/internal/PasswordResetCodeMailer.java",
       "src/main/java/org/courtside/notification/internal/ReminderMailer.java",
       "src/main/java/org/courtside/notification/internal/UsernameReminderMailer.java",
-      "src/main/java/org/courtside/rules/internal/ShippedRuleSetNaming.java"
+      "src/main/java/org/courtside/rules/internal/ShippedRuleSetNaming.java",
+      "src/main/java/org/courtside/shared/internal/StartupWarmUp.java"
     ],
     "startupFiles": [
       "src/main/java/org/courtside/card/internal/ShippedCardNaming.java",
@@ -515,6 +516,32 @@
         "ShippedCardNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)",
         "ShippedMembershipTypeNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)",
         "ShippedRuleSetNaming#whenTheClubChangesItsLanguage(ConfigEvent.LocaleChanged)"
+      ]
+    },
+    {
+      "id": "startup-warm-up",
+      "kind": "demanding",
+      "entryPoints": [
+        "StartupWarmUp#beforeReadiness(ApplicationReadyEvent)"
+      ],
+      "growthDrivers": "courtside.warm-up.rounds, 200 by default, sets the round count. Per process start the series preview of twelve occurrences runs every round, the seven loopback reads at most 40 rounds, the booking created and cancelled at most 20 and the Argon2id verification at most 10. Only the court plan's size grows with the club's bookings for one day.",
+      "inputOrDataBound": "The steps choose their own input: the first active court, the first card that tracks no players, a free opening slot searched over at most 28 days, and a fixed password. No request supplies a value.",
+      "concurrencyOrRateBound": "One warm-up thread runs the steps one after another, once per process start and before the instance reports ready. Its loopback reads spend at most 400 tokens of the loopback address's request budget and stop once that budget refuses them, and each booking round holds the booking-grid lock only from its insert to its rollback.",
+      "executionModel": "An ApplicationReadyEvent listener runs the steps on its own thread and waits for them; Spring Boot publishes readiness only after every such listener has returned. Writes run inside a transaction the step rolls back, with a ten-second timeout per transaction and per request.",
+      "failureBehavior": "A failing step is logged once with its cause types and problem type and is not run again; the other steps continue. Nothing a step did survives its rolled-back transaction.",
+      "consumerTimeoutBehavior": "courtside.warm-up.deadline, 30 seconds by default, bounds the whole warm-up. At the deadline no further step starts and the running step is interrupted, ending at the latest with its transaction or request timeout; the instance reports ready. There is no HTTP consumer waiting.",
+      "productionPaths": [
+        "src/main/java/org/courtside/shared/internal/StartupWarmUp.java",
+        "src/main/java/org/courtside/shared/internal/LoopbackReadStep.java",
+        "src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java",
+        "src/main/java/org/courtside/booking/internal/SeriesPreviewWarmUp.java",
+        "src/main/java/org/courtside/identity/internal/PasswordVerificationWarmUp.java",
+        "src/main/java/org/courtside/booking/internal/CourtPlanWarmUpReads.java",
+        "src/main/java/org/courtside/booking/internal/WarmUpTarget.java"
+      ],
+      "evidence": [
+        "src/test/java/org/courtside/shared/internal/StartupWarmUpTest.java#givenAStepThatOutlastsTheDeadline_whenTheWarmUpRuns_thenItReturnsAtTheDeadlineAndInterruptsTheStep",
+        "src/test/java/org/courtside/shared/internal/StartupWarmUpIntegrationTest.java#givenAClubWithACourt_whenTheWarmUpRuns_thenEveryStepRunsAndNoTableChanges"
       ]
     }
   ]

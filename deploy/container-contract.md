@@ -68,6 +68,12 @@ groups and carries no components. It returns `503` when a check fails. With the 
 unreachable, the `503` takes about 30 seconds to arrive, because it waits for a database connection
 first.
 
+A starting instance answers `503` until it has warmed its request paths, for at most
+`COURTSIDE_WARM_UP_DEADLINE`, and reports ready afterwards even if a warm-up step failed. The
+default of 30 seconds leaves the declared 90-second start period a minute for the start itself. A
+platform that allows less time shortens the deadline so that the start and the deadline together
+stay well inside its own start period.
+
 The image declares its own health check against `/actuator/health`: every 15 seconds, a 3 second
 timeout, three retries and a start period of `90s`. A platform that runs its own probe should use
 the same path, allow the same start period and keep a short timeout, so a lost database marks the
@@ -319,3 +325,6 @@ they name a file on the host, in the container the path it is mounted at. The
 | `COURTSIDE_SLOW_QUERY_THRESHOLD_MS` | `500` |
 | `COURTSIDE_SOURCE_URL` | this repository |
 | `COURTSIDE_TRACING_SAMPLING_PROBABILITY` | `0.1` |
+| `COURTSIDE_WARM_UP_DEADLINE` | `30s` |
+| `COURTSIDE_WARM_UP_ENABLED` | `true` |
+| `COURTSIDE_WARM_UP_ROUNDS` | `200` |

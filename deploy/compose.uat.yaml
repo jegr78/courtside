@@ -58,6 +58,7 @@ services:
       COURTSIDE_MAIL_RELAY_HOST: mail.invalid
       COURTSIDE_MAIL_FROM: no-reply@example.org
       COURTSIDE_MAIL_REPLY_TO: board@example.org
+      COURTSIDE_WARM_UP_DEADLINE: 15s
       COURTSIDE_OPERATIONAL_LOG_PATH: /var/lib/courtside/operational-logs
     networks:
       - backend

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-08",
+  "reviewedAt": "2026-10-09",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "2f133a4ef75e8cd14c8f90e81b75762e9ea54176b56773acc33b6756f85ff842",
   "protectedFieldInventorySha256": "4f16eed4229be447f36a68cbd5c82d5b9f5afb3c6dbad61dcad6c242025d9bad",
-  "productionAuthorizationSha256": "ecc261f4f67f4b16a7d7990f7e547c54c48a2e786e391eea912e56daacfc7d40",
+  "productionAuthorizationSha256": "786b94c93854c2a2d966252d34a24c4e3d832508b3b48adac207daa27f66ba5a",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -2032,7 +2032,7 @@
     },
     {
       "id": "TRAINER",
-      "description": "An authenticated account holding the trainer role."
+      "description": "An authenticated account holding the trainer role. The start-up warm-up passes this role without an account to preview a series."
     },
     {
       "id": "SPORT_DIRECTOR",
@@ -2052,7 +2052,7 @@
     },
     {
       "id": "ADMIN",
-      "description": "An authenticated account holding the instance administrator role."
+      "description": "An authenticated account holding the instance administrator role. The start-up warm-up passes this role without an account to write a booking it rolls back."
     },
     {
       "id": "INITIAL_PASSWORD",
@@ -2900,7 +2900,7 @@
     {
       "id": "booking-card-eligibility",
       "title": "Booking card role and state",
-      "rule": "A booking card must be active and admit at least one actor role; ADMIN bypasses the card role list but not facility availability or invariant checks.",
+      "rule": "A booking card must be active and admit at least one actor role; ADMIN bypasses the card role list but not facility availability or invariant checks. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
       "attributes": [
         "booking-card",
         "booking-card-active",
@@ -2920,7 +2920,9 @@
         "src/main/java/org/courtside/booking/web/BookingController.java#getBookingEligibility",
         "src/main/java/org/courtside/booking/web/BookingController.java#createBooking",
         "src/main/java/org/courtside/booking/web/SeriesController.java#createSeries",
-        "src/main/java/org/courtside/booking/web/SeriesController.java#previewSeries"
+        "src/main/java/org/courtside/booking/web/SeriesController.java#previewSeries",
+        "src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run",
+        "src/main/java/org/courtside/booking/internal/SeriesPreviewWarmUp.java#run"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenTheRequiredRole_whenRequiringEligibility_thenTheCardIsReturned"
@@ -2932,7 +2934,7 @@
     {
       "id": "booking-ownership",
       "title": "Booking and participation ownership",
-      "rule": "Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN and withdrawal removes only the current person's participation.",
+      "rule": "Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN and withdrawal removes only the current person's participation. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
       "attributes": [
         "current-account",
         "booking-owner",
@@ -2950,7 +2952,8 @@
         "src/main/java/org/courtside/booking/web/BookingController.java#listPersonalBookings",
         "src/main/java/org/courtside/booking/web/BookingController.java#listOwnParticipations",
         "src/main/java/org/courtside/booking/web/BookingController.java#removeOwnParticipation",
-        "src/main/java/org/courtside/booking/web/BookingController.java#cancelBooking"
+        "src/main/java/org/courtside/booking/web/BookingController.java#cancelBooking",
+        "src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid"
@@ -2980,7 +2983,7 @@
     {
       "id": "managed-booking-scope",
       "title": "Managed booking scope",
-      "rule": "Managed listings and details contain only bookings whose card names one of the actor roles as a managing role; ADMIN sees every card.",
+      "rule": "Managed listings and details contain only bookings whose card names one of the actor roles as a managing role; ADMIN sees every card. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
       "attributes": [
         "booking-card",
         "managing-role",
@@ -2992,7 +2995,8 @@
         "src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#list",
         "src/main/java/org/courtside/booking/internal/ManagedAppointmentQuery.java#get",
         "src/main/java/org/courtside/booking/web/BookingController.java#listManagedAppointments",
-        "src/main/java/org/courtside/booking/web/BookingController.java#getManagedAppointment"
+        "src/main/java/org/courtside/booking/web/BookingController.java#getManagedAppointment",
+        "src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOfficerAppointment_whenListingManagedAppointments_thenBothResponsibleRolesSeeIt",

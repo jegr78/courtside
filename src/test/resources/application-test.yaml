@@ -12,6 +12,8 @@ courtside:
     username: bootstrap-admin
     password: temporary-password
     display-name: Bootstrap Administrator
+  warm-up:
+    enabled: false
 
 server:
   servlet:

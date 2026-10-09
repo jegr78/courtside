@@ -657,6 +657,51 @@ The reference deployment is a supported starting point, not a managed service. C
 configuration it owns and supplies lifecycle tools. The operator owns the machine, external
 services, credentials, backups and availability.
 
+### Start sequence
+
+An instance migrates its schema, opens its port and runs its startup tasks, such as creating the
+bootstrap administrator. It then warms its busiest request paths and only afterwards reports ready.
+Until the warm-up ends, readiness is refused and `/actuator/health` answers `503`.
+
+The warm-up repeats its steps for `COURTSIDE_WARM_UP_ROUNDS` rounds, 200 by default, so that the
+methods a request runs are called often enough to be compiled before members arrive. A step may stop
+earlier at its own budget:
+
+- the public reads (club configuration, courts, opening hours, booking grid, card legend and web
+  manifest) and the court plan for today in the club's time zone, as HTTP requests to its own port
+  on `127.0.0.1` without any proxy, so the security filters, admission control, Spring MVC and
+  Jackson run as they do for a member. They stop after 40 rounds;
+- a series preview for the first active court and a card that tracks no players, evaluated as a
+  trainer so the overridable rules run too, in every round;
+- an administrator's booking on the first free opening slot about 400 days ahead, created and
+  cancelled inside a transaction the warm-up rolls back. It stops after 20 rounds;
+- an Argon2id verification of a fixed password it hashed itself in memory, for 10 rounds.
+
+Nothing it does survives it in the database. The rolled-back transaction never reaches the
+before-commit listeners that store audit events and outbox messages, and `courtside.bookings.created`
+counts committed bookings only. Its work still shows in telemetry: the reads appear in the HTTP
+request metrics, a rule rejection or a lost race of the booking step counts in
+`courtside.bookings.rejected` or `courtside.bookings.conflicts`, and with OTLP enabled its requests
+and transactions are traced. The reads open no session and attempt no sign-in.
+
+The reads spend at most 400 tokens of the loopback address's request budget and stop without a
+warning once that budget refuses them, so a smaller configured burst shortens them. Behind the reference
+ingress, which overwrites `X-Forwarded-For`, no client is admitted under that address; an instance
+whose port clients reach directly from the same host shares it with them.
+
+The booking step takes the booking-grid lock like any booking. Each of its rounds holds it from the
+insert to the rollback, so a real booking, a series or a configuration change arriving at that
+moment waits for it, as it would for another member's booking.
+
+A step with nothing to exercise is skipped: the booking steps need an active court, a card that
+tracks no players and opening hours. A step that fails is logged once as a warning with its cause
+types and problem type, and the other steps still run. With `COURTSIDE_APP_TLS_MODE` at `serve`
+the read steps are skipped, because the served certificate does not name the loopback address.
+`COURTSIDE_WARM_UP_DEADLINE`, 30 seconds by default, bounds the whole warm-up. At the deadline the
+instance reports ready, no further step starts, and the running step is interrupted and ends at the
+latest with its transaction or request timeout. One log line states the duration and the steps that ran, were
+skipped and failed. `COURTSIDE_WARM_UP_ENABLED=false` reports ready without a warm-up.
+
 ## Verification strategy
 
 | Risk | Evidence |

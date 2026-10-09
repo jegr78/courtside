@@ -28,6 +28,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -94,13 +96,22 @@ class BookingWriter {
             }
             throw e;
         }
-        meters.counter("courtside.bookings.created").increment();
+        countCreatedOnCommit();
         // A series is one decision and gets one message of its own, not one per occurrence.
         if (command.seriesId() == null) {
             events.publishEvent(new BookingConfirmed(booking.getId()));
             announceRecordedMembers(booking.getId(), command);
         }
         return booking.getId();
+    }
+
+    private void countCreatedOnCommit() {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                meters.counter("courtside.bookings.created").increment();
+            }
+        });
     }
 
     private void requireAvailableCourts(CreateBookingCommand command, String idempotencyKey) {
