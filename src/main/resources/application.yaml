@@ -140,6 +140,9 @@ courtside:
   import:
     preview-retention: ${COURTSIDE_IMPORT_PREVIEW_RETENTION:7d}
     sweep-interval: ${COURTSIDE_IMPORT_SWEEP_INTERVAL:1h}
+  warm-up:
+    enabled: ${COURTSIDE_WARM_UP_ENABLED:true}
+    deadline: ${COURTSIDE_WARM_UP_DEADLINE:60s}
 
 management:
   tracing:
