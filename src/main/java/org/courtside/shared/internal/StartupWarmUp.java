@@ -85,7 +85,7 @@ class StartupWarmUp {
                         progress.ran(step.name());
                     } else {
                         active.remove(step);
-                        progress.skipped(step.name());
+                        progress.ranOut(step.name());
                     }
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
@@ -145,6 +145,12 @@ class StartupWarmUp {
 
         synchronized void skipped(String step) {
             skipped.add(step);
+        }
+
+        synchronized void ranOut(String step) {
+            if (!ran.contains(step)) {
+                skipped.add(step);
+            }
         }
 
         synchronized void failed(String step) {

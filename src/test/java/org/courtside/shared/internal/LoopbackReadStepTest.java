@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 class LoopbackReadStepTest {
 
     private static final String REFUSED = "/api/public/refused";
+    private static final String DENIED = "/api/denied";
     private static final ServerTlsProperties PLAINTEXT =
             new ServerTlsProperties(ServerTlsProperties.Mode.PLAINTEXT, null, null);
     private static final ServerTlsProperties SERVE =
@@ -36,10 +37,12 @@ class LoopbackReadStepTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             requested.add(exchange.getRequestURI().toString());
-            boolean refused = exchange.getRequestURI().getPath().equals(REFUSED);
-            byte[] body = (refused ? "{\"type\":\"urn:courtside:error:request-rate-limited\"}" : "{}")
+            String path = exchange.getRequestURI().getPath();
+            int status = path.equals(REFUSED) ? 429 : path.equals(DENIED) ? 401 : 200;
+            byte[] body = (status == 429 ? "{\"type\":\"urn:courtside:error:request-rate-limited\"}"
+                    : status == 401 ? "{\"type\":\"urn:courtside:error:authentication-required\"}" : "{}")
                     .getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(refused ? 429 : 200, body.length);
+            exchange.sendResponseHeaders(status, body.length);
             exchange.getResponseBody().write(body);
             exchange.close();
         });
@@ -90,16 +93,34 @@ class LoopbackReadStepTest {
     @Test
     void givenARefusedRead_whenTheStepRuns_thenTheFailureNamesThePathStatusAndProblemType() {
         // given
-        LoopbackReadStep step = new LoopbackReadStep("public-reads", () -> List.of(REFUSED),
+        LoopbackReadStep step = new LoopbackReadStep("public-reads", () -> List.of(DENIED),
                 instance(), PLAINTEXT);
 
         // when / then
         assertThatThrownBy(step::run)
                 .as("a refused read must be diagnosable from its path, status and problem type")
                 .isInstanceOf(WarmUpRequestRefusedException.class)
-                .hasMessageContaining(REFUSED)
-                .hasMessageContaining("429")
-                .hasMessageContaining("urn:courtside:error:request-rate-limited");
+                .hasMessageContaining(DENIED)
+                .hasMessageContaining("401")
+                .hasMessageContaining("urn:courtside:error:authentication-required");
+    }
+
+    @Test
+    void givenTheLoopbackBudgetIsSpent_whenTheStepRuns_thenItStopsReadingWithoutAFailure() throws Exception {
+        // given
+        LoopbackReadStep step = new LoopbackReadStep("public-reads",
+                () -> List.of(REFUSED, "/api/public/config"), instance(), PLAINTEXT);
+
+        // when
+        boolean exercised = step.run();
+
+        // then
+        assertThat(exercised)
+                .as("a spent request budget ends the reads instead of failing the warm-up")
+                .isFalse();
+        assertThat(requested)
+                .as("no read may follow the refusal that spent the budget")
+                .containsExactly(REFUSED);
     }
 
     @Test

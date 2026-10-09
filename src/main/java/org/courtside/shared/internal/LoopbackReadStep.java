@@ -23,6 +23,7 @@ final class LoopbackReadStep implements WarmUpStep {
     static final int ROUND_BUDGET = 40;
 
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+    private static final String RATE_LIMITED = "urn:courtside:error:request-rate-limited";
     private static final Pattern PROBLEM_TYPE = Pattern.compile("\"type\"\\s*:\\s*\"(urn:courtside:error:[a-z0-9-]+)\"");
 
     private final String name;
@@ -42,7 +43,7 @@ final class LoopbackReadStep implements WarmUpStep {
         return name;
     }
 
-    // The loopback reads spend the loopback address's request budget, so they stop well short of it.
+    // The loopback reads spend the loopback address's request budget and end early once it is spent.
     @Override
     public int roundBudget() {
         return ROUND_BUDGET;
@@ -70,8 +71,12 @@ final class LoopbackReadStep implements WarmUpStep {
                         .timeout(REQUEST_TIMEOUT)
                         .GET()
                         .build(), HttpResponse.BodyHandlers.ofString());
+                String problemType = problemType(response.body());
+                if (response.statusCode() == 429 && RATE_LIMITED.equals(problemType)) {
+                    return false;
+                }
                 if (response.statusCode() / 100 != 2) {
-                    throw new WarmUpRequestRefusedException(target, response.statusCode(), problemType(response.body()));
+                    throw new WarmUpRequestRefusedException(target, response.statusCode(), problemType);
                 }
             }
         }

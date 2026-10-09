@@ -5,7 +5,7 @@ public interface WarmUpStep {
 
     String name();
 
-    /** Returns {@code false} when the instance holds nothing this step could exercise. */
+    /** Returns {@code false} when the instance holds nothing, or nothing more, this step could exercise. */
     boolean run() throws Exception;
 
     /** The most rounds this step runs, whatever the warm-up's own round count. */

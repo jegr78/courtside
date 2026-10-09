@@ -199,6 +199,37 @@ class StartupWarmUpTest {
     }
 
     @Test
+    void givenAStepThatRanAndThenHasNothingLeft_whenTheWarmUpRuns_thenItCountsAsRunAndStops() {
+        // given
+        java.util.concurrent.atomic.AtomicInteger runs = new java.util.concurrent.atomic.AtomicInteger();
+        org.courtside.shared.WarmUpStep reads = new org.courtside.shared.WarmUpStep() {
+            @Override
+            public String name() {
+                return "public-reads";
+            }
+
+            @Override
+            public boolean run() {
+                return runs.incrementAndGet() <= 3;
+            }
+        };
+
+        // when
+        StartupWarmUp.Report report = new StartupWarmUp(List.of(reads), ENABLED).run();
+
+        // then
+        assertThat(runs.get())
+                .as("a step that reports nothing left must not be asked again")
+                .isEqualTo(4);
+        assertThat(report.ran())
+                .as("a step that ran before it ran out still ran")
+                .containsExactly("public-reads");
+        assertThat(report.skipped())
+                .as("running out after running is not a skip")
+                .isEmpty();
+    }
+
+    @Test
     void givenAStepWithASmallerRoundBudget_whenTheWarmUpRuns_thenItStopsThereWhileTheOthersRunEveryRound() {
         // given
         CountingStep reads = new CountingStep("public-reads", true);

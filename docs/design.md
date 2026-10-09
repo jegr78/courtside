@@ -684,7 +684,8 @@ request metrics, a rule rejection or a lost race of the booking step counts in
 `courtside.bookings.rejected` or `courtside.bookings.conflicts`, and with OTLP enabled its requests
 and transactions are traced. The reads open no session and attempt no sign-in.
 
-The reads spend at most 400 tokens of the loopback address's request budget. Behind the reference
+The reads spend at most 400 tokens of the loopback address's request budget and stop without a
+warning once that budget refuses them, so a smaller configured burst shortens them. Behind the reference
 ingress, which overwrites `X-Forwarded-For`, no client is admitted under that address; an instance
 whose port clients reach directly from the same host shares it with them.
 
