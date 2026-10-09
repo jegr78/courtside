@@ -104,14 +104,19 @@ A missing or malformed report, foreign scanner origin, URL credential, query str
 The active suite writes `authorization-matrix.json`, `authenticated-zap.json` and `openapi-fuzz.json`. It creates all role sessions outside the scanners and passes credentials only through stdin to mode-`0600` files in container tmpfs. The gateway applies a suite-specific method allowlist and stops forwarding when its request or generated-body budget is exhausted. Schemathesis writable files live on three tmpfs mounts whose combined capacity stays below the generated-data contract. The gateway also counts every relayed `429` whose problem type is an admission refusal, which is how a refused ZAP attack leaves its attempt incomplete. The ZAP policy disables every passive rule except the isolated canary and every active rule except the two IDs in [`security/zap-authenticated-policy.json`](../security/zap-authenticated-policy.json) and paces the active scan with one thread and a fixed request delay. The Schemathesis policy in [`security/openapi-fuzz-policy.json`](../security/openapi-fuzz-policy.json) fixes its image, seed, phases, examples, workers, required input classes and explicit operation exclusions. The runtime route inventory comes from the assessment-only Actuator mappings endpoint and never enters scanner traffic. Run the safe profile separately for the full passive baseline.
 
 The SECURITY Compose file sets no login or admission override, so every profile assesses the
-limits a club installs. The destructive suite writes version-2 `resource-abuse.json`. Its complete primary-key snapshots
+limits a club installs. The destructive suite writes version-3 `resource-abuse.json`. Before the
+breaker is armed, the runner warms the application from inside its own container with anonymous
+reads, so neither the scanner gateway nor the request journal sees them, and then waits until five
+consecutive samples stay below every trip threshold or the settle deadline passes. The warm-up
+samples are retained apart from the measured window and count toward no trip, while the safety
+limits bind throughout: a warm-up beyond one stops the run. Its complete primary-key snapshots
 protect all existing rows and columns, including authentication, audit and import data. A changed
 whole-database fingerprint is not by itself a corruption finding: a real booking legitimately adds
 allocations, participants, an audit event and mail bookkeeping. Only effects correlated with the
 private request journal and the actual application response may qualify. Unknown schema, missing
 attribution or unsupported authentication data remains incomplete; a proven protected mutation
-fails even when a circuit breaker stopped the workload early. Previous version-1 attempts remain
-historical evidence and are not relabelled as version-2 qualification.
+fails even when a circuit breaker stopped the workload early. Previous version-1 and version-2
+attempts remain historical evidence and are not relabelled as version-3 qualification.
 
 An internal, resource-limited mail sink accepts STARTTLS deliveries only to `@example.org`. Each
 instance receives a private relay certificate and Java truststore, without a heap override or a

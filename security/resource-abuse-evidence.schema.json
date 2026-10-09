@@ -3,9 +3,9 @@
   "$id": "urn:courtside:security:resource-abuse-evidence:v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "testIds", "targetFingerprint", "image", "policyDigest", "policyFileDigest", "scriptDigest", "gatewayDigest", "integrityModuleDigest", "receiptParserDigest", "journalDigest", "integrityEvidenceDigest", "attempt", "scenarios", "samples", "circuitBreaker", "safetyLimitViolation", "stateBefore", "stateAfter", "stateAfterCleanup", "stateAfterRecovery", "integrity", "competingWrites", "recovery", "requestCount", "generatedDataMegabytes", "runtimeHardened", "outcome"],
+  "required": ["schemaVersion", "testIds", "targetFingerprint", "image", "policyDigest", "policyFileDigest", "scriptDigest", "gatewayDigest", "integrityModuleDigest", "receiptParserDigest", "journalDigest", "integrityEvidenceDigest", "attempt", "scenarios", "samples", "circuitBreaker", "safetyLimitViolation", "warmUp", "warmUpSafetyLimitViolation", "stateBefore", "stateAfter", "stateAfterCleanup", "stateAfterRecovery", "integrity", "competingWrites", "recovery", "requestCount", "generatedDataMegabytes", "runtimeHardened", "outcome"],
   "properties": {
-    "schemaVersion": { "const": 2 },
+    "schemaVersion": { "const": 3 },
     "testIds": { "const": ["CSA-RES-001"] },
     "targetFingerprint": { "$ref": "#/$defs/digest" },
     "image": { "type": "string", "pattern": "^grafana/k6:2\\.3\\.0@sha256:[a-f0-9]{64}$" },
@@ -34,6 +34,20 @@
       }
     },
     "safetyLimitViolation": { "type": "object", "additionalProperties": false,
+      "required": ["violated", "reason", "sampleSequence"], "properties": {
+        "violated": { "type": "boolean" },
+        "reason": { "type": ["string", "null"], "enum": ["app-cpu", "app-memory", "db-cpu", "db-memory", "database-connections", "connection-pool-active", "connection-pool-pending", "database-locks", "session-growth", "storage-growth", "request-latency", "upstream-errors", null] },
+        "sampleSequence": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "warmUp": { "type": "object", "additionalProperties": false,
+      "required": ["settled", "durationSeconds", "samples"], "properties": {
+        "settled": { "type": "boolean" },
+        "durationSeconds": { "type": "number", "minimum": 0 },
+        "samples": { "type": "array", "items": { "$ref": "#/$defs/sample" } }
+      }
+    },
+    "warmUpSafetyLimitViolation": { "type": "object", "additionalProperties": false,
       "required": ["violated", "reason", "sampleSequence"], "properties": {
         "violated": { "type": "boolean" },
         "reason": { "type": ["string", "null"], "enum": ["app-cpu", "app-memory", "db-cpu", "db-memory", "database-connections", "connection-pool-active", "connection-pool-pending", "database-locks", "session-growth", "storage-growth", "request-latency", "upstream-errors", null] },

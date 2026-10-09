@@ -60,6 +60,12 @@ const plan = {
   targetFingerprint: digest, budgets: { requests: 50000, concurrency: 50, generatedDataMegabytes: 500 }
 };
 
+function warmUpSample(sequence, appCpuPercent) {
+  return { sequence, appCpuPercent, appMemoryMegabytes: 400, dbCpuPercent: 10, dbMemoryMegabytes: 300,
+    activeConnections: 4, activePoolConnections: 1, pendingPoolConnections: 0, poolMaxConnections: 10,
+    waitingLocks: 0, sessionRows: 2, storageMegabytes: 40, requestP95Milliseconds: 120, errorRate: 0 };
+}
+
 function successfulExecution() {
   return {
     runtimeHardened: true,
@@ -78,6 +84,7 @@ function successfulExecution() {
     ],
     circuitBreaker: { tripped: false, reason: null, sampleSequence: null },
     safetyLimitViolation: { violated: false, reason: null, sampleSequence: null },
+    warmUp: { settled: true, durationSeconds: 34, samples: [warmUpSample(1, 30)] },
     stateBefore: digest,
     stateAfter: digest,
     stateAfterCleanup: digest,
@@ -142,7 +149,7 @@ test("given a complete destructive execution, when retaining evidence, then reco
 
   // then
   assert.equal(result.outcome, "passed");
-  assert.equal(result.schemaVersion, 2);
+  assert.equal(result.schemaVersion, 3);
   assert.equal(result.requestCount, 640);
   assert.equal(validateResourceAbuseEvidence(result), true);
   const retained = JSON.parse(readFileSync(join(evidenceDirectory, "resource-abuse.json"), "utf8"));
@@ -294,6 +301,37 @@ test("given an unbounded tool result, when evaluating the run, then the assessme
   // then
   assert.equal(result.outcome, "incomplete");
   assert.equal(result.runtimeHardened, false);
+});
+
+test("given a JVM that warmed above the trip thresholds before the breaker armed, when evaluating, then the warm-up trips nothing and stays on record", async () => {
+  // given
+  const execution = successfulExecution();
+  execution.warmUp = { settled: true, durationSeconds: 41, samples: [warmUpSample(1, 98), warmUpSample(2, 101),
+    warmUpSample(3, 40)] };
+  // when
+  const result = await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000), runAbuse: async () => execution
+  });
+  // then
+  assert.equal(result.circuitBreaker.tripped, false, "only the armed window may trip the breaker");
+  assert.equal(result.outcome, "passed");
+  assert.deepEqual(result.warmUp.samples.map(({ appCpuPercent }) => appCpuPercent), [98, 101, 40],
+    "the warm-up samples are retained apart from the measured window");
+});
+
+test("given a warm-up sample beyond a safety limit, when evaluating, then the run failed", async () => {
+  // given
+  const execution = successfulExecution();
+  execution.warmUp = { settled: false, durationSeconds: 12, samples: [warmUpSample(1, 115)] };
+  // when
+  const result = await runResourceAbuseAssessment(plan, {
+    evidenceDirectory: mkdtempSync(join(tmpdir(), "courtside-resource-abuse-")),
+    maxRequests: 1000, attempt: 1, deadline: new Date(Date.now() + 60000), runAbuse: async () => execution
+  });
+  // then
+  assert.equal(result.outcome, "failed", "a safety limit binds before the breaker is armed as well");
+  assert.equal(result.warmUpSafetyLimitViolation.violated, true);
 });
 
 test("given breached resource limits, when the tool omits the breaker, then the run is incomplete", async () => {
