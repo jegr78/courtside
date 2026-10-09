@@ -275,7 +275,7 @@ test("concurrent participant-card claims leave exactly one capacity owner", asyn
 test("a series move and scoped cancellation serialize without a partial occurrence", async ({ pinnedBrowser, journeyService }, testInfo) => {
   // given
   const first = await memberContext(pinnedBrowser, journeyService, "doe.jane");
-  const second = await memberContext(pinnedBrowser, journeyService, "doe.jane");
+  const second = await memberContext(pinnedBrowser, journeyService, "configuration-admin");
   const movePage = first.pages()[0];
   const cancelPage = second.pages()[0];
   let arrivals = 0;
