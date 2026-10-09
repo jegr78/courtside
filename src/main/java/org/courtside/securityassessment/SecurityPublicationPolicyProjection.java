@@ -41,7 +41,7 @@ public final class SecurityPublicationPolicyProjection {
             }
             var adapter = new TransactionalApplicationListenerMethodAdapter("bookingMailer", listener, method);
             var listenerId = adapter.getListenerId();
-            if (adapter.getTransactionPhase() != TransactionPhase.AFTER_COMMIT
+            if (adapter.getTransactionPhase() != TransactionPhase.BEFORE_COMMIT
                     || listenerId.isBlank() || listenerId.length() > 512
                     || listenerId.chars().anyMatch(character -> character < 32 || character > 126)) {
                 throw rejected();

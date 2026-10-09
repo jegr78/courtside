@@ -14,8 +14,18 @@ class TransactionalEventListenerPhaseTest {
 
     private static final String ANNOTATION = "@TransactionalEventListener";
 
+    private static final List<String> WRITES_IN_THE_COMMITTING_TRANSACTION = List.of(
+            "org/courtside/audit/internal/DomainEventWriter.java",
+            "org/courtside/notification/internal/BookingMailer.java",
+            "org/courtside/notification/internal/CredentialMailer.java",
+            "org/courtside/notification/internal/DisplacementMailer.java",
+            "org/courtside/notification/internal/ParticipationMailer.java",
+            "org/courtside/notification/internal/PasswordResetCodeMailer.java",
+            "org/courtside/notification/internal/ReminderMailer.java",
+            "org/courtside/notification/internal/UsernameReminderMailer.java");
+
     @Test
-    void whenScanningEverySource_thenExactlyOneTransactionalEventListenerExistsAtBeforeCommit() throws IOException {
+    void whenScanningEverySource_thenOnlyTheAuditAndOutboxListenersRunBeforeCommit() throws IOException {
         // given / when
         List<String> annotated;
         try (Stream<Path> sources = Files.walk(Path.of("src/main/java"))) {
@@ -29,11 +39,12 @@ class TransactionalEventListenerPhaseTest {
         List<String> beforeCommit = annotated.stream()
                 .filter(TransactionalEventListenerPhaseTest::listensBeforeCommit).toList();
         assertThat(beforeCommit).as(
-                        "the audit guarantee rests on exactly one " + ANNOTATION
-                                + " registered at BEFORE_COMMIT: no commit without a row")
-                .containsExactly("org/courtside/audit/internal/DomainEventWriter.java");
-        assertThat(Files.readString(Path.of("src/main/java", beforeCommit.getFirst())))
-                .contains(ANNOTATION + "(phase = TransactionPhase.BEFORE_COMMIT)");
+                        "only the audit row and the outbox rows are written by an " + ANNOTATION
+                                + " at BEFORE_COMMIT: no commit without them, and nothing else inside")
+                .containsExactlyInAnyOrderElementsOf(WRITES_IN_THE_COMMITTING_TRANSACTION);
+        assertThat(beforeCommit).allSatisfy(source -> assertThat(read(Path.of("src/main/java", source)))
+                .as("%s must register its listener at BEFORE_COMMIT", source)
+                .contains(ANNOTATION + "(phase = TransactionPhase.BEFORE_COMMIT"));
     }
 
     private static boolean listensBeforeCommit(String relative) {

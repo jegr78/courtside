@@ -614,6 +614,7 @@ const en: Record<keyof typeof de, string> = {
   "admin.statistics.members.neverSignedIn": "Never signed in",
   "admin.statistics.messages.heading": "Messages",
   "admin.statistics.messages.empty": "Courtside sent no message in this period.",
+  "admin.statistics.messages.retried": "Tried again",
   "admin.export.title": "Export data",
   "admin.export.explain": "The club's lists as a CSV file. The separator and character set decide whether your spreadsheet opens it correctly.",
   "admin.export.bookings": "Bookings of a period",

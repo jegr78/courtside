@@ -74,11 +74,11 @@ const members: MemberStatistics = {
     signedInWithin90Days: 75, neverSignedIn: 10 }
 };
 
-const quiet = { queued: 0, handedOver: 0, refused: 0, failed: 0 };
+const quiet = { queued: 0, handedOver: 0, refused: 0, failed: 0, retried: 0 };
 const messages: MessageStatistics = {
   period,
   kinds: [
-    { kind: "BOOKING_CONFIRMED", queued: 1, handedOver: 30, refused: 2, failed: 0 },
+    { kind: "BOOKING_CONFIRMED", queued: 1, handedOver: 30, refused: 2, failed: 0, retried: 3 },
     { kind: "BOOKING_REMINDER", ...quiet }
   ],
   previous: null
@@ -309,6 +309,7 @@ describe("AdminStatisticsView", () => {
     expect(screen.getByTestId("statistics-never-signed-in-value")).toHaveTextContent("10");
     expect(screen.getByTestId("statistics-message-BOOKING_CONFIRMED-handedOver")).toHaveTextContent("30");
     expect(screen.getByTestId("statistics-message-BOOKING_CONFIRMED-refused")).toHaveTextContent("2");
+    expect(screen.getByTestId("statistics-message-BOOKING_CONFIRMED-retried")).toHaveTextContent("3");
     expect(screen.queryByTestId("statistics-message-BOOKING_REMINDER")).toBeNull();
   });
 

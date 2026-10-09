@@ -17,29 +17,20 @@ import java.util.concurrent.ThreadPoolExecutor;
 @EnableConfigurationProperties(MailProperties.class)
 class NotificationConfiguration {
 
-    // Handing a message over waits for the relay, and the shared executor also carries the audit
-    // trail and every other module's listeners, which must not queue behind a mail server.
+    // Only woken by publishers, never run by them: a pass already waiting in the queue will find
+    // whatever a discarded wake-up would have found.
     @Bean
-    @ConditionalOnMissingBean(name = "credentialMailExecutor")
-    TaskExecutor credentialMailExecutor() {
-        return mailExecutor("credential-mail-");
-    }
-
-    // Its own pool, because a relay that has stopped answering holds a thread for the whole retry
-    // ladder: a busy evening of bookings must not delay the message somebody cannot sign in without.
-    @Bean
-    @ConditionalOnMissingBean(name = "bookingMailExecutor")
-    TaskExecutor bookingMailExecutor() {
-        return mailExecutor("booking-mail-");
-    }
-
-    private static TaskExecutor mailExecutor(String threadNamePrefix) {
+    @ConditionalOnMissingBean(name = "mailOutboxExecutor")
+    TaskExecutor mailOutboxExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(4);
-        executor.setQueueCapacity(100);
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        executor.setThreadNamePrefix(threadNamePrefix);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(1);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
+        executor.setThreadNamePrefix("mail-outbox-");
+        // Inside the container's ten-second stop grace, so a deploy rarely cuts a handover off mid-send.
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(8);
         executor.initialize();
         return executor;
     }
@@ -67,6 +58,7 @@ class NotificationConfiguration {
         }
         mail.put("mail.smtp.timeout", "10000");
         mail.put("mail.smtp.connectiontimeout", "10000");
+        mail.put("mail.smtp.writetimeout", "10000");
         sender.setJavaMailProperties(mail);
         return sender;
     }

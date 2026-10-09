@@ -478,8 +478,10 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
                 Instant.parse("2026-05-10T21:30:00Z"));
         notifications.recordHandedOver(account, MessageKind.BOOKING_REMINDER, "m4", Instant.parse("2026-05-10T22:30:00Z"));
         notifications.recordHandedOver(account, MessageKind.BOOKING_REMINDER, "m5", Instant.parse("2026-05-01T10:00:00Z"));
-        message(account, MessageKind.BOOKING_DISPLACED, "FAILED", "2026-05-07T10:00:00Z");
-        message(account, MessageKind.BOOKING_DISPLACED, "QUEUED", "2026-05-07T11:00:00Z");
+        message(account, MessageKind.BOOKING_DISPLACED, "FAILED", "2026-05-07T10:00:00Z", 4, 3, "MailConnectException");
+        message(account, MessageKind.BOOKING_DISPLACED, "QUEUED", "2026-05-07T11:00:00Z", 1, 1, "MailConnectException");
+        message(account, MessageKind.BOOKING_DISPLACED, "QUEUED", "2026-05-07T12:00:00Z", 0, 0, null);
+        message(account, MessageKind.BOOKING_DISPLACED, "QUEUED", "2026-05-07T13:00:00Z", 2, 0, null);
 
         // when
         String body = mockMvc.perform(get("/api/admin/statistics/messages")
@@ -491,7 +493,9 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath(kind(MessageKind.CREDENTIALS_NEW_ACCOUNT) + ".handedOver").value(1))
                 .andExpect(jsonPath(kind(MessageKind.BOOKING_REMINDER) + ".handedOver").value(0))
                 .andExpect(jsonPath(kind(MessageKind.BOOKING_DISPLACED) + ".failed").value(1))
-                .andExpect(jsonPath(kind(MessageKind.BOOKING_DISPLACED) + ".queued").value(1))
+                .andExpect(jsonPath(kind(MessageKind.BOOKING_DISPLACED) + ".queued").value(3))
+                .andExpect(jsonPath(kind(MessageKind.BOOKING_DISPLACED) + ".retried").value(2))
+                .andExpect(jsonPath(kind(MessageKind.BOOKING_CONFIRMED) + ".retried").value(0))
                 .andExpect(jsonPath("$.previous.period.to").value("2026-05-03"))
                 .andExpect(jsonPath("$.previous" + kind(MessageKind.BOOKING_REMINDER).substring(1) + ".handedOver").value(1))
                 .andReturn().getResponse().getContentAsString();
@@ -625,14 +629,18 @@ class StatisticsControllerTest extends AbstractIntegrationTest {
                 .update();
     }
 
-    private void message(UUID accountId, MessageKind kind, String state, String queuedAt) {
+    private void message(UUID accountId, MessageKind kind, String state, String queuedAt, int attempts,
+                         int retries, String reason) {
+        boolean queued = "QUEUED".equals(state);
         jdbc.sql("""
-                        INSERT INTO message_record (id, account_id, kind, state, message_id, queued_at, settled_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO message_record (id, account_id, kind, state, message_id, queued_at, settled_at,
+                                                    attempts, retries, next_attempt_at, reason)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """)
                 .params(UUID.randomUUID(), accountId, kind.name(), state, UUID.randomUUID().toString(),
                         Instant.parse(queuedAt).atOffset(ZoneOffset.UTC),
-                        "QUEUED".equals(state) ? null : Instant.parse(queuedAt).atOffset(ZoneOffset.UTC))
+                        queued ? null : Instant.parse(queuedAt).atOffset(ZoneOffset.UTC),
+                        attempts, retries, queued ? Instant.parse(queuedAt).atOffset(ZoneOffset.UTC) : null, reason)
                 .update();
     }
 }

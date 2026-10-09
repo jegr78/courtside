@@ -255,10 +255,10 @@ workloads.
 
 ### What a run pays for mail
 
-A confirmed booking hands a message to a relay, and the executor that carries it has four threads,
-a queue of a hundred, and a rejection policy that makes the caller do the work itself. Once that
-queue is full the handover time is inside the request, so where mail goes is part of what the
-`booking` threshold measures rather than a detail beside it.
+A confirmed booking stores a message in the outbox, and two outbox workers hand it to a relay
+outside the request. The `booking` threshold pays for that row and never for the handover, but the
+relay decides how fast the outbox drains and how much database work the workers add beside the
+requests, so where mail goes is still part of what a run measures.
 
 The environment therefore runs a Mailpit relay on the `backend` network and points the application
 at it over STARTTLS, with a certificate the CLI issues per start into the ignored `build/perf-mail`
@@ -270,11 +270,9 @@ anywhere. **A load run measures an instance whose relay accepts**, which is what
 working mail server sees; it does not measure an instance that skips mail, and it does not measure
 one whose relay is refusing.
 
-That last case is not hypothetical. The environment previously pointed at `mail.invalid`, a name
-RFC 2606 reserves so that it never resolves. Every message then walked the whole retry ladder --
-four attempts with five, fifteen and forty-five second pauses -- and because the seed creates far
-more messages than the queue holds, the seeding thread itself waited sixty-five seconds per
-message. The dataset never finished and the environment never became healthy.
+A relay that never resolves, such as `mail.invalid`, would send every message through six
+attempts over about half an hour and end it as `failed`, so a run against it measures retry traffic
+rather than a club's evening.
 
 `--telemetry` adds Prometheus and a PostgreSQL exporter to the isolated project. Prometheus is
 available only on `http://127.0.0.1:9090`; the exporter and the application's management port have

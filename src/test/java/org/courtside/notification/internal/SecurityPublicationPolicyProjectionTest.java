@@ -44,7 +44,7 @@ class SecurityPublicationPolicyProjectionTest {
         assertThat(projection.size()).isEqualTo(4);
         assertThat(projection.get("listenerId").asString()).isEqualTo(adapter.getListenerId());
         assertThat(projection.get("eventType").asString()).isEqualTo(BookingConfirmed.class.getName());
-        assertThat(adapter.getTransactionPhase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
+        assertThat(adapter.getTransactionPhase()).isEqualTo(TransactionPhase.BEFORE_COMMIT);
         assertThat(projection.get("repositoryMode").asString()).isEqualTo("JDBC_V2");
         try (var bytes = getClass().getResourceAsStream("/org/springframework/modulith/events/jdbc/JdbcEventPublicationRepositoryV2.class")) {
             assertThat(bytes).isNotNull();

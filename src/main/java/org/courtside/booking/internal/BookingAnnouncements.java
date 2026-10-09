@@ -3,6 +3,7 @@ package org.courtside.booking.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.booking.Booking;
 import org.courtside.booking.BookingRepository;
+import org.courtside.booking.BookingStatus;
 import org.courtside.booking.BookingParticipant;
 import org.courtside.booking.CourtAllocation;
 import org.courtside.card.CardService;
@@ -54,7 +55,8 @@ class BookingAnnouncements implements BookingAnnouncer {
                 allocations.stream().map(CourtAllocation::getStartsAt).min(Comparator.naturalOrder()).orElseThrow(),
                 allocations.stream().map(CourtAllocation::getEndsAt).max(Comparator.naturalOrder()).orElseThrow(),
                 allocations.stream().map(allocation -> courtOf(allocation.getCourtId())).toList(),
-                cards.requireCard(booking.getCardId()).getLabel()));
+                cards.requireCard(booking.getCardId()).getLabel(),
+                booking.getStatus() == BookingStatus.CANCELLED));
     }
 
     private BookingAnnouncement.AnnouncedCourt courtOf(UUID courtId) {

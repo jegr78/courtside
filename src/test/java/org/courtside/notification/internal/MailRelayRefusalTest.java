@@ -14,8 +14,6 @@ import org.testcontainers.utility.DockerImageName;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -59,14 +57,15 @@ class MailRelayRefusalTest {
     @Test
     void givenARecipientARealRelayRejects_whenHandingOver_thenItIsRefusedOnTheFirstAttempt() {
         // given
-        List<java.time.Duration> gaps = new ArrayList<>();
-        MailHandover handover = new MailHandover(gaps::add);
+        MailHandover handover = new MailHandover();
         JavaMailSender sender = sender();
 
         // when / then — an address nobody holds will not start existing between attempts
         MailRecipientRefusedException refusal = catchThrowableOfType(MailRecipientRefusedException.class,
                 () -> handover.attempt("<a-message-id@example.org>", () -> send(sender, REFUSED)));
-        assertThat(gaps).isEmpty();
+        assertThat(refusal)
+                .as("a refused recipient leaves as the one failure the outbox does not try again")
+                .isNotNull();
         assertThat(refusal.diagnosis()).contains("SendFailedException");
         assertThat(refusal.statusCode()).matches("[45]\\d\\d");
     }
@@ -74,8 +73,7 @@ class MailRelayRefusalTest {
     @Test
     void givenARecipientARealRelayRejects_whenItIsRecorded_thenNeitherTheAddressNorItsWordsAreKept() {
         // given
-        MailHandover handover = new MailHandover(gap -> {
-        });
+        MailHandover handover = new MailHandover();
         JavaMailSender sender = sender();
 
         // when
@@ -90,8 +88,7 @@ class MailRelayRefusalTest {
     @Test
     void givenARecipientARealRelayAccepts_whenHandingOver_thenNothingIsRefused() {
         // given
-        MailHandover handover = new MailHandover(gap -> {
-        });
+        MailHandover handover = new MailHandover();
         JavaMailSender sender = sender();
 
         // when / then — the refusal must name the rejected recipient, not every failure there is

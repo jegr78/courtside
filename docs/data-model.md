@@ -190,7 +190,7 @@ a different file than the one previewed is visible after the fact.
 | Table | Holds | References |
 |---|---|---|
 | `domain_event` | The change log: event type, the entity it concerns, the account that caused it, when, and the payload | None |
-| `message_record` | One row per message the instance tried to deliver, and what became of it | `user_account` |
+| `message_record` | The mail outbox: one row per message the instance is to deliver, and what became of it | `user_account` |
 | `message_optout` | A message kind an account has declined | `user_account` |
 | `event_publication` | Spring Modulith's transactional outbox for events between modules | None |
 
@@ -214,6 +214,16 @@ entries come from `member`.
 `message_record.kind` and `message_optout.kind` are governed by CHECK constraints that have grown
 with the product; read the constraint rather than a list here. A message somebody declined leaves no
 row at all: it did not fail, it was not sent.
+
+A `QUEUED` row is a message waiting in the outbox. Its `parameters` hold the identifiers the message
+is written from, a booking id, a closure kind or the person who withdrew, and never rendered text,
+an address or a credential: a message is composed from the current rows when it is handed over, and
+a generated credential or reset code exists only in that transaction. `next_attempt_at` says when the
+row is next due, `attempts` counts the claims made for it and `retries` the failed handovers that
+were scheduled again. On a `QUEUED` row, `reason` names the last failed attempt; on a settled row it
+names why the message failed or was refused. Settling a row clears both `parameters` and
+`next_attempt_at`, and CHECK constraints refuse a settled row that keeps either, and `parameters`
+that are anything but an object of strings.
 
 `event_publication` is not domain data. Spring Modulith writes it so an event survives a listener
 that was not running, and Courtside neither reads nor migrates it by hand.

@@ -6,7 +6,7 @@ import java.util.UUID;
 
 public record BookingAnnouncement(UUID bookedByAccountId, List<UUID> playerPersonIds,
                                   Instant startsAt, Instant endsAt,
-                                  List<AnnouncedCourt> courts, String cardLabel) {
+                                  List<AnnouncedCourt> courts, String cardLabel, boolean cancelled) {
 
     public BookingAnnouncement {
         playerPersonIds = List.copyOf(playerPersonIds);

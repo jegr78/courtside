@@ -12,10 +12,8 @@ import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.ParticipantRecorded;
 import org.courtside.shared.ParticipantWithdrew;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.HashMap;
@@ -23,12 +21,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class ParticipationMailer {
+class ParticipationMailer implements MessageComposer {
 
     private final BookingAnnouncer bookings;
     private final UserAccountRepository accounts;
@@ -36,57 +36,63 @@ class ParticipationMailer {
     private final ClubIdentity club;
     private final MailTemplates templates;
     private final BookingWording wording;
-    private final RecordedHandover handover;
+    private final MessageOutbox outbox;
 
     // The participation list resolves no name at all, not the booker's and not the other players',
     // so the message that says somebody was recorded names none of them either.
-    @Async("bookingMailExecutor")
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(ParticipantRecorded recorded) {
         bookings.describe(recorded.bookingId()).ifPresent(booking ->
-                send(booking, accountOf(recorded.personId()),
-                        MessageKind.BOOKING_PLAYER_RECORDED, Map.of()));
+                queue(accountOf(recorded.personId()), MessageKind.BOOKING_PLAYER_RECORDED,
+                        Map.of(QueuedMessage.BOOKING, recorded.bookingId().toString())));
     }
 
-    @Async("bookingMailExecutor")
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(ParticipantWithdrew withdrew) {
-        Optional<Person> player = persons.findById(withdrew.personId());
-        if (player.isEmpty()) {
+        if (persons.findById(withdrew.personId()).isEmpty()) {
             log.warn("Person {} withdrew and is on no roster to name", withdrew.personId());
             return;
         }
         // The booker entered the name themselves, so it tells them nothing they did not have.
         bookings.describe(withdrew.bookingId()).ifPresent(booking ->
-                send(booking, accounts.findById(booking.bookedByAccountId()),
-                        MessageKind.BOOKING_PLAYER_WITHDREW, Map.of("player", nameOf(player.get()))));
+                queue(accounts.findById(booking.bookedByAccountId()), MessageKind.BOOKING_PLAYER_WITHDREW,
+                        Map.of(QueuedMessage.BOOKING, withdrew.bookingId().toString(),
+                                QueuedMessage.PLAYER, withdrew.personId().toString())));
     }
 
-    private void send(BookingAnnouncement booking, Optional<UserAccount> recipient,
-                      MessageKind kind, Map<String, String> extra) {
+    private void queue(Optional<UserAccount> recipient, MessageKind kind, Map<String, String> parameters) {
         Optional<UserAccount> reachable = MessageRecipient.reachable(recipient);
         if (reachable.isEmpty()) {
             log.info("A {} message has nobody to reach", kind);
             return;
         }
-        UserAccount account = reachable.get();
-        String address = account.getPerson().getEmail();
+        outbox.queue(reachable.get().getId(), kind, parameters);
+    }
+
+    @Override
+    public Set<MessageKind> kinds() {
+        return Set.of(MessageKind.BOOKING_PLAYER_RECORDED, MessageKind.BOOKING_PLAYER_WITHDREW);
+    }
+
+    @Override
+    public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
+        BookingAnnouncement booking = AnnouncedBooking.current(bookings, message.booking());
+        UserAccount account = MessageRecipient.required(accounts, message.accountId());
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
-        values.putAll(extra);
-        handover.handOver(account.getId(), kind, address,
-                templates.render(kind.templateKey() + ".subject", locale, values),
-                templates.render(kind.templateKey() + ".body", locale, values));
+        if (message.kind() == MessageKind.BOOKING_PLAYER_WITHDREW) {
+            Person player = persons.findById(message.player())
+                    .orElseThrow(() -> new MessageUndeliverableException("PlayerGone"));
+            values.put("player", player.getFirstName() + " " + player.getLastName());
+        }
+        String key = message.kind().templateKey();
+        handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
+                templates.render(key + ".subject", locale, values),
+                templates.render(key + ".body", locale, values)));
     }
 
     private Optional<UserAccount> accountOf(UUID personId) {
         return accounts.findByPersonIdIn(List.of(personId)).stream().findFirst();
-    }
-
-    private static String nameOf(Person person) {
-        return person.getFirstName() + " " + person.getLastName();
     }
 }

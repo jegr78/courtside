@@ -1,13 +1,11 @@
 package org.courtside.notification.internal;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.MailSendException;
 import org.springframework.stereotype.Component;
 
 import jakarta.mail.SendFailedException;
 
-import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -17,47 +15,26 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-// The mail server is a neighbour in the same network: if it cannot be reached it is restarting, and
-// that is over in minutes. Waiting for days would leave a member's access in a state nobody can act on.
 @Slf4j
 @Component
-@RequiredArgsConstructor
 class MailHandover {
 
-    private static final int ATTEMPTS = 4;
-    private static final Duration FIRST_GAP = Duration.ofSeconds(5);
-    private static final int GROWTH = 3;
     private static final Pattern STATUS_CODE = Pattern.compile("^[45]\\d\\d");
 
-    private final MailPause pause;
-
-    // Returns only once the message is handed over, so that a caller whose completion is recorded
-    // elsewhere records it for a delivery that happened.
+    // One attempt. A refused recipient leaves as its own type, because it is the one failure that
+    // trying again cannot change.
     void attempt(String messageId, Runnable handover) {
-        Duration gap = FIRST_GAP;
-        for (int attempt = 1; ; attempt++) {
-            try {
-                handover.run();
-                return;
-            } catch (RuntimeException failure) {
-                if (refusedRecipient(failure) != null) {
-                    log.info("Handing over {} was refused: {}", messageId, diagnosis(failure));
-                    throw new MailRecipientRefusedException(messageId, diagnosis(failure),
-                            statusCode(failure));
-                }
-                if (attempt >= ATTEMPTS) {
-                    String diagnosis = diagnosis(failure);
-                    log.warn("Gave up handing over {} after {} attempts: {}", messageId, attempt,
-                            diagnosis);
-                    // Without the cause: it escapes into the async handler, which logs the chain,
-                    // and a rejected recipient reports the address it rejected.
-                    throw new MailHandoverFailedException(messageId, diagnosis);
-                }
-                log.info("Handing over {} failed on attempt {} ({}), retrying in {}", messageId,
-                        attempt, diagnosis(failure), gap);
-                pause.untilTheNextAttempt(gap);
-                gap = gap.multipliedBy(GROWTH);
+        try {
+            handover.run();
+        } catch (RuntimeException failure) {
+            String diagnosis = diagnosis(failure);
+            if (refusedRecipient(failure) != null) {
+                log.info("Handing over {} was refused: {}", messageId, diagnosis);
+                throw new MailRecipientRefusedException(messageId, diagnosis, statusCode(failure));
             }
+            log.info("Handing over {} failed: {}", messageId, diagnosis);
+            // Without the cause: a rejected recipient reports the address it rejected.
+            throw new MailHandoverFailedException(messageId, diagnosis);
         }
     }
 

@@ -3,50 +3,67 @@ package org.courtside.notification.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.ClubIdentity;
 import org.courtside.identity.UserAccount;
+import org.courtside.identity.UserAccountRepository;
 import org.courtside.notification.MessageKind;
 import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.BookingDisplaced;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
 
 @Component
 @RequiredArgsConstructor
-class DisplacementMailer {
+class DisplacementMailer implements MessageComposer {
 
     private final BookingAnnouncer bookings;
     private final BookingAudience audience;
+    private final UserAccountRepository accounts;
     private final ClubIdentity club;
     private final MailTemplates templates;
     private final BookingWording wording;
-    private final RecordedHandover handover;
+    private final MessageOutbox outbox;
 
-    @Async("bookingMailExecutor")
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(BookingDisplaced displaced) {
-        bookings.describe(displaced.bookingId()).ifPresent(booking ->
-                audience.of(booking).forEach(account -> send(booking, account, displaced.closure())));
+        bookings.describe(displaced.bookingId()).ifPresent(booking -> audience.of(booking).forEach(account ->
+                outbox.queue(account.getId(), MessageKind.BOOKING_DISPLACED, Map.of(
+                        QueuedMessage.BOOKING, displaced.bookingId().toString(),
+                        QueuedMessage.CLOSURE, displaced.closure().name()))));
     }
 
-    private void send(BookingAnnouncement booking, UserAccount account,
-                      BookingDisplaced.Closure closure) {
-        String address = account.getPerson().getEmail();
+    @Override
+    public Set<MessageKind> kinds() {
+        return Set.of(MessageKind.BOOKING_DISPLACED);
+    }
+
+    @Override
+    public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
+        BookingDisplaced.Closure closure = closureOf(message.closure());
+        BookingAnnouncement booking = AnnouncedBooking.current(bookings, message.booking());
+        UserAccount account = MessageRecipient.required(accounts, message.accountId());
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_DISPLACED.templateKey();
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
         values.put("closure", templates.render(key + "." + closureKey(closure), locale, values));
-        handover.handOver(account.getId(), MessageKind.BOOKING_DISPLACED, address,
+        handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),
-                templates.render(key + ".body", locale, values));
+                templates.render(key + ".body", locale, values)));
+    }
+
+    private static BookingDisplaced.Closure closureOf(String stored) {
+        return Arrays.stream(BookingDisplaced.Closure.values())
+                .filter(closure -> closure.name().equals(stored))
+                .findFirst()
+                .orElseThrow(() -> new MessageUndeliverableException("ParameterMalformed"));
     }
 
     private static String closureKey(BookingDisplaced.Closure closure) {

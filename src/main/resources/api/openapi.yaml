@@ -2583,13 +2583,18 @@ components:
 
     MessageKindCount:
       type: object
-      required: [kind, queued, handedOver, refused, failed]
+      required: [kind, queued, handedOver, refused, failed, retried]
       properties:
         kind: { $ref: "#/components/schemas/MessageKind" }
         queued: { type: integer, format: int64, minimum: 0 }
         handedOver: { type: integer, format: int64, minimum: 0 }
         refused: { type: integer, format: int64, minimum: 0 }
         failed: { type: integer, format: int64, minimum: 0 }
+        retried:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Messages of this kind whose first handover attempt failed and that were, or wait to be, tried again.
 
     PreviousMessageCounts:
       type: object

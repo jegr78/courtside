@@ -197,9 +197,9 @@
           "positiveBoundaries": "The application writes a synthetic club through its public API; its backup and the upgrade-origin fixture each restore into empty PostgreSQL 18, and the matching image reads the restored login, booking and logo.",
           "negativeBoundaries": "A corrupt archive leaves no database objects, an interrupted restore preserves the usable database, and the restored exclusion constraint still rejects overlap.",
           "level": "CLI contract, release qualification", "frequency": ["PR", "periodic", "release"],
-          "environment": "Fresh PostgreSQL 18", "syntheticData": "API-written and upgrade-origin synthetic datasets, including an outstanding event publication",
+          "environment": "Fresh PostgreSQL 18", "syntheticData": "API-written and upgrade-origin synthetic datasets, including an outstanding queued message",
           "evidenceType": "CLI recovery-unit checks, before-and-after table and sequence evidence, backup sizes, image ID and schema version", "owner": "Operations",
-          "openGap": "The relay is stopped before a second API booking so the backup contains an application-written outstanding Modulith publication; remote storage remains operator-owned."
+          "openGap": "The relay is stopped before a second API booking so the backup contains an application-written message still queued in the outbox; remote storage remains operator-owned."
         },
         {
           "id": "OP-4", "impact": "P1", "likelihood": "Medium",

@@ -169,9 +169,13 @@ Repositories persist state and do not decide policy.
 State-changing services publish typed domain events. The audit listener runs before commit and
 writes its row in the same transaction. A covered change cannot commit without its audit event.
 
-Notification listeners run after commit through Spring Modulith's event publication registry.
-Incomplete publications remain available after a restart. A failed mail handover cannot roll back
-a booking that already committed.
+Mail listeners run before commit, like the audit listener, and store the message in the outbox in
+the same transaction. A committed change therefore always has its queued message, and a change whose
+message cannot be stored does not commit: the request fails and nothing of it remains. A mail
+listener never talks to the relay, so a failed handover cannot roll back a change that committed.
+Publishing such an event outside a transaction is refused. Other after-commit listeners run through
+Spring Modulith's event publication registry, whose incomplete publications remain available after
+a restart.
 
 Events contain identifiers and non-personal change descriptions. Free text, names and email
 addresses are not copied into audit payloads. Stored event payloads evolve additively.
@@ -403,7 +407,8 @@ period between them. Each read runs its statements under a 30-second statement t
   of them. Only the latest sign-in is stored, so for
   a past period the 30- and 90-day windows count the accounts whose latest sign-in falls inside
   them.
-- Messages are counted per kind and state by the time they were queued.
+- Messages are counted per kind and state by the time they were queued. Retried counts the
+  messages whose handover failed at least once and was scheduled again, whatever became of them.
 
 ## Membership data exchange
 
@@ -492,13 +497,29 @@ confirmations, participant additions and withdrawals, displaced bookings and upc
 series sends no confirmation per occurrence. Displacement informs people but does not cancel the
 booking.
 
-Each attempted message has a `message_record` with account, kind, `Message-ID`, time and state. The
-states are `queued`, `handed_over`, `refused` and `failed`. `handed_over` means the relay accepted the
-message, not that a mailbox delivered it.
+Each message is a `message_record` with account, kind, `Message-ID`, time and state. The states are
+`queued`, `handed_over`, `refused` and `failed`. `handed_over` means the relay accepted the message,
+not that a mailbox delivered it.
 
-Temporary transport failures are retried. A definite recipient refusal is not. Failed publication
-remains outstanding for a later retry. Credential creation and handover share a transaction, so a
-credential the relay never accepted does not replace the stored one.
+`message_record` is the mail outbox. A listener stores a `queued` row holding identifiers only, and
+two outbox workers hand rows over. No request thread hands a message over, so a slow relay never
+lengthens a response. A worker claims a due row with `FOR UPDATE SKIP LOCKED` under a five-minute
+lease. It then locks the row, checks that its claim is still the current attempt, composes the
+message from the current data, hands it over under the `Message-ID` chosen when it was queued and
+records the outcome, all in one transaction. A pass runs after every queued commit and every five
+seconds, which also resumes what a restart left queued. A worker that dies during a handover leaves
+its row to the next pass after the lease, which can send that message a second time under the same
+`Message-ID`; `security-risks.md` records that bound.
+
+A transport failure reschedules the row after 15 seconds and then after gaps three times as long,
+and fails it on the sixth attempt, about half an hour after the first. A definite recipient refusal
+is not retried. A message fails at once when its booking or recipient is gone, its booking was
+cancelled, or, for a reminder, its booking has already started by the time it is due. Every outcome
+stays on the row with its reason, and the message statistics count the messages that needed a
+retry. Credential creation and handover share a transaction, so a credential the relay never
+accepted does not replace the stored one, and no plaintext credential waits in the outbox. Credential
+messages for one account are composed one after the other, so the last one sent carries the
+credential the account holds.
 
 Members choose optional message kinds. No opt-out means enabled. Credentials, displacement and
 participant-addition notices cannot be disabled because no other product path replaces them.

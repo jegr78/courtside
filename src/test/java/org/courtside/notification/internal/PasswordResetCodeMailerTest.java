@@ -1,22 +1,29 @@
 package org.courtside.notification.internal;
 
 import org.courtside.config.ClubIdentity;
+import org.courtside.identity.Person;
+import org.courtside.identity.UserAccount;
+import org.courtside.identity.UserAccountRepository;
 import org.courtside.notification.MessageKind;
 import org.courtside.shared.IssuedResetCode;
 import org.courtside.shared.PasswordResetCodeIssuer;
 import org.courtside.shared.PasswordResetRequested;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,16 +36,13 @@ class PasswordResetCodeMailerTest {
     private static final String CODE = "ABCD-EFGH";
 
     private final PasswordResetCodeIssuer codes = mock(PasswordResetCodeIssuer.class);
+    private final UserAccountRepository accounts = mock(UserAccountRepository.class);
     private final ClubIdentity club = mock(ClubIdentity.class);
-    private final MailDispatch dispatch = mock(MailDispatch.class);
-    private final MessageLog messages = mock(MessageLog.class);
-    private final MailProperties properties = new MailProperties(
-            "mail.example.org", 587, "noreply@example.org", "board@example.org", null, null, false);
-    private final MessageChoices choices = new MessageChoices(mock(JdbcClient.class));
+    private final MessageOutbox outbox = mock(MessageOutbox.class);
+    private final List<OutgoingMail> handedOver = new ArrayList<>();
 
-    private final PasswordResetCodeMailer mailer = new PasswordResetCodeMailer(codes, club,
-            new MailTemplates(),
-            new RecordedHandover(dispatch, new MailHandover(gap -> { }), properties, choices, messages));
+    private final PasswordResetCodeMailer mailer = new PasswordResetCodeMailer(codes, accounts, club,
+            new MailTemplates(), outbox);
 
     @Test
     void givenAMemberWrittenToInEnglish_whenTheirCodeIsSent_thenTheMessageCarriesItAndItsDeadline() {
@@ -47,7 +51,7 @@ class PasswordResetCodeMailerTest {
         issues("en");
 
         // when
-        mailer.on(new PasswordResetRequested(ACCOUNT));
+        compose();
 
         // then — the club default is German, so only the account's own language can produce this
         assertThat(subjectSent()).isEqualTo("Example Tennis Club: your password reset code");
@@ -66,7 +70,7 @@ class PasswordResetCodeMailerTest {
         issues("de");
 
         // when
-        mailer.on(new PasswordResetRequested(ACCOUNT));
+        compose();
 
         // then
         assertThat(subjectSent()).isEqualTo("Example Tennis Club: dein Code zum Zurücksetzen");
@@ -80,7 +84,7 @@ class PasswordResetCodeMailerTest {
         issues("en");
 
         // when
-        mailer.on(new PasswordResetRequested(ACCOUNT));
+        compose();
 
         // then — the message is the whole promise the endpoint makes, so it may not overstate it
         assertThat(bodySent())
@@ -88,16 +92,13 @@ class PasswordResetCodeMailerTest {
     }
 
     @Test
-    void whenTheCodeIsSent_thenTheRecordCarriesItsOwnKindAndNotTheCredentialOne() {
-        // given
-        club("en");
-        issues("en");
-
+    void whenTheCodeIsRequested_thenTheRowCarriesItsOwnKindAndTheCodeIsNotYetIssued() {
         // when
         mailer.on(new PasswordResetRequested(ACCOUNT));
 
         // then
-        verify(messages).queued(eq(ACCOUNT), eq(MessageKind.ACCOUNT_PASSWORD_RESET_CODE), anyString());
+        verify(outbox).queue(eq(ACCOUNT), eq(MessageKind.ACCOUNT_PASSWORD_RESET_CODE), eq(Map.of()));
+        verify(codes, never()).issueFor(any());
         assertThat(MessageKind.ACCOUNT_PASSWORD_RESET_CODE.templateKey())
                 .isEqualTo("account.passwordResetCode");
         assertThat(MessageKind.ACCOUNT_PASSWORD_RESET_CODE.isDeclinable())
@@ -113,12 +114,36 @@ class PasswordResetCodeMailerTest {
         return handedOver().body();
     }
 
-    private Message handedOver() {
-        ArgumentCaptor<String> recipient = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-        verify(dispatch).send(recipient.capture(), subject.capture(), body.capture(), anyString());
-        return new Message(recipient.getValue(), subject.getValue(), body.getValue());
+    private OutgoingMail handedOver() {
+        assertThat(handedOver).as("exactly one message is handed over").hasSize(1);
+        return handedOver.getFirst();
+    }
+
+    private void compose() {
+        mailer.compose(new QueuedMessage(ACCOUNT, MessageKind.ACCOUNT_PASSWORD_RESET_CODE, Map.of()),
+                handedOver::add);
+    }
+
+    @Test
+    void givenADeactivatedAccount_whenItsCodeIsComposed_thenNoCodeIsIssuedAndTheReasonIsNamed() {
+        // given
+        reachable(false, ADDRESS);
+
+        // when / then
+        assertThatThrownBy(this::compose)
+                .isInstanceOf(MessageUndeliverableException.class)
+                .satisfies(failure -> assertThat(((MessageUndeliverableException) failure).reason())
+                        .isEqualTo("RecipientUnreachable"));
+        verify(codes, never()).issueFor(any());
+    }
+
+    private void reachable(boolean enabled, String address) {
+        Person person = mock(Person.class);
+        when(person.getEmail()).thenReturn(address);
+        UserAccount account = mock(UserAccount.class);
+        when(account.isEnabled()).thenReturn(enabled);
+        when(account.getPerson()).thenReturn(person);
+        when(accounts.findById(ACCOUNT)).thenReturn(Optional.of(account));
     }
 
     private void club(String defaultLocale) {
@@ -128,10 +153,8 @@ class PasswordResetCodeMailerTest {
     }
 
     private void issues(String recipientLocale) {
+        reachable(true, ADDRESS);
         when(codes.issueFor(ACCOUNT)).thenReturn(new IssuedResetCode(
                 ADDRESS, "Jane", recipientLocale, "doe.jane", CODE, EXPIRES_AT));
-    }
-
-    private record Message(String recipient, String subject, String body) {
     }
 }

@@ -198,6 +198,7 @@
         "BookingReminderSchedule#remindWhatIsDue",
         "BookingValidationPreparation#onWebServerInitialized(ServletWebServerInitializedEvent)",
         "DisplacementMailer#on(BookingDisplaced)",
+        "MailOutbox#poll",
         "ParticipationMailer#on(ParticipantRecorded)",
         "ParticipationMailer#on(ParticipantWithdrew)",
         "ReminderMailer#on(BookingReminderDue)"

@@ -9,22 +9,21 @@ import org.courtside.notification.MessageKind;
 import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.BookingConfirmed;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.Set;
+import java.util.function.Consumer;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class BookingMailer {
+class BookingMailer implements MessageComposer {
 
     private final BookingAnnouncer bookings;
     private final UserAccountRepository accounts;
@@ -32,36 +31,42 @@ class BookingMailer {
     private final MailTemplates templates;
     private final BookingWording wording;
     private final BookingCalendar calendar;
-    private final RecordedHandover handover;
+    private final MessageOutbox outbox;
 
-    @Async("bookingMailExecutor")
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(BookingConfirmed confirmed) {
         Optional<BookingAnnouncement> announced = bookings.describe(confirmed.bookingId());
         if (announced.isEmpty()) {
             log.warn("Booking {} was confirmed but describes nothing to send", confirmed.bookingId());
             return;
         }
-        BookingAnnouncement booking = announced.get();
         Optional<UserAccount> recipient =
-                MessageRecipient.reachable(accounts.findById(booking.bookedByAccountId()));
+                MessageRecipient.reachable(accounts.findById(announced.get().bookedByAccountId()));
         if (recipient.isEmpty()) {
             log.info("Account {} cannot be reached, so its booking confirmation stays unsent",
-                    booking.bookedByAccountId());
+                    announced.get().bookedByAccountId());
             return;
         }
-        send(confirmed.bookingId(), booking, recipient.get(), recipient.get().getPerson().getEmail());
+        outbox.queue(recipient.get().getId(), MessageKind.BOOKING_CONFIRMED,
+                Map.of(QueuedMessage.BOOKING, confirmed.bookingId().toString()));
     }
 
-    private void send(UUID bookingId, BookingAnnouncement booking, UserAccount account, String address) {
+    @Override
+    public Set<MessageKind> kinds() {
+        return Set.of(MessageKind.BOOKING_CONFIRMED);
+    }
+
+    @Override
+    public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
+        BookingAnnouncement booking = AnnouncedBooking.current(bookings, message.booking());
+        UserAccount account = MessageRecipient.required(accounts, message.accountId());
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_CONFIRMED.templateKey();
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));
         values.put("firstName", account.getPerson().getFirstName());
-        handover.handOver(account.getId(), MessageKind.BOOKING_CONFIRMED, address,
+        handOver.accept(new OutgoingMail(account.getPerson().getEmail(),
                 templates.render(key + ".subject", locale, values),
                 templates.render(key + ".body", locale, values),
-                calendar.create(bookingId, booking, values.get("courts")));
+                calendar.create(message.booking(), booking, values.get("courts"))));
     }
 }
