@@ -22,6 +22,7 @@ import {
   isMissingDockerResource,
   mergeSecurityProcessEnvironment,
   prometheusMetric,
+  warmResourceTarget,
   remainingScannerRequestBudget,
   resourceAuthenticationPolicy,
   shippedLoginAddressMaxFailures,
@@ -785,6 +786,7 @@ function resourceIntegrationHarness({ processFailure = false, effectsOutcome = "
       recovery: recoveryProof ?? { outcome: effects.outcome, actualFingerprint: effects.outcome === "passed" ? digest : null },
       integrityEvidenceDigest: digest }; },
     resourceSample: async () => { if (earlyFailure === "sample") throw new Error("private sample failure"); return {}; }, evaluateResourceSignals: () => ({ tripped: false }),
+    warmResourceTarget: async () => ({ settled: true, durationSeconds: 0, samples: [] }),
     evaluateSafetyLimits: () => ({ violated: false }), scannerGatewayMetrics: async () => {
       if (missingTelemetry) throw new Error("private metrics failure");
       return { requests: 12, requestBytes: 1024, bodyLimitReceipts: missingGatewayReceipt ? [] : gatewayReceipts,
@@ -2089,4 +2091,78 @@ test("given missing telemetry and a malformed scanner summary, when the run fini
       "missing telemetry keeps why it could not be read");
     assert.equal(failures.scannerSummary?.name, "SyntaxError", "a malformed summary keeps the parse failure");
   } finally { rmSync(privateRoot, { recursive: true, force: true }); }
+});
+
+function warmUpHarness(cpuSeries) {
+  const commands = [];
+  let now = 0;
+  let index = 0;
+  const policy = JSON.parse(readFileSync(new URL("../security/resource-abuse-policy.json", import.meta.url), "utf8"));
+  return {
+    policy, commands,
+    run: () => warmResourceTarget({ runId: "run-0001", gateway: "gateway", policy,
+      command: async (args) => { commands.push(args); return { stdout: "" }; },
+      sample: async (_runId, _gateway, sequence) => ({ sequence, appCpuPercent: cpuSeries[Math.min(index++, cpuSeries.length - 1)],
+        appMemoryMegabytes: 400, dbCpuPercent: 5, dbMemoryMegabytes: 300, activeConnections: 3, activePoolConnections: 1,
+        pendingPoolConnections: 0, poolMaxConnections: 10, waitingLocks: 0, sessionRows: 1, storageMegabytes: 40,
+        requestP95Milliseconds: 50, errorRate: 0 }),
+      wait: async (milliseconds) => { now += milliseconds; },
+      clock: () => now })
+  };
+}
+
+test("given a target that settles after its warm-up, when warming it, then the breaker arms only after a calm run of samples", async () => {
+  // given
+  const harness = warmUpHarness([97, 101, 88, 40, 30, 30, 30, 30]);
+  // when
+  const result = await harness.run();
+  // then
+  assert.equal(result.settled, true);
+  assert.deepEqual(result.samples.slice(-harness.policy.targetWarmUp.settleSamples).map(({ appCpuPercent }) => appCpuPercent),
+    Array(harness.policy.targetWarmUp.settleSamples).fill(30).fill(40, 0, 1),
+    "the calm samples that armed the breaker are the last ones recorded");
+});
+
+test("given a warm-up that exceeds a safety limit, when warming the target, then the run stops", async () => {
+  // given
+  const harness = warmUpHarness([60, 115]);
+  // when / then
+  await assert.rejects(harness.run(), { message: "Resource-abuse target warm-up exceeded a safety limit" });
+});
+
+test("given a target that never calms, when the settle deadline passes, then the breaker arms unsettled and says so", async () => {
+  // given
+  const harness = warmUpHarness([90]);
+  // when
+  const result = await harness.run();
+  // then
+  assert.equal(result.settled, false);
+  assert.ok(result.durationSeconds >= harness.policy.targetWarmUp.durationSeconds + harness.policy.targetWarmUp.settleDeadlineSeconds,
+    "an unsettled warm-up ends at its deadline rather than waiting forever");
+});
+
+test("given the warm-up paths, when the API document describes them, then each is a GET a caller without an account may make", () => {
+  // given
+  const policy = JSON.parse(readFileSync(new URL("../security/resource-abuse-policy.json", import.meta.url), "utf8"));
+  const api = yaml.load(readFileSync(new URL("../src/main/resources/api/openapi.yaml", import.meta.url), "utf8"));
+  // when
+  const refused = policy.targetWarmUp.paths.filter((path) => {
+    const read = api.paths[path]?.get;
+    return !read || !(Array.isArray(read.security) && read.security.length === 0 || read.operationId === "getSessionStatus");
+  });
+  // then
+  assert.deepEqual(refused, [], "a warm-up path that needs an account answers 401 and warms nothing");
+});
+
+test("given the warm-up workload, when it runs, then it only reads anonymously inside the application container", async () => {
+  // given
+  const harness = warmUpHarness([30]);
+  // when
+  await harness.run();
+  // then
+  const [args] = harness.commands;
+  assert.deepEqual(args.slice(-6, -3), ["exec", "-T", "app"], "the warm-up must bypass the scanner gateway and its journal");
+  const script = args.at(-1);
+  for (const path of harness.policy.targetWarmUp.paths) assert.ok(script.includes(path), `the warm-up skips ${path}`);
+  assert.doesNotMatch(script, /-X|--data|-d |POST|PUT|DELETE/, "the warm-up must not change state");
 });

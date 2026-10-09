@@ -202,6 +202,8 @@ export async function runResourceAbuseAssessment(plan, context) {
   });
   const observedBreaker = evaluateResourceSignals(execution.samples, resourceAbusePolicy.circuitBreakers);
   const observedSafetyViolation = evaluateSafetyLimits(execution.samples, resourceAbusePolicy.circuitBreakers);
+  const warmUp = execution.warmUp ?? { settled: false, durationSeconds: 0, samples: [] };
+  const warmUpSafetyViolation = evaluateSafetyLimits(warmUp.samples, resourceAbusePolicy.circuitBreakers);
   const breakerConsistent = JSON.stringify(observedBreaker) === JSON.stringify(execution.circuitBreaker);
   const safetyConsistent = JSON.stringify(observedSafetyViolation) === JSON.stringify(execution.safetyLimitViolation);
   const recoveryOutcomes = Object.values(execution.recovery);
@@ -231,7 +233,7 @@ export async function runResourceAbuseAssessment(plan, context) {
     || !observedBreaker.tripped && duplicateObserved && duplicateIncomplete
     || execution.competingWrites.toctouCreated > 0
     || !observedBreaker.tripped && toctouObserved && toctouIncomplete
-    || observedSafetyViolation.violated
+    || observedSafetyViolation.violated || warmUpSafetyViolation.violated
     || integrityOutcomes.includes("failed")
     || execution.scenarios.some(({ outcome }) => outcome === "failed")
     || recoveryOutcomes.includes("failed");
@@ -247,7 +249,7 @@ export async function runResourceAbuseAssessment(plan, context) {
     || !execution.stateBefore || !execution.stateAfter || !execution.stateAfterCleanup || !execution.stateAfterRecovery;
   const outcome = integrityFailed ? "failed" : incomplete ? "incomplete" : "passed";
   const evidence = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     testIds: ["CSA-RES-001"],
     targetFingerprint: plan.targetFingerprint,
     image: resourceAbusePolicy.image,
@@ -264,6 +266,8 @@ export async function runResourceAbuseAssessment(plan, context) {
     samples: execution.samples,
     circuitBreaker: observedBreaker,
     safetyLimitViolation: observedSafetyViolation,
+    warmUp,
+    warmUpSafetyLimitViolation: warmUpSafetyViolation,
     stateBefore: execution.stateBefore ?? null,
     stateAfter: execution.stateAfter ?? null,
     stateAfterCleanup: execution.stateAfterCleanup ?? null,

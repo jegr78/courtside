@@ -1339,6 +1339,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       classpathDigest: `sha256:${createHash("sha256").update(classpathText).digest("hex")}`, runtimeBinding, publicationBinding,
       ...(Object.keys(stepFailures).length ? { failures: { ...stepFailures } } : {}) });
     if (!runtimeBinding || !publicationBinding) throw new Error("Resource-abuse publication native binding incomplete");
+    const warmUp = await warmResourceTarget({ runId: plan.runId, gateway, policy: limits.policy, command });
     const before = await captureResourceState(command, securityComposeArgs(plan.runId));
     privateRecord("before-native.json", before);
     const stateBefore = resourceIntegritySnapshotFingerprint(before);
@@ -1437,6 +1438,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
       samples,
       circuitBreaker: breaker,
       safetyLimitViolation,
+      warmUp,
       stateBefore,
       stateAfter,
       stateAfterCleanup: phases.cleanup?.actualFingerprint ?? null,
@@ -1513,6 +1515,36 @@ async function resourceSample(runId, gateway, sequence, command) {
     pendingPoolConnections, poolMaxConnections,
     waitingLocks, sessionRows, storageMegabytes: storageBytes / (1024 * 1024),
     requestP95Milliseconds: gatewayMetrics.requestP95Milliseconds, errorRate: gatewayMetrics.errorRate };
+}
+
+export async function warmResourceTarget({ runId, gateway, policy, command, sample = resourceSample,
+  wait = (milliseconds) => new Promise((resolveWait) => setTimeout(resolveWait, milliseconds)), clock = Date.now }) {
+  const { durationSeconds, requestIntervalMilliseconds, settleSamples, settleDeadlineSeconds, paths } = policy.targetWarmUp;
+  const { tripThresholds, sampleIntervalMilliseconds } = policy.circuitBreakers;
+  const requests = paths.map((path) => `curl -s -o /dev/null http://127.0.0.1:8080${path}`).join("; ");
+  const script = `end=$(($(date +%s) + ${durationSeconds})); while [ "$(date +%s)" -lt "$end" ]; do ${requests}; `
+    + `sleep ${requestIntervalMilliseconds / 1000}; done`;
+  const startedAt = clock();
+  let finished = false;
+  let failure;
+  command([...securityComposeArgs(runId), "exec", "-T", "app", "sh", "-c", script],
+    { timeoutMilliseconds: (durationSeconds + 30) * 1000 })
+    .then(() => { finished = true; }, (error) => { failure = error; finished = true; });
+  const samples = [];
+  const calm = () => samples.length >= settleSamples && samples.slice(-settleSamples)
+    .every((value) => Object.entries(tripThresholds).every(([property, threshold]) => value[property] <= threshold));
+  const deadline = startedAt + (durationSeconds + settleDeadlineSeconds) * 1000;
+  let settled = false;
+  while (!settled && (!finished || clock() < deadline)) {
+    await wait(sampleIntervalMilliseconds);
+    samples.push(await sample(runId, gateway, samples.length + 1, command));
+    if (evaluateSafetyLimits(samples, policy.circuitBreakers).violated) {
+      throw new Error("Resource-abuse target warm-up exceeded a safety limit");
+    }
+    settled = finished && calm();
+  }
+  if (failure) throw new Error("Resource-abuse target warm-up failed", { cause: failure });
+  return { settled, durationSeconds: (clock() - startedAt) / 1000, samples };
 }
 
 export function prometheusMetric(output, name) {

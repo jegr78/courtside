@@ -584,7 +584,9 @@ test("given the instrumented script, when k6 reads its options, then scenarios a
   const race = (exec) => ({ executor: "per-vu-iterations", exec, vus: policy.integrity.racers,
     iterations: policy.integrity.rounds, startTime: `${policy.warmupSeconds}s`,
     maxDuration: `${policy.integrity.rounds * policy.integrity.tickSeconds + 10}s` });
-  assert.deepEqual(options, { scenarios: {
+  const stopping = (scenarios) => Object.fromEntries(Object.entries(scenarios)
+    .map(([name, scenario]) => [name, { ...scenario, gracefulStop: "2s" }]));
+  assert.deepEqual(options, { scenarios: stopping({
     resource_abuse: { executor: "ramping-vus", exec: "resourceAbuse", startVUs: 0, stages: policy.stages },
     competing_occupancy: race("competingOccupancyRace"),
     duplicate_delivery: race("duplicateDeliveryRace"),
@@ -599,7 +601,8 @@ test("given the instrumented script, when k6 reads its options, then scenarios a
       startTime: "1s", maxDuration: "15s" },
     request_body: { executor: "shared-iterations", exec: "requestBodyLimit", vus: 1, iterations: 1,
       startTime: "2s", maxDuration: "10s" }
-  }, gracefulStop: "2s", noCookiesReset: true, thresholds: { checks: ["rate==1"], http_req_failed: ["rate<0.02"] } });
+  }), noCookiesReset: true, thresholds: { checks: ["rate==1"], http_req_failed: ["rate<0.02"] } },
+  "k6 2.3.0 knows gracefulStop only per scenario");
 });
 
 test("given separate failed-login cookies, when pressure precedes another booking, then the manager actor remains attributable", () => {

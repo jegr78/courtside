@@ -51,24 +51,26 @@ const responseInstant = value => typeof value === "string"
   && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?(?:Z|[+-]\d\d:\d\d)$/.test(value)
   && Number.isFinite(Date.parse(value));
 
+const scenarios = {
+  resource_abuse: { executor: "ramping-vus", exec: "resourceAbuse", startVUs: 0, stages: policy.stages },
+  competing_occupancy: raceScenario("competingOccupancyRace"),
+  duplicate_delivery: raceScenario("duplicateDeliveryRace"),
+  participant_capacity: raceScenario("participantCapacityRace"),
+  address_pressure: { executor: "constant-arrival-rate", exec: "addressPressure", rate: policy.addressPressure.rate,
+    timeUnit: "1s", duration: `${policy.addressPressure.durationSeconds}s`,
+    startTime: `${policy.addressPressure.startSeconds}s`, preAllocatedVUs: policy.addressPressure.preAllocatedVUs,
+    maxVUs: policy.addressPressure.maxVUs },
+  series_pressure: { executor: "constant-vus", exec: "seriesPressure", vus: policy.seriesPressure.vus,
+    startTime: `${policy.seriesPressure.startSeconds}s`, duration: `${policy.seriesPressure.durationSeconds}s` },
+  preview_mutation: { executor: "shared-iterations", exec: "previewMutation", vus: 1, iterations: 1,
+    startTime: "1s", maxDuration: "15s" },
+  request_body: { executor: "shared-iterations", exec: "requestBodyLimit", vus: 1, iterations: 1,
+    startTime: "2s", maxDuration: "10s" }
+};
+
 export const options = {
-  scenarios: {
-    resource_abuse: { executor: "ramping-vus", exec: "resourceAbuse", startVUs: 0, stages: policy.stages },
-    competing_occupancy: raceScenario("competingOccupancyRace"),
-    duplicate_delivery: raceScenario("duplicateDeliveryRace"),
-    participant_capacity: raceScenario("participantCapacityRace"),
-    address_pressure: { executor: "constant-arrival-rate", exec: "addressPressure", rate: policy.addressPressure.rate,
-      timeUnit: "1s", duration: `${policy.addressPressure.durationSeconds}s`,
-      startTime: `${policy.addressPressure.startSeconds}s`, preAllocatedVUs: policy.addressPressure.preAllocatedVUs,
-      maxVUs: policy.addressPressure.maxVUs },
-    series_pressure: { executor: "constant-vus", exec: "seriesPressure", vus: policy.seriesPressure.vus,
-      startTime: `${policy.seriesPressure.startSeconds}s`, duration: `${policy.seriesPressure.durationSeconds}s` },
-    preview_mutation: { executor: "shared-iterations", exec: "previewMutation", vus: 1, iterations: 1,
-      startTime: "1s", maxDuration: "15s" },
-    request_body: { executor: "shared-iterations", exec: "requestBodyLimit", vus: 1, iterations: 1,
-      startTime: "2s", maxDuration: "10s" }
-  },
-  gracefulStop: "2s",
+  scenarios: Object.fromEntries(Object.entries(scenarios)
+    .map(([name, scenario]) => [name, { ...scenario, gracefulStop: "2s" }])),
   noCookiesReset: true,
   thresholds: {
     checks: ["rate==1"],
