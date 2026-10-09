@@ -1,6 +1,10 @@
 package org.courtside.shared.internal;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.facility.testfixture.FacilityTestFixture;
+import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.WarmUpStep;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,20 +18,26 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "courtside.warm-up.enabled=true")
-@Import(WarmUpReadinessTest.ObservingSteps.class)
-class WarmUpReadinessTest extends AbstractIntegrationTest {
+@Import({StartupWarmUpIntegrationTest.ObservingSteps.class, FacilityTestFixture.class})
+class StartupWarmUpIntegrationTest extends AbstractIntegrationTest {
 
     private static final List<String> FAILED = new CopyOnWriteArrayList<>();
     private static final List<Observation> OBSERVED = new CopyOnWriteArrayList<>();
@@ -37,6 +47,18 @@ class WarmUpReadinessTest extends AbstractIntegrationTest {
 
     @Autowired
     private ApplicationAvailability availability;
+
+    @Autowired
+    private StartupWarmUp warmUp;
+
+    @Autowired
+    private FacilityTestFixture facility;
+
+    @Autowired
+    private JdbcClient jdbc;
+
+    @Autowired
+    private MeterRegistry meters;
 
     @Test
     void givenAStartingInstance_whenTheWarmUpRuns_thenHealthRefusesTrafficUntilItEnds() throws Exception {
@@ -79,6 +101,67 @@ class WarmUpReadinessTest extends AbstractIntegrationTest {
         assertThat(afterWarmUp.statusCode())
                 .as("a failed warm-up step must not keep the instance from reporting up: " + afterWarmUp.body())
                 .isEqualTo(200);
+    }
+
+    @Test
+    void givenAClubWithACourt_whenTheWarmUpRuns_thenEveryStepRunsAndNoTableChanges() {
+        // given
+        facility.createCourt(1, "Centre Court");
+        Arrays.stream(DayOfWeek.values()).forEach(day ->
+                facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0))));
+        Map<String, String> before = contents();
+        double bookingsCreated = bookingsCreated();
+
+        // when
+        StartupWarmUp.Report report = warmUp.run();
+
+        // then
+        assertThat(report.failed())
+                .as("no warm-up step but the deliberately failing one may fail on a configured club")
+                .containsExactly("failing");
+        assertThat(report.skipped())
+                .as("a club with a court must give every warm-up step something to exercise")
+                .isEmpty();
+        assertThat(report.ran())
+                .as("the warm-up must exercise reads, the court plan, a series preview, a booking write and"
+                        + " password verification")
+                .contains("public-reads", "court-plan", "series-preview", "booking-write",
+                        "password-verification");
+        assertThat(contents())
+                .as("the warm-up must leave every table exactly as it found it")
+                .isEqualTo(before);
+        assertThat(bookingsCreated())
+                .as("a booking the warm-up rolled back must not count as created")
+                .isEqualTo(bookingsCreated);
+    }
+
+    @Test
+    void givenAClubWithoutCourts_whenTheWarmUpRuns_thenTheBookingStepsAreSkippedRatherThanFailed() {
+        // when
+        StartupWarmUp.Report report = warmUp.run();
+
+        // then
+        assertThat(report.failed())
+                .as("an instance nobody has set up yet must not report a failing warm-up step of its own")
+                .containsExactly("failing");
+        assertThat(report.skipped())
+                .as("without a court there is no series to preview and no booking to write")
+                .containsExactlyInAnyOrder("series-preview", "booking-write");
+    }
+
+    private Map<String, String> contents() {
+        Map<String, String> contents = new LinkedHashMap<>();
+        publicTables(jdbc).forEach(table -> contents.put(table, jdbc.sql(
+                        "SELECT count(*) || ':' || coalesce(md5(string_agg(t::text, '|' ORDER BY t::text)), '')"
+                                + " FROM public." + table + " t")
+                .query(String.class)
+                .single()));
+        return contents;
+    }
+
+    private double bookingsCreated() {
+        Counter counter = meters.find("courtside.bookings.created").counter();
+        return counter == null ? 0 : counter.count();
     }
 
     private static HttpResponse<String> health(int port) throws Exception {

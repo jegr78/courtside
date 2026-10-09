@@ -142,7 +142,8 @@ courtside:
     sweep-interval: ${COURTSIDE_IMPORT_SWEEP_INTERVAL:1h}
   warm-up:
     enabled: ${COURTSIDE_WARM_UP_ENABLED:true}
-    deadline: ${COURTSIDE_WARM_UP_DEADLINE:60s}
+    rounds: ${COURTSIDE_WARM_UP_ROUNDS:200}
+    deadline: ${COURTSIDE_WARM_UP_DEADLINE:30s}
 
 management:
   tracing:

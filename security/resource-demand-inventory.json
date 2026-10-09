@@ -539,7 +539,7 @@
       ],
       "evidence": [
         "src/test/java/org/courtside/shared/internal/StartupWarmUpTest.java#givenAStepThatOutlastsTheDeadline_whenTheWarmUpRuns_thenItReturnsAtTheDeadlineAndInterruptsTheStep",
-        "src/test/java/org/courtside/shared/internal/StartupWarmUpTraceTest.java#givenAClubWithACourt_whenTheWarmUpRuns_thenEveryStepRunsAndNoTableChanges"
+        "src/test/java/org/courtside/shared/internal/StartupWarmUpIntegrationTest.java#givenAClubWithACourt_whenTheWarmUpRuns_thenEveryStepRunsAndNoTableChanges"
       ]
     }
   ]

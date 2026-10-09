@@ -18,6 +18,8 @@ import java.util.UUID;
 @Order(40)
 class BookingWriteWarmUp implements WarmUpStep {
 
+    static final int ROUND_BUDGET = 20;
+
     private static final int DAYS_AHEAD = 400;
     private static final int TRANSACTION_TIMEOUT_SECONDS = 10;
     private static final Set<Role> ADMINISTRATOR = Set.of(Role.ADMIN);
@@ -36,6 +38,12 @@ class BookingWriteWarmUp implements WarmUpStep {
     @Override
     public String name() {
         return "booking-write";
+    }
+
+    // Each round holds the booking-grid lock that real bookings and configuration changes wait for.
+    @Override
+    public int roundBudget() {
+        return ROUND_BUDGET;
     }
 
     // Rolled back, so no before-commit listener stores an audit event or a message.

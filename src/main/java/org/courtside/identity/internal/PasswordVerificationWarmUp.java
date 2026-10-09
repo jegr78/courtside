@@ -11,6 +11,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class PasswordVerificationWarmUp implements WarmUpStep {
 
+    static final int ROUND_BUDGET = 10;
+
     // Protects nothing: the hash lives in memory only and no account is read or touched.
     private static final String PROBE = "warm-up-password-verification";
 
@@ -20,6 +22,12 @@ class PasswordVerificationWarmUp implements WarmUpStep {
     @Override
     public String name() {
         return "password-verification";
+    }
+
+    // One Argon2id verification already loops long enough to compile its hash.
+    @Override
+    public int roundBudget() {
+        return ROUND_BUDGET;
     }
 
     @Override

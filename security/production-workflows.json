@@ -232,7 +232,7 @@
         "src/test/java/org/courtside/booking/web/BookingValidationPreparationTest.java#givenAServletClassLoader_whenTheWebServerStarts_thenValidationIsPreparedWithoutCallingTheController",
         "src/test/java/org/courtside/booking/web/BookingValidationPreparationTest.java#givenFailedMvcBindingValidation_whenTheWebServerStarts_thenStartupFailsAndTheClassLoaderIsRestored",
         "src/test/java/org/courtside/booking/ParticipationServiceTest.java#givenAMemberNamedInSomebodyElsesBooking_whenTheyWithdraw_thenTheBookingKeepsEverythingElse",
-        "src/test/java/org/courtside/shared/internal/StartupWarmUpTraceTest.java#givenAClubWithACourt_whenTheWarmUpRuns_thenEveryStepRunsAndNoTableChanges"
+        "src/test/java/org/courtside/shared/internal/StartupWarmUpIntegrationTest.java#givenAClubWithACourt_whenTheWarmUpRuns_thenEveryStepRunsAndNoTableChanges"
       ]
     },
     {

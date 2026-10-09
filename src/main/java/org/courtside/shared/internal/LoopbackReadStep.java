@@ -1,13 +1,14 @@
 package org.courtside.shared.internal;
 
+import org.courtside.shared.ServerTlsProperties;
 import org.courtside.shared.WarmUpStep;
-import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ApplicationContext;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -19,17 +20,21 @@ import java.util.regex.Pattern;
 
 final class LoopbackReadStep implements WarmUpStep {
 
+    static final int ROUND_BUDGET = 40;
+
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final Pattern PROBLEM_TYPE = Pattern.compile("\"type\"\\s*:\\s*\"(urn:courtside:error:[a-z0-9-]+)\"");
 
     private final String name;
-    private final ApplicationContext context;
     private final Supplier<List<String>> paths;
+    private final ApplicationContext context;
+    private final ServerTlsProperties tls;
 
-    LoopbackReadStep(String name, ApplicationContext context, Supplier<List<String>> paths) {
+    LoopbackReadStep(String name, Supplier<List<String>> paths, ApplicationContext context, ServerTlsProperties tls) {
         this.name = name;
-        this.context = context;
         this.paths = paths;
+        this.context = context;
+        this.tls = tls;
     }
 
     @Override
@@ -37,36 +42,40 @@ final class LoopbackReadStep implements WarmUpStep {
         return name;
     }
 
+    // The loopback reads spend the loopback address's request budget, so they stop well short of it.
     @Override
-    public boolean run() throws IOException, InterruptedException {
-        if (!(context instanceof WebServerApplicationContext web) || servesTls()) {
+    public int roundBudget() {
+        return ROUND_BUDGET;
+    }
+
+    @Override
+    public boolean run() throws IOException, InterruptedException, URISyntaxException {
+        // The certificate names the club's host, not the loopback address this step connects to.
+        if (!(context instanceof WebServerApplicationContext web) || tls.mode() == ServerTlsProperties.Mode.SERVE) {
             return false;
         }
         WebServer server = web.getWebServer();
         if (server == null || server.getPort() <= 0) {
             return false;
         }
-        try (HttpClient client = HttpClient.newBuilder().connectTimeout(REQUEST_TIMEOUT).build()) {
-            for (String path : paths.get()) {
-                HttpResponse<String> response = client.send(HttpRequest.newBuilder(
-                                URI.create("http://127.0.0.1:" + server.getPort() + path))
+        try (HttpClient client = HttpClient.newBuilder()
+                .proxy(HttpClient.Builder.NO_PROXY).connectTimeout(REQUEST_TIMEOUT).build()) {
+            for (String target : paths.get()) {
+                int query = target.indexOf('?');
+                URI uri = new URI("http", null, "127.0.0.1", server.getPort(),
+                        query < 0 ? target : target.substring(0, query),
+                        query < 0 ? null : target.substring(query + 1), null);
+                HttpResponse<String> response = client.send(HttpRequest.newBuilder(uri)
                         .header("Accept", "application/json, */*;q=0.8")
                         .timeout(REQUEST_TIMEOUT)
                         .GET()
                         .build(), HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() / 100 != 2) {
-                    throw new WarmUpRequestRefusedException(path, response.statusCode(), problemType(response.body()));
+                    throw new WarmUpRequestRefusedException(target, response.statusCode(), problemType(response.body()));
                 }
             }
         }
         return true;
-    }
-
-    // The certificate names the club's host, not the loopback address this step connects to.
-    private boolean servesTls() {
-        return Binder.get(context.getEnvironment()).bind("courtside.server.tls.mode", String.class)
-                .map("serve"::equalsIgnoreCase)
-                .orElse(false);
     }
 
     private static String problemType(String body) {

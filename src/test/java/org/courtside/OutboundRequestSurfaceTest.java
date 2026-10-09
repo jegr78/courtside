@@ -25,7 +25,9 @@ class OutboundRequestSurfaceTest {
             "org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
             "org/courtside/shared/internal/LoopbackReadStep.java");
 
-    private static final Pattern DESTINATION = Pattern.compile("URI\\.create\\(\\s*\"([^\"]*)\"");
+    private static final Pattern DESTINATION = Pattern.compile(
+            "new URI\\(\\s*\"([^\"]*)\",\\s*null,\\s*\"([^\"]*)\"");
+    private static final Pattern ANY_URI = Pattern.compile("URI\\.create\\(|new URI\\(");
 
     @Test
     void whenReadingEveryOutboundClient_thenOnlyTheBreachEndpointAndTheInstanceItselfAreReached() throws IOException {
@@ -67,16 +69,20 @@ class OutboundRequestSurfaceTest {
                 Path.of("src/main/java/org/courtside/shared/internal/LoopbackReadStep.java"));
 
         // when
-        List<String> destinations = DESTINATION.matcher(source).results().map(match -> match.group(1)).toList();
+        List<String> destinations = DESTINATION.matcher(source).results()
+                .map(match -> match.group(1) + "://" + match.group(2)).toList();
 
         // then
-        assertThat(source.split("URI\\.create\\(", -1).length - 1)
-                .as("every destination the warm-up builds must start from a literal this test can read")
+        assertThat(ANY_URI.matcher(source).results().count())
+                .as("every destination the warm-up builds must name its scheme and host in literals this test reads")
                 .isEqualTo(destinations.size());
         assertThat(destinations)
                 .as("the warm-up may reach this instance's own port on the loopback address and nothing else")
                 .isNotEmpty()
-                .allMatch(destination -> destination.equals("http://127.0.0.1:"));
+                .allMatch(destination -> destination.equals("http://127.0.0.1"));
+        assertThat(source)
+                .as("a proxy the platform configures must not stand between the instance and itself")
+                .contains(".proxy(HttpClient.Builder.NO_PROXY)");
     }
 
     private static boolean constructsAClient(Path source) {

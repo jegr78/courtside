@@ -5,8 +5,6 @@ import org.courtside.shared.DomainFailure;
 import org.courtside.shared.WarmUpStep;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -24,10 +22,9 @@ import java.util.concurrent.TimeoutException;
 @Slf4j
 class StartupWarmUp {
 
-    static final int ROUNDS = 5;
-
     private final List<WarmUpStep> steps;
     private final WarmUpProperties properties;
+    private volatile boolean stopped;
 
     StartupWarmUp(List<WarmUpStep> steps, WarmUpProperties properties) {
         this.steps = List.copyOf(steps);
@@ -36,7 +33,6 @@ class StartupWarmUp {
 
     // Spring Boot accepts traffic only after every ApplicationReadyEvent listener has returned.
     @EventListener(ApplicationReadyEvent.class)
-    @Order(Ordered.LOWEST_PRECEDENCE)
     void beforeReadiness(ApplicationReadyEvent ready) {
         if (properties.enabled()) {
             run();
@@ -45,6 +41,7 @@ class StartupWarmUp {
 
     Report run() {
         long started = System.nanoTime();
+        stopped = false;
         Progress progress = new Progress();
         ExecutorService worker = Executors.newSingleThreadExecutor(
                 Thread.ofPlatform().name("warm-up").daemon().factory());
@@ -53,7 +50,7 @@ class StartupWarmUp {
             exercise.get(properties.deadline().toMillis(), TimeUnit.MILLISECONDS);
             Report report = progress.report(true);
             log.info("Warm-up finished in {} ms over {} rounds; ran {}, skipped {}, failed {}",
-                    elapsedMillis(started), ROUNDS, report.ran(), report.skipped(), report.failed());
+                    elapsedMillis(started), properties.rounds(), report.ran(), report.skipped(), report.failed());
             return report;
         } catch (TimeoutException deadline) {
             Report report = progress.report(false);
@@ -67,16 +64,21 @@ class StartupWarmUp {
             Thread.currentThread().interrupt();
             return progress.report(false);
         } finally {
+            stopped = true;
             worker.shutdownNow();
         }
     }
 
     private void exercise(Progress progress) {
         List<WarmUpStep> active = new ArrayList<>(steps);
-        for (int round = 0; round < ROUNDS && !active.isEmpty(); round++) {
+        for (int round = 0; round < properties.rounds() && !active.isEmpty(); round++) {
             for (WarmUpStep step : List.copyOf(active)) {
-                if (Thread.currentThread().isInterrupted()) {
+                if (stopped || Thread.currentThread().isInterrupted()) {
                     return;
+                }
+                if (round >= step.roundBudget()) {
+                    active.remove(step);
+                    continue;
                 }
                 try {
                     if (step.run()) {

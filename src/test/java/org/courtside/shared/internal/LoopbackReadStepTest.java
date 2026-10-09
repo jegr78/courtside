@@ -3,13 +3,14 @@ package org.courtside.shared.internal;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.courtside.shared.ServerTlsProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
-import org.springframework.mock.env.MockEnvironment;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -22,6 +23,10 @@ import static org.mockito.Mockito.when;
 class LoopbackReadStepTest {
 
     private static final String REFUSED = "/api/public/refused";
+    private static final ServerTlsProperties PLAINTEXT =
+            new ServerTlsProperties(ServerTlsProperties.Mode.PLAINTEXT, null, null);
+    private static final ServerTlsProperties SERVE =
+            new ServerTlsProperties(ServerTlsProperties.Mode.SERVE, null, null);
 
     private final List<String> requested = new CopyOnWriteArrayList<>();
     private HttpServer server;
@@ -49,8 +54,8 @@ class LoopbackReadStepTest {
     @Test
     void givenAPlaintextInstance_whenTheStepRuns_thenItReadsEveryPathOverTheLoopbackAddress() throws Exception {
         // given
-        LoopbackReadStep step = new LoopbackReadStep("public-reads", instance("plaintext"),
-                () -> List.of("/api/public/config", "/api/bookings?date=2026-05-12"));
+        LoopbackReadStep step = new LoopbackReadStep("public-reads",
+                () -> List.of("/api/public/config", "/api/bookings?date=2026-05-12"), instance(), PLAINTEXT);
 
         // when
         boolean exercised = step.run();
@@ -67,8 +72,8 @@ class LoopbackReadStepTest {
     @Test
     void givenAnInstanceServingTls_whenTheStepRuns_thenItSkipsWithoutARequest() throws Exception {
         // given
-        LoopbackReadStep step = new LoopbackReadStep("public-reads", instance("serve"),
-                () -> List.of("/api/public/config"));
+        LoopbackReadStep step = new LoopbackReadStep("public-reads", () -> List.of("/api/public/config"),
+                instance(), SERVE);
 
         // when
         boolean exercised = step.run();
@@ -85,8 +90,8 @@ class LoopbackReadStepTest {
     @Test
     void givenARefusedRead_whenTheStepRuns_thenTheFailureNamesThePathStatusAndProblemType() {
         // given
-        LoopbackReadStep step = new LoopbackReadStep("public-reads", instance("plaintext"),
-                () -> List.of(REFUSED));
+        LoopbackReadStep step = new LoopbackReadStep("public-reads", () -> List.of(REFUSED),
+                instance(), PLAINTEXT);
 
         // when / then
         assertThatThrownBy(step::run)
@@ -97,13 +102,36 @@ class LoopbackReadStepTest {
                 .hasMessageContaining("urn:courtside:error:request-rate-limited");
     }
 
-    private WebServerApplicationContext instance(String tlsMode) {
+    @Test
+    void givenADefaultProxySelector_whenTheStepRuns_thenItStillReachesTheInstanceDirectly() throws Exception {
+        // given
+        ProxySelector original = ProxySelector.getDefault();
+        ProxySelector.setDefault(ProxySelector.of(new InetSocketAddress("127.0.0.1", 9)));
+        LoopbackReadStep step = new LoopbackReadStep("public-reads", () -> List.of("/api/public/config"),
+                instance(), PLAINTEXT);
+
+        // when
+        boolean exercised;
+        try {
+            exercised = step.run();
+        } finally {
+            ProxySelector.setDefault(original);
+        }
+
+        // then
+        assertThat(exercised)
+                .as("a proxy the platform configures must not stand between the instance and itself")
+                .isTrue();
+        assertThat(requested)
+                .as("the read must arrive at the instance, not at a proxy")
+                .containsExactly("/api/public/config");
+    }
+
+    private WebServerApplicationContext instance() {
         WebServer webServer = mock(WebServer.class);
         when(webServer.getPort()).thenReturn(server.getAddress().getPort());
         WebServerApplicationContext context = mock(WebServerApplicationContext.class);
         when(context.getWebServer()).thenReturn(webServer);
-        when(context.getEnvironment()).thenReturn(
-                new MockEnvironment().withProperty("courtside.server.tls.mode", tlsMode));
         return context;
     }
 }

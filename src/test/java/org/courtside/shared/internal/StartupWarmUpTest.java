@@ -27,7 +27,7 @@ import static org.mockito.Mockito.mock;
 
 class StartupWarmUpTest {
 
-    private static final WarmUpProperties ENABLED = new WarmUpProperties(true, Duration.ofSeconds(10));
+    private static final WarmUpProperties ENABLED = new WarmUpProperties(true, 7, Duration.ofSeconds(10));
 
     private final Logger logger = (Logger) LoggerFactory.getLogger(StartupWarmUp.class);
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
@@ -55,7 +55,7 @@ class StartupWarmUpTest {
         // then
         assertThat(reads.runs.get())
                 .as("a step that succeeds must run in every round")
-                .isEqualTo(StartupWarmUp.ROUNDS);
+                .isEqualTo(ENABLED.rounds());
         assertThat(report.ran())
                 .as("the report must name every step that ran")
                 .containsExactly("public-reads", "booking-write");
@@ -97,7 +97,7 @@ class StartupWarmUpTest {
                 .containsExactly("series-preview");
         assertThat(later.runs.get())
                 .as("a step after a failing one must still run every round")
-                .isEqualTo(StartupWarmUp.ROUNDS);
+                .isEqualTo(ENABLED.rounds());
         assertThat(logged.list.stream().filter(event -> event.getLevel() == Level.WARN).toList())
                 .as("a failing step must be warned about once, with its cause types and without its message")
                 .singleElement()
@@ -167,7 +167,7 @@ class StartupWarmUpTest {
             @Override
             public boolean run() {
                 try {
-                    new CountDownLatch(1).await();
+                    new CountDownLatch(1).await(10, TimeUnit.SECONDS);
                 } catch (InterruptedException expected) {
                     interrupted.countDown();
                 }
@@ -175,7 +175,7 @@ class StartupWarmUpTest {
             }
         };
         StartupWarmUp warmUp = new StartupWarmUp(List.of(hanging),
-                new WarmUpProperties(true, Duration.ofMillis(300)));
+                new WarmUpProperties(true, 7, Duration.ofMillis(300)));
 
         // when
         long started = System.nanoTime();
@@ -199,10 +199,73 @@ class StartupWarmUpTest {
     }
 
     @Test
+    void givenAStepWithASmallerRoundBudget_whenTheWarmUpRuns_thenItStopsThereWhileTheOthersRunEveryRound() {
+        // given
+        CountingStep reads = new CountingStep("public-reads", true);
+        CountingStep writes = new CountingStep("booking-write", true, 2);
+
+        // when
+        StartupWarmUp.Report report = new StartupWarmUp(List.of(reads, writes), ENABLED).run();
+
+        // then
+        assertThat(writes.runs.get())
+                .as("a step must not run more rounds than its own budget")
+                .isEqualTo(2);
+        assertThat(reads.runs.get())
+                .as("a step without a budget of its own must run every configured round")
+                .isEqualTo(ENABLED.rounds());
+        assertThat(report.ran())
+                .as("a step that used up its budget still ran")
+                .containsExactly("public-reads", "booking-write");
+    }
+
+    @Test
+    void givenAStepThatIgnoresTheInterrupt_whenItFinishesAfterTheDeadline_thenNoFurtherRoundStarts()
+            throws Exception {
+        // given
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch secondStart = new CountDownLatch(2);
+        WarmUpStep stubborn = new WarmUpStep() {
+            @Override
+            public String name() {
+                return "booking-write";
+            }
+
+            @Override
+            public boolean run() {
+                secondStart.countDown();
+                boolean released = false;
+                while (!released) {
+                    try {
+                        released = release.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException ignored) {
+                        Thread.interrupted();
+                    }
+                }
+                return true;
+            }
+        };
+        StartupWarmUp warmUp = new StartupWarmUp(List.of(stubborn),
+                new WarmUpProperties(true, 7, Duration.ofMillis(200)));
+
+        // when
+        StartupWarmUp.Report report = warmUp.run();
+        release.countDown();
+
+        // then
+        assertThat(report.completed())
+                .as("a warm-up stopped at its deadline must not report completion")
+                .isFalse();
+        assertThat(secondStart.await(1, TimeUnit.SECONDS))
+                .as("a step still running at the deadline must not be followed by another round")
+                .isFalse();
+    }
+
+    @Test
     void givenTheWarmUpDisabled_whenTheInstanceIsReady_thenNoStepRuns() {
         // given
         CountingStep reads = new CountingStep("public-reads", true);
-        StartupWarmUp warmUp = new StartupWarmUp(List.of(reads), new WarmUpProperties(false, Duration.ofSeconds(10)));
+        StartupWarmUp warmUp = new StartupWarmUp(List.of(reads), new WarmUpProperties(false, 7, Duration.ofSeconds(10)));
 
         // when
         warmUp.beforeReadiness(mock(ApplicationReadyEvent.class));
@@ -230,11 +293,22 @@ class StartupWarmUpTest {
 
         private final String name;
         private final boolean exercised;
+        private final int roundBudget;
         private final AtomicInteger runs = new AtomicInteger();
 
         private CountingStep(String name, boolean exercised) {
+            this(name, exercised, Integer.MAX_VALUE);
+        }
+
+        private CountingStep(String name, boolean exercised, int roundBudget) {
             this.name = name;
             this.exercised = exercised;
+            this.roundBudget = roundBudget;
+        }
+
+        @Override
+        public int roundBudget() {
+            return roundBudget;
         }
 
         @Override
