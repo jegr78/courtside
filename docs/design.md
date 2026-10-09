@@ -641,6 +641,36 @@ the operator still owns durable storage, external access and the longer retentio
 The image exposes `/actuator/health`. Mail health is available to administrators at
 `/actuator/health/mail`. Other management endpoints are not public by default.
 
+### Start sequence
+
+An instance migrates its schema, opens its port and runs its startup tasks, such as creating the
+bootstrap administrator. It then warms its busiest request paths and only afterwards reports ready.
+Until the warm-up ends, readiness is refused and `/actuator/health` answers `503`.
+
+The warm-up runs five rounds of these steps:
+
+- the public reads (club configuration, courts, opening hours, booking grid, card legend and web
+  manifest) and today's court plan, as HTTP requests to its own port on `127.0.0.1`, so the
+  security filters, admission control, Spring MVC and Jackson run as they do for a member;
+- a series preview for the first active court and a card that tracks no players, evaluated as a
+  trainer so the overridable rules run too;
+- an administrator's booking on the first free opening slot about 400 days ahead, created and
+  cancelled inside a transaction the warm-up rolls back;
+- an Argon2id verification of a fixed password it hashed itself in memory.
+
+Nothing it does survives it. The rolled-back transaction never reaches the before-commit listeners
+that store audit events and outbox messages, and `courtside.bookings.created` counts committed
+bookings only. The reads open no session and attempt no sign-in. They spend at most 50 tokens of
+the loopback address's request budget, an address no client behind the ingress shares.
+
+A step with nothing to exercise is skipped: the booking steps need an active court, a card that
+tracks no players and opening hours. A step that fails is logged once as a warning with its cause
+types and problem type, and the other steps still run. With `COURTSIDE_APP_TLS_MODE` at `serve`
+the read steps are skipped, because the served certificate does not name the loopback address.
+`COURTSIDE_WARM_UP_DEADLINE` bounds the whole warm-up: at the deadline the running step is
+interrupted and the instance reports ready. One log line states the duration and the steps that
+ran, were skipped and failed. `COURTSIDE_WARM_UP_ENABLED=false` reports ready without a warm-up.
+
 Structured ECS logs go to standard output. Metrics and traces can use OTLP when the operator enables
 their separate endpoints. Courtside requires no monitoring backend.
 

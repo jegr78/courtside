@@ -344,7 +344,7 @@
           "manualProcedureId": "MAN-INPUT-001",
           "controlEvidence": {
             "productionPath": "src/main/java/org/courtside/identity/internal/HaveIBeenPwnedPasswordLookup.java",
-            "falsifyingTest": "src/test/java/org/courtside/OutboundRequestSurfaceTest.java#whenReadingEveryOutboundClient_thenOnlyTheConfiguredBreachEndpointIsReached"
+            "falsifyingTest": "src/test/java/org/courtside/OutboundRequestSurfaceTest.java#whenReadingEveryOutboundClient_thenOnlyTheBreachEndpointAndTheInstanceItselfAreReached"
           }
         },
         {
@@ -1633,7 +1633,7 @@
           "manualProcedureId": "MAN-OPS-001",
           "controlEvidence": {
             "productionPath": "src/main/resources/application.yaml",
-            "falsifyingTest": "src/test/java/org/courtside/OutboundRequestSurfaceTest.java#whenReadingEveryOutboundClient_thenOnlyTheConfiguredBreachEndpointIsReached"
+            "falsifyingTest": "src/test/java/org/courtside/OutboundRequestSurfaceTest.java#whenReadingEveryOutboundClient_thenOnlyTheBreachEndpointAndTheInstanceItselfAreReached"
           }
         },
         {

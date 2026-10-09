@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-08",
+  "reviewedAt": "2026-10-09",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "2f133a4ef75e8cd14c8f90e81b75762e9ea54176b56773acc33b6756f85ff842",
   "protectedFieldInventorySha256": "4f16eed4229be447f36a68cbd5c82d5b9f5afb3c6dbad61dcad6c242025d9bad",
-  "productionAuthorizationSha256": "ecc261f4f67f4b16a7d7990f7e547c54c48a2e786e391eea912e56daacfc7d40",
+  "productionAuthorizationSha256": "c273643c8e0aebd5d6a8aef5d43a2a7e3816a79b3a1add3639011c0a46939033",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -2920,7 +2920,8 @@
         "src/main/java/org/courtside/booking/web/BookingController.java#getBookingEligibility",
         "src/main/java/org/courtside/booking/web/BookingController.java#createBooking",
         "src/main/java/org/courtside/booking/web/SeriesController.java#createSeries",
-        "src/main/java/org/courtside/booking/web/SeriesController.java#previewSeries"
+        "src/main/java/org/courtside/booking/web/SeriesController.java#previewSeries",
+        "src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/booking/internal/CardEligibilityPolicyTest.java#givenTheRequiredRole_whenRequiringEligibility_thenTheCardIsReturned"

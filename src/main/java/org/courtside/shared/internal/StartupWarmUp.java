@@ -1,6 +1,7 @@
 package org.courtside.shared.internal;
 
 import lombok.extern.slf4j.Slf4j;
+import org.courtside.shared.DomainFailure;
 import org.courtside.shared.WarmUpStep;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -10,6 +11,8 @@ import org.springframework.core.annotation.Order;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -34,7 +37,7 @@ class StartupWarmUp {
     // Spring Boot accepts traffic only after every ApplicationReadyEvent listener has returned.
     @EventListener(ApplicationReadyEvent.class)
     @Order(Ordered.LOWEST_PRECEDENCE)
-    void beforeReadiness() {
+    void beforeReadiness(ApplicationReadyEvent ready) {
         if (properties.enabled()) {
             run();
         }
@@ -94,13 +97,31 @@ class StartupWarmUp {
         }
     }
 
-    // Types only: a message may carry data the request path read.
+    // No messages: one may carry data the request path read.
     private static String causeTypes(Throwable failure) {
         List<String> types = new ArrayList<>();
         for (Throwable cause = failure; cause != null && types.size() < 10; cause = cause.getCause()) {
-            types.add(cause.getClass().getSimpleName());
+            types.add(cause.getClass().getSimpleName() + detail(cause));
         }
         return String.join(" <- ", types);
+    }
+
+    private static String detail(Throwable cause) {
+        if (cause instanceof WarmUpRequestRefusedException refused) {
+            return " (" + refused.getMessage() + ")";
+        }
+        if (cause instanceof DomainFailure domain) {
+            List<Object> codes = domain.getBody().getProperties() != null
+                    && domain.getBody().getProperties().get("violations") instanceof List<?> violations
+                    ? violations.stream()
+                            .map(violation -> violation instanceof Map<?, ?> entry ? entry.get("code") : null)
+                            .filter(Objects::nonNull)
+                            .map(Object.class::cast)
+                            .toList()
+                    : List.of();
+            return " (" + domain.problemType().uri() + (codes.isEmpty() ? "" : " " + codes) + ")";
+        }
+        return "";
     }
 
     private static long elapsedMillis(long started) {

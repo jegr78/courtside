@@ -201,7 +201,8 @@
         "MailOutbox#poll",
         "ParticipationMailer#on(ParticipantRecorded)",
         "ParticipationMailer#on(ParticipantWithdrew)",
-        "ReminderMailer#on(BookingReminderDue)"
+        "ReminderMailer#on(BookingReminderDue)",
+        "StartupWarmUp#beforeReadiness(ApplicationReadyEvent)"
       ],
       "stateTransitions": [
         "A valid request creates a confirmed booking and court allocations.",
@@ -211,7 +212,8 @@
       ],
       "alternatePaths": [
         "Booking-card roles and ADMIN authority select which appointments a caller may create or manage.",
-        "Series and move previews report blocked occurrences without mutation."
+        "Series and move previews report blocked occurrences without mutation.",
+        "Before the instance reports ready, its warm-up previews a series and writes and cancels a booking inside a transaction it rolls back."
       ],
       "failurePaths": [
         "Rules, opening hours, unavailable resources and duplicate participants reject the whole write.",
@@ -222,13 +224,15 @@
         "src/main/java/org/courtside/booking/BookingService.java",
         "src/main/java/org/courtside/booking/web/BookingValidationPreparation.java",
         "src/main/java/org/courtside/booking/ParticipationService.java",
-        "src/main/java/org/courtside/booking/series/SeriesService.java"
+        "src/main/java/org/courtside/booking/series/SeriesService.java",
+        "src/main/java/org/courtside/shared/internal/StartupWarmUp.java"
       ],
       "evidence": [
         "src/test/java/org/courtside/booking/BookingServiceTest.java#givenAnExistingBooking_whenCreatingAnOverlappingOne_thenCourtUnavailableIsThrown",
         "src/test/java/org/courtside/booking/web/BookingValidationPreparationTest.java#givenAServletClassLoader_whenTheWebServerStarts_thenValidationIsPreparedWithoutCallingTheController",
         "src/test/java/org/courtside/booking/web/BookingValidationPreparationTest.java#givenFailedMvcBindingValidation_whenTheWebServerStarts_thenStartupFailsAndTheClassLoaderIsRestored",
-        "src/test/java/org/courtside/booking/ParticipationServiceTest.java#givenAMemberNamedInSomebodyElsesBooking_whenTheyWithdraw_thenTheBookingKeepsEverythingElse"
+        "src/test/java/org/courtside/booking/ParticipationServiceTest.java#givenAMemberNamedInSomebodyElsesBooking_whenTheyWithdraw_thenTheBookingKeepsEverythingElse",
+        "src/test/java/org/courtside/shared/internal/StartupWarmUpTraceTest.java#givenAClubWithACourt_whenTheWarmUpRuns_thenEveryStepRunsAndNoTableChanges"
       ]
     },
     {

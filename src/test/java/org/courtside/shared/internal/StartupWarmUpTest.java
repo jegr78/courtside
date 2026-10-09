@@ -4,20 +4,26 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import org.courtside.shared.CodedDomainFailure;
+import org.courtside.shared.ProblemType;
 import org.courtside.shared.WarmUpStep;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.http.HttpStatus;
 
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class StartupWarmUpTest {
 
@@ -101,6 +107,33 @@ class StartupWarmUpTest {
     }
 
     @Test
+    void givenAStepRefusedByTheDomain_whenTheWarmUpRuns_thenTheWarningNamesTheProblemTypeAndViolationCode() {
+        // given
+        WarmUpStep refused = new WarmUpStep() {
+            @Override
+            public String name() {
+                return "booking-write";
+            }
+
+            @Override
+            public boolean run() {
+                throw new RefusedSlot();
+            }
+        };
+
+        // when
+        new StartupWarmUp(List.of(refused), ENABLED).run();
+
+        // then
+        assertThat(logged.list.stream().filter(event -> event.getLevel() == Level.WARN).toList())
+                .as("a domain refusal must be diagnosable from its problem type and violation code alone")
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage())
+                        .contains("booking-write", "urn:courtside:error:slot-refused", "booking.rule.slotGrid")
+                        .doesNotContain("Example Tennis Club"));
+    }
+
+    @Test
     void givenAStepWithNothingToExercise_whenTheWarmUpRuns_thenItIsReportedSkippedAndNotRepeated() {
         // given
         CountingStep empty = new CountingStep("booking-write", false);
@@ -172,12 +205,25 @@ class StartupWarmUpTest {
         StartupWarmUp warmUp = new StartupWarmUp(List.of(reads), new WarmUpProperties(false, Duration.ofSeconds(10)));
 
         // when
-        warmUp.beforeReadiness();
+        warmUp.beforeReadiness(mock(ApplicationReadyEvent.class));
 
         // then
         assertThat(reads.runs.get())
                 .as("a disabled warm-up must not run any step")
                 .isZero();
+    }
+
+    private static final class RefusedSlot extends CodedDomainFailure {
+
+        private RefusedSlot() {
+            super("booking.rule.slotGrid", Map.of("club", "Example Tennis Club"));
+        }
+
+        @Override
+        public ProblemType problemType() {
+            return new ProblemType("slot-refused", HttpStatus.UNPROCESSABLE_ENTITY, "Slot refused",
+                    "The slot is not on the grid");
+        }
     }
 
     private static final class CountingStep implements WarmUpStep {
