@@ -1486,7 +1486,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
   }
 }
 
-async function resourceSample(runId, gateway, sequence, command) {
+async function resourceSample(runId, gateway, sequence, command, { throughGateway = true } = {}) {
   const project = securityProject(runId);
   const stats = async (container) => {
     const output = (await command(["stats", "--no-stream", "--format", "{{.CPUPerc}}|{{.MemUsage}}", container]))
@@ -1505,7 +1505,9 @@ async function resourceSample(runId, gateway, sequence, command) {
   const activePoolConnections = prometheusMetric(prometheus, "hikaricp_connections_active");
   const pendingPoolConnections = prometheusMetric(prometheus, "hikaricp_connections_pending");
   const poolMaxConnections = prometheusMetric(prometheus, "hikaricp_connections_max");
-  const gatewayMetrics = await scannerGatewayMetrics(gateway, command);
+  // Nothing passes the gateway before the pressure, so it has no latency or errors to report yet.
+  const gatewayMetrics = throughGateway ? await scannerGatewayMetrics(gateway, command)
+    : { requestP95Milliseconds: 0, errorRate: 0 };
   if (![app.cpu, app.memory, db.cpu, db.memory, activeConnections, activePoolConnections,
     pendingPoolConnections, poolMaxConnections, waitingLocks,
     sessionRows, storageBytes, gatewayMetrics.requestP95Milliseconds, gatewayMetrics.errorRate]
@@ -1517,7 +1519,9 @@ async function resourceSample(runId, gateway, sequence, command) {
     requestP95Milliseconds: gatewayMetrics.requestP95Milliseconds, errorRate: gatewayMetrics.errorRate };
 }
 
-export async function warmResourceTarget({ runId, gateway, policy, command, sample = resourceSample,
+export async function warmResourceTarget({ runId, gateway, policy, command,
+  sample = (sampleRunId, sampleGateway, sequence, sampleCommand) => resourceSample(sampleRunId, sampleGateway, sequence,
+    sampleCommand, { throughGateway: false }),
   wait = (milliseconds) => new Promise((resolveWait) => setTimeout(resolveWait, milliseconds)), clock = Date.now }) {
   const { durationSeconds, requestIntervalMilliseconds, settleSamples, settleDeadlineSeconds, paths } = policy.targetWarmUp;
   const { tripThresholds, sampleIntervalMilliseconds } = policy.circuitBreakers;
