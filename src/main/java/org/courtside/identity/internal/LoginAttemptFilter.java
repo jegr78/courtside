@@ -48,10 +48,9 @@ class LoginAttemptFilter extends OncePerRequestFilter {
         Optional<String> accountId = currentUser.accountId().map(Object::toString);
         String loginAddress = "login:" + address;
         Optional<LoginBlock> blocked = login
-                ? protection.registerAttempt(loginAddress, true,
-                        SecurityEventLog.ControlTrigger.LOGIN_ADDRESS_LIMIT)
-                : accountId.map(account -> protection.registerCredentialAttempt(account, address))
-                        .orElseGet(() -> protection.registerAnonymousCredentialAttempt(address));
+                ? protection.loginBlock(loginAddress)
+                : accountId.map(account -> protection.credentialBlock(account, address))
+                        .orElseGet(() -> protection.anonymousCredentialBlock(address));
         if (blocked.isPresent()) {
             handler.handle(response, blocked.orElseThrow().retryAfter(), login);
             return;
@@ -67,6 +66,15 @@ class LoginAttemptFilter extends OncePerRequestFilter {
             return;
         }
         try (LoginVerificationCapacity.Permit ignored = permit.orElseThrow()) {
+            Optional<LoginBlock> registered = login
+                    ? protection.registerAttempt(loginAddress, true,
+                            SecurityEventLog.ControlTrigger.LOGIN_ADDRESS_LIMIT)
+                    : accountId.map(account -> protection.registerCredentialAttempt(account, address))
+                            .orElseGet(() -> protection.registerAnonymousCredentialAttempt(address));
+            if (registered.isPresent()) {
+                handler.handle(response, registered.orElseThrow().retryAfter(), login);
+                return;
+            }
             filterChain.doFilter(request, response);
             if (response.getStatus() >= 200 && response.getStatus() < 300) {
                 if (login) {

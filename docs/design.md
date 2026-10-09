@@ -512,7 +512,8 @@ CSRF uses a double-submit cookie. Only the session endpoint issues its token, so
 worker request cannot replace the token held by a signed-in page.
 
 Rate limiting runs before password verification. Source buckets contain concentrated attempts, and
-a concurrency guard bounds Argon2 work. A successful sign-in withdraws only its own attempt from its
+a concurrency guard bounds Argon2 work. A blocked source and a full guard are refused before the attempt
+is recorded, so a refusal costs a read and no write. A successful sign-in withdraws only its own attempt from its
 source's bucket, so one valid account cannot reset the failures spent on other accounts from the same
 address. Distributed attempts produce a privacy-safe metric and log
 event instead of an instance-wide lockout an anonymous caller could hold closed. Caddy replaces the

@@ -50,7 +50,6 @@ class LoginAttemptFilterTest {
             throws Exception {
         // given
         LoginVerificationCapacity capacity = capacity(1);
-        when(protection.registerAttempt(anyString(), anyBoolean(), any())).thenReturn(Optional.empty());
 
         // when
         try (LoginVerificationCapacity.Permit ignored = capacity.tryAcquire().orElseThrow()) {
@@ -171,6 +170,82 @@ class LoginAttemptFilterTest {
                 org.mockito.ArgumentMatchers.eq(false));
         verify(chain, never()).doFilter(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void givenVerificationCapacityIsOccupied_whenLoginArrives_thenNoAttemptIsWritten() throws Exception {
+        // given
+        LoginVerificationCapacity capacity = capacity(1);
+        when(protection.loginBlock(anyString())).thenReturn(Optional.empty());
+
+        // when
+        try (LoginVerificationCapacity.Permit ignored = capacity.tryAcquire().orElseThrow()) {
+            filter(capacity).doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), chain);
+        }
+
+        // then
+        verify(protection, never()).registerAttempt(anyString(), anyBoolean(), any());
+        verify(handler).handle(any(), org.mockito.ArgumentMatchers.eq(Duration.ofSeconds(1)),
+                org.mockito.ArgumentMatchers.eq(true));
+    }
+
+    @Test
+    void givenCredentialCapacityIsOccupied_whenAProofArrives_thenNoAttemptIsWritten() throws Exception {
+        // given
+        LoginVerificationCapacity capacity = capacity(1);
+        UUID accountId = UUID.randomUUID();
+        when(currentUser.accountId()).thenReturn(Optional.of(accountId));
+        when(protection.credentialBlock(anyString(), anyString())).thenReturn(Optional.empty());
+        LoginAttemptFilter filter = new LoginAttemptFilter(LoginAttemptFilter.Kind.CREDENTIAL,
+                request -> true, protection, capacity(1), capacity, handler, securityEvents, currentUser);
+
+        // when
+        try (LoginVerificationCapacity.Permit ignored = capacity.tryAcquire().orElseThrow()) {
+            filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), chain);
+        }
+
+        // then
+        verify(protection, never()).registerCredentialAttempt(anyString(), anyString());
+        verify(protection, never()).registerAnonymousCredentialAttempt(anyString());
+    }
+
+    @Test
+    void givenTheAddressIsAlreadyBlocked_whenLoginArrives_thenItIsRefusedWithoutTakingCapacityOrWriting()
+            throws Exception {
+        // given
+        LoginVerificationCapacity capacity = capacity(1);
+        when(protection.loginBlock(anyString()))
+                .thenReturn(Optional.of(new LoginBlock("ADDRESS", Duration.ofSeconds(30))));
+
+        // when
+        filter(capacity).doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), chain);
+
+        // then
+        verify(handler).handle(any(), org.mockito.ArgumentMatchers.eq(Duration.ofSeconds(30)),
+                org.mockito.ArgumentMatchers.eq(true));
+        verify(protection, never()).registerAttempt(anyString(), anyBoolean(), any());
+        assertThat(capacity.tryAcquire()).as("a blocked address must not have held verification capacity")
+                .isPresent();
+    }
+
+    @Test
+    void givenTheAddressBecomesBlockedWhileCapacityIsTaken_whenTheAttemptIsRecorded_thenTheCapacityIsReturned()
+            throws Exception {
+        // given
+        LoginVerificationCapacity capacity = capacity(1);
+        when(protection.loginBlock(anyString())).thenReturn(Optional.empty());
+        when(protection.registerAttempt(anyString(), anyBoolean(), any()))
+                .thenReturn(Optional.of(new LoginBlock("ADDRESS", Duration.ofSeconds(60))));
+
+        // when
+        filter(capacity).doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), chain);
+
+        // then
+        verify(handler).handle(any(), org.mockito.ArgumentMatchers.eq(Duration.ofSeconds(60)),
+                org.mockito.ArgumentMatchers.eq(true));
+        verify(chain, never()).doFilter(any(), any());
+        assertThat(capacity.tryAcquire()).as("the attempt that turned out blocked returns its capacity")
+                .isPresent();
     }
 
     private LoginAttemptFilter filter(LoginVerificationCapacity capacity) {
