@@ -274,20 +274,21 @@ class MailOutboxTest extends AbstractIntegrationTest {
         // given — between this pass's claim and its handover another pass has taken the row over
         UUID accountId = member("overtaken");
         UUID recordId = queuedRow(accountId, MessageKind.ACCOUNT_USERNAME_REMINDER, "<overtaken@example.org>", "{}");
-        doAnswer(invocation -> {
-            jdbc.sql("UPDATE message_record SET attempts = attempts + 1 WHERE id = :id")
-                    .param("id", recordId).update();
-            return invocation.callRealMethod();
-        }).when(records).lockById(recordId);
+        jdbc.sql("UPDATE message_record SET attempts = 2 WHERE id = :id").param("id", recordId).update();
+        MailOutbox.Claimed stale = new MailOutbox.Claimed(recordId, accountId,
+                MessageKind.ACCOUNT_USERNAME_REMINDER.name(), java.util.Map.of(), "<overtaken@example.org>", 1);
 
         // when
-        outbox.deliverDue();
+        outbox.deliver(stale);
 
         // then
         verify(sender, never()).send(any(MimeMessage.class));
         assertThat(states(List.of(accountId)))
                 .as("only the pass holding the current attempt hands over and writes the outcome")
                 .containsExactly("QUEUED");
+        assertThat(jdbc.sql("SELECT reason FROM message_record WHERE id = :id").param("id", recordId)
+                .query(String.class).optional())
+                .as("the overtaken pass writes no outcome either").isEmpty();
     }
 
     @Test

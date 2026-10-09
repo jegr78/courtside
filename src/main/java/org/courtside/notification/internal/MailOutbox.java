@@ -130,7 +130,7 @@ class MailOutbox {
                 .optional());
     }
 
-    private void deliver(Claimed claimed) {
+    void deliver(Claimed claimed) {
         Optional<MessageKind> kind = Arrays.stream(MessageKind.values())
                 .filter(known -> known.name().equals(claimed.kind()))
                 .findFirst();
@@ -245,7 +245,7 @@ class MailOutbox {
         return types.stream().collect(Collectors.joining(" <- "));
     }
 
-    private record Claimed(UUID id, UUID accountId, String kind, Map<String, String> parameters,
+    record Claimed(UUID id, UUID accountId, String kind, Map<String, String> parameters,
                            String messageId, int attempts) {
     }
 }
