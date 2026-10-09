@@ -133,6 +133,9 @@ class RequestEntryPointInventoryTest extends AbstractIntegrationTest {
                     new Boundary("the session the request already carries, and the Accept-Language"
                             + " header, which chooses a language and never a right",
                             List.of("getLocale", "getSession"))),
+            Map.entry("org/courtside/shared/RequestDeadlineTransactionManager.java",
+                    new Boundary("nothing of the request itself: it asks only whether a request is"
+                            + " bound to the thread, to choose the request deadline", List.of())),
             Map.entry("org/courtside/shared/web/ProblemDetailErrorReportValve.java",
                     new Boundary("nothing of the request itself: it answers a target the connector"
                             + " refused before any dispatch, and writes rather than reads",
