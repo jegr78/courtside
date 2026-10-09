@@ -19,6 +19,8 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,16 +28,16 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Slf4j
 @Component
 class MailOutbox {
 
-    // The relay is a neighbour in the same network: one that cannot be reached is restarting, and
-    // that is over in minutes, while waiting days would leave an account nobody can act on.
-    static final int ATTEMPTS = 4;
-    private static final Duration FIRST_GAP = Duration.ofSeconds(5);
+    // Six attempts spread over about half an hour outlast a relay restart, upgrade or host reboot.
+    static final int ATTEMPTS = 6;
+    private static final Duration FIRST_GAP = Duration.ofSeconds(15);
     private static final int GROWTH = 3;
 
     // Far longer than one handover can take under the relay timeouts, so only a pass that died
@@ -91,20 +93,21 @@ class MailOutbox {
     }
 
     void deliverDue() {
+        Optional<Claimed> claimed = Optional.empty();
         try {
-            Optional<Claimed> claimed = claimNext();
+            claimed = claimNext();
             while (claimed.isPresent()) {
                 deliver(claimed.get());
                 claimed = claimNext();
             }
         } catch (RuntimeException failure) {
-            log.warn("Delivering queued messages stopped until the next pass: {}",
-                    failure.getClass().getSimpleName());
+            log.warn("Delivering queued messages stopped at {} until the next pass: {}",
+                    claimed.map(Claimed::messageId).orElse("a claim"), chainOf(failure));
         }
     }
 
     // A row another pass holds is skipped rather than waited for, and the lease it commits keeps
-    // every later pass off it, so no message is handed over twice.
+    // every later pass off it until a pass that died with it has certainly stopped.
     private Optional<Claimed> claimNext() {
         Instant now = clock.instant();
         return transactions.execute(status -> jdbc.sql("""
@@ -121,25 +124,30 @@ class MailOutbox {
                 .param("leaseEnd", Timestamp.from(now.plus(LEASE)))
                 .param("urgent", URGENT)
                 .query((row, number) -> new Claimed(row.getObject("id", UUID.class),
-                        new QueuedMessage(row.getObject("account_id", UUID.class),
-                                MessageKind.valueOf(row.getString("kind")),
-                                parameters(row.getString("parameters"))),
-                        row.getString("message_id"), row.getInt("attempts")))
+                        row.getObject("account_id", UUID.class), row.getString("kind"),
+                        parameters(row.getString("parameters")), row.getString("message_id"),
+                        row.getInt("attempts")))
                 .optional());
     }
 
     private void deliver(Claimed claimed) {
+        Optional<MessageKind> kind = Arrays.stream(MessageKind.values())
+                .filter(known -> known.name().equals(claimed.kind()))
+                .findFirst();
+        if (kind.isEmpty()) {
+            settle(claimed, record -> messages.failed(record, "UnknownKind"));
+            return;
+        }
+        if (claimed.attempts() > ATTEMPTS) {
+            settle(claimed, record -> messages.failed(record, "AttemptsExhausted"));
+            return;
+        }
+        QueuedMessage message = new QueuedMessage(claimed.accountId(), kind.get(), claimed.parameters());
         try {
-            if (!handOver(claimed)) {
-                settle(claimed, record -> messages.failed(record, "NothingComposed"));
-                return;
-            }
-            settle(claimed, messages::handedOver);
-            log.info("Handed over a {} message for account {}", claimed.message().kind(),
-                    claimed.message().accountId());
+            transactions.executeWithoutResult(status -> handOverAndSettle(claimed, message));
         } catch (MessageUndeliverableException undeliverable) {
-            log.info("A {} message for account {} cannot be written: {}", claimed.message().kind(),
-                    claimed.message().accountId(), undeliverable.reason());
+            log.info("A {} message for account {} cannot be written: {}", message.kind(), message.accountId(),
+                    undeliverable.reason());
             settle(claimed, record -> messages.failed(record, undeliverable.reason()));
         } catch (MailRecipientRefusedException refusal) {
             settle(claimed, record -> messages.refused(record, refusal.diagnosis(), refusal.statusCode()));
@@ -156,23 +164,38 @@ class MailOutbox {
         }
     }
 
-    private boolean handOver(Claimed claimed) {
-        MessageComposer composer = composerFor(claimed.message().kind());
+    // One transaction holds the row, whatever composing stores and the outcome, so a credential the
+    // relay accepted is never stored without its row saying so.
+    private void handOverAndSettle(Claimed claimed, QueuedMessage message) {
+        Optional<MessageRecord> held = heldBy(claimed);
+        if (held.isEmpty()) {
+            return;
+        }
         AtomicBoolean handedOver = new AtomicBoolean();
-        transactions.executeWithoutResult(status -> composer.compose(claimed.message(), mail -> {
+        composerFor(message.kind()).compose(message, mail -> {
             handover.attempt(claimed.messageId(), () -> send(mail, claimed.messageId()));
             handedOver.set(true);
-        }));
-        return handedOver.get();
+        });
+        if (handedOver.get()) {
+            messages.handedOver(held.get());
+            log.info("Handed over a {} message for account {}", message.kind(), message.accountId());
+        } else {
+            messages.failed(held.get(), "NothingComposed");
+        }
     }
 
-    // Only the pass that holds this attempt writes its outcome: one whose lease ran out has been
-    // overtaken, and the pass that took the row over writes the outcome instead.
     private void settle(Claimed claimed, Consumer<MessageRecord> outcome) {
-        transactions.executeWithoutResult(status -> records.lockById(claimed.id())
-                .filter(record -> record.getAttempts() == claimed.attempts())
-                .ifPresentOrElse(outcome, () -> log.warn("Message {} was taken over before its outcome"
-                        + " was written", claimed.messageId())));
+        transactions.executeWithoutResult(status -> heldBy(claimed).ifPresent(outcome));
+    }
+
+    // A pass whose lease ran out may find its row taken over, and then it neither sends nor writes.
+    private Optional<MessageRecord> heldBy(Claimed claimed) {
+        Optional<MessageRecord> held = records.lockById(claimed.id())
+                .filter(record -> record.getAttempts() == claimed.attempts());
+        if (held.isEmpty()) {
+            log.warn("Message {} was taken over by another pass", claimed.messageId());
+        }
+        return held;
     }
 
     private void send(OutgoingMail mail, String messageId) {
@@ -213,6 +236,16 @@ class MailOutbox {
                 : failure.getClass().getSimpleName();
     }
 
-    private record Claimed(UUID id, QueuedMessage message, String messageId, int attempts) {
+    // Types only: a mail library's message can carry the address it was given.
+    private static String chainOf(Throwable failure) {
+        List<String> types = new ArrayList<>();
+        for (Throwable cause = failure; cause != null && types.size() < 10; cause = cause.getCause()) {
+            types.add(cause.getClass().getName());
+        }
+        return types.stream().collect(Collectors.joining(" <- "));
+    }
+
+    private record Claimed(UUID id, UUID accountId, String kind, Map<String, String> parameters,
+                           String messageId, int attempts) {
     }
 }

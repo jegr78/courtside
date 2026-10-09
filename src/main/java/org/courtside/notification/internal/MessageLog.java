@@ -12,8 +12,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.function.Consumer;
 
-// Each outcome is written in the transaction that holds the claimed row, so no other worker can
-// hand the same message over while it is being written.
+// Writes an outcome onto a row the caller has locked and checked against its own attempt.
 @Service
 @RequiredArgsConstructor
 class MessageLog {

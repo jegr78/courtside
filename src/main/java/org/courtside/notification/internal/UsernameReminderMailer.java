@@ -7,8 +7,7 @@ import org.courtside.identity.UserAccountRepository;
 import org.courtside.notification.MessageKind;
 import org.courtside.shared.UsernameReminderRequested;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.Locale;
@@ -25,8 +24,7 @@ class UsernameReminderMailer implements MessageComposer {
     private final MailTemplates templates;
     private final MessageOutbox outbox;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(UsernameReminderRequested requested) {
         MessageRecipient.reachable(accounts.findById(requested.accountId())).ifPresent(account ->
                 outbox.queue(account.getId(), MessageKind.ACCOUNT_USERNAME_REMINDER, Map.of()));

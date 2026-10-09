@@ -13,8 +13,7 @@ import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.ParticipantRecorded;
 import org.courtside.shared.ParticipantWithdrew;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.HashMap;
@@ -41,16 +40,14 @@ class ParticipationMailer implements MessageComposer {
 
     // The participation list resolves no name at all, not the booker's and not the other players',
     // so the message that says somebody was recorded names none of them either.
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(ParticipantRecorded recorded) {
         bookings.describe(recorded.bookingId()).ifPresent(booking ->
                 queue(accountOf(recorded.personId()), MessageKind.BOOKING_PLAYER_RECORDED,
                         Map.of(QueuedMessage.BOOKING, recorded.bookingId().toString())));
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(ParticipantWithdrew withdrew) {
         if (persons.findById(withdrew.personId()).isEmpty()) {
             log.warn("Person {} withdrew and is on no roster to name", withdrew.personId());
@@ -79,8 +76,7 @@ class ParticipationMailer implements MessageComposer {
 
     @Override
     public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
-        BookingAnnouncement booking = bookings.describe(message.booking())
-                .orElseThrow(() -> new MessageUndeliverableException("BookingGone"));
+        BookingAnnouncement booking = AnnouncedBooking.current(bookings, message.booking());
         UserAccount account = MessageRecipient.required(accounts, message.accountId());
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         Map<String, String> values = new HashMap<>(wording.of(booking, locale));

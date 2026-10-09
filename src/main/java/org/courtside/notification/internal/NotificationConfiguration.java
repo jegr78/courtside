@@ -28,6 +28,9 @@ class NotificationConfiguration {
         executor.setQueueCapacity(1);
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
         executor.setThreadNamePrefix("mail-outbox-");
+        // Inside the container's ten-second stop grace, so a deploy rarely cuts a handover off mid-send.
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(8);
         executor.initialize();
         return executor;
     }
@@ -55,6 +58,7 @@ class NotificationConfiguration {
         }
         mail.put("mail.smtp.timeout", "10000");
         mail.put("mail.smtp.connectiontimeout", "10000");
+        mail.put("mail.smtp.writetimeout", "10000");
         sender.setJavaMailProperties(mail);
         return sender;
     }

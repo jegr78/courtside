@@ -270,8 +270,8 @@ anywhere. **A load run measures an instance whose relay accepts**, which is what
 working mail server sees; it does not measure an instance that skips mail, and it does not measure
 one whose relay is refusing.
 
-A relay that never resolves, such as `mail.invalid`, would send every message through four
-attempts over about a minute and end it as `failed`, so a run against it measures retry traffic
+A relay that never resolves, such as `mail.invalid`, would send every message through six
+attempts over about half an hour and end it as `failed`, so a run against it measures retry traffic
 rather than a club's evening.
 
 `--telemetry` adds Prometheus and a PostgreSQL exporter to the isolated project. Prometheus is

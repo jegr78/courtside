@@ -53,6 +53,9 @@ class MailOutboxTest extends AbstractIntegrationTest {
     @MockitoSpyBean
     private JavaMailSender sender;
 
+    @MockitoSpyBean
+    private MessageRecordRepository records;
+
     @MockitoBean(name = "mailOutboxExecutor")
     private TaskExecutor executor;
 
@@ -197,8 +200,9 @@ class MailOutboxTest extends AbstractIntegrationTest {
         // then
         verify(sender, times(MailOutbox.ATTEMPTS)).send(any(MimeMessage.class));
         assertThat(gaps)
-                .as("a retry waits for its gap, and four tries fit inside the minute a restart takes")
-                .containsExactly(Duration.ofSeconds(5), Duration.ofSeconds(15), Duration.ofSeconds(45));
+                .as("a retry waits for its gap, and the gaps outlast a relay that is down for minutes")
+                .containsExactly(Duration.ofSeconds(15), Duration.ofSeconds(45), Duration.ofSeconds(135),
+                        Duration.ofSeconds(405), Duration.ofSeconds(1215));
         assertThat(states(List.of(accountId))).containsExactly("FAILED");
         assertThat(jdbc.sql("SELECT reason FROM message_record WHERE id = :id").param("id", recordId)
                 .query(String.class).single())
@@ -244,6 +248,82 @@ class MailOutboxTest extends AbstractIntegrationTest {
         // then
         verify(sender, never()).send(any(MimeMessage.class));
         assertThat(states(List.of(accountId))).containsExactly("QUEUED");
+    }
+
+    @Test
+    void givenARowWhoseLeaseRanOut_whenThePassRuns_thenItIsTakenOverWithoutCountingAsARetry() {
+        // given — a pass that claimed it died: one attempt counted, its lease already over
+        UUID accountId = member("takenover");
+        UUID recordId = queuedRow(accountId, MessageKind.ACCOUNT_USERNAME_REMINDER, "<takenover@example.org>", "{}");
+        jdbc.sql("UPDATE message_record SET attempts = 1, next_attempt_at = :at WHERE id = :id")
+                .param("at", java.sql.Timestamp.from(NOW.minusSeconds(1))).param("id", recordId).update();
+
+        // when
+        outbox.deliverDue();
+
+        // then
+        verify(sender, times(1)).send(any(MimeMessage.class));
+        assertThat(states(List.of(accountId))).containsExactly("HANDED_OVER");
+        assertThat(jdbc.sql("SELECT retries FROM message_record WHERE id = :id").param("id", recordId)
+                .query(Integer.class).single())
+                .as("a pass that died is not a failed handover").isZero();
+    }
+
+    @Test
+    void givenAPassThatWasOvertakenAfterItsClaim_whenItReachesTheRow_thenItNeitherSendsNorWrites() {
+        // given — between this pass's claim and its handover another pass has taken the row over
+        UUID accountId = member("overtaken");
+        UUID recordId = queuedRow(accountId, MessageKind.ACCOUNT_USERNAME_REMINDER, "<overtaken@example.org>", "{}");
+        doAnswer(invocation -> {
+            jdbc.sql("UPDATE message_record SET attempts = attempts + 1 WHERE id = :id")
+                    .param("id", recordId).update();
+            return invocation.callRealMethod();
+        }).when(records).lockById(recordId);
+
+        // when
+        outbox.deliverDue();
+
+        // then
+        verify(sender, never()).send(any(MimeMessage.class));
+        assertThat(states(List.of(accountId)))
+                .as("only the pass holding the current attempt hands over and writes the outcome")
+                .containsExactly("QUEUED");
+    }
+
+    @Test
+    void givenARowThatUsedUpItsAttemptsInPassesThatDied_whenItIsClaimed_thenItFailsWithoutAnotherSend() {
+        // given
+        UUID accountId = member("exhausted");
+        UUID recordId = queuedRow(accountId, MessageKind.ACCOUNT_USERNAME_REMINDER, "<exhausted@example.org>", "{}");
+        jdbc.sql("UPDATE message_record SET attempts = :attempts WHERE id = :id")
+                .param("attempts", MailOutbox.ATTEMPTS).param("id", recordId).update();
+
+        // when
+        outbox.deliverDue();
+
+        // then
+        verify(sender, never()).send(any(MimeMessage.class));
+        assertThat(states(List.of(accountId))).containsExactly("FAILED");
+        assertThat(jdbc.sql("SELECT reason FROM message_record WHERE id = :id").param("id", recordId)
+                .query(String.class).single())
+                .as("a row that keeps killing its pass cannot be claimed forever").isEqualTo("AttemptsExhausted");
+    }
+
+    @Test
+    void givenABookingMessageQueuedBeforeACredential_whenThePassRuns_thenTheCredentialGoesFirst() {
+        // given
+        UUID accountId = member("urgent");
+        UUID booking = queuedRow(accountId, MessageKind.BOOKING_CONFIRMED, "<earlier@example.org>",
+                "{\"bookingId\": \"" + UUID.randomUUID() + "\"}");
+        UUID credential = queuedRow(accountId, MessageKind.ACCOUNT_USERNAME_REMINDER, "<later@example.org>", "{}");
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(records);
+
+        // when
+        outbox.deliverDue();
+
+        // then — somebody waiting at the sign-in page is served before a busy evening
+        order.verify(records).lockById(credential);
+        order.verify(records, org.mockito.Mockito.atLeastOnce()).lockById(booking);
     }
 
     private void runWakeUpsOnTheProductionPool() {

@@ -10,8 +10,7 @@ import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.BookingConfirmed;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.HashMap;
@@ -34,8 +33,7 @@ class BookingMailer implements MessageComposer {
     private final BookingCalendar calendar;
     private final MessageOutbox outbox;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(BookingConfirmed confirmed) {
         Optional<BookingAnnouncement> announced = bookings.describe(confirmed.bookingId());
         if (announced.isEmpty()) {
@@ -60,8 +58,7 @@ class BookingMailer implements MessageComposer {
 
     @Override
     public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
-        BookingAnnouncement booking = bookings.describe(message.booking())
-                .orElseThrow(() -> new MessageUndeliverableException("BookingGone"));
+        BookingAnnouncement booking = AnnouncedBooking.current(bookings, message.booking());
         UserAccount account = MessageRecipient.required(accounts, message.accountId());
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_CONFIRMED.templateKey();

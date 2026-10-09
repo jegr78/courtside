@@ -8,8 +8,7 @@ import org.courtside.shared.IssuedResetCode;
 import org.courtside.shared.PasswordResetCodeIssuer;
 import org.courtside.shared.PasswordResetRequested;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.Instant;
@@ -31,8 +30,7 @@ class PasswordResetCodeMailer implements MessageComposer {
     private final MailTemplates templates;
     private final MessageOutbox outbox;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(PasswordResetRequested requested) {
         outbox.queue(requested.accountId(), MessageKind.ACCOUNT_PASSWORD_RESET_CODE, Map.of());
     }

@@ -156,7 +156,7 @@
       "growthDrivers": "Argon2id memory and CPU work, a bounded HIBP range response, and credential delivery work dominate these paths.",
       "inputOrDataBound": "Passwords and account fields have contract limits; HIBP responses stop at 256 KiB and their request deadline defaults to three seconds.",
       "concurrencyOrRateBound": "Password verification admits two concurrent operations per application instance; login addresses and credential issuance also have persisted rate windows. Every operation here except the filter-handled sign-in also spends 5 tokens of its caller's request budget.",
-      "executionModel": "Verification and password policy run synchronously in the request; committed credential events hand mail to the asynchronous event listener.",
+      "executionModel": "Verification and password policy run synchronously in the request; a credential event queues its message in the same transaction for the mail outbox.",
       "failureBehavior": "Capacity exhaustion returns a typed 429, HIBP unavailability refuses a new password, and a failed transaction stores no partial credential change.",
       "consumerTimeoutBehavior": "The application rolls a request's transaction back after 30 seconds and cancels any statement after 15 seconds. The HIBP dependency has its own deadline. The reference proxy adds no arbitrary response deadline; a caller retry remains subject to rate and transaction rules.",
       "productionPaths": [
@@ -455,9 +455,9 @@
       "growthDrivers": "Mail work fans out with booking participants, reminders and displaced future bookings; every fanned-out message is one stored outbox row, and relay latency holds an outbox worker for one handover.",
       "inputOrDataBound": "A booking has at most twenty participant positions, closure discovery pages by 100, a queued row carries identifiers only, and each SMTP connect and read wait stops after ten seconds.",
       "concurrencyOrRateBound": "Two outbox workers hand messages over, each holding one database connection while it composes and sends; a wake-up beyond one pending pass is discarded because that pass finds its row. Closure announcements use at most two threads and a queue of 100 with caller-run backpressure.",
-      "executionModel": "Committed domain events reach their listeners through Spring Modulith's publication registry. A mail listener runs after commit and only stores a queued message_record row; the outbox workers claim due rows with FOR UPDATE SKIP LOCKED under a five-minute lease, compose and hand over in a new transaction and record the outcome. A scheduled pass every five seconds resumes what a restart or a retry left due. Each closure page runs in a new transaction outside the originating mutation.",
-      "failureBehavior": "A transport failure reschedules the row after 5, 15 and 45 seconds and fails it on the fourth attempt; a refused recipient, a vanished booking or an unreachable recipient settles it at once with its reason. No outcome undoes the committed change, and no message leaves the outbox without a settled row.",
-      "consumerTimeoutBehavior": "The originating HTTP response waits for the queued row insert after commit and never for the relay. A saturated closure-announcement queue runs paging on the publishing thread, which queues rows but hands no message over.",
+      "executionModel": "A mail listener runs before commit inside the publishing transaction and only stores a queued message_record row, so the row commits with the change or not at all. The outbox workers claim due rows with FOR UPDATE SKIP LOCKED under a five-minute lease, then lock the row, compose, hand over and record the outcome in one transaction. A scheduled pass every five seconds resumes what a restart or a retry left due. Closure announcements run after commit through the publication registry, and each closure page runs in a new transaction outside the originating mutation.",
+      "failureBehavior": "A transport failure reschedules the row after 15 seconds and then gaps three times as long, and fails it on the sixth attempt; a refused recipient, a vanished or cancelled booking, a reminder past its start or an unreachable recipient settles it at once with its reason. A queue insert that fails rolls the originating change back. No message leaves the outbox without a settled row.",
+      "consumerTimeoutBehavior": "The originating HTTP response waits for the queued row insert inside its own transaction and never for the relay. A saturated closure-announcement queue runs paging on the publishing thread, which queues rows but hands no message over.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/BookingConfiguration.java",
         "src/main/java/org/courtside/booking/internal/ClosureAnnouncements.java",
@@ -470,7 +470,8 @@
         "src/test/java/org/courtside/notification/internal/MailOutboxTest.java#givenARelayThatHoldsEveryMessage_whenEventsArePublished_thenThePublisherReturnsWithTheMessagesQueued",
         "src/test/java/org/courtside/notification/internal/MailOutboxTest.java#givenARelayThatStaysAway_whenTheRetriesComeDue_thenTheyAreSpacedBoundedAndCounted",
         "src/test/java/org/courtside/notification/internal/MailOutboxTest.java#givenTwoPassesRunningAtOnce_whenTheyDrainTheSameRows_thenEveryMessageIsHandedOverExactlyOnce",
-        "src/test/java/org/courtside/notification/internal/NotificationExecutorCapacityTest.java#givenASaturatedOutboxExecutor_whenMoreWakeUpsArrive_thenNoneRunsOnTheCallersThread"
+        "src/test/java/org/courtside/notification/internal/NotificationExecutorCapacityTest.java#givenASaturatedOutboxExecutor_whenMoreWakeUpsArrive_thenNoneRunsOnTheCallersThread",
+        "src/test/java/org/courtside/notification/internal/OutboxTransactionTest.java#givenAQueueInsertThatFails_whenTheChangeCommits_thenTheChangeIsRolledBackWithIt"
       ]
     },
     {
@@ -489,7 +490,7 @@
       "inputOrDataBound": "Retention and reminder windows bound age, not row count; a sweep can still span every expired or due row accumulated by the instance.",
       "concurrencyOrRateBound": "Spring's default single scheduling thread serializes these methods in this application; database and mail work retain their own transaction and delivery bounds.",
       "executionModel": "The in-process scheduler invokes each method on its configured cadence; cleanup uses transactions and reminders claim each booking before publishing events.",
-      "failureBehavior": "A failed transactional sweep rolls back and remains eligible later; a claimed reminder commits before asynchronous delivery records its own outcome.",
+      "failureBehavior": "A failed transactional sweep rolls back and remains eligible later; a claimed reminder commits together with its queued messages, whose delivery records its own outcome.",
       "consumerTimeoutBehavior": "Each sweep allows its statements ten minutes, so an accumulated backlog cannot cancel the run that clears it. There is no HTTP consumer. A delayed or failed run is retried by the next fixed-delay or cron invocation rather than by extending an arbitrary timeout.",
       "productionPaths": [
         "src/main/java/org/courtside/booking/internal/BookingReminderSchedule.java",

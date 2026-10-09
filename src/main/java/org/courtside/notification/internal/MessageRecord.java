@@ -57,6 +57,9 @@ class MessageRecord {
     @Column(nullable = false)
     private int attempts;
 
+    @Column(nullable = false)
+    private int retries;
+
     private Instant nextAttemptAt;
 
     @Getter(AccessLevel.NONE)
@@ -76,15 +79,8 @@ class MessageRecord {
         this.parameters = new HashMap<>(parameters);
     }
 
-    Map<String, String> parameters() {
-        return Map.copyOf(parameters);
-    }
-
-    void attempted() {
-        attempts++;
-    }
-
     void retryAt(Instant at, String reason) {
+        this.retries++;
         this.nextAttemptAt = at;
         this.reason = reason;
     }

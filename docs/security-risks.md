@@ -81,8 +81,15 @@ The shared subject window lets another caller delay recovery for that username, 
 address can make unrelated members share a limit. Neither blocks sign-in, and the board can issue
 credentials from the roster.
 
-The mail pool may run work on a request thread when saturated. Separate sign-in capacity and request
-limits bound the effect. Reconsider when production evidence shows request starvation.
+## A message can reach its recipient twice
+
+The outbox hands a message over and records the outcome in one transaction. A process that stops
+after the relay accepted the message and before that transaction commits leaves the row queued, and
+a later pass sends it again after the five-minute lease, under the same `Message-ID`. A repeated
+credential or reset code is a new one that replaces the first, so only the last mail works. Nobody
+can cause this from outside: it needs the application killed during a handover, which a deploy
+avoids by letting the outbox finish within its stop grace. The bound is one repeat per crash and
+message. Reconsider if the relay offers an idempotent submission keyed by `Message-ID`.
 
 ## Reset codes use an unkeyed digest
 

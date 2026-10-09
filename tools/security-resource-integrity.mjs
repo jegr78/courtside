@@ -26,7 +26,7 @@ const definitions = {
   member: "id person_id membership_type_id started_on ended_on",
   membership_type: "id name rule_set_id active grants_account",
   message_optout: "user_account_id kind created_at",
-  message_record: "id account_id kind state message_id reason status_code queued_at queued_seq settled_at attempts next_attempt_at parameters",
+  message_record: "id account_id kind state message_id reason status_code queued_at queued_seq settled_at attempts retries next_attempt_at parameters",
   opening_hours: "id day_of_week opens_at closes_at version_id",
   opening_hours_version: "id effective_from",
   participant_card: "id label active capacity",

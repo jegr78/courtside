@@ -11,6 +11,7 @@ import org.courtside.shared.CredentialsRequested;
 import org.courtside.shared.IssuedCredential;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -48,7 +50,7 @@ class CredentialMailerTest {
     private final List<OutgoingMail> handedOver = new ArrayList<>();
 
     private final CredentialMailer mailer = new CredentialMailer(credentials, validity, accounts, club,
-            new MailTemplates(), outbox, Clock.fixed(NOW, ZONE));
+            new MailTemplates(), outbox, mock(JdbcClient.class, RETURNS_DEEP_STUBS), Clock.fixed(NOW, ZONE));
 
     @Test
     void givenAnAccountWrittenToInEnglish_whenItsCredentialIsSent_thenTheMessageIsInEnglish() {

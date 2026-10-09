@@ -9,10 +9,10 @@ import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.BookingReminderDue;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -30,9 +30,9 @@ class ReminderMailer implements MessageComposer {
     private final MailTemplates templates;
     private final BookingWording wording;
     private final MessageOutbox outbox;
+    private final Clock clock;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(BookingReminderDue due) {
         bookings.describe(due.bookingId()).ifPresent(booking -> audience.of(booking).forEach(account ->
                 outbox.queue(account.getId(), MessageKind.BOOKING_REMINDER,
@@ -46,8 +46,10 @@ class ReminderMailer implements MessageComposer {
 
     @Override
     public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
-        BookingAnnouncement booking = bookings.describe(message.booking())
-                .orElseThrow(() -> new MessageUndeliverableException("BookingGone"));
+        BookingAnnouncement booking = AnnouncedBooking.current(bookings, message.booking());
+        if (!booking.startsAt().isAfter(clock.instant())) {
+            throw new MessageUndeliverableException("BookingStarted");
+        }
         UserAccount account = MessageRecipient.required(accounts, message.accountId());
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_REMINDER.templateKey();

@@ -1102,6 +1102,10 @@
         "level": "operational",
         "lifecycle": "account-cascade"
       },
+      "retries": {
+        "level": "operational",
+        "lifecycle": "account-cascade"
+      },
       "settled_at": {
         "level": "operational",
         "lifecycle": "account-cascade"

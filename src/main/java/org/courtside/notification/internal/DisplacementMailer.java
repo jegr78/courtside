@@ -9,8 +9,7 @@ import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.BookingDisplaced;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.Arrays;
@@ -32,8 +31,7 @@ class DisplacementMailer implements MessageComposer {
     private final BookingWording wording;
     private final MessageOutbox outbox;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(BookingDisplaced displaced) {
         bookings.describe(displaced.bookingId()).ifPresent(booking -> audience.of(booking).forEach(account ->
                 outbox.queue(account.getId(), MessageKind.BOOKING_DISPLACED, Map.of(
@@ -49,8 +47,7 @@ class DisplacementMailer implements MessageComposer {
     @Override
     public void compose(QueuedMessage message, Consumer<OutgoingMail> handOver) {
         BookingDisplaced.Closure closure = closureOf(message.closure());
-        BookingAnnouncement booking = bookings.describe(message.booking())
-                .orElseThrow(() -> new MessageUndeliverableException("BookingGone"));
+        BookingAnnouncement booking = AnnouncedBooking.current(bookings, message.booking());
         UserAccount account = MessageRecipient.required(accounts, message.accountId());
         Locale locale = MessageLanguage.of(account.getLocale(), club.defaultLocale());
         String key = MessageKind.BOOKING_DISPLACED.templateKey();
