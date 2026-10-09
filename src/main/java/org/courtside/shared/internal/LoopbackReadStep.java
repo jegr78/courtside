@@ -67,7 +67,6 @@ final class LoopbackReadStep implements WarmUpStep {
                         query < 0 ? target : target.substring(0, query),
                         query < 0 ? null : target.substring(query + 1), null);
                 HttpResponse<String> response = client.send(HttpRequest.newBuilder(uri)
-                        .header("Accept", "application/json, */*;q=0.8")
                         .timeout(REQUEST_TIMEOUT)
                         .GET()
                         .build(), HttpResponse.BodyHandlers.ofString());

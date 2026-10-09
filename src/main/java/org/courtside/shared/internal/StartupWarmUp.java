@@ -9,8 +9,6 @@ import org.springframework.context.event.EventListener;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -113,14 +111,7 @@ class StartupWarmUp {
             return " (" + refused.getMessage() + ")";
         }
         if (cause instanceof DomainFailure domain) {
-            List<Object> codes = domain.getBody().getProperties() != null
-                    && domain.getBody().getProperties().get("violations") instanceof List<?> violations
-                    ? violations.stream()
-                            .map(violation -> violation instanceof Map<?, ?> entry ? entry.get("code") : null)
-                            .filter(Objects::nonNull)
-                            .map(Object.class::cast)
-                            .toList()
-                    : List.of();
+            List<String> codes = domain.violationCodes();
             return " (" + domain.problemType().uri() + (codes.isEmpty() ? "" : " " + codes) + ")";
         }
         return "";
