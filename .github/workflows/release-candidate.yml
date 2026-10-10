@@ -368,7 +368,7 @@ jobs:
           ref: ${{ needs.select.outputs.commit }}
           persist-credentials: false
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: image-input
           path: build
@@ -487,7 +487,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: deployment-archive
           path: build/deployment-archive
@@ -639,7 +639,7 @@ jobs:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: deployment-archive
           path: build/archive

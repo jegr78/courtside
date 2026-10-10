@@ -147,7 +147,7 @@ jobs:
           digest: ${{ inputs.booking-seed-digest }}
           repository: ${{ github.repository }}
           load: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.archive-artifact }}
           path: build/archive-under-test
@@ -199,7 +199,7 @@ jobs:
           digest: ${{ inputs.booking-seed-digest }}
           repository: ${{ github.repository }}
           load: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.archive-artifact }}
           path: build/deployment-archive
@@ -286,13 +286,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.qualification-artifact-prefix }}amd64
           path: build/uat-smoke
           run-id: ${{ inputs.artifacts-run-id || github.run_id }}
           github-token: ${{ github.token }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.fixtures-artifact }}
           path: target/fixtures-classes
@@ -361,14 +361,14 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.security-base-artifact }}
           path: build/security-input
           run-id: ${{ inputs.security-base-run-id || github.run_id }}
           github-token: ${{ github.token }}
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: ${{ inputs.qualification-artifact-prefix }}*
           path: build/security-input
@@ -376,7 +376,7 @@ jobs:
           run-id: ${{ inputs.artifacts-run-id || github.run_id }}
           github-token: ${{ github.token }}
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: release-active-security
           path: build/security-input
