@@ -48,7 +48,7 @@ jobs:
           ./mvnw -B test -Dsurefire.runOrder="${TEST_ORDER}" -Dsurefire.runOrder.random.seed="${seed}"
       - name: Upload first-attempt evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: order-${{ matrix.order }}-${{ github.run_id }}
           path: |
@@ -73,7 +73,7 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: '26'
           cache: npm
@@ -104,7 +104,7 @@ jobs:
           npm run reliability:validate -- "${result}"
       - name: Upload first-attempt browser evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-order-${{ matrix.project_order }}-${{ github.run_id }}
           path: |
@@ -120,7 +120,7 @@ jobs:
           retention-days: 14
       - name: Upload redacted WebKit reliability history
         if: ${{ always() && steps.validate-webkit-record.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: webkit-reliability-${{ matrix.project_order }}-${{ github.run_id }}
           path: |
@@ -141,7 +141,7 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: '26'
           cache: npm
@@ -164,7 +164,7 @@ jobs:
           --project=android
       - name: Upload browser compatibility evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-compatibility-${{ github.run_id }}
           path: |
