@@ -21,7 +21,7 @@ services:
 
   # A booking hands its message over on an executor that makes the caller wait once the queue fills.
   mail:
-    image: axllent/mailpit:v1.31@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+    image: axllent/mailpit:v1.31@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
     user: ${COURTSIDE_PERF_MAIL_USER:?run node tools/courtside.mjs perf}
     command:
       - --smtp-tls-cert
@@ -84,7 +84,7 @@ services:
       retries: 120
 
   proxy:
-    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
     security_opt:
       - no-new-privileges:true
     cap_drop:
