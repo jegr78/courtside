@@ -877,7 +877,7 @@ test("given native publication policy and matching candidate classes, when press
   assert.ok(command);
   assert.equal(command.options.input, undefined);
   assert.equal(command.options.outputLimitBytes, 4096);
-  assert.equal(command.options.timeoutMilliseconds, 10000);
+  assert.equal(command.options.timeoutMilliseconds, 30000, "a cold decoder JVM must have room to start");
   assert.ok(harness.events.indexOf("publication-policy") < harness.events.indexOf("pressure"));
   const binding = harness.writes.find(entry => entry.name === "decoder-binding-native.json").value.publicationBinding;
   assert.match(binding.sourceDigest, /^sha256:[a-f0-9]{64}$/);

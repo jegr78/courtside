@@ -1321,7 +1321,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
           "--sun-misc-unsafe-memory-access=deny",
           "-Dloader.main=org.courtside.securityassessment.SecurityPublicationPolicyProjection",
           "-cp", ".", "org.springframework.boot.loader.launch.PropertiesLauncher"],
-        { outputLimitBytes: 4096, timeoutMilliseconds: 10000 })).stdout;
+        { outputLimitBytes: 4096, timeoutMilliseconds: 30000 })).stdout;
         const projection = resourcePublicationProjection(projectionOutput, publicationPolicy);
         return {
           sourceDigest: `sha256:${createHash("sha256").update(readFileSync(join(root,
