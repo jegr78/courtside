@@ -147,7 +147,7 @@ jobs:
           digest: ${{ inputs.booking-seed-digest }}
           repository: ${{ github.repository }}
           load: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.archive-artifact }}
           path: build/archive-under-test
@@ -199,7 +199,7 @@ jobs:
           digest: ${{ inputs.booking-seed-digest }}
           repository: ${{ github.repository }}
           load: 'false'
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.archive-artifact }}
           path: build/deployment-archive
@@ -243,7 +243,7 @@ jobs:
                 outcome: (if $journey == "success" then "passed" else "failed" end)}],
               outcome: (if $journey == "success" then "passed" else "failed" end)}' \
             > build/deployment-mail/result.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: deployment-mail-qualification
@@ -286,13 +286,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.qualification-artifact-prefix }}amd64
           path: build/uat-smoke
           run-id: ${{ inputs.artifacts-run-id || github.run_id }}
           github-token: ${{ github.token }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.fixtures-artifact }}
           path: target/fixtures-classes
@@ -336,7 +336,7 @@ jobs:
       - name: Remove the disposable security target
         if: always()
         run: node tools/courtside.mjs security-cleanup "$RUN_ID"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: release-active-security
@@ -361,14 +361,14 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.security-base-artifact }}
           path: build/security-input
           run-id: ${{ inputs.security-base-run-id || github.run_id }}
           github-token: ${{ github.token }}
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: ${{ inputs.qualification-artifact-prefix }}*
           path: build/security-input
@@ -376,7 +376,7 @@ jobs:
           run-id: ${{ inputs.artifacts-run-id || github.run_id }}
           github-token: ${{ github.token }}
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: release-active-security
           path: build/security-input
@@ -396,7 +396,7 @@ jobs:
           --source-subject "$SOURCE_COMMIT"
           --output build/security-record.json
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-security-record-input
           path: build/security-record.json
@@ -489,7 +489,7 @@ jobs:
           COURTSIDE_UPGRADE_CANDIDATE_IMAGE: ${{ steps.image.outputs.reference }}
         run: node tools/courtside.upgrade-smoke.mjs --confirm courtside-upgrade
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: ${{ inputs.run-label }}-database-upgrade-${{ matrix.origin.ref }}
@@ -534,7 +534,7 @@ jobs:
           COURTSIDE_RESTORE_IMAGE: ${{ steps.image.outputs.reference }}
         run: node tools/courtside.restore-smoke.mjs --confirm courtside-restore
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: database-restore

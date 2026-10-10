@@ -124,6 +124,13 @@
       "validators": []
     },
     {
+      "path": ".github/workflows/dependency-action-smoke.yml",
+      "profiles": [
+        "full"
+      ],
+      "validators": []
+    },
+    {
       "path": ".github/workflows/mail-smoke.yml",
       "profiles": [
         "full"

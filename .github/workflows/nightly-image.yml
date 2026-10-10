@@ -67,7 +67,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         if: inputs.verification_run != ''
         with:
           name: nightly-verification-${{ inputs.verification_run }}-1
@@ -188,14 +188,14 @@ jobs:
           mkdir -p build/fixtures
           cp -R target/fixtures-classes build/fixtures/classes
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: nightly-image-input
           path: build
           retention-days: 1
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: nightly-assessment-fixtures
           path: target/fixtures-classes
@@ -219,7 +219,7 @@ jobs:
           ref: ${{ needs.select.outputs.commit }}
           persist-credentials: false
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: nightly-image-input
           path: build
@@ -285,7 +285,7 @@ jobs:
             --repository "$GITHUB_REPOSITORY" --workflow nightly-image.yml \
             --ref "$GITHUB_REF" --output build/deployment-archive
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: nightly-deployment-archive
           path: build/deployment-archive
@@ -318,7 +318,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/tool-dependencies
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: nightly-deployment-archive
           path: build/deployment-archive
@@ -419,7 +419,7 @@ jobs:
               > build/uat-smoke/container-logs.txt 2>&1 || true
           fi
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: nightly-image-qualification-${{ matrix.architecture }}
@@ -427,7 +427,7 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always() && matrix.architecture == 'amd64'
         with:
           name: nightly-installed-database-upgrade-${{ matrix.architecture }}
@@ -483,13 +483,13 @@ jobs:
       - name: Prepare publication evidence directory
         run: mkdir -p build
 
-      - uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.digest }}
           output-file: build/courtside-nightly.spdx.json
           upload-artifact: false
 
-      - uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ghcr.io/${{ github.repository }}@${{ needs.image.outputs.booking-seed-digest }}
           output-file: build/courtside-booking-seed-nightly.spdx.json

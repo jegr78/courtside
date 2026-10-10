@@ -119,7 +119,7 @@ jobs:
       - name: Remove raw npm audit reports
         if: always()
         run: rm -f build/security/npm.json build/security/npm-site.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: npm-audit-evidence-${{ github.run_id }}
@@ -128,7 +128,7 @@ jobs:
             build/security/npm-audit-site-summary.json
           retention-days: 14
           if-no-files-found: error
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: dependency-remediation-${{ steps.dependency-evidence.outputs.status }}-${{ steps.dependency-evidence.outputs.readiness }}-${{ github.run_id }}
