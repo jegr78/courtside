@@ -88,7 +88,7 @@ function fixture() {
         { scope: "GLOBAL", subjectHash: digest("all") }],
       sessionPolicy: { inactivitySeconds: 900, absoluteLifetimeMilliseconds: 3600000, concurrentLimit: 5,
         cookieName: "__Host-SESSION", browserFamily: "OTHER" },
-      loginPolicy: { proofMode: "http-bounded-v1", sourceAddress,
+      loginPolicy: { proofMode: "http-bounded-v1", sourceAddress, verificationConcurrency: 2,
         address: { maxFailures: 3, windowMilliseconds: 60000, blockMilliseconds: 300000 },
         global: { windowMilliseconds: 60000 } } } };
   const complete = { ...structuredClone(journal), effectsSettled: true,
