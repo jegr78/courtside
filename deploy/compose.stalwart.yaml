@@ -22,7 +22,7 @@ services:
       - ./Caddyfile.stalwart:/etc/caddy/sites.d/stalwart.caddy:ro
 
   mail:
-    image: stalwartlabs/stalwart:v0.16.24@sha256:ec011be228596e37e65f41aab17deed573859614430472f7eeb42178c50d87b7
+    image: stalwartlabs/stalwart:v0.16.25@sha256:74e5a7d55303ba525d939c6bf97ed4e010df7521f52d80afc22a815b66bd53f3
     profiles: [mail]
     restart: unless-stopped
     logging: *logging
@@ -55,7 +55,7 @@ services:
       - "127.0.0.1:${COURTSIDE_MAIL_ADMIN_PORT:-8081}:8080"
 
   mail-certificate:
-    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
     profiles: [mail]
     restart: unless-stopped
     logging: *logging

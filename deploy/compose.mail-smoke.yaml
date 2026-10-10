@@ -2,7 +2,7 @@ name: courtside-mail-smoke
 
 services:
   mail:
-    image: stalwartlabs/stalwart:v0.16.24@sha256:ec011be228596e37e65f41aab17deed573859614430472f7eeb42178c50d87b7
+    image: stalwartlabs/stalwart:v0.16.25@sha256:74e5a7d55303ba525d939c6bf97ed4e010df7521f52d80afc22a815b66bd53f3
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -29,7 +29,7 @@ services:
       - "127.0.0.1::8080"
 
   proxy:
-    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
     security_opt:
       - no-new-privileges:true
     environment:
@@ -41,7 +41,7 @@ services:
       - caddy-config:/config
 
   mail-certificate:
-    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -97,7 +97,7 @@ services:
       retries: 2
 
   sink:
-    image: axllent/mailpit:v1.31@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+    image: axllent/mailpit:v1.31@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
     security_opt:
       - no-new-privileges:true
     ports:

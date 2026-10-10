@@ -122,7 +122,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   mail:
-    image: axllent/mailpit:v1.31@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+    image: axllent/mailpit:v1.31@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
     pull_policy: never
     user: ${COURTSIDE_SECURITY_MAIL_USER:?required}
     read_only: true
@@ -153,7 +153,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   callback:
-    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
     pull_policy: never
     command: ["caddy", "respond", "--listen", ":8080", "--body", "callback-ok"]
     read_only: true
@@ -177,7 +177,7 @@ services:
       org.courtside.security.instance-fingerprint: ${COURTSIDE_SECURITY_INSTANCE_FINGERPRINT:?required}
 
   proxy:
-    image: caddy:2-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
     pull_policy: never
     read_only: true
     tmpfs:
@@ -280,7 +280,7 @@ services:
 
   schemathesis:
     profiles: [assessment]
-    image: schemathesis/schemathesis:v4.28.0@sha256:0a71757c60ccdba270c154a859d9dd3d019625f782f23ab36ad604771e15f78b
+    image: schemathesis/schemathesis:v4.29.4@sha256:16d21ecba0097fc8a3ca71b8d1db3797d2a057610d808715871216450e63f0a6
     pull_policy: never
     entrypoint: ["tail", "-f", "/dev/null"]
     read_only: true
