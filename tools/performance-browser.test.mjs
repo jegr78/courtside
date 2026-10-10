@@ -13,10 +13,39 @@ import * as browserDiagnostics from "../performance/browser-diagnostics.js";
 const browserSource = readFileSync(new URL("../performance/browser.js", import.meta.url), "utf8");
 const contract = JSON.parse(readFileSync(new URL("../performance/contract.json", import.meta.url), "utf8"));
 
+function startingToday(page, actions = []) {
+  let selected = 0;
+  const locator = page.locator.bind(page);
+  page.locator = (selector) => {
+    if (selector.includes('aria-pressed="true"')) return { waitFor: async () => {} };
+    if (selector.includes("day-selector-")) return { count: async () => 7, nth: index => ({
+      getAttribute: async name => name === "aria-pressed" ? String(index === selected) : `day-selector-2026-10-${5 + index}`,
+      click: async () => { selected = index; actions.push(`day:${index}`); }
+    }) };
+    return locator(selector);
+  };
+  return page;
+}
+
+test("given a free slot today, when preparing a booking, then book from tomorrow because today's slot may start before submission", async () => {
+  // given
+  const actions = [];
+  const page = startingToday({
+    locator: () => ({ count: async () => 1, waitFor: async () => {},
+      nth: () => ({ click: async () => actions.push("slot"), waitFor: async () => {} }) }),
+    getByTestId: id => ({ click: async () => actions.push(id), waitFor: async () => {}, fill: async () => {},
+      inputValue: async () => "Browser Test Guest" })
+  }, actions);
+  // when
+  await prepareBrowserBooking(page, 1);
+  // then
+  assert.deepEqual(actions.slice(0, 2), ["day:1", "slot"], "the journey must leave today before choosing a slot");
+});
+
 test("given a current-week slot, when preparing a booking, then expand the guest field before entering a participant", async () => {
   // given
   const actions = [];
-  const page = {
+  const page = startingToday({
     locator(selector) {
       if (selector === 'div[data-testid="free-slot"]') return { nth: () => ({ waitFor: async () => {} }) };
       if (selector === '[data-testid="booking-card"] option') return { nth: () => ({ waitFor: async () => actions.push("cards") }) };
@@ -32,7 +61,7 @@ test("given a current-week slot, when preparing a booking, then expand the guest
         inputValue: async () => "Browser Test Guest"
       };
     }
-  };
+  });
   // when
   await prepareBrowserBooking(page, 1);
   // then
@@ -62,11 +91,11 @@ test("given no remaining current-week slot, when preparing a booking, then use n
 test("given an inaccessible guest field, when preparing a booking, then fail rather than submit an empty participant list", async () => {
   // given
   let filled = false;
-  const page = {
+  const page = startingToday({
     locator: () => ({ count: async () => 1, waitFor: async () => {}, nth: () => ({ click: async () => {}, waitFor: async () => {} }) }),
     getByTestId: () => ({ click: async () => {}, waitFor: async () => { throw new Error("Guest field is hidden"); },
       fill: async () => { filled = true; } })
-  };
+  });
   // when / then
   await assert.rejects(prepareBrowserBooking(page, 1), /Guest field is hidden/);
   assert.equal(filled, false);
@@ -114,13 +143,13 @@ test("given no eligible slot in either week, when preparing a booking, then fail
 test("given delayed eligibility rendering, when searching slots, then wait for noninteractive placeholders to detach", async () => {
   // given
   let eligible = false;
-  const page = { locator(selector) {
+  const page = startingToday({ locator(selector) {
     if (selector === 'div[data-testid="free-slot"]') return { nth: () => ({ waitFor: async options => {
       assert.equal(options.state, "detached"); eligible = true;
     } }) };
     return { count: async () => { assert.equal(eligible, true); return 1; }, nth: () => ({ click: async () => {}, waitFor: async () => {} }),
       waitFor: async () => {} };
-  }, getByTestId: () => ({ click: async () => {}, waitFor: async () => {}, fill: async () => {}, inputValue: async () => "Browser Test Guest" }) };
+  }, getByTestId: () => ({ click: async () => {}, waitFor: async () => {}, fill: async () => {}, inputValue: async () => "Browser Test Guest" }) });
   // when
   await prepareBrowserBooking(page, 1);
   // then
@@ -180,7 +209,7 @@ test("given a browser that cannot open a page, when a journey starts, then the f
 test("given a summary click that leaves the details closed, when preparing a booking, then fail before entering a guest", async () => {
   // given
   let filled = false;
-  const page = {
+  const page = startingToday({
     locator(selector) {
       if (selector === 'details[data-testid="booking-more"][open]') return { waitFor: async () => {
         throw new Error("waiting for details[data-testid=booking-more][open]: timed out");
@@ -189,7 +218,7 @@ test("given a summary click that leaves the details closed, when preparing a boo
     },
     getByTestId: () => ({ click: async () => {}, waitFor: async () => {}, fill: async () => { filled = true; },
       inputValue: async () => "" })
-  };
+  });
   // when / then
   await assert.rejects(prepareBrowserBooking(page, 1), /booking-more.*open/);
   assert.equal(filled, false, "a guest typed into closed details never reaches the dialog");
@@ -197,10 +226,10 @@ test("given a summary click that leaves the details closed, when preparing a boo
 
 test("given a fill that does not reach the guest field, when preparing a booking, then fail instead of submitting without the guest", async () => {
   // given
-  const page = {
+  const page = startingToday({
     locator: () => ({ count: async () => 1, waitFor: async () => {}, nth: () => ({ click: async () => {}, waitFor: async () => {} }) }),
     getByTestId: () => ({ click: async () => {}, waitFor: async () => {}, fill: async () => {}, inputValue: async () => "" })
-  };
+  });
   // when / then
   await assert.rejects(prepareBrowserBooking(page, 1), /guest field holds "" after entering "Browser Test Guest"/);
 });

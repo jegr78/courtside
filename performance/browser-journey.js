@@ -3,13 +3,14 @@ const GUEST_NAME = "Browser Test Guest";
 export async function prepareBrowserBooking(page, courtNumber) {
   await page.locator('div[data-testid="free-slot"]').nth(0).waitFor({ state: "detached" });
   const selector = `button[data-testid="free-slot"][data-court-number="${courtNumber}"]:not([disabled])`;
-  if (!await selectAvailableDay(page, selector)) {
+  // Today's next slot can start before the dialog is submitted, so the journey books from tomorrow on.
+  if (!await selectAvailableDay(page, selector, false)) {
     const firstDay = await page.locator('button[data-testid^="day-selector-"]').nth(0).getAttribute("data-testid");
     const nextMonday = new Date(`${firstDay.slice("day-selector-".length)}T00:00:00Z`);
     nextMonday.setUTCDate(nextMonday.getUTCDate() + 7);
     await page.getByTestId("week-next").click();
     await page.getByTestId(`day-selector-${nextMonday.toISOString().slice(0, 10)}`).waitFor();
-    if (!await selectAvailableDay(page, selector)) throw new Error("No enabled booking slot in the bounded two-week search");
+    if (!await selectAvailableDay(page, selector, true)) throw new Error("No enabled booking slot in the bounded two-week search");
   }
   await page.locator(selector).nth(0).click();
   // The loaded cards add the player count line, which shifts the centred dialog under a pending click.
@@ -23,8 +24,8 @@ export async function prepareBrowserBooking(page, courtNumber) {
   if (entered !== GUEST_NAME) throw new Error(`The guest field holds ${JSON.stringify(entered)} after entering "${GUEST_NAME}"`);
 }
 
-async function selectAvailableDay(page, selector) {
-  if (await page.locator(selector).count() > 0) return true;
+async function selectAvailableDay(page, selector, includeSelected) {
+  if (includeSelected && await page.locator(selector).count() > 0) return true;
   const days = page.locator('button[data-testid^="day-selector-"]');
   const count = await days.count();
   let selected = -1;
