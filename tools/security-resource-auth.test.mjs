@@ -28,7 +28,7 @@ function fixture() {
   return { before, effects, sourceAddress: "192.0.2.10", decoderContainer: "courtside-security-decoder-example",
     sessionPolicy: { inactivitySeconds: 1800, absoluteLifetimeMilliseconds: 86400000,
       concurrentLimit: 5, cookieName: "SESSION", browserFamily: "CHROME" },
-    loginPolicy: { address: { maxFailures: 20, windowMilliseconds: 60000, blockMilliseconds: 600000 },
+    loginPolicy: { verificationConcurrency: 2, address: { maxFailures: 20, windowMilliseconds: 60000, blockMilliseconds: 600000 },
       global: { windowMilliseconds: 60000 }, proofMode: "http-bounded-v1" },
     runtimeBinding: { sourceDigest: `sha256:${"1".repeat(64)}`, classDigests: Object.fromEntries(
       resourceSessionProjectionClassPaths.map((path, index) => [path, `sha256:${String(index + 2).repeat(64)}`])) },

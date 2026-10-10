@@ -223,8 +223,10 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
     .find((row) => row.scope === subject.scope && row.subject_hash === subject.subjectHash)]));
   const after = new Map(subjects.map((subject) => [subject.scope, currentRows("login_attempt_limit")
     .find((row) => row.scope === subject.scope && row.subject_hash === subject.subjectHash)]));
+  if (!Number.isSafeInteger(policy.verificationConcurrency) || policy.verificationConcurrency < 1) { incomplete(); return; }
   const counted = [];
   const blocked = [];
+  const refused = [];
   for (const operation of logins) {
     if (operation.sourceAddress !== policy.sourceAddress) { finding("login-source-mismatch", "failed"); return; }
     if (operation.status === 200 || operation.status === 401) counted.push(operation);
@@ -233,8 +235,8 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
           || !Number.isSafeInteger(operation.retryAfterSeconds) || operation.retryAfterSeconds < 1) {
         incomplete(); return;
       }
-      // Retry-After one may also be a full verification capacity, which records no attempt and no deadline.
-      if (operation.retryAfterSeconds > 1) blocked.push(operation);
+      // Retry-After one may also be a full verification capacity, which records no attempt.
+      (operation.retryAfterSeconds > 1 ? blocked : refused).push(operation);
     } else { incomplete(); return; }
   }
   const successes = counted.filter((operation) => operation.status === 200);
@@ -340,6 +342,11 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
       if (witness) break;
     }
     if (!witness) { failed(actualAddress); return; }
+  }
+  for (const operation of refused) {
+    const blockTail = deadline !== null && ends(operation) >= deadline - 1000000000n && starts(operation) < deadline;
+    const verifying = counted.filter((other) => starts(other) <= ends(operation) && ends(other) >= starts(operation));
+    if (!blockTail && verifying.length < policy.verificationConcurrency) { failed(actualAddress); return; }
   }
   for (const operation of blocked) {
     if (deadline === null) { failed(actualAddress); return; }

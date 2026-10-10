@@ -105,7 +105,7 @@ export function resourceAuthenticationPolicy(runtime, application, classpathText
       absoluteLifetimeMilliseconds: duration(session?.["absolute-lifetime"]),
       concurrentLimit: integer(session?.["concurrent-limit"]), cookieName: "__Host-SESSION", browserFamily: "OTHER",
       passwordFactorRequired: true },
-    loginPolicy: { proofMode: "http-bounded-v1",
+    loginPolicy: { proofMode: "http-bounded-v1", verificationConcurrency: integer(login?.["verification-concurrency"]),
       address: { maxFailures: integer(login?.address?.["max-failures"]),
         windowMilliseconds: duration(login?.address?.window), blockMilliseconds: duration(login?.address?.block) },
       global: { threshold: integer(login?.global?.threshold), windowMilliseconds: duration(login?.global?.window) } }

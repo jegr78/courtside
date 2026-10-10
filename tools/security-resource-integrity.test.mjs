@@ -260,7 +260,7 @@ function scriptFixtureStates(journal, clock) {
   const addressHash = createHash("sha256").update(`login:${sourceAddress}`).digest("hex");
   const globalHash = createHash("sha256").update("all").digest("hex");
   input.contract.authentication.loginSubjects = [{ scope: "ADDRESS", subjectHash: addressHash }, { scope: "GLOBAL", subjectHash: globalHash }];
-  input.contract.authentication.loginPolicy = { proofMode: "http-bounded-v1", sourceAddress,
+  input.contract.authentication.loginPolicy = { proofMode: "http-bounded-v1", sourceAddress, verificationConcurrency: 2,
     address: { maxFailures: 5, windowMilliseconds: 60000, blockMilliseconds: 60000 }, global: { windowMilliseconds: 60000 } };
   input.after.tables.login_attempt_limit.rows.push(row("login_attempt_limit", { scope: "GLOBAL", subject_hash: globalHash,
     attempt_count: journal.operations.filter((operation) => operation.kind === "login").length,
@@ -279,7 +279,7 @@ function loginBuckets(input) {
   input.contract.authentication.loginSubjects = [
     { scope: "ADDRESS", subjectHash: addressHash }, { scope: "GLOBAL", subjectHash: globalHash }
   ];
-  input.contract.authentication.loginPolicy = { sourceAddress,
+  input.contract.authentication.loginPolicy = { sourceAddress, verificationConcurrency: 2,
     address: { maxFailures: 5, windowMilliseconds: 60000, blockMilliseconds: 60000 },
     global: { windowMilliseconds: 60000 } };
   input.journal.loginTransitionsComplete = true;
@@ -1596,6 +1596,28 @@ test("given a bucket that counted a capacity refusal, when Retry-After one recor
   const result = compareResourceIntegrity(input);
   // then
   assert.equal(result.outcome, "failed", "a capacity refusal must not appear in any login bucket");
+});
+
+test("given Retry-After one while no verification ran and no block was ending, when bounding the refusal, then integrity fails", () => {
+  // given
+  const input = httpBuckets(fixture());
+  input.journal.operations.push({ id: "unexplained-refusal", kind: "login", status: 429, sourceAddress: "172.20.0.2",
+    startedAt: "2026-10-05T10:00:10.500Z", endedAt: "2026-10-05T10:00:10.600Z", retryAfterSeconds: 1,
+    problemType: "urn:courtside:error:login-rate-limited" });
+  // when
+  const result = compareResourceIntegrity(input);
+  // then
+  assert.equal(result.outcome, "failed", "Retry-After one needs a full verification capacity or an ending block");
+});
+
+test("given a login policy without its verification capacity, when proving HTTP logins, then the proof stays incomplete", () => {
+  // given
+  const input = httpBuckets(fixture());
+  delete input.contract.authentication.loginPolicy.verificationConcurrency;
+  // when
+  const result = compareResourceIntegrity(input);
+  // then
+  assert.equal(result.outcome, "incomplete", "a capacity refusal cannot be bounded without the configured capacity");
 });
 
 test("given capacity refusals among counted failures, when the buckets hold only the failures, then integrity passes", () => {

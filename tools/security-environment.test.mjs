@@ -1110,7 +1110,7 @@ test("given the actual candidate configuration and security overrides, when bind
   // then
   assert.deepEqual(result.sessionPolicy, { inactivitySeconds: 1800, absoluteLifetimeMilliseconds: 86400000,
     concurrentLimit: 5, cookieName: "__Host-SESSION", browserFamily: "OTHER", passwordFactorRequired: true });
-  assert.deepEqual(result.loginPolicy, { proofMode: "http-bounded-v1",
+  assert.deepEqual(result.loginPolicy, { proofMode: "http-bounded-v1", verificationConcurrency: 2,
     address: { maxFailures: 5, windowMilliseconds: 60000, blockMilliseconds: 60000 },
     global: { threshold: 20, windowMilliseconds: 60000 } });
 });
