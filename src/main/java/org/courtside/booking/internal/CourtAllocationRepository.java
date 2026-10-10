@@ -88,15 +88,16 @@ public interface CourtAllocationRepository extends JpaRepository<CourtAllocation
                                                    @Param("openTime") String openTime);
 
     @Query("""
-            SELECT DISTINCT a.courtId FROM CourtAllocation a
+            SELECT new org.courtside.booking.internal.CourtOccupancy(a.courtId, a.startsAt, a.endsAt)
+            FROM CourtAllocation a
             WHERE a.courtId IN :courtIds
               AND a.status = org.courtside.booking.BookingStatus.CONFIRMED
               AND a.startsAt < :endsAt
               AND a.endsAt > :startsAt
             """)
-    List<UUID> findOccupiedCourts(@Param("courtIds") Collection<UUID> courtIds,
-                                  @Param("startsAt") Instant startsAt,
-                                  @Param("endsAt") Instant endsAt);
+    List<CourtOccupancy> findOccupancies(@Param("courtIds") Collection<UUID> courtIds,
+                                         @Param("startsAt") Instant startsAt,
+                                         @Param("endsAt") Instant endsAt);
 
     @Query("""
             SELECT DISTINCT a.courtId FROM CourtAllocation a

@@ -29,6 +29,7 @@ import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingRuleGate;
 import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.booking.internal.CourtAllocationRepository;
+import org.courtside.booking.internal.CourtOccupancy;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
@@ -106,9 +107,11 @@ public class SeriesService {
                         bookedBy, bookedByPersonId, callerRoles))
                 .toList();
         List<List<RuleViolation>> violations = ruleGate.violationsFor(checks);
+        List<CourtOccupancy> occupancies = occupancies(rule, expansion.slots());
         List<SeriesPreview.Occurrence> occurrences = IntStream.range(0, expansion.slots().size())
                 .mapToObj(index -> new SeriesPreview.Occurrence(
-                        expansion.slots().get(index), blockedCourts(rule, expansion.slots().get(index)),
+                        expansion.slots().get(index),
+                        blockedCourts(rule, expansion.slots().get(index), occupancies),
                         violations.get(index)))
                 .toList();
         return new SeriesPreview(occurrences, expansion.truncatedByHorizon(), expansion.horizonLimit());
@@ -461,7 +464,19 @@ public class SeriesService {
         }
     }
 
-    private List<UUID> blockedCourts(SeriesRule rule, TimeSlot slot) {
-        return allocations.findOccupiedCourts(rule.courtIds(), slot.start(), slot.end());
+    private List<CourtOccupancy> occupancies(SeriesRule rule, List<TimeSlot> slots) {
+        if (slots.isEmpty()) {
+            return List.of();
+        }
+        Instant from = slots.stream().map(TimeSlot::start).min(Instant::compareTo).orElseThrow();
+        Instant to = slots.stream().map(TimeSlot::end).max(Instant::compareTo).orElseThrow();
+        return allocations.findOccupancies(rule.courtIds(), from, to);
+    }
+
+    private static List<UUID> blockedCourts(SeriesRule rule, TimeSlot slot, List<CourtOccupancy> occupancies) {
+        return rule.courtIds().stream()
+                .filter(court -> occupancies.stream()
+                        .anyMatch(occupancy -> occupancy.courtId().equals(court) && occupancy.overlaps(slot)))
+                .toList();
     }
 }
