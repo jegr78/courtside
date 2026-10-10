@@ -27,7 +27,9 @@ export function cumulativeReleaseNotes(changelog, tag) {
 
   const start = headings[0].index;
   const followingHeading = releaseHeadings.find((heading) => heading.index > start);
-  const notes = changelog.slice(start, followingHeading?.index).trimEnd();
+  // The changelog keeps each commit link; the release body names pull requests only to stay within GitHub's limit.
+  const notes = changelog.slice(start, followingHeading?.index)
+    .replace(/ \(\[[0-9a-f]{7,40}\]\(https:\/\/github\.com\/[^)\s]+\/commit\/[0-9a-f]{7,40}\)\)/g, "").trimEnd();
   if (line === "0.1.0" && /^### .*BREAKING CHANGES/m.test(notes)) {
     throw new Error("the initial 0.1.0 release must not claim breaking changes");
   }
