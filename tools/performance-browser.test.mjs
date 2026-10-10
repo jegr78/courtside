@@ -19,7 +19,8 @@ function startingToday(page, actions = []) {
   page.locator = (selector) => {
     if (selector.includes('aria-pressed="true"')) return { waitFor: async () => {} };
     if (selector.includes("day-selector-")) return { count: async () => 7, nth: index => ({
-      getAttribute: async name => name === "aria-pressed" ? String(index === selected) : `day-selector-2026-10-${5 + index}`,
+      getAttribute: async name => name === "aria-pressed" ? String(index === selected)
+        : `day-selector-2026-10-${String(5 + index).padStart(2, "0")}`,
       click: async () => { selected = index; actions.push(`day:${index}`); }
     }) };
     return locator(selector);
@@ -40,6 +41,21 @@ test("given a free slot today, when preparing a booking, then book from tomorrow
   await prepareBrowserBooking(page, 1);
   // then
   assert.deepEqual(actions.slice(0, 2), ["day:1", "slot"], "the journey must leave today before choosing a slot");
+});
+
+test("given today's slots still rendered after choosing tomorrow, when clicking a slot, then only tomorrow's date can match", async () => {
+  // given
+  const clicked = [];
+  const page = startingToday({
+    locator: selector => ({ count: async () => 1, waitFor: async () => {},
+      nth: () => ({ click: async () => clicked.push(selector), waitFor: async () => {} }) }),
+    getByTestId: () => ({ click: async () => {}, waitFor: async () => {}, fill: async () => {},
+      inputValue: async () => "Browser Test Guest" })
+  });
+  // when
+  await prepareBrowserBooking(page, 1);
+  // then
+  assert.match(clicked[0], /data-date="2026-10-06"/, "the slot selector must name the chosen day");
 });
 
 test("given a current-week slot, when preparing a booking, then expand the guest field before entering a participant", async () => {
@@ -73,15 +89,13 @@ test("given no remaining current-week slot, when preparing a booking, then use n
   // given
   const actions = [];
   let nextWeek = false;
-  const page = {
-    locator: selector => selector.includes("day-selector-")
-      ? { count: async () => 0, nth: () => ({ getAttribute: async () => "day-selector-2026-10-05" }) }
-      : { count: async () => nextWeek ? 1 : 0, nth: () => ({ click: async () => actions.push("slot"), waitFor: async () => {} }), waitFor: async () => {} },
+  const page = startingToday({
+    locator: () => ({ count: async () => nextWeek ? 1 : 0, nth: () => ({ click: async () => actions.push("slot"), waitFor: async () => {} }), waitFor: async () => {} }),
     getByTestId: (id) => ({
       click: async () => { actions.push(id); if (id === "week-next") nextWeek = true; },
       waitFor: async () => {}, fill: async () => {}, inputValue: async () => "Browser Test Guest"
     })
-  };
+  });
   // when
   await prepareBrowserBooking(page, 2);
   // then
@@ -160,15 +174,13 @@ test("given a delayed next-week grid, when no current-week slot remains, then wa
   // given
   let nextWeek = false;
   let loaded = false;
-  const page = { locator(selector) {
+  const page = startingToday({ locator(selector) {
     if (selector === 'div[data-testid="free-slot"]') return { nth: () => ({ waitFor: async () => {} }) };
-    if (selector.includes("day-selector-")) return { count: async () => 0,
-      nth: () => ({ getAttribute: async () => "day-selector-2026-10-05" }) };
     return { count: async () => { if (nextWeek) assert.equal(loaded, true); return nextWeek ? 1 : 0; },
       nth: () => ({ click: async () => {}, waitFor: async () => {} }), waitFor: async () => {} };
   }, getByTestId: id => ({ click: async () => { if (id === "week-next") nextWeek = true; },
     waitFor: async () => { if (id === "day-selector-2026-10-12") loaded = true; }, fill: async () => {},
-    inputValue: async () => "Browser Test Guest" }) };
+    inputValue: async () => "Browser Test Guest" }) });
   // when
   await prepareBrowserBooking(page, 1);
   // then
@@ -545,6 +557,8 @@ test("given a certificate verifier change again after the reload, when the journ
   assert.deepEqual(harness.events, ["goto", "goto"], "the page is loaded again only once");
   assert.deepEqual(harness.metrics.get("browser_errors").filter(value => value > 0), [1, 1],
     "a second verifier change is a browser error like any other failed request");
+  assert.ok(harness.logged.some(line => line.endsWith("net::ERR_CERT_VERIFIER_CHANGED during open sign-in")),
+    `a counted request failure must name the journey step, got ${JSON.stringify(harness.logged)}`);
 });
 
 test("given the sign-in navigation itself fails on a verifier change, when the journey opens sign-in, then it navigates again once instead of failing", async () => {
