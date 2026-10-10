@@ -40,7 +40,7 @@
         <frontend.skip>false</frontend.skip>
         <frontend.test.skip>${skipTests}</frontend.test.skip>
         <frontend.e2e.skip>${frontend.skip}</frontend.e2e.skip>
-        <openapi-generator.version>7.25.0</openapi-generator.version>
+        <openapi-generator.version>7.26.0</openapi-generator.version>
         <versions-maven-plugin.version>2.22.0</versions-maven-plugin.version>
         <frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
         <node.version>v26.5.1</node.version>
