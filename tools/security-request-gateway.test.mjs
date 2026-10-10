@@ -174,6 +174,29 @@ test("given an oversized body the client keeps uploading, when the gateway refus
   }
 });
 
+test("given an oversized body trickling in, when the gateway discards it, then the connection closes at the overall deadline", { timeout: 15000 }, async () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-trickle-"));
+  const { gatewayProcess, port } = await startGateway(directory);
+  const started = performance.now();
+  // when
+  const closedAfter = await new Promise((resolve) => {
+    const socket = connect(port, "127.0.0.1");
+    const trickle = setInterval(() => socket.write("x"), 1000);
+    socket.on("error", () => {});
+    socket.on("close", () => { clearInterval(trickle); resolve(performance.now() - started); });
+    socket.write("POST /api/session HTTP/1.1\r\nHost: scanner-gateway\r\n"
+      + "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: 2000001\r\n\r\n");
+  });
+  // then
+  try {
+    assert.ok(closedAfter < 8000, `a trickling upload must not hold the gateway past its deadline, held ${closedAfter} ms`);
+  } finally {
+    gatewayProcess.kill();
+    await once(gatewayProcess, "exit");
+  }
+});
+
 test("given repeated oversized requests, when native receipt storage fills, then keep the cap and report incomplete capture", async () => {
   // given
   const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-receipt-cap-"));

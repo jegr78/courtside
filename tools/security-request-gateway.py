@@ -137,10 +137,14 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
 
     # Closing over an unread body resets the connection, and a client still uploading never reads the refusal.
     def discard_body(self, remaining):
-        self.connection.settimeout(DISCARD_TIMEOUT_SECONDS)
+        deadline = time.monotonic() + DISCARD_TIMEOUT_SECONDS
         try:
             while remaining > 0:
-                chunk = self.rfile.read(min(remaining, 65536))
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    return
+                self.connection.settimeout(left)
+                chunk = self.rfile.read1(min(remaining, 65536))
                 if not chunk:
                     return
                 remaining -= len(chunk)
