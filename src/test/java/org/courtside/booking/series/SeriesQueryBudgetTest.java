@@ -87,7 +87,8 @@ class SeriesQueryBudgetTest extends AbstractIntegrationTest {
         assertStableRuleQueriesAreBounded(snapshot);
         // The time zone has its own lightweight entity so repeated reads share the persistence
         // context without making the main configuration query carry the uploaded logo bytes.
-        assertThat(snapshot.total()).as(snapshot.toString()).isLessThanOrEqualTo(count + 17L);
+        assertThat(snapshot.total()).as("occupancy is read once for the whole series, " + snapshot)
+                .isLessThanOrEqualTo(14L);
     }
 
     @ParameterizedTest
