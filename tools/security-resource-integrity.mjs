@@ -233,8 +233,8 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
           || !Number.isSafeInteger(operation.retryAfterSeconds) || operation.retryAfterSeconds < 1) {
         incomplete(); return;
       }
-      if (operation.retryAfterSeconds === 1) counted.push(operation);
-      else blocked.push(operation);
+      // Retry-After one may also be a full verification capacity, which records no attempt and no deadline.
+      if (operation.retryAfterSeconds > 1) blocked.push(operation);
     } else { incomplete(); return; }
   }
   const successes = counted.filter((operation) => operation.status === 200);
@@ -251,8 +251,7 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
   const priorBlock = priorAddress?.blocked_until == null ? null : instantNanoseconds(priorAddress.blocked_until);
   if (priorAddress?.blocked_until != null && priorBlock === null) { incomplete(); return; }
   if (priorBlock !== null && loginBegin !== null && priorBlock > loginBegin) {
-    if (priorBlock <= loginEnd || priorBlock - loginEnd <= 1000000000n
-        && failures.some((operation) => operation.status === 429 && operation.retryAfterSeconds === 1)) {
+    if (priorBlock <= loginEnd) {
       incomplete(); return;
     }
     if (counted.length) { failed(after.get("ADDRESS") ?? priorAddress); return; }
@@ -262,8 +261,7 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
   if (actualAddress?.blocked_until != null && deadline === null) { failed(actualAddress); return; }
   if (deadline !== null && nonSuccesses.length) {
     const pressureEnd = max(nonSuccesses.map(ends));
-    if (pressureEnd >= deadline || deadline - pressureEnd <= 1000000000n
-        && failures.some((operation) => operation.status === 429 && operation.retryAfterSeconds === 1)) {
+    if (pressureEnd >= deadline) {
       incomplete(); return;
     }
   }
