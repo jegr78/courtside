@@ -1,73 +1,7 @@
 # Changelog
 
-## [0.1.0-rc.12](https://github.com/jegr78/courtside/compare/v0.1.0-rc.11...v0.1.0-rc.12) (2026-10-10)
-
-
-### ⚠ BREAKING CHANGES
-
-* The documented container heap default is now 50 percent rather than 75 percent. Deployments relying on the previous default must re-qualify their workload.
-
-### Features
-
-* admit requests per principal by cost and bound demanding operations by class ([#1356](https://github.com/jegr78/courtside/issues/1356)) ([4342aab](https://github.com/jegr78/courtside/commit/4342aabdb264178f581cc19639e3a92e7cef69a8))
-* reuse immutable images for isolated qualification ([#1310](https://github.com/jegr78/courtside/issues/1310)) ([6761d91](https://github.com/jegr78/courtside/commit/6761d9167fdfb836437d57534bbd497d12bfc54b))
-* warm the hot request paths before the instance reports ready ([#1369](https://github.com/jegr78/courtside/issues/1369)) ([6fa93a0](https://github.com/jegr78/courtside/commit/6fa93a0621a9b3ba8901b96f6de7bf6fcca093c2))
-
-
-### Bug fixes
-
-* arm the destructive CPU breaker after a bounded warm-up of the target ([#1368](https://github.com/jegr78/courtside/issues/1368)) ([0cfdbb1](https://github.com/jegr78/courtside/commit/0cfdbb1d4593f09ba3c006833fa4861c7dfe3771))
-* avoid repeated court-plan availability calculations ([#1312](https://github.com/jegr78/courtside/issues/1312)) ([304f7ee](https://github.com/jegr78/courtside/commit/304f7eecfb11e0fd4d668b1a100f3950abae53d9))
-* avoid repeated validation of visible court-plan slots ([#1313](https://github.com/jegr78/courtside/issues/1313)) ([7d0ca45](https://github.com/jegr78/courtside/commit/7d0ca450447dec4e2d24ddbb22dae15b9eb3bcbf))
-* bound browser sign-in waiting under verification pressure ([#1306](https://github.com/jegr78/courtside/issues/1306)) ([23268e3](https://github.com/jegr78/courtside/commit/23268e3e211346e2611911c2f7b51c84f8682140))
-* choose an upgrade origin that registry retention keeps for the run ([#1340](https://github.com/jegr78/courtside/issues/1340)) ([e5c61da](https://github.com/jegr78/courtside/commit/e5c61da0dffb5abdfcdbe2eb8f80b786a97cbcdf))
-* compile the shipped JVM with C1 only ([#1367](https://github.com/jegr78/courtside/issues/1367)) ([855b97b](https://github.com/jegr78/courtside/commit/855b97b634e975a52acef250a1da95f97f872906))
-* deliver mail from a stored outbox instead of the request thread ([#1360](https://github.com/jegr78/courtside/issues/1360)) ([05cfb1a](https://github.com/jegr78/courtside/commit/05cfb1ad3ab91b99e21307da0c2a320fff46d8c9))
-* describe every failed performance request and refused journey ([#1327](https://github.com/jegr78/courtside/issues/1327)) ([70c3f7d](https://github.com/jegr78/courtside/commit/70c3f7d28ddb2cf95a5cde8c5453bdaa205e344b))
-* exercise valid bounded qualification journeys ([510e876](https://github.com/jegr78/courtside/commit/510e87699b2a80dad18bc295117e227ac55960db)), closes [#1295](https://github.com/jegr78/courtside/issues/1295)
-* exercise valid qualification browser and authorization journeys ([#1302](https://github.com/jegr78/courtside/issues/1302)) ([510e876](https://github.com/jegr78/courtside/commit/510e87699b2a80dad18bc295117e227ac55960db))
-* give every request transaction and statement a deadline that rolls it back ([#1359](https://github.com/jegr78/courtside/issues/1359)) ([b592b8b](https://github.com/jegr78/courtside/commit/b592b8b7be9368198efe9967c77ce62cb7f3b140))
-* keep a filtered access log on the performance and UAT proxies ([#1331](https://github.com/jegr78/courtside/issues/1331)) ([8da3318](https://github.com/jegr78/courtside/commit/8da33189c078073b80da08d1210b357f9207808c))
-* keep a record of what failed in a failed UAT smoke ([#1338](https://github.com/jegr78/courtside/issues/1338)) ([95018a4](https://github.com/jegr78/courtside/commit/95018a4800a5d159bf664260796e84ca9085d458))
-* keep every security assessment client meaningful under request budgets ([#1357](https://github.com/jegr78/courtside/issues/1357)) ([484715d](https://github.com/jegr78/courtside/commit/484715dee291ae100de3291f96fba320e3c12305))
-* keep pointer presses local and reuse booking time models ([#1318](https://github.com/jegr78/courtside/issues/1318)) ([e70aad1](https://github.com/jegr78/courtside/commit/e70aad128507d4ec31350aba20579175e75da2d6))
-* keep the cumulative release body within GitHub's limit ([#1383](https://github.com/jegr78/courtside/issues/1383)) ([c694c63](https://github.com/jegr78/courtside/commit/c694c63b43d0c263b6e0acd7134ce34b48a02c04))
-* keep the frontend's console warnings in the browser run log ([#1337](https://github.com/jegr78/courtside/issues/1337)) ([5744158](https://github.com/jegr78/courtside/commit/5744158c10a9298e8abb253dacbe99c8fc7a39c5)), closes [#1325](https://github.com/jegr78/courtside/issues/1325)
-* keep the mail recovery password out of Stalwart's hash formats ([#1291](https://github.com/jegr78/courtside/issues/1291)) ([82f526b](https://github.com/jegr78/courtside/commit/82f526b7cfd146860ef34968cea9b7898e3c9704))
-* keep why a security assessment step ended incomplete ([#1339](https://github.com/jegr78/courtside/issues/1339)) ([6b596c2](https://github.com/jegr78/courtside/commit/6b596c255f35616620237cfb72c7cd7eae657cab))
-* let the browser journey enter its guest only into a settled, open dialog ([#1334](https://github.com/jegr78/courtside/issues/1334)) ([69aec3f](https://github.com/jegr78/courtside/commit/69aec3f71ff4c04b7afdf2a0299ca2989006b0bf))
-* let the destructive and browser qualification measure the product instead of the harness ([#1381](https://github.com/jegr78/courtside/issues/1381)) ([e2a63eb](https://github.com/jegr78/courtside/commit/e2a63eb5a185918fe0be7f59e9e4d98c7f3a8602))
-* let the mail certificate helper read the store only once its watch exists ([#1336](https://github.com/jegr78/courtside/issues/1336)) ([0fafd2f](https://github.com/jegr78/courtside/commit/0fafd2f4d230f2f26b5704df2a1e3909071f01a8))
-* log every refused request at the default log level ([#1330](https://github.com/jegr78/courtside/issues/1330)) ([c64503f](https://github.com/jegr78/courtside/commit/c64503f2765d0b511efd04a929c32224a4147e93)), closes [#1321](https://github.com/jegr78/courtside/issues/1321)
-* name swallowed API failures on the booking path in the console ([#1332](https://github.com/jegr78/courtside/issues/1332)) ([bb1c226](https://github.com/jegr78/courtside/commit/bb1c2264db26679efa9d2439b028f3f0ddf66ba1))
-* pass every recorded deployment value to the security run's commands ([#1345](https://github.com/jegr78/courtside/issues/1345)) ([bcb34cd](https://github.com/jegr78/courtside/commit/bcb34cd6c2b638ac4fd9c516b04445f995c4d1c1))
-* prove resource-abuse integrity before cleanup ([#1307](https://github.com/jegr78/courtside/issues/1307)) ([6f26d04](https://github.com/jegr78/courtside/commit/6f26d04a9eea85255df6c5c772be7b34cc4f7c88))
-* read a series preview's court occupancy with one query ([#1380](https://github.com/jegr78/courtside/issues/1380)) ([026a3e9](https://github.com/jegr78/courtside/commit/026a3e96da9b7b0f4e90883be4dff3d7746fcc64))
-* read the created booking's id from its location in the browser journey ([#1349](https://github.com/jegr78/courtside/issues/1349)) ([4e1c77d](https://github.com/jegr78/courtside/commit/4e1c77d4d25ca77c7f669e7b34cdbcd45cef78f0))
-* read the created booking's location from k6's header map ([#1363](https://github.com/jegr78/courtside/issues/1363)) ([2cc3f1e](https://github.com/jegr78/courtside/commit/2cc3f1ed8b73c53f9c6c75d5a87c4f19c72ede75))
-* reload the sign-in page once after a certificate verifier change on the first load ([#1348](https://github.com/jegr78/courtside/issues/1348)) ([963c714](https://github.com/jegr78/courtside/commit/963c7148ecf43ecc8bb6d5e856836b0235dcf610)), closes [#1344](https://github.com/jegr78/courtside/issues/1344)
-* renew each actor's recent authentication proof during the authorization matrix ([#1346](https://github.com/jegr78/courtside/issues/1346)) ([b7b1058](https://github.com/jegr78/courtside/commit/b7b10587685a186814bf498bf7761d866d83aaa5)), closes [#1342](https://github.com/jegr78/courtside/issues/1342)
-* reserve half of container memory outside the Java heap ([#1304](https://github.com/jegr78/courtside/issues/1304)) ([5bbf049](https://github.com/jegr78/courtside/commit/5bbf0496f337264d02a96b81f1c557beb7cf37ef)), closes [#1296](https://github.com/jegr78/courtside/issues/1296)
-* resolve the calendar time zone once per render ([#1315](https://github.com/jegr78/courtside/issues/1315)) ([93a767d](https://github.com/jegr78/courtside/commit/93a767d9a5629882f266180ec265ff42460871f0))
-* reuse bounded date formatters in court-plan rendering ([#1305](https://github.com/jegr78/courtside/issues/1305)) ([9e4449a](https://github.com/jegr78/courtside/commit/9e4449a7c73a5b560333949e61d131051073b253))
-* reuse court-plan boundaries and unchanged day cells ([#1314](https://github.com/jegr78/courtside/issues/1314)) ([d0ba80a](https://github.com/jegr78/courtside/commit/d0ba80a6129c73c12a09385864b2fc76c696d0c3))
-* reuse exact zone-offset probes when resolving a week ([#1317](https://github.com/jegr78/courtside/issues/1317)) ([0ab8c5b](https://github.com/jegr78/courtside/commit/0ab8c5b6b0cbe682c2c3b28e5d7adee9ed43041a))
-* reuse unchanged court-plan slot geometry ([7d0ca45](https://github.com/jegr78/courtside/commit/7d0ca450447dec4e2d24ddbb22dae15b9eb3bcbf))
-* sample the destructive warm-up without the gateway and reopen sign-in after a verifier change ([#1370](https://github.com/jegr78/courtside/issues/1370)) ([168b12f](https://github.com/jegr78/courtside/commit/168b12f434466d1e6dc97472b3300e60a179bc15))
-* start performance runs on a rootless Docker daemon ([#1329](https://github.com/jegr78/courtside/issues/1329)) ([29516a6](https://github.com/jegr78/courtside/commit/29516a6bac651395b8d383a94024bee8390060f7)), closes [#1326](https://github.com/jegr78/courtside/issues/1326)
-* stop a successful sign-in from resetting its address's failed-login count ([#1347](https://github.com/jegr78/courtside/issues/1347)) ([e8e3d87](https://github.com/jegr78/courtside/commit/e8e3d872b67e9acdecea7b0e338b080b96ad7d40))
-* stop offering a slot in the court plan once it has started ([#1328](https://github.com/jegr78/courtside/issues/1328)) ([179dbea](https://github.com/jegr78/courtside/commit/179dbeacf61b8bec5b410da078f345f455c2f896)), closes [#1319](https://github.com/jegr78/courtside/issues/1319)
-* take login verification capacity before recording the attempt ([#1358](https://github.com/jegr78/courtside/issues/1358)) ([d625b68](https://github.com/jegr78/courtside/commit/d625b68cf26d5ed6a618ef5c28ba159e55d668ec)), closes [#1352](https://github.com/jegr78/courtside/issues/1352)
-
-
-### Build and dependencies
-
-* **deps-dev:** bump source-map-js from 1.2.1 to 1.2.2 in /frontend ([#1309](https://github.com/jegr78/courtside/issues/1309)) ([f4e278b](https://github.com/jegr78/courtside/commit/f4e278b0baeaf638a8d9a4cc65616423376f76cf))
-* **deps-dev:** bump source-map-js from 1.2.1 to 1.2.2 in /site ([#1308](https://github.com/jegr78/courtside/issues/1308)) ([a7c9942](https://github.com/jegr78/courtside/commit/a7c9942005dbe077cedd3fc8428ea9f730c74efa))
-* **deps:** update build tooling and frontend dependencies ([#1382](https://github.com/jegr78/courtside/issues/1382)) ([ff18643](https://github.com/jegr78/courtside/commit/ff1864371bb4b1a3394881f1a3718d7ca90ae8dd))
-* graduate the 0.1.0 candidate line ([#1289](https://github.com/jegr78/courtside/issues/1289)) ([ddf5aa1](https://github.com/jegr78/courtside/commit/ddf5aa107a7622f820503b120edb28c6848daebe))
-
 ## 0.1.0 (2026-09-14)
+
 
 
 
@@ -81,6 +15,8 @@
 
 ### Notable changes
 
+* The documented container heap default is now 50 percent rather than 75 percent. Deployments relying on the previous default must re-qualify their workload.
+
 * bundled PostgreSQL 18 deployments bind the generated COURTSIDE_DATABASE_VOLUME explicitly.
 * the reference deployment requires PostgreSQL 18, and the database volume is mounted at /var/lib/postgresql. A data directory written by PostgreSQL 17 does not start under the new image; no release has been published with PostgreSQL 17.
 
@@ -91,6 +27,10 @@
 * **api:** validation codes in fieldErrors entries change for missing, blank, non-positive and unknown-enum values, and field names now carry array indices. The problem type, the status and the fieldErrors shape are unchanged.
 
 ### Features
+
+* admit requests per principal by cost and bound demanding operations by class ([#1356](https://github.com/jegr78/courtside/issues/1356)) ([4342aab](https://github.com/jegr78/courtside/commit/4342aabdb264178f581cc19639e3a92e7cef69a8))
+* reuse immutable images for isolated qualification ([#1310](https://github.com/jegr78/courtside/issues/1310)) ([6761d91](https://github.com/jegr78/courtside/commit/6761d9167fdfb836437d57534bbd497d12bfc54b))
+* warm the hot request paths before the instance reports ready ([#1369](https://github.com/jegr78/courtside/issues/1369)) ([6fa93a0](https://github.com/jegr78/courtside/commit/6fa93a0621a9b3ba8901b96f6de7bf6fcca093c2))
 
 * let operators prune old releases and recovery units ([#1222](https://github.com/jegr78/courtside/issues/1222)) ([40f2369](https://github.com/jegr78/courtside/commit/40f23694b89367f19f9e70da945a077e41c50436))
 * show the club's name in an installed app opened offline ([#1256](https://github.com/jegr78/courtside/issues/1256)) ([cc3a246](https://github.com/jegr78/courtside/commit/cc3a24660205848c8e89ea218b83523e5b0f6298))
@@ -260,6 +200,49 @@
 * write to a member in the language they read ([#447](https://github.com/jegr78/courtside/issues/447)) ([596ce57](https://github.com/jegr78/courtside/commit/596ce576320ebf65ae3727d3e5059afdac42c5ef))
 
 ### Bug fixes
+
+* arm the destructive CPU breaker after a bounded warm-up of the target ([#1368](https://github.com/jegr78/courtside/issues/1368)) ([0cfdbb1](https://github.com/jegr78/courtside/commit/0cfdbb1d4593f09ba3c006833fa4861c7dfe3771))
+* avoid repeated court-plan availability calculations ([#1312](https://github.com/jegr78/courtside/issues/1312)) ([304f7ee](https://github.com/jegr78/courtside/commit/304f7eecfb11e0fd4d668b1a100f3950abae53d9))
+* avoid repeated validation of visible court-plan slots ([#1313](https://github.com/jegr78/courtside/issues/1313)) ([7d0ca45](https://github.com/jegr78/courtside/commit/7d0ca450447dec4e2d24ddbb22dae15b9eb3bcbf))
+* bound browser sign-in waiting under verification pressure ([#1306](https://github.com/jegr78/courtside/issues/1306)) ([23268e3](https://github.com/jegr78/courtside/commit/23268e3e211346e2611911c2f7b51c84f8682140))
+* choose an upgrade origin that registry retention keeps for the run ([#1340](https://github.com/jegr78/courtside/issues/1340)) ([e5c61da](https://github.com/jegr78/courtside/commit/e5c61da0dffb5abdfcdbe2eb8f80b786a97cbcdf))
+* compile the shipped JVM with C1 only ([#1367](https://github.com/jegr78/courtside/issues/1367)) ([855b97b](https://github.com/jegr78/courtside/commit/855b97b634e975a52acef250a1da95f97f872906))
+* deliver mail from a stored outbox instead of the request thread ([#1360](https://github.com/jegr78/courtside/issues/1360)) ([05cfb1a](https://github.com/jegr78/courtside/commit/05cfb1ad3ab91b99e21307da0c2a320fff46d8c9))
+* describe every failed performance request and refused journey ([#1327](https://github.com/jegr78/courtside/issues/1327)) ([70c3f7d](https://github.com/jegr78/courtside/commit/70c3f7d28ddb2cf95a5cde8c5453bdaa205e344b))
+* exercise valid bounded qualification journeys ([510e876](https://github.com/jegr78/courtside/commit/510e87699b2a80dad18bc295117e227ac55960db)), closes [#1295](https://github.com/jegr78/courtside/issues/1295)
+* exercise valid qualification browser and authorization journeys ([#1302](https://github.com/jegr78/courtside/issues/1302)) ([510e876](https://github.com/jegr78/courtside/commit/510e87699b2a80dad18bc295117e227ac55960db))
+* give every request transaction and statement a deadline that rolls it back ([#1359](https://github.com/jegr78/courtside/issues/1359)) ([b592b8b](https://github.com/jegr78/courtside/commit/b592b8b7be9368198efe9967c77ce62cb7f3b140))
+* keep a filtered access log on the performance and UAT proxies ([#1331](https://github.com/jegr78/courtside/issues/1331)) ([8da3318](https://github.com/jegr78/courtside/commit/8da33189c078073b80da08d1210b357f9207808c))
+* keep a record of what failed in a failed UAT smoke ([#1338](https://github.com/jegr78/courtside/issues/1338)) ([95018a4](https://github.com/jegr78/courtside/commit/95018a4800a5d159bf664260796e84ca9085d458))
+* keep every security assessment client meaningful under request budgets ([#1357](https://github.com/jegr78/courtside/issues/1357)) ([484715d](https://github.com/jegr78/courtside/commit/484715dee291ae100de3291f96fba320e3c12305))
+* keep pointer presses local and reuse booking time models ([#1318](https://github.com/jegr78/courtside/issues/1318)) ([e70aad1](https://github.com/jegr78/courtside/commit/e70aad128507d4ec31350aba20579175e75da2d6))
+* keep the cumulative release body within GitHub's limit ([#1383](https://github.com/jegr78/courtside/issues/1383)) ([c694c63](https://github.com/jegr78/courtside/commit/c694c63b43d0c263b6e0acd7134ce34b48a02c04))
+* keep the frontend's console warnings in the browser run log ([#1337](https://github.com/jegr78/courtside/issues/1337)) ([5744158](https://github.com/jegr78/courtside/commit/5744158c10a9298e8abb253dacbe99c8fc7a39c5)), closes [#1325](https://github.com/jegr78/courtside/issues/1325)
+* keep the mail recovery password out of Stalwart's hash formats ([#1291](https://github.com/jegr78/courtside/issues/1291)) ([82f526b](https://github.com/jegr78/courtside/commit/82f526b7cfd146860ef34968cea9b7898e3c9704))
+* keep why a security assessment step ended incomplete ([#1339](https://github.com/jegr78/courtside/issues/1339)) ([6b596c2](https://github.com/jegr78/courtside/commit/6b596c255f35616620237cfb72c7cd7eae657cab))
+* let the browser journey enter its guest only into a settled, open dialog ([#1334](https://github.com/jegr78/courtside/issues/1334)) ([69aec3f](https://github.com/jegr78/courtside/commit/69aec3f71ff4c04b7afdf2a0299ca2989006b0bf))
+* let the destructive and browser qualification measure the product instead of the harness ([#1381](https://github.com/jegr78/courtside/issues/1381)) ([e2a63eb](https://github.com/jegr78/courtside/commit/e2a63eb5a185918fe0be7f59e9e4d98c7f3a8602))
+* let the mail certificate helper read the store only once its watch exists ([#1336](https://github.com/jegr78/courtside/issues/1336)) ([0fafd2f](https://github.com/jegr78/courtside/commit/0fafd2f4d230f2f26b5704df2a1e3909071f01a8))
+* log every refused request at the default log level ([#1330](https://github.com/jegr78/courtside/issues/1330)) ([c64503f](https://github.com/jegr78/courtside/commit/c64503f2765d0b511efd04a929c32224a4147e93)), closes [#1321](https://github.com/jegr78/courtside/issues/1321)
+* name swallowed API failures on the booking path in the console ([#1332](https://github.com/jegr78/courtside/issues/1332)) ([bb1c226](https://github.com/jegr78/courtside/commit/bb1c2264db26679efa9d2439b028f3f0ddf66ba1))
+* pass every recorded deployment value to the security run's commands ([#1345](https://github.com/jegr78/courtside/issues/1345)) ([bcb34cd](https://github.com/jegr78/courtside/commit/bcb34cd6c2b638ac4fd9c516b04445f995c4d1c1))
+* prove resource-abuse integrity before cleanup ([#1307](https://github.com/jegr78/courtside/issues/1307)) ([6f26d04](https://github.com/jegr78/courtside/commit/6f26d04a9eea85255df6c5c772be7b34cc4f7c88))
+* read a series preview's court occupancy with one query ([#1380](https://github.com/jegr78/courtside/issues/1380)) ([026a3e9](https://github.com/jegr78/courtside/commit/026a3e96da9b7b0f4e90883be4dff3d7746fcc64))
+* read the created booking's id from its location in the browser journey ([#1349](https://github.com/jegr78/courtside/issues/1349)) ([4e1c77d](https://github.com/jegr78/courtside/commit/4e1c77d4d25ca77c7f669e7b34cdbcd45cef78f0))
+* read the created booking's location from k6's header map ([#1363](https://github.com/jegr78/courtside/issues/1363)) ([2cc3f1e](https://github.com/jegr78/courtside/commit/2cc3f1ed8b73c53f9c6c75d5a87c4f19c72ede75))
+* reload the sign-in page once after a certificate verifier change on the first load ([#1348](https://github.com/jegr78/courtside/issues/1348)) ([963c714](https://github.com/jegr78/courtside/commit/963c7148ecf43ecc8bb6d5e856836b0235dcf610)), closes [#1344](https://github.com/jegr78/courtside/issues/1344)
+* renew each actor's recent authentication proof during the authorization matrix ([#1346](https://github.com/jegr78/courtside/issues/1346)) ([b7b1058](https://github.com/jegr78/courtside/commit/b7b10587685a186814bf498bf7761d866d83aaa5)), closes [#1342](https://github.com/jegr78/courtside/issues/1342)
+* reserve half of container memory outside the Java heap ([#1304](https://github.com/jegr78/courtside/issues/1304)) ([5bbf049](https://github.com/jegr78/courtside/commit/5bbf0496f337264d02a96b81f1c557beb7cf37ef)), closes [#1296](https://github.com/jegr78/courtside/issues/1296)
+* resolve the calendar time zone once per render ([#1315](https://github.com/jegr78/courtside/issues/1315)) ([93a767d](https://github.com/jegr78/courtside/commit/93a767d9a5629882f266180ec265ff42460871f0))
+* reuse bounded date formatters in court-plan rendering ([#1305](https://github.com/jegr78/courtside/issues/1305)) ([9e4449a](https://github.com/jegr78/courtside/commit/9e4449a7c73a5b560333949e61d131051073b253))
+* reuse court-plan boundaries and unchanged day cells ([#1314](https://github.com/jegr78/courtside/issues/1314)) ([d0ba80a](https://github.com/jegr78/courtside/commit/d0ba80a6129c73c12a09385864b2fc76c696d0c3))
+* reuse exact zone-offset probes when resolving a week ([#1317](https://github.com/jegr78/courtside/issues/1317)) ([0ab8c5b](https://github.com/jegr78/courtside/commit/0ab8c5b6b0cbe682c2c3b28e5d7adee9ed43041a))
+* reuse unchanged court-plan slot geometry ([7d0ca45](https://github.com/jegr78/courtside/commit/7d0ca450447dec4e2d24ddbb22dae15b9eb3bcbf))
+* sample the destructive warm-up without the gateway and reopen sign-in after a verifier change ([#1370](https://github.com/jegr78/courtside/issues/1370)) ([168b12f](https://github.com/jegr78/courtside/commit/168b12f434466d1e6dc97472b3300e60a179bc15))
+* start performance runs on a rootless Docker daemon ([#1329](https://github.com/jegr78/courtside/issues/1329)) ([29516a6](https://github.com/jegr78/courtside/commit/29516a6bac651395b8d383a94024bee8390060f7)), closes [#1326](https://github.com/jegr78/courtside/issues/1326)
+* stop a successful sign-in from resetting its address's failed-login count ([#1347](https://github.com/jegr78/courtside/issues/1347)) ([e8e3d87](https://github.com/jegr78/courtside/commit/e8e3d872b67e9acdecea7b0e338b080b96ad7d40))
+* stop offering a slot in the court plan once it has started ([#1328](https://github.com/jegr78/courtside/issues/1328)) ([179dbea](https://github.com/jegr78/courtside/commit/179dbeacf61b8bec5b410da078f345f455c2f896)), closes [#1319](https://github.com/jegr78/courtside/issues/1319)
+* take login verification capacity before recording the attempt ([#1358](https://github.com/jegr78/courtside/issues/1358)) ([d625b68](https://github.com/jegr78/courtside/commit/d625b68cf26d5ed6a618ef5c28ba159e55d668ec)), closes [#1352](https://github.com/jegr78/courtside/issues/1352)
 
 * let the court plan stand at the current time before it is shown ([#1287](https://github.com/jegr78/courtside/issues/1287)) ([15a63de](https://github.com/jegr78/courtside/commit/15a63de61e98234703d8ad668dcfd6d97efd76ef))
 
@@ -577,6 +560,11 @@
 
 ### Build and dependencies
 
+* **deps-dev:** bump source-map-js from 1.2.1 to 1.2.2 in /frontend ([#1309](https://github.com/jegr78/courtside/issues/1309)) ([f4e278b](https://github.com/jegr78/courtside/commit/f4e278b0baeaf638a8d9a4cc65616423376f76cf))
+* **deps-dev:** bump source-map-js from 1.2.1 to 1.2.2 in /site ([#1308](https://github.com/jegr78/courtside/issues/1308)) ([a7c9942](https://github.com/jegr78/courtside/commit/a7c9942005dbe077cedd3fc8428ea9f730c74efa))
+* **deps:** update build tooling and frontend dependencies ([#1382](https://github.com/jegr78/courtside/issues/1382)) ([ff18643](https://github.com/jegr78/courtside/commit/ff1864371bb4b1a3394881f1a3718d7ca90ae8dd))
+* graduate the 0.1.0 candidate line ([#1289](https://github.com/jegr78/courtside/issues/1289)) ([ddf5aa1](https://github.com/jegr78/courtside/commit/ddf5aa107a7622f820503b120edb28c6848daebe))
+
 * **deps-dev:** bump the frontend-minor-and-patch group across 1 directory with 3 updates ([#1284](https://github.com/jegr78/courtside/issues/1284)) ([5410445](https://github.com/jegr78/courtside/commit/5410445cd9f16d27b62b372f4cd2c3f774c56f7d))
 * **deps:** bump Maven, deployment images, msw and the frontend group ([#1279](https://github.com/jegr78/courtside/issues/1279)) ([23ae4e9](https://github.com/jegr78/courtside/commit/23ae4e936056ee908baff33e75970498e753f857))
 
@@ -650,3 +638,4 @@ the same way.
   longer reach it.
 - **fix: let a member book when the club serves Courtside without TLS**
   ([#319](https://github.com/jegr78/courtside/pull/319))
+
