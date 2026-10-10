@@ -194,7 +194,9 @@ since the preceding candidate; the release-please workflow then folds those entr
 opens that section, and graduating to the release folds the last delta into it and dates it with the
 release. The normalizer refuses multiple candidate deltas and duplicate sections instead of guessing. The
 release workflow independently rejects a missing or split section and uses that complete section
-for both candidate and stable GitHub release notes.
+for both candidate and stable GitHub release notes. The release body drops each entry's commit link
+and keeps its pull request, so the cumulative first line stays within GitHub's release body limit;
+`CHANGELOG.md` keeps both.
 
 None of that applies to the very first release, because there is nothing to bump from: with no
 release in the history release-please never asks the versioning strategy at all and takes

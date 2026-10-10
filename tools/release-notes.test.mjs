@@ -67,6 +67,25 @@ test("given this repository's changelog, when its release line is cut, then GitH
   assert.ok(notes.length <= RELEASE_NOTES_LIMIT, `the 0.1.0 notes have ${notes.length} characters`);
 });
 
+test("given release-please entries whose commit links exceed the body limit, when notes are cut, then they keep their pull requests and drop the commit links", () => {
+  // given
+  const entry = (number) => `* change number ${number} lands for members `
+    + `([#${number}](https://github.com/jegr78/courtside/issues/${number})) `
+    + `([4342aab](https://github.com/jegr78/courtside/commit/4342aabdb264178f581cc19639e3a92e7cef69a8))\n`;
+  const changelog = `# Changelog\n\n## 0.1.0 (2026-09-14)\n\n### Bug Fixes\n\n${
+    Array.from({ length: 700 }, (_, index) => entry(1000 + index)).join("")}`;
+  assert.ok(changelog.length > RELEASE_NOTES_LIMIT, "the fixture must exceed the limit with its commit links");
+
+  // when
+  const notes = cumulativeReleaseNotes(changelog, "v0.1.0-rc.12");
+
+  // then
+  assert.ok(notes.length <= RELEASE_NOTES_LIMIT, `the notes have ${notes.length} characters`);
+  assert.doesNotMatch(notes, /\/commit\//, "the release body must not carry commit links");
+  assert.match(notes, /^\* change number 1699 lands for members \(\[#1699\]\(https:\/\/github\.com\/jegr78\/courtside\/issues\/1699\)\)$/m,
+    "every entry must keep its pull request link");
+});
+
 test("given a release line longer than GitHub stores, when its notes are cut, then the build refuses it", () => {
   // given
   const changelog = `# Changelog\n\n## 0.2.0\n\n### Features\n\n${"* entry\n".repeat(20000)}`;
