@@ -22,9 +22,21 @@ jobs:
       - uses: ./.github/actions/tool-dependencies
       - name: Prepare evidence directory
         run: mkdir -p build/dependency-action-smoke
+      - id: smoke-image
+        name: Resolve the deployment image
+        run: |
+          node <<'JS'
+          const { readFileSync, appendFileSync } = require("node:fs");
+          const yaml = require("./frontend/node_modules/js-yaml");
+          const image = yaml.load(readFileSync("deploy/compose.yaml", "utf8")).services.db.image;
+          if (!/^postgres:[^\s@]+@sha256:[a-f0-9]{64}$/.test(image)) {
+            throw new Error("The deployment database image must be digest-pinned");
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `image=${image}\n`);
+          JS
       - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c
         with:
-          image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+          image: ${{ steps.smoke-image.outputs.image }}
           output-file: build/dependency-action-smoke/image.spdx.json
           upload-artifact: false
       - name: Verify generated SBOM
