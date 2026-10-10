@@ -243,7 +243,7 @@ jobs:
                 outcome: (if $journey == "success" then "passed" else "failed" end)}],
               outcome: (if $journey == "success" then "passed" else "failed" end)}' \
             > build/deployment-mail/result.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: deployment-mail-qualification
@@ -336,7 +336,7 @@ jobs:
       - name: Remove the disposable security target
         if: always()
         run: node tools/courtside.mjs security-cleanup "$RUN_ID"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: release-active-security
@@ -396,7 +396,7 @@ jobs:
           --source-subject "$SOURCE_COMMIT"
           --output build/security-record.json
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-security-record-input
           path: build/security-record.json
@@ -489,7 +489,7 @@ jobs:
           COURTSIDE_UPGRADE_CANDIDATE_IMAGE: ${{ steps.image.outputs.reference }}
         run: node tools/courtside.upgrade-smoke.mjs --confirm courtside-upgrade
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: ${{ inputs.run-label }}-database-upgrade-${{ matrix.origin.ref }}
@@ -534,7 +534,7 @@ jobs:
           COURTSIDE_RESTORE_IMAGE: ${{ steps.image.outputs.reference }}
         run: node tools/courtside.restore-smoke.mjs --confirm courtside-restore
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: database-restore

@@ -115,7 +115,7 @@ jobs:
             SELECTED=$(jq -nr --argjson jobs "$JOBS" --arg job "$job" '($jobs | index($job)) != null')
             echo "$job=$SELECTED" >> "$GITHUB_OUTPUT"
           done
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: test-profile-plan-${{ github.run_id }}-${{ github.run_attempt }}
@@ -235,7 +235,7 @@ jobs:
             *) echo "the runtime decision was $REQUIRED, which is neither" >&2; exit 1 ;;
           esac
           echo "changed=$REQUIRED" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: security-runtime-identity-${{ github.run_id }}
@@ -383,7 +383,7 @@ jobs:
           ) || BASE_CLEANUP=$?
           frontend/node/node tools/courtside.mjs security-cleanup "$CANDIDATE_RUN_ID" || CANDIDATE_CLEANUP=$?
           [[ "$BASE_CLEANUP" = 0 && "$CANDIDATE_CLEANUP" = 0 ]]
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: security-tool-update-${{ github.run_id }}
@@ -416,7 +416,7 @@ jobs:
           -Dmaven.test.redirectTestOutputToFile=true
       - name: Upload backend test evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: backend-test-evidence-${{ github.run_id }}
           path: |
@@ -456,7 +456,7 @@ jobs:
       - name: Package the E2E application
         run: ./mvnw -B --no-transfer-progress package -DskipTests -Pjava-only
       - name: Upload the browser and deployment candidate
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: application-candidate-${{ github.run_id }}
           path: |
@@ -467,7 +467,7 @@ jobs:
           retention-days: 1
       - name: Upload frontend test evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: frontend-test-evidence-${{ github.run_id }}
           path: frontend/coverage
@@ -503,7 +503,7 @@ jobs:
         run: npm run test:e2e
       - name: Upload visual browser evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-visual-evidence-${{ github.run_id }}
           path: |
@@ -550,7 +550,7 @@ jobs:
         run: npm run test:e2e
       - name: Upload functional browser evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: browser-${{ matrix.group }}-evidence-${{ github.run_id }}
           path: |
@@ -591,7 +591,7 @@ jobs:
         run: node tools/compose-wait-smoke.mjs
       - name: Upload Compose evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: compose-wait-smoke-${{ github.run_id }}
           path: build/compose-wait-smoke/result.json
@@ -654,26 +654,26 @@ jobs:
             echo "version=$version"
             echo "ref=refs/heads/$HEAD_REF"
           } >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gate-image-${{ github.run_id }}
           path: build/gate-image/images.tar
           retention-days: 1
           if-no-files-found: error
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gate-deployment-archive-${{ github.run_id }}
           path: build/gate-archive
           retention-days: 1
           if-no-files-found: error
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: gate-image-qualification-amd64
           path: build/uat-smoke
           retention-days: 14
           if-no-files-found: error
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: gate-assessment-fixtures-${{ github.run_id }}
           path: target/fixtures-classes
@@ -854,7 +854,7 @@ jobs:
         run: rm -rf build/security/trivy-runtime.json build/security/trivy-source.json build/security/codeql build/security/runtime build/security/npm.json
       - name: Upload security evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: security-evidence-${{ github.run_id }}
           path: |
@@ -864,7 +864,7 @@ jobs:
           retention-days: 14
       - name: Upload the release-build security summary
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: nightly-release-security-base
           path: build/security/release-build.json
@@ -1031,7 +1031,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload nightly verification
         if: ${{ always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: nightly-verification-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/nightly/verification.json
@@ -1074,7 +1074,7 @@ jobs:
           node tools/coverage-diff.mjs "${arguments[@]}"
       - name: Upload combined test evidence
         if: github.event_name == 'pull_request' && (needs.test-profile-plan.outputs.backend == 'true' || needs.test-profile-plan.outputs.frontend == 'true')
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: combined-test-evidence-${{ github.run_id }}
           path: build/coverage/changed.md
@@ -1145,7 +1145,7 @@ jobs:
               releaseReadiness: (if $attempt == 1 and $build == "success" and $nightlyImage == "success"
                 and $releaseGates == "success" then "complete" else "incomplete" end)}' \
             > build/nightly-release/evidence.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: nightly-release-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/nightly-release/evidence.json
