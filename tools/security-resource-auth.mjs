@@ -182,7 +182,8 @@ function policies(input) {
     && safe(session.inactivitySeconds, 60) && safe(session.absoluteLifetimeMilliseconds, 60000, 2592000000)
     && safe(session.concurrentLimit, 1, 50) && ["SESSION", "__Host-SESSION"].includes(session.cookieName)
     && families.includes(session.browserFamily), "authentication-session-policy-incomplete");
-  requireEvidence(object(login) && Object.keys(login).every((key) => ["address", "global", "proofMode", "sourceAddress"].includes(key))
+  requireEvidence(object(login) && Object.keys(login).every((key) => ["address", "global", "proofMode", "sourceAddress", "verificationConcurrency"].includes(key))
+    && safe(login.verificationConcurrency, 1)
     && exact(login.address, ["maxFailures", "windowMilliseconds", "blockMilliseconds"])
     && object(login.global) && Object.hasOwn(login.global, "windowMilliseconds")
     && Object.keys(login.global).every((key) => ["windowMilliseconds", "threshold"].includes(key))

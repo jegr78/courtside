@@ -13,6 +13,7 @@ import urllib.parse
 MAX_REQUESTS = int(os.environ["COURTSIDE_SECURITY_MAX_REQUESTS"])
 MAX_CONCURRENCY = int(os.environ["COURTSIDE_SECURITY_MAX_CONCURRENCY"])
 MAX_BODY_BYTES = 2_000_000
+DISCARD_TIMEOUT_SECONDS = 5
 UPSTREAM_HOST = "proxy"
 UPSTREAM_PORT = 8080
 ALLOWED_METHODS = frozenset(filter(None, os.environ.get(
@@ -78,6 +79,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             self.write_metrics()
         if content_length > MAX_BODY_BYTES:
             self.reject(413)
+            self.discard_body(content_length)
             return
         if not concurrency.acquire(blocking=False):
             self.reject(429)
@@ -132,6 +134,22 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.send_header("Content-Length", "0")
         self.end_headers()
+
+    # Closing over an unread body resets the connection, and a client still uploading never reads the refusal.
+    def discard_body(self, remaining):
+        deadline = time.monotonic() + DISCARD_TIMEOUT_SECONDS
+        try:
+            while remaining > 0:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    return
+                self.connection.settimeout(left)
+                chunk = self.rfile.read1(min(remaining, 65536))
+                if not chunk:
+                    return
+                remaining -= len(chunk)
+        except OSError:
+            return
 
     def send_canary(self):
         payload = b"Courtside scanner canary"

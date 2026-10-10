@@ -105,7 +105,7 @@ export function resourceAuthenticationPolicy(runtime, application, classpathText
       absoluteLifetimeMilliseconds: duration(session?.["absolute-lifetime"]),
       concurrentLimit: integer(session?.["concurrent-limit"]), cookieName: "__Host-SESSION", browserFamily: "OTHER",
       passwordFactorRequired: true },
-    loginPolicy: { proofMode: "http-bounded-v1",
+    loginPolicy: { proofMode: "http-bounded-v1", verificationConcurrency: integer(login?.["verification-concurrency"]),
       address: { maxFailures: integer(login?.address?.["max-failures"]),
         windowMilliseconds: duration(login?.address?.window), blockMilliseconds: duration(login?.address?.block) },
       global: { threshold: integer(login?.global?.threshold), windowMilliseconds: duration(login?.global?.window) } }
@@ -1321,7 +1321,7 @@ export async function runResourceAbuse(plan, stopFile, limits) {
           "--sun-misc-unsafe-memory-access=deny",
           "-Dloader.main=org.courtside.securityassessment.SecurityPublicationPolicyProjection",
           "-cp", ".", "org.springframework.boot.loader.launch.PropertiesLauncher"],
-        { outputLimitBytes: 4096, timeoutMilliseconds: 10000 })).stdout;
+        { outputLimitBytes: 4096, timeoutMilliseconds: 30000 })).stdout;
         const projection = resourcePublicationProjection(projectionOutput, publicationPolicy);
         return {
           sourceDigest: `sha256:${createHash("sha256").update(readFileSync(join(root,

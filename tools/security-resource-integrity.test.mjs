@@ -260,7 +260,7 @@ function scriptFixtureStates(journal, clock) {
   const addressHash = createHash("sha256").update(`login:${sourceAddress}`).digest("hex");
   const globalHash = createHash("sha256").update("all").digest("hex");
   input.contract.authentication.loginSubjects = [{ scope: "ADDRESS", subjectHash: addressHash }, { scope: "GLOBAL", subjectHash: globalHash }];
-  input.contract.authentication.loginPolicy = { proofMode: "http-bounded-v1", sourceAddress,
+  input.contract.authentication.loginPolicy = { proofMode: "http-bounded-v1", sourceAddress, verificationConcurrency: 2,
     address: { maxFailures: 5, windowMilliseconds: 60000, blockMilliseconds: 60000 }, global: { windowMilliseconds: 60000 } };
   input.after.tables.login_attempt_limit.rows.push(row("login_attempt_limit", { scope: "GLOBAL", subject_hash: globalHash,
     attempt_count: journal.operations.filter((operation) => operation.kind === "login").length,
@@ -279,7 +279,7 @@ function loginBuckets(input) {
   input.contract.authentication.loginSubjects = [
     { scope: "ADDRESS", subjectHash: addressHash }, { scope: "GLOBAL", subjectHash: globalHash }
   ];
-  input.contract.authentication.loginPolicy = { sourceAddress,
+  input.contract.authentication.loginPolicy = { sourceAddress, verificationConcurrency: 2,
     address: { maxFailures: 5, windowMilliseconds: 60000, blockMilliseconds: 60000 },
     global: { windowMilliseconds: 60000 } };
   input.journal.loginTransitionsComplete = true;
@@ -1587,7 +1587,7 @@ test("given complete concurrent HTTP failures, when five counted requests create
   assert.equal(result.outcome, "passed");
 });
 
-test("given HTTP capacity advice, when a long block cannot explain Retry-After one, then capacity 429 is counted exactly", () => {
+test("given a bucket that counted a capacity refusal, when Retry-After one records no attempt, then integrity fails", () => {
   // given
   const input = httpBuckets(fixture());
   Object.assign(input.journal.operations[0], { status: 429, retryAfterSeconds: 1,
@@ -1595,7 +1595,43 @@ test("given HTTP capacity advice, when a long block cannot explain Retry-After o
   // when
   const result = compareResourceIntegrity(input);
   // then
-  assert.equal(result.outcome, "passed");
+  assert.equal(result.outcome, "failed", "a capacity refusal must not appear in any login bucket");
+});
+
+test("given Retry-After one while no verification ran and no block was ending, when bounding the refusal, then integrity fails", () => {
+  // given
+  const input = httpBuckets(fixture());
+  input.journal.operations.push({ id: "unexplained-refusal", kind: "login", status: 429, sourceAddress: "172.20.0.2",
+    startedAt: "2026-10-05T10:00:10.500Z", endedAt: "2026-10-05T10:00:10.600Z", retryAfterSeconds: 1,
+    problemType: "urn:courtside:error:login-rate-limited" });
+  // when
+  const result = compareResourceIntegrity(input);
+  // then
+  assert.equal(result.outcome, "failed", "Retry-After one needs a full verification capacity or an ending block");
+});
+
+test("given a login policy without its verification capacity, when proving HTTP logins, then the proof stays incomplete", () => {
+  // given
+  const input = httpBuckets(fixture());
+  delete input.contract.authentication.loginPolicy.verificationConcurrency;
+  // when
+  const result = compareResourceIntegrity(input);
+  // then
+  assert.equal(result.outcome, "incomplete", "a capacity refusal cannot be bounded without the configured capacity");
+});
+
+test("given capacity refusals among counted failures, when the buckets hold only the failures, then integrity passes", () => {
+  // given
+  const input = httpBuckets(fixture());
+  const failure = input.journal.operations.find((operation) => operation.kind === "login" && operation.status === 401);
+  for (const id of ["capacity-1", "capacity-2"]) {
+    input.journal.operations.push({ ...structuredClone(failure), id, status: 429, retryAfterSeconds: 1,
+      problemType: "urn:courtside:error:login-rate-limited" });
+  }
+  // when
+  const result = compareResourceIntegrity(input);
+  // then
+  assert.equal(result.outcome, "passed", "capacity refusals leave every login bucket unchanged");
 });
 
 for (const mutation of ["global-count", "address-count", "deadline", "first-window", "retry-advice", "source"]) {
@@ -1848,7 +1884,7 @@ test("given a one-minute counting window, when successful login observations spa
   assert.equal(result.outcome, "incomplete");
 });
 
-test("given Retry-After one near an actual block deadline, when capacity and address refusal cannot be distinguished, then the ambiguous request is never counted by assumption", () => {
+test("given Retry-After one near an actual block deadline, when capacity and address refusal cannot be distinguished, then neither is counted and integrity passes", () => {
   // given
   const input = minuteHttpPressure();
   Object.assign(input.journal.operations.at(-1), { startedAt: "2026-10-05T10:01:09.100Z",
@@ -1856,7 +1892,7 @@ test("given Retry-After one near an actual block deadline, when capacity and add
   // when
   const result = compareResourceIntegrity(input);
   // then
-  assert.equal(result.outcome, "incomplete");
+  assert.equal(result.outcome, "passed", "neither refusal records an attempt");
 });
 
 test("given a baseline one-minute block and later capture, when the last actual refused login precedes expiry, then snapshot-time expiry alone does not invalidate unchanged buckets", () => {
@@ -1870,7 +1906,7 @@ test("given a baseline one-minute block and later capture, when the last actual 
   assert.equal(result.outcome, "passed");
 });
 
-test("given a one-minute block and typed capacity refusal well before expiry, when complete counted evidence fits its actual deadline, then Retry-After one is narrowly counted", () => {
+test("given a one-minute block and typed capacity refusal well before expiry, when the buckets still count it, then integrity fails", () => {
   // given
   const input = minuteHttpPressure();
   Object.assign(input.journal.operations[0], { status: 429, retryAfterSeconds: 1,
@@ -1878,7 +1914,7 @@ test("given a one-minute block and typed capacity refusal well before expiry, wh
   // when
   const result = compareResourceIntegrity(input);
   // then
-  assert.equal(result.outcome, "passed");
+  assert.equal(result.outcome, "failed", "a capacity refusal must not appear in any login bucket");
 });
 
 test("given expired-block ambiguity and protected account corruption, when bounded HTTP proof cannot finish, then the known integrity violation still fails", () => {

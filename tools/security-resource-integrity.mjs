@@ -223,8 +223,10 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
     .find((row) => row.scope === subject.scope && row.subject_hash === subject.subjectHash)]));
   const after = new Map(subjects.map((subject) => [subject.scope, currentRows("login_attempt_limit")
     .find((row) => row.scope === subject.scope && row.subject_hash === subject.subjectHash)]));
+  if (!Number.isSafeInteger(policy.verificationConcurrency) || policy.verificationConcurrency < 1) { incomplete(); return; }
   const counted = [];
   const blocked = [];
+  const refused = [];
   for (const operation of logins) {
     if (operation.sourceAddress !== policy.sourceAddress) { finding("login-source-mismatch", "failed"); return; }
     if (operation.status === 200 || operation.status === 401) counted.push(operation);
@@ -233,8 +235,8 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
           || !Number.isSafeInteger(operation.retryAfterSeconds) || operation.retryAfterSeconds < 1) {
         incomplete(); return;
       }
-      if (operation.retryAfterSeconds === 1) counted.push(operation);
-      else blocked.push(operation);
+      // Retry-After one may also be a full verification capacity, which records no attempt.
+      (operation.retryAfterSeconds > 1 ? blocked : refused).push(operation);
     } else { incomplete(); return; }
   }
   const successes = counted.filter((operation) => operation.status === 200);
@@ -251,8 +253,7 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
   const priorBlock = priorAddress?.blocked_until == null ? null : instantNanoseconds(priorAddress.blocked_until);
   if (priorAddress?.blocked_until != null && priorBlock === null) { incomplete(); return; }
   if (priorBlock !== null && loginBegin !== null && priorBlock > loginBegin) {
-    if (priorBlock <= loginEnd || priorBlock - loginEnd <= 1000000000n
-        && failures.some((operation) => operation.status === 429 && operation.retryAfterSeconds === 1)) {
+    if (priorBlock <= loginEnd) {
       incomplete(); return;
     }
     if (counted.length) { failed(after.get("ADDRESS") ?? priorAddress); return; }
@@ -262,8 +263,7 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
   if (actualAddress?.blocked_until != null && deadline === null) { failed(actualAddress); return; }
   if (deadline !== null && nonSuccesses.length) {
     const pressureEnd = max(nonSuccesses.map(ends));
-    if (pressureEnd >= deadline || deadline - pressureEnd <= 1000000000n
-        && failures.some((operation) => operation.status === 429 && operation.retryAfterSeconds === 1)) {
+    if (pressureEnd >= deadline) {
       incomplete(); return;
     }
   }
@@ -342,6 +342,11 @@ function httpLoginPermissions({ policy, validPolicy, contract, journal, operatio
       if (witness) break;
     }
     if (!witness) { failed(actualAddress); return; }
+  }
+  for (const operation of refused) {
+    const blockTail = deadline !== null && ends(operation) >= deadline - 1000000000n && starts(operation) < deadline;
+    const verifying = counted.filter((other) => starts(other) <= ends(operation) && ends(other) >= starts(operation));
+    if (!blockTail && verifying.length < policy.verificationConcurrency) { failed(actualAddress); return; }
   }
   for (const operation of blocked) {
     if (deadline === null) { failed(actualAddress); return; }

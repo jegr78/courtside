@@ -388,7 +388,9 @@ verification. Chromium receives only the SPKI pin from that verified target cert
 than a general instruction to accept invalid certificates.
 
 The browser journey uses the earliest enabled slot on its VU's dedicated court, checking the
-selected day and the remaining current-week days before a single next-week fallback. It fails
+remaining current-week days after today before a single next-week fallback. Today is skipped
+because its next slot can start before the dialog is submitted, which the product correctly
+refuses as a start in the past. It fails
 explicitly if neither week offers an enabled slot. It waits for the dialog's booking cards,
 because their arrival moves the dialog, then expands the additional booking fields, requires them
 to be open, fills the guest input and reads the value back before submitting. This keeps the UI request

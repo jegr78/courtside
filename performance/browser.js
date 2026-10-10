@@ -16,6 +16,7 @@ const technicalErrors = new Rate("technical_errors");
 const unexpectedServerErrors = new Counter("unexpected_server_errors");
 const browserVerifierReloads = new Counter("browser_verifier_reloads");
 let firstPageLoad = { open: false, verifierChanged: false };
+let step = "open browser page";
 
 export const options = {
   scenarios: {
@@ -64,7 +65,7 @@ function observe(page) {
       report(`${description} on the first page load; reloading once`);
       return;
     }
-    report(description);
+    report(`${description} during ${step}`);
     browserErrors.add(1);
     technicalErrors.add(true);
   });
@@ -94,7 +95,7 @@ export default async function () {
   let page;
   let bookingId;
   let journeyPassed = false;
-  let step = "open browser page";
+  step = "open browser page";
   browserErrors.add(0);
   unexpectedServerErrors.add(0);
   try {

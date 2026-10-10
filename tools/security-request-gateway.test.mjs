@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { createInterface } from "node:readline";
 import { createServer, request } from "node:http";
+import { connect } from "node:net";
 import { fileURLToPath } from "node:url";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -136,6 +137,60 @@ test("given an oversized correlated request, when the native gateway rejects it,
     assert.ok(Date.parse(receipt.observedAt) >= startedAt
       && Date.parse(receipt.observedAt) <= Math.floor(performance.timeOrigin + performance.now()));
     assert.equal(metrics.bodyLimitReceipts.length, 1);
+  } finally {
+    gatewayProcess.kill();
+    await once(gatewayProcess, "exit");
+  }
+});
+
+test("given an oversized body the client keeps uploading, when the gateway refuses it, then the client reads 413 instead of a reset", async () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-upload-"));
+  const { gatewayProcess, port } = await startGateway(directory);
+  const body = Buffer.alloc(2_000_001, "x");
+  const head = Buffer.from("POST /api/session HTTP/1.1\r\nHost: scanner-gateway\r\n"
+    + `Content-Type: application/x-www-form-urlencoded\r\nContent-Length: ${body.length}\r\n\r\n`);
+  // when
+  const outcome = await new Promise((resolve) => {
+    const socket = connect(port, "127.0.0.1");
+    const chunks = [];
+    let uploaded = false;
+    socket.on("error", (error) => resolve(error.code));
+    socket.on("close", () => resolve(`${Buffer.concat(chunks).toString("latin1").split("\r\n")[0]} uploaded=${uploaded}`));
+    socket.on("data", (chunk) => {
+      chunks.push(chunk);
+      if (chunks.length > 1) return;
+      setTimeout(() => socket.end(body.subarray(65536), () => { uploaded = true; }), 200);
+    });
+    socket.write(Buffer.concat([head, body.subarray(0, 65536)]));
+  });
+  // then
+  try {
+    assert.match(outcome, /^HTTP\/1\.1 413 .+ uploaded=true$/,
+      "a client still uploading when the 413 arrives must finish without a reset");
+  } finally {
+    gatewayProcess.kill();
+    await once(gatewayProcess, "exit");
+  }
+});
+
+test("given an oversized body trickling in, when the gateway discards it, then the connection closes at the overall deadline", { timeout: 15000 }, async () => {
+  // given
+  const directory = mkdtempSync(join(tmpdir(), "courtside-gateway-trickle-"));
+  const { gatewayProcess, port } = await startGateway(directory);
+  const started = performance.now();
+  // when
+  const closedAfter = await new Promise((resolve) => {
+    const socket = connect(port, "127.0.0.1");
+    const trickle = setInterval(() => socket.write("x"), 1000);
+    socket.on("error", () => {});
+    socket.on("close", () => { clearInterval(trickle); resolve(performance.now() - started); });
+    socket.write("POST /api/session HTTP/1.1\r\nHost: scanner-gateway\r\n"
+      + "Content-Type: application/x-www-form-urlencoded\r\nContent-Length: 2000001\r\n\r\n");
+  });
+  // then
+  try {
+    assert.ok(closedAfter < 8000, `a trickling upload must not hold the gateway past its deadline, held ${closedAfter} ms`);
   } finally {
     gatewayProcess.kill();
     await once(gatewayProcess, "exit");
