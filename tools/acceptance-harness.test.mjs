@@ -195,3 +195,99 @@ test("given lanes across the change from summer time, when the Sunday slot becom
   // then
   assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
 });
+
+import { attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
+import { claimRunDirectory, harnessCommit } from "../acceptance/lib/run-directory.mjs";
+import { findExecutable } from "../acceptance/lib/executable.mjs";
+import { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const utc = (time) => `2030-03-11T${time}:00Z`;
+
+test("given allocations on several courts and times, when one slot is swept, then only bookings overlapping it on that court are chosen", () => {
+  // given
+  const allocations = [
+    { bookingId: "inside", courtId: "c1", startsAt: utc("08:00"), endsAt: utc("08:30") },
+    { bookingId: "straddling", courtId: "c1", startsAt: utc("07:30"), endsAt: utc("08:30") },
+    { bookingId: "touching", courtId: "c1", startsAt: utc("09:00"), endsAt: utc("10:00") },
+    { bookingId: "other-court", courtId: "c2", startsAt: utc("08:00"), endsAt: utc("09:00") },
+    { bookingId: "inside", courtId: "c1", startsAt: utc("08:30"), endsAt: utc("09:00") }
+  ];
+  // when
+  const chosen = occupying(allocations, "c1", new Date(utc("08:00")), new Date(utc("09:00")));
+  // then
+  assert.deepEqual(chosen, ["inside", "straddling"]);
+});
+
+test("given an answer that is not a list, when swept, then the refusal says what came back", () => {
+  // when / then
+  assert.throws(() => occupying({ type: "urn:courtside:error:request-rate-limited" }, "c1", new Date(), new Date()), /request-rate-limited/);
+});
+
+test("given a ledger with a booking already cancelled, when replayed, then it is reported as gone and the rest cancelled", async () => {
+  // given
+  const statuses = { a: 204, b: 404, c: 500 };
+  const remove = async (path) => ({ status: () => statuses[path.split("/").at(-1).split("?")[0]] });
+  // when
+  const outcome = await replayEntries([{ kind: "booking", id: "a" }, { kind: "booking", id: "b" }, { kind: "booking", id: "c" }], remove);
+  // then
+  assert.deepEqual(outcome.map((item) => item.outcome), ["cancelled", "gone", "failed"]);
+});
+
+test("when failure messages are classified, then a timeout makes it harness and otherwise the first prefix decides", () => {
+  // when / then
+  assert.equal(classify("Error: PRECONDITION: slot singles could not be cleared"), "precondition");
+  assert.equal(classify("Error: product: the booking in singles is accepted"), "product");
+  assert.equal(classify("Error: expect(locator).toBeVisible() failed"), "harness");
+  assert.equal(classifyErrors(["Test timeout of 60000ms exceeded.", "Error: product: the series is created"]), "harness");
+  assert.equal(classifyErrors(["Error: product: the scheduled week is removed", "Error: PRECONDITION: removing answered 500"]), "product");
+  assert.equal(classifyErrors([]), "harness");
+});
+
+test("given two overlapping steps, when an error falls in both windows, then it is attributed to both and marked ambiguous", () => {
+  // given
+  const steps = [
+    { project: "p1", persona: "memberA", name: "book", start: utc("10:00"), end: "2030-03-11T10:00:10Z" },
+    { project: "p2", persona: "admin", name: "roster", start: "2030-03-11T10:00:05Z", end: "2030-03-11T10:00:20Z" }
+  ];
+  const lines = ["2030-03-11T10:00:07.123456789Z ERROR o.c.Booking boom", "2030-03-11T10:00:30.000Z WARN later", "2030-03-11T10:00:08Z INFO fine"];
+  // when
+  const result = attribute(lines, steps);
+  // then
+  assert.equal(result.length, 2);
+  assert.deepEqual(result[0].steps.map((step) => step.name), ["book", "roster"]);
+  assert.equal(result[0].ambiguous, true);
+  assert.deepEqual(result[1].steps, [], "a line outside every step stays unattributed");
+});
+
+test("given a run directory that already holds results, when claimed, then it is refused, and a fresh one is created", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "acceptance-run-"));
+  const used = join(root, "used");
+  mkdirSync(used); writeFileSync(join(used, "results.json"), "{}");
+  // when / then
+  assert.throws(() => claimRunDirectory(used), /already holds results/);
+  claimRunDirectory(join(root, "fresh"));
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("given a source stamp beside the harness, when the commit is read, then the stamp wins over the repository head", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "acceptance-source-"));
+  writeFileSync(join(root, "source.json"), JSON.stringify({ commit: "0123456789abcdef0123456789abcdef01234567" }));
+  // when / then
+  assert.equal(harnessCommit(new URL(`file://${root}/`)), "0123456789abcdef0123456789abcdef01234567");
+  rmSync(root, { recursive: true, force: true });
+});
+
+test("given a PATH with a relative entry and an executable in an absolute one, when looked up, then only the absolute match is returned", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "acceptance-path-"));
+  const binary = join(root, "probe-tool");
+  writeFileSync(binary, "#!/bin/sh\n"); chmodSync(binary, 0o755);
+  // when / then
+  assert.equal(findExecutable("probe-tool", `relative-dir:${root}`), binary);
+  assert.equal(findExecutable("probe-tool", "relative-dir"), null);
+  rmSync(root, { recursive: true, force: true });
+});
