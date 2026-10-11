@@ -163,6 +163,60 @@ test("an administrator can open both core administration views", async ({ page }
   await expect(page.getByTestId("create-court")).toBeVisible();
 });
 
+const transparent = "rgba(0, 0, 0, 0)";
+
+function textFill(field: import("@playwright/test").Locator): Promise<string> {
+  return field.evaluate((element) => getComputedStyle(element).getPropertyValue("-webkit-text-fill-color"));
+}
+
+test("an empty time filter hides the browser's ghost value until it is focused or filled", async ({ page, browserName }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  await page.goto("/admin/audit");
+  const from = page.getByTestId("audit-filter-from");
+  const hint = page.getByTestId("audit-filter-from-empty");
+  await expect(page.getByTestId("admin-audit-view")).toBeVisible();
+
+  // then
+  await expect(from).toHaveAttribute("data-empty", "true");
+  await expect.poll(() => textFill(from), { message: `${browserName} paints no ghost value into an empty filter` }).toBe(transparent);
+  await expect(hint, `${browserName} shows the empty hint instead`).toBeVisible();
+
+  // when
+  await from.focus();
+
+  // then
+  await expect.poll(() => textFill(from), { message: `${browserName} reveals the editable fields on focus` }).not.toBe(transparent);
+  await expect(hint, `${browserName} hides the hint while the field is edited`).toBeHidden();
+
+  // when
+  await from.fill("2026-10-03T12:30");
+  await page.getByTestId("audit-filter-query").focus();
+
+  // then
+  await expect(from).not.toHaveAttribute("data-empty");
+  await expect.poll(() => textFill(from), { message: `${browserName} shows a chosen time` }).not.toBe(transparent);
+  await expect(hint).toHaveCount(0);
+});
+
+test("a closed day shows its opening times as empty rather than as a ghost time", async ({ page, browserName }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  await page.goto("/admin/facility/opening-hours");
+  await expect(page.getByTestId("admin-opening-hours-view")).toBeVisible();
+
+  // when
+  await page.getByTestId("hours-closed-SUNDAY").check();
+
+  // then
+  for (const testId of ["hours-open-SUNDAY", "hours-close-SUNDAY"]) {
+    const field = page.getByTestId(testId);
+    await expect(field).toBeDisabled();
+    await expect.poll(() => textFill(field), { message: `${browserName} paints no time into ${testId}` }).toBe(transparent);
+    await expect(page.getByTestId(`${testId}-empty`), `${browserName} marks ${testId} as not set`).toBeVisible();
+  }
+});
+
 test("a member's pages load without the administration and without the language nobody chose", async ({ page }) => {
   // given
   await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "de"));
