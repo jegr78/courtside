@@ -1038,3 +1038,43 @@ test("given today's plan on a phone, when its grid first appears, then the page 
   expect(settled, "the plan scrolls the page to the current time").toBeGreaterThan(0);
   expect(shownAt, "a page that moves after the grid appears moves it under a tap already on its way").toBe(settled);
 });
+
+async function selectedDayPlacement(page: Page) {
+  return page.getByTestId("mobile-week-navigation").evaluate((navigation) => {
+    const box = (testId: string) => navigation.querySelector(`[data-testid${testId}]`)!.getBoundingClientRect();
+    const strip = box('="mobile-week-days"');
+    const now = box('="mobile-current-time"');
+    const day = box('^="day-selector-"][aria-pressed="true"');
+    return {
+      insideStrip: day.left >= strip.left - 0.5 && day.right <= strip.right + 0.5,
+      clearOfNow: day.right <= now.left || day.left >= now.right,
+      edges: `day ${day.left}..${day.right}, strip ${strip.left}..${strip.right}, now ${now.left}..${now.right}`
+    };
+  });
+}
+
+for (const phone of [{ name: "iPhone SE", width: 375, height: 667 }, { name: "landscape iPhone", width: 852, height: 393 }]) {
+  test(`given a ${phone.name}, when the court plan opens and a later day is chosen, then the selected day lies whole inside the day strip and clear of the return to now`, async ({ page }) => {
+    // given
+    await page.setViewportSize({ width: phone.width, height: phone.height });
+
+    // when
+    await page.goto("/");
+    const navigation = page.getByTestId("mobile-week-navigation");
+    await expect(navigation).toBeVisible();
+
+    // then
+    await expect.poll(() => selectedDayPlacement(page), "today's card is whole on first render")
+      .toMatchObject({ insideStrip: true, clearOfNow: true });
+
+    // when
+    const lastDay = navigation.locator('[data-testid^="day-selector-"]').last();
+    // A tap on a card's visible sliver does not scroll the strip first, as click() would.
+    await lastDay.dispatchEvent("click");
+
+    // then
+    await expect(lastDay).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(() => selectedDayPlacement(page), "the chosen card is whole after the selection changes")
+      .toMatchObject({ insideStrip: true, clearOfNow: true });
+  });
+}
