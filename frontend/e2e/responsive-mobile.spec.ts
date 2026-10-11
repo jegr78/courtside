@@ -297,6 +297,38 @@ test("a member holding two upcoming bookings sees both on the phone without scro
   }
 });
 
+test("a member reads a notification and marks it read on the phone", async ({ page, journeyService }) => {
+  // given
+  const notification = "7c000000-0000-0000-0000-0000000000c1";
+  await journeyService.executeSql(`
+    INSERT INTO notification (id, account_id, kind, parameters, created_at)
+    VALUES ('${notification}', '00000000-0000-0000-0000-000000000102', 'BOOKING_REMINDER', '{}', now());`);
+  try {
+    await signIn(page, "doe.jane");
+
+    // when
+    await page.getByTestId("my-messages-link").tap();
+
+    // then
+    const entry = page.getByTestId(`notification-${notification}`);
+    await expect(entry).toHaveAttribute("data-read", "false");
+    await expectNoHorizontalOverflow(page);
+    for (const target of [entry.getByRole("link"), entry.getByTestId("notification-mark-read")]) {
+      const box = await target.boundingBox();
+      expect(box!.height, "each action on an entry is a target a thumb can hit").toBeGreaterThanOrEqual(44);
+    }
+
+    // when
+    await entry.getByTestId("notification-mark-read").tap();
+
+    // then
+    await expect(entry).toHaveAttribute("data-read", "true");
+    await expectNoHorizontalOverflow(page);
+  } finally {
+    await journeyService.executeSql(`DELETE FROM notification WHERE id = '${notification}';`);
+  }
+});
+
 test("member and administration surfaces remain usable on a touch viewport", async ({ page, journeyService }) => {
   // given
   await signIn(page, "doe.jane");

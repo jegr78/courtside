@@ -21,6 +21,8 @@ public record SubjectAccessRecord(Instant producedAt, UUID personId, String firs
                                   List<PersonBookingHistory.Series> bookingSeries,
                                   List<PersonMessageHistory.Message> messages,
                                   List<PersonMessageHistory.Declined> declinedMessages,
+                                  List<PersonMessageHistory.Notification> notifications,
+                                  List<PersonMessageHistory.DeclinedChannel> declinedChannels,
                                   List<Reference> externalReferences,
                                   List<PersonAuditTrail.SubjectEntry> changesAsSubject,
                                   List<PersonAuditTrail.ActorEntry> changesAsActor) {

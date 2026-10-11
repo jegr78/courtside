@@ -78,7 +78,7 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `public-username-reminder-boundary` | `requestUsernameReminder` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary` |
 | `public-club-and-calendar` | `listCourts`, `listOpeningHours`, `getBookingGrid`, `getClubConfig`, `getClubLogo`, `getAppIcon`, `getWebManifest`, `listBookingCardLegend`, `listAllocations` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary`, `public-projection` |
 | `initial-password-replacement` | `changeInitialPassword` | `INITIAL_PASSWORD` | `initial-password-gate`, `credential-write-only` |
-| `own-account-preferences-and-session-list` | `listOwnSessions`, `changeOwnLocale`, `listOwnMessageChoices`, `chooseOwnMessages` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `own-account-scope` |
+| `own-account-preferences-and-session-list` | `listOwnSessions`, `changeOwnLocale`, `listOwnMessageChoices`, `chooseOwnMessages`, `listOwnMessageChannels`, `chooseOwnMessageChannels`, `listOwnNotifications`, `markOwnNotificationRead` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `own-account-scope` |
 | `own-credential-proof-and-replacement` | `reauthenticate`, `changeOwnPassword` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `own-account-scope`, `credential-write-only` |
 | `own-session-termination` | `endOwnSessions`, `endOwnSession` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `own-account-scope`, `recent-authentication` |
 | `authenticated-booking-card-discovery` | `listBookableCards` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `booking-card-eligibility` |
@@ -147,15 +147,15 @@ Negative tests: `src/test/java/org/courtside/identity/AdminAuthorizationTest.jav
 
 ### Own account scope
 
-The authenticated account identifier selects session, locale and message-choice state; callers cannot supply another account identifier to these operations.
+The authenticated account identifier selects session, locale, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found.
 
 Attributes: `current-account`, `session-handle`.
 
-Production: `src/main/java/org/courtside/identity/CurrentUser.java#requireAccount`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#list`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#endOne`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#endAll`, `src/main/java/org/courtside/identity/internal/AccountLocaleService.java#change`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#current`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#choose`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#accountId`.
+Production: `src/main/java/org/courtside/identity/CurrentUser.java#requireAccount`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#list`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#endOne`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#endAll`, `src/main/java/org/courtside/identity/internal/AccountLocaleService.java#change`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#current`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#choose`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#currentChannels`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#chooseChannels`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#accountId`, `src/main/java/org/courtside/notification/internal/OwnNotifications.java#page`, `src/main/java/org/courtside/notification/internal/OwnNotifications.java#markRead`, `src/main/java/org/courtside/notification/internal/OwnNotifications.java#accountId`.
 
-Positive tests: `src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenTwoActiveSessions_whenOneIsListedAndEnded_thenOnlyPrivacySafeMetadataAndTheOtherRemain`.
+Positive tests: `src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenTwoActiveSessions_whenOneIsListedAndEnded_thenOnlyPrivacySafeMetadataAndTheOtherRemain`, `src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenNotificationsForTwoMembers_whenOneReadsTheCentre_thenOnlyTheirOwnAreServedWithContentAndLink`.
 
-Negative tests: `src/test/java/org/courtside/identity/internal/AccountSessionServiceTest.java#givenAnUnknownHandle_whenASessionIsEnded_thenNothingIsDeleted`.
+Negative tests: `src/test/java/org/courtside/identity/internal/AccountSessionServiceTest.java#givenAnUnknownHandle_whenASessionIsEnded_thenNothingIsDeleted`, `src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAnotherMembersNotification_whenAMemberMarksItRead_thenItIsNotFoundAndStaysUnread`.
 
 ### Credential write-only boundary
 
@@ -183,15 +183,15 @@ Negative tests: `src/test/java/org/courtside/booking/internal/CardEligibilityPol
 
 ### Booking and participation ownership
 
-Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN and withdrawal removes only the current person's participation. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.
+Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN and withdrawal removes only the current person's participation. A notification describes and links a booking only to its owner or a current participant. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.
 
 Attributes: `current-account`, `booking-owner`, `participant-person`, `administrator-override`.
 
-Production: `src/main/java/org/courtside/booking/BookingService.java#cancel`, `src/main/java/org/courtside/booking/BookingWriter.java#cancel`, `src/main/java/org/courtside/booking/Booking.java#withdrawParticipant`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireManagementAccess`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireRoleManagementAccess`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#managementRoles`, `src/main/java/org/courtside/booking/ParticipationService.java#withdraw`, `src/main/java/org/courtside/booking/web/BookingController.java#listPersonalBookings`, `src/main/java/org/courtside/booking/web/BookingController.java#listOwnParticipations`, `src/main/java/org/courtside/booking/web/BookingController.java#removeOwnParticipation`, `src/main/java/org/courtside/booking/web/BookingController.java#cancelBooking`, `src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run`.
+Production: `src/main/java/org/courtside/booking/BookingService.java#cancel`, `src/main/java/org/courtside/booking/BookingWriter.java#cancel`, `src/main/java/org/courtside/booking/Booking.java#withdrawParticipant`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireManagementAccess`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireRoleManagementAccess`, `src/main/java/org/courtside/booking/internal/BookingAccessControl.java#managementRoles`, `src/main/java/org/courtside/booking/ParticipationService.java#withdraw`, `src/main/java/org/courtside/booking/internal/BookingAnnouncements.java#describeVisibleTo`, `src/main/java/org/courtside/booking/internal/BookingAnnouncements.java#visibleTo`, `src/main/java/org/courtside/booking/web/BookingController.java#listPersonalBookings`, `src/main/java/org/courtside/booking/web/BookingController.java#listOwnParticipations`, `src/main/java/org/courtside/booking/web/BookingController.java#removeOwnParticipation`, `src/main/java/org/courtside/booking/web/BookingController.java#cancelBooking`, `src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run`.
 
-Positive tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid`.
+Positive tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid`, `src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerStillInABooking_whenTheyReadTheCentre_thenTheEntryDescribesAndLinksTheBooking`.
 
-Negative tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed`.
+Negative tests: `src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed`, `src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerWhoLeftTheBooking_whenTheyReadTheCentre_thenTheEntryNoLongerDescribesOrLinksIt`.
 
 ### Participant card availability
 

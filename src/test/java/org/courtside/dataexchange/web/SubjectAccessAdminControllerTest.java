@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -127,6 +128,8 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.bookingsMade[0].note").value(NOTE))
                 .andExpect(jsonPath("$.bookingsMade[0].reservations[0].courtId")
                         .value(courtId.toString()))
+                .andExpect(jsonPath("$.notifications[?(@.kind == 'BOOKING_CONFIRMED')].bookingId")
+                        .value(hasItem(bookingId.toString())))
                 .andExpect(jsonPath("$.externalReferences[0].externalId").value("4711"))
                 .andExpect(jsonPath("$.changesAsSubject[?(@.eventType == 'roster.person.added')]")
                         .value(hasSize(1)))
@@ -183,6 +186,8 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.email").value(nullValue()))
                 .andExpect(jsonPath("$.messages").value(hasSize(0)))
                 .andExpect(jsonPath("$.declinedMessages").value(hasSize(0)))
+                .andExpect(jsonPath("$.notifications").value(hasSize(0)))
+                .andExpect(jsonPath("$.declinedChannels").value(hasSize(0)))
                 .andExpect(jsonPath("$.bookingSeries").value(hasSize(0)));
     }
 

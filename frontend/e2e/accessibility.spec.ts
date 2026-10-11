@@ -123,18 +123,29 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
   });
 
-  test(`${locale} messages view meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+  test(`${locale} messages view meets automated WCAG 2.2 AA checks`, async ({ page, journeyService }) => {
     // given
-    await page.goto("/");
-    await selectPreference(page, "#locale-preference", locale);
-    await signIn(page, "doe.jane");
+    const unread = "7c000000-0000-0000-0000-0000000000a1";
+    const read = "7c000000-0000-0000-0000-0000000000a2";
+    await journeyService.executeSql(`
+      INSERT INTO notification (id, account_id, kind, parameters, created_at, read_at) VALUES
+        ('${unread}', '00000000-0000-0000-0000-000000000102', 'BOOKING_DISPLACED', '{"closure": "DAY_CLOSED"}', now(), NULL),
+        ('${read}', '00000000-0000-0000-0000-000000000102', 'ACCOUNT_USERNAME_REMINDER', '{}', now(), now());`);
+    try {
+      await page.goto("/");
+      await selectPreference(page, "#locale-preference", locale);
+      await signIn(page, "doe.jane");
 
-    // when
-    await page.getByTestId("my-messages-link").click();
-    await expect(page.getByTestId("my-messages-view")).toBeVisible();
+      // when
+      await page.getByTestId("my-messages-link").click();
+      await expect(page.getByTestId(`notification-${unread}`)).toBeVisible();
+      await expect(page.getByTestId(`notification-${read}`)).toHaveAttribute("data-read", "true");
 
-    // then
-    await expectNoWcagViolations(page);
+      // then
+      await expectNoWcagViolations(page);
+    } finally {
+      await journeyService.executeSql(`DELETE FROM notification WHERE id IN ('${unread}', '${read}');`);
+    }
   });
 
   test(`${locale} the series form meets automated WCAG 2.2 AA checks`, async ({ page }) => {

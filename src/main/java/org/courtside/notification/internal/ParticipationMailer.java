@@ -61,12 +61,12 @@ class ParticipationMailer implements MessageComposer {
     }
 
     private void queue(Optional<UserAccount> recipient, MessageKind kind, Map<String, String> parameters) {
-        Optional<UserAccount> reachable = MessageRecipient.reachable(recipient);
-        if (reachable.isEmpty()) {
+        Optional<UserAccount> enabled = MessageRecipient.enabled(recipient);
+        if (enabled.isEmpty()) {
             log.info("A {} message has nobody to reach", kind);
             return;
         }
-        outbox.queue(reachable.get().getId(), kind, parameters);
+        outbox.queue(enabled.get().getId(), kind, parameters);
     }
 
     @Override

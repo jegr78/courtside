@@ -19,6 +19,10 @@ final class MessageRecipient {
                         && !found.getPerson().getEmail().isBlank());
     }
 
+    static Optional<UserAccount> enabled(Optional<UserAccount> account) {
+        return account.filter(UserAccount::isEnabled);
+    }
+
     static UserAccount required(UserAccountRepository accounts, UUID accountId) {
         return reachable(accounts.findById(accountId))
                 .orElseThrow(() -> new MessageUndeliverableException("RecipientUnreachable"));

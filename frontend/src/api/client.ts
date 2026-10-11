@@ -45,6 +45,10 @@ export type MessagePage = components["schemas"]["MessagePage"];
 export type MessageState = components["schemas"]["MessageState"];
 export type MessageKind = components["schemas"]["MessageKind"];
 export type MessageChoice = components["schemas"]["MessageChoice"];
+export type MessageChannel = components["schemas"]["MessageChannel"];
+export type MessageChannelChoice = components["schemas"]["MessageChannelChoice"];
+export type Notification = components["schemas"]["Notification"];
+export type NotificationPage = components["schemas"]["NotificationPage"];
 export type AccountSession = components["schemas"]["AccountSession"];
 export type PersonRequest = components["schemas"]["PersonRequest"];
 export type MembershipRequest = components["schemas"]["MembershipRequest"];
@@ -328,6 +332,16 @@ export const api = {
   chooseOwnMessages: (declined: MessageKind[]) => request<void>("/api/account/messages", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ declined })
   }),
+  ownMessageChannels: () => request<MessageChannelChoice[]>("/api/account/messages/channels"),
+  chooseOwnMessageChannels: (declined: MessageChannel[]) => request<void>("/api/account/messages/channels", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ declined })
+  }),
+  ownNotifications: (cursor?: string, limit = 50) => request<NotificationPage>(
+    `/api/account/notifications?${new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) })}`
+  ),
+  markNotificationRead: (notificationId: string) => request<void>(
+    `/api/account/notifications/${notificationId}/read`, { method: "POST" }
+  ),
   adminConfig: () => request<AdminClubConfig>("/api/admin/config"),
   changeAdminConfig: (config: ClubConfigRequest) => request<AdminClubConfig>("/api/admin/config", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config)

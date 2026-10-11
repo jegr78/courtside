@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { type SessionStatus } from "../api/client";
+import { useUnreadNotifications } from "../navigation/unreadNotifications";
 
 interface Destination {
   to: string;
@@ -53,10 +54,12 @@ export function PrimaryNavigation({ session }: { session: SessionStatus }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const open = destinations.filter((destination) => destination.visible(session));
+  const unread = useUnreadNotifications(session.authenticated, pathname);
+  const counted = (destination: Destination) => destination.icon === "messages" && unread > 0;
 
   const reachable = open.length > 1;
   const linkClass = reachable
-    ? "focus-ring flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-center text-xs font-semibold underline-offset-4 aria-[current]:bg-(--cs-raised) aria-[current]:underline sm:block sm:min-h-0 sm:flex-none sm:px-0 sm:text-base"
+    ? "focus-ring relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-center text-xs font-semibold underline-offset-4 aria-[current]:bg-(--cs-raised) aria-[current]:underline sm:block sm:min-h-0 sm:flex-none sm:px-0 sm:text-base"
     : "focus-ring flex min-h-11 items-center rounded-lg px-3 font-semibold underline-offset-4 aria-[current]:bg-(--cs-raised) aria-[current]:underline sm:block sm:min-h-0 sm:px-0";
 
   return <div data-testid="primary-navigation" className="grid w-full max-w-7xl gap-3">
@@ -71,7 +74,7 @@ export function PrimaryNavigation({ session }: { session: SessionStatus }) {
             key={destination.testId}
             to={destination.to}
             data-testid={destination.testId}
-            aria-label={t(destination.label)}
+            aria-label={counted(destination) ? t("nav.myMessagesUnread", { count: unread }) : t(destination.label)}
             aria-current={isCurrent(destination, pathname) ? "page" : undefined}
             className={linkClass}
           >
@@ -80,6 +83,10 @@ export function PrimaryNavigation({ session }: { session: SessionStatus }) {
               <span data-testid={`${destination.testId.replace("-link", "")}-compact-label`} className="sm:hidden">{t(destination.compactLabel)}</span>
               <span data-testid={`${destination.testId.replace("-link", "")}-full-label`} className="hidden sm:inline">{t(destination.label)}</span>
             </> : t(destination.label)}
+            {counted(destination) && <span data-testid="my-messages-unread" aria-hidden="true"
+              className="button-primary absolute top-0 right-1/4 min-w-5 rounded-full px-1.5 text-center text-xs leading-5 font-bold sm:static sm:ml-2 sm:inline-block">
+              {unread}
+            </span>}
           </Link>)}
       </nav>
       {!session.authenticated && pathname !== "/login" && <Link to="/login" data-testid="sign-in-link" className="button-primary focus-ring rounded-lg px-4 py-3 font-semibold">{t("auth.submit")}</Link>}

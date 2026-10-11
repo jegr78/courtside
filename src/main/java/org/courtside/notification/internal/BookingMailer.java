@@ -41,9 +41,9 @@ class BookingMailer implements MessageComposer {
             return;
         }
         Optional<UserAccount> recipient =
-                MessageRecipient.reachable(accounts.findById(announced.get().bookedByAccountId()));
+                MessageRecipient.enabled(accounts.findById(announced.get().bookedByAccountId()));
         if (recipient.isEmpty()) {
-            log.info("Account {} cannot be reached, so its booking confirmation stays unsent",
+            log.info("Account {} is deactivated, so its booking confirmation stays unsent",
                     announced.get().bookedByAccountId());
             return;
         }

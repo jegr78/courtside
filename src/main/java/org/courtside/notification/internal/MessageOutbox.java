@@ -2,6 +2,8 @@ package org.courtside.notification.internal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.courtside.identity.UserAccountRepository;
+import org.courtside.notification.MessageChannel;
 import org.courtside.notification.MessageKind;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -20,16 +22,24 @@ class MessageOutbox {
 
     private final MessageRecordRepository records;
     private final MessageChoices choices;
+    private final MessageChannels channels;
+    private final NotificationInbox inbox;
+    private final UserAccountRepository accounts;
     private final MailProperties properties;
     private final MailOutbox worker;
     private final Clock clock;
 
     // Every message passes here, so a kind somebody switched off cannot be queued by a mailer that
-    // forgot to ask.
+    // forgot to ask, and the centre holds whatever a member was told on any channel.
     @Transactional(propagation = Propagation.MANDATORY)
     public void queue(UUID accountId, MessageKind kind, Map<String, String> parameters) {
         if (!choices.wants(accountId, kind)) {
             log.info("A {} message was not queued: account {} does not want it", kind, accountId);
+            return;
+        }
+        inbox.record(accountId, kind, parameters);
+        if (!kind.isAlwaysMailed() && !mailable(accountId)) {
+            log.info("A {} message stays in the centre: account {} takes no mail", kind, accountId);
             return;
         }
         String messageId = MailDispatch.newMessageId(MailSettings.senderDomain(properties.from()));
@@ -40,5 +50,10 @@ class MessageOutbox {
                 worker.wake();
             }
         });
+    }
+
+    private boolean mailable(UUID accountId) {
+        return channels.wants(accountId, MessageChannel.EMAIL)
+                && MessageRecipient.reachable(accounts.findById(accountId)).isPresent();
     }
 }

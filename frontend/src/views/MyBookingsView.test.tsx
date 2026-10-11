@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { api } from "../api/client";
 import i18n from "../i18n";
 import { MyBookingsView } from "./MyBookingsView";
@@ -775,4 +775,98 @@ it("given more upcoming bookings than one page, when loaded, then their load mor
   const loadMore = await screen.findByTestId("load-more-bookings");
   expect(loadMore.compareDocumentPosition(screen.getByTestId("past-bookings")) & Node.DOCUMENT_POSITION_FOLLOWING,
     "the control reads the upcoming list only").toBeTruthy();
+});
+
+const pastId = "44444444-4444-4444-4444-444444444444";
+
+function linkTo(fragment: string) {
+  const scrolled = vi.fn();
+  const original = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+  Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, writable: true, value: scrolled });
+  window.history.replaceState(null, "", fragment);
+  onTestFinished(() => {
+    if (original) Object.defineProperty(Element.prototype, "scrollIntoView", original);
+    else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    window.history.replaceState(null, "", "#");
+  });
+  return scrolled;
+}
+
+it("given a link to one booking, when the bookings have loaded, then that booking is brought into view and focused", async () => {
+  // given
+  const scrolled = linkTo(`#booking-${upcomingId}`);
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  const linked = await screen.findByTestId(`booking-${upcomingId}`);
+
+  // then
+  await waitFor(() => expect(scrolled).toHaveBeenCalled());
+  expect(scrolled.mock.contexts[0]).toBe(linked);
+  expect(document.activeElement, "keyboard users land on the linked booking").toBe(linked);
+});
+
+it("given a link to one booking, when an action reloads the bookings, then the view does not jump back to it", async () => {
+  // given
+  recordedAsCoPlayer();
+  vi.spyOn(api, "withdrawParticipation").mockResolvedValue(undefined);
+  const scrolled = linkTo(`#booking-${upcomingId}`);
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await waitFor(() => expect(scrolled).toHaveBeenCalledTimes(1));
+  const answer = vi.mocked(api.personalBookings).getMockImplementation()!;
+  vi.mocked(api.personalBookings).mockImplementation((options) =>
+    new Promise((resolve) => setTimeout(() => resolve(answer(options)), 0)));
+
+  // when
+  await userEvent.click(await screen.findByTestId("withdraw-participation"));
+
+  // then
+  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Participation withdrawn."));
+  expect(api.participations).toHaveBeenCalledTimes(2);
+  expect(scrolled, "the link was followed once, not after every reload").toHaveBeenCalledTimes(1);
+});
+
+it("given a link to a past booking, when the bookings have loaded, then its folded section opens and the booking takes the focus", async () => {
+  // given
+  const scrolled = linkTo(`#booking-${pastId}`);
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  const linked = await screen.findByTestId(`booking-${pastId}`);
+
+  // then
+  await waitFor(() => expect(scrolled).toHaveBeenCalled());
+  expect(screen.getByTestId("past-bookings")).toHaveAttribute("open");
+  expect(scrolled.mock.contexts[0]).toBe(linked);
+  expect(document.activeElement).toBe(linked);
+});
+
+it("given a link to one booking and a first load that failed, when the member tries again, then the link is followed", async () => {
+  // given
+  const scrolled = linkTo(`#booking-${upcomingId}`);
+  vi.mocked(api.personalBookings).mockRejectedValueOnce(new Error("offline for a moment"));
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await screen.findByTestId("load-failure");
+
+  // when
+  await userEvent.click(screen.getByTestId("retry-load"));
+
+  // then
+  const linked = await screen.findByTestId(`booking-${upcomingId}`);
+  await waitFor(() => expect(scrolled).toHaveBeenCalledTimes(1));
+  expect(document.activeElement).toBe(linked);
+});
+
+it("given a link to a booking the lists do not hold, when the bookings have loaded, then nothing moves and nothing fails", async () => {
+  // given
+  const scrolled = linkTo("#booking-77777777-7777-7777-7777-777777777777");
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await screen.findByTestId(`booking-${upcomingId}`);
+
+  // then
+  expect(scrolled).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(document.body);
+  expect(screen.getByTestId("past-bookings")).not.toHaveAttribute("open");
 });

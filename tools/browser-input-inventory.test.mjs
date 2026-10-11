@@ -113,6 +113,11 @@ const BOUNDARIES = {
     classification: "writes a fixed address and reloads, and reads nothing off the location",
     test: "src/views/ApplicationErrorView.test.tsx#given the page may just be stale, when reloading from the error page, then the browser reloads"
   },
+  "src/views/MyBookingsView.tsx location": {
+    value: "the fragment a notification link put on the address",
+    classification: "names an element id the page looks up among the bookings it already shows, so an unknown id moves nothing and reaches no data",
+    test: "src/views/MyBookingsView.test.tsx#given a link to a booking the lists do not hold, when the bookings have loaded, then nothing moves and nothing fails"
+  },
   "src/views/facility/AdminBookingCardView.tsx useLocation": {
     value: "the mark the card list set when it navigated here",
     classification: "compared strictly with true, so nothing else announces a created card",

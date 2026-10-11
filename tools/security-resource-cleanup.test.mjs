@@ -56,6 +56,8 @@ function fixture() {
   effects.tables.message_record.rows.push(row("message_record", { id: "80000000-0000-0000-0000-000000000001",
     account_id: manager, kind: "BOOKING_CONFIRMED", state: "HANDED_OVER", message_id: "<cleanup@example.org>",
     queued_at: time, queued_seq: 1, settled_at: time }));
+  effects.tables.notification.rows.push(row("notification", { id: "81000000-0000-0000-0000-000000000001",
+    account_id: manager, kind: "BOOKING_CONFIRMED", parameters: { bookingId }, created_at: time, created_seq: 1 }));
   effects.tables.user_account.rows[0].last_login_at = time;
   return { before, effects, contract: { schemaVersion: 1, managerAccountId: manager,
     interval: { startedAt, endedAt }, mailEnabled: true,
@@ -400,19 +402,20 @@ function manyBookings(count) {
     operation.request.endsAt = new Date(Date.parse(operation.request.endsAt) + (index + 10) * 86400000).toISOString();
     operation.request.requestFingerprint = resourceBookingRequestFingerprint(operation.request);
     input.journal.operations.push(operation);
-    for (const table of ["booking", "court_allocation", "booking_participant", "domain_event", "message_record"]) {
+    for (const table of ["booking", "court_allocation", "booking_participant", "domain_event", "message_record", "notification"]) {
       const additions = template.effects.tables[table].rows.filter(row =>
         !template.before.tables[table].rows.some(old => old.id === row.id));
       for (const [position, source] of additions.entries()) {
         const added = structuredClone(source);
         added.id = table === "booking" ? newId : id({ court_allocation: "b", booking_participant: "c",
-          domain_event: "d", message_record: "e" }[table], index * 2 + position);
+          domain_event: "d", message_record: "e", notification: "f" }[table], index * 2 + position);
         if (table === "booking") Object.assign(added, { idempotency_key: operation.request.idempotencyKey,
           request_fingerprint: operation.request.requestFingerprint });
         if (["court_allocation", "booking_participant"].includes(table)) added.booking_id = newId;
         if (table === "court_allocation") Object.assign(added, { starts_at: operation.request.startsAt, ends_at: operation.request.endsAt });
         if (table === "domain_event") Object.assign(added, { subject_id: newId, payload: { bookingId: newId } });
         if (table === "message_record") Object.assign(added, { message_id: `<cleanup-${index}@example.org>`, queued_seq: index });
+        if (table === "notification") Object.assign(added, { parameters: { bookingId: newId }, created_seq: index });
         input.effects.tables[table].rows.push(added);
       }
     }
@@ -435,6 +438,7 @@ test("given exactly 256 proven bookings, when planning cleanup, then permit ever
   assert.equal(plan.expected.tables.booking.rows.length, 1);
   assert.equal(plan.expected.tables.domain_event.rows.length, 256);
   assert.equal(plan.expected.tables.message_record.rows.length, 256);
+  assert.equal(plan.expected.tables.notification.rows.length, 256);
   assert.equal(verifyResourceCleanup({ ...input, actual: plan.expected }).outcome, "passed");
 });
 
