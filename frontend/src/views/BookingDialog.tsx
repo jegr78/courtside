@@ -48,6 +48,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const [submitting, setSubmitting] = useState(false);
   const [requestKey, setRequestKey] = useState(() => idempotencyKey());
   const [showsMore, setShowsMore] = useState(false);
+  const [refusedAsTaken, setRefusedAsTaken] = useState(false);
 
   useEffect(() => {
     void Promise.all([api.bookingCards(), api.participantCards()]).then(([cards, participants]) => {
@@ -100,6 +101,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       }, requestKey);
       await created();
     } catch (failure) {
+      if (failure instanceof ApiError && failure.problem?.type === COURT_UNAVAILABLE) setRefusedAsTaken(true);
       if (failure instanceof ApiError && failure.status === 409) {
         await conflicted().catch((refreshFailure: unknown) =>
           warnAbout("Court plan refresh after a conflict failed", refreshFailure));
@@ -131,7 +133,9 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
     && maxBookingMinutes < grid.slotMinutes;
   const showsBound = maxBookingMinutes !== undefined && maxBookingMinutes !== null && !boundLeavesNoPeriod;
   const durationDescription = showsBound ? "booking-duration-bound booking-duration-hint" : "booking-duration-hint";
-  const selectedDuration = durations.includes(durationMinutes) ? durationMinutes : durations[0] ?? grid.slotMinutes;
+  const slotTaken = refusedAsTaken && durations.length === 0;
+  const selectedDuration = durations.includes(durationMinutes) || slotTaken
+    ? durationMinutes : durations[0] ?? grid.slotMinutes;
   const period = useMemo(() => bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration),
     [selection.date, selection.slot, grid.timeZone, selectedDuration]);
   const chosenPlayers = 1 + selectedMembers.length
@@ -145,6 +149,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       <h3 id="booking-heading" className="text-xl font-bold">{t("booking.title")}</h3>
       <p data-testid="booking-period" aria-live="polite" className="mt-2 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
+      {!slotTaken && <>
       <label className="mt-5 grid gap-2 font-medium">{t("booking.duration")}
         <select data-testid="booking-duration" aria-describedby={durationDescription} value={selectedDuration} onChange={(event) => setDurationMinutes(Number(event.target.value))} className="form-control rounded-lg border px-3 py-3">
           {durations.map((minutes) => <option key={minutes} value={minutes}>{t("booking.durationMinutes", { count: minutes })}</option>)}
@@ -154,6 +159,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         {t("booking.durationBound", { duration: t("booking.durationMinutes", { count: maxBookingMinutes }) })}
       </p>}
       <p id="booking-duration-hint" data-testid="booking-duration-hint" className="text-muted mt-1 text-sm">{t("booking.durationHint")}</p>
+      </>}
       {boundLeavesNoPeriod && <Alert tone="warning" testId="booking-no-duration">{t("booking.boundBelowSlotGrid")}</Alert>}
       {canChooseSeveralCourts
         ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
@@ -228,7 +234,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>}
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
         <Button variant="secondary" type="button" data-testid="booking-close" onClick={closed}>{t("booking.close")}</Button>
-        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod}>{t("booking.submit")}</Button>
+        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || slotTaken}>{t("booking.submit")}</Button>
       </div>
     </form>
   </Modal>;
@@ -291,6 +297,7 @@ function courtName(courts: PublicCourt[], courtId: string, t: ReturnType<typeof 
 }
 
 const BEHIND_THE_DISCLOSURE = ["participants", "note"];
+const COURT_UNAVAILABLE = "urn:courtside:error:court-unavailable";
 
 function violationField(code: string): string {
   if (code.startsWith("booking.participants.")) return "participants";

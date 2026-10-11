@@ -638,6 +638,88 @@ it("given a booking conflict and a failed refresh, when submission fails, then t
   expect(screen.getByRole("dialog")).toBeInTheDocument();
 });
 
+it("given a slot taken in the meantime, when the booking is refused, then the dialog keeps the refused period and offers no duration to book", async () => {
+  // given
+  vi.mocked(api.createBooking).mockRejectedValue(new ApiError(409, {
+    type: "urn:courtside:error:court-unavailable",
+    title: "Court unavailable",
+    status: 409
+  }));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  await userEvent.selectOptions(screen.getByTestId("booking-duration"), "60");
+  const refusedPeriod = screen.getByTestId("booking-period").textContent;
+  takeCourtOneAtEight();
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  expect(await screen.findByRole("alert")).toHaveTextContent("Someone else just booked this court. Choose another time.");
+  expect(screen.getAllByRole("alert")).toHaveLength(1);
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("booking-duration")).not.toBeInTheDocument();
+  expect(screen.getByTestId("booking-submit")).toBeDisabled();
+  expect(screen.getByTestId("booking-period")).toHaveTextContent(refusedPeriod);
+  expect(refusedPeriod).toContain("8:00 AM – 9:00 AM");
+});
+
+it("given a reused idempotency key, when the booking is refused, then the duration field stays in place", async () => {
+  // given
+  vi.mocked(api.createBooking).mockRejectedValue(new ApiError(409, {
+    type: "urn:courtside:error:idempotency-key-reused",
+    title: "Idempotency key reused",
+    status: 409
+  }));
+  render(<WeekView today={clubInstant("07:00")} />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  takeCourtOneAtEight();
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  expect(await screen.findByRole("alert")).toHaveTextContent("Reload the page and try again.");
+  expect(screen.getByTestId("booking-duration")).toBeInTheDocument();
+  expect(screen.getByTestId("booking-submit")).toBeEnabled();
+});
+
+it("given a slot taken in the meantime and several courts allowed, when a free court replaces the taken one, then a duration is offered again", async () => {
+  // given
+  vi.mocked(api.createBooking).mockRejectedValue(new ApiError(409, {
+    type: "urn:courtside:error:court-unavailable",
+    title: "Court unavailable",
+    status: 409
+  }));
+  render(<WeekView today={clubInstant("07:00")} canChooseSeveralCourts />);
+  await userEvent.click(await findFreeSlot(1, "08:00"));
+  takeCourtOneAtEight();
+  await userEvent.click(screen.getByTestId("booking-submit"));
+  await waitFor(() => expect(screen.queryByTestId("booking-duration")).not.toBeInTheDocument());
+
+  // when
+  await userEvent.click(screen.getByTestId(`booking-court-${courts[0].id}`));
+  await userEvent.click(screen.getByTestId(`booking-court-${courts[1].id}`));
+
+  // then
+  expect(screen.getByTestId("booking-duration")).toHaveValue("30");
+  expect(screen.getByTestId("booking-submit")).toBeEnabled();
+});
+
+function takeCourtOneAtEight() {
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T08:00:00+02:00",
+    endsAt: "2026-08-10T08:30:00+02:00",
+    cardLabel: "Member booking",
+    cardColor: "#176b55",
+    ownBooking: false,
+    showGenericOccupancy: true,
+    participantCount: 2
+  }] : []));
+}
+
 it("given the browser and club have different dates, when loading, then the club date is selected", async () => {
   // given
   vi.mocked(api.bookingGrid).mockResolvedValue({
