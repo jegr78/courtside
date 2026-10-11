@@ -90,3 +90,47 @@ test("given the example configuration, when parsed, then it is valid", () => {
   // when / then
   assert.doesNotThrow(() => parseConfig(example, env));
 });
+
+import { addDays, defaultWindowStart, localDate, resolveWindowStart, windowDays, weekdayOf, zonedInstant } from "../acceptance/config/calendar.mjs";
+
+test("given an instant after UTC midnight's eve, when the club day is read in a zone ahead of UTC, then it is the club's next day", () => {
+  // given
+  const lateEvening = new Date(Date.UTC(2030, 2, 3, 23, 30));
+  // when / then
+  assert.equal(localDate(lateEvening, "UTC"), "2030-03-03");
+  assert.equal(localDate(lateEvening, "Europe/Berlin"), "2030-03-04");
+});
+
+test("when the default window is asked for on each weekday, then it starts on the first Monday after today", () => {
+  // when / then
+  assert.equal(defaultWindowStart(new Date(Date.UTC(2030, 2, 6, 12)), "UTC"), "2030-03-11");
+  assert.equal(defaultWindowStart(new Date(Date.UTC(2030, 2, 10, 12)), "UTC"), "2030-03-11");
+  assert.equal(defaultWindowStart(new Date(Date.UTC(2030, 2, 11, 12)), "UTC"), "2030-03-18");
+});
+
+test("given a configured start on today or earlier, when resolved, then it is refused by name, and a later Monday is kept", () => {
+  // given
+  const now = new Date(Date.UTC(2030, 2, 11, 12));
+  // when / then
+  assert.throws(() => resolveWindowStart("2030-03-11", now, "UTC"), /window\.start/);
+  assert.equal(resolveWindowStart("2030-03-25", now, "UTC"), "2030-03-25");
+  assert.equal(resolveWindowStart(undefined, now, "UTC"), "2030-03-18");
+});
+
+test("when a window is laid out, then it holds seven consecutive days from Monday to Sunday across a month end", () => {
+  // when
+  const days = windowDays("2030-04-29");
+  // then
+  assert.deepEqual(days, ["2030-04-29", "2030-04-30", "2030-05-01", "2030-05-02", "2030-05-03", "2030-05-04", "2030-05-05"]);
+  assert.deepEqual([weekdayOf(days[0]), weekdayOf(days[6])], ["MONDAY", "SUNDAY"]);
+  assert.equal(addDays("2030-12-31", 1), "2031-01-01");
+});
+
+test("given a week that ends with the change from summer time, when local hours become instants, then each keeps its local hour", () => {
+  // when
+  const saturday = zonedInstant("2026-10-24", "10:00", "Europe/Berlin");
+  const sunday = zonedInstant("2026-10-25", "10:00", "Europe/Berlin");
+  // then
+  assert.equal(saturday.toISOString(), "2026-10-24T08:00:00.000Z");
+  assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
+});
