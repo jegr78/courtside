@@ -122,7 +122,7 @@ describe("unread notifications in the primary navigation", () => {
 
     // then
     expect(screen.queryByTestId("my-messages-unread"), "the previous account's count is gone").not.toBeInTheDocument();
-    await act(async () => answerNext(1));
+    act(() => answerNext(1));
     expect(await screen.findByTestId("my-messages-unread")).toHaveTextContent("1");
   });
 

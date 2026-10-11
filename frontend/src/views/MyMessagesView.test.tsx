@@ -165,7 +165,7 @@ describe("MyMessagesView", () => {
     // then
     expect(screen.getByTestId("notifications-status"), "the region empties so the next mark is a new announcement")
       .toBeEmptyDOMElement();
-    await act(async () => answerSecond());
+    act(() => answerSecond());
     await waitFor(() => expect(screen.getByTestId("notifications-status")).toHaveTextContent("Marked as read."));
     expect(document.activeElement).toBe(entry(displaced.id));
   });
