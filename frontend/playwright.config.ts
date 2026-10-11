@@ -16,8 +16,11 @@ if (projectOrder !== undefined && projectOrder !== "configured" && projectOrder 
   throw new Error(`Unsupported browser project order: ${projectOrder}`);
 }
 
+// A hung axe test fails with its trace instead of consuming the job; the slowest takes under a minute.
+const accessibilityTestBound = 5 * 60_000;
+
 const qualificationProjects = process.env.COURTSIDE_WEBKIT_AXE === "true" ? [
-  { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "webkit" as const } }
+  { name: "webkit-accessibility", testMatch: /accessibility\.spec\.ts/, timeout: accessibilityTestBound, use: { browserName: "webkit" as const } }
 ] : [];
 
 // The catalogue's two tiers: whoever does this at the club with a phone is walked on all three
@@ -51,7 +54,7 @@ const configuredProjects = [
   { name: "guides-de", testMatch: /guide-screenshots\.spec\.ts/, snapshotPathTemplate: "{testDir}/../../site/screenshots/de/{arg}{ext}", use: { browserName: "chromium" as const, locale: "de-DE" } },
   { name: "guides-en", testMatch: /guide-screenshots\.spec\.ts/, snapshotPathTemplate: "{testDir}/../../site/screenshots/en/{arg}{ext}", use: { browserName: "chromium" as const, locale: "en-GB" } },
   { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts|guide-screenshots\.spec\.ts|journeys\//, use: { browserName: "chromium" as const } },
-  { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, use: { browserName: "chromium" as const } },
+  { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, timeout: accessibilityTestBound, use: { browserName: "chromium" as const } },
   { name: "webkit-core", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts/, use: { browserName: "webkit" as const } },
   { name: "webkit-pwa", testMatch: /pwa-browser-compatibility\.spec\.ts/, use: { browserName: "webkit" as const } },
   // Both engines, because a phone layout breaks per engine: the booking dialog was swallowed by a

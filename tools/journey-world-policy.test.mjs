@@ -57,7 +57,7 @@ test("given several browser projects, when Playwright runs them, then one global
   assert.match(playwright, /Unsupported browser project order/);
 });
 
-test("given hosted browser jobs have an outer deadline, when the runner is slow, then Playwright adds no wall-clock deadline", () => {
+test("given hosted browser jobs have an outer deadline, when the runner is slow, then only accessibility tests carry their own bound", () => {
   // given / when / then
   assert.match(workflowJob(buildWorkflow, "browser_visual"), /^    timeout-minutes: 15$/m);
   assert.match(workflowJob(buildWorkflow, "browser"), /^    timeout-minutes: 30$/m);
@@ -69,6 +69,9 @@ test("given hosted browser jobs have an outer deadline, when the runner is slow,
   assert.match(playwright, /actionTimeout: 0/);
   assert.match(playwright, /navigationTimeout: 0/);
   assert.doesNotMatch(playwright, /\n  timeout: (?!0,)\d/);
+  assert.match(playwright, /const accessibilityTestBound = 5 \* 60_000;/);
+  assert.equal(playwright.match(/timeout: accessibilityTestBound/g)?.length, 2,
+    "a hung axe test fails with its trace in both engines, and no other project carries a test bound");
 });
 
 test("given release-critical journey commands, when the runner is slow, then only the outer gate owns their deadline", () => {
