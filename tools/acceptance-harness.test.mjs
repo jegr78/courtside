@@ -291,3 +291,71 @@ test("given a PATH with a relative entry and an executable in an absolute one, w
   assert.equal(findExecutable("probe-tool", "relative-dir"), null);
   rmSync(root, { recursive: true, force: true });
 });
+
+import { collectFindings } from "../acceptance/report/findings.mjs";
+import { applyReview, validateReview } from "../acceptance/report/review.mjs";
+
+const row = (overrides) => ({ project: "pixel-7", persona: "admin", label: "overview", url: "https://club.example.org/admin", shot: "shots/a.png", axe: [], console: [], httpErrors: [], ...overrides });
+
+test("given the same findings in two runs with other ids and dates, when collected, then their keys are equal", () => {
+  // given
+  const first = [row({ console: ["pageerror: /api/bookings?date=2030-03-11 due to access control checks."], httpErrors: [{ url: "https://club.example.org/api/bookings/3f2b6c1e-0000-4000-8000-000000000001", status: 500 }], axe: [{ id: "heading-order", impact: "moderate", targets: ["#series-title"] }] })];
+  const second = [row({ console: ["pageerror: /api/bookings?date=2030-04-08 due to access control checks."], httpErrors: [{ url: "https://club.example.org/api/bookings/aa11bb22-0000-4000-8000-000000000002", status: 500 }], axe: [{ id: "heading-order", impact: "moderate", targets: ["#series-title"] }] })];
+  const failures = [{ project: "ipad", file: "journeys/40-admin.spec.ts", title: "when the admin visits every administration page, then each renders", class: "product", error: "Error: product: x" }];
+  // when
+  const keys = (metrics) => collectFindings({ metrics, failures }).map((finding) => finding.key).sort();
+  // then
+  assert.deepEqual(keys(first), keys(second));
+  assert.ok(keys(first).includes("axe:heading-order"));
+  assert.ok(keys(first).includes("http:500:/api/bookings/:id"));
+  assert.ok(keys(first).includes("failure:journeys/40-admin.spec.ts:when the admin visits every administration page, then each renders:ipad"));
+});
+
+test("given a harness or precondition failure, when collected, then it is not a product finding", () => {
+  // when
+  const findings = collectFindings({ metrics: [], failures: [{ project: "ipad", file: "f", title: "t", class: "harness", error: "timeout" }] });
+  // then
+  assert.deepEqual(findings, []);
+});
+
+test("given a finding without an assessment, when the review is applied, then the report is a draft that names it", () => {
+  // given
+  const findings = collectFindings({ metrics: [row({ axe: [{ id: "heading-order", impact: "moderate", targets: [] }, { id: "color-contrast", impact: "serious", targets: [] }] })], failures: [] });
+  const review = { assessments: { "axe:heading-order": { assessment: "known-issue", reason: "tracked", followUp: "none", issue: 1243 } }, manual: [] };
+  // when
+  const applied = applyReview(findings, review);
+  // then
+  assert.equal(applied.status, "draft");
+  assert.deepEqual(applied.unassessed, ["axe:color-contrast"]);
+});
+
+test("given every finding assessed and a manual finding, when the review is applied, then the report is final and lists the manual one", () => {
+  // given
+  const findings = collectFindings({ metrics: [row({ axe: [{ id: "heading-order", impact: "moderate", targets: [] }] })], failures: [] });
+  const review = {
+    assessments: {
+      "axe:heading-order": { assessment: "known-issue", reason: "tracked", followUp: "none", issue: 1243 },
+      "manual:update-notice": { assessment: "product-defect", reason: "shown without a deployment", followUp: "open an issue" }
+    },
+    manual: [{ key: "manual:update-notice", severity: "major", kind: "PWA", title: "Update notice without a deployment", detail: "", where: [{ project: "desktop-firefox" }] }]
+  };
+  // when
+  const applied = applyReview(findings, review);
+  // then
+  assert.equal(applied.status, "final");
+  assert.deepEqual(applied.findings.map((finding) => finding.key).sort(), ["axe:heading-order", "manual:update-notice"]);
+});
+
+test("given an assessment for a key this run did not produce, when applied, then it is reported stale", () => {
+  // when
+  const applied = applyReview([], { assessments: { "axe:gone": { assessment: "capture-artefact", reason: "r", followUp: "none" } }, manual: [] });
+  // then
+  assert.deepEqual(applied.stale, ["axe:gone"]);
+});
+
+test("given a known issue without an issue number or an unknown assessment, when validated, then each is refused", () => {
+  // when / then
+  assert.throws(() => validateReview({ assessments: { k: { assessment: "known-issue", reason: "r", followUp: "f" } }, manual: [] }), /issue/);
+  assert.throws(() => validateReview({ assessments: { k: { assessment: "fine", reason: "r", followUp: "f" } }, manual: [] }), /assessment/);
+  assert.throws(() => validateReview({ assessments: { k: { assessment: "harness-gap", reason: "", followUp: "f" } }, manual: [] }), /reason/);
+});
