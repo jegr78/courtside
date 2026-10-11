@@ -59,7 +59,12 @@ test("given the promoted candidate, when publish downloads its inputs, then they
     assert.equal(step.with["run-id"], "${{ needs.candidate.outputs.run-id }}", `${step.with.name} comes from the candidate run`);
     assert.equal(step.with["github-token"], "${{ github.token }}");
   }
-  assert.match(stepsText(release.jobs.publish), /sha256sum[\s\S]+needs\.candidate\.outputs\.archive-sha256|ARCHIVE_SHA256/);
+  const steps = release.jobs.publish.steps;
+  const recheck = steps.find((step) => step.name === "Require the archive the candidate qualified");
+  assert.equal(recheck?.env.ARCHIVE_SHA256, "${{ needs.candidate.outputs.archive-sha256 }}");
+  assert.match(recheck.run, /echo "\$ARCHIVE_SHA256  build\/courtside-deployment-\$\{GITHUB_REF_NAME#v\}\.zip" \| sha256sum -c -/,
+    "an archive whose bytes differ from the evidence would be attested and attached");
+  assert.ok(steps.indexOf(recheck) < steps.findIndex((step) => step.id === "archive-provenance"));
   assert.equal(release.jobs.publish.permissions.actions, "read", "another run's artifacts need actions: read");
 });
 
