@@ -2,6 +2,7 @@ package org.courtside.notification.internal;
 
 import lombok.RequiredArgsConstructor;
 import org.courtside.identity.CurrentUser;
+import org.courtside.identity.UserAccount;
 import org.courtside.notification.MessageKind;
 import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
@@ -19,7 +20,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -42,6 +43,7 @@ public class OwnNotifications {
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
             throw new IllegalStateException("Notification page size must be between 1 and " + MAX_PAGE_SIZE);
         }
+        UserAccount account = currentUser.requireAccount();
         List<Stored> stored = jdbc.sql("""
                         SELECT id, kind, parameters::text AS parameters, created_at, read_at
                         FROM notification
@@ -52,7 +54,7 @@ public class OwnNotifications {
                         ORDER BY created_seq DESC
                         LIMIT :probe
                         """)
-                .param("accountId", accountId())
+                .param("accountId", account.getId())
                 .param("cursor", cursor)
                 .param("probe", limit + 1)
                 .query((rows, number) -> new Stored(rows.getObject("id", UUID.class),
@@ -61,7 +63,10 @@ public class OwnNotifications {
                         rows.getTimestamp("created_at").toInstant(),
                         instant(rows.getTimestamp("read_at"))))
                 .list();
-        List<Entry> items = stored.stream().limit(limit).map(this::entry).toList();
+        List<Stored> shown = stored.stream().limit(limit).toList();
+        Map<UUID, BookingAnnouncement> visible = bookings.describeVisibleTo(account.getId(),
+                account.getPerson().getId(), shown.stream().map(Stored::bookingId).filter(Objects::nonNull).toList());
+        List<Entry> items = shown.stream().map(entry -> entry(entry, visible)).toList();
         UUID next = stored.size() > limit ? items.getLast().id() : null;
         return new CursorPage.Result<>(items, next);
     }
@@ -81,22 +86,12 @@ public class OwnNotifications {
         }
     }
 
-    private Entry entry(Stored stored) {
-        Optional<BookingAnnouncement> booking = bookingOf(stored.parameters().get(QueuedMessage.BOOKING));
-        UUID linkedBooking = booking.isPresent() ? UUID.fromString(stored.parameters().get(QueuedMessage.BOOKING)) : null;
-        return new Entry(stored.id(), stored.kind(), stored.createdAt(), stored.readAt(), booking.orElse(null),
-                closureOf(stored.parameters().get(QueuedMessage.CLOSURE)), targetOf(stored.kind()), linkedBooking);
-    }
-
-    private Optional<BookingAnnouncement> bookingOf(String bookingId) {
-        if (bookingId == null) {
-            return Optional.empty();
-        }
-        try {
-            return bookings.describe(UUID.fromString(bookingId));
-        } catch (IllegalArgumentException malformed) {
-            return Optional.empty();
-        }
+    // A booking the account may no longer see stays unnamed, so a player who left learns nothing more of it.
+    private static Entry entry(Stored stored, Map<UUID, BookingAnnouncement> visible) {
+        BookingAnnouncement booking = stored.bookingId() == null ? null : visible.get(stored.bookingId());
+        return new Entry(stored.id(), stored.kind(), stored.createdAt(), stored.readAt(), booking,
+                closureOf(stored.parameters().get(QueuedMessage.CLOSURE)), targetOf(stored.kind()),
+                booking == null ? null : stored.bookingId());
     }
 
     private static BookingDisplaced.Closure closureOf(String stored) {
@@ -125,6 +120,18 @@ public class OwnNotifications {
 
     private record Stored(UUID id, MessageKind kind, Map<String, String> parameters, Instant createdAt,
                           Instant readAt) {
+
+        UUID bookingId() {
+            String stored = parameters.get(QueuedMessage.BOOKING);
+            if (stored == null) {
+                return null;
+            }
+            try {
+                return UUID.fromString(stored);
+            } catch (IllegalArgumentException malformed) {
+                return null;
+            }
+        }
     }
 
     public enum Target {

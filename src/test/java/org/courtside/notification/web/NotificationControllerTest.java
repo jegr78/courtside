@@ -2,9 +2,11 @@ package org.courtside.notification.web;
 
 import jakarta.mail.internet.MimeMessage;
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.SqlStatementCounter;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
+import org.courtside.booking.ParticipationService;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
@@ -12,6 +14,7 @@ import org.courtside.notification.MessageKind;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,6 +78,12 @@ class NotificationControllerTest extends AbstractIntegrationTest {
     @Autowired
     private NotificationTestFixture notifications;
 
+    @Autowired
+    private ParticipationService participations;
+
+    @Autowired
+    private SqlStatementCounter queries;
+
     private MockMvc mockMvc;
     private UUID courtId;
     private UUID janePersonId;
@@ -94,6 +103,11 @@ class NotificationControllerTest extends AbstractIntegrationTest {
         janeAccountId = identity.createEnabledAccount(janePersonId, "doe.jane", Set.of(Role.MEMBER));
         johnPersonId = identity.createPerson("John", "Roe", "john.roe@example.org");
         johnAccountId = identity.createEnabledAccount(johnPersonId, "roe.john", Set.of(Role.MEMBER));
+    }
+
+    @AfterEach
+    void stopCounting() {
+        queries.pause();
     }
 
     @Test
@@ -118,6 +132,67 @@ class NotificationControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.items[0].link.target").value("BOOKINGS"))
                 .andExpect(jsonPath("$.items[0].link.bookingId").value(janesBooking.toString()))
                 .andExpect(jsonPath("$.nextCursor").value(nullValue()));
+    }
+
+    @Test
+    void givenAPlayerStillInABooking_whenTheyReadTheCentre_thenTheEntryDescribesAndLinksTheBooking()
+            throws Exception {
+        // given
+        UUID janesBooking = bookNaming(johnPersonId, SIX_PM, SEVEN_PM);
+
+        // when / then
+        mockMvc.perform(get("/api/account/notifications").with(as("roe.john")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].kind").value("BOOKING_PLAYER_RECORDED"))
+                .andExpect(jsonPath("$.items[0].booking.startsAt").value("2026-05-12T16:00:00Z"))
+                .andExpect(jsonPath("$.items[0].booking.cardLabel").exists())
+                .andExpect(jsonPath("$.items[0].link.bookingId").value(janesBooking.toString()));
+    }
+
+    @Test
+    void givenAPlayerWhoLeftTheBooking_whenTheyReadTheCentre_thenTheEntryNoLongerDescribesOrLinksIt()
+            throws Exception {
+        // given
+        UUID janesBooking = bookNaming(johnPersonId, SIX_PM, SEVEN_PM);
+        participations.withdraw(janesBooking, johnPersonId, johnAccountId);
+
+        // when / then
+        mockMvc.perform(get("/api/account/notifications").with(as("roe.john")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].kind").value("BOOKING_PLAYER_RECORDED"))
+                .andExpect(jsonPath("$.items[0].booking").doesNotExist())
+                .andExpect(jsonPath("$.items[0].link.target").value("BOOKINGS"))
+                .andExpect(jsonPath("$.items[0].link.bookingId").doesNotExist());
+    }
+
+    @Test
+    void givenEntriesAboutManyBookings_whenTheCentreIsRead_thenTheStatementsDoNotGrowWithThePage()
+            throws Exception {
+        // given
+        notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER,
+                book(janeAccountId, janePersonId, SIX_PM, SEVEN_PM), EARLIER);
+        queries.reset();
+        mockMvc.perform(get("/api/account/notifications").with(as("doe.jane"))).andExpect(status().isOk());
+        long oneEntry = queries.snapshot().total();
+        queries.pause();
+        for (int hour = 1; hour < 3; hour++) {
+            Instant from = SIX_PM.plusSeconds(3_600L * hour);
+            notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER,
+                    book(janeAccountId, janePersonId, from, from.plusSeconds(3_600)), EARLIER);
+        }
+
+        // when
+        queries.reset();
+        mockMvc.perform(get("/api/account/notifications").with(as("doe.jane")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[5].booking.startsAt").exists());
+        var manyEntries = queries.snapshot();
+        queries.pause();
+
+        // then
+        assertThat(manyEntries.total()).as("a page of many entries costs what one costs: " + manyEntries)
+                .isEqualTo(oneEntry);
     }
 
     @Test
@@ -293,6 +368,12 @@ class NotificationControllerTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"declined\": " + declined + "}"))
                 .andExpect(status().isNoContent());
+    }
+
+    private UUID bookNaming(UUID playerPersonId, Instant from, Instant to) {
+        return bookings.create(new CreateBookingCommand(List.of(courtId), MEMBER_BOOKING_CARD,
+                new TimeSlot(from, to), janeAccountId, janePersonId, Set.of(Role.MEMBER),
+                null, List.of(ParticipantSpec.member(playerPersonId)), null));
     }
 
     private UUID book(UUID accountId, UUID personId, Instant from, Instant to) {

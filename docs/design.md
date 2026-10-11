@@ -526,7 +526,9 @@ credential the account holds.
 Every message addressed to an account also becomes an entry in that account's notification centre,
 whether or not mail goes out. An entry stores the kind, the identifiers it concerns and when it was
 read, never rendered text. The centre resolves the booking an entry concerns when it is read and
-links to a page of the client by target, so an entry cannot lead off the instance. An account reads
+links to a page of the client by target, so an entry cannot lead off the instance. It names and
+links that booking only while the account owns it or plays in it; an entry about a booking the
+account has left stays listed without either. An account reads
 and marks only its own entries; another account's id answers
 `urn:courtside:error:notification-not-found`. The entry has no channel of its own, so another
 channel can be added beside email without changing it.

@@ -4,7 +4,7 @@
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
   "openApiFieldInventorySha256": "20ab3e9132a4ab8e35bf7e7000ae4d4ec53d7d7e9563aaa9e9c75868822e305b",
   "protectedFieldInventorySha256": "4f16eed4229be447f36a68cbd5c82d5b9f5afb3c6dbad61dcad6c242025d9bad",
-  "productionAuthorizationSha256": "36e98b13de07a803f8f43242a01e04f3af302897a4a0e527c4257e8ab98926cf",
+  "productionAuthorizationSha256": "c9ecedc682271d416802e57f6818d8b1c3c2ec58fc57a6f1fd13e5e3d0d5381e",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -3009,7 +3009,7 @@
     {
       "id": "booking-ownership",
       "title": "Booking and participation ownership",
-      "rule": "Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN and withdrawal removes only the current person's participation. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
+      "rule": "Personal queries derive identity from the current account; cancellation requires the booking owner or ADMIN and withdrawal removes only the current person's participation. A notification describes and links a booking only to its owner or a current participant. The start-up warm-up also acts here as an in-process caller without an account or request input, and it rolls back every write it makes.",
       "attributes": [
         "current-account",
         "booking-owner",
@@ -3024,6 +3024,8 @@
         "src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireRoleManagementAccess",
         "src/main/java/org/courtside/booking/internal/BookingAccessControl.java#managementRoles",
         "src/main/java/org/courtside/booking/ParticipationService.java#withdraw",
+        "src/main/java/org/courtside/booking/internal/BookingAnnouncements.java#describeVisibleTo",
+        "src/main/java/org/courtside/booking/internal/BookingAnnouncements.java#visibleTo",
         "src/main/java/org/courtside/booking/web/BookingController.java#listPersonalBookings",
         "src/main/java/org/courtside/booking/web/BookingController.java#listOwnParticipations",
         "src/main/java/org/courtside/booking/web/BookingController.java#removeOwnParticipation",
@@ -3031,10 +3033,12 @@
         "src/main/java/org/courtside/booking/internal/BookingWriteWarmUp.java#run"
       ],
       "positiveTests": [
-        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid"
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAnOwnBooking_whenCancellingIt_thenItDisappearsFromTheGrid",
+        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerStillInABooking_whenTheyReadTheCentre_thenTheEntryDescribesAndLinksTheBooking"
       ],
       "negativeTests": [
-        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed"
+        "src/test/java/org/courtside/booking/web/BookingControllerTest.java#givenAForeignBooking_whenAMemberCancelsIt_thenItIsNotFoundAndItStaysConfirmed",
+        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAPlayerWhoLeftTheBooking_whenTheyReadTheCentre_thenTheEntryNoLongerDescribesOrLinksIt"
       ]
     },
     {
