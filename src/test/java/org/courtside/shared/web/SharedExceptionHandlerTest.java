@@ -10,7 +10,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.ServletRequestBindingException;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
+import java.lang.reflect.Method;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -129,6 +133,33 @@ class SharedExceptionHandlerTest {
         assertThat(problem.getType().toString()).isEqualTo("urn:courtside:error:transaction-timeout");
         assertThat(problem.getDetail()).as("the framework's message names internals and never reaches a client")
                 .doesNotContain("deadline was");
+    }
+
+    @Test
+    void givenAnUploadAboveTheLimit_whenTheAdviceIsChosen_thenTheOversizeAnswerOutranksTheUnparseableOne() {
+        // given
+        ExceptionHandlerMethodResolver resolver = new ExceptionHandlerMethodResolver(SharedExceptionHandler.class);
+
+        // when
+        Method oversized = resolver.resolveMethodByThrowable(new MaxUploadSizeExceededException(1));
+        Method unparseable = resolver.resolveMethodByThrowable(new MultipartException("no boundary"));
+
+        // then
+        assertThat(oversized).extracting(Method::getName).isEqualTo("handleOversizedUpload");
+        assertThat(unparseable).extracting(Method::getName).isEqualTo("handleUnparseableMultipart");
+    }
+
+    @Test
+    void givenAMultipartBodyThatCannotBeParsed_whenAnsweringIt_thenItIsABadRequestWithoutTheCause() {
+        // when
+        ProblemDetail problem = handler().handleUnparseableMultipart(
+                new MultipartException("Failed to parse multipart servlet request"));
+
+        // then
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(problem.getType().toString()).isEqualTo("urn:courtside:error:malformed-request-body");
+        assertThat(problem.getDetail()).as("the parser's message names internals and never reaches a client")
+                .doesNotContain("multipart servlet");
     }
 
     private static SharedExceptionHandler handler() {
