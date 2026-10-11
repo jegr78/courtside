@@ -1,17 +1,6 @@
 # Changelog
 
-## 0.1.0 (2026-09-14)
-
-
-
-
-
-
-
-
-
-
-
+## 0.1.0 (2026-10-11)
 
 ### Notable changes
 
@@ -27,6 +16,8 @@
 * **api:** validation codes in fieldErrors entries change for missing, blank, non-positive and unknown-enum values, and field names now carry array indices. The problem type, the status and the fieldErrors shape are unchanged.
 
 ### Features
+
+* run the release acceptance walk from the repository ([#1386](https://github.com/jegr78/courtside/issues/1386)) ([b7645f0](https://github.com/jegr78/courtside/commit/b7645f0a460c86d92de4f36721d2d78d4982b895))
 
 * admit requests per principal by cost and bound demanding operations by class ([#1356](https://github.com/jegr78/courtside/issues/1356)) ([4342aab](https://github.com/jegr78/courtside/commit/4342aabdb264178f581cc19639e3a92e7cef69a8))
 * reuse immutable images for isolated qualification ([#1310](https://github.com/jegr78/courtside/issues/1310)) ([6761d91](https://github.com/jegr78/courtside/commit/6761d9167fdfb836437d57534bbd497d12bfc54b))
@@ -559,6 +550,8 @@
 * stop the assessment from filing an issue for every unprovable control ([#910](https://github.com/jegr78/courtside/issues/910)) ([8740314](https://github.com/jegr78/courtside/commit/87403146786f632a5c7006fa0de871bb65978cf7))
 
 ### Build and dependencies
+
+* graduate the 0.1.0 candidate line from rc.12 ([#1388](https://github.com/jegr78/courtside/issues/1388)) ([9277736](https://github.com/jegr78/courtside/commit/92777367c87c969c3e72bd16be12552ccd9cd980))
 
 * **deps-dev:** bump source-map-js from 1.2.1 to 1.2.2 in /frontend ([#1309](https://github.com/jegr78/courtside/issues/1309)) ([f4e278b](https://github.com/jegr78/courtside/commit/f4e278b0baeaf638a8d9a4cc65616423376f76cf))
 * **deps-dev:** bump source-map-js from 1.2.1 to 1.2.2 in /site ([#1308](https://github.com/jegr78/courtside/issues/1308)) ([a7c9942](https://github.com/jegr78/courtside/commit/a7c9942005dbe077cedd3fc8428ea9f730c74efa))
