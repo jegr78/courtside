@@ -134,3 +134,64 @@ test("given a week that ends with the change from summer time, when local hours 
   assert.equal(saturday.toISOString(), "2026-10-24T08:00:00.000Z");
   assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
 });
+
+import { governingHours, journeysOf, LaneError, planLanes, PROFILE_NAMES, slotIn } from "../acceptance/config/lanes.mjs";
+import { zonedInstant as at } from "../acceptance/config/calendar.mjs";
+
+const open = (opensAt, closesAt) => () => ({ opensAt, closesAt });
+const plan = (hoursOf = open("06:00", "23:00"), courts = [1, 3, 2]) => planLanes({ start: "2030-03-11", courts, hoursOf });
+const overlap = (a, b) => a.date === b.date && a.court === b.court && a.start < b.end && b.start < a.end;
+
+test("when the lanes are planned, then no two slots overlap and each lies inside the day's opening hours", () => {
+  // when
+  const { slots } = plan(open("07:30", "23:00"));
+  // then
+  assert.deepEqual(slots.flatMap((a, i) => slots.slice(i + 1).filter((b) => overlap(a, b)).map((b) => `${a.profile}/${a.journey}x${b.profile}/${b.journey}`)), []);
+  assert.deepEqual(slots.filter((slot) => slot.start < "08:00" || slot.end > "23:00"), []);
+});
+
+test("when the lanes are planned, then weekday lanes use the first two courts and only the opening journey uses the weekend", () => {
+  // when
+  const lanes = plan();
+  // then
+  assert.deepEqual([...new Set(lanes.slots.filter((s) => s.date < lanes.saturday).map((s) => s.court))].sort(), [1, 3]);
+  assert.deepEqual([...new Set(lanes.slots.filter((s) => s.date >= lanes.saturday).map((s) => s.journey))], ["saturday-opening"]);
+  assert.deepEqual([...new Set(lanes.slots.filter((s) => s.journey === "saturday-opening").map((s) => s.court))].sort(), [1, 2, 3]);
+});
+
+test("given every profile, when its journeys are resolved, then each has a slot and unknown pairs are refused", () => {
+  // given
+  const lanes = plan();
+  // when / then
+  for (const profile of PROFILE_NAMES) for (const journey of journeysOf(profile)) assert.equal(slotIn(lanes, profile, journey).journey, journey);
+  assert.throws(() => slotIn(lanes, "iphone-se", "trainer"), /trainer does not run on iphone-se/);
+});
+
+test("given a lane day too short for its journeys, when planned, then the refusal names the profile and the day", () => {
+  // when / then
+  assert.throws(() => plan(open("06:00", "12:00")), (error) => error instanceof LaneError && /desktop-chrome/.test(error.message) && /2030-03-11/.test(error.message));
+});
+
+test("given a closed lane day, when planned, then the refusal names the day", () => {
+  // when / then
+  assert.throws(() => plan((date) => date === "2030-03-13" ? { opensAt: null, closesAt: null } : { opensAt: "06:00", closesAt: "23:00" }), /2030-03-13 is closed/);
+});
+
+test("given a booking grid with a later week, when the governing hours of a date are read, then the last started week decides", () => {
+  // given
+  const day = (dayOfWeek, opensAt) => ({ dayOfWeek, opensAt, closesAt: "22:00" });
+  const week = (effectiveFrom, opensAt) => ({ effectiveFrom, days: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"].map((d) => day(d, opensAt)) });
+  const grid = { openingWeeks: [week(null, "06:00"), week("2030-03-13", "09:00")] };
+  // when / then
+  assert.equal(governingHours(grid, "2030-03-12").opensAt, "06:00");
+  assert.equal(governingHours(grid, "2030-03-13").opensAt, "09:00");
+});
+
+test("given lanes across the change from summer time, when the Sunday slot becomes an instant, then it keeps its local hour", () => {
+  // given
+  const lanes = planLanes({ start: "2026-10-19", courts: [1, 3, 2], hoursOf: open("06:00", "23:00") });
+  // when
+  const sunday = at(lanes.sunday, "10:00", "Europe/Berlin");
+  // then
+  assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
+});
