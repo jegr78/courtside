@@ -5,6 +5,7 @@ const EXPECTED_CONSOLE = [/Refused to apply a stylesheet/, /status of 401/, /sta
 const pathOf = (url) => { try { return new URL(url).pathname; } catch { return url; } };
 const normalise = (text) => text
   .replace(/https?:\/\/[^/\s]+/g, "")
+  .replace(/\/?[a-z0-9-]+(\.[a-z0-9-]+)+(?=\/)/gi, "")
   .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ":id")
   .replace(/\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?/g, ":date")
   .replace(/\d+/g, "n");

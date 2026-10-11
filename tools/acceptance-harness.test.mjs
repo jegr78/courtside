@@ -407,3 +407,31 @@ test("given a reason that names a username, an address, a host, a person or an i
     assert.throws(() => summarise(reason), (error) => kind.test(error.message) && !error.message.includes(reason));
   }
 });
+
+import { coverageOf } from "../acceptance/report/html.mjs";
+
+test("given Playwright results with passed, skipped and failed cells, when coverage is read, then setup and discovery are left out and each cell keeps its status", () => {
+  // given
+  const results = { suites: [{ file: "journeys/20-member.spec.ts", specs: [{ title: "t", tests: [
+    { projectName: "pixel-7", status: "expected", results: [{ status: "passed" }] },
+    { projectName: "ipad", status: "skipped", results: [{ status: "skipped" }], annotations: [{ type: "skip", description: "member journeys run on phones" }] },
+    { projectName: "narrow", status: "unexpected", results: [{ status: "failed", errors: [{ message: "Error: product: x" }] }] }
+  ] }] }, { file: "journeys/00-setup.spec.ts", specs: [{ title: "s", tests: [{ projectName: "setup-chromium", status: "expected", results: [{ status: "passed" }] }] }] }] };
+  // when
+  const { rows, cells } = coverageOf(results);
+  // then
+  assert.deepEqual(cells, { passed: 1, failed: 1, skipped: 1 });
+  assert.deepEqual(rows.map((row) => row.flow), ["t"]);
+  assert.equal(rows[0].cells.ipad.reason, "member journeys run on phones");
+});
+
+test("given the same WebKit page error from two instances, when collected, then the key and title carry no host", () => {
+  // given
+  const message = (host) => [row({ console: [`pageerror: /${host}/api/bookings?date=2030-03-11 due to access control checks.`] })];
+  // when
+  const first = collectFindings({ metrics: message("club.example.org"), failures: [] });
+  const second = collectFindings({ metrics: message("courts.example.org"), failures: [] });
+  // then
+  assert.equal(first[0].key, second[0].key);
+  assert.doesNotMatch(first[0].title, /example\.org/);
+});
