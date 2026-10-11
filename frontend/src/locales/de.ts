@@ -1118,6 +1118,7 @@ const de = {
   "notifications.unread": "Neu",
   "notifications.read": "Gelesen",
   "notifications.markRead": "Als gelesen markieren",
+  "notifications.markedRead": "Als gelesen markiert.",
   "notifications.loadMore": "Ältere Benachrichtigungen zeigen",
   "notifications.open.BOOKINGS": "In meinen Buchungen zeigen",
   "notifications.open.ACCOUNT_SECURITY": "Kontosicherheit öffnen",

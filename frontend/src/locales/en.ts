@@ -1120,6 +1120,7 @@ const en: Record<keyof typeof de, string> = {
   "notifications.unread": "New",
   "notifications.read": "Read",
   "notifications.markRead": "Mark as read",
+  "notifications.markedRead": "Marked as read.",
   "notifications.loadMore": "Show older notifications",
   "notifications.open.BOOKINGS": "Show in my bookings",
   "notifications.open.ACCOUNT_SECURITY": "Open account security",

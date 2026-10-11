@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { api, type MessageChannel, type MessageChannelChoice, type MessageChoice, type MessageKind, type Notification } from "../api/client";
@@ -24,16 +24,20 @@ function summaryOf(notification: Notification, t: Translate) {
     : t(`notifications.summary.${notification.kind}`);
 }
 
-function NotificationEntry({ notification, timeZone, marking, markRead, t, language }: {
-  notification: Notification; timeZone: string; marking: boolean; markRead: (id: string, quietly?: boolean) => void;
-  t: Translate; language: string;
+function NotificationEntry({ notification, timeZone, marking, justRead, markRead, t, language }: {
+  notification: Notification; timeZone: string; marking: boolean; justRead: boolean;
+  markRead: (id: string, quietly?: boolean) => void; t: Translate; language: string;
 }) {
   const summaryId = useId();
+  const item = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (justRead) item.current?.focus();
+  }, [justRead]);
   const read = Boolean(notification.readAt);
   const route = routes[notification.link.target];
   const booking = notification.booking;
-  return <li data-testid={`notification-${notification.id}`} data-read={String(read)}
-    className={`border-structural grid gap-1 rounded-xl border p-4 ${read ? "" : "surface-raised border-l-4"}`}>
+  return <li ref={item} tabIndex={-1} data-testid={`notification-${notification.id}`} data-read={String(read)}
+    className={`focus-ring border-structural grid gap-1 rounded-xl border p-4 ${read ? "" : "surface-raised border-l-4"}`}>
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
       <span className="font-semibold">{t(`messages.kind.${notification.kind}`)}</span>
       <span data-testid="notification-state" className={read ? "text-muted text-sm" : "rounded-full border px-2 text-sm font-semibold"}>
@@ -70,6 +74,7 @@ function NotificationCentre() {
   const [entries, setEntries] = useState<Notification[]>();
   const [nextCursor, setNextCursor] = useState<string>();
   const [marking, setMarking] = useState<string>();
+  const [justRead, setJustRead] = useState<string>();
   const [loadingMore, setLoadingMore] = useState(false);
   const [failure, setFailure] = useState<{ cause: unknown }>();
   const error = failure && problemMessage(failure.cause, t);
@@ -103,11 +108,15 @@ function NotificationCentre() {
       await api.markNotificationRead(id);
       const readAt = new Date().toISOString();
       setEntries((current) => current?.map((entry) => entry.id === id ? { ...entry, readAt } : entry));
+      if (!quietly) setJustRead(id);
       setFailure(undefined);
       announceNotificationsRead();
     } catch (cause) {
       if (quietly) warnAbout("Notification not marked read", cause);
-      else setFailure({ cause });
+      else {
+        setJustRead(undefined);
+        setFailure({ cause });
+      }
     } finally {
       setMarking(undefined);
     }
@@ -116,11 +125,12 @@ function NotificationCentre() {
   return <section className="grid gap-3" aria-labelledby="notifications-title">
     <h2 id="notifications-title" className="text-2xl font-bold">{t("notifications.title")}</h2>
     {error && <Alert>{error}</Alert>}
+    <p role="status" data-testid="notifications-status" className="sr-only">{justRead && t("notifications.markedRead")}</p>
     {entries && club && (entries.length === 0
       ? <p data-testid="notifications-empty" className="text-muted">{t("notifications.empty")}</p>
       : <ul data-testid="notifications" className="grid gap-3">
         {entries.map((notification) => <NotificationEntry key={notification.id} notification={notification}
-          timeZone={club.timeZone} marking={marking === notification.id} markRead={(id, quietly) => void markRead(id, quietly)}
+          timeZone={club.timeZone} marking={marking === notification.id} justRead={justRead === notification.id} markRead={(id, quietly) => void markRead(id, quietly)}
           t={t} language={i18n.language} />)}
       </ul>)}
     {nextCursor && <Button variant="secondary" data-testid="notifications-load-more" className="justify-self-start"

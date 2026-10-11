@@ -130,6 +130,24 @@ describe("MyMessagesView", () => {
     expect(within(entry(confirmed.id)).getByTestId("notification-state")).toHaveTextContent("Read");
   });
 
+  it("given an unread notification, when the member marks it read, then the entry keeps the focus and the change is announced", async () => {
+    // given
+    vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
+    show();
+    const unread = await screen.findByTestId(`notification-${confirmed.id}`);
+    const button = within(unread).getByTestId("notification-mark-read");
+    button.focus();
+
+    // when
+    await userEvent.click(button);
+
+    // then
+    await waitFor(() => expect(document.activeElement).toBe(entry(confirmed.id)));
+    const status = screen.getByTestId("notifications-status");
+    expect(status).toHaveAttribute("role", "status");
+    expect(status).toHaveTextContent("Marked as read.");
+  });
+
   it("given an unread notification, when it is marked read, then the navigation is told to count again", async () => {
     // given
     vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
