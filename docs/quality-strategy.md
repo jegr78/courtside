@@ -49,6 +49,9 @@ Tests are placed at the lowest level that can prove the risk. Database guarantee
 A timeout or unavailable required tool makes a gate incomplete, not successful. Budgets are reviewed when their representative workload changes; tests are not silently removed to meet a budget.
 
 A workflow job's `timeout-minutes` is set from measurement: at least twice the longest recent successful run, rounded up to five minutes.
+The accessibility browser projects bound each test by the same rule, at five minutes, so a hang
+fails its own test with a trace and the pending step instead of consuming the job. Every other
+browser project leaves its deadline to the job.
 
 The local Docker release gates follow the same rule: their 35 minutes are twice the 17.1 minutes the five gates took with a cold image build on an arm64 Mac.
 
