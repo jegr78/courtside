@@ -2726,8 +2726,9 @@ components:
     NotificationBooking:
       type: object
       description: |
-        The booking an entry concerns as it stands now, absent when the entry concerns none or the
-        booking no longer exists. It names no person.
+        The booking an entry concerns as it stands now. It is absent when the entry concerns none,
+        when the booking no longer exists, or when the account neither owns it nor plays in it any
+        more. It names no person.
       required: [startsAt, endsAt, courts, cardLabel, cancelled]
       properties:
         startsAt: { type: string, format: date-time }
@@ -2754,7 +2755,8 @@ components:
       type: object
       description: |
         Where the entry leads, as one of the client's own pages rather than an address, so no entry
-        can send a member off the instance. `bookingId` is present while the booking exists.
+        can send a member off the instance. `bookingId` is present only while the booking exists and
+        the account owns it or plays in it.
       required: [target]
       properties:
         target:
