@@ -148,6 +148,28 @@ describe("MyMessagesView", () => {
     expect(status).toHaveTextContent("Marked as read.");
   });
 
+  it("given two unread notifications, when the member marks one and then the other, then the second is announced afresh and keeps the focus", async () => {
+    // given
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [confirmed, displaced], nextCursor: null, unread: 2 });
+    let answerSecond: () => void = () => undefined;
+    vi.spyOn(api, "markNotificationRead")
+      .mockResolvedValueOnce(undefined)
+      .mockImplementationOnce(() => new Promise<void>((resolve) => { answerSecond = resolve; }));
+    show();
+    await userEvent.click(within(await screen.findByTestId(`notification-${confirmed.id}`)).getByTestId("notification-mark-read"));
+    await waitFor(() => expect(screen.getByTestId("notifications-status")).toHaveTextContent("Marked as read."));
+
+    // when
+    await userEvent.click(within(entry(displaced.id)).getByTestId("notification-mark-read"));
+
+    // then
+    expect(screen.getByTestId("notifications-status"), "the region empties so the next mark is a new announcement")
+      .toBeEmptyDOMElement();
+    await act(async () => answerSecond());
+    await waitFor(() => expect(screen.getByTestId("notifications-status")).toHaveTextContent("Marked as read."));
+    expect(document.activeElement).toBe(entry(displaced.id));
+  });
+
   it("given an unread notification, when it is marked read, then the navigation is told to count again", async () => {
     // given
     vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);

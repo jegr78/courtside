@@ -104,6 +104,7 @@ function NotificationCentre() {
   // Following a link leaves the page, so a refusal there is only logged rather than shown.
   async function markRead(id: string, quietly = false) {
     setMarking(id);
+    if (!quietly) setJustRead(undefined);
     try {
       await api.markNotificationRead(id);
       const readAt = new Date().toISOString();
@@ -113,10 +114,7 @@ function NotificationCentre() {
       announceNotificationsRead();
     } catch (cause) {
       if (quietly) warnAbout("Notification not marked read", cause);
-      else {
-        setJustRead(undefined);
-        setFailure({ cause });
-      }
+      else setFailure({ cause });
     } finally {
       setMarking(undefined);
     }
