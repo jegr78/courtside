@@ -8,7 +8,8 @@ export function forbiddenTerms(config, discovery) {
   return {
     usernames: [...new Set([...Object.values(config.personas), ...(config.disposables ?? []), ...roster.map((entry) => entry.username)].filter(Boolean))],
     hosts: [new URL(config.baseUrl).hostname],
-    names: [...new Set(roster.flatMap((entry) => [entry.firstName, entry.lastName]).filter(Boolean))]
+    names: [...new Set(roster.filter((entry) => entry.firstName && entry.lastName)
+      .flatMap((entry) => [`${entry.firstName} ${entry.lastName}`, `${entry.lastName}, ${entry.firstName}`]))]
   };
 }
 

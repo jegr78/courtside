@@ -133,8 +133,8 @@ appear under rejected suspicions, harness gaps under their own heading.
 
 Each report also writes `release-summary.md`: the version, the run, the passed, failed and skipped
 cells, and every finding with its assessment and issue. It contains no username, email address,
-name of anybody on the roster, instance host or image; a summary that would is refused. Post it on
-the release parent or the release pull request.
+full name of anybody on the roster, instance host or image; a summary that would is refused. Post
+it on the release parent or the release pull request.
 
 Full reports and screenshots are never committed. The `report/` directory may be shared
 privately. The rest of the run directory stays on the operator's machine: Playwright traces in

@@ -521,13 +521,15 @@ test("given a configuration and a roster, when the forbidden terms are built, th
   assert.ok(terms.usernames.includes("mary.roe"), "the second disposable is forbidden");
   assert.ok(terms.usernames.includes("richard.doe"), "a roster username is forbidden");
   assert.deepEqual(terms.hosts, ["club.example.org"], "the host without its port");
-  assert.ok(["Richard", "Doe", "Mary", "Major"].every((name) => terms.names.includes(name)), "first and last names are forbidden");
+  assert.deepEqual(terms.names, ["Richard Doe", "Doe, Richard", "Mary Major", "Major, Mary"], "full names in both orders are forbidden");
 });
 
-test("given a short surname inside another word, when checked, then the summary is not refused", () => {
+test("given roster entries named like ordinary words, when the summary uses those words, then it is not refused", () => {
+  // given
+  const terms = forbiddenTerms({ baseUrl: "https://club.example.org", personas: {}, disposables: [] }, { roster: [{ username: "test.admin", firstName: "Test", lastName: "Admin" }] });
   // when / then
-  assert.doesNotThrow(() => assertPrivacySafe("The bottom row overflows.", { usernames: [], hosts: [], names: ["Ott"] }));
-  assert.throws(() => assertPrivacySafe("Reported by Ott.", { usernames: [], hosts: [], names: ["Ott"] }), /person/);
+  assert.doesNotThrow(() => assertPrivacySafe("The admin signs in again before saving.", terms));
+  assert.throws(() => assertPrivacySafe("Reported by Test Admin.", terms), /person/);
 });
 
 import { coverageOf } from "../acceptance/report/html.mjs";
