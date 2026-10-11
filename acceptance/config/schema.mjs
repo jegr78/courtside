@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 export const PERSONA_KEYS = ["admin", "trainer", "youth", "sport", "grounds", "treasurer", "memberA", "memberB", "memberC", "disposable"];
-const TOP_LEVEL = ["baseUrl", "expectedVersion", "personas", "timeZone", "window", "courts", "mail", "logs", "metrics", "browsers", "loadLimit"];
+const TOP_LEVEL = ["baseUrl", "expectedVersion", "personas", "timeZone", "window", "courts", "mail", "logs", "metrics", "browsers", "loadLimit", "resetCodesPerHour"];
 
 export class ConfigError extends Error {
   constructor(field, problem) {
@@ -42,16 +42,22 @@ export function parseConfig(raw, env) {
     window: {},
     logs: {},
     browsers: {},
-    loadLimit: 5.5
+    loadLimit: 5.5,
+    resetCodesPerHour: 5
   };
   const personas = object(input.personas, "personas");
   onlyKeys(personas, PERSONA_KEYS, "personas");
   const seen = new Set();
   for (const key of PERSONA_KEYS) {
-    const username = text(personas[key], `personas.${key}`);
-    if (seen.has(username)) throw new ConfigError(`personas.${key}`, "repeats another actor's username");
-    seen.add(username);
-    config.personas[key] = username;
+    const many = key === "disposable" && Array.isArray(personas[key]);
+    if (many && personas[key].length === 0) throw new ConfigError("personas.disposable", "must name at least one account");
+    const usernames = many ? personas[key].map((value) => text(value, "personas.disposable")) : [text(personas[key], `personas.${key}`)];
+    for (const username of usernames) {
+      if (seen.has(username)) throw new ConfigError(`personas.${key}`, "repeats another actor's username");
+      seen.add(username);
+    }
+    config.personas[key] = usernames[0];
+    if (key === "disposable") config.disposables = usernames;
   }
   if (input.timeZone !== undefined) {
     try { new Intl.DateTimeFormat("en", { timeZone: text(input.timeZone, "timeZone") }); } catch (error) {
@@ -105,6 +111,10 @@ export function parseConfig(raw, env) {
   if (input.loadLimit !== undefined) {
     if (typeof input.loadLimit !== "number" || !(input.loadLimit > 0)) throw new ConfigError("loadLimit", "must be a positive number");
     config.loadLimit = input.loadLimit;
+  }
+  if (input.resetCodesPerHour !== undefined) {
+    if (!Number.isInteger(input.resetCodesPerHour) || input.resetCodesPerHour < 1) throw new ConfigError("resetCodesPerHour", "must be a positive whole number");
+    config.resetCodesPerHour = input.resetCodesPerHour;
   }
   return config;
 }

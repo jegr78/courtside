@@ -4,8 +4,9 @@ import { writeFileSync } from "node:fs";
 import { apiAs } from "../lib/api";
 import { canSignIn } from "../lib/disposable";
 import { allSlots, instantOf } from "../lib/lanes";
-import { config, PASSWORD, persona, runPath, type PersonaKey } from "../lib/context";
+import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
+import { profilesOf, resetQuota } from "../config/disposables.mjs";
 import { occupying } from "../lib/core.mjs";
 
 
@@ -37,18 +38,20 @@ test("when the environment is checked before a run, then every precondition hold
       await api.dispose();
     }
     checks.openBookings = open;
-    checks.disposableSignsIn = await canSignIn(PASSWORD);
+    checks.disposablesSignIn = Object.fromEntries(await Promise.all(disposables.map(async (username, index) => [`disposable ${index + 1}`, await canSignIn(PASSWORD, username)])));
     const weeks = await (await admin.get("/api/admin/opening-hours/schedule")).json() as { effectiveFrom: string | null }[];
     checks.futureWeeks = weeks.slice(1).map((w) => w.effectiveFrom);
     const roster = await (await admin.post("/api/admin/roster-search", {})).json() as { entries: { username: string | null; email: string | null }[] };
-    const email = roster.entries.find((e) => e.username === persona("disposable").username)?.email;
-    if (mailAvailable()) {
-      const hourAgo = Date.now() - 3_600_000;
-      const mails = await fetch(`${config.mail!.url}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}&limit=50`).then((r) => r.json(), () => ({ messages: [] }));
-      checks.resetMailsLastHour = (mails.messages ?? []).filter((m: { Created: string; Subject: string }) => Date.parse(m.Created) > hourAgo && /Code|code/.test(m.Subject)).length;
-    } else {
-      checks.resetMailsLastHour = 0;
+    const resetQuotas: Record<string, unknown> = {};
+    for (const [index, username] of disposables.entries()) {
+      const email = roster.entries.find((e) => e.username === username)?.email;
+      const mails = mailAvailable()
+        ? await fetch(`${config.mail!.url}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}&limit=50`).then((r) => r.json(), () => ({ messages: [] }))
+        : { messages: [] };
+      const sentAt = (mails.messages ?? []).filter((m: { Subject: string }) => /Code|code/.test(m.Subject)).map((m: { Created: string }) => Date.parse(m.Created));
+      resetQuotas[`disposable ${index + 1}`] = resetQuota({ sentAt, now: Date.now(), perHour: config.resetCodesPerHour, needed: profilesOf(username, disposables).length + 1 });
     }
+    checks.resetQuotas = resetQuotas;
   } finally {
     writeFileSync(runPath("preflight.json"), JSON.stringify(checks, null, 2));
     await admin.dispose();
@@ -58,7 +61,11 @@ test("when the environment is checked before a run, then every precondition hold
   if (config.metrics) expect.soft(checks.metrics, "PRECONDITION: the metrics endpoint answers").toBe("success");
   expect.soft(checks.occupiedSlots, "PRECONDITION: every reserved slot is free").toEqual([]);
   for (const [key, count] of Object.entries(checks.openBookings as Record<string, number>)) expect.soft(count, `PRECONDITION: ${key} has at most 6 open bookings`).toBeLessThanOrEqual(6);
-  expect.soft(checks.disposableSignsIn, "PRECONDITION: the disposable member signs in with the shared password").toBe(true);
+  for (const [account, signsIn] of Object.entries(checks.disposablesSignIn as Record<string, boolean>)) {
+    expect.soft(signsIn, `PRECONDITION: ${account} signs in with the shared password`).toBe(true);
+  }
   expect.soft(checks.futureWeeks, "PRECONDITION: no opening week is scheduled after today").toEqual([]);
-  expect.soft(checks.resetMailsLastHour as number, "PRECONDITION: at most one reset code went out in the last hour (limit 5, the run needs 3 plus one repair)").toBeLessThanOrEqual(Number(process.env.ACCEPTANCE_RESET_MAILS_MAX ?? 1));
+  for (const [account, quota] of Object.entries(checks.resetQuotas as Record<string, { ok: boolean; sentInLastHour: number; freeAt: string | null }>)) {
+    expect.soft(quota.ok, `PRECONDITION: ${account} can still receive the reset codes this run needs (${quota.sentInLastHour} sent in the last hour, enough again at ${quota.freeAt})`).toBe(true);
+  }
 });

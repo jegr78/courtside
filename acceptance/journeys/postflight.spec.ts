@@ -8,7 +8,7 @@ import { allSlots, lanePlan } from "../lib/lanes";
 import { sweep } from "../lib/sweep";
 import { clearWeekend } from "../lib/weekend";
 import { canSignIn, restoreDisposable } from "../lib/disposable";
-import { PASSWORD } from "../lib/context";
+import { disposables, PASSWORD } from "../lib/context";
 
 const ids = (day: unknown) => new Set((day as { bookingId?: string; id?: string }[]).map((a) => a.bookingId ?? a.id));
 
@@ -42,9 +42,9 @@ test("when the run ends, then every reserved slot is empty, no week is scheduled
   // when
   const { removed, left } = await sweep(admin, allSlots());
   const weeks = await clearWeekend();
-  await restoreDisposable();
+  for (const username of disposables) await restoreDisposable(username);
   writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, weeks }, null, 2));
   // then
   expect(left, "every reserved slot is empty").toEqual([]);
-  expect(await canSignIn(PASSWORD), "the disposable member signs in").toBe(true);
+  for (const [index, username] of disposables.entries()) expect(await canSignIn(PASSWORD, username), `disposable ${index + 1} signs in`).toBe(true);
 });

@@ -12,11 +12,12 @@ created.
 
 ## What the instance needs
 
-- Ten accounts for the journey actors in `personas`: an administrator, a trainer, a youth
-  director, a sport director, a groundskeeper, a treasurer, three plain members and a disposable
-  member. All share one password.
-- The disposable account may have its password, language and active state changed during the run;
-  the harness restores it afterwards.
+- Accounts for the journey actors in `personas`: an administrator, a trainer, a youth director, a
+  sport director, a groundskeeper, a treasurer, three plain members and one to three disposable
+  members. All share one password.
+- A disposable account may have its password, language and active state changed during the run;
+  the harness restores it afterwards. The disposable journeys run on three profiles; with three
+  disposable accounts each profile uses its own.
 - Active booking cards that the trainer, youth director, sport director and groundskeeper may use,
   and an active participant card for the participant journey.
 - At least two active courts. Weekday lanes use the first two courts of `courts`; the weekend
@@ -38,7 +39,7 @@ shows the shape with placeholder accounts.
 | --- | --- | --- |
 | `baseUrl` | Instance under test | yes |
 | `expectedVersion` | Version the preflight must read from the instance | yes |
-| `personas` | Username per journey actor: `admin`, `trainer`, `youth`, `sport`, `grounds`, `treasurer`, `memberA`, `memberB`, `memberC`, `disposable` | yes |
+| `personas` | Username per journey actor: `admin`, `trainer`, `youth`, `sport`, `grounds`, `treasurer`, `memberA`, `memberB`, `memberC`; `disposable` takes one username or a list | yes |
 | `timeZone` | Club time zone; default the zone the instance reports | no |
 | `window.start` | Monday of the booking window; default the first Monday after the run starts | no |
 | `courts` | Court numbers the journeys use; default the first three active courts | no |
@@ -47,6 +48,7 @@ shows the shape with placeholder accounts.
 | `metrics.url` | Prometheus query endpoint for request latency around failures | no |
 | `browsers.firefox.wsEndpoint` | Remote Firefox launch server; default a local Firefox | no |
 | `loadLimit` | One-minute load average the run waits to fall below before it starts; default 5.5 | no |
+| `resetCodesPerHour` | Password-reset codes the instance mails per account and hour; default 5, the instance's own default | no |
 
 The file is validated before any browser starts. A missing or malformed field, two actors sharing
 one username, a window start that is not a Monday or fewer than two courts stop the run and name
@@ -55,8 +57,11 @@ the field.
 Every slot is converted to an instant through the club time zone, so a window across a change of
 daylight saving time books the intended local hours. "Today" is the club's today, not UTC's.
 
-`ACCEPTANCE_RESET_MAILS_MAX` raises the preflight's limit on password-reset mails the disposable
-account received in the last hour; the default is one.
+Each run asks for one password-reset code per disposable profile, and a repair may ask for one
+more. The instance limits reset codes per account and hour, so the preflight counts the codes each
+disposable account received in the last hour and starts only when the run's codes still fit;
+otherwise it names the time they will. Three disposable accounts let one run follow another
+without waiting.
 
 ## Running
 

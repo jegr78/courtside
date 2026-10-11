@@ -475,3 +475,55 @@ test("when the postflight runs alone, then it writes its own results file and th
   assert.equal(resultsFileFor(["postflight"]), "postflight-results.json");
   assert.equal(resultsFileFor(["desktop-chrome", "ipad"]), "results.json");
 });
+
+import { disposableFor, DISPOSABLE_PROFILES, resetQuota } from "../acceptance/config/disposables.mjs";
+
+test("given several disposable accounts, when parsed, then all are kept in order and the first stands for the role", () => {
+  // given
+  const raw = valid(); raw.personas.disposable = ["jane.spare", "john.spare", "mary.spare"];
+  // when
+  const config = parseConfig(raw, env);
+  // then
+  assert.deepEqual(config.disposables, ["jane.spare", "john.spare", "mary.spare"]);
+  assert.equal(config.personas.disposable, "jane.spare");
+  assert.deepEqual(parseConfig(valid(), env).disposables, ["jane.disposable"]);
+});
+
+test("given an empty disposable list or a disposable account that repeats another actor, when parsed, then personas.disposable is refused", () => {
+  // given
+  const empty = valid(); empty.personas.disposable = [];
+  const repeated = valid(); repeated.personas.disposable = ["jane.spare", "jane.spare"];
+  const shared = valid(); shared.personas.disposable = ["jane.spare", shared.personas.memberA];
+  // when / then
+  for (const raw of [empty, repeated, shared]) assert.equal(field(raw), "personas.disposable");
+});
+
+test("given three accounts, when the disposable profiles ask for theirs, then each gets its own and other profiles get the first", () => {
+  // given
+  const accounts = ["jane.spare", "john.spare", "mary.spare"];
+  // when
+  const assigned = DISPOSABLE_PROFILES.map((profile) => disposableFor(profile, accounts));
+  // then
+  assert.deepEqual(new Set(assigned).size, 3);
+  assert.equal(disposableFor("pixel-7", accounts), "jane.spare");
+  assert.equal(disposableFor(DISPOSABLE_PROFILES[2], ["jane.spare"]), "jane.spare");
+});
+
+test("given reset codes sent in the last hour, when the quota is asked, then a run starts only if its codes fit and otherwise names when they will", () => {
+  // given
+  const now = Date.parse("2030-03-11T10:00:00Z");
+  const sent = ["2030-03-11T09:10:00Z", "2030-03-11T09:20:00Z", "2030-03-11T09:30:00Z", "2030-03-11T08:30:00Z"].map(Date.parse);
+  // when
+  const fits = resetQuota({ sentAt: sent, now, perHour: 5, needed: 2 });
+  const tight = resetQuota({ sentAt: sent, now, perHour: 5, needed: 4 });
+  // then
+  assert.deepEqual(fits, { ok: true, sentInLastHour: 3, freeAt: null });
+  assert.deepEqual(tight, { ok: false, sentInLastHour: 3, freeAt: "2030-03-11T10:20:00.000Z" });
+});
+
+test("given no reset limit or a configured one, when parsed, then the instance default of five applies or the configured one, and a non-positive one is refused", () => {
+  // when / then
+  assert.equal(parseConfig(valid(), env).resetCodesPerHour, 5);
+  assert.equal(parseConfig({ ...valid(), resetCodesPerHour: 8 }, env).resetCodesPerHour, 8);
+  assert.equal(field({ ...valid(), resetCodesPerHour: 0 }), "resetCodesPerHour");
+});

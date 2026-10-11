@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { PASSWORD, persona, RUN, type PersonaKey } from "./context";
+import { PASSWORD, persona, RUN, stateKey, type PersonaKey } from "./context";
 import { setPersona, watch } from "./checks";
 
 export const statePath = (engine: string, key: string) => `${RUN}/state/${engine}/${key}.json`;
@@ -31,7 +31,7 @@ export async function openAs(browser: Browser, key: PersonaKey | "visitor", opti
   const project = test.info().project;
   const profile = project.metadata as { theme: string; locale: string; engine: string };
   const engine = profile.engine;
-  const stored = key === "visitor" ? undefined : statePath(engine, key);
+  const stored = key === "visitor" ? undefined : statePath(engine, stateKey(key));
   const context = await browser.newContext({ ...project.use, storageState: stored && existsSync(stored) ? stored : undefined });
   await context.addInitScript(([theme, locale, seedLocale]) => {
     try {

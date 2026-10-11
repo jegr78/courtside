@@ -8,12 +8,14 @@ import { latestMailTo } from "../lib/mail";
 import { PASSWORD, persona } from "../lib/context";
 import { openAs, reauthenticateIfAsked, signInByForm } from "../lib/session";
 import { step } from "../lib/steps";
-import { discovery, projectName } from "../lib/journey";
+import { disposableRecord, projectName } from "../lib/journey";
+import { DISPOSABLE_PROFILES } from "../config/disposables.mjs";
 
-const DISPOSABLE_PROFILES = /iphone-15-de|desktop-safari|desktop-firefox/;
-test.beforeEach(() => { test.skip(!DISPOSABLE_PROFILES.test(projectName()), "disposable journeys run on three profiles"); });
+test.beforeEach(() => { test.skip(!DISPOSABLE_PROFILES.includes(projectName()), "disposable journeys run on three profiles"); });
 test.setTimeout(120_000);
-test.beforeAll(async ({}, workerInfo) => { if (DISPOSABLE_PROFILES.test(workerInfo.project.name)) await restoreDisposable(); });
+test.beforeAll(async ({}, workerInfo) => {
+  if (DISPOSABLE_PROFILES.includes(workerInfo.project.name)) await restoreDisposable(persona("disposable", workerInfo.project.name).username);
+});
 test.afterEach(async ({ browser }, info) => {
   if (info.status === "skipped" || info.status === info.expectedStatus) return;
   for (const context of browser.contexts()) await context.close().catch(() => undefined);
@@ -84,7 +86,7 @@ test("given a forgotten password, when a reset code is mailed and redeemed, then
     await page.getByTestId("recovery-password-submit").click();
     await expect(page.getByTestId("recovery-sent")).toBeVisible();
     await capture(page, "recovery-sent");
-    const mail = await latestMailTo(discovery.emails.disposable, since);
+    const mail = await latestMailTo(disposableRecord(username()).email, since);
     expect(mail, "product: the reset code reached Mailpit").not.toBeNull();
     await renderMail(browser, mail!.html, "mail-reset-code");
     const code = /^Code:\s*(\S+)\s*$/m.exec(mail!.text)?.[1];
@@ -110,11 +112,11 @@ test("given a forgotten username, when a reminder is asked for by email, then it
   try {
     await page.getByTestId("sign-in-link").click();
     await page.getByTestId("forgotten-credentials-link").click();
-    await page.getByTestId("recovery-email").fill(discovery.emails.disposable);
+    await page.getByTestId("recovery-email").fill(disposableRecord(username()).email);
     await page.getByTestId("recovery-usernames-submit").click();
     await expect(page.getByTestId("recovery-sent")).toBeVisible();
     await capture(page, "username-reminder-sent");
-    const mail = await latestMailTo(discovery.emails.disposable, since);
+    const mail = await latestMailTo(disposableRecord(username()).email, since);
     expect(mail, "product: the username reminder reached Mailpit").not.toBeNull();
     await renderMail(browser, mail!.html, "mail-username-reminder");
   } finally { await page.context().close(); }
@@ -123,7 +125,7 @@ test("given a forgotten username, when a reminder is asked for by email, then it
 test("given a deactivated account, when the member signs in, then it is refused until the admin reactivates it", async ({ browser }) => {
   const admin = await openAs(browser, "admin");
   try {
-    await admin.goto(`/admin/roster/${discovery.personIds.disposable}`);
+    await admin.goto(`/admin/roster/${disposableRecord(username()).personId}`);
     await expect(admin.getByTestId("admin-person-view")).toBeVisible();
     await admin.getByTestId("toggle-account").click();
     await reauthenticateIfAsked(admin);
@@ -146,7 +148,7 @@ test("given a deactivated account, when the member signs in, then it is refused 
 
 test("given the disposable member, when the language is switched in the preferences and back, then both render", async ({ browser }) => {
   const page = await openAs(browser, "disposable", { seedLocale: false });
-  const original = discovery.disposable.locale ?? "de";
+  const original = disposableRecord(username()).locale ?? "de";
   try {
     await page.getByTestId("preferences-menu").click();
     await page.locator("#locale-preference").selectOption(original === "de" ? "en" : "de");

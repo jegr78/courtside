@@ -1,28 +1,30 @@
 import type { APIResponse } from "@playwright/test";
 import { anonymousApi, apiAs, type Api } from "./api";
-import { discovery } from "./journey";
+import { disposableRecord } from "./journey";
 import { latestMailTo } from "./mail";
 import { PASSWORD, persona } from "./context";
 import { precondition } from "./precondition";
 
-export async function canSignIn(password: string): Promise<boolean> {
+const own = () => persona("disposable").username;
+
+export async function canSignIn(password: string, username = own()): Promise<boolean> {
   const api = await anonymousApi();
   try {
-    const response = await api.postForm("/api/session", { username: persona("disposable").username, password });
+    const response = await api.postForm("/api/session", { username, password });
     if (!response.ok()) return false;
     return (await (await api.get("/api/session")).json()).authenticated === true;
   } finally { await api.dispose(); }
 }
 
-async function resetToShared() {
+async function resetToShared(username: string) {
   const since = new Date();
   const api = await anonymousApi();
   try {
-    const asked = await api.post("/api/account-recovery/password", { username: persona("disposable").username });
+    const asked = await api.post("/api/account-recovery/password", { username });
     precondition(asked.ok(), `reset code request answered ${asked.status()}`);
-    const mail = await latestMailTo(discovery.emails.disposable, since);
+    const mail = await latestMailTo(disposableRecord(username).email, since);
     const code = mail && /^Code:\s*(\S+)\s*$/m.exec(mail.text)?.[1];
-    precondition(code, "reset code reached Mailpit (the instance mails at most 5 reset codes per account and hour)");
+    precondition(code, "reset code reached Mailpit (the instance limits reset codes per account and hour)");
     const redeemed = await api.post("/api/account-recovery/password/redemption", { code, password: PASSWORD });
     precondition(redeemed.ok(), `reset code redemption answered ${redeemed.status()}`);
   } finally { await api.dispose(); }
@@ -37,13 +39,13 @@ async function adminPut(admin: Api, path: string, data: unknown): Promise<APIRes
   return admin.put(path, data);
 }
 
-export async function restoreDisposable() {
+export async function restoreDisposable(username = own()) {
   const admin = await apiAs("admin");
-  const id = discovery.personIds.disposable;
+  const id = disposableRecord(username).personId;
   const read = await admin.get(`/api/admin/roster/${id}`);
   precondition(read.ok(), `reading the disposable account answered ${read.status()}`);
   const state = await read.json() as { enabled: boolean; locale: string | null };
-  const locale = discovery.disposable.locale ?? "de";
+  const locale = disposableRecord(username).locale ?? "de";
   if (!state.enabled) {
     const active = await adminPut(admin, `/api/admin/roster/${id}/account/active`, { active: true });
     precondition(active.ok(), `reactivating the disposable account answered ${active.status()}`);
@@ -52,7 +54,7 @@ export async function restoreDisposable() {
     const changed = await adminPut(admin, `/api/admin/roster/${id}/account/locale`, { locale });
     precondition(changed.ok(), `restoring the disposable locale answered ${changed.status()}`);
   }
-  if (await canSignIn(PASSWORD)) return;
-  await resetToShared();
-  precondition(await canSignIn(PASSWORD), "the disposable account signs in with the shared password");
+  if (await canSignIn(PASSWORD, username)) return;
+  await resetToShared(username);
+  precondition(await canSignIn(PASSWORD, username), "the disposable account signs in with the shared password");
 }

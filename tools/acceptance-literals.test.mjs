@@ -28,7 +28,7 @@ export function literalOffences(files, usernames) {
 
 test("given the harness sources, when scanned, then no date, offset, address, host or example username is written in them", () => {
   // given
-  const usernames = Object.values(JSON.parse(readFileSync(join(root, "config.example.json"), "utf8")).personas);
+  const usernames = Object.values(JSON.parse(readFileSync(join(root, "config.example.json"), "utf8")).personas).flat();
   // when / then
   assert.deepEqual(literalOffences(sources(), usernames), []);
 });
