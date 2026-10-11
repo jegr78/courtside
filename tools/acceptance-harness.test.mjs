@@ -435,3 +435,21 @@ test("given the same WebKit page error from two instances, when collected, then 
   assert.equal(first[0].key, second[0].key);
   assert.doesNotMatch(first[0].title, /example\.org/);
 });
+
+import { parseArguments, waitForLoad } from "../acceptance/run.mjs";
+
+test("when arguments are parsed, then a later phase needs an existing run and projects narrow the matrix", () => {
+  // when / then
+  assert.deepEqual(parseArguments([]), { phase: "all", run: null, projects: [] });
+  assert.deepEqual(parseArguments(["--phase", "matrix", "--project", "ipad", "--project", "narrow"]), { phase: "matrix", run: null, projects: ["ipad", "narrow"] });
+  assert.throws(() => parseArguments(["--phase", "report"]), /--run/);
+  assert.throws(() => parseArguments(["--phase", "everything"]), /phase/);
+});
+
+test("given a load that falls below the limit, when waited for, then it returns, and a load that never falls stops at the deadline", async () => {
+  // given
+  const loads = [7, 6, 4];
+  // when / then
+  await waitForLoad({ limit: 5.5, loadavg: () => [loads.shift() ?? 4], sleep: async () => {}, deadlineMs: 1_000, now: (() => { let t = 0; return () => (t += 1); })() });
+  await assert.rejects(waitForLoad({ limit: 5.5, loadavg: () => [9], sleep: async () => {}, deadlineMs: 3, now: (() => { let t = 0; return () => (t += 1); })() }), /load stayed above 5.5/);
+});
