@@ -569,7 +569,7 @@ test("given the same WebKit page error from two instances, when collected, then 
   const second = collectFindings({ metrics: message("courts.example.org"), failures: [] });
   // then
   assert.equal(first[0].key, second[0].key);
-  assert.doesNotMatch(first[0].title, /example\.org/);
+  assert.ok(!first[0].title.includes("example.org"), "the host is removed from the title");
 });
 
 import { parseArguments, waitForLoad } from "../acceptance/run.mjs";

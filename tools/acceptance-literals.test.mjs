@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,10 +13,10 @@ const RULES = [
   ["host", /["'`/@](?![\w.-]*example\.org\b)[a-z0-9-]+(\.[a-z0-9-]+)*\.(ts\.net|com|de|net|io|dev|app|eu|org)\b/i]
 ];
 
-const sources = (directory = root) => readdirSync(directory).flatMap((name) => {
-  if (SKIP.has(name)) return [];
-  const path = join(directory, name);
-  return statSync(path).isDirectory() ? sources(path) : /\.(ts|mjs|json)$/.test(name) ? [{ path: relative(root, path), text: readFileSync(path, "utf8") }] : [];
+const sources = (directory = root) => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+  if (SKIP.has(entry.name)) return [];
+  const path = join(directory, entry.name);
+  return entry.isDirectory() ? sources(path) : /\.(ts|mjs|json)$/.test(entry.name) ? [{ path: relative(root, path), text: readFileSync(path, "utf8") }] : [];
 });
 
 export function literalOffences(files, usernames) {
