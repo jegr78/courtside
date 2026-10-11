@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { assessmentImages } from "./security-image-inventory.mjs";
-import { openApiFuzzVersion, securityImportSourceKey, securityImportSourceRequest } from "./security-openapi-fuzz.mjs";
+import { securityImportSourceKey, securityImportSourceRequest } from "./security-openapi-fuzz.mjs";
 
 const yaml = createRequire(new URL("../frontend/package.json", import.meta.url))("js-yaml");
 const composeServices = yaml.load(readFileSync(new URL("../deploy/compose.security.yaml", import.meta.url), "utf8")).services;
@@ -16,12 +16,12 @@ test("given active assessment configuration, when resolving images, then all pin
   const images = assessmentImages("active");
 
   // then
-  assert.deepEqual(images.map((image) => image.split("@")[0]), [
-    "axllent/mailpit:v1.31",
-    "caddy:2-alpine",
-    "postgres:18-alpine",
-    `schemathesis/schemathesis:${openApiFuzzVersion}`,
-    "zaproxy/zap-stable:2.17.0",
+  assert.deepEqual(images.map((image) => image.split("@")[0].replace(/:[\w.-]+$/, "")), [
+    "axllent/mailpit",
+    "caddy",
+    "postgres",
+    "schemathesis/schemathesis",
+    "zaproxy/zap-stable",
   ]);
   assert.ok(images.every((image) => /@sha256:[a-f0-9]{64}$/.test(image)));
 });
@@ -63,7 +63,7 @@ test("given infrastructure sharing an inactive scanner image, when resolving saf
   assert.ok(assessmentImages("destructive", { compose }).includes(image));
 });
 
-for (const image of ["axllent/mailpit:v1.31", "example/runtime:latest", "${UNTRUSTED_IMAGE}", "${COURTSIDE_SECURITY_IMAGE:-foreign:latest}"]) {
+for (const image of ["axllent/mailpit:latest", "example/runtime:latest", "${UNTRUSTED_IMAGE}", "${COURTSIDE_SECURITY_IMAGE:-foreign:latest}"]) {
   test(`given unsupported runtime image ${image}, when resolving inventory, then fail closed`, () => {
     // given
     const directory = mkdtempSync(join(tmpdir(), "security-images-"));

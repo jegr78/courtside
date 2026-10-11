@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { captureSecurityMailBaseline, observeSecurityMail, securityMailObservationLimits,
-  securityMailObservationSource } from "./security-mail-observation.mjs";
+  securityMailObservationImage, securityMailObservationSource } from "./security-mail-observation.mjs";
 
 const runId = "mail-run-0001";
 const id = "0123456789ABCDEFGHIJKL";
@@ -34,7 +34,7 @@ const list = (messages) => JSON.stringify({ total: messages.length, unread: mess
   count: messages.length, messages_count: messages.length, messages_unread: messages.length,
   start: 0, tags: [], messages });
 const inspect = () => [{ Id: sinkId, Image: imageId, Name: `/${project}-mail-1`, State: { Running: true },
-  Config: { Image: `axllent/mailpit:v1.31@${securityMailObservationSource.imageDigest}`,
+  Config: { Image: securityMailObservationImage,
     Env: ["MP_MAX_MESSAGES=100"], Entrypoint: ["/mailpit"], Cmd: null, Labels: labels("mail") },
   NetworkSettings: { Networks: { [`${project}_backend`]: { NetworkID: networkId, IPAddress: sinkIp,
     Aliases: ["mail", `${project}-mail-1`] } } } }];
@@ -86,7 +86,7 @@ test("given the pinned Mailpit source, when reading the API contract, then bind 
   assert.equal(source.commit, "4355c8cd7dbe745c6fc6ce8619d23a1a31b746c9");
   assert.equal(source.imageDigest, "sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea");
   assert.ok(readFileSync(new URL("../deploy/compose.security.yaml", import.meta.url), "utf8")
-    .includes(`axllent/mailpit:v1.31@${source.imageDigest}`));
+    .includes(`${source.image}@${source.imageDigest}`));
 });
 
 test("given a baseline and a native MIME confirmation, when observing new mail, then return only a private receipt with the sink creation time", async () => {
@@ -380,7 +380,7 @@ test("given trusted environment identity, when capturing a native baseline, then
   assert.deepEqual(baseline.runtimeBinding, { sinkId, imageId, appId, backendNetworkId: networkId, sinkIPv4: sinkIp });
   assert.deepEqual(identity, original);
   assert.ok(h.calls.some(({ args }) => JSON.stringify(args) === JSON.stringify([
-    "image", "inspect", `axllent/mailpit:v1.31@${securityMailObservationSource.imageDigest}`])));
+    "image", "inspect", securityMailObservationImage])));
 });
 
 for (const [name, change] of [

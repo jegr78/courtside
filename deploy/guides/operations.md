@@ -1498,8 +1498,9 @@ logo must use HTTPS and discloses each visitor's IP address and the Courtside or
   handed a message to this server and learns nothing after that, so a bounce arriving here
   afterwards is the answer nobody reads, and DMARC reports have no reader either.
 - **A reload the mail server refuses leaves it serving a certificate it generated itself.**
-  Stalwart 0.16.20 does not keep the pair it had when a reload fails: it answers `notCreated`, drops
-  the certificate, and the listener falls back to a self-signed one valid from 1975 to 4096. Nothing
+  Stalwart does not keep the pair it had when a reload fails. That was measured on 0.16.20, and no
+  changelog entry up to the pinned release changes it: the server answers `notCreated`, drops the
+  certificate, and the listener falls back to a self-signed one valid from 1975 to 4096. Nothing
   about the fallback is silent here, the reload stays owed until one is accepted, so `mail-reload`
   names the refusal, retries it, and stays unhealthy while it is owed, and the instance stops
   handing messages over rather than handing them to something it cannot authenticate. That is

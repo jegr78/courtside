@@ -31,25 +31,37 @@ class DeploymentImageParityTest {
 
     private static final Pattern COMPOSE_FILE = Pattern.compile("compose[\\w.-]*\\.yaml");
     private static final Pattern ANY_DIGEST = Pattern.compile("@sha256:[a-f0-9]{64}");
-    private static final Pattern ANY_PIN =
-            Pattern.compile("(?<![\\w./-])([a-z0-9][\\w./-]*):([\\w.-]+)@sha256:([a-f0-9]{64})");
+    private static final Pattern ANY_PIN = Pattern.compile(
+            "(?:(?<=:-)|(?<![\\w./-]))([a-z0-9][\\w./-]*)(?::([\\w.-]+))?@sha256:([a-f0-9]{64})");
+    private static final Pattern IMAGE_LINE = Pattern.compile("(?m)^\\s*image:\\s*[\"']?([^\\s\"']+)");
 
     @Test
     void whenTheDeploymentNamesAnImage_thenEveryFileUnderItAgreesOnOneVersionAndDigest() throws Exception {
         // when
         Map<String, Set<String>> digestsByReference = new TreeMap<>();
         Map<String, Set<String>> versionsByRepository = new TreeMap<>();
+        Map<String, Set<String>> digestsByRepository = new TreeMap<>();
+        Map<String, Set<String>> tagsByRepository = new TreeMap<>();
         for (Pin pin : deploymentPins()) {
+            digestsByRepository.computeIfAbsent(pin.repository(), key -> new TreeSet<>()).add(pin.digest());
+            tagsByRepository.computeIfAbsent(pin.repository(), key -> new TreeSet<>()).add(String.valueOf(pin.tag()));
             digestsByReference.computeIfAbsent(pin.reference(), key -> new TreeSet<>()).add(pin.digest());
-            versionsByRepository.computeIfAbsent(pin.repository(), key -> new TreeSet<>()).add(pin.version());
+            if (pin.tag() != null) {
+                versionsByRepository.computeIfAbsent(pin.repository(), key -> new TreeSet<>()).add(pin.version());
+            }
         }
 
         // then
         assertThat(digestsByReference).as("the files under deploy/ pin images").isNotEmpty();
+        assertThat(unreadImages()).as("every third-party image under deploy/ is a pin this test reads").isEmpty();
         assertThat(digestsByReference).allSatisfy((reference, digests) -> assertThat(digests)
                 .as("the files under deploy/ name one digest for %s", reference).hasSize(1));
         assertThat(versionsByRepository).allSatisfy((repository, versions) -> assertThat(versions)
                 .as("the files under deploy/ run one version of %s", repository).hasSize(1));
+        assertThat(digestsByRepository).allSatisfy((repository, digests) -> assertThat(digests)
+                .as("a pin of %s without a tag names a digest one of its tags already has", repository)
+                .hasSizeLessThanOrEqualTo(Math.max(1, tagsByRepository.get(repository).size() - (
+                        tagsByRepository.get(repository).contains("null") ? 1 : 0))));
     }
 
     @Test
@@ -61,6 +73,7 @@ class DeploymentImageParityTest {
         deployed.forEach(pin -> {
             repositories.add(pin.repository());
             pins.add(pin.text());
+            pins.add(pin.repository() + "@sha256:" + pin.digest());
         });
 
         // when
@@ -146,15 +159,40 @@ class DeploymentImageParityTest {
     }
 
     private static List<Pin> pinsIn(Path file) throws IOException {
-        return ANY_PIN.matcher(content(file)).results()
-                .map(match -> new Pin(match.group(1), match.group(2), match.group(3))).toList();
+        return pinsIn(content(file));
+    }
+
+    private static String withoutDefaultRegistry(String repository) {
+        return repository.replaceFirst("^docker\\.io/(library/)?", "");
+    }
+
+    private static List<String> unreadImages() throws IOException {
+        List<String> unread = new ArrayList<>();
+        for (Path file : sources()) {
+            if (file.startsWith(DEPLOY)) {
+                for (MatchResult line : IMAGE_LINE.matcher(content(file)).results().toList()) {
+                    String image = line.group(1);
+                    boolean candidate = image.contains("${") || image.startsWith("courtside:");
+                    if (!candidate && pinsIn(image).isEmpty()) {
+                        unread.add(file + " runs " + image);
+                    }
+                }
+            }
+        }
+        return unread;
+    }
+
+    private static List<Pin> pinsIn(String text) {
+        return ANY_PIN.matcher(text).results()
+                .map(match -> new Pin(withoutDefaultRegistry(match.group(1)), match.group(2), match.group(3)))
+                .toList();
     }
 
     // A variant such as k6's "-with-browser" is a different image of the same release.
     private record Pin(String repository, String tag, String digest) {
 
         String reference() {
-            return repository + ":" + tag;
+            return tag == null ? repository : repository + ":" + tag;
         }
 
         String version() {

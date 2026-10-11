@@ -13,7 +13,7 @@ import { planResourceCleanup } from "./security-resource-cleanup.mjs";
 import { runResourceAbuseAssessment, resourceAbusePolicy, resourceAbuseScriptDigest,
   resourceAbuseGatewayDigest, resourceAbusePolicyFileDigest, resourceAbuseIntegrityDigest,
   resourceAbuseReceiptParserDigest } from "./security-resource-abuse.mjs";
-import { securityMailObservationSource, captureSecurityMailBaseline } from "./security-mail-observation.mjs";
+import { securityMailObservationImage, captureSecurityMailBaseline } from "./security-mail-observation.mjs";
 import { observeResourceEffects, cleanupAndRecoverResourceRuntime, createResourceEvidence,
   writeNativeEvidence, retainResourceEvidenceFailure, resourceEvidenceSummary } from "./security-resource-runtime.mjs";
 
@@ -111,7 +111,7 @@ async function harness(input = fixture(), { snapshots = [input.effects, input.ef
   const command = async (args, options = {}) => {
     calls.push({ args, options });
     if (args[0] === "image") {
-      assert.deepEqual(args, ["image", "inspect", `axllent/mailpit:v1.31@${securityMailObservationSource.imageDigest}`]);
+      assert.deepEqual(args, ["image", "inspect", securityMailObservationImage]);
       return { stdout: JSON.stringify([{ Id: mailImageId }]) };
     }
     if (args[0] === "network") {
@@ -125,7 +125,7 @@ async function harness(input = fixture(), { snapshots = [input.effects, input.ef
     if (args[0] === "inspect") {
       if (args[1].endsWith("-mail-1")) return { stdout: JSON.stringify([{ Id: sinkId, Image: mailImageId,
         Name: `/${project}-mail-1`, State: { Running: true }, Config: {
-        Image: `axllent/mailpit:v1.31@${securityMailObservationSource.imageDigest}`,
+        Image: securityMailObservationImage,
         Env: ["MP_MAX_MESSAGES=100"], Entrypoint: ["/mailpit"], Cmd: null, Labels: labels("mail") },
         NetworkSettings: { Networks: { [`${project}_backend`]: { NetworkID: networkId, IPAddress: sinkIp,
           Aliases: ["mail", `${project}-mail-1`] } } } }]) };
