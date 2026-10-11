@@ -111,7 +111,7 @@ test("given a branch dispatch with a security base, when the image is qualified,
 
 test("given nightly cleanup and release publication, when registry access is scheduled, then writes cannot overlap", () => {
   // when / then
-  for (const jobName of ["image", "publish"]) {
+  for (const jobName of ["publish"]) {
     assert.equal(release.jobs[jobName].concurrency.group, "container-registry-${{ github.repository }}");
     assert.equal(release.jobs[jobName].concurrency["cancel-in-progress"], false);
   }

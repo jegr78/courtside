@@ -30,11 +30,11 @@ test("given a deployment pull request, when CI plans tooling, then archive, hand
 
 test("given a release candidate archive, when release qualification starts, then every recipe reads that exact archive", () => {
   // given
-  const release = source("../.github/workflows/release.yml");
-  const qualification = release.slice(release.indexOf("\n  qualify:"), release.indexOf("\n  security-record:"));
+  const candidate = source("../.github/workflows/release-candidate.yml");
+  const qualification = candidate.slice(candidate.indexOf("\n  qualify:"), candidate.indexOf("\n  gates:"));
 
   // when / then
-  assert.match(qualification, /needs: \[archive, image\]/);
+  assert.match(qualification, /needs: \[select, archive, image\]/);
   assert.match(qualification, /name: deployment-archive/);
   assert.match(qualification, /deployment-qualification\.mjs --inspect-archive/);
   assert.match(qualification, /--recipes standard,full-self-hosted,existing-infrastructure,funnel/);
@@ -46,15 +46,15 @@ test("given a release candidate archive, when release qualification starts, then
 
 test("given the self-hosted mail recipe, when a release is cut, then its controlled Stalwart journey blocks publication", () => {
   // given
-  const release = source("../.github/workflows/release.yml");
+  const candidate = source("../.github/workflows/release-candidate.yml");
   const gates = source("../.github/workflows/release-gates.yml");
 
   // when / then
   assert.match(gates, /\n  mail:\n    runs-on: ubuntu-latest/);
   assert.match(gates, /node tools\/courtside\.mail-smoke\.mjs/);
-  assert.match(release, /\n  gates:\n    needs: \[build, image, archive, qualify\]/);
-  assert.match(release, /archive-artifact: deployment-archive/);
-  assert.match(release, /needs: \[archive, build, browser, image, qualify, gates\]/);
+  assert.match(candidate, /\n  gates:\n    needs: \[select, release-build, image, archive, qualify\]/);
+  assert.match(candidate, /archive-artifact: deployment-archive/);
+  assert.match(candidate, /\n  evidence:\n    needs: \[select, preconditions, release-build, image, archive, qualify, gates\]/);
 });
 
 test("given main or nightly qualification, when the image is exercised, then a candidate archive is inspected on both architectures", () => {
@@ -83,12 +83,12 @@ test("given main or nightly qualification, when the image is exercised, then a c
 
 test("given release-relevant deployment qualification, when PostgreSQL changes major, then the installed nightly upgrade blocks publication", () => {
   // given
-  const workflows = [source("../.github/workflows/release.yml"),
+  const workflows = [source("../.github/workflows/release-candidate.yml"),
     source("../.github/workflows/nightly-image.yml")];
 
   // when / then
   for (const workflow of workflows) {
-    const qualification = workflow.match(/\n  qualify:\n([\s\S]+?)\n  (?:mail|publish):/)?.[1] ?? "";
+    const qualification = workflow.match(/\n  qualify:\n([\s\S]+?)\n  (?:gates|mail|publish):/)?.[1] ?? "";
     assert.match(qualification,
       /uses: actions\/checkout@[a-f0-9]{40}[\s\S]+?fetch-depth: 0/);
     assert.match(qualification,

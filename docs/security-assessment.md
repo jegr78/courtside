@@ -268,8 +268,8 @@ Evidence that cannot be published in that form is not retained past the run. Rei
 protected channel means creating and holding a key first, and proving it usable by decrypting
 something the workflow encrypted, never by recording that somebody did.
 
-The release workflow runs the complete `active` profile after both architectures qualify the
-candidate and before the security record can be assembled. The active manifest, normalized gate,
+The release candidate workflow runs the complete `active` profile after both architectures qualify
+the candidate and before the security record can be assembled. The active manifest, normalized gate,
 image-security summaries and final release record all name the same candidate digest. Publication
 depends on that record, so another image or a second successful attempt cannot replace the required
 first attempt.

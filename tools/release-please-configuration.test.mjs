@@ -239,22 +239,17 @@ test("given the token can publish under this project's name, when the workflow r
       "the action authenticates every call with the PAT, so the run's own token needs nothing —"
       + " and a job that grants itself nothing cannot lend anything to a step added later");
     assert.match(guard.if, /RELEASE_PLEASE_TOKEN == ''/,
-      "a tag pushed with GITHUB_TOKEN starts no pipeline, so a release without the PAT is refused");
+      "a release pull request opened with GITHUB_TOKEN starts no checks, so a run without the PAT is refused");
     assert.match(release.with.token, /secrets\.RELEASE_PLEASE_TOKEN/);
     assert.doesNotMatch(release.with.token, /github\.token/,
-      "no fallback: the guard above refuses the run rather than cutting a release nothing builds");
+      "no fallback: the guard above refuses the run rather than opening a release pull request nothing checks");
   });
 
-// release-please publishes the release the moment the release pull request is merged, which is
-// before build, qualify, the signature and the security record exist. A draft is the only state
-// that lets the tag start the pipeline without the release already claiming to be one.
-test("given a release nothing has verified yet, when the tag is written, then the release is a draft",
+test("given a merged release pull request, when release-please is configured, then it carries no release settings",
   () => {
     // when / then
-    assert.equal(config.draft, true,
-      "a published release standing before publish would be indistinguishable from one that passed"
-      + " every gate, and it would count as an upgrade origin naming an image nobody pushed");
-    assert.equal(config["force-tag-creation"], true,
-      "GitHub writes no git tag for a draft release, and without the tag the release workflow"
-      + " never starts at all");
+    for (const key of ["draft", "force-tag-creation", "skip-github-release"]) {
+      assert.equal(config[key], undefined,
+        `${key} would read as if release-please cut the release; the candidate writes the tag and publish the release`);
+    }
   });

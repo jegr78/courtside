@@ -23,8 +23,8 @@ import {
 } from "./courtside.upgrade-smoke.mjs";
 import { retainedNightlyCount } from "./nightly-image-retention.mjs";
 
-const releaseWorkflow = readFileSync(
-  fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)),
+const candidateWorkflow = readFileSync(
+  fileURLToPath(new URL("../.github/workflows/release-candidate.yml", import.meta.url)),
   "utf8"
 );
 const gatesWorkflow = readFileSync(
@@ -297,16 +297,17 @@ test("given an interrupted candidate, when the origin is recovered, then usabili
 
 test("given a release candidate, when release qualification runs, then every supported database origin blocks publication", () => {
   // when / then
-  assert.match(releaseWorkflow, /id: upgrade-origins/);
-  assert.match(releaseWorkflow, /--release-origins "\$GITHUB_REPOSITORY"/);
-  assert.match(releaseWorkflow, /upgrade-origins: \$\{\{ needs\.build\.outputs\.upgrade-origins \}\}/);
+  assert.match(candidateWorkflow, /id: upgrade-origins/);
+  assert.match(candidateWorkflow, /--release-origins "\$GITHUB_REPOSITORY"/);
+  assert.match(candidateWorkflow, /upgrade-origins: \$\{\{ needs\.release-build\.outputs\.upgrade-origins \}\}/);
   assert.match(gatesWorkflow, /node tools\/courtside\.upgrade-smoke\.mjs --confirm courtside-upgrade/);
   assert.match(gatesWorkflow,
     /\n  upgrade:\n[\s\S]+?uses: \.\/\.github\/actions\/gate-image\n[\s\S]+?digest: \$\{\{ inputs\.image-digest \}\}/);
   assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_CANDIDATE_IMAGE: \$\{\{ steps\.image\.outputs\.reference \}\}/);
   assert.match(gatesWorkflow, /COURTSIDE_UPGRADE_ORIGIN_IMAGE: \$\{\{ matrix\.origin\.image \}\}/);
-  assert.match(releaseWorkflow, /Supported database upgrade origins/);
-  assert.match(releaseWorkflow, /needs: \[archive, build, browser, image, qualify, gates\]/);
+  assert.match(candidateWorkflow, /Supported database upgrade origins/);
+  assert.match(candidateWorkflow, /\n  evidence:\n    needs: \[select, preconditions, release-build, image, archive, qualify, gates\]/,
+    "no candidate evidence exists without the upgrade gate");
 });
 
 test("given a migration that adds a column, when comparing the proof, then the new column is not a change", () => {

@@ -8,7 +8,7 @@ const yaml = require("js-yaml");
 
 const workflow = readFileSync(new URL("../.github/workflows/npm-audit.yml", import.meta.url), "utf8");
 const build = readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8");
-const release = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
+const release = readFileSync(new URL("../.github/workflows/release-candidate.yml", import.meta.url), "utf8");
 const frontendPackage = JSON.parse(readFileSync(new URL("../frontend/package.json", import.meta.url), "utf8"));
 
 test("given the remote audit, when workflows select its cadence, then pull requests omit it and Tuesday runs retain evidence", () => {

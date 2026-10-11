@@ -9,6 +9,7 @@ const repository = join(dirname(fileURLToPath(import.meta.url)), "..");
 const build = readFileSync(join(repository, ".github/workflows/build.yml"), "utf8");
 const codeql = readFileSync(join(repository, ".github/codeql/codeql-config.yml"), "utf8");
 const release = readFileSync(join(repository, ".github/workflows/release.yml"), "utf8");
+const candidate = readFileSync(join(repository, ".github/workflows/release-candidate.yml"), "utf8");
 const gates = readFileSync(join(repository, ".github/workflows/release-gates.yml"), "utf8");
 const scheduled = readFileSync(join(repository, ".github/workflows/security-assessment.yml"), "utf8");
 const policy = readFileSync(join(repository, "docs/security-scanning.md"), "utf8");
@@ -73,7 +74,7 @@ test("given every job that starts a security target, when it runs, then the fixt
   // then
   assert.ok(starters.length >= 2, "no workflow starts a security target");
   assert.deepEqual(unsupplied.map(({ file, name }) => `${file}:${name}`), []);
-  assert.match(release, /name: assessment-fixtures\n\s+path: target\/fixtures-classes/);
+  assert.match(candidate, /name: assessment-fixtures\n\s+path: target\/fixtures-classes/);
 });
 
 function allWorkflows() {
@@ -137,13 +138,13 @@ test("given dependency findings, when scheduled and release gates run, then over
   // when / then
   assert.doesNotMatch(dependabot, /\n\s+ignore:/);
   assert.match(build, /actions\/dependency-review-action@[a-f0-9]{40}/);
-  assert.match(release, /security-events: read|security-events: write/);
-  assert.match(release, /vulnerability-alerts: read/);
-  assert.match(release, /--subject "\$\{\{ github\.sha \}\}"[\s\S]+node tools\/dependency-remediation\.mjs/);
-  assert.match(release, /--current-summary build\/security\/release-build\.json/);
-  assert.match(release, /id: release-security[\s\S]+continue-on-error: true[\s\S]+Require completed release security gates/);
-  assert.match(release, /dependency-remediation[\s\S]+if: always\(\)[\s\S]+build\/security\/dependency-remediation\.json/);
-  assert.match(release, /actions\/artifacts\?per_page=100[\s\S]+gh run download[\s\S]+--previous-evidence/);
+  assert.match(candidate, /security-events: read|security-events: write/);
+  assert.match(candidate, /vulnerability-alerts: read/);
+  assert.match(candidate, /--subject "\$COMMIT"[\s\S]+node tools\/dependency-remediation\.mjs/);
+  assert.match(candidate, /--current-summary build\/security\/release-build\.json/);
+  assert.match(candidate, /id: release-security[\s\S]+continue-on-error: true[\s\S]+Require completed release security gates/);
+  assert.match(candidate, /dependency-remediation[\s\S]+if: always\(\)[\s\S]+build\/security\/dependency-remediation\.json/);
+  assert.match(candidate, /actions\/artifacts\?per_page=100[\s\S]+gh run download[\s\S]+--previous-evidence/);
   assert.match(npmAudit, /vulnerability-alerts: read/);
   assert.doesNotMatch(npmAudit, /security-events:/);
   assert.match(npmAudit, /node tools\/dependency-remediation\.mjs/);
@@ -531,9 +532,10 @@ test("given a job that only needs the artefact, when it builds one, then the sui
 
 test("given a release candidate, when publishing it, then its exact digest passes the active gate first", () => {
   // when / then
-  assert.match(release, /\n  gates:\n    needs: \[build, image, archive, qualify\]/);
-  assert.match(release, /image-digest: \$\{\{ needs\.image\.outputs\.digest \}\}/);
-  assert.match(release, /\n  publish:\n    needs: \[[^\]]*\bgates\b[^\]]*\]/);
+  assert.match(candidate, /\n  gates:\n    needs: \[select, release-build, image, archive, qualify\]/);
+  assert.match(candidate, /image-digest: \$\{\{ needs\.image\.outputs\.digest \}\}/);
+  assert.match(candidate, /\n  evidence:\n    needs: \[[^\]]*\bgates\b[^\]]*\]/);
+  assert.match(release, /\n  publish:\n    needs: \[candidate\]/);
   assert.match(gates,
     /active-security:[\s\S]+?- id: image\n\s+uses: \.\/\.github\/actions\/gate-image\n[\s\S]+?digest: \$\{\{ inputs\.image-digest \}\}/);
   assert.match(gates, /IMAGE: \$\{\{ steps\.image\.outputs\.reference \}\}/);
@@ -551,9 +553,10 @@ test("given the release-build policy, when a night rehearses it, then it runs th
   const policyStep = (source, job) => yaml.load(source).jobs[job].steps
     .find((step) => /--scope release-build/.test(step.run ?? ""));
   const argumentsOf = (step) => step.run.replace(/^(frontend\/node\/node|node) /, "")
-    .replace(/\s+/g, " ").replace("--subject ${{ github.sha }}", "--subject <commit>").trim();
+    .replace(/\s+/g, " ").replace("--subject ${{ github.sha }}", "--subject <commit>")
+    .replace('--subject "$COMMIT"', "--subject <commit>").trim();
   const nightly = policyStep(build, "security");
-  const released = policyStep(release, "build");
+  const released = policyStep(candidate, "release-build");
 
   // when / then
   assert.ok(nightly && released, "a release-build policy step is missing");
@@ -576,17 +579,17 @@ test("given security evidence, when workflows retain it, then only normalized re
   assert.match(build, /build\/security\/summary\.json/);
   assert.doesNotMatch(build, /path: build\/security\s*$/m);
   assert.match(build, /rm -rf build\/security\/trivy-runtime\.json build\/security\/trivy-source\.json build\/security\/codeql/);
-  assert.match(release, /build\/uat-smoke\/security-summary-/);
-  assert.match(release, /rm -f build\/uat-smoke\/trivy-/);
-  assert.match(release, /npm-cli\.js run audit:security/);
+  assert.match(candidate, /build\/uat-smoke\/security-summary-/);
+  assert.match(candidate, /rm -f build\/uat-smoke\/trivy-/);
+  assert.match(candidate, /npm-cli\.js run audit:security/);
   assert.match(gates, /release-security-record/);
   assert.match(release, /name: release-security-record-input/);
   assert.match(gates, /--summary build\/security-input\/release-build\.json/);
-  assert.match(release, /--assessment-policy not-applicable/g);
-  assert.match(release, /--trivy build\/security\/trivy-source\.json/);
-  assert.match(release, /--codeql build\/security\/codeql/);
-  assert.match(release, /--npm-version/);
-  assert.match(release, /--trivy-version[\s\S]+trivy --version/);
+  assert.match(candidate, /--assessment-policy not-applicable/g);
+  assert.match(candidate, /--trivy build\/security\/trivy-source\.json/);
+  assert.match(candidate, /--codeql build\/security\/codeql/);
+  assert.match(candidate, /--npm-version/);
+  assert.match(candidate, /--trivy-version[\s\S]+trivy --version/);
   assert.match(release, /node tools\/security-supply-chain\.mjs/);
   assert.match(release, /cosign verify[\s\S]+gh attestation verify[\s\S]+security-supply-chain\.mjs/);
 });
@@ -598,7 +601,7 @@ test("given a scanner finding, when it is triaged, then exceptions are precise, 
   assert.match(policy, /expiry/);
   assert.match(policy, /independentReview.*false/);
   assert.match(policy, /scanner outage/i);
-  assert.match(release, /node tools\/security-findings\.mjs/);
+  assert.match(candidate, /node tools\/security-findings\.mjs/);
   assert.match(policy, /scan scope/);
 });
 
@@ -648,7 +651,7 @@ test("given the release trusts the verifiers' exit codes, when it verifies, then
     if (command.includes("oci://")) assert.match(command, /--predicate-type https:\/\/\S+/);
   }
   for (const image of ["IMAGE", "BOOKING_SEED_IMAGE"]) {
-    assert.match(verify.env[image], /@\$\{\{ needs\.image\.outputs\.(?:booking-seed-)?digest \}\}$/,
+    assert.match(verify.env[image], /@\$\{\{ needs\.candidate\.outputs\.(?:booking-seed|image)-digest \}\}$/,
       "a tag instead of a digest would verify whatever the tag points to now");
   }
 });

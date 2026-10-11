@@ -18,16 +18,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # A tag pushed with GITHUB_TOKEN triggers no workflow, so a release cut without the PAT
-      # would carry no image, no signature and no qualification.
-      - name: Refuse to cut a release without the token that starts its pipeline
+      # A pull request opened with GITHUB_TOKEN starts no checks, so its release could never merge.
+      - name: Refuse to open a release pull request without the token that starts its checks
         if: env.RELEASE_PLEASE_TOKEN == ''
         env:
           RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |
           echo "::error::RELEASE_PLEASE_TOKEN is not set. release-please would open a release" \
-            "pull request whose checks never run, and merging it would push a tag that starts" \
-            "no release pipeline. Add the fine-grained PAT that docs/security-risks.md scopes."
+            "pull request whose checks never run. Add the fine-grained PAT that" \
+            "docs/security-risks.md scopes."
           exit 1
 
       - id: release
@@ -36,6 +35,7 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          skip-github-release: true
 
       - name: Validate the release pull request branch
         if: steps.release.outputs.prs_created == 'true'
