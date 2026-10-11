@@ -230,10 +230,10 @@ that are anything but an object of strings.
 A `notification` row is written with the outbox row in the same transaction, and also when no mail
 is queued because the account has no address or switched email off. Its `parameters` keep only the
 booking id and closure kind; the person who withdrew stays in the outbox. `read_at` is empty until
-the account marks the entry read. `notification.kind` follows the same CHECK as
-`message_record.kind`, and `message_channel_optout.channel` accepts `EMAIL`. No row in
-`message_channel_optout` means the channel is on, which is how every account received mail before
-the choice existed.
+the account marks the entry read, and a partial index over each account's unread entries serves the
+unread count. `notification.kind` follows the same CHECK as `message_record.kind`, and
+`message_channel_optout.channel` accepts `EMAIL`. No row in `message_channel_optout` means the
+channel is on, which is how every account received mail before the choice existed.
 
 `event_publication` is not domain data. Spring Modulith writes it so an event survives a listener
 that was not running, and Courtside neither reads nor migrates it by hand.
