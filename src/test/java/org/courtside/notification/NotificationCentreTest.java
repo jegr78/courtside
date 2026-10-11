@@ -11,6 +11,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.BookingDisplaced;
+import org.courtside.shared.BookingReminderDue;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.courtside.shared.UsernameReminderRequested;
@@ -136,6 +137,27 @@ class NotificationCentreTest extends AbstractIntegrationTest {
         assertThat(notifications.mailsQueuedFor(playerAccountId))
                 .as("nothing is queued for an address that does not exist")
                 .isEmpty();
+    }
+
+    @Test
+    void givenAPlayerWithoutAnAddress_whenTheirBookingIsDueAndDisplaced_thenTheCentreTellsThemBoth() {
+        // given
+        UUID playerPersonId = identity.createPerson("John", "Roe", "");
+        UUID playerAccountId = identity.createEnabledAccount(playerPersonId, "roe.john", Set.of(Role.MEMBER));
+        UUID bookingId = book(List.of(ParticipantSpec.member(playerPersonId)));
+
+        // when
+        transactions.executeWithoutResult(status -> {
+            events.publishEvent(new BookingReminderDue(bookingId));
+            events.publishEvent(new BookingDisplaced(bookingId, BookingDisplaced.Closure.DAY_CLOSED));
+        });
+
+        // then
+        assertThat(notifications.notificationsFor(playerAccountId))
+                .as("every enabled player hears of their booking, with or without an address")
+                .containsExactly(MessageKind.BOOKING_PLAYER_RECORDED, MessageKind.BOOKING_REMINDER,
+                        MessageKind.BOOKING_DISPLACED);
+        assertThat(notifications.mailsQueuedFor(playerAccountId)).isEmpty();
     }
 
     @Test
