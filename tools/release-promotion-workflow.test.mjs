@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createRequire } from "node:module";
 import test from "node:test";
 
@@ -111,10 +114,12 @@ test("given qualified release evidence, when the candidate finishes, then it alo
   for (const step of [write, relabel]) {
     assert.equal(step.env.GH_TOKEN, "${{ secrets.RELEASE_PLEASE_TOKEN }}", "a tag pushed with GITHUB_TOKEN starts no release run");
   }
-  assert.match(write.run, /git\/refs" -f ref="refs\/tags\/\$TAG" -f sha="\$COMMIT"/,
-    "the tag names the commit the candidate qualified, created once and never moved");
-  assert.match(write.run, /\[ "\$tagged" = "\$COMMIT" \]/);
-  assert.match(relabel.run, /--remove-label "autorelease: pending" --add-label "autorelease: tagged"/,
+  assert.match(write.run, /if ! tagged=\$\(gh api "repos\/\$GITHUB_REPOSITORY\/git\/ref\/tags\/\$TAG"[\s\S]+git\/refs" -f ref="refs\/tags\/\$TAG" -f sha="\$COMMIT"/,
+    "a re-run after a partial success finds its own tag instead of failing to create it");
+  assert.match(write.run, /\n\[ "\$tagged" = "\$COMMIT" \]/, "a tag at any other commit stops the run and is never moved");
+  assert.doesNotMatch(write.run, /-X (PATCH|DELETE)|force/, "the job never moves or deletes a tag");
+  assert.match(relabel.run, /labels\[\]=autorelease: tagged/);
+  assert.match(relabel.run, /-X DELETE "repos\/\$GITHUB_REPOSITORY\/issues\/\$PULL_REQUEST\/labels\/autorelease:%20pending"/,
     "release-please opens no further release pull request while a merged one is still pending");
   assert.ok(tag.steps.indexOf(write) < tag.steps.indexOf(relabel), "a pull request is never marked tagged without its tag");
 });
@@ -126,4 +131,33 @@ test("given a merged release pull request, when release-please runs on main, the
   // when / then
   assert.equal(action.with["skip-github-release"], true,
     "a tag written at merge time would start the release before any candidate qualified the commit");
+});
+
+// A stand-in gh answers the ref lookup from `existing` and records whether the step tried to create one.
+function writeTag(existing, commit = "c".repeat(40)) {
+  const step = candidate.jobs.tag.steps.find((each) => each.name === "Write the tag at the qualified commit");
+  const directory = mkdtempSync(join(tmpdir(), "courtside-tag-"));
+  const gh = join(directory, "gh");
+  writeFileSync(gh, `#!/usr/bin/env bash
+case "$*" in
+  *git/ref/tags/*) if [ -n "$EXISTING" ]; then echo "$EXISTING"; elif [ -f "$DIRECTORY/created" ]; then cat "$DIRECTORY/created"; else exit 1; fi ;;
+  *git/refs*) echo "$COMMIT" > "$DIRECTORY/created" ;;
+esac
+`);
+  chmodSync(gh, 0o755);
+  try {
+    execFileSync("bash", ["-e", "-c", step.run], { encoding: "utf8", stdio: "pipe", env: { ...process.env,
+      PATH: `${directory}:${process.env.PATH}`, DIRECTORY: directory, EXISTING: existing, COMMIT: commit,
+      TAG: "v0.2.0-rc.1", GITHUB_REPOSITORY: "jegr78/courtside" } });
+    return { refused: false, created: existsSync(join(directory, "created")) };
+  } catch (refusal) {
+    return { refused: `${refusal.stdout}${refusal.stderr}`.includes("::error::"), created: existsSync(join(directory, "created")) };
+  }
+}
+
+test("given the tag job, when it runs, then it creates a missing tag, accepts its own and refuses a moved one", () => {
+  // when / then
+  assert.deepEqual(writeTag(""), { refused: false, created: true }, "a missing tag is written at the qualified commit");
+  assert.deepEqual(writeTag("c".repeat(40)), { refused: false, created: false }, "a re-run finds the tag it wrote and goes on");
+  assert.deepEqual(writeTag("d".repeat(40)), { refused: true, created: false }, "a tag at another commit stops the run and is not moved");
 });

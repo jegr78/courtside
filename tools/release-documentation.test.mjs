@@ -19,9 +19,9 @@ const source = repositoryFile(".github/workflows/release.yml");
 const candidateSource = repositoryFile(".github/workflows/release-candidate.yml");
 const candidateWorkflow = yaml.load(candidateSource);
 
-// Nobody types the tag any more, so the thing to hold is that what writes it and what answers it
-// still agree on its shape — a tag without the leading v would start nothing at all.
-test("given the release trigger, when release-please writes a tag, then the workflow answers that shape",
+// The candidate writes v<version> and release-please finds the previous release under that name,
+// so both have to agree with the trigger; a tag without the leading v would start nothing at all.
+test("given the release trigger, when the candidate writes a tag, then the workflow answers that shape",
   () => {
     // given
     const triggers = workflow.on ?? workflow[true];
@@ -193,9 +193,8 @@ test("given a failed tag, when the document says it costs nothing, then neither 
       "the document explains where the two reads look, and the workflow has to keep looking there");
   });
 
-// release-please creates the release as a draft so that nothing claims to be released before the
-// gates run. Exactly one step turns it into a release a club can see, and it does so by omission:
-// action-gh-release publishes an existing draft unless it is told to keep it.
+// publish creates the release as a draft, so nothing claims to be released before its assets are
+// attached; exactly one later step turns it into a release a club can see.
 test("given a draft the pipeline has to publish, when the release is written, then nothing keeps it draft",
   () => {
     // given

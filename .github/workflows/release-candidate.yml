@@ -692,19 +692,23 @@ jobs:
           echo "::error::RELEASE_PLEASE_TOKEN is not set. A tag pushed with GITHUB_TOKEN starts no release run."
           exit 1
 
-      # Creating a ref that exists fails, so a second candidate of the same version cannot move the tag.
+      # An existing tag is accepted only at the qualified commit, so a re-run completes and a tag never moves.
       - name: Write the tag at the qualified commit
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |
-          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$COMMIT" > /dev/null
-          tagged=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)
+          if ! tagged=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha 2> /dev/null); then
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$COMMIT" > /dev/null
+            tagged=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)
+          fi
           [ "$tagged" = "$COMMIT" ] \
             || { echo "::error::$TAG names $tagged, but the candidate qualified $COMMIT"; exit 1; }
 
       - name: Mark the release pull request as tagged
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-        run: >
-          gh pr edit "$PULL_REQUEST" --repo "$GITHUB_REPOSITORY"
-          --remove-label "autorelease: pending" --add-label "autorelease: tagged"
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST/labels" -f "labels[]=autorelease: tagged" > /dev/null
+          if gh api "repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST/labels" --jq '.[].name' | grep -qx 'autorelease: pending'; then
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST/labels/autorelease:%20pending" > /dev/null
+          fi

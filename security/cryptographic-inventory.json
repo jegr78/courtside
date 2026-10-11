@@ -767,7 +767,7 @@
     },
     {
       "id": "release-image-signature",
-      "purpose": "Let anybody verify that a published image was built by this repository's release workflow",
+      "purpose": "Let anybody verify that a published image was published by this repository's release workflow",
       "algorithm": "cosign-keyless",
       "implementation": "sigstore",
       "strength": {
@@ -777,12 +777,12 @@
       "class": "signing",
       "owner": "repository-maintainer",
       "storageBoundary": "No long-lived private key exists. Sigstore issues a short-lived certificate against the workflow's OIDC identity and records the signature in a public transparency log.",
-      "permittedUse": "Signing a published image. It says which workflow built the image, not that the image is free of defects.",
+      "permittedUse": "Signing a published image. It says which workflow published the image, not that the image is free of defects; the release workflow signs the digest the release candidate workflow built and qualified.",
       "rotation": "Every signing operation obtains a new short-lived certificate; there is nothing to rotate on a schedule.",
       "revocation": "Not applicable to a keyless signature. A withdrawn release is deleted and stated as withdrawn.",
       "recovery": "None is possible or needed: no material can be lost, and a signature is produced again by re-running the release.",
       "retirement": "Replaced by changing the signing action, which changes what a verifier is told to expect.",
-      "evidence": ".github/workflows/release.yml, tools/release-workflow.test.mjs",
+      "evidence": ".github/workflows/release.yml, tools/release-workflow.test.mjs, tools/release-promotion-workflow.test.mjs",
       "detects": [
         "cosign"
       ],
@@ -819,7 +819,7 @@
     },
     {
       "id": "build-attestation",
-      "purpose": "Publish where an image came from and what it contains, signed by the workflow that built it",
+      "purpose": "Publish where an image came from and what it contains, signed by the workflow that published it",
       "algorithm": "sigstore-attestation",
       "implementation": "sigstore",
       "strength": {
@@ -829,7 +829,7 @@
       "class": "signing",
       "owner": "repository-maintainer",
       "storageBoundary": "Same keyless identity as the release signature; the attestation is pushed to the registry beside the image.",
-      "permittedUse": "Attesting build provenance and the software bill of materials. It records what a build did, not that the result is correct.",
+      "permittedUse": "Attesting build provenance and the software bill of materials. The provenance names the release run that published the digest; the build ran in the release candidate run the release evidence names. It records what a run did, not that the result is correct.",
       "rotation": "Each run attests under its own short-lived certificate.",
       "revocation": "Not applicable to a keyless attestation.",
       "recovery": "None is possible or needed.",

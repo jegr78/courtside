@@ -138,7 +138,11 @@ test("given a candidate, when its preconditions run, then a nightly verified an 
   assert.match(gate, /git merge-base --is-ancestor "\$head" "\$COMMIT"/);
   assert.match(gate, /nightly-release-evidence-\$\{id\}-1/);
   assert.match(gate, /node tools\/nightly-release-evidence\.mjs/);
+  assert.match(gate, /--commit "\$head" --run-id "\$id" \|\| continue/,
+    "the nightly evidence must name the commit and run it was downloaded for");
   assert.ok(gate.indexOf("gh run download") < gate.indexOf("node tools/nightly-release-evidence.mjs"));
+  assert.ok(gate.indexOf("node tools/nightly-release-evidence.mjs") < gate.indexOf('verified="$id"'),
+    "a run counts as verified only after its evidence passed");
   assert.match(gate, /no green first-attempt build with a completed nightly release rehearsal verified a commit this candidate builds on/);
   assert.match(gate, /issues\?state=open&labels=nightly&per_page=100/);
   assert.match(gate, /courtside-nightly-fingerprint/);
@@ -261,6 +265,9 @@ test("given a qualified candidate, when the gates run, then they bind its exact 
   const download = gates["active-security"].steps.find((entry) =>
     entry.with?.name === "${{ inputs.qualification-artifact-prefix }}amd64");
   assert.equal(download.with.path, "build/uat-smoke");
+  const assessment = gates["active-security"].steps.find((entry) => String(entry.run).includes("security-run"));
+  assert.match(assessment.run, /--qualification build\/uat-smoke\/qualification\.json/,
+    "the active assessment reads the qualification where the download puts it");
   assert.equal(jobs.qualify.steps.find((entry) => entry.with?.name === "image-qualification-${{ matrix.architecture }}")
     .with.path.trim(), "build/uat-smoke", "the qualification artifact is rooted where the active assessment reads it");
 });

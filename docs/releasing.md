@@ -129,10 +129,11 @@ private root, verifies its identity and member paths before extraction and never
 changes the firewall or prunes Docker globally. It leaves the installation running for inspection;
 removal remains an explicit operator action through the installed lifecycle CLI.
 
-This does not replace the release gate. A release stamps its version, runs its complete build,
-active assessment, restore check and the upgrade check from every origin it has, and publishes a
-different digest under versioned tags. The nightly image is an acceptance artifact for the current code. The release workflow still
-proves the tagged code and image itself.
+This does not replace the release gate. A release candidate builds its own digest from the release
+commit and runs the release-build policy, active assessment, restore check and the upgrade check
+from every origin it has against it; the release publishes that digest under versioned tags. The
+nightly image is an acceptance artifact for the current code. The candidate proves the release
+commit and its image itself.
 
 If the selected revision already labels the published `nightly` image, the workflow skips package,
 image and qualification work and runs retention only, unless its caller asks it to rebuild, as a
@@ -153,10 +154,11 @@ both that claim and the workflow identity before moving either nightly tag. The 
 attestation is read directly from the image registry because GitHub's API filter rejects the
 fragment-bearing predicate identifier; its signature and exact predicate type remain mandatory.
 
-**What the merge writes.** Merging the release pull request writes the tag and a *draft* GitHub
-release. A draft is visible to whoever may write to this repository and to nobody else, and `publish`
-is what turns it into the release a club sees, after every gate above it has passed. A run that
-stops earlier leaves the draft standing, which is why a failed release is invisible from the outside
+**What the merge writes.** Merging the release pull request writes the version and the changelog,
+and no tag and no GitHub release. The candidate's `tag` job writes the tag once the commit has
+qualified. `publish` creates a *draft* GitHub release, uploads its assets and makes it visible last.
+A draft is visible to whoever may write to this repository and to nobody else. A publication that
+stops early leaves the draft standing, which is why a failed release is invisible from the outside
 rather than merely unsigned.
 
 **Where the version lives.** `pom.xml` carries it between releases: release-please writes it, Maven
@@ -166,9 +168,10 @@ root-package version fields in `frontend/package-lock.json` move in the same pul
 no snapshot transition between releases: a snapshot pull request writes `0.1.0-rc.2-SNAPSHOT` into
 the JSON files and the release after it cannot take that back, because the updater replaces only
 the version its pattern matches and that pattern stops at the hyphen before `SNAPSHOT`. So the
-files carry the released version between releases, and the manifest agrees with them. The release
-build itself does not trust repository metadata: it takes the version from the tag and stamps it in with
-`versions:set`, so what is published is what the tag says even if the pom were to disagree.
+files carry the released version between releases, and the manifest agrees with them. Nothing
+stamps a version during a release. The candidate's `select` refuses a commit whose manifest,
+`pom.xml` and `frontend/package.json` disagree, and the release's `candidate` job refuses a tag that
+names another version, so the image is published under the version it was built as.
 
 ## Cutting a candidate
 
@@ -183,15 +186,15 @@ Candidates are opened and closed with one line of configuration, not with a hand
    merging it.
 3. Set `"prerelease": false` again to graduate. The suffix is stripped and the next release pull
    request proposes `v0.3.0`.
-4. A graduation whose release run failed before it published may instead reopen the line, the one
-   exception *When a release fails* names: set `"prerelease": true` again, return the manifest,
-   `pom.xml`, `frontend/package.json` and both root versions in `frontend/package-lock.json` to the
-   last published candidate, and restore `CHANGELOG.md` to its state before the graduation. The
-   graduation pull request keeps `autorelease: tagged`, because a merged release pull request
-   marked `pending` makes release-please recreate its tag and refuse every new release pull
-   request. The next release pull request proposes the following candidate, `v0.3.0-rc.<n+1>`.
-   Delete the unpublished tag and its draft before the line graduates again, or the new graduation
-   finds the old tag and publishes the old commit.
+4. A graduation that never published may instead reopen the line, the one exception *When a
+   release fails* names: set `"prerelease": true` again, return the manifest, `pom.xml`,
+   `frontend/package.json` and both root versions in `frontend/package-lock.json` to the last
+   published candidate, and restore `CHANGELOG.md` to its state before the graduation. Remove the
+   label `autorelease: pending` from the graduation pull request if its candidate never wrote a
+   tag, because a merged release pull request marked `pending` makes release-please
+   refuse every new release pull request. The next release pull request proposes the following
+   candidate, `v0.3.0-rc.<n+1>`. If a tag and a draft were written, delete both before the line
+   graduates again, or the new graduation's candidate finds the version already tagged and stops.
 
 A published candidate is walked on the UAT instance with the acceptance harness described in
 [acceptance-testing.md](acceptance-testing.md). Its release summary, with every finding assessed, is
@@ -311,7 +314,7 @@ pulls is the digest that was brought up twice.
 The release page carries the OpenAPI document, the security record and the deployment archive with
 its checksum. `archive` builds those bytes once and `publish` attaches the artifact it downloads, so
 what a club unpacks is what was attested. Before anything reaches the registry, `gates` builds
-the archive again from the tagged tree and requires the same bytes, and `publish` waits for it. The contents are derived rather
+the archive again from the release commit and requires the same bytes, and `publish` waits for it. The contents are derived rather
 than listed by hand: every Compose file the shipped resolver can emit, every file those Compose
 files name, the recipes, the configuration example, the recipe and operations guides and the container
 contract, together with the standalone Bash lifecycle launcher. `tools/deployment-archive.test.mjs`
@@ -339,6 +342,8 @@ unqualified, in a public registry. Nightly retention removes them after 14 days.
 - A defect in the commit: fix it on `main` through the usual pull request. Then dispatch
   `release-candidate.yml` with `rehearsal=false` and `commit` set to the fixed commit on `main`. The
   candidate qualifies that commit under the version the manifest still records and tags it there.
+  The fix then ships in that version without a changelog entry, because the next changelog starts
+  after the tag.
 
 **A publication that fails leaves the tag where it is.** The release the run creates is still a
 draft and stays one. `publish` uploads the release assets to the draft before it pushes a version
@@ -418,7 +423,7 @@ published surface, and a change in the shape of any of them is breaking. A
 pull request that makes one carries `!` in its Conventional Commit title or a `BREAKING CHANGE:`
 footer, which is what the title lint reads and what the version bump follows.
 
-**The upgrade note is your commit message.** `build` collects every `BREAKING CHANGE:` footer and
+**The upgrade note is your commit message.** The candidate's `release-build` collects every `BREAKING CHANGE:` footer and
 every `!:` subject between the previous published release and this one and puts them verbatim into
 the release body under *Upgrade notes*; with none it writes that no published surface changed and a
 club may replace `COURTSIDE_IMAGE_DIGEST` and restart. The footer is not paperwork, then, it is the text a
