@@ -467,3 +467,11 @@ test("given font directories, when a font for the sheet labels is looked up, the
   assert.equal(findFont([join(root, "missing")]), null);
   rmSync(root, { recursive: true, force: true });
 });
+
+import { resultsFileFor } from "../acceptance/run.mjs";
+
+test("when the postflight runs alone, then it writes its own results file and the matrix keeps results.json", () => {
+  // when / then
+  assert.equal(resultsFileFor(["postflight"]), "postflight-results.json");
+  assert.equal(resultsFileFor(["desktop-chrome", "ipad"]), "results.json");
+});

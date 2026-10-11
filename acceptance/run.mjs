@@ -36,10 +36,12 @@ export async function waitForLoad({ limit, loadavg = systemLoad, sleep = (ms) =>
   }
 }
 
+export const resultsFileFor = (projects) => projects.length === 1 && projects[0] === "postflight" ? "postflight-results.json" : "results.json";
+
 function playwright(run, projects) {
   const cli = createRequire(join(here, "package.json")).resolve("@playwright/test/cli");
   const result = spawnSync(process.execPath, [cli, "test", "--config", join(here, "playwright.config.ts"), ...projects.flatMap((project) => ["--project", project])],
-    { cwd: here, stdio: "inherit", env: { ...process.env, ACCEPTANCE_RUN_DIR: run } });
+    { cwd: here, stdio: "inherit", env: { ...process.env, ACCEPTANCE_RUN_DIR: run, ACCEPTANCE_RESULTS: resultsFileFor(projects) } });
   return result.status ?? 1;
 }
 

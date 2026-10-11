@@ -15,7 +15,7 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: 0,
-  reporter: [["line"], ["json", { outputFile: runPath("results.json") }]],
+  reporter: [["line"], ["json", { outputFile: runPath(process.env.ACCEPTANCE_RESULTS ?? "results.json") }]],
   use: { baseURL: config.baseUrl, trace: "retain-on-failure", screenshot: "only-on-failure" },
   projects: [
     ...ENGINES.map((engine) => ({ name: `setup-${engine}`, testMatch: /journeys\/00-setup\.spec\.ts$/, metadata: { engine }, use: { ...shared, browserName: engine, ...remote(engine) } })),
