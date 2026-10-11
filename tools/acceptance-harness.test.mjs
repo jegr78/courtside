@@ -453,3 +453,17 @@ test("given a load that falls below the limit, when waited for, then it returns,
   await waitForLoad({ limit: 5.5, loadavg: () => [loads.shift() ?? 4], sleep: async () => {}, deadlineMs: 1_000, now: (() => { let t = 0; return () => (t += 1); })() });
   await assert.rejects(waitForLoad({ limit: 5.5, loadavg: () => [9], sleep: async () => {}, deadlineMs: 3, now: (() => { let t = 0; return () => (t += 1); })() }), /load stayed above 5.5/);
 });
+
+import { findFont } from "../acceptance/report/sheets.mjs";
+
+test("given font directories, when a font for the sheet labels is looked up, then a TrueType file is found and a missing directory is skipped", () => {
+  // given
+  const root = mkdtempSync(join(tmpdir(), "acceptance-fonts-"));
+  mkdirSync(join(root, "nested"));
+  writeFileSync(join(root, "nested", "Sans.ttf"), "");
+  writeFileSync(join(root, "readme.txt"), "");
+  // when / then
+  assert.equal(findFont([join(root, "missing"), root]), join(root, "nested", "Sans.ttf"));
+  assert.equal(findFont([join(root, "missing")]), null);
+  rmSync(root, { recursive: true, force: true });
+});

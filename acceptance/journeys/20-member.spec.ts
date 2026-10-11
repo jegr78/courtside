@@ -91,8 +91,11 @@ test("given a member, when a booking is made, cancelled and made again, then my 
       await capture(page, "my-bookings-with-new");
       await row.click();
       await capture(page, "cancel-confirmation");
+      const cancelled = page.waitForResponse((r) => r.url().endsWith(`/api/bookings/${first}`) && r.request().method() === "DELETE");
       await page.getByTestId("confirm-cancellation").click();
-      await expect(page.getByTestId(`booking-${first}`), "product: My bookings shows the booking as cancelled").toHaveAttribute("data-status", "CANCELLED");
+      expect((await cancelled).status(), "product: the cancellation is accepted").toBeLessThan(300);
+      await expect(page.locator('p[role="status"]:not([data-testid])'), "product: My bookings finishes loading after the cancellation").toHaveCount(0);
+      await expect(page.locator(`[data-testid="booking-${first}"][data-status="CONFIRMED"]`), "product: the booking is no longer listed as confirmed").toHaveCount(0);
       await expect(row, "product: the cancelled booking loses its cancel action").toHaveCount(0);
       await capture(page, "my-bookings-after-cancel");
       await page.getByTestId("court-plan-link").click();

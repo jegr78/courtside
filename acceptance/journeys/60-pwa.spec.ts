@@ -53,6 +53,8 @@ test("given a booking of my own, when offline and reloaded, then My bookings sti
   try {
     ids.push(await bookAt(page, "memberA", slot, (p) => addPartner(p, "memberB")));
     await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    expect(await page.evaluate(() => !!navigator.serviceWorker.controller), "product: the service worker controls the page after a reload").toBe(true);
     await page.getByTestId("my-bookings-link").click();
     await expect(page.getByTestId(`booking-${ids[0]}`), "product: the new booking is listed online").toBeVisible();
     await page.waitForLoadState("networkidle", { timeout: 3_000 }).catch(() => undefined);

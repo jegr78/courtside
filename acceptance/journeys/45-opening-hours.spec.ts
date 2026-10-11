@@ -73,7 +73,7 @@ test("given a member booking early on a Saturday, when the admin schedules a lat
       await member.goto("/");
       await gotoDay(member, saturday);
       const early = await member.locator(`button[data-testid="free-slot"][data-date="${saturday}"]`)
-        .evaluateAll((cells) => cells.map((c) => c.getAttribute("data-slot")).filter((s) => s !== null && s < laterOpening));
+        .evaluateAll((cells, before) => cells.map((c) => c.getAttribute("data-slot")).filter((s) => s !== null && s < before), laterOpening);
       expect(early, "product: no slot before the new opening is offered").toEqual([]);
       await expect(member.locator(`[data-testid="outside-slot"][data-date="${saturday}"]`).first(), "product: the closed morning is shown as outside").toBeAttached();
       await capture(member, "plan-later-opening");

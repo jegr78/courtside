@@ -28,6 +28,6 @@ export default defineConfig({
       metadata: profile,
       use: { ...profile.use, ...shared, browserName: profile.engine, ...remote(profile.engine) }
     })),
-    { name: "postflight", testMatch: /journeys\/postflight\.spec\.ts$/, ...chromium }
+    { name: "postflight", testMatch: /journeys\/postflight\.spec\.ts$/, outputDir: `${RUN}/test-results-postflight`, ...chromium }
   ]
 });
