@@ -14,10 +14,10 @@ export function forbiddenTerms(config, discovery) {
   };
 }
 
-export function assertPrivacySafe(markdown, forbidden) {
+export function assertPrivacySafe(markdown, forbidden, written = markdown) {
   if (mentions(markdown, forbidden.usernames)) throw new Error("release summary names a configured username");
-  // A name part counts only as written, so "the admin" is not the roster's "Admin".
-  if (mentions(markdown, forbidden.names) || mentions(markdown, forbidden.nameParts ?? [], "u")) throw new Error("release summary names a person from the roster");
+  // A name part counts only as written and only in review text, so neither "the admin" nor the template's own words match.
+  if (mentions(markdown, forbidden.names) || mentions(written, forbidden.nameParts ?? [], "u")) throw new Error("release summary names a person from the roster");
   if (mentions(markdown, forbidden.hosts)) throw new Error("release summary names the instance host");
   if (/[\w.+-]+@[\w-]+\.[\w.-]+/.test(markdown)) throw new Error("release summary contains an email address");
   if (/!\[[^\]]*\]\(|<img\b/i.test(markdown)) throw new Error("release summary contains an image");
@@ -45,5 +45,6 @@ export function releaseSummary({ version, runId, harnessCommit, cells, reviewed,
     ...(reviewed.findings.length ? reviewed.findings.map(line) : ["None."]),
     ""
   ].join("\n");
-  return assertPrivacySafe(markdown, forbidden);
+  const written = reviewed.findings.flatMap((finding) => finding.review ? [finding.review.reason, finding.review.followUp] : []).join("\n");
+  return assertPrivacySafe(markdown, forbidden, written);
 }

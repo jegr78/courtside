@@ -525,6 +525,16 @@ test("given a configuration and a roster, when the forbidden terms are built, th
   assert.deepEqual(terms.nameParts, ["Richard", "Doe", "Mary", "Major"], "each name part is forbidden as written");
 });
 
+test("given a roster surname that the summary template uses, when summarised, then only the written review text is checked for it", () => {
+  // given
+  const terms = { usernames: [], hosts: [], names: [], nameParts: ["Acceptance", "Admin"] };
+  const summarise = (reason) => releaseSummary({ version: "1", runId: "r", harnessCommit: "c", cells: { passed: 1, failed: 0, skipped: 0 },
+    reviewed: { ...reviewed, findings: [{ ...reviewed.findings[0], review: { ...reviewed.findings[0].review, reason } }] }, forbidden: terms });
+  // when / then
+  assert.match(summarise("A heading level is skipped."), /Acceptance of 1/, "the template's own heading is not a name");
+  assert.throws(() => summarise("Seen by Admin only."), /person/, "a name in the review text is refused");
+});
+
 test("given roster entries named like ordinary words, when the summary uses those words, then it is not refused", () => {
   // given
   const terms = forbiddenTerms({ baseUrl: "https://club.example.org", personas: {}, disposables: [] }, { roster: [{ username: "test.admin", firstName: "Test", lastName: "Admin" }] });
