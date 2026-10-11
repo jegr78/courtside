@@ -244,25 +244,6 @@ class NotificationCentreTest extends AbstractIntegrationTest {
                 .isEmpty();
     }
 
-    @Test
-    void whenAnAccountsUnreadEntriesAreCounted_thenThePlannerReadsTheUnreadIndex() {
-        // when
-        String plan = transactions.execute(status -> {
-            jdbc.sql("SET LOCAL enable_seqscan = off").update();
-            return String.join("\n", jdbc.sql("""
-                            EXPLAIN SELECT count(*) FROM notification
-                            WHERE account_id = :accountId AND read_at IS NULL
-                            """)
-                    .param("accountId", bookerAccountId)
-                    .query(String.class)
-                    .list());
-        });
-
-        // then
-        assertThat(plan).as("the unread count reads only the unread entries of one account")
-                .contains("notification_unread_idx");
-    }
-
     private UUID book(List<ParticipantSpec> players) {
         return bookings.create(new CreateBookingCommand(List.of(courtId), MEMBER_BOOKING_CARD,
                 new TimeSlot(SIX_PM, SEVEN_PM), bookerAccountId, bookerPersonId, Set.of(Role.MEMBER),

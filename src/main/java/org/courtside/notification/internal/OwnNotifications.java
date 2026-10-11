@@ -27,6 +27,8 @@ import java.util.UUID;
 public class OwnNotifications {
 
     private static final int MAX_PAGE_SIZE = 100;
+    static final String UNREAD_COUNT =
+            "SELECT count(*) FROM notification WHERE account_id = :accountId AND read_at IS NULL";
     private static final TypeReference<Map<String, String>> PARAMETERS = new TypeReference<>() {
     };
 
@@ -71,7 +73,7 @@ public class OwnNotifications {
     }
 
     private long unread(UUID accountId) {
-        return jdbc.sql("SELECT count(*) FROM notification WHERE account_id = :accountId AND read_at IS NULL")
+        return jdbc.sql(UNREAD_COUNT)
                 .param("accountId", accountId)
                 .query(Long.class)
                 .single();
