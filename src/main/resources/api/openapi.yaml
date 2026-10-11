@@ -3112,12 +3112,18 @@ components:
       type: object
       required: [kind, createdAt]
       description: |
-        One entry of this person's notification centre: what it was and whether they read it, not
-        what it showed, because the entry holds no text of its own.
+        One entry of this person's notification centre: what it was, what it stored and whether
+        they read it, not what it showed, because the entry holds no text of its own.
       properties:
         kind: { $ref: "#/components/schemas/MessageKind" }
         createdAt: { type: string, format: date-time }
         readAt: { type: [string, "null"], format: date-time }
+        bookingId:
+          type: string
+          format: uuid
+          description: The booking the entry concerns, as stored, whether or not it still exists.
+        closure:
+          $ref: "#/components/schemas/NotificationClosure"
 
     SubjectAccessDeclinedChannel:
       type: object

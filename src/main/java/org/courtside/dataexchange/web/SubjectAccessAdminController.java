@@ -17,6 +17,7 @@ import org.courtside.api.ApiSubjectAccessExport;
 import org.courtside.api.ApiSubjectAccessExternalReference;
 import org.courtside.api.ApiSubjectAccessMembership;
 import org.courtside.api.ApiSubjectAccessMessage;
+import org.courtside.api.ApiNotificationClosure;
 import org.courtside.api.ApiSubjectAccessNotification;
 import org.courtside.api.ApiSubjectAccessParticipation;
 import org.courtside.api.ApiSubjectAccessReservation;
@@ -102,7 +103,10 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
     private static ApiSubjectAccessNotification toNotification(PersonMessageHistory.Notification notification) {
         return new ApiSubjectAccessNotification(ApiMessageKind.fromValue(notification.kind().name()),
                 WireTypes.toOffsetDateTime(notification.createdAt()))
-                .readAt(WireTypes.toOffsetDateTime(notification.readAt()));
+                .readAt(WireTypes.toOffsetDateTime(notification.readAt()))
+                .bookingId(notification.bookingId())
+                .closure(notification.closure() == null ? null
+                        : ApiNotificationClosure.fromValue(notification.closure().name()));
     }
 
     private static ApiSubjectAccessDeclinedChannel toDeclinedChannel(PersonMessageHistory.DeclinedChannel declined) {

@@ -138,6 +138,31 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenCentreEntriesNamingBookings_whenTheAnswerIsProduced_thenEachCarriesWhatItStoredAndNoOtherAccountsEntry() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID otherPersonId = roster.addPerson("John", "Roe", "john.roe@example.org");
+        UUID otherAccountId = identity.createEnabledAccount(otherPersonId, "john.roe", Set.of(Role.MEMBER));
+        UUID remindedOf = UUID.randomUUID();
+        UUID displaced = UUID.randomUUID();
+        notifications.notify(accountId, MessageKind.BOOKING_REMINDER, remindedOf, SIX_PM);
+        notifications.notifyDisplaced(accountId, displaced, "DAY_CLOSED", SIX_PM);
+        notifications.notifyDisplaced(otherAccountId, UUID.randomUUID(), "COURT_OUT_OF_SERVICE", SIX_PM);
+
+        // when
+        SubjectAccessRecord answer = subjectAccess.answerFor(personId);
+
+        // then
+        assertThat(answer.notifications())
+                .extracting(notification -> notification.kind().name(), PersonMessageHistory.Notification::bookingId,
+                        notification -> notification.closure() == null ? null : notification.closure().name())
+                .as("every stored parameter of this person's entries, and nothing of anybody else's")
+                .containsExactly(tuple("BOOKING_REMINDER", remindedOf, null),
+                        tuple("BOOKING_DISPLACED", displaced, "DAY_CLOSED"));
+    }
+
+    @Test
     void givenAMemberSetUpARecurringBooking_whenTheAnswerIsProduced_thenTheSeriesIsInItToo() {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");

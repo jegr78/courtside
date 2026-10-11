@@ -4,11 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.courtside.notification.MessageChannel;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.PersonMessageHistory;
+import org.courtside.shared.BookingDisplaced;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,15 +50,36 @@ public class MessageHistoryService implements PersonMessageHistory {
     public List<Notification> notificationsFor(UUID accountId) {
         requireAccount(accountId);
         return jdbc.sql("""
-                        SELECT kind, created_at, read_at FROM notification
+                        SELECT kind, created_at, read_at, parameters ->> 'bookingId' AS booking_id,
+                               parameters ->> 'closure' AS closure
+                        FROM notification
                         WHERE account_id = :accountId
                         ORDER BY created_seq
                         """)
                 .param("accountId", accountId)
                 .query((rs, row) -> new Notification(MessageKind.valueOf(rs.getString("kind")),
                         rs.getTimestamp("created_at").toInstant(),
-                        rs.getTimestamp("read_at") == null ? null : rs.getTimestamp("read_at").toInstant()))
+                        rs.getTimestamp("read_at") == null ? null : rs.getTimestamp("read_at").toInstant(),
+                        bookingIdOf(rs.getString("booking_id")), closureOf(rs.getString("closure"))))
                 .list();
+    }
+
+    private static UUID bookingIdOf(String stored) {
+        if (stored == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(stored);
+        } catch (IllegalArgumentException malformed) {
+            return null;
+        }
+    }
+
+    private static BookingDisplaced.Closure closureOf(String stored) {
+        return Arrays.stream(BookingDisplaced.Closure.values())
+                .filter(closure -> closure.name().equals(stored))
+                .findFirst()
+                .orElse(null);
     }
 
     @Override
