@@ -359,3 +359,40 @@ test("given a known issue without an issue number or an unknown assessment, when
   assert.throws(() => validateReview({ assessments: { k: { assessment: "fine", reason: "r", followUp: "f" } }, manual: [] }), /assessment/);
   assert.throws(() => validateReview({ assessments: { k: { assessment: "harness-gap", reason: "", followUp: "f" } }, manual: [] }), /reason/);
 });
+
+import { assertPrivacySafe, releaseSummary } from "../acceptance/report/release-summary.mjs";
+
+const forbidden = { usernames: ["jane.doe"], hosts: ["club.example.org"], names: ["Jane Doe"] };
+const reviewed = {
+  status: "final", unassessed: [], stale: [],
+  findings: [{ key: "axe:heading-order", severity: "hint", kind: "accessibility", title: "axe heading-order (moderate)",
+    review: { assessment: "known-issue", reason: "The series form skips a heading level.", followUp: "Planned in 0.2.0.", issue: 1243 } }]
+};
+
+test("given a final review, when summarised, then version, run, cells and each finding with its issue are listed", () => {
+  // when
+  const summary = releaseSummary({ version: "1.2.3", runId: "20300311T090000Z", harnessCommit: "abc1234", cells: { passed: 188, failed: 0, skipped: 144 }, reviewed, forbidden });
+  // then
+  assert.match(summary, /1\.2\.3/);
+  assert.match(summary, /188 passed, 0 failed, 144 skipped/);
+  assert.match(summary, /`axe:heading-order`.*known issue.*#1243/);
+  assert.doesNotMatch(summary, /draft/i);
+});
+
+test("given a draft review, when summarised, then the summary says it is not final and names the open keys", () => {
+  // when
+  const summary = releaseSummary({ version: "1.2.3", runId: "r", harnessCommit: "c", cells: { passed: 1, failed: 0, skipped: 0 }, reviewed: { ...reviewed, status: "draft", unassessed: ["axe:color-contrast"] }, forbidden });
+  // then
+  assert.match(summary, /Draft/);
+  assert.match(summary, /axe:color-contrast/);
+});
+
+test("given a reason that names a username, an address, a host, a person or an image, when summarised, then each is refused without echoing it", () => {
+  // given
+  const leaking = (reason) => ({ ...reviewed, findings: [{ ...reviewed.findings[0], review: { ...reviewed.findings[0].review, reason } }] });
+  const summarise = (reason) => releaseSummary({ version: "1", runId: "r", harnessCommit: "c", cells: { passed: 1, failed: 0, skipped: 0 }, reviewed: leaking(reason), forbidden });
+  // when / then
+  for (const [reason, kind] of [["seen for jane.doe", /username/], ["mail to someone@example.org", /email/], ["on club.example.org", /host/], ["Jane Doe saw it", /name/], ["![shot](a.png)", /image/]]) {
+    assert.throws(() => summarise(reason), (error) => kind.test(error.message) && !error.message.includes(reason));
+  }
+});
