@@ -191,7 +191,9 @@ a different file than the one previewed is visible after the fact.
 |---|---|---|
 | `domain_event` | The change log: event type, the entity it concerns, the account that caused it, when, and the payload | None |
 | `message_record` | The mail outbox: one row per message the instance is to deliver, and what became of it | `user_account` |
-| `message_optout` | A message kind an account has declined | `user_account` |
+| `message_optout` | A message kind an account has declined, on every channel | `user_account` |
+| `message_channel_optout` | A channel an account receives no messages on besides the notification centre | `user_account` |
+| `notification` | The notification centre: one row per message addressed to an account, and when the account read it | `user_account` |
 | `event_publication` | Spring Modulith's transactional outbox for events between modules | None |
 
 `domain_event.subject_id` is `NOT NULL`, so every entry names something. An operation that concerns
@@ -224,6 +226,14 @@ were scheduled again. On a `QUEUED` row, `reason` names the last failed attempt;
 names why the message failed or was refused. Settling a row clears both `parameters` and
 `next_attempt_at`, and CHECK constraints refuse a settled row that keeps either, and `parameters`
 that are anything but an object of strings.
+
+A `notification` row is written with the outbox row in the same transaction, and also when no mail
+is queued because the account has no address or switched email off. Its `parameters` keep only the
+booking id and closure kind; the person who withdrew stays in the outbox. `read_at` is empty until
+the account marks the entry read. `notification.kind` follows the same CHECK as
+`message_record.kind`, and `message_channel_optout.channel` accepts `EMAIL`. No row in
+`message_channel_optout` means the channel is on, which is how every account received mail before
+the choice existed.
 
 `event_publication` is not domain data. Spring Modulith writes it so an event survives a listener
 that was not running, and Courtside neither reads nor migrates it by hand.

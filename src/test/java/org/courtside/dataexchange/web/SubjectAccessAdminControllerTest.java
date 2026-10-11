@@ -183,6 +183,8 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.email").value(nullValue()))
                 .andExpect(jsonPath("$.messages").value(hasSize(0)))
                 .andExpect(jsonPath("$.declinedMessages").value(hasSize(0)))
+                .andExpect(jsonPath("$.notifications").value(hasSize(0)))
+                .andExpect(jsonPath("$.declinedChannels").value(hasSize(0)))
                 .andExpect(jsonPath("$.bookingSeries").value(hasSize(0)));
     }
 

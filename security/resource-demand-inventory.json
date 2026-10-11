@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-10-08",
+  "reviewedAt": "2026-10-11",
   "sources": {
     "openapi": "src/main/resources/api/openapi.yaml",
     "scheduledFiles": [
@@ -57,6 +57,7 @@
         "changeParticipantCard",
         "changePerson",
         "changeRuleSet",
+        "chooseOwnMessageChannels",
         "chooseOwnMessages",
         "createBookingCard",
         "createCourt",
@@ -92,7 +93,9 @@
         "listOpeningHours",
         "listOpeningHoursForAdmin",
         "listOpeningScheduleForAdmin",
+        "listOwnMessageChannels",
         "listOwnMessageChoices",
+        "listOwnNotifications",
         "listOwnParticipations",
         "listOwnSessions",
         "listPersonalBookings",
@@ -100,6 +103,7 @@
         "listRules",
         "listSupportedEncodings",
         "logOut",
+        "markOwnNotificationRead",
         "readAuditLog",
         "readImportPreview",
         "readImportSource",

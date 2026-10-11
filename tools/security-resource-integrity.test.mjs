@@ -82,6 +82,10 @@ function fixture(withBooking = false) {
       state: "HANDED_OVER", message_id: "<example-1@example.org>", queued_at: time,
       queued_seq: 1, settled_at: time
     }));
+    after.tables.notification.rows.push(row("notification", {
+      id: "81000000-0000-0000-0000-000000000001", account_id: manager, kind: "BOOKING_CONFIRMED",
+      parameters: { bookingId }, created_at: time, created_seq: 1, read_at: null
+    }));
     journal.mailReceipts.push({ messageId: "<example-1@example.org>", accountId: manager,
       recipient: "jane@example.org", calendarUid: `booking-${bookingId}@courtside`,
       startsAt: request.startsAt, endsAt: request.endsAt, acceptedAt: time });
@@ -103,13 +107,14 @@ function secondBooking(input, overlapping = false) {
     idempotency_key: other.journal.operations[0].request.idempotencyKey,
     request_fingerprint: other.journal.operations[0].request.requestFingerprint
   });
-  for (const table of ["booking", "court_allocation", "booking_participant", "domain_event", "message_record"]) {
+  for (const table of ["booking", "court_allocation", "booking_participant", "domain_event", "message_record", "notification"]) {
     for (const added of other.after.tables[table].rows) {
       if (table !== "booking") added.id = `9${added.id.slice(1)}`;
       if (table === "court_allocation") Object.assign(added, {
         starts_at: other.journal.operations[0].request.startsAt, ends_at: other.journal.operations[0].request.endsAt
       });
       if (table === "message_record") Object.assign(added, { message_id: "<example-2@example.org>", queued_seq: 2 });
+      if (table === "notification") added.created_seq = 2;
       input.after.tables[table].rows.push(added);
     }
   }
@@ -173,6 +178,7 @@ function sharedSessionAfterBooking() {
   input.after.tables.booking.rows[0].created_at = booking.endedAt;
   input.after.tables.domain_event.rows[0].occurred_at = booking.endedAt;
   Object.assign(input.after.tables.message_record.rows[0], { queued_at: booking.endedAt, settled_at: booking.endedAt });
+  input.after.tables.notification.rows[0].created_at = booking.endedAt;
   input.journal.mailReceipts[0].acceptedAt = booking.endedAt;
   const login = input.journal.operations.find(({ kind }) => kind === "login");
   Object.assign(login, { sourceAddress: "172.20.0.2", requestSessionId: null });
@@ -239,6 +245,8 @@ function scriptFixtureStates(journal, clock) {
   Object.assign(input.after.tables.domain_event.rows[0], { subject_id: winner.responseBookingId,
     payload: { bookingId: winner.responseBookingId }, occurred_at: winner.endedAt });
   Object.assign(input.after.tables.message_record.rows[0], { queued_at: winner.endedAt, settled_at: winner.endedAt });
+  Object.assign(input.after.tables.notification.rows[0], { created_at: winner.endedAt,
+    parameters: { bookingId: winner.responseBookingId } });
   Object.assign(receipt, { calendarUid: `booking-${winner.responseBookingId}@courtside`, startsAt: winner.request.startsAt,
     endsAt: winner.request.endsAt, acceptedAt: winner.endedAt });
   input.journal.mailReceipts = [receipt];
@@ -441,7 +449,9 @@ for (const [table, field, value] of [
   ["domain_event", "actor_account_id", person], ["domain_event", "subject_id", person],
   ["domain_event", "payload", { bookingId: person }], ["message_record", "account_id", person],
   ["message_record", "kind", "CREDENTIALS_PASSWORD_RESET"],
-  ["message_record", "message_id", "<different@example.org>"]
+  ["message_record", "message_id", "<different@example.org>"],
+  ["notification", "account_id", person], ["notification", "kind", "BOOKING_REMINDER"],
+  ["notification", "read_at", time]
 ]) {
   test(`given a journalled booking, when ${table} ${field} is mislinked, then its effects fail`, () => {
     // given
@@ -455,7 +465,7 @@ for (const [table, field, value] of [
   });
 }
 
-for (const table of ["domain_event", "message_record", "court_allocation", "booking_participant"]) {
+for (const table of ["domain_event", "message_record", "court_allocation", "booking_participant", "notification"]) {
   for (const mode of ["missing", "duplicate"]) {
     test(`given a committed booking, when ${table} is ${mode}, then integrity fails`, () => {
       // given
@@ -511,11 +521,41 @@ test("given an opted out manager, when a booking commits without mail, then its 
   input.before.tables.message_optout.rows.push(preference);
   input.after.tables.message_optout.rows.push({ ...preference });
   input.after.tables.message_record.rows = [];
+  input.after.tables.notification.rows = [];
   input.journal.mailReceipts = [];
   // when
   const result = compareResourceIntegrity(input);
   // then
   assert.equal(result.outcome, "passed");
+});
+
+test("given a manager who switched email off, when a booking commits, then its centre entry is expected without mail", () => {
+  // given
+  const input = fixture(true);
+  const preference = row("message_channel_optout", { user_account_id: manager, channel: "EMAIL", created_at: start });
+  input.before.tables.message_channel_optout.rows.push(preference);
+  input.after.tables.message_channel_optout.rows.push({ ...preference });
+  input.after.tables.message_record.rows = [];
+  input.journal.mailReceipts = [];
+  // when
+  const result = compareResourceIntegrity(input);
+  // then
+  assert.equal(result.outcome, "passed", JSON.stringify(result.findings));
+});
+
+test("given a manager who declined confirmations, when a centre entry appears anyway, then integrity fails", () => {
+  // given
+  const input = fixture(true);
+  const preference = row("message_optout", { user_account_id: manager, kind: "BOOKING_CONFIRMED", created_at: start });
+  input.before.tables.message_optout.rows.push(preference);
+  input.after.tables.message_optout.rows.push({ ...preference });
+  input.after.tables.message_record.rows = [];
+  input.journal.mailReceipts = [];
+  // when
+  const result = compareResourceIntegrity(input);
+  // then
+  assert.equal(result.outcome, "failed");
+  assert.deepEqual(result.findings.map(({ code }) => code), ["confirmation-notification-count-mismatch"]);
 });
 
 test("given a replay, when its response identifies another booking, then integrity fails even during interruption", () => {

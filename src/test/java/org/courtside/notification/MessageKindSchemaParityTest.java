@@ -1,6 +1,7 @@
 package org.courtside.notification;
 
 import org.courtside.AbstractIntegrationTest;
+import org.courtside.notification.MessageChannel;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -37,6 +38,22 @@ class MessageKindSchemaParityTest extends AbstractIntegrationTest {
                         .filter(MessageKind::isDeclinable)
                         .map(Enum::name)
                         .toList());
+    }
+
+    @Test
+    void whenAKindIsAdded_thenTheNotificationCentreAlreadyAcceptsIt() {
+        // when / then
+        assertThat(namesIn("notification_kind_known"))
+                .containsExactlyInAnyOrderElementsOf(
+                        Arrays.stream(MessageKind.values()).map(Enum::name).toList());
+    }
+
+    @Test
+    void whenAChannelIsAdded_thenTheChannelOptOutTableAcceptsIt() {
+        // when / then
+        assertThat(namesIn("message_channel_optout_channel_known"))
+                .containsExactlyInAnyOrderElementsOf(
+                        Arrays.stream(MessageChannel.values()).map(Enum::name).toList());
     }
 
     private List<String> namesIn(String constraint) {

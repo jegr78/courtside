@@ -79,6 +79,8 @@ function fixture() {
   effects.tables.message_record.rows.push(row("message_record", { id: "80000000-0000-0000-0000-000000000001",
     account_id: manager, kind: "BOOKING_CONFIRMED", state: "HANDED_OVER", message_id: "<runtime@example.org>",
     queued_at: time, queued_seq: 1, settled_at: time }));
+  effects.tables.notification.rows.push(row("notification", { id: "81000000-0000-0000-0000-000000000001",
+    account_id: manager, kind: "BOOKING_CONFIRMED", parameters: { bookingId }, created_at: time, created_seq: 1 }));
   const sourceAddress = "172.30.0.5";
   const contract = { schemaVersion: 1, managerAccountId: manager, interval: { startedAt, endedAt },
     mailEnabled: true, publicationListeners: [], publicationLifecycle: { completionMode: "DELETE", repositoryMode: "JDBC_V2",

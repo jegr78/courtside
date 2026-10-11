@@ -2684,6 +2684,96 @@ components:
           type: array
           items: { $ref: "#/components/schemas/MessageKind" }
 
+    MessageChannel:
+      type: string
+      description: A way a message reaches a member besides the notification centre.
+      enum: [EMAIL]
+
+    MessageChannelChoice:
+      type: object
+      required: [channel, enabled]
+      properties:
+        channel: { $ref: "#/components/schemas/MessageChannel" }
+        enabled:
+          type: boolean
+          description: Whether this account currently receives messages on the channel.
+
+    MessageChannelChoiceRequest:
+      type: object
+      required: [declined]
+      properties:
+        declined:
+          type: array
+          items: { $ref: "#/components/schemas/MessageChannel" }
+
+    Notification:
+      type: object
+      required: [id, kind, createdAt, link]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: "#/components/schemas/MessageKind" }
+        createdAt: { type: string, format: date-time }
+        readAt:
+          type: [string, "null"]
+          format: date-time
+          description: When the account first marked the entry read, or `null` while it is unread.
+        booking:
+          $ref: "#/components/schemas/NotificationBooking"
+        closure:
+          $ref: "#/components/schemas/NotificationClosure"
+        link: { $ref: "#/components/schemas/NotificationLink" }
+
+    NotificationBooking:
+      type: object
+      description: |
+        The booking an entry concerns as it stands now, absent when the entry concerns none or the
+        booking no longer exists. It names no person.
+      required: [startsAt, endsAt, courts, cardLabel, cancelled]
+      properties:
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        courts:
+          type: array
+          items: { $ref: "#/components/schemas/NotificationCourt" }
+        cardLabel: { type: string }
+        cancelled: { type: boolean }
+
+    NotificationCourt:
+      type: object
+      required: [number]
+      properties:
+        number: { type: integer }
+        name: { type: [string, "null"] }
+
+    NotificationClosure:
+      type: string
+      description: Why a displaced booking no longer fits, present on `BOOKING_DISPLACED` entries only.
+      enum: [COURT_OUT_OF_SERVICE, CARD_OUT_OF_SERVICE, DAY_CLOSED, HOURS_NARROWED]
+
+    NotificationLink:
+      type: object
+      description: |
+        Where the entry leads, as one of the client's own pages rather than an address, so no entry
+        can send a member off the instance. `bookingId` is present while the booking exists.
+      required: [target]
+      properties:
+        target:
+          type: string
+          enum: [BOOKINGS, ACCOUNT_SECURITY]
+        bookingId: { type: string, format: uuid }
+
+    NotificationPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Notification" }
+        nextCursor:
+          type: [string, "null"]
+          format: uuid
+          description: Pass this notification id as `cursor` to continue after the current page.
+
     MessageState:
       type: string
       description: |
@@ -3011,11 +3101,30 @@ components:
         kind: { $ref: "#/components/schemas/MessageKind" }
         declinedAt: { type: string, format: date-time }
 
+    SubjectAccessNotification:
+      type: object
+      required: [kind, createdAt]
+      description: |
+        One entry of this person's notification centre: what it was and whether they read it, not
+        what it showed, because the entry holds no text of its own.
+      properties:
+        kind: { $ref: "#/components/schemas/MessageKind" }
+        createdAt: { type: string, format: date-time }
+        readAt: { type: [string, "null"], format: date-time }
+
+    SubjectAccessDeclinedChannel:
+      type: object
+      required: [channel, declinedAt]
+      description: A channel this person asked to receive no messages on.
+      properties:
+        channel: { $ref: "#/components/schemas/MessageChannel" }
+        declinedAt: { type: string, format: date-time }
+
     SubjectAccessExport:
       type: object
       required: [producedAt, personId, firstName, lastName, accounts, memberships, bookingsMade,
-                 bookingsRecordedIn, bookingSeries, messages, declinedMessages,
-                 externalReferences, changesAsSubject, changesAsActor]
+                 bookingsRecordedIn, bookingSeries, messages, declinedMessages, notifications,
+                 declinedChannels, externalReferences, changesAsSubject, changesAsActor]
       description: |
         Everything this instance holds about one person, and nothing it holds about anybody else.
       properties:
@@ -3050,6 +3159,12 @@ components:
         declinedMessages:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessDeclinedMessage" }
+        notifications:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessNotification" }
+        declinedChannels:
+          type: array
+          items: { $ref: "#/components/schemas/SubjectAccessDeclinedChannel" }
         externalReferences:
           type: array
           items: { $ref: "#/components/schemas/SubjectAccessExternalReference" }
@@ -3637,6 +3752,118 @@ paths:
           $ref: "#/components/responses/Conflict"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/account/messages/channels:
+    get:
+      tags: [account-messages]
+      operationId: listOwnMessageChannels
+      summary: Which channels besides the notification centre this account receives messages on.
+      description: |
+        A channel choice is separate from the kind choice: a declined kind reaches the account on no
+        channel, the notification centre included, while a declined channel only stops that channel.
+        A channel nobody chose about is on. Credentials, password-reset codes and username reminders
+        are mailed whatever this says, because whoever asks for them cannot sign in to read the
+        centre.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The channel choices.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MessageChannelChoice" }
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    put:
+      tags: [account-messages]
+      operationId: chooseOwnMessageChannels
+      summary: Switch channels off for this account.
+      description: The request names every channel this account declines; anything absent from it is on.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MessageChannelChoiceRequest" }
+      responses:
+        "204":
+          description: Chosen.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/account/notifications:
+    get:
+      tags: [account-notifications]
+      operationId: listOwnNotifications
+      summary: The notification centre of the signed-in account, newest first.
+      description: |
+        Every message addressed to this account, whichever channel also carried it, and only those.
+        An entry names what it concerns and links to it by target rather than by address, so the
+        client resolves the link to one of its own pages.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: |
+            The opaque `nextCursor` returned by the preceding page. A cursor this account's
+            notifications do not contain yields an empty page rather than an error.
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/PageLimit"
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: The account's notifications.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationPage" }
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/account/notifications/{notificationId}/read:
+    post:
+      tags: [account-notifications]
+      operationId: markOwnNotificationRead
+      summary: Mark one of this account's notifications read.
+      description: |
+        Marking an entry that is already read keeps the time it was first read. An id this account
+        holds no notification under, another account's included, answers
+        `urn:courtside:error:notification-not-found`.
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204":
+          description: Read.
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/RateLimited"
 

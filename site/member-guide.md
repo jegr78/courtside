@@ -221,18 +221,24 @@ Beachte dabei:
 Eine spätere Änderung kann deine Buchung betreffen. Beispiele sind ein deaktivierter Platz, eine
 stillgelegte Buchungsart oder verkürzte Öffnungszeiten.
 
-Courtside sendet dir eine E-Mail mit dem Grund. Die Buchung wird dadurch nicht automatisch
-storniert. Der Verein entscheidet, wie er mit ihr umgeht.
+Courtside nennt dir den Grund unter *Benachrichtigungen* und per E-Mail, wenn du E-Mail gewählt
+hast. Die Buchung wird dadurch nicht automatisch storniert. Der Verein entscheidet, wie er mit ihr umgeht.
 
 ## Benachrichtigungen
 
-Öffne *Benachrichtigungen*, um optionale Nachrichten ein- oder auszuschalten.
+Unter *Benachrichtigungen* stehen alle Nachrichten, die Courtside dir geschickt hat, die neueste
+zuerst. Jeder Eintrag zeigt, wann er kam, worum es geht und ob du ihn schon gelesen hast. Neue
+Einträge sind mit *Neu* markiert. Über den Link darunter kommst du zur betroffenen Buchung oder zu
+deiner Kontosicherheit. Mit *Als gelesen markieren* oder dem Link markierst du einen Eintrag als
+gelesen. Hier siehst du nur Nachrichten an dich, auch ohne E-Mail-Adresse.
 
-Du kannst diese Nachrichten abwählen:
+Darunter wählst du, was du bekommst. Du kannst diese Nachrichten abwählen:
 
 * Buchungsbestätigung,
 * Erinnerung vor der Buchung,
 * Nachricht über den Austritt einer Person aus deiner Buchung.
+
+Eine abgewählte Nachricht bekommst du gar nicht mehr, weder hier noch per E-Mail.
 
 Diese Nachrichten sendet Courtside immer:
 
@@ -240,9 +246,13 @@ Diese Nachrichten sendet Courtside immer:
 * Mitteilung über deine Eintragung als Mitspieler,
 * Mitteilung über eine Änderung, die deine Buchung betrifft.
 
+Getrennt davon entscheidest du, ob du zusätzlich eine E-Mail bekommst. Ohne E-Mail stehen deine
+Nachrichten weiter hier. Zugangsdaten, deinen Benutzernamen und Codes zum Zurücksetzen schickt
+Courtside immer per E-Mail, denn dafür bist du nicht angemeldet.
+
 Speichere die Auswahl. Die Einstellung gilt nur für künftige Nachrichten.
 
-![Die Benachrichtigungseinstellungen mit optionalen und verpflichtenden Nachrichten.](screenshots/de/notification-choices.png)
+![Die Benachrichtigungen mit deinen Nachrichten und deiner Auswahl.](screenshots/de/notification-choices.png)
 
 ## Dein Konto
 

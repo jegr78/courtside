@@ -219,18 +219,25 @@ Keep these rules in mind:
 A later configuration change may affect your booking. Examples include a deactivated court, a
 retired booking type or shorter opening hours.
 
-Courtside emails you with the reason. This does not cancel the booking automatically. The club
+Courtside tells you the reason under *Notifications*, and by email if you chose email. This does
+not cancel the booking automatically. The club
 decides how to handle it.
 
 ## Notifications
 
-Open *Notifications* to enable or disable optional messages.
+*Notifications* lists every message Courtside sent you, newest first. Each entry shows when it
+arrived, what it concerns and whether you have read it. New entries are marked *New*. The link
+below an entry opens the booking it concerns or your account security. Select *Mark as read* or
+follow the link to mark an entry read. You see only messages addressed to you, even without an
+email address.
 
-You can disable:
+Below the list you choose what you receive. You can disable:
 
 * booking confirmations,
 * reminders before a booking,
 * messages when somebody withdraws from your booking.
+
+A disabled message no longer reaches you at all, neither here nor by email.
 
 Courtside always sends:
 
@@ -238,9 +245,13 @@ Courtside always sends:
 * notice that somebody added you as a player,
 * notice of a change that affects your booking.
 
+Separately, you choose whether you also get an email. Without email your messages still appear
+here. Courtside always emails credentials, your username and reset codes, because you are not
+signed in when you need them.
+
 Save your choices. They apply to future messages only.
 
-![Notification settings with optional and required messages.](../screenshots/en/notification-choices.png)
+![Notifications with your messages and your choices.](../screenshots/en/notification-choices.png)
 
 ## Your account
 

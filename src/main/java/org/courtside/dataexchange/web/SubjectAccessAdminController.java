@@ -3,6 +3,7 @@ package org.courtside.dataexchange.web;
 import lombok.RequiredArgsConstructor;
 import org.courtside.api.AdminSubjectAccessApi;
 import org.courtside.api.ApiBookingStatus;
+import org.courtside.api.ApiMessageChannel;
 import org.courtside.api.ApiMessageKind;
 import org.courtside.api.ApiMessageState;
 import org.courtside.api.ApiRole;
@@ -10,11 +11,13 @@ import org.courtside.api.ApiSubjectAccessAccount;
 import org.courtside.api.ApiSubjectAccessAction;
 import org.courtside.api.ApiSubjectAccessBooking;
 import org.courtside.api.ApiSubjectAccessChange;
+import org.courtside.api.ApiSubjectAccessDeclinedChannel;
 import org.courtside.api.ApiSubjectAccessDeclinedMessage;
 import org.courtside.api.ApiSubjectAccessExport;
 import org.courtside.api.ApiSubjectAccessExternalReference;
 import org.courtside.api.ApiSubjectAccessMembership;
 import org.courtside.api.ApiSubjectAccessMessage;
+import org.courtside.api.ApiSubjectAccessNotification;
 import org.courtside.api.ApiSubjectAccessParticipation;
 import org.courtside.api.ApiSubjectAccessReservation;
 import org.courtside.api.ApiSubjectAccessSeries;
@@ -55,6 +58,9 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 answer.messages().stream().map(SubjectAccessAdminController::toMessage).toList(),
                 answer.declinedMessages().stream()
                         .map(SubjectAccessAdminController::toDeclined).toList(),
+                answer.notifications().stream().map(SubjectAccessAdminController::toNotification).toList(),
+                answer.declinedChannels().stream()
+                        .map(SubjectAccessAdminController::toDeclinedChannel).toList(),
                 answer.externalReferences().stream()
                         .map(SubjectAccessAdminController::toReference).toList(),
                 answer.changesAsSubject().stream().map(SubjectAccessAdminController::toChange).toList(),
@@ -90,6 +96,17 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
 
     private static ApiSubjectAccessDeclinedMessage toDeclined(PersonMessageHistory.Declined declined) {
         return new ApiSubjectAccessDeclinedMessage(ApiMessageKind.fromValue(declined.kind().name()),
+                WireTypes.toOffsetDateTime(declined.declinedAt()));
+    }
+
+    private static ApiSubjectAccessNotification toNotification(PersonMessageHistory.Notification notification) {
+        return new ApiSubjectAccessNotification(ApiMessageKind.fromValue(notification.kind().name()),
+                WireTypes.toOffsetDateTime(notification.createdAt()))
+                .readAt(WireTypes.toOffsetDateTime(notification.readAt()));
+    }
+
+    private static ApiSubjectAccessDeclinedChannel toDeclinedChannel(PersonMessageHistory.DeclinedChannel declined) {
+        return new ApiSubjectAccessDeclinedChannel(ApiMessageChannel.fromValue(declined.channel().name()),
                 WireTypes.toOffsetDateTime(declined.declinedAt()));
     }
 

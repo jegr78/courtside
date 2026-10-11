@@ -25,6 +25,8 @@ const definitions = {
   login_attempt_limit: "scope subject_hash attempt_count window_started_at blocked_until",
   member: "id person_id membership_type_id started_on ended_on",
   membership_type: "id name rule_set_id active grants_account",
+  notification: "id account_id kind parameters created_at created_seq read_at",
+  message_channel_optout: "user_account_id channel created_at",
   message_optout: "user_account_id kind created_at",
   message_record: "id account_id kind state message_id reason status_code queued_at queued_seq settled_at attempts retries next_attempt_at parameters",
   opening_hours: "id day_of_week opens_at closes_at version_id",
@@ -51,6 +53,7 @@ const primaryKeys = {
   import_owned_field: ["source_id", "canonical_field"],
   import_type_mapping: ["source_id", "source_value"],
   login_attempt_limit: ["scope", "subject_hash"],
+  message_channel_optout: ["user_account_id", "channel"],
   message_optout: ["user_account_id", "kind"],
   password_reset_mail_limit: ["account_id"],
   password_reset_token: ["account_id"],
@@ -851,6 +854,10 @@ function compare(input) {
     const allow = (table, row) => allowed.add(canonical([table, keyOf(table, row)]));
     const finding = (code, outcome, table, row, field = null) =>
       report(code, outcome, table, row ? keyOf(table, row) : null, field);
+    const wantsConfirmation = (accountId) => !oldRows("message_optout").some((row) =>
+      row.user_account_id === accountId && row.kind === "BOOKING_CONFIRMED");
+    const wantsEmail = (accountId, person) => typeof person?.email === "string" && person.email.trim() !== ""
+      && !oldRows("message_channel_optout").some((row) => row.user_account_id === accountId && row.channel === "EMAIL");
     const manager = oldRows("user_account").find((row) => row.id === contract?.managerAccountId);
     const interval = contract?.interval;
     const contractValid = record(contract) && contract.schemaVersion === 1 && uuid.test(contract.managerAccountId)
@@ -1153,9 +1160,22 @@ function compare(input) {
         }
         allow("domain_event", event);
       }
-      const wantsMail = contract.mailEnabled && !oldRows("message_optout").some((row) =>
-        row.user_account_id === manager.id && row.kind === "BOOKING_CONFIRMED");
       const person = oldRows("person").find((row) => row.id === manager.person_id);
+      const wantsMail = contract.mailEnabled && wantsConfirmation(manager.id) && wantsEmail(manager.id, person);
+      const entries = added("notification").filter((row) => equal(row.parameters, { bookingId: id }));
+      if (entries.length !== (wantsConfirmation(manager.id) ? 1 : 0)) {
+        finding("confirmation-notification-count-mismatch", "failed", "booking", booking);
+        valid = false;
+      }
+      for (const entry of entries) {
+        allow("notification", entry);
+        if (!uuid.test(entry.id) || entry.account_id !== manager.id || entry.kind !== "BOOKING_CONFIRMED"
+            || entry.read_at !== null || !windows.some((window) => within(entry.created_at, window))
+            || !Number.isSafeInteger(Number(entry.created_seq)) || Number(entry.created_seq) < 1) {
+          finding("confirmation-notification-mismatch", "failed", "notification", entry);
+          valid = false;
+        }
+      }
       const matchingReceipts = receipts.filter((receipt) => record(receipt)
         && receipt.calendarUid === `booking-${id}@courtside`);
       if (matchingReceipts.length > (wantsMail ? 1 : 0)) finding("confirmation-receipt-count-mismatch", "failed", "booking", booking);
@@ -1185,8 +1205,8 @@ function compare(input) {
     for (const receipt of receipts) {
       if (!correlatedReceipts.has(receipt)) report("unattributed-mail-receipt", attributionComplete ? "failed" : "incomplete");
     }
-    const wantedCount = contractValid && contract.mailEnabled
-      && !oldRows("message_optout").some((row) => row.user_account_id === manager.id && row.kind === "BOOKING_CONFIRMED")
+    const wantedCount = contractValid && contract.mailEnabled && wantsConfirmation(manager.id)
+      && wantsEmail(manager.id, oldRows("person").find((row) => row.id === manager.person_id))
       ? creations.size : 0;
     if (attributionComplete && added("message_record").length > wantedCount) report("extra-message-record", "failed");
     for (const message of added("message_record")) {
@@ -1244,7 +1264,7 @@ function compare(input) {
       for (const [key, next] of current) {
         if (previous.has(key) || allowed.has(canonical([table, key]))) continue;
         const owned = authenticationEffect(table, next);
-        const unattributed = ["booking", "court_allocation", "booking_participant", "domain_event"].includes(table)
+        const unattributed = ["booking", "court_allocation", "booking_participant", "domain_event", "notification"].includes(table)
           && !attributionComplete;
         report(owned ? "authentication-effect-unsupported" : "unexpected-row-added",
           owned || unattributed ? "incomplete" : "failed", table, key, null, null, next);

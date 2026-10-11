@@ -36,7 +36,7 @@ The current product includes:
 - people, memberships, accounts, roles and sessions;
 - repeatable membership snapshot imports;
 - roster, booking and per-person data exports;
-- localized email notifications and a message log;
+- an in-app notification centre, localized email notifications and a message log;
 - an append-only audit log;
 - court-utilisation reporting and board statistics for any period;
 - a React and Vite progressive web application;
@@ -144,7 +144,7 @@ as one application process and uses PostgreSQL 18.
 | `facility` | Courts and opening hours |
 | `identity` | People, accounts, roles, credentials and sessions |
 | `member` | Membership types, memberships and roster administration |
-| `notification` | Email creation, delivery state and preferences |
+| `notification` | Notification centre, email creation, delivery state and preferences |
 | `reporting` | Board statistics composed from the read ports of the other modules |
 | `rules` | Rule-set administration and rule evaluation |
 | `shared` | Shared domain events and cross-cutting value types |
@@ -171,8 +171,8 @@ Repositories persist state and do not decide policy.
 State-changing services publish typed domain events. The audit listener runs before commit and
 writes its row in the same transaction. A covered change cannot commit without its audit event.
 
-Mail listeners run before commit, like the audit listener, and store the message in the outbox in
-the same transaction. A committed change therefore always has its queued message, and a change whose
+Mail listeners run before commit, like the audit listener, and store the notification-centre entry
+and the outbox message in the same transaction. A committed change therefore always has its queued message, and a change whose
 message cannot be stored does not commit: the request fails and nothing of it remains. A mail
 listener never talks to the relay, so a failed handover cannot roll back a change that committed.
 Publishing such an event outside a transaction is refused. Other after-commit listeners run through
@@ -523,8 +523,20 @@ accepted does not replace the stored one, and no plaintext credential waits in t
 messages for one account are composed one after the other, so the last one sent carries the
 credential the account holds.
 
-Members choose optional message kinds. No opt-out means enabled. Credentials, displacement and
-participant-addition notices cannot be disabled because no other product path replaces them.
+Every message addressed to an account also becomes an entry in that account's notification centre,
+whether or not mail goes out. An entry stores the kind, the identifiers it concerns and when it was
+read, never rendered text. The centre resolves the booking an entry concerns when it is read and
+links to a page of the client by target, so an entry cannot lead off the instance. An account reads
+and marks only its own entries; another account's id answers
+`urn:courtside:error:notification-not-found`. The entry has no channel of its own, so another
+channel can be added beside email without changing it.
+
+Members choose optional message kinds and, separately, channels. No opt-out means enabled. A
+declined kind reaches the account on no channel, the centre included. A declined email channel
+stops mail and keeps the entry. Credentials, password-reset codes and username reminders are mailed
+whatever the channel choice says, because whoever asks for them cannot sign in to read the centre.
+Credentials, displacement and participant-addition notices cannot be disabled because no other
+product path replaces them. An account without an address still receives its entries.
 
 ## Security model
 
@@ -627,8 +639,8 @@ not copy names, addresses, credentials or free text. Erasing the referenced pers
 without rewriting the append-only event.
 
 Session rows are deleted after inactivity or absolute expiry. Import previews retain their resolved
-change set only for the configured period and never store the uploaded file. Message records leave
-with their account.
+change set only for the configured period and never store the uploaded file. Message records,
+notification-centre entries and message choices leave with their account.
 
 An administrator can export all data held about one person. The response excludes other people's
 identity even when they share a booking or audit event. Producing it is itself recorded.

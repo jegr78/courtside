@@ -78,6 +78,8 @@ public class SubjectAccessService {
                 eachAccount(accountIds, bookings::seriesCreatedBy),
                 eachAccount(accountIds, messages::sentTo),
                 eachAccount(accountIds, messages::declinedBy),
+                eachAccount(accountIds, messages::notificationsFor),
+                eachAccount(accountIds, messages::declinedChannelsBy),
                 referencesOf(personId),
                 changesAbout(personId, accountIds),
                 eachAccount(accountIds, auditTrail::recordedBy));

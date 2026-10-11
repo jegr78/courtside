@@ -97,6 +97,14 @@ VALUES ('72000000-0000-0000-0000-000000000001', repeat('c', 64), repeat('d', 64)
 INSERT INTO message_optout (user_account_id, kind, created_at)
 VALUES ('72000000-0000-0000-0000-000000000001', 'BOOKING_REMINDER', '2025-01-01T00:00:00Z');
 
+INSERT INTO message_channel_optout (user_account_id, channel, created_at)
+VALUES ('72000000-0000-0000-0000-000000000001', 'EMAIL', '2025-01-01T00:00:00Z');
+
+INSERT INTO notification (id, account_id, kind, parameters, created_at, read_at)
+VALUES ('7b000000-0000-0000-0000-000000000002', '72000000-0000-0000-0000-000000000001',
+        'BOOKING_CONFIRMED', '{"bookingId": "77000000-0000-0000-0000-000000000001"}',
+        '2025-01-01T00:00:00Z', '2025-01-01T00:01:00Z');
+
 INSERT INTO message_record (id, account_id, kind, state, message_id, queued_at, settled_at)
 VALUES ('7b000000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001',
         'BOOKING_CONFIRMED', 'HANDED_OVER', '<upgrade-fixture@example.org>',

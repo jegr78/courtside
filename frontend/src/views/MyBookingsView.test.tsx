@@ -776,3 +776,22 @@ it("given more upcoming bookings than one page, when loaded, then their load mor
   expect(loadMore.compareDocumentPosition(screen.getByTestId("past-bookings")) & Node.DOCUMENT_POSITION_FOLLOWING,
     "the control reads the upcoming list only").toBeTruthy();
 });
+
+it("given a link to one booking, when the bookings have loaded, then that booking is brought into view", async () => {
+  // given
+  const scrolled = vi.fn();
+  const original = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+  Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, writable: true, value: scrolled });
+  window.history.replaceState(null, "", `#booking-${upcomingId}`);
+
+  // when
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  const linked = await screen.findByTestId(`booking-${upcomingId}`);
+
+  // then
+  await waitFor(() => expect(scrolled).toHaveBeenCalled());
+  expect(scrolled.mock.contexts[0]).toBe(linked);
+  if (original) Object.defineProperty(Element.prototype, "scrollIntoView", original);
+  else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  window.history.replaceState(null, "", "#");
+});

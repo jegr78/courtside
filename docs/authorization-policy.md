@@ -78,7 +78,7 @@ The maintained JSON classifies every reachable OpenAPI field either as ordinary 
 | `public-username-reminder-boundary` | `requestUsernameReminder` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary` |
 | `public-club-and-calendar` | `listCourts`, `listOpeningHours`, `getBookingGrid`, `getClubConfig`, `getClubLogo`, `getAppIcon`, `getWebManifest`, `listBookingCardLegend`, `listAllocations` | `ANONYMOUS`, `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN`, `INITIAL_PASSWORD` | `request-boundary`, `public-projection` |
 | `initial-password-replacement` | `changeInitialPassword` | `INITIAL_PASSWORD` | `initial-password-gate`, `credential-write-only` |
-| `own-account-preferences-and-session-list` | `listOwnSessions`, `changeOwnLocale`, `listOwnMessageChoices`, `chooseOwnMessages` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `own-account-scope` |
+| `own-account-preferences-and-session-list` | `listOwnSessions`, `changeOwnLocale`, `listOwnMessageChoices`, `chooseOwnMessages`, `listOwnMessageChannels`, `chooseOwnMessageChannels`, `listOwnNotifications`, `markOwnNotificationRead` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `own-account-scope` |
 | `own-credential-proof-and-replacement` | `reauthenticate`, `changeOwnPassword` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `own-account-scope`, `credential-write-only` |
 | `own-session-termination` | `endOwnSessions`, `endOwnSession` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `own-account-scope`, `recent-authentication` |
 | `authenticated-booking-card-discovery` | `listBookableCards` | `MEMBER`, `TRAINER`, `SPORT_DIRECTOR`, `YOUTH_DIRECTOR`, `GROUNDSKEEPER`, `TREASURER`, `ADMIN` | `permanent-account-gate`, `booking-card-eligibility` |
@@ -147,15 +147,15 @@ Negative tests: `src/test/java/org/courtside/identity/AdminAuthorizationTest.jav
 
 ### Own account scope
 
-The authenticated account identifier selects session, locale and message-choice state; callers cannot supply another account identifier to these operations.
+The authenticated account identifier selects session, locale, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found.
 
 Attributes: `current-account`, `session-handle`.
 
-Production: `src/main/java/org/courtside/identity/CurrentUser.java#requireAccount`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#list`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#endOne`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#endAll`, `src/main/java/org/courtside/identity/internal/AccountLocaleService.java#change`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#current`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#choose`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#accountId`.
+Production: `src/main/java/org/courtside/identity/CurrentUser.java#requireAccount`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#list`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#endOne`, `src/main/java/org/courtside/identity/internal/AccountSessionService.java#endAll`, `src/main/java/org/courtside/identity/internal/AccountLocaleService.java#change`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#current`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#choose`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#currentChannels`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#chooseChannels`, `src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#accountId`, `src/main/java/org/courtside/notification/internal/OwnNotifications.java#page`, `src/main/java/org/courtside/notification/internal/OwnNotifications.java#markRead`, `src/main/java/org/courtside/notification/internal/OwnNotifications.java#accountId`.
 
-Positive tests: `src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenTwoActiveSessions_whenOneIsListedAndEnded_thenOnlyPrivacySafeMetadataAndTheOtherRemain`.
+Positive tests: `src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenTwoActiveSessions_whenOneIsListedAndEnded_thenOnlyPrivacySafeMetadataAndTheOtherRemain`, `src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenNotificationsForTwoMembers_whenOneReadsTheCentre_thenOnlyTheirOwnAreServedWithContentAndLink`.
 
-Negative tests: `src/test/java/org/courtside/identity/internal/AccountSessionServiceTest.java#givenAnUnknownHandle_whenASessionIsEnded_thenNothingIsDeleted`.
+Negative tests: `src/test/java/org/courtside/identity/internal/AccountSessionServiceTest.java#givenAnUnknownHandle_whenASessionIsEnded_thenNothingIsDeleted`, `src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAnotherMembersNotification_whenAMemberMarksItRead_thenItIsNotFoundAndStaysUnread`.
 
 ### Credential write-only boundary
 

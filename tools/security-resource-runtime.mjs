@@ -228,7 +228,9 @@ function observeJournal(ctx, after, mail, projections) {
   const creates = new Set(journal.operations.filter(operation => operation.kind === "createBooking" && operation.status === 201)
     .map(operation => operation.responseBookingId));
   const wantsMail = ctx.contract.mailEnabled && !ctx.before.tables.message_optout.rows.some(row =>
-    row.user_account_id === ctx.contract.managerAccountId && row.kind === "BOOKING_CONFIRMED");
+    row.user_account_id === ctx.contract.managerAccountId && row.kind === "BOOKING_CONFIRMED")
+    && !(ctx.before.tables.message_channel_optout?.rows ?? []).some(row =>
+      row.user_account_id === ctx.contract.managerAccountId && row.channel === "EMAIL");
   const expectedMail = wantsMail ? creates.size : 0;
   const emptyObserved = expectedMail === 0 && messages.length === 0 && mail.receipts.length === 0
     && mail.status === "incomplete" && JSON.stringify(mail.findings) === '["mail-new-messages-missing"]';

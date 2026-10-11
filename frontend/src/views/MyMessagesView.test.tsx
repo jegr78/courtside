@@ -1,8 +1,10 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, api, type MessageChoice } from "../api/client";
+import { ApiError, api, type MessageChoice, type Notification } from "../api/client";
 import i18n from "../i18n";
+import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { MyMessagesView } from "./MyMessagesView";
 
 const choices: MessageChoice[] = [
@@ -12,16 +14,196 @@ const choices: MessageChoice[] = [
   { kind: "BOOKING_REMINDER", declinable: true, enabled: false }
 ];
 
+const confirmed: Notification = {
+  id: "11111111-1111-1111-1111-111111111111",
+  kind: "BOOKING_CONFIRMED",
+  createdAt: "2026-05-12T08:00:00Z",
+  readAt: null,
+  booking: {
+    startsAt: "2026-05-12T16:00:00Z", endsAt: "2026-05-12T17:00:00Z",
+    courts: [{ number: 1, name: "Centre Court" }], cardLabel: "Member booking", cancelled: false
+  },
+  link: { target: "BOOKINGS", bookingId: "22222222-2222-2222-2222-222222222222" }
+};
+
+const reminderRead: Notification = {
+  id: "33333333-3333-3333-3333-333333333333",
+  kind: "BOOKING_REMINDER",
+  createdAt: "2026-05-11T08:00:00Z",
+  readAt: "2026-05-11T09:00:00Z",
+  link: { target: "BOOKINGS" }
+};
+
+const usernameReminder: Notification = {
+  id: "44444444-4444-4444-4444-444444444444",
+  kind: "ACCOUNT_USERNAME_REMINDER",
+  createdAt: "2026-05-10T08:00:00Z",
+  readAt: null,
+  link: { target: "ACCOUNT_SECURITY" }
+};
+
+const displaced: Notification = {
+  id: "55555555-5555-5555-5555-555555555555",
+  kind: "BOOKING_DISPLACED",
+  createdAt: "2026-05-09T08:00:00Z",
+  readAt: null,
+  closure: "DAY_CLOSED",
+  booking: {
+    startsAt: "2026-05-20T16:00:00Z", endsAt: "2026-05-20T17:00:00Z",
+    courts: [{ number: 2, name: null }], cardLabel: "Member booking", cancelled: false
+  },
+  link: { target: "BOOKINGS", bookingId: "66666666-6666-6666-6666-666666666666" }
+};
+
+function show() {
+  render(<MemoryRouter><WithClubConfiguration><MyMessagesView /></WithClubConfiguration></MemoryRouter>);
+}
+
+function entry(id: string) {
+  return screen.getByTestId(`notification-${id}`);
+}
+
 describe("MyMessagesView", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await i18n.changeLanguage("en");
     vi.spyOn(api, "ownMessageChoices").mockResolvedValue(choices);
+    vi.spyOn(api, "ownMessageChannels").mockResolvedValue([{ channel: "EMAIL", enabled: true }]);
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [confirmed, reminderRead], nextCursor: null });
+  });
+
+  it("given notifications addressed to the member, when the centre opens, then each shows its time, read state, content and link", async () => {
+    // when
+    show();
+
+    // then
+    const unread = await screen.findByTestId(`notification-${confirmed.id}`);
+    expect(unread).toHaveAttribute("data-read", "false");
+    expect(within(unread).getByTestId("notification-state")).toHaveTextContent("New");
+    expect(within(unread).getByTestId("notification-summary")).toHaveTextContent("Your booking is confirmed.");
+    expect(within(unread).getByTestId("notification-booking")).toHaveTextContent("Centre Court");
+    expect(within(unread).getByTestId("notification-time")).toHaveAttribute("dateTime", confirmed.createdAt);
+    expect(within(unread).getByRole("link")).toHaveAttribute("href", `/my-bookings#booking-${confirmed.link.bookingId}`);
+    expect(entry(reminderRead.id)).toHaveAttribute("data-read", "true");
+    expect(within(entry(reminderRead.id)).getByTestId("notification-state")).toHaveTextContent("Read");
+    expect(within(entry(reminderRead.id)).queryByTestId("notification-mark-read")).toBeNull();
+  });
+
+  it("given sign-in help in the centre, when it is shown, then it links to the account page and names no booking", async () => {
+    // given
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [usernameReminder], nextCursor: null });
+
+    // when
+    show();
+
+    // then
+    const help = await screen.findByTestId(`notification-${usernameReminder.id}`);
+    expect(within(help).getByRole("link")).toHaveAttribute("href", "/account/security");
+    expect(within(help).queryByTestId("notification-booking")).toBeNull();
+  });
+
+  it("given a closure under a booking, when it is shown, then it says why the booking no longer fits", async () => {
+    // given
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [displaced], nextCursor: null });
+
+    // when
+    show();
+
+    // then
+    const closure = await screen.findByTestId(`notification-${displaced.id}`);
+    expect(within(closure).getByTestId("notification-summary")).toHaveTextContent("The club is now closed on that day.");
+    expect(within(closure).getByTestId("notification-booking")).toHaveTextContent("Court 2");
+  });
+
+  it("given an unread notification, when the member marks it read, then the instance is told and it shows as read", async () => {
+    // given
+    const marked = vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
+    show();
+    const unread = await screen.findByTestId(`notification-${confirmed.id}`);
+
+    // when
+    await userEvent.click(within(unread).getByTestId("notification-mark-read"));
+
+    // then
+    expect(marked).toHaveBeenCalledWith(confirmed.id);
+    await waitFor(() => expect(entry(confirmed.id)).toHaveAttribute("data-read", "true"));
+    expect(within(entry(confirmed.id)).getByTestId("notification-state")).toHaveTextContent("Read");
+  });
+
+  it("given marking read is refused, when the member marks an entry, then the refusal is shown and the entry stays new", async () => {
+    // given
+    vi.spyOn(api, "markNotificationRead").mockRejectedValue(new ApiError(404, {
+      type: "urn:courtside:error:notification-not-found", title: "Notification not found", status: 404,
+      violations: [{ code: "notification.notFound", params: {} }]
+    }));
+    show();
+    const unread = await screen.findByTestId(`notification-${confirmed.id}`);
+
+    // when
+    await userEvent.click(within(unread).getByTestId("notification-mark-read"));
+
+    // then
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("This notification is not addressed to you."));
+    expect(entry(confirmed.id)).toHaveAttribute("data-read", "false");
+  });
+
+  it("given an unread notification, when the member follows its link, then it is marked read", async () => {
+    // given
+    const marked = vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
+    show();
+    const unread = await screen.findByTestId(`notification-${confirmed.id}`);
+
+    // when
+    await userEvent.click(within(unread).getByRole("link"));
+
+    // then
+    expect(marked).toHaveBeenCalledWith(confirmed.id);
+  });
+
+  it("given nothing was addressed to the member, when the centre opens, then it says so", async () => {
+    // given
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [], nextCursor: null });
+
+    // when
+    show();
+
+    // then
+    expect(await screen.findByTestId("notifications-empty")).toHaveTextContent("Nothing has been sent to you yet.");
+  });
+
+  it("given more entries than one page, when the member asks for more, then the next page follows the first", async () => {
+    // given
+    const pages = vi.spyOn(api, "ownNotifications")
+      .mockResolvedValueOnce({ items: [confirmed], nextCursor: confirmed.id })
+      .mockResolvedValueOnce({ items: [reminderRead], nextCursor: null });
+    show();
+    await screen.findByTestId(`notification-${confirmed.id}`);
+
+    // when
+    await userEvent.click(screen.getByTestId("notifications-load-more"));
+
+    // then
+    expect(await screen.findByTestId(`notification-${reminderRead.id}`)).toBeInTheDocument();
+    expect(pages).toHaveBeenLastCalledWith(confirmed.id);
+    expect(screen.queryByTestId("notifications-load-more")).toBeNull();
+  });
+
+  it("given German, when the centre opens, then the entry and its state speak German", async () => {
+    // given
+    await i18n.changeLanguage("de");
+
+    // when
+    show();
+
+    // then
+    const unread = await screen.findByTestId(`notification-${confirmed.id}`);
+    expect(within(unread).getByTestId("notification-summary")).toHaveTextContent("Deine Buchung ist bestätigt.");
+    expect(within(unread).getByTestId("notification-state")).toHaveTextContent("Neu");
   });
 
   it("given a kind the club must send, when the choices are shown, then it is on and cannot be switched off", async () => {
     // when
-    render(<MyMessagesView />);
+    show();
 
     // then
     const mandatory = await screen.findByTestId("message-choice-CREDENTIALS_NEW_ACCOUNT");
@@ -32,16 +214,17 @@ describe("MyMessagesView", () => {
 
   it("given a kind already switched off, when the choices are shown, then it is unchecked", async () => {
     // when
-    render(<MyMessagesView />);
+    show();
 
     // then
     expect(await screen.findByTestId("message-choice-BOOKING_REMINDER")).not.toBeChecked();
   });
 
-  it("given a kind is unchecked, when the choice is saved, then exactly the unwanted kinds are declined", async () => {
+  it("given a kind is unchecked, when the choice is saved, then exactly the unwanted kinds are declined and email stays on", async () => {
     // given
     const chosen = vi.spyOn(api, "chooseOwnMessages").mockResolvedValue(undefined);
-    render(<MyMessagesView />);
+    const channels = vi.spyOn(api, "chooseOwnMessageChannels").mockResolvedValue(undefined);
+    show();
     await screen.findByTestId("message-choice-BOOKING_CONFIRMED");
 
     // when
@@ -50,13 +233,32 @@ describe("MyMessagesView", () => {
 
     // then
     expect(chosen).toHaveBeenCalledWith(["BOOKING_CONFIRMED", "BOOKING_REMINDER"]);
+    expect(channels).toHaveBeenCalledWith([]);
     expect(await screen.findByTestId("my-messages-saved")).toHaveTextContent("Your choice was saved.");
+  });
+
+  it("given email is on, when it is switched off and saved, then email is declined and every kind stays as it was", async () => {
+    // given
+    const chosen = vi.spyOn(api, "chooseOwnMessages").mockResolvedValue(undefined);
+    const channels = vi.spyOn(api, "chooseOwnMessageChannels").mockResolvedValue(undefined);
+    show();
+    const email = await screen.findByTestId("message-channel-EMAIL");
+    expect(email).toBeChecked();
+
+    // when
+    await userEvent.click(email);
+    await userEvent.click(screen.getByTestId("my-messages-save"));
+
+    // then
+    expect(channels).toHaveBeenCalledWith(["EMAIL"]);
+    expect(chosen).toHaveBeenCalledWith(["BOOKING_REMINDER"]);
   });
 
   it("given every kind is wanted again, when the choice is saved, then nothing is declined", async () => {
     // given
     const chosen = vi.spyOn(api, "chooseOwnMessages").mockResolvedValue(undefined);
-    render(<MyMessagesView />);
+    vi.spyOn(api, "chooseOwnMessageChannels").mockResolvedValue(undefined);
+    show();
     await screen.findByTestId("message-choice-BOOKING_REMINDER");
 
     // when
@@ -69,7 +271,7 @@ describe("MyMessagesView", () => {
 
   it("given a tick nobody saved yet, when the language changes, then it is still ticked", async () => {
     // given
-    render(<MyMessagesView />);
+    show();
     await screen.findByTestId("message-choice-BOOKING_CONFIRMED");
     await userEvent.click(screen.getByTestId("message-choice-BOOKING_CONFIRMED"));
 
@@ -89,7 +291,8 @@ describe("MyMessagesView", () => {
       status: 409,
       violations: [{ code: "notification.message.notDeclinable", params: { kind: "BOOKING_DISPLACED" } }]
     }));
-    render(<MyMessagesView />);
+    vi.spyOn(api, "chooseOwnMessageChannels").mockResolvedValue(undefined);
+    show();
     await screen.findByTestId("message-choice-BOOKING_CONFIRMED");
 
     // when

@@ -8,6 +8,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.MessageKind;
+import org.courtside.notification.PersonMessageHistory;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
@@ -113,6 +114,30 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAMemberWithACentreEntryAndEmailSwitchedOff_whenTheAnswerIsProduced_thenBothAreInIt() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID otherPersonId = roster.addPerson("John", "Roe", "john.roe@example.org");
+        UUID otherAccountId = identity.createEnabledAccount(otherPersonId, "john.roe", Set.of(Role.MEMBER));
+        notifications.notify(accountId, MessageKind.BOOKING_REMINDER, null, SIX_PM);
+        notifications.notify(otherAccountId, MessageKind.BOOKING_CONFIRMED, null, SIX_PM);
+        notifications.declineEmail(accountId);
+
+        // when
+        SubjectAccessRecord answer = subjectAccess.answerFor(personId);
+
+        // then
+        assertThat(answer.notifications())
+                .extracting(notification -> notification.kind().name(), PersonMessageHistory.Notification::readAt)
+                .as("the centre's entries for this person and nobody else's")
+                .containsExactly(tuple("BOOKING_REMINDER", null));
+        assertThat(answer.declinedChannels())
+                .extracting(declined -> declined.channel().name())
+                .containsExactly("EMAIL");
+    }
+
+    @Test
     void givenAMemberSetUpARecurringBooking_whenTheAnswerIsProduced_thenTheSeriesIsInItToo() {
         // given
         UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
@@ -162,6 +187,8 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
         // then
         assertThat(answer.messages()).isEmpty();
         assertThat(answer.declinedMessages()).isEmpty();
+        assertThat(answer.notifications()).isEmpty();
+        assertThat(answer.declinedChannels()).isEmpty();
         assertThat(answer.bookingSeries()).isEmpty();
     }
 

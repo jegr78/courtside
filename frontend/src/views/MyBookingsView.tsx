@@ -80,6 +80,11 @@ export function MyBookingsView({ now, offline = false }: {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    const linked = window.location.hash.startsWith("#booking-") ? window.location.hash.slice(1) : undefined;
+    if (!loading && linked) document.getElementById(linked)?.scrollIntoView({ block: "center" });
+  }, [loading]);
+
   // The bound only fills in a field's maximum, and the server holds the rule either way, so a
   // reading that fails leaves the maximum unset rather than taking the bookings down with it.
   useEffect(() => {
@@ -211,7 +216,7 @@ function ParticipationSection({ participations, courtNames, locale, timeZone, wi
     <div data-testid="participations" className="mt-4">
       {participations.length === 0 ? <p className="text-muted">{t("participations.empty")}</p>
         : <ul className="grid gap-3">{participations.map((participation) =>
-          <li key={participation.id} data-testid={`participation-${participation.id}`} data-status={participation.status} className="border-structural grid gap-1 rounded-xl border p-4">
+          <li key={participation.id} id={`booking-${participation.id}`} data-testid={`participation-${participation.id}`} data-status={participation.status} className="border-structural grid gap-1 rounded-xl border p-4">
             <span data-testid="booking-title" className="grid font-semibold">
               <span>{formatBookingPeriod(participation.startsAt, participation.endsAt, locale, timeZone)}</span>
               <span>{participation.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>
@@ -238,7 +243,7 @@ function BookingSection({ testId, title, titleHidden = false, empty, bookings, c
     {title && <h3 className={titleHidden ? "sr-only" : "text-xl font-semibold"}>{title}</h3>}
     {groups.length === 0 ? <p className={titleHidden ? "text-muted" : "text-muted mt-3"}>{empty}</p> : <div className={`grid gap-3 sm:gap-4 ${titleHidden ? "" : "mt-3"}`}>{groups.map((group) =>
       <article key={group.key} className="border-structural rounded-xl border p-3 sm:p-4">
-        <ul className="grid gap-3">{group.bookings.map((booking) => <li key={booking.id} data-testid={`booking-${booking.id}`} data-status={booking.status} className="border-structural grid gap-1 border-b pb-3 last:border-0 last:pb-0">
+        <ul className="grid gap-3">{group.bookings.map((booking) => <li key={booking.id} id={`booking-${booking.id}`} data-testid={`booking-${booking.id}`} data-status={booking.status} className="border-structural grid gap-1 border-b pb-3 last:border-0 last:pb-0">
           <span data-testid="booking-title" className="grid font-semibold">
             <span>{formatBookingPeriod(booking.startsAt, booking.endsAt, locale, timeZone)}</span>
             <span>{booking.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ")}</span>

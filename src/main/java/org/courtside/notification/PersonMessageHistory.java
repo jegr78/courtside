@@ -15,7 +15,17 @@ public interface PersonMessageHistory {
     record Declined(MessageKind kind, Instant declinedAt) {
     }
 
+    record Notification(MessageKind kind, Instant createdAt, Instant readAt) {
+    }
+
+    record DeclinedChannel(MessageChannel channel, Instant declinedAt) {
+    }
+
     List<Message> sentTo(UUID accountId);
 
     List<Declined> declinedBy(UUID accountId);
+
+    List<Notification> notificationsFor(UUID accountId);
+
+    List<DeclinedChannel> declinedChannelsBy(UUID accountId);
 }
