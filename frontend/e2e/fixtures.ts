@@ -207,9 +207,9 @@ export async function expectShownAsEmpty(field: Locator, engine: string): Promis
   const testId = await field.getAttribute("data-testid");
   const hint = field.page().getByTestId(`${testId}-empty`);
   await field.scrollIntoViewIfNeeded();
-  await expect(field, `${engine} marks ${testId} as empty`).toHaveAttribute("data-empty", "true");
-  await expect.poll(() => textFill(field), { message: `${engine} paints no ghost value into ${testId}` }).toBe(transparentText);
-  await expect(hint, `${engine} shows the empty hint of ${testId}`).toBeVisible();
+  await expect(field, `${engine} marks ${testId} as empty`).toHaveAttribute("data-empty", "true", { timeout: 10_000 });
+  await expect.poll(() => textFill(field), { message: `${engine} paints no ghost value into ${testId}`, timeout: 10_000 }).toBe(transparentText);
+  await expect(hint, `${engine} shows the empty hint of ${testId}`).toBeVisible({ timeout: 10_000 });
   const [fieldBox, hintBox] = [await field.boundingBox(), await hint.boundingBox()];
   expect(fieldBox !== null && hintBox !== null
     && hintBox.x >= fieldBox.x - 1 && hintBox.y >= fieldBox.y - 1

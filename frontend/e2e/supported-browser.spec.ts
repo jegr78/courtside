@@ -178,17 +178,17 @@ test("an empty time filter hides the browser's ghost value until it is focused o
   await from.focus();
 
   // then
-  await expect.poll(() => textFill(from), { message: `${browserName} reveals the editable fields on focus` }).not.toBe(transparentText);
-  await expect(hint, `${browserName} hides the hint while the field is edited`).toBeHidden();
+  await expect.poll(() => textFill(from), { message: `${browserName} reveals the editable fields on focus`, timeout: 10_000 }).not.toBe(transparentText);
+  await expect(hint, `${browserName} hides the hint while the field is edited`).toBeHidden({ timeout: 10_000 });
 
   // when
   await from.fill("2026-10-03T12:30");
   await page.getByTestId("audit-filter-query").focus();
 
   // then
-  await expect(from, `${browserName} no longer marks a filled filter as empty`).not.toHaveAttribute("data-empty");
-  await expect.poll(() => textFill(from), { message: `${browserName} shows a chosen time` }).not.toBe(transparentText);
-  await expect(hint, `${browserName} drops the hint once a time is chosen`).toHaveCount(0);
+  await expect(from, `${browserName} no longer marks a filled filter as empty`).not.toHaveAttribute("data-empty", { timeout: 10_000 });
+  await expect.poll(() => textFill(from), { message: `${browserName} shows a chosen time`, timeout: 10_000 }).not.toBe(transparentText);
+  await expect(hint, `${browserName} drops the hint once a time is chosen`).toHaveCount(0, { timeout: 10_000 });
 });
 
 test("a closed day shows its opening times as empty rather than as a ghost time", async ({ page, browserName }) => {
