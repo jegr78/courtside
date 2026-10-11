@@ -246,8 +246,8 @@ Courtside always sends:
 * notice of a change that affects your booking.
 
 Separately, you choose whether you also get an email. Without email your messages still appear
-here. That includes the notices Courtside always sends: you then learn only here that somebody added
-you as a player or that a change affects your booking. Courtside always emails credentials, your username and reset codes, because you are not
+here. You then learn only here that somebody added you as a player or that a change affects your
+booking. Courtside always emails credentials, your username and reset codes, because you are not
 signed in when you need them.
 
 Save your choices. They apply to future messages only.

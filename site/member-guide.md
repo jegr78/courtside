@@ -248,8 +248,8 @@ Diese Nachrichten sendet Courtside immer:
 * Mitteilung über eine Änderung, die deine Buchung betrifft.
 
 Getrennt davon entscheidest du, ob du zusätzlich eine E-Mail bekommst. Ohne E-Mail stehen deine
-Nachrichten weiter hier. Das gilt auch für die Mitteilungen, die Courtside immer sendet: Von deiner
-Eintragung als Mitspieler oder einer Änderung an deiner Buchung erfährst du dann nur hier.
+Nachrichten weiter hier. Von deiner Eintragung als Mitspieler oder einer Änderung an deiner Buchung
+erfährst du dann nur hier.
 Zugangsdaten, deinen Benutzernamen und Codes zum Zurücksetzen schickt Courtside immer per E-Mail,
 denn dafür bist du nicht angemeldet.
 
