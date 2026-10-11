@@ -85,9 +85,9 @@ export function MyBookingsView({ now, offline = false }: {
   useEffect(() => {
     const fragment = window.location.hash;
     if (loading || !fragment.startsWith("#booking-") || followedFragment.current === fragment) return;
-    followedFragment.current = fragment;
     const target = document.getElementById(fragment.slice(1));
     if (!target) return;
+    followedFragment.current = fragment;
     const folded = target.closest("details");
     if (folded) folded.open = true;
     target.scrollIntoView({ block: "center" });

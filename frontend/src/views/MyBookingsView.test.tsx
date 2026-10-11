@@ -841,6 +841,22 @@ it("given a link to a past booking, when the bookings have loaded, then its fold
   expect(document.activeElement).toBe(linked);
 });
 
+it("given a link to one booking and a first load that failed, when the member tries again, then the link is followed", async () => {
+  // given
+  const scrolled = linkTo(`#booking-${upcomingId}`);
+  vi.mocked(api.personalBookings).mockRejectedValueOnce(new Error("offline for a moment"));
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await screen.findByTestId("load-failure");
+
+  // when
+  await userEvent.click(screen.getByTestId("retry-load"));
+
+  // then
+  const linked = await screen.findByTestId(`booking-${upcomingId}`);
+  await waitFor(() => expect(scrolled).toHaveBeenCalledTimes(1));
+  expect(document.activeElement).toBe(linked);
+});
+
 it("given a link to a booking the lists do not hold, when the bookings have loaded, then nothing moves and nothing fails", async () => {
   // given
   const scrolled = linkTo("#booking-77777777-7777-7777-7777-777777777777");
