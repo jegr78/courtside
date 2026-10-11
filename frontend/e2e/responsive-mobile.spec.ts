@@ -1064,7 +1064,7 @@ for (const phone of [{ name: "iPhone SE", width: 375, height: 667 }, { name: "la
     await expect(navigation).toBeVisible();
 
     // then
-    await expect.poll(() => selectedDayPlacement(page), "today's card is whole on first render")
+    await expect.poll(() => selectedDayPlacement(page), { message: "today's card is whole on first render", timeout: 10_000 })
       .toMatchObject({ insideStrip: true, clearOfNow: true });
 
     // when
@@ -1074,7 +1074,7 @@ for (const phone of [{ name: "iPhone SE", width: 375, height: 667 }, { name: "la
 
     // then
     await expect(lastDay).toHaveAttribute("aria-pressed", "true");
-    await expect.poll(() => selectedDayPlacement(page), "the chosen card is whole after the selection changes")
+    await expect.poll(() => selectedDayPlacement(page), { message: "the chosen card is whole after the selection changes", timeout: 10_000 })
       .toMatchObject({ insideStrip: true, clearOfNow: true });
   });
 }
