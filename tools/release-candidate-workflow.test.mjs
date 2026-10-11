@@ -86,17 +86,20 @@ test("given a dispatch on any ref, when the candidate runs, then nothing reads t
   }
 });
 
-test("given the rehearsal pipeline, when it runs, then it can be dispatched only and writes no tag or release", () => {
+test("given the candidate pipeline, when it runs, then no job but the tag job writes a tag or release", () => {
+  // given
+  const qualifying = Object.fromEntries(Object.entries(jobs).filter(([name]) => name !== "tag"));
+  const qualifyingSource = yaml.dump(qualifying, { lineWidth: -1 });
+
   // when / then
-  assert.deepEqual(Object.keys(candidate.on), ["workflow_dispatch"]);
+  assert.deepEqual(Object.keys(candidate.on), ["workflow_run", "workflow_dispatch"]);
   assert.equal(candidate.on.workflow_dispatch.inputs.commit.required, true);
   assert.equal(candidate.on.workflow_dispatch.inputs.rehearsal.default, true,
-    "until the promotion reads candidates, every dispatch is a rehearsal unless someone says otherwise");
-  assert.equal(jobs.tag, undefined);
+    "a dispatch is a rehearsal unless someone says otherwise");
   assert.deepEqual(candidate.permissions, {});
   for (const forbidden of [/RELEASE_PLEASE_TOKEN/, /release-please-action/, /git\/refs/, /action-gh-release/,
     /gh release/, /contents: write/, /imagetools create/]) {
-    assert.doesNotMatch(source, forbidden, `the candidate must not ${forbidden}`);
+    assert.doesNotMatch(qualifyingSource, forbidden, `a qualifying job must not ${forbidden}`);
   }
 });
 
@@ -109,7 +112,10 @@ test("given a dispatch, when the candidate selects, then the selection tool deci
   assert.match(selection.run, /--event "\$EVENT" --commit "\$REQUESTED_COMMIT" --rehearsal "\$REHEARSAL"/);
   assert.match(selection.run, /--github-output "\$GITHUB_OUTPUT"/);
   assert.deepEqual(selection.env, { GH_TOKEN: "${{ github.token }}", EVENT: "${{ github.event_name }}",
-    REQUESTED_COMMIT: "${{ inputs.commit }}", REHEARSAL: "${{ inputs.rehearsal }}" });
+    REQUESTED_COMMIT: "${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.commit }}",
+    REHEARSAL: "${{ inputs.rehearsal }}" });
+  assert.equal(jobs.select.if, "github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && "
+    + "github.event.workflow_run.conclusion == 'success')", "a red or scheduled build costs no candidate runner");
   for (const output of ["release", "commit", "version", "tag", "rehearsal", "build-run-id", "build-run-attempt"]) {
     assert.equal(jobs.select.outputs[output], `\${{ steps.selection.outputs.${output} }}`);
   }

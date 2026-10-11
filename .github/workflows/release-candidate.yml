@@ -1,6 +1,10 @@
 name: release candidate
 
 on:
+  workflow_run:
+    workflows: [build]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       commit:
@@ -17,6 +21,7 @@ permissions: {}
 
 jobs:
   select:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -32,6 +37,7 @@ jobs:
       rehearsal: ${{ steps.selection.outputs.rehearsal }}
       build-run-id: ${{ steps.selection.outputs.build-run-id }}
       build-run-attempt: ${{ steps.selection.outputs.build-run-attempt }}
+      pending-pull-request: ${{ steps.selection.outputs.pending-pull-request }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -43,7 +49,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
-          REQUESTED_COMMIT: ${{ inputs.commit }}
+          REQUESTED_COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.commit }}
           REHEARSAL: ${{ inputs.rehearsal }}
         run: >
           node tools/release-candidate-selection.mjs
@@ -666,3 +672,39 @@ jobs:
           path: build/candidate/evidence.json
           retention-days: 14
           if-no-files-found: error
+
+  tag:
+    needs: [select, evidence]
+    if: ${{ always() && needs.evidence.result == 'success' && needs.select.outputs.release == 'true' && needs.select.outputs.rehearsal != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      TAG: ${{ needs.select.outputs.tag }}
+      COMMIT: ${{ needs.select.outputs.commit }}
+      PULL_REQUEST: ${{ needs.select.outputs.pending-pull-request }}
+    steps:
+      - name: Refuse to tag without the token that starts the release run
+        if: env.RELEASE_PLEASE_TOKEN == ''
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          echo "::error::RELEASE_PLEASE_TOKEN is not set. A tag pushed with GITHUB_TOKEN starts no release run."
+          exit 1
+
+      # Creating a ref that exists fails, so a second candidate of the same version cannot move the tag.
+      - name: Write the tag at the qualified commit
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$COMMIT" > /dev/null
+          tagged=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)
+          [ "$tagged" = "$COMMIT" ] \
+            || { echo "::error::$TAG names $tagged, but the candidate qualified $COMMIT"; exit 1; }
+
+      - name: Mark the release pull request as tagged
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: >
+          gh pr edit "$PULL_REQUEST" --repo "$GITHUB_REPOSITORY"
+          --remove-label "autorelease: pending" --add-label "autorelease: tagged"

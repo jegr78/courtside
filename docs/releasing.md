@@ -1,8 +1,10 @@
 # Cutting a release
 
 A release is a `v<version>` tag in this repository. Release Please maintains the release pull
-request. Merging that pull request updates the version and changelog, creates the tag and starts the
-release workflow. Do not create the tag manually.
+request. Merging that pull request updates the version and changelog. The green push build of that
+merge starts the `release candidate` workflow, which qualifies the commit and only then writes the
+tag. The tag starts the release workflow, which promotes the qualified images and builds nothing.
+Do not create the tag manually.
 
 This document describes the release steps and the guarantees behind their gates. `CLAUDE.md`
 defines the policy for branches, commits and pull requests.
@@ -19,7 +21,8 @@ open on `main` and grows with every merge; it shows the version it would cut and
 would write. Release Please initially writes a candidate delta, and the same workflow immediately
 folds it into the one changelog section named after the release line, such as `## 0.1.0`. A release
 pull request with a separate candidate section is incomplete and must not be merged. Merge the
-normalized pull request when a nightly has verified the commit it sits on, and the rest happens.
+normalized pull request when a nightly has verified the commit it sits on, and the rest happens:
+the push build, the candidate, about 45 minutes, and the promotion, a few minutes.
 
 Release Please does not open a second snapshot pull request. The release pull request moves every
 version field together, and the repository keeps that published version until the next release
@@ -73,14 +76,14 @@ code is covered by the backend tests and by the restore journey, which sends a m
 A release confirms what the night before already proved; it does not discover it. A scheduled or
 dispatched `build` rebuilds the nightly image even when the revision already carries one, so the
 digest the rehearsal binds is qualified in the same run, and then calls `release-gates.yml` with it.
-That is the workflow the release's `gates` job calls, with the same jobs and commands:
+That is the workflow the candidate's `gates` job calls, with the same jobs and commands:
 `archive-reproducibility`, `mail`, `active-security`, `security-record`, `restore`, `npm-audit` and
 `upgrade`. At night `upgrade` starts from the earliest retained dated nightly whose migrations and
 `upgrade/verify.sql` the candidate still carries unchanged, because Flyway refuses a database whose
 applied migration was corrected in place; a release passes the published versions it upgrades from
 instead.
 The scheduled `security` job runs the release-build policy with npm audit evidence and the same
-command line as the release's `build` job. A push to `main` builds and qualifies its image but does not
+command line as the candidate's `release-build` job. A push to `main` builds and qualifies its image but does not
 rehearse the gates.
 
 A change to the gates is rehearsed before it merges. Dispatch `build` on the branch, then dispatch
@@ -222,29 +225,32 @@ security in `docs/design.md`.
 
 ## What the release refuses before it builds anything
 
-Four checks run before a single compilation, and each fails the run rather than warning.
+Four checks stop a release before anything is built or promoted, and each fails the run rather than
+warning. The candidate's `preconditions` job demands the nightly and the closed nightly issues before
+it builds an image; the release's `candidate` job reads the tag before it promotes anything.
 
-**The tag has to sit on `main`.** A tag on a branch, or on a commit that never landed, is refused by
+**The tag has to sit on `main`.** The candidate writes the tag at the commit it qualified, which is
+on `main`. A tag on a branch, or on a commit that never landed, was written by hand and is refused by
 name. The tag is spent at that point, *When a release fails* below applies to this refusal like any
 other.
 
-**The tag has to name the release that commit records.** `versions:set` takes the version from the
-tag verbatim, so the tag alone decides what the published image calls itself. It is read against
-`.release-please-manifest.json` at that commit, which release-please writes in the same pull request
-that creates the tag, and `pom.xml`, `frontend/package.json` and both root lockfile versions are
-tied to that manifest by `release-please-configuration.test.mjs`. Checking the one value therefore
-covers all five. Without this a tag naming a candidate nobody cut, such as `v0.1.0-rc.7` while the
-repository records `0.1.0-rc.2`, would build, sign and publish under that name, because its release
-line exists and nothing else ever consults the repository's own record.
+**The tag has to name the release that commit records.** The tag decides the version tags the image
+is published under. It is read against `.release-please-manifest.json` at that commit, which
+release-please writes in the release pull request, and `pom.xml`, `frontend/package.json` and both
+root lockfile versions are tied to that manifest by `release-please-configuration.test.mjs`. Checking
+the one value therefore covers all five. Without this a tag naming a candidate nobody cut, such as
+`v0.1.0-rc.7` while the repository records `0.1.0-rc.2`, would publish under that name, because its
+release line exists and nothing else ever consults the repository's own record.
 
-**A nightly must already have rehearsed an ancestor of this commit.** The release looks for a
+**A nightly must already have rehearsed an ancestor of this commit.** The candidate looks for a
 scheduled or manually dispatched `build` run on `main` that succeeded on its *first* attempt, whose
-head commit is an ancestor of the tag, and whose `coupled-nightly-rehearsal-v2` evidence says the
-complete build, the nightly-image workflow and the release gates all succeeded
+head commit is an ancestor of the release commit, and whose `coupled-nightly-rehearsal-v2` evidence
+says the complete build, the nightly-image workflow and the release gates all succeeded
 (`releaseReadiness: complete`). Evidence written before the gates were rehearsed does not count, nor
 does a run that went green on its second attempt. Note what this does and does not establish: some
-ancestor passed every gate the release runs, not necessarily the tagged commit. What verifies the
-tagged commit is the release's own `build` job and its own call of the same gates.
+ancestor passed every gate, not necessarily the release commit. What verifies the release commit is
+its own green push `build`, which ran the test suite and every browser group, and the candidate's own
+call of the same gates on its exact digests.
 
 **No tracker-written `nightly` failure issue may be open.** The check counts open issues carrying
 the `nightly` label whose title starts with `[nightly] ` and whose body holds the tracker's
@@ -269,30 +275,38 @@ weeks. It was removed.
 
 ## What the release refuses after scanning
 
-**No confirmed dependency finding may be past its remediation deadline.** The build matches the
-complete Dependabot alert history against npm and Trivy summaries bound to the tagged commit. The
+**No confirmed dependency finding may be past its remediation deadline.** The candidate's
+`release-build` matches the complete Dependabot alert history against npm and Trivy summaries bound
+to the release commit. The
 summaries establish current dependency state; alert history supplies the earliest reliable clock.
 An exact, current maintainer exception can keep the release ready. An unavailable alert service
 produces explicit skipped evidence and does not block publication by itself. The latest completed
 default-branch artifact keeps a still-current overdue finding blocked during that outage.
-Permission failures and malformed evidence still stop the build.
+Permission failures and malformed evidence still stop the candidate.
 
 ## What runs, and what each part proves
 
+A release runs in two workflows. `release-candidate.yml` qualifies the release commit and writes the
+tag; `release.yml` answers the tag and publishes exactly what was qualified.
+
 | Job | What it establishes |
 |---|---|
-| `nightly-evidence` | A first-attempt build on `main`, its nightly-image workflow and its release-gate rehearsal completed for an ancestor of the tag, and no tracker-written nightly failure remains open |
-| `build` | Dependency-remediation deadlines hold, the version is stamped, backend, frontend, tooling and artifact tests pass on the tagged commit, CodeQL analyses the sources, npm audit evidence is captured, and the release-build security policy holds |
-| `browser` | The packaged tagged source passes the complete Chromium and WebKit browser matrix; it runs beside `build` so browser duration cannot consume the security-analysis budget |
-| `image` | One multi-architecture image is built and pushed as `release-candidate-<sha>` |
+| `select` | The green push `build` that finished belongs to a release commit: the manifest changed, exactly one merged `autorelease: pending` pull request is titled for that version, the commit is on `main` and the version is not tagged yet |
+| `preconditions` | A first-attempt build on `main`, its nightly-image workflow and its release-gate rehearsal completed for an ancestor of the release commit, and no tracker-written nightly failure remains open |
+| `release-build` | Dependency-remediation deadlines hold, CodeQL analyses the sources, npm audit evidence is captured, the release-build security policy holds, and the release notes and upgrade origins are collected. The test suite and the complete browser matrix already ran in the commit's own green push `build`, which `select` requires |
+| `image` | One multi-architecture image and its booking-seed image, pushed as `release-candidate-<sha>-<run id>` |
+| `archive` | `tools/deployment-archive.mjs` packs the reference deployment for that digest into `courtside-deployment-<version>.zip`, under the identity `release.yml` will attest it with |
 | `qualify` | The exact deployment archive is checked against that digest and all four recipes, then the digest is brought up through the reference deployment on `amd64` and `arm64` and checked against the candidate-image policy |
-| `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the tagged tree and requires the same bytes. `npm-audit` holds the release npm policy. `upgrade` migrates a database from each resolved origin into the candidate; the first release has none |
-| `archive` | `tools/deployment-archive.mjs` packs the reference deployment for that digest into `courtside-deployment-<version>.zip` |
-| `publish` | The qualified manifest is signed with cosign and given an SBOM and a provenance attestation; the draft release receives its assets, the version tags are pushed, and only then is the release made visible |
+| `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the release commit and requires the same bytes. `npm-audit` holds the release npm policy. `upgrade` migrates a database from each resolved origin into the candidate; the first release has none |
+| `evidence` | The record `release-candidate-evidence-<sha>`: both digests, the archive checksum, the version, the run and the push build, written only when every job above succeeded |
+| `tag` | Writes `v<version>` at the qualified commit through the release token and marks the release pull request `autorelease: tagged`. Creating a tag that exists fails, so a tag never moves |
+| `candidate` | In `release.yml`: the tag sits on `main` and names the version the commit records, and the newest release-mode candidate evidence for that commit verifies, including the archive's checksum |
+| `publish` | The qualified manifests are signed with cosign and given SBOMs and provenance attestations; the draft release receives the candidate's archive, notes and security record, the version tags are pushed, and only then is the release made visible |
 | `plan-sync` | The release plan's status comment is synchronized with the release just published |
 
-`publish` retags the manifest that `qualify` proved. Nothing is rebuilt between qualification and
-publication, so the digest a club pulls is the digest that was brought up twice.
+`publish` retags the manifest that `qualify` proved, by the digest the evidence names. Nothing is
+built between qualification and publication, and no gate runs a second time, so the digest a club
+pulls is the digest that was brought up twice.
 
 The release page carries the OpenAPI document, the security record and the deployment archive with
 its checksum. `archive` builds those bytes once and `publish` attaches the artifact it downloads, so
@@ -313,19 +327,30 @@ binding before its controlled Stalwart journey. `publish` waits for both.
 
 ## When a release fails
 
-It stops at the job that refused, and nothing is published under a version tag: the release the
-merge created is still a draft and stays one. What stays behind is the `release-candidate-<sha>`
-image, unsigned and unqualified, in a public registry. Nightly retention removes a candidate-only
-digest after 14 days; a published version that shares the digest keeps it. No version tag resolves
-to a failed candidate. `publish` itself uploads the release assets to the draft before it pushes a
-version tag, and makes the release visible last.
+**A candidate that fails writes no tag.** The release pull request stays merged with the label
+`autorelease: pending`, and Release Please opens no further release pull request until that version
+is tagged. What stays behind are the `release-candidate-<sha>-<run id>` images, unsigned and
+unqualified, in a public registry. Nightly retention removes them after 14 days.
+
+- A failure outside the commit, such as a runner that died or a registry that timed out: choose
+  Re-run failed jobs on the candidate run. `evidence` and `tag` run again once everything is green.
+- A defect in the commit: fix it on `main` through the usual pull request. Then dispatch
+  `release-candidate.yml` with `rehearsal=false` and `commit` set to the fixed commit on `main`. The
+  candidate qualifies that commit under the version the manifest still records and tags it there.
+
+**A publication that fails leaves the tag where it is.** The release the run creates is still a
+draft and stays one. `publish` uploads the release assets to the draft before it pushes a version
+tag, and makes the release visible last. When a signing or attestation step failed on a network
+error from the sigstore transparency log (`rekor.sigstore.dev`), wait until it answers and re-run
+only that job with `gh run rerun <run id> --failed`. The failure message names the failed steps.
+Nothing is built again; the same evidence is verified and the same digests are promoted.
 
 **The tag stays where it is.** A tag that once named a commit and later names another is the one
-thing a consumer cannot detect, and by the time a run has started, the tag has been observed. Fix
-the cause on `main` through the usual pull request; the next release pull request then proposes the
-patch after it, so a `v0.2.0` that failed is followed by `v0.2.1`. The version that failed is
-skipped rather than retried, and the manifest already names it, worth knowing before somebody
-looks for a `v0.2.0` that never appeared.
+thing a consumer cannot detect, and by the time a run has started, the tag has been observed. If a
+publication cannot be completed, fix the cause on `main`; the next release pull request then
+proposes the version after it, so a `v0.2.0` that failed is followed by `v0.2.1`. The version that
+failed is skipped rather than retried, and the manifest already names it, worth knowing before
+somebody looks for a `v0.2.0` that never appeared.
 
 Only a tag no run ever saw is free to move, and under a `v*` trigger that is rarer than it sounds,
 a misspelling that keeps the leading `v` still starts a run.
@@ -344,8 +369,9 @@ where it is, and nothing has to be deleted to move on.
 
 ## Rehearsing a release candidate
 
-The `release candidate` workflow qualifies one commit the way the release does, without a tag.
-Nothing depends on it yet: a release still runs as described above. Run it with
+The `release candidate` workflow starts by itself when a push `build` on `main` succeeds, and
+qualifies the commit if it is a release commit. A dispatch qualifies one commit without writing a
+tag. Run it with
 
 ```bash
 gh workflow run release-candidate.yml --ref main -f commit=<sha> -f rehearsal=true
@@ -354,7 +380,8 @@ gh workflow run release-candidate.yml --ref main -f commit=<sha> -f rehearsal=tr
 `commit` is the full 40-character sha to qualify. `rehearsal` defaults to `true`. A rehearsal may
 qualify any commit, a branch head included, and skips the release preconditions: a pending release
 pull request, a commit on `main`, an unused tag and a green push build of that commit. With
-`rehearsal=false` the workflow refuses to run from anything but `main` and demands all four.
+`rehearsal=false` the workflow refuses to run from anything but `main`, demands all four and writes
+the tag like a run the push build started.
 GitHub dispatches a workflow only once its file exists on the default branch.
 
 The jobs, in order:
@@ -369,13 +396,14 @@ The jobs, in order:
 | `qualify` | The reference deployment and image policy on `amd64` and `arm64` |
 | `gates` | Every release gate on those exact digests and that archive |
 | `evidence` | The record `release-candidate-evidence-<sha>`, written only when every job above succeeded |
+| `tag` | For a release only: the tag at the qualified commit, which starts `release.yml` |
 
-The run writes no git tag, no GitHub release and no version tag. Its only registry writes are the
+A rehearsal writes no git tag, no GitHub release and no version tag. Its only registry writes are the
 two candidate image tags above, which nightly retention removes after 14 days. A rehearsal uploads
 no dependency evidence, so later runs cannot read it as their previous evidence.
 
 The evidence, the archive and the release notes are kept for 14 days, and the candidate images for
-the same window. A promotion has to read them within those 14 days; after that, run a new
+the same window. The promotion reads them within those 14 days; after that, dispatch a new
 candidate. Re-run failed jobs on a red run to finish it: the `evidence` job runs again and uploads
 the record. Re-run all jobs on a green run cannot upload the record again, because the run already
 holds an artifact of that name. Dispatch a new run instead.

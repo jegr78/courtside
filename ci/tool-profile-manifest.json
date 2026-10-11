@@ -138,6 +138,7 @@
     { "path": "tools/release-notes.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/release-notes.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-please-configuration.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/release-promotion-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/resource-demand-inventory.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/role-inventory.test.mjs", "profiles": ["tooling"], "test": true },

@@ -202,6 +202,9 @@ test("given the command line, when a candidate writes its evidence, then the ver
   assert.equal(written.runAttempt, 2);
   assert.deepEqual(written.build, { runId: 37211926309, runAttempt: 2 }, "the green push build attempt is recorded");
   assert.match(readFileSync(githubOutput, "utf8"), new RegExp(`^image=ghcr\\.io/jegr78/courtside@${imageDigest}$`, "m"));
+  assert.match(readFileSync(githubOutput, "utf8"), new RegExp(`^image-digest=${imageDigest}$`, "m"),
+    "the promotion attests and signs the digest the record names");
+  assert.match(readFileSync(githubOutput, "utf8"), new RegExp(`^booking-seed-digest=${bookingSeedDigest}$`, "m"));
   writeFileSync(archive, "other bytes");
   assert.throws(() => execFileSync(process.execPath, [tool, "--verify", "--evidence", output, "--commit", commit,
     "--version", "0.1.0", "--run-id", "42", "--mode", "release", "--archive", archive], { env: environment, stdio: "pipe" }),

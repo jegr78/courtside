@@ -52,8 +52,10 @@ configured source location through `GET /api/source`.
 ## Distribution and compatibility
 
 A tagged release publishes a multi-architecture image on GHCR, its OpenAPI document, release notes,
-a software bill of materials and provenance. The release workflow signs the image with cosign. A
-release candidate follows the same qualification path but receives no floating version tag.
+a software bill of materials and provenance. The release candidate workflow builds and qualifies the
+image from the release commit before the tag exists, and the release workflow then signs and
+publishes that exact digest without building again. A release candidate follows the same
+qualification path but receives no floating version tag.
 
 The reference deployment lives in `deploy/`. Its recipes are `standard`, `full-self-hosted`,
 `existing-infrastructure` and `funnel`. A tagged release also publishes
