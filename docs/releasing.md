@@ -188,6 +188,10 @@ Candidates are opened and closed with one line of configuration, not with a hand
    Delete the unpublished tag and its draft before the line graduates again, or the new graduation
    finds the old tag and publishes the old commit.
 
+A published candidate is walked on the UAT instance with the acceptance harness described in
+[acceptance-testing.md](acceptance-testing.md). Its release summary, with every finding assessed, is
+posted on the release parent before the line graduates.
+
 Every candidate is a checkpoint on the same release line. Release Please proposes the changes
 since the preceding candidate; the release-please workflow then folds those entries into the single
 `## <major>.<minor>.<patch>` section on its pull-request branch. The first candidate of a new line
