@@ -568,6 +568,58 @@ it("given a slot that starts in ten seconds, when it starts, then it is no longe
   expect(freeSlot(1, "12:30")).toBeDisabled();
 });
 
+function dayStripGeometry(rects: Record<string, { left: number; right: number }>) {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const rect = rects[this.dataset.testid ?? ""];
+    return rect ? new DOMRect(rect.left, 0, rect.right - rect.left, 60) : new DOMRect();
+  });
+  const scrollIntoView = vi.fn();
+  const originalScroll = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+  Object.defineProperty(Element.prototype, "scrollIntoView", { value: scrollIntoView, configurable: true, writable: true });
+  onTestFinished(() => {
+    if (originalScroll) Object.defineProperty(Element.prototype, "scrollIntoView", originalScroll);
+    else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  });
+  return (target: Element) => scrollIntoView.mock.calls.filter((_, index) => scrollIntoView.mock.instances[index] === target);
+}
+
+it("given today's card reaches past the day strip's edge, when the plan loads, then the strip aligns that card to its start", async () => {
+  // given
+  const scrollsOf = dayStripGeometry({
+    "mobile-week-days": { left: 41, right: 255 },
+    "day-selector-2026-08-10": { left: 161, right: 273 }
+  });
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+
+  // then
+  await waitFor(() => expect(scrollsOf(screen.getByTestId("day-selector-2026-08-10")),
+    "a card cut by the strip's edge is aligned to its own snap point").toEqual([[{ block: "nearest", inline: "start" }]]));
+});
+
+it("given a day card cut by the day strip's edge, when the member selects it, then the strip aligns that card to its start", async () => {
+  // given
+  const scrollsOf = dayStripGeometry({
+    "mobile-week-days": { left: 41, right: 255 },
+    "day-selector-2026-08-10": { left: 89, right: 201 },
+    "day-selector-2026-08-11": { left: 209, right: 321 }
+  });
+  render(<WeekView today={clubInstant("12:00")} />);
+  await screen.findByTestId("week-grid");
+  const cutDay = screen.getByTestId("day-selector-2026-08-11");
+
+  // when
+  await userEvent.click(cutDay);
+
+  // then
+  await waitFor(() => expect(scrollsOf(cutDay), "the chosen card is aligned to its own snap point")
+    .toEqual([[{ block: "nearest", inline: "start" }]]));
+  expect(scrollsOf(screen.getByTestId("day-selector-2026-08-10")), "a card already inside the strip stays where it is")
+    .toEqual([[{ block: "nearest", inline: "nearest" }]]);
+});
+
 it("given the plan is open, when the refresh interval elapses and focus returns, then the selected day is refreshed", async () => {
   // given
   vi.useFakeTimers({ shouldAdvanceTime: true });
