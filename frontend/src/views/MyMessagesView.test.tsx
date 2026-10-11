@@ -400,4 +400,29 @@ describe("MyMessagesView", () => {
     expect(screen.getByTestId("message-channel-EMAIL")).toBeChecked();
     expect(screen.queryByTestId("my-messages-saved")).toBeNull();
   });
+
+  it("given the channel choice is refused and the stored choices cannot be read back, when saving, then nothing claims the form shows what is stored", async () => {
+    // given
+    vi.spyOn(api, "ownMessageChoices")
+      .mockResolvedValueOnce(choices)
+      .mockRejectedValue(new Error("offline"));
+    vi.spyOn(api, "chooseOwnMessages").mockResolvedValue(undefined);
+    vi.spyOn(api, "chooseOwnMessageChannels").mockRejectedValue(new ApiError(503, {
+      type: "urn:courtside:error:service-unavailable", title: "Unavailable", status: 503
+    }));
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    show();
+    await screen.findByTestId("message-channel-EMAIL");
+
+    // when
+    await userEvent.click(screen.getByTestId("message-channel-EMAIL"));
+    await userEvent.click(screen.getByTestId("my-messages-save"));
+
+    // then
+    await waitFor(() => expect(warning).toHaveBeenCalled());
+    const alert = screen.getByRole("alert");
+    expect(alert).not.toHaveTextContent("The settings shown are the ones saved now.");
+    expect(alert).not.toBeEmptyDOMElement();
+    expect(screen.queryByTestId("my-messages-saved")).toBeNull();
+  });
 });
