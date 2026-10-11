@@ -19,7 +19,10 @@ export function useUnreadNotifications(authenticated: boolean, pathname: string)
   }, []);
 
   useEffect(() => {
-    if (!authenticated) return;
+    if (!authenticated) {
+      setUnread(0);
+      return;
+    }
     let current = true;
     api.ownNotifications(undefined, 1)
       .then((page) => { if (current) setUnread(page.unread); })

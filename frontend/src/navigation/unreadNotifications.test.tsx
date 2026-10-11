@@ -105,6 +105,27 @@ describe("unread notifications in the primary navigation", () => {
     expect(screen.getByTestId("my-messages-link")).toHaveAccessibleName("Notifications");
   });
 
+  it("given a count on screen, when the member signs out and another signs in, then the old count never shows for the new account", async () => {
+    // given
+    let answerNext: (unread: number) => void = () => undefined;
+    vi.spyOn(api, "ownNotifications")
+      .mockResolvedValueOnce({ items: [], nextCursor: null, unread: 3 })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        answerNext = (unread) => resolve({ items: [], nextCursor: null, unread });
+      }));
+    const view = render(<MemoryRouter initialEntries={["/"]}><PrimaryNavigation session={member} /></MemoryRouter>);
+    expect(await screen.findByTestId("my-messages-unread")).toHaveTextContent("3");
+    view.rerender(<MemoryRouter initialEntries={["/"]}><PrimaryNavigation session={anonymous} /></MemoryRouter>);
+
+    // when
+    view.rerender(<MemoryRouter initialEntries={["/"]}><PrimaryNavigation session={{ ...member }} /></MemoryRouter>);
+
+    // then
+    expect(screen.queryByTestId("my-messages-unread"), "the previous account's count is gone").not.toBeInTheDocument();
+    await act(async () => answerNext(1));
+    expect(await screen.findByTestId("my-messages-unread")).toHaveTextContent("1");
+  });
+
   it("given an anonymous visitor, when the navigation renders, then no count is asked for", () => {
     // given
     vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [], nextCursor: null, unread: 2 });
