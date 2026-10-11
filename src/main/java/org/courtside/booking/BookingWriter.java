@@ -11,6 +11,7 @@ import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.ParticipantKind;
 import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
+import org.courtside.booking.internal.SeriesOccurrenceCancellation;
 import org.courtside.booking.internal.IdempotencyKeyRaceException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
@@ -19,6 +20,7 @@ import org.courtside.facility.FacilityService;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
+import org.courtside.shared.BookingCancelled;
 import org.courtside.shared.BookingConfirmed;
 import org.courtside.shared.ParticipantRecorded;
 import org.courtside.shared.SqlConstraintViolation;
@@ -45,7 +47,7 @@ import java.util.stream.IntStream;
 @Component
 @RequiredArgsConstructor
 @Transactional
-class BookingWriter {
+class BookingWriter implements SeriesOccurrenceCancellation {
 
     private static final String OVERLAP_CONSTRAINT = "court_allocation_no_overlap";
     private static final String IDEMPOTENCY_CONSTRAINT = "booking_idempotency_by_account";
@@ -139,6 +141,17 @@ class BookingWriter {
     }
 
     void cancel(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles) {
+        if (cancelBooking(bookingId, cancelledBy, cancellerRoles)) {
+            events.publishEvent(new BookingCancelled(bookingId, cancelledBy));
+        }
+    }
+
+    @Override
+    public void cancelOccurrence(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles) {
+        cancelBooking(bookingId, cancelledBy, cancellerRoles);
+    }
+
+    private boolean cancelBooking(UUID bookingId, UUID cancelledBy, Set<Role> cancellerRoles) {
         bookings.lockById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         entityManager.clear();
@@ -146,9 +159,17 @@ class BookingWriter {
                 .orElseThrow(() -> new BookingNotFoundException("No booking with id " + bookingId));
         accessControl.requireManagementAccess(booking, cancelledBy, cancellerRoles);
         Instant cancelledAt = clock.instant();
-        ruleGate.requireCancellationAllowed(booking, cancellerRoles, cancelledAt);
-        booking.cancel(cancelledBy, cancelledAt);
+        try {
+            ruleGate.requireCancellationAllowed(booking, cancellerRoles, cancelledAt);
+        } catch (BookingRulesViolatedException failure) {
+            failure.getViolations().forEach(violation -> meters
+                    .counter("courtside.bookings.rejected", "rule", violation.code())
+                    .increment());
+            throw failure;
+        }
+        boolean changed = booking.cancel(cancelledBy, cancelledAt);
         bookings.saveAndFlush(booking);
+        return changed;
     }
 
     private boolean isOverlap(DataIntegrityViolationException e) {

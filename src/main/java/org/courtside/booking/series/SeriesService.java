@@ -33,17 +33,24 @@ import org.courtside.booking.internal.CourtOccupancy;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
+import org.courtside.booking.internal.SeriesOccurrenceCancellation;
 import org.courtside.card.BookingCard;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.Role;
 import org.courtside.rules.RuleViolation;
+import org.courtside.shared.SeriesCancelled;
+import org.courtside.shared.SeriesCreated;
+import org.courtside.shared.SeriesMoved;
 import org.courtside.shared.TimeSlot;
 import org.courtside.shared.SqlConstraintViolation;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class SeriesService {
@@ -53,6 +60,7 @@ public class SeriesService {
     private final SeriesSchedule schedule;
     private final CourtAllocationRepository allocations;
     private final BookingService bookings;
+    private final SeriesOccurrenceCancellation occurrences;
     private final BookingSeriesRepository seriesRepository;
     private final BookingRepository bookingRepository;
     private final FacilityService facility;
@@ -64,10 +72,13 @@ public class SeriesService {
     private final ClubTimeZone timeZone;
     private final BookingGridCoordination bookingGridCoordination;
     private final EntityManager entityManager;
+    private final ApplicationEventPublisher events;
+    private final TransactionTemplate transaction;
 
     public SeriesService(SeriesSchedule schedule,
                          CourtAllocationRepository allocations,
                          BookingService bookings,
+                         SeriesOccurrenceCancellation occurrences,
                          BookingSeriesRepository seriesRepository,
                          BookingRepository bookingRepository,
                          FacilityService facility,
@@ -78,10 +89,13 @@ public class SeriesService {
                          Clock clock,
                          BookingGridCoordination bookingGridCoordination,
                          ClubTimeZone timeZone,
-                         EntityManager entityManager) {
+                         EntityManager entityManager,
+                         ApplicationEventPublisher events,
+                         PlatformTransactionManager transactions) {
         this.schedule = schedule;
         this.allocations = allocations;
         this.bookings = bookings;
+        this.occurrences = occurrences;
         this.seriesRepository = seriesRepository;
         this.bookingRepository = bookingRepository;
         this.facility = facility;
@@ -93,6 +107,8 @@ public class SeriesService {
         this.bookingGridCoordination = bookingGridCoordination;
         this.timeZone = timeZone;
         this.entityManager = entityManager;
+        this.events = events;
+        this.transaction = new TransactionTemplate(transactions);
     }
 
     @Transactional(readOnly = true)
@@ -149,6 +165,8 @@ public class SeriesService {
         } catch (RuntimeException e) {
             if (created.isEmpty()) {
                 seriesRepository.delete(series);
+            } else {
+                announceCommitted(series.getId(), created, e);
             }
             throw e;
         }
@@ -156,7 +174,21 @@ public class SeriesService {
             seriesRepository.delete(series);
             return new SeriesCreationResult(null, created, skipped);
         }
+        announce(series.getId(), created);
         return new SeriesCreationResult(series.getId(), created, skipped);
+    }
+
+    // Each occurrence commits on its own, so the series is announced once they have.
+    private void announce(UUID seriesId, List<UUID> created) {
+        transaction.executeWithoutResult(status -> events.publishEvent(new SeriesCreated(seriesId, created)));
+    }
+
+    private void announceCommitted(UUID seriesId, List<UUID> created, RuntimeException failure) {
+        try {
+            announce(seriesId, created);
+        } catch (RuntimeException announcementFailure) {
+            failure.addSuppressed(announcementFailure);
+        }
     }
 
     private void requireCardDoesNotTrackPlayers(BookingCard card) {
@@ -175,9 +207,14 @@ public class SeriesService {
         discardPreLockState();
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
 
-        List<Booking> affected = affectedBookings(seriesId, fromBookingId, scope);
-        affected.forEach(booking ->
-                bookings.cancel(booking.getId(), cancelledBy, cancellerRoles));
+        List<UUID> affected = affectedBookings(seriesId, fromBookingId, scope).stream()
+                .map(Booking::getId)
+                .toList();
+        affected.forEach(bookingId ->
+                occurrences.cancelOccurrence(bookingId, cancelledBy, cancellerRoles));
+        if (!affected.isEmpty()) {
+            events.publishEvent(new SeriesCancelled(seriesId, affected, cancelledBy));
+        }
         return affected.size();
     }
 
@@ -271,6 +308,9 @@ public class SeriesService {
                         "One of the requested courts is already occupied for that time", e);
             }
             throw e;
+        }
+        if (!movingIds.isEmpty()) {
+            events.publishEvent(new SeriesMoved(request.seriesId(), movingIds, movedBy));
         }
         return executions.size();
     }
