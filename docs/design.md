@@ -537,8 +537,10 @@ Members choose optional message kinds and, separately, channels. No opt-out mean
 declined kind reaches the account on no channel, the centre included. A declined email channel
 stops mail and keeps the entry. Credentials, password-reset codes and username reminders are mailed
 whatever the channel choice says, because whoever asks for them cannot sign in to read the centre.
-Credentials, displacement and participant-addition notices cannot be disabled because no other
-product path replaces them. An account without an address still receives its entries.
+Credentials, displacement and participant-addition notices cannot be disabled as kinds, because no
+other product path tells the member. A declined email channel stops their mail too; the centre then
+replaces it, and every centre page carries the account's unread count, which the primary navigation
+shows beside the centre's entry. An account without an address still receives its entries.
 
 ## Security model
 

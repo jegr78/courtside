@@ -69,7 +69,7 @@ describe("MyMessagesView", () => {
     await i18n.changeLanguage("en");
     vi.spyOn(api, "ownMessageChoices").mockResolvedValue(choices);
     vi.spyOn(api, "ownMessageChannels").mockResolvedValue([{ channel: "EMAIL", enabled: true }]);
-    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [confirmed, reminderRead], nextCursor: null });
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [confirmed, reminderRead], nextCursor: null, unread: 1 });
   });
 
   it("given notifications addressed to the member, when the centre opens, then each shows its time, read state, content and link", async () => {
@@ -91,7 +91,7 @@ describe("MyMessagesView", () => {
 
   it("given sign-in help in the centre, when it is shown, then it links to the account page and names no booking", async () => {
     // given
-    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [usernameReminder], nextCursor: null });
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [usernameReminder], nextCursor: null, unread: 1 });
 
     // when
     show();
@@ -104,7 +104,7 @@ describe("MyMessagesView", () => {
 
   it("given a closure under a booking, when it is shown, then it says why the booking no longer fits", async () => {
     // given
-    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [displaced], nextCursor: null });
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [displaced], nextCursor: null, unread: 1 });
 
     // when
     show();
@@ -128,6 +128,22 @@ describe("MyMessagesView", () => {
     expect(marked).toHaveBeenCalledWith(confirmed.id);
     await waitFor(() => expect(entry(confirmed.id)).toHaveAttribute("data-read", "true"));
     expect(within(entry(confirmed.id)).getByTestId("notification-state")).toHaveTextContent("Read");
+  });
+
+  it("given an unread notification, when it is marked read, then the navigation is told to count again", async () => {
+    // given
+    vi.spyOn(api, "markNotificationRead").mockResolvedValue(undefined);
+    const told = vi.fn();
+    window.addEventListener("courtside:notifications-read", told);
+    show();
+    const unread = await screen.findByTestId(`notification-${confirmed.id}`);
+
+    // when
+    await userEvent.click(within(unread).getByTestId("notification-mark-read"));
+
+    // then
+    await waitFor(() => expect(told).toHaveBeenCalledTimes(1));
+    window.removeEventListener("courtside:notifications-read", told);
   });
 
   it("given marking read is refused, when the member marks an entry, then the refusal is shown and the entry stays new", async () => {
@@ -162,7 +178,7 @@ describe("MyMessagesView", () => {
 
   it("given nothing was addressed to the member, when the centre opens, then it says so", async () => {
     // given
-    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [], nextCursor: null });
+    vi.spyOn(api, "ownNotifications").mockResolvedValue({ items: [], nextCursor: null, unread: 1 });
 
     // when
     show();
@@ -174,8 +190,8 @@ describe("MyMessagesView", () => {
   it("given more entries than one page, when the member asks for more, then the next page follows the first", async () => {
     // given
     const pages = vi.spyOn(api, "ownNotifications")
-      .mockResolvedValueOnce({ items: [confirmed], nextCursor: confirmed.id })
-      .mockResolvedValueOnce({ items: [reminderRead], nextCursor: null });
+      .mockResolvedValueOnce({ items: [confirmed], nextCursor: confirmed.id, unread: 1 })
+      .mockResolvedValueOnce({ items: [reminderRead], nextCursor: null, unread: 1 });
     show();
     await screen.findByTestId(`notification-${confirmed.id}`);
 
@@ -210,6 +226,16 @@ describe("MyMessagesView", () => {
     expect(mandatory).toBeChecked();
     expect(mandatory).toBeDisabled();
     expect(screen.getByTestId("message-choice-BOOKING_CONFIRMED")).toBeEnabled();
+  });
+
+  it("given the email channel, when it is shown, then it says notices that cannot be switched off then arrive only here", async () => {
+    // when
+    show();
+
+    // then
+    expect(await screen.findByTestId("message-channels-reason"))
+      .toHaveTextContent("Switching email off also stops the mail for notices you cannot switch off");
+    expect(screen.getByTestId("message-channels-reason")).toHaveTextContent("then reaches you only here");
   });
 
   it("given a kind already switched off, when the choices are shown, then it is unchecked", async () => {

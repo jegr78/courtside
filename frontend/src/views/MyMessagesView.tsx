@@ -8,6 +8,7 @@ import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { SuccessFeedback } from "../components/SuccessFeedback";
+import { announceNotificationsRead } from "../navigation/unreadNotifications";
 import { formatBookingPeriod, formatDateTime } from "../time/clubZone";
 
 type Translate = ReturnType<typeof useTranslation>["t"];
@@ -103,6 +104,7 @@ function NotificationCentre() {
       const readAt = new Date().toISOString();
       setEntries((current) => current?.map((entry) => entry.id === id ? { ...entry, readAt } : entry));
       setFailure(undefined);
+      announceNotificationsRead();
     } catch (cause) {
       if (quietly) warnAbout("Notification not marked read", cause);
       else setFailure({ cause });
@@ -223,7 +225,7 @@ function MessageSettings() {
       />
       <section className="grid gap-2">
         <h3 className="text-lg font-semibold">{t("myMessages.channels")}</h3>
-        <p className="text-muted text-sm">{t("myMessages.channelsReason")}</p>
+        <p data-testid="message-channels-reason" className="text-muted text-sm">{t("myMessages.channelsReason")}</p>
         <ul className="grid gap-2">
           {channels.map((choice) => <li key={choice.channel}>
             <label className="flex items-center gap-3 font-medium">

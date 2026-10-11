@@ -229,7 +229,7 @@ decides how to handle it.
 arrived, what it concerns and whether you have read it. New entries are marked *New*. The link
 below an entry opens the booking it concerns or your account security. Select *Mark as read* or
 follow the link to mark an entry read. You see only messages addressed to you, even without an
-email address.
+email address. The number beside *Notifications* in the menu counts the unread entries.
 
 Below the list you choose what you receive. You can disable:
 
@@ -246,7 +246,8 @@ Courtside always sends:
 * notice of a change that affects your booking.
 
 Separately, you choose whether you also get an email. Without email your messages still appear
-here. Courtside always emails credentials, your username and reset codes, because you are not
+here. That includes the notices Courtside always sends: you then learn only here that somebody added
+you as a player or that a change affects your booking. Courtside always emails credentials, your username and reset codes, because you are not
 signed in when you need them.
 
 Save your choices. They apply to future messages only.

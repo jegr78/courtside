@@ -230,7 +230,8 @@ Unter *Benachrichtigungen* stehen alle Nachrichten, die Courtside dir geschickt 
 zuerst. Jeder Eintrag zeigt, wann er kam, worum es geht und ob du ihn schon gelesen hast. Neue
 Einträge sind mit *Neu* markiert. Über den Link darunter kommst du zur betroffenen Buchung oder zu
 deiner Kontosicherheit. Mit *Als gelesen markieren* oder dem Link markierst du einen Eintrag als
-gelesen. Hier siehst du nur Nachrichten an dich, auch ohne E-Mail-Adresse.
+gelesen. Hier siehst du nur Nachrichten an dich, auch ohne E-Mail-Adresse. Wie viele Einträge
+ungelesen sind, zeigt die Zahl neben *Benachrichtigungen* im Menü.
 
 Darunter wählst du, was du bekommst. Du kannst diese Nachrichten abwählen:
 
@@ -247,8 +248,10 @@ Diese Nachrichten sendet Courtside immer:
 * Mitteilung über eine Änderung, die deine Buchung betrifft.
 
 Getrennt davon entscheidest du, ob du zusätzlich eine E-Mail bekommst. Ohne E-Mail stehen deine
-Nachrichten weiter hier. Zugangsdaten, deinen Benutzernamen und Codes zum Zurücksetzen schickt
-Courtside immer per E-Mail, denn dafür bist du nicht angemeldet.
+Nachrichten weiter hier. Das gilt auch für die Mitteilungen, die Courtside immer sendet: Von deiner
+Eintragung als Mitspieler oder einer Änderung an deiner Buchung erfährst du dann nur hier.
+Zugangsdaten, deinen Benutzernamen und Codes zum Zurücksetzen schickt Courtside immer per E-Mail,
+denn dafür bist du nicht angemeldet.
 
 Speichere die Auswahl. Die Einstellung gilt nur für künftige Nachrichten.
 
