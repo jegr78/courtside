@@ -8,7 +8,8 @@ import { Button } from "../components/Button";
 import { LoadFailure } from "../components/LoadFailure";
 import { SuccessFeedback } from "../components/SuccessFeedback";
 import { useReportedFailure } from "../failures/useReportedFailure";
-import { formatBookingPeriod } from "../time/clubZone";
+import { dateInTimeZone, formatBookingPeriod, formatBookingTimeRange } from "../time/clubZone";
+import { dateTimeFormatter } from "../time/dateTimeFormatter";
 import { CancelDialog, ManagedAppointmentDialog, MoveDialog } from "./AppointmentDialogs";
 import { SeriesForm } from "./SeriesForm";
 
@@ -158,20 +159,24 @@ export function AdminManagedAppointmentsView() {
     {success && <div className="mt-4"><SuccessFeedback testId="managed-success">{success}</SuccessFeedback></div>}
     {loading ? <p className="mt-6" role="status">{t("status.loading")}</p>
       : groups.length === 0 ? <p className="text-muted mt-6">{t("managedAppointments.empty")}</p>
-      : <div data-testid="managed-bookings" className="mt-6 divide-y border-y">
+      : <div data-testid="managed-bookings" className="mt-6 grid gap-4">
         {groups.map((group) => group.series
-          ? <details key={group.key} data-testid={`managed-series-${group.key}`}>
-            <summary data-testid="managed-series-summary" className="focus-ring cursor-pointer px-2 py-4 font-semibold">
-              {t("managedAppointments.seriesSummary", { label: group.items[0].cardLabel, count: group.items.length })}
+          ? <details key={group.key} data-testid={`managed-series-${group.key}`} className="surface-raised rounded-lg border">
+            <summary data-testid="managed-series-summary" className="focus-ring cursor-pointer px-3 py-4 font-semibold">
+              {seriesHeading(group.items, courtNames, i18n.language, timeZone, t)}
             </summary>
             <ul className="divide-y border-t pl-4 sm:pl-8">{group.items.map((appointment) => <AppointmentRow key={appointment.id}
               appointment={appointment} courtNames={courtNames} locale={i18n.language} timeZone={timeZone}
               actionsOpen={openActionsId === appointment.id} toggleActions={setOpenActionsId} moveAvailable={courtsReady}
               showDetail={setDetail} cancel={startCancelling} move={startMoving} t={t} />)}</ul>
           </details>
-          : <ul key={group.key}><AppointmentRow appointment={group.items[0]} courtNames={courtNames}
-            locale={i18n.language} timeZone={timeZone} actionsOpen={openActionsId === group.items[0].id}
-            toggleActions={setOpenActionsId} moveAvailable={courtsReady} showDetail={setDetail} cancel={startCancelling} move={startMoving} t={t} /></ul>)}
+          : <section key={group.key} aria-labelledby={`managed-singles-${group.key}`}>
+            <h2 id={`managed-singles-${group.key}`} className="text-muted px-2 text-sm font-semibold">{t("managedAppointments.singleAppointments")}</h2>
+            <ul data-testid="managed-single-appointments" className="mt-1 divide-y border-y">{group.items.map((appointment) => <AppointmentRow
+              key={appointment.id} appointment={appointment} courtNames={courtNames} locale={i18n.language} timeZone={timeZone}
+              actionsOpen={openActionsId === appointment.id} toggleActions={setOpenActionsId} moveAvailable={courtsReady}
+              showDetail={setDetail} cancel={startCancelling} move={startMoving} t={t} />)}</ul>
+          </section>)}
       </div>}
 
     {nextCursor && <Button data-testid="managed-load-more" variant="secondary" className="mt-5" disabled={loadingMore}
@@ -251,10 +256,38 @@ function AppointmentRow({ appointment, courtNames, locale, timeZone, actionsOpen
 }
 
 function groupAppointments(appointments: ManagedAppointment[]) {
-  const groups = new Map<string, ManagedAppointment[]>();
+  const series = new Map<string, ManagedAppointment[]>();
+  const groups: { key: string; series: boolean; items: ManagedAppointment[] }[] = [];
   for (const appointment of appointments) {
-    const key = appointment.seriesId ?? appointment.id;
-    groups.set(key, [...(groups.get(key) ?? []), appointment]);
+    const known = appointment.seriesId ? series.get(appointment.seriesId) : undefined;
+    const last = groups.at(-1);
+    if (known) known.push(appointment);
+    else if (appointment.seriesId) {
+      const items = [appointment];
+      series.set(appointment.seriesId, items);
+      groups.push({ key: appointment.seriesId, series: true, items });
+    } else if (last && !last.series) last.items.push(appointment);
+    else groups.push({ key: appointment.id, series: false, items: [appointment] });
   }
-  return [...groups].map(([key, items]) => ({ key, series: Boolean(items[0].seriesId), items }));
+  return groups;
+}
+
+function seriesHeading(items: ManagedAppointment[], courtNames: Map<string, string>, locale: string,
+  timeZone: string | undefined, t: Translate) {
+  const [first] = items;
+  const courts = first.courtIds.map((id) => courtNames.get(id) ?? t("myBookings.unknownCourt")).join(", ");
+  const count = t("managedAppointments.loadedCount", { count: items.length });
+  if (!timeZone) return [first.cardLabel, courts, count].join(" · ");
+  const weekday = dateTimeFormatter(locale, { weekday: "short", timeZone });
+  const weekdays = [...new Set(sortedByWeekday(items, timeZone).map((item) => weekday.format(new Date(item.startsAt))))].join(", ");
+  const starts = items.map((item) => new Date(item.startsAt).getTime());
+  const date = dateTimeFormatter(locale, { dateStyle: "medium", timeZone });
+  const dates = date.formatRange(Math.min(...starts), Math.max(...starts));
+  return [first.cardLabel, `${weekdays} ${formatBookingTimeRange(first.startsAt, first.endsAt, locale, timeZone)}`,
+    courts, dates, count].join(" · ");
+}
+
+function sortedByWeekday(items: ManagedAppointment[], timeZone: string) {
+  const isoWeekday = (item: ManagedAppointment) => (dateInTimeZone(new Date(item.startsAt), timeZone).getDay() + 6) % 7;
+  return [...items].sort((left, right) => isoWeekday(left) - isoWeekday(right));
 }

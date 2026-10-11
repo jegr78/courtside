@@ -43,8 +43,65 @@ describe("AdminManagedAppointmentsView", () => {
       view: "UPCOMING", courtId: undefined, cardId: undefined, limit: 20
     });
     expect(series).not.toHaveAttribute("open");
-    expect(within(series).getByTestId("managed-series-summary")).toHaveTextContent("Training · 2 loaded appointments");
+    expect(within(series).getByTestId("managed-series-summary")).toHaveTextContent(/^Training · .* · 2 loaded appointments$/);
     expect(screen.getByTestId("new-series"), "creating work starts above the list").toBeInTheDocument();
+  });
+
+  it("given two series of the same card, when the list loads, then each heading names its own weekday, time, court and dates", async () => {
+    // given
+    const monday: ManagedAppointment = {
+      ...first, id: "33333333-3333-3333-3333-333333333333", seriesId: "series-2", courtIds: ["court-2"],
+      startsAt: "2026-10-05T18:00:00Z", endsAt: "2026-10-05T19:00:00Z"
+    };
+    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [first, monday, second] });
+    vi.mocked(api.courts).mockResolvedValue([
+      { id: "court-1", number: 1, name: "Centre Court" }, { id: "court-2", number: 2, name: "Court 2" }
+    ]);
+
+    // when
+    show();
+
+    // then
+    const thursdays = within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary");
+    const mondays = within(screen.getByTestId("managed-series-series-2")).getByTestId("managed-series-summary");
+    await waitFor(() => expect(thursdays).toHaveTextContent(/^Training · Thu 6:00\s?PM – 7:00\s?PM · Centre Court/));
+    expect(thursdays, "the loaded dates bound the series").toHaveTextContent(/Oct 1 – 8, 2026 · 2 loaded appointments$/);
+    expect(mondays).toHaveTextContent(/^Training · Mon 8:00\s?PM – 9:00\s?PM · Court 2 · Oct 5, 2026 · one loaded appointment$/);
+  });
+
+  it("given a series on two weekdays, when the list loads, then its heading names both weekdays from Monday on", async () => {
+    // given
+    const monday: ManagedAppointment = {
+      ...first, id: "66666666-6666-6666-6666-666666666666", startsAt: "2026-10-05T16:00:00Z", endsAt: "2026-10-05T17:00:00Z"
+    };
+    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [first, monday] });
+
+    // when
+    show();
+
+    // then
+    const summary = within(await screen.findByTestId("managed-series-series-1")).getByTestId("managed-series-summary");
+    await waitFor(() => expect(summary, "each loaded weekday appears once, in week order").toHaveTextContent(/^Training · Mon, Thu 6:00/));
+  });
+
+  it("given a single appointment between two series, when the list loads, then it stands in its own list outside every series", async () => {
+    // given
+    const single: ManagedAppointment = {
+      ...first, id: "44444444-4444-4444-4444-444444444444", seriesId: null, startsAt: "2026-10-02T16:00:00Z", endsAt: "2026-10-02T17:00:00Z"
+    };
+    const other: ManagedAppointment = { ...second, id: "55555555-5555-5555-5555-555555555555", seriesId: "series-2" };
+    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [first, single, other] });
+
+    // when
+    show();
+
+    // then
+    const series = await screen.findByTestId("managed-series-series-1");
+    const singles = screen.getByTestId("managed-single-appointments");
+    expect(within(singles).getByTestId(`booking-${single.id}`), "a single appointment sits in its own list").toBeInTheDocument();
+    expect(within(series).queryByTestId(`booking-${single.id}`), "a single appointment is no part of the series before it").not.toBeInTheDocument();
+    expect(singles.compareDocumentPosition(screen.getByTestId("managed-series-series-2")) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the list keeps the loaded order").toBeTruthy();
   });
 
   it("given the upcoming view, when history and filters are chosen, then each criterion reaches the server", async () => {
