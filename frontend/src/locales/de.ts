@@ -1107,6 +1107,7 @@ const de = {
   "myMessages.mandatoryReason": "Diese Nachrichten lassen sich nicht abschalten: Ohne sie kommst du nicht an dein Konto, erfährst nicht von einer Sperrung unter deiner Buchung und nicht davon, dass jemand dich eingetragen hat.",
   "myMessages.save": "Auswahl speichern",
   "myMessages.saved": "Deine Auswahl wurde gespeichert.",
+  "myMessages.savedStateShown": "Angezeigt sind die Einstellungen, die jetzt gespeichert sind.",
   "error.type.notification-not-found": "Diese Benachrichtigung ist nicht an dich gerichtet.",
   "notification.notFound": "Diese Benachrichtigung ist nicht an dich gerichtet.",
   "myMessages.settings": "Was du bekommst",

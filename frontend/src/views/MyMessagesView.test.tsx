@@ -348,4 +348,34 @@ describe("MyMessagesView", () => {
       .toHaveTextContent('"Closure under a booking" cannot be switched off.'));
     expect(screen.queryByTestId("my-messages-saved")).toBeNull();
   });
+
+  it("given the channel choice is refused after the kinds were saved, when saving, then the form shows what is stored and says so", async () => {
+    // given
+    const declinedConfirmation = choices.map((choice) =>
+      choice.kind === "BOOKING_CONFIRMED" ? { ...choice, enabled: false } : choice);
+    const kinds = vi.spyOn(api, "ownMessageChoices")
+      .mockResolvedValueOnce(choices)
+      .mockResolvedValue(declinedConfirmation);
+    const ways = vi.spyOn(api, "ownMessageChannels").mockResolvedValue([{ channel: "EMAIL", enabled: true }]);
+    vi.spyOn(api, "chooseOwnMessages").mockResolvedValue(undefined);
+    vi.spyOn(api, "chooseOwnMessageChannels").mockRejectedValue(new ApiError(503, {
+      type: "urn:courtside:error:service-unavailable", title: "Unavailable", status: 503
+    }));
+    show();
+    await screen.findByTestId("message-choice-BOOKING_CONFIRMED");
+
+    // when
+    await userEvent.click(screen.getByTestId("message-choice-BOOKING_CONFIRMED"));
+    await userEvent.click(screen.getByTestId("message-channel-EMAIL"));
+    await userEvent.click(screen.getByTestId("my-messages-save"));
+
+    // then
+    await waitFor(() => expect(screen.getByRole("alert"))
+      .toHaveTextContent("The settings shown are the ones saved now."));
+    expect(kinds).toHaveBeenCalledTimes(2);
+    expect(ways).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("message-choice-BOOKING_CONFIRMED")).not.toBeChecked();
+    expect(screen.getByTestId("message-channel-EMAIL")).toBeChecked();
+    expect(screen.queryByTestId("my-messages-saved")).toBeNull();
+  });
 });

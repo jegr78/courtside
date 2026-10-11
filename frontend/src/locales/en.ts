@@ -1109,6 +1109,7 @@ const en: Record<keyof typeof de, string> = {
   "myMessages.mandatoryReason": "These cannot be switched off: without them you cannot reach your account, you would not hear about a closure under your booking, and you would not hear that somebody recorded you in one.",
   "myMessages.save": "Save choice",
   "myMessages.saved": "Your choice was saved.",
+  "myMessages.savedStateShown": "The settings shown are the ones saved now.",
   "error.type.notification-not-found": "This notification is not addressed to you.",
   "notification.notFound": "This notification is not addressed to you.",
   "myMessages.settings": "What you receive",

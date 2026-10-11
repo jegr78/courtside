@@ -171,7 +171,7 @@ function MessageSettings() {
   const { t } = useTranslation();
   const [choices, setChoices] = useState<MessageChoice[]>();
   const [channels, setChannels] = useState<MessageChannelChoice[]>();
-  const [failure, setFailure] = useState<{ cause: unknown }>();
+  const [failure, setFailure] = useState<{ cause: unknown; reloaded?: boolean }>();
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const error = failure && problemMessage(failure.cause, t);
@@ -208,16 +208,29 @@ function MessageSettings() {
       setSaved(true);
     } catch (cause) {
       setSaved(false);
-      setFailure({ cause });
+      setFailure({ cause, reloaded: await reloadSaved() });
     } finally {
       setPending(false);
+    }
+  }
+
+  // The two choices are stored one after the other, so after a failure only the instance knows which one took.
+  async function reloadSaved() {
+    try {
+      const [kinds, ways] = await Promise.all([api.ownMessageChoices(), api.ownMessageChannels()]);
+      setChoices(kinds);
+      setChannels(ways);
+      return true;
+    } catch (failure) {
+      warnAbout("Saved message choices unavailable", failure);
+      return false;
     }
   }
 
   return <section className="border-structural grid gap-6 border-t pt-6" aria-labelledby="message-settings-title">
     <h2 id="message-settings-title" className="text-2xl font-bold">{t("myMessages.settings")}</h2>
     <p className="text-muted">{t("myMessages.description")}</p>
-    {error && <Alert>{error}</Alert>}
+    {error && <Alert>{error}{failure?.reloaded && <> {t("myMessages.savedStateShown")}</>}</Alert>}
     {saved && <SuccessFeedback testId="my-messages-saved">{t("myMessages.saved")}</SuccessFeedback>}
     {choices && channels && <>
       <MessageChoiceGroup
