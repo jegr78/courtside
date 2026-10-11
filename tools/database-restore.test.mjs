@@ -50,6 +50,7 @@ test("given a backup archive, when qualification runs, then corruption is reject
 test("given a release candidate, when release qualification runs, then restore blocks publication", () => {
   // given
   const release = source("../.github/workflows/release.yml");
+  const candidate = source("../.github/workflows/release-candidate.yml");
   const gates = source("../.github/workflows/release-gates.yml");
 
   // when / then
@@ -60,9 +61,11 @@ test("given a release candidate, when release qualification runs, then restore b
   assert.match(gates, /node tools\/courtside\.restore-smoke\.mjs --confirm courtside-restore/);
   assert.match(gates, /!build\/database-restore\/\*\*\/\*\.dump/);
   assert.match(gates, /!build\/database-restore\/\*\*\/\*\.sql/);
-  assert.match(release, /\n  gates:\n[\s\S]+?uses: \.\/\.github\/workflows\/release-gates\.yml/);
-  assert.match(release, /image-digest: \$\{\{ needs\.image\.outputs\.digest \}\}/);
-  assert.match(release, /needs: \[archive, build, browser, image, qualify, gates\]/);
+  assert.match(candidate, /\n  gates:\n[\s\S]+?uses: \.\/\.github\/workflows\/release-gates\.yml/);
+  assert.match(candidate, /image-digest: \$\{\{ needs\.image\.outputs\.digest \}\}/);
+  assert.match(candidate, /\n  evidence:\n    needs: \[select, preconditions, release-build, image, archive, qualify, gates\]/,
+    "no candidate evidence exists without the restore gate");
+  assert.match(release, /\n  publish:\n    needs: \[candidate\]/);
 });
 
 test("given the recurring restore workflow, when it runs, then evidence is retained", () => {

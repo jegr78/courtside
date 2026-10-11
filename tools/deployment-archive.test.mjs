@@ -453,9 +453,10 @@ test("given an archive, when a shell script is extracted from it, then it is sti
   });
 });
 
-test("given the release workflow, when it publishes, then it attaches the archive it already built", () => {
+test("given the release workflow, when it publishes, then it attaches the archive the candidate built", () => {
   const workflow = readFileSync(resolve(deploy, "../.github/workflows/release.yml"), "utf8");
-  const archive = workflow.slice(workflow.indexOf("\n  archive:"), workflow.indexOf("\n  qualify:"));
+  const candidate = readFileSync(resolve(deploy, "../.github/workflows/release-candidate.yml"), "utf8");
+  const archive = candidate.slice(candidate.indexOf("\n  archive:"), candidate.indexOf("\n  qualify:"));
   const publish = workflow.slice(workflow.indexOf("\n  publish:"));
   const gates = readFileSync(resolve(deploy, "../.github/workflows/release-gates.yml"), "utf8");
   const reproduction = gates.slice(gates.indexOf("\n  archive-reproducibility:"), gates.indexOf("\n  mail:"));
@@ -469,9 +470,13 @@ test("given the release workflow, when it publishes, then it attaches the archiv
   assert.match(reproduction,
     /cmp "build\/archive-under-test\/courtside-deployment-\$VERSION\.zip" \\\n\s+"build\/rebuilt\/courtside-deployment-/,
     "the gates do not compare the archive to publish with one built from the tagged tree");
-  assert.match(workflow, /archive-artifact: deployment-archive\n/, "the gates compare another archive");
-  assert.match(publish, /needs: \[[^\]]*\bgates\b[^\]]*\]/,
-    "publish may write to the registry before the archive was compared");
+  assert.match(candidate, /archive-artifact: deployment-archive\n/, "the gates compare another archive");
+  assert.match(candidate, /\n  evidence:\n    needs: \[[^\]]*\bgates\b[^\]]*\]/,
+    "a candidate may pass before the archive was compared");
+  assert.match(publish, /needs: \[candidate\]/, "publish may write to the registry before the evidence was verified");
+  assert.match(publish, /run-id: \$\{\{ needs\.candidate\.outputs\.run-id \}\}/,
+    "publish does not attach the archive the candidate qualified");
+  assert.match(publish, /sha256sum -c/, "publish attaches an archive whose bytes nobody compared to the evidence");
   assert.match(publish, /files: \|[\s\S]*\n {12}build\/courtside-deployment-\*\n/,
     "the release page does not carry the archive that was downloaded");
   assert.match(publish, /attest-build-provenance[\s\S]*subject-path: build\/courtside-deployment-\*\.zip/,

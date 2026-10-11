@@ -16,10 +16,12 @@ function repositoryFile(path) {
 const document = repositoryFile("docs/releasing.md");
 const workflow = yaml.load(repositoryFile(".github/workflows/release.yml"));
 const source = repositoryFile(".github/workflows/release.yml");
+const candidateSource = repositoryFile(".github/workflows/release-candidate.yml");
+const candidateWorkflow = yaml.load(candidateSource);
 
-// Nobody types the tag any more, so the thing to hold is that what writes it and what answers it
-// still agree on its shape — a tag without the leading v would start nothing at all.
-test("given the release trigger, when release-please writes a tag, then the workflow answers that shape",
+// The candidate writes v<version> and release-please finds the previous release under that name,
+// so both have to agree with the trigger; a tag without the leading v would start nothing at all.
+test("given the release trigger, when the candidate writes a tag, then the workflow answers that shape",
   () => {
     // given
     const triggers = workflow.on ?? workflow[true];
@@ -36,10 +38,10 @@ test("given the release trigger, when release-please writes a tag, then the work
 
 test("given the jobs a release runs, when the document explains them, then it names every one", () => {
   // given
-  const jobs = Object.keys(workflow.jobs);
+  const jobs = [...new Set([...Object.keys(candidateWorkflow.jobs), ...Object.keys(workflow.jobs)])];
 
   // when / then
-  assert.ok(jobs.length >= 8, `the release workflow declares only ${jobs.length} jobs`);
+  assert.ok(jobs.length >= 8, `the candidate and the release declare only ${jobs.length} jobs`);
   for (const job of jobs) {
     assert.match(document, new RegExp("`" + job + "`"),
       `docs/releasing.md explains no job named ${job}, so a release runs a step nobody documented`);
@@ -49,11 +51,11 @@ test("given the jobs a release runs, when the document explains them, then it na
 test("given the checks a release refuses on, when the document lists them, then each is still there",
   () => {
     // given
-    const refusals = [...source.matchAll(/^ {6}- name: (Refuse|Demand) ([^\n]+)$/gm)]
+    const refusals = [...`${candidateSource}\n${source}`.matchAll(/^ {6}- name: (Refuse|Demand) ([^\n]+)$/gm)]
       .map((match) => `${match[1]} ${match[2]}`);
 
     // when / then
-    assert.ok(refusals.length >= 3, `the workflow refuses on only ${refusals.length} checks`);
+    assert.ok(refusals.length >= 3, `the candidate and the release refuse on only ${refusals.length} checks`);
     assert.match(document, /## What the release refuses before it builds anything/);
     assert.equal(document.split("\n")
       .filter((line) => line.startsWith("**") && line.includes("`main`")).length >= 1, true,
@@ -113,11 +115,10 @@ test("given a candidate tag, when the release resolves upgrade origins, then the
 test("given a tag that never published, when the release reads its history, then it reads releases instead",
   () => {
     // given
-    const published = workflow.jobs.build.steps
-      .find((step) => step.name === "Read the releases this repository has published");
-    const collect = workflow.jobs.build.steps.find((step) => step.name === "Collect the upgrade notes");
-    const origins = workflow.jobs.build.steps
-      .find((step) => step.name === "Resolve supported database upgrade origins");
+    const build = candidateWorkflow.jobs["release-build"].steps;
+    const published = build.find((step) => step.name === "Read the releases this repository has published");
+    const collect = build.find((step) => step.name === "Collect the upgrade notes");
+    const origins = build.find((step) => step.name === "Resolve supported database upgrade origins");
 
     // when / then
     assert.match(published.run, /node tools\/published-release-tags\.mjs/);
@@ -184,15 +185,16 @@ test("given a pre-one release, when image tags are generated, then the floating 
 test("given a failed tag, when the document says it costs nothing, then neither read touches the tag history",
   () => {
     // when / then
-    assert.doesNotMatch(source, /git describe/);
-    assert.doesNotMatch(source, /git tag --list/);
+    for (const pipeline of [source, candidateSource]) {
+      assert.doesNotMatch(pipeline, /git describe/);
+      assert.doesNotMatch(pipeline, /git tag --list/);
+    }
     assert.match(document, /come from the releases this\nrepository has \*\*published\*\*/,
       "the document explains where the two reads look, and the workflow has to keep looking there");
   });
 
-// release-please creates the release as a draft so that nothing claims to be released before the
-// gates run. Exactly one step turns it into a release a club can see, and it does so by omission:
-// action-gh-release publishes an existing draft unless it is told to keep it.
+// publish creates the release as a draft, so nothing claims to be released before its assets are
+// attached; exactly one later step turns it into a release a club can see.
 test("given a draft the pipeline has to publish, when the release is written, then nothing keeps it draft",
   () => {
     // given
@@ -201,7 +203,7 @@ test("given a draft the pipeline has to publish, when the release is written, th
 
     // when / then
     assert.ok(publish, "nothing writes the GitHub release, so the draft would stand for ever");
-    const steps = workflow.jobs.publish.steps;
+    const steps = workflow.jobs.publish.steps.filter((step) => step.if !== "failure()");
     const visible = steps.findIndex((step) => /gh release edit "\$GITHUB_REF_NAME"[^\n]*--draft=false/.test(step.run ?? ""));
     assert.equal(publish.with.draft, true, "the assets reach the release while it is still a draft");
     assert.ok(visible > steps.indexOf(publish), "a later step must publish the draft, or it stands for ever");
