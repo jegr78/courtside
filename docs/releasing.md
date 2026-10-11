@@ -332,6 +332,8 @@ binding before its controlled Stalwart journey. `publish` waits for both.
 is tagged. What stays behind are the `release-candidate-<sha>-<run id>` images, unsigned and
 unqualified, in a public registry. Nightly retention removes them after 14 days.
 
+- A red push `build` of the release commit starts no candidate. Re-run its failed jobs; the
+  candidate starts when that attempt turns green.
 - A failure outside the commit, such as a runner that died or a registry that timed out: choose
   Re-run failed jobs on the candidate run. `evidence` and `tag` run again once everything is green.
 - A defect in the commit: fix it on `main` through the usual pull request. Then dispatch
