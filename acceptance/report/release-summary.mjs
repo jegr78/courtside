@@ -1,7 +1,7 @@
 const LABEL = { "product-defect": "product defect", "known-issue": "known issue", "capture-artefact": "capture artefact", "harness-gap": "harness gap" };
 
 const escape = (term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const mentions = (markdown, terms) => terms.filter(Boolean).some((term) => new RegExp(`(?<![\\p{L}\\p{N}])${escape(term)}(?![\\p{L}\\p{N}])`, "iu").test(markdown));
+const mentions = (markdown, terms, flags = "iu") => terms.filter(Boolean).some((term) => new RegExp(`(?<![\\p{L}\\p{N}])${escape(term)}(?![\\p{L}\\p{N}])`, flags).test(markdown));
 
 export function forbiddenTerms(config, discovery) {
   const roster = discovery.roster ?? [];
@@ -9,13 +9,15 @@ export function forbiddenTerms(config, discovery) {
     usernames: [...new Set([...Object.values(config.personas), ...(config.disposables ?? []), ...roster.map((entry) => entry.username)].filter(Boolean))],
     hosts: [new URL(config.baseUrl).hostname],
     names: [...new Set(roster.filter((entry) => entry.firstName && entry.lastName)
-      .flatMap((entry) => [`${entry.firstName} ${entry.lastName}`, `${entry.lastName}, ${entry.firstName}`]))]
+      .flatMap((entry) => [`${entry.firstName} ${entry.lastName}`, `${entry.lastName}, ${entry.firstName}`]))],
+    nameParts: [...new Set(roster.flatMap((entry) => [entry.firstName, entry.lastName]).filter(Boolean))]
   };
 }
 
 export function assertPrivacySafe(markdown, forbidden) {
   if (mentions(markdown, forbidden.usernames)) throw new Error("release summary names a configured username");
-  if (mentions(markdown, forbidden.names)) throw new Error("release summary names a person from the roster");
+  // A name part counts only as written, so "the admin" is not the roster's "Admin".
+  if (mentions(markdown, forbidden.names) || mentions(markdown, forbidden.nameParts ?? [], "u")) throw new Error("release summary names a person from the roster");
   if (mentions(markdown, forbidden.hosts)) throw new Error("release summary names the instance host");
   if (/[\w.+-]+@[\w-]+\.[\w.-]+/.test(markdown)) throw new Error("release summary contains an email address");
   if (/!\[[^\]]*\]\(|<img\b/i.test(markdown)) throw new Error("release summary contains an image");

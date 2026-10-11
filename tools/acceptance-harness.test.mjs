@@ -522,6 +522,7 @@ test("given a configuration and a roster, when the forbidden terms are built, th
   assert.ok(terms.usernames.includes("richard.doe"), "a roster username is forbidden");
   assert.deepEqual(terms.hosts, ["club.example.org"], "the host without its port");
   assert.deepEqual(terms.names, ["Richard Doe", "Doe, Richard", "Mary Major", "Major, Mary"], "full names in both orders are forbidden");
+  assert.deepEqual(terms.nameParts, ["Richard", "Doe", "Mary", "Major"], "each name part is forbidden as written");
 });
 
 test("given roster entries named like ordinary words, when the summary uses those words, then it is not refused", () => {
@@ -530,6 +531,7 @@ test("given roster entries named like ordinary words, when the summary uses thos
   // when / then
   assert.doesNotThrow(() => assertPrivacySafe("The admin signs in again before saving.", terms));
   assert.throws(() => assertPrivacySafe("Reported by Test Admin.", terms), /person/);
+  assert.throws(() => assertPrivacySafe("Seen by Admin only.", terms), /person/, "a capitalised name part alone is refused");
 });
 
 import { coverageOf } from "../acceptance/report/html.mjs";
