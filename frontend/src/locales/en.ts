@@ -784,6 +784,7 @@ const en: Record<keyof typeof de, string> = {
   "myBookings.scope.WHOLE_SERIES": "Whole series",
   "myBookings.moveTitle": "Move series",
   "myBookings.newStartTime": "New start time",
+  "myBookings.startUnchanged": "Unchanged",
   "myBookings.newDuration": "New duration in minutes",
   "myBookings.movePreview": "Preview move",
   "myBookings.moveConfirm": "Confirm move",

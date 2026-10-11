@@ -26,8 +26,8 @@ it("given a field with a value, when it renders, then it carries neither the mar
   // then
   const field = screen.getByTestId("starts");
   expect(field, "a set value is shown as it is").not.toHaveAttribute("data-empty");
-  expect(field).not.toHaveAccessibleDescription();
-  expect(screen.queryByTestId("starts-empty")).not.toBeInTheDocument();
+  expect(field, "a set value is not described as not set").not.toHaveAccessibleDescription();
+  expect(screen.queryByTestId("starts-empty"), "a set value shows no empty hint").not.toBeInTheDocument();
 });
 
 it("given an empty field nobody controls, when a date is entered, then the mark and the hint go", () => {
@@ -40,7 +40,7 @@ it("given an empty field nobody controls, when a date is entered, then the mark 
 
   // then
   expect(field, "an entered date is no longer empty").not.toHaveAttribute("data-empty");
-  expect(screen.queryByTestId("starts-empty")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("starts-empty"), "an entered date removes the empty hint").not.toBeInTheDocument();
 });
 
 it("given a field with a description of its own, when it is empty, then both descriptions reach assistive technology", () => {
@@ -62,5 +62,45 @@ it("given German, when an empty field renders, then the hint is German", async (
   render(<DateTimeInput data-testid="starts" type="time" aria-label="Beginn" value="" onChange={() => {}} />);
 
   // then
-  expect(screen.getByTestId("starts")).toHaveAccessibleDescription("Nicht gesetzt");
+  expect(screen.getByTestId("starts"), "the default locale announces the empty state in German").toHaveAccessibleDescription("Nicht gesetzt");
+});
+
+it("given a partly typed time, when the field loses focus, then it is not presented as empty", () => {
+  // given
+  render(<DateTimeInput data-testid="starts" type="time" aria-label="Starts" value="" onChange={() => {}} />);
+  const field = screen.getByTestId("starts");
+  Object.defineProperty(field, "validity", { configurable: true, value: { badInput: true } });
+
+  // when
+  fireEvent.input(field);
+  fireEvent.blur(field);
+
+  // then
+  expect(field, "typed digits stay painted although the value is still empty").not.toHaveAttribute("data-empty");
+  expect(screen.queryByTestId("starts-empty"), "no hint claims a partly typed field is not set").not.toBeInTheDocument();
+});
+
+it("given a partly typed time, when the digits are removed again, then it is presented as empty", () => {
+  // given
+  render(<DateTimeInput data-testid="starts" type="time" aria-label="Starts" value="" onChange={() => {}} />);
+  const field = screen.getByTestId("starts");
+  Object.defineProperty(field, "validity", { configurable: true, value: { badInput: true } });
+  fireEvent.input(field);
+
+  // when
+  Object.defineProperty(field, "validity", { configurable: true, value: { badInput: false } });
+  fireEvent.blur(field);
+
+  // then
+  expect(field, "a field emptied again shows as empty").toHaveAttribute("data-empty", "true");
+  expect(screen.getByTestId("starts-empty"), "the empty hint returns").toBeVisible();
+});
+
+it("given a hint of its own, when the field is empty, then that hint is shown and announced instead", () => {
+  // when
+  render(<DateTimeInput data-testid="starts" type="time" aria-label="Starts" emptyHint="Unchanged" value="" onChange={() => {}} />);
+
+  // then
+  expect(screen.getByTestId("starts"), "the caller's meaning of empty is announced").toHaveAccessibleDescription("Unchanged");
+  expect(screen.getByTestId("starts-empty"), "the caller's meaning of empty is shown").toHaveTextContent("Unchanged");
 });

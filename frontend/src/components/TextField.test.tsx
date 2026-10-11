@@ -125,5 +125,5 @@ it("given an empty time field in its label, when it renders, then the label name
   const field = screen.getByTestId("opens-at");
   expect(field, "the hint inside the label stays out of the name").toHaveAccessibleName("Opens at");
   expect(field, "the empty state is announced as a description").toHaveAccessibleDescription("Not set");
-  expect(field).toHaveAttribute("data-empty", "true");
+  expect(field, "a time field in a label is marked empty for the stylesheet").toHaveAttribute("data-empty", "true");
 });

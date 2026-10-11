@@ -782,6 +782,7 @@ const de = {
   "myBookings.scope.WHOLE_SERIES": "Ganze Serie",
   "myBookings.moveTitle": "Serie verschieben",
   "myBookings.newStartTime": "Neue Startzeit",
+  "myBookings.startUnchanged": "Unverändert",
   "myBookings.newDuration": "Neue Dauer in Minuten",
   "myBookings.movePreview": "Verschiebung prüfen",
   "myBookings.moveConfirm": "Verschiebung bestätigen",

@@ -237,13 +237,18 @@ input[type="time"] {
     inset: 0;
     display: flex;
     align-items: center;
-    padding: 0 2.5rem 0 0.75rem;
-    overflow: hidden;
+    padding: 0 1.75rem 0 0.75rem;
     color: var(--cs-muted);
     font-size: 0.875rem;
     font-weight: 400;
-    white-space: nowrap;
     pointer-events: none;
+  }
+
+  .date-time-empty > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .date-time-field:focus-within .date-time-empty {

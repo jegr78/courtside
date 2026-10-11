@@ -144,10 +144,10 @@ describe("AdminOpeningHoursView", () => {
       const field = screen.getByTestId(testId);
       expect(field, `${testId} cannot be edited on a closed day`).toBeDisabled();
       expect(field, `${testId} is marked empty so no ghost time shows`).toHaveAttribute("data-empty", "true");
-      expect(field).toHaveAccessibleDescription("Not set");
+      expect(field, `${testId} is announced as not set`).toHaveAccessibleDescription("Not set");
     }
     expect(screen.getByTestId("hours-open-TUESDAY"), "a day closed from the start shows as empty too").toHaveAttribute("data-empty", "true");
-    expect(screen.queryByTestId("hours-open-MONDAY-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("hours-open-MONDAY-empty"), "a closed day shows the empty hint").toBeVisible();
   });
 
   it("given a day the server rejects, when the week is saved, then the message lands on that day", async () => {
