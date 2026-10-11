@@ -29,7 +29,8 @@ created.
 - A booking grid whose slot length divides an hour.
 - No opening week scheduled after today, no club booking on the window's Sunday, and none on its
   Saturday before the latest later opening the weekend journeys schedule. The preflight names
-  each one it finds.
+  each one it finds. With `notifyClubBookings` such bookings stay in place and their bookers are
+  told about the changed hours; the report counts them.
 - Mail delivered to a catcher, never to members. The journeys change opening hours, and the
   instance tells members about bookings those changes affect.
 - The Mailpit API of that catcher for the journeys that read mail. Without `mail.url` those
@@ -55,6 +56,7 @@ shows the shape with placeholder accounts.
 | `browsers.firefox.wsEndpoint` | Remote Firefox launch server; default a local Firefox | no |
 | `loadLimit` | One-minute load average the run waits to fall below before it starts; default 5.5 | no |
 | `resetCodesPerHour` | Password-reset codes the instance mails per account and hour; default 5, the instance's own default | no |
+| `notifyClubBookings` | Let the weekend journeys run over club bookings and notify their bookers; only for an instance whose mail reaches a catcher; default false | no |
 
 The file is validated before any browser starts. A missing or malformed field, two actors sharing
 one username, a window start that is not a Monday or fewer than two courts stop the run and name

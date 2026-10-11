@@ -9,7 +9,7 @@ export type Config = {
   personas: Record<Exclude<PersonaKey, "disposable">, string> & { disposable: string };
   disposables: string[]; timeZone?: string; window: { start?: string }; courts?: number[];
   mail?: { url: string }; logs: { app?: string; proxy?: string }; metrics?: { url: string };
-  browsers: { firefox?: { wsEndpoint: string } }; loadLimit: number; resetCodesPerHour: number;
+  browsers: { firefox?: { wsEndpoint: string } }; loadLimit: number; resetCodesPerHour: number; notifyClubBookings: boolean;
 };
 export const config = loadConfig() as unknown as Config;
 export const PASSWORD: string = config.password;

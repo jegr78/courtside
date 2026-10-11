@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 export const PERSONA_KEYS = ["admin", "trainer", "youth", "sport", "grounds", "treasurer", "memberA", "memberB", "memberC", "disposable"];
-const TOP_LEVEL = ["baseUrl", "expectedVersion", "personas", "timeZone", "window", "courts", "mail", "logs", "metrics", "browsers", "loadLimit", "resetCodesPerHour"];
+const TOP_LEVEL = ["baseUrl", "expectedVersion", "personas", "timeZone", "window", "courts", "mail", "logs", "metrics", "browsers", "loadLimit", "resetCodesPerHour", "notifyClubBookings"];
 
 export class ConfigError extends Error {
   constructor(field, problem) {
@@ -43,6 +43,7 @@ export function parseConfig(raw, env) {
     logs: {},
     browsers: {},
     loadLimit: 5.5,
+    notifyClubBookings: false,
     resetCodesPerHour: 5
   };
   const personas = object(input.personas, "personas");
@@ -115,6 +116,10 @@ export function parseConfig(raw, env) {
   if (input.resetCodesPerHour !== undefined) {
     if (!Number.isInteger(input.resetCodesPerHour) || input.resetCodesPerHour < 1) throw new ConfigError("resetCodesPerHour", "must be a positive whole number");
     config.resetCodesPerHour = input.resetCodesPerHour;
+  }
+  if (input.notifyClubBookings !== undefined) {
+    if (typeof input.notifyClubBookings !== "boolean") throw new ConfigError("notifyClubBookings", "must be true or false");
+    config.notifyClubBookings = input.notifyClubBookings;
   }
   return config;
 }

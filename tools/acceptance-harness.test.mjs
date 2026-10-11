@@ -47,6 +47,13 @@ test("given a minimal configuration, when parsed, then defaults are filled and t
   assert.equal(config.loadLimit, 5.5);
   assert.deepEqual(config.window, {});
   assert.deepEqual(config.logs, {});
+  assert.equal(config.notifyClubBookings, false, "club bookings are protected unless the operator says otherwise");
+});
+
+test("given notifyClubBookings, when parsed, then true is kept and anything but a boolean is refused", () => {
+  // when / then
+  assert.equal(parseConfig({ ...valid(), notifyClubBookings: true }, env).notifyClubBookings, true);
+  assert.equal(field({ ...valid(), notifyClubBookings: "yes" }), "notifyClubBookings");
 });
 
 test("given a configuration without baseUrl, when parsed, then the refusal names the field", () => {

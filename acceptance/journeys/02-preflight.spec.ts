@@ -66,7 +66,7 @@ test("when the environment is checked before a run, then every precondition hold
   if (config.mail) expect.soft(checks.mail, "PRECONDITION: the mail API answers").toBe(true);
   if (config.metrics) expect.soft(checks.metrics, "PRECONDITION: the metrics endpoint answers").toBe("success");
   expect.soft(checks.occupiedSlots, "PRECONDITION: every reserved slot is free").toEqual([]);
-  expect.soft(checks.weekendConflicts, "PRECONDITION: no club booking lies before a Saturday later opening or on the window's Sunday").toEqual([]);
+  if (!config.notifyClubBookings) expect.soft(checks.weekendConflicts, "PRECONDITION: no club booking lies before a Saturday later opening or on the window's Sunday").toEqual([]);
   for (const [key, count] of Object.entries(checks.openBookings as Record<string, number>)) expect.soft(count, `PRECONDITION: ${key} has at most 6 open bookings`).toBeLessThanOrEqual(6);
   for (const [account, signsIn] of Object.entries(checks.disposablesSignIn as Record<string, boolean>)) {
     expect.soft(signsIn, `PRECONDITION: ${account} signs in with the shared password`).toBe(true);
