@@ -1,4 +1,4 @@
-import { expect, selectJourneyDate, test } from "./fixtures";
+import { expect, expectShownAsEmpty, selectJourneyDate, test, textFill, transparentText } from "./fixtures";
 
 interface CookieFacts {
   name: string;
@@ -163,30 +163,22 @@ test("an administrator can open both core administration views", async ({ page }
   await expect(page.getByTestId("create-court")).toBeVisible();
 });
 
-const transparent = "rgba(0, 0, 0, 0)";
-
-function textFill(field: import("@playwright/test").Locator): Promise<string> {
-  return field.evaluate((element) => getComputedStyle(element).getPropertyValue("-webkit-text-fill-color"));
-}
-
 test("an empty time filter hides the browser's ghost value until it is focused or filled", async ({ page, browserName }) => {
   // given
   await signIn(page, "configuration-admin");
   await page.goto("/admin/audit");
   const from = page.getByTestId("audit-filter-from");
   const hint = page.getByTestId("audit-filter-from-empty");
-  await expect(page.getByTestId("admin-audit-view")).toBeVisible();
+  await expect(page.getByTestId("admin-audit-view"), "the change log opens").toBeVisible();
 
   // then
-  await expect(from).toHaveAttribute("data-empty", "true");
-  await expect.poll(() => textFill(from), { message: `${browserName} paints no ghost value into an empty filter` }).toBe(transparent);
-  await expect(hint, `${browserName} shows the empty hint instead`).toBeVisible();
+  await expectShownAsEmpty(from, browserName);
 
   // when
   await from.focus();
 
   // then
-  await expect.poll(() => textFill(from), { message: `${browserName} reveals the editable fields on focus` }).not.toBe(transparent);
+  await expect.poll(() => textFill(from), { message: `${browserName} reveals the editable fields on focus` }).not.toBe(transparentText);
   await expect(hint, `${browserName} hides the hint while the field is edited`).toBeHidden();
 
   // when
@@ -194,16 +186,16 @@ test("an empty time filter hides the browser's ghost value until it is focused o
   await page.getByTestId("audit-filter-query").focus();
 
   // then
-  await expect(from).not.toHaveAttribute("data-empty");
-  await expect.poll(() => textFill(from), { message: `${browserName} shows a chosen time` }).not.toBe(transparent);
-  await expect(hint).toHaveCount(0);
+  await expect(from, `${browserName} no longer marks a filled filter as empty`).not.toHaveAttribute("data-empty");
+  await expect.poll(() => textFill(from), { message: `${browserName} shows a chosen time` }).not.toBe(transparentText);
+  await expect(hint, `${browserName} drops the hint once a time is chosen`).toHaveCount(0);
 });
 
 test("a closed day shows its opening times as empty rather than as a ghost time", async ({ page, browserName }) => {
   // given
   await signIn(page, "configuration-admin");
   await page.goto("/admin/facility/opening-hours");
-  await expect(page.getByTestId("admin-opening-hours-view")).toBeVisible();
+  await expect(page.getByTestId("admin-opening-hours-view"), "the opening hours open").toBeVisible();
 
   // when
   await page.getByTestId("hours-closed-SUNDAY").check();
@@ -211,9 +203,8 @@ test("a closed day shows its opening times as empty rather than as a ghost time"
   // then
   for (const testId of ["hours-open-SUNDAY", "hours-close-SUNDAY"]) {
     const field = page.getByTestId(testId);
-    await expect(field).toBeDisabled();
-    await expect.poll(() => textFill(field), { message: `${browserName} paints no time into ${testId}` }).toBe(transparent);
-    await expect(page.getByTestId(`${testId}-empty`), `${browserName} marks ${testId} as not set`).toBeVisible();
+    await expect(field, `${browserName} locks ${testId} on a closed day`).toBeDisabled();
+    await expectShownAsEmpty(field, browserName);
   }
 });
 
