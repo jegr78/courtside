@@ -15,6 +15,17 @@ test("given the acceptance package, when its browser dependencies are read, then
   for (const [own, theirs] of pins) assert.equal(own, theirs, "acceptance pins the frontend's exact version");
 });
 
+test("given the acceptance package, when axe's Playwright core is read, then it is the pinned Playwright version", () => {
+  // given
+  const acceptance = json("acceptance/package.json");
+  const lock = json("acceptance/package-lock.json");
+  // when
+  const resolved = lock.packages["node_modules/@axe-core/playwright/node_modules/playwright-core"]?.version
+    ?? lock.packages["node_modules/playwright-core"]?.version;
+  // then
+  assert.equal(resolved, acceptance.dependencies["@playwright/test"], "axe drives the same Playwright the journeys use");
+});
+
 import { ConfigError, parseConfig, PERSONA_KEYS } from "../acceptance/config/schema.mjs";
 
 const valid = () => ({

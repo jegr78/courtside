@@ -3,10 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "playwright test --config test/playwright.config.ts"
+    "test": "ACCEPTANCE_CONFIG=config.example.json ACCEPTANCE_PASSWORD=unused ACCEPTANCE_RUN_DIR=../build/acceptance-selftest playwright test --config test/playwright.config.ts"
   },
   "dependencies": {
     "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.63.0"
+  },
+  "overrides": {
+    "@axe-core/playwright": {
+      "playwright-core": "1.63.0"
+    }
   }
 }

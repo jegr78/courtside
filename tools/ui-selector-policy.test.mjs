@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const frontend = fileURLToPath(new URL("../frontend", import.meta.url));
+const acceptance = fileURLToPath(new URL("../acceptance", import.meta.url));
+const root = fileURLToPath(new URL("..", import.meta.url));
 const frontendRequire = createRequire(new URL("../frontend/package.json", import.meta.url));
 const ts = frontendRequire("typescript");
 const forbiddenQuery = /\b(?:find|get|query)(?:All)?By(?:Text|LabelText|PlaceholderText|DisplayValue|Title|AltText)\s*\(/g;
@@ -39,7 +41,10 @@ test("given an option chosen by the words it renders, when a test picks it, then
 
 test("given UI tests, when selecting elements, then rendered copy is never the locator", () => {
   // given
-  const testFiles = files(frontend).filter((path) => /\.(?:test|spec)\.(?:ts|tsx)$/.test(path));
+  const testFiles = [
+    ...files(frontend).filter((path) => /\.(?:test|spec)\.(?:ts|tsx)$/.test(path)),
+    ...files(acceptance).filter((path) => /\.ts$/.test(path))
+  ];
 
   // when
   const violations = testFiles.flatMap((path) => {
@@ -47,7 +52,7 @@ test("given UI tests, when selecting elements, then rendered copy is never the l
     const queryOffsets = [...source.matchAll(new RegExp(forbiddenQuery.source, "g"))].map((match) => match.index);
     return [...queryOffsets, ...roleNameViolations(source), ...optionLabelViolations(source)]
       .map((offset) =>
-      `${path.slice(frontend.length + 1)}:${source.slice(0, offset).split("\n").length}`
+      `${path.slice(root.length)}:${source.slice(0, offset).split("\n").length}`
     );
   });
 

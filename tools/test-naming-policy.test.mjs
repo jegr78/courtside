@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const suites = ["frontend/src", "frontend/e2e", "tools"];
+const suites = ["frontend/src", "frontend/e2e", "tools", "acceptance"];
 
 // A half-renamed name keeps the Java joints even where its first clause already reads as a sentence,
 // and that is the form a sweep leaves behind, so it is the one worth catching.
@@ -16,7 +16,8 @@ const declarations = [
 
 function testFiles(directory) {
   return readdirSync(new URL(`../${directory}`, import.meta.url), { withFileTypes: true, recursive: true })
-    .filter((entry) => entry.isFile() && /\.test\.(ts|tsx|mjs)$/.test(entry.name))
+    .filter((entry) => entry.isFile() && !entry.parentPath.includes("node_modules")
+      && (/\.test\.(ts|tsx|mjs)$/.test(entry.name) || (directory === "acceptance" && /\.spec\.ts$/.test(entry.name))))
     .map((entry) => `${entry.parentPath}/${entry.name}`);
 }
 
