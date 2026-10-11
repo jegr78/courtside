@@ -934,6 +934,23 @@ test("given the narrowest supported phone, when a member opens each of their pag
   expect(overflowing, "a member page wider than a 320 px screen").toEqual([]);
 });
 
+test("given a German word longer than a 320 px line, when a heading wraps it, then it breaks at a syllable with a hyphen", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/login");
+  await page.evaluate(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+  await become(page, "doe.jane");
+
+  // when
+  await page.goto("/my-messages");
+  const heading = page.getByRole("heading", { level: 1 });
+  const hyphenation = await heading.evaluate((element) => getComputedStyle(element).hyphens);
+
+  // then
+  await expect(page.locator("html"), "the browser hyphenates by the document language").toHaveAttribute("lang", "de");
+  expect(hyphenation, "a heading word that does not fit breaks at a syllable, not at an arbitrary letter").toBe("auto");
+});
+
 test("every page keeps its text legible and its controls on screen at phone width", async ({ page }) => {
   // given
   const pages = routerPages();
