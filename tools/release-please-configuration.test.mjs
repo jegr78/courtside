@@ -102,15 +102,14 @@ test("given no release to bump from, when the first candidate is proposed, then 
     + " the complete release pipeline as rc.1 before this repository publishes 0.1.0");
 });
 
-test("given the candidates proved the release path, when the strategy is read, then the line graduates and can open again",
+test("given 0.1.0 is published, when the strategy is read, then main counts candidates of the next line",
   () => {
     // when / then
     assert.equal(config.versioning, "prerelease");
     assert.equal(packageEntry["prerelease-type"], "rc");
-    assert.equal(config.prerelease, false,
-      "0.1.0-rc.12 passed every gate, the tag-triggered publication and the acceptance walk, so the next"
-      + " release pull request strips the suffix and proposes 0.1.0; a later line opens candidates by turning this on");
-    assert.match(manifest["."], /^0\.1\.0(-rc\.\d+)?$/, "the graduating line stays on 0.1.0 until it is released");
+    assert.equal(config.prerelease, true,
+      "main carries the next milestone as candidates; patch releases of 0.1 come from a release branch");
+    assert.match(manifest["."], /^0\.(1\.0|2\.0-rc\.\d+)$/, "the line after 0.1.0 is 0.2.0, opened by a Release-As footer");
   });
 
 test("given release-please writes a candidate delta, when it updates the release PR, then the changelog is normalized before review",
