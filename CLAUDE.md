@@ -74,9 +74,9 @@ fails on the missing `BuildProperties` bean.
   and email templates resolve the message.
 * **Flyway migrations are editable until the first release, append-only after it.** The rule exists
   to protect databases that have already applied a migration: Flyway verifies checksums and refuses
-  to start when one changes underneath it. No such database exists yet — nothing is tagged, no image
-  is published, and the only databases that ever see these files are Testcontainers, recreated on
-  every run.
+  to start when one changes underneath it. 0.1.0 is published on GHCR, so such databases exist and
+  every migration up to it is shipped. A pull request that changes `src/main/resources/db/migration/`
+  proves the upgrade from every published origin of the next release before it merges.
 
   **Before the first published release:** *corrections* are edited in place. Getting
   `V2__booking_card.sql` right beats carrying a `V8` that repairs it, and a club installing 1.0

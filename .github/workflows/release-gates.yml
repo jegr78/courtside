@@ -420,6 +420,7 @@ jobs:
       - id: resolve
         name: Resolve the database upgrade origins
         env:
+          GH_TOKEN: ${{ github.token }}
           REQUESTED: ${{ inputs.upgrade-origins }}
           SOURCE_COMMIT: ${{ inputs.source-commit }}
           UPGRADE_BASE: ${{ inputs.upgrade-base }}
@@ -431,6 +432,11 @@ jobs:
               "https://ghcr.io/v2/$GITHUB_REPOSITORY/tags/list?n=10000" | jq -c .tags)
             origins=$(node tools/courtside.upgrade-smoke.mjs --nightly-origins "$GITHUB_REPOSITORY" "$tags" \
               "$SOURCE_COMMIT")
+            if [ -n "$UPGRADE_BASE" ]; then
+              published=$(node tools/published-release-tags.mjs)
+              proven=$(node tools/courtside.upgrade-smoke.mjs --pull-request-origins "$GITHUB_REPOSITORY" "$UPGRADE_BASE" "$SOURCE_COMMIT" "$published")
+              origins=$(jq -cn --argjson nightly "$origins" --argjson proven "$proven" '$nightly + $proven | unique_by(.ref)')
+            fi
             if [ "$origins" = '[]' ]; then
               test -n "$UPGRADE_BASE"
               notice=$(node tools/courtside.upgrade-smoke.mjs --empty-origin-notice "$UPGRADE_BASE" "$SOURCE_COMMIT")
