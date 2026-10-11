@@ -1,5 +1,4 @@
-import type { APIResponse } from "@playwright/test";
-import { anonymousApi, apiAs, type Api } from "./api";
+import { adminPut, anonymousApi, apiAs } from "./api";
 import { disposableRecord } from "./journey";
 import { latestMailTo } from "./mail";
 import { PASSWORD, persona } from "./context";
@@ -28,15 +27,6 @@ async function resetToShared(username: string) {
     const redeemed = await api.post("/api/account-recovery/password/redemption", { code, password: PASSWORD });
     precondition(redeemed.ok(), `reset code redemption answered ${redeemed.status()}`);
   } finally { await api.dispose(); }
-}
-
-// Reauthenticates only when the write asks for it, so a healthy account costs no credential check.
-async function adminPut(admin: Api, path: string, data: unknown): Promise<APIResponse> {
-  const first = await admin.put(path, data);
-  if (first.status() !== 401 && first.status() !== 403) return first;
-  const reauthenticated = await admin.post("/api/session/reauthentication", { password: PASSWORD });
-  precondition(reauthenticated.ok(), `admin reauthentication answered ${reauthenticated.status()}`);
-  return admin.put(path, data);
 }
 
 export async function restoreDisposable(username = own()) {

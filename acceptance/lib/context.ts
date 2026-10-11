@@ -4,7 +4,14 @@ import { loadConfig } from "../config/schema.mjs";
 import { disposableFor } from "../config/disposables.mjs";
 
 export type PersonaKey = "admin" | "trainer" | "youth" | "sport" | "grounds" | "treasurer" | "memberA" | "memberB" | "memberC" | "disposable";
-export const config = loadConfig();
+export type Config = {
+  baseUrl: string; expectedVersion: string; password: string;
+  personas: Record<Exclude<PersonaKey, "disposable">, string> & { disposable: string };
+  disposables: string[]; timeZone?: string; window: { start?: string }; courts?: number[];
+  mail?: { url: string }; logs: { app?: string; proxy?: string }; metrics?: { url: string };
+  browsers: { firefox?: { wsEndpoint: string } }; loadLimit: number; resetCodesPerHour: number;
+};
+export const config = loadConfig() as unknown as Config;
 export const PASSWORD: string = config.password;
 const run = process.env.ACCEPTANCE_RUN_DIR;
 if (!run) throw new Error("ACCEPTANCE_RUN_DIR is not set; start the harness through acceptance/run.mjs");

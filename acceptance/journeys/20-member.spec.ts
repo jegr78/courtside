@@ -9,13 +9,16 @@ import { addPartner, bookAt, cancelQuietly, discovery, onPhonesAndChrome, openSl
 test.beforeEach(() => { test.skip(!onPhonesAndChrome(), "member journeys run on phones and desktop chrome"); });
 
 test("given a member, when a singles court is booked with a partner, then the plan shows it and a confirmation is mailed", async ({ browser, lanes }) => {
+  // given
   const slot = await lanes.take("singles");
   const page = await openAs(browser, "memberA");
   const ids: string[] = [];
   const since = new Date();
   try {
     await step("memberA", "plan", () => capture(page, "plan"));
+    // when
     ids.push(await step("memberA", "book singles", () => bookAt(page, "memberA", slot, (p) => addPartner(p, "memberB"))));
+    // then
     await expect(page.getByTestId("own-allocation").first(), "product: the plan shows the own booking").toBeVisible();
     await step("memberA", "plan with own booking", () => capture(page, "plan-own-booking"));
     await step("memberA", "confirmation mail", async () => {
@@ -26,10 +29,12 @@ test("given a member, when a singles court is booked with a partner, then the pl
 });
 
 test("given a member, when a doubles court is booked with three others, then the booking is made", async ({ browser, lanes }) => {
+  // given
   const slot = await lanes.take("doubles");
   const page = await openAs(browser, "memberB");
   const ids: string[] = [];
   try {
+    // when / then
     ids.push(await step("memberB", "book doubles", () => bookAt(page, "memberB", slot, async (p) => {
       for (const key of ["memberA", "memberC", "treasurer"]) await addPartner(p, key);
     })));
@@ -37,10 +42,12 @@ test("given a member, when a doubles court is booked with three others, then the
 });
 
 test("given a member, when a court is booked with a guest, then the booking is made", async ({ browser, lanes }) => {
+  // given
   const slot = await lanes.take("guest");
   const page = await openAs(browser, "memberC");
   const ids: string[] = [];
   try {
+    // when / then
     ids.push(await step("memberC", "book with guest", () => bookAt(page, "memberC", slot, async (p) => {
       await p.getByTestId("booking-more-summary").click();
       await capture(p, "booking-more");
@@ -50,12 +57,14 @@ test("given a member, when a court is booked with a guest, then the booking is m
 });
 
 test("given a member, when a court is booked with a participant card, then the booking is made", async ({ browser, lanes }) => {
+  // given
   const card = discovery.participantCards.find((c: { active: boolean }) => c.active);
   test.skip(!card, "no active participant card");
   const slot = await lanes.take("participant");
   const page = await openAs(browser, "memberA");
   const ids: string[] = [];
   try {
+    // when / then
     ids.push(await step("memberA", "book with participant card", () => bookAt(page, "memberA", slot, async (p) => {
       await p.getByTestId("booking-more-summary").click();
       await p.getByTestId("participant-card").selectOption(card.id);
@@ -64,6 +73,7 @@ test("given a member, when a court is booked with a participant card, then the b
 });
 
 test("given a member, when a booking is made, cancelled and made again, then my bookings follows each step", async ({ browser, lanes }) => {
+  // given
   const slot = await lanes.take("rebook");
   const page = await openAs(browser, "memberB");
   const ids: string[] = [];
@@ -74,8 +84,10 @@ test("given a member, when a booking is made, cancelled and made again, then my 
       await capture(page, "my-bookings");
       await page.getByTestId("court-plan-link").click();
     });
+    // when
     const first = await step("memberB", "book", () => bookAt(page, "memberB", slot, (p) => addPartner(p, "memberC")));
     ids.push(first);
+    // then — the booking is listed, then cancelled
     await step("memberB", "cancel", async () => {
       await page.getByTestId("my-bookings-link").click();
       const row = page.locator(`[data-testid="personal-cancel"][data-booking-id="${first}"]`);
@@ -100,6 +112,7 @@ test("given a member, when a booking is made, cancelled and made again, then my 
       await capture(page, "my-bookings-after-cancel");
       await page.getByTestId("court-plan-link").click();
     });
+    // when / then — the slot can be booked again
     ids.push(await step("memberB", "book again", () => bookAt(page, "memberB", slot, (p) => addPartner(p, "memberC"))));
   } finally { await cancelQuietly(page, ids); await page.context().close(); }
 });
@@ -108,15 +121,18 @@ let choicesBefore: { kind: string; declinable: boolean; enabled: boolean }[] | u
 test.afterEach(async () => {
   if (!choicesBefore) return;
   const api = await apiAs("memberC");
-  await api.put("/api/account/messages", { declined: choicesBefore.filter((c) => c.declinable && !c.enabled).map((c) => c.kind) });
+  const restored = await api.put("/api/account/messages", { declined: choicesBefore.filter((c) => c.declinable && !c.enabled).map((c) => c.kind) });
+  expect(restored.ok(), `memberC's message choices are restored (${restored.status()})`).toBe(true);
   choicesBefore = undefined;
 });
 
 test("given a member, when the message choices are changed and changed back, then each save is confirmed", async ({ browser }) => {
+  // given
   const api = await apiAs("memberC");
   choicesBefore = await (await api.get("/api/account/messages")).json() as { kind: string; declinable: boolean; enabled: boolean }[];
   const page = await openAs(browser, "memberC");
   try {
+    // when
     await page.getByTestId("my-messages-link").click();
     await expect(page.getByTestId("my-messages-view")).toBeVisible();
     await capture(page, "my-messages");
@@ -124,8 +140,10 @@ test("given a member, when the message choices are changed and changed back, the
     const checked = await choice.isChecked();
     await choice.click();
     await page.getByTestId("my-messages-save").click();
+    // then
     await expect(page.getByTestId("my-messages-saved"), "product: the changed choice is saved").toBeVisible();
     await capture(page, "my-messages-saved");
+    // when
     await choice.click();
     await page.getByTestId("my-messages-save").click();
     await expect(choice, "product: the choice is back to its original state").toBeChecked({ checked });
@@ -135,6 +153,7 @@ test("given a member, when the message choices are changed and changed back, the
 });
 
 test("given two members on the same slot, when both submit, then the second is refused with a reason", async ({ browser, lanes }) => {
+  // given
   const slot = await lanes.take("contention");
   const first = await openAs(browser, "memberB");
   const second = await openAs(browser, "memberC");
@@ -144,8 +163,10 @@ test("given two members on the same slot, when both submit, then the second is r
     await openSlot(second, slot);
     await addPartner(first, "memberA");
     await addPartner(second, "memberA");
+    // when
     const won = await submitBooking(first, "memberB");
     if (won.id) ids.push(won.id);
+    // then
     expect(won.status, "product: the first submission is accepted").toBeLessThan(300);
     const lost = await submitBooking(second, "memberC");
     if (lost.id) ids.push(lost.id);
@@ -156,8 +177,10 @@ test("given two members on the same slot, when both submit, then the second is r
 });
 
 test("given a member, when the preferences menu is opened and the theme switched, then both themes render", async ({ browser }) => {
+  // given
   const page = await openAs(browser, "memberA");
   try {
+    // when / then — each theme is captured
     await page.getByTestId("preferences-menu").click();
     await capture(page, "preferences-open");
     const theme = page.locator("#theme-preference");

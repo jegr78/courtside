@@ -44,15 +44,19 @@ async function signsInWith(browser: import("@playwright/test").Browser, password
 }
 
 test("given a wrong password, when the disposable member signs in, then the form says no", async ({ browser }) => {
+  // given
   const page = await openAs(browser, "visitor");
   try {
+    // when
     await signInByForm(page, username(), "definitely-not-the-password");
+    // then
     await expect(page.getByTestId("login-view").getByRole("alert"), "product: a wrong password is refused").toBeVisible();
     await capture(page, "login-wrong-password", { expectedStatuses: [401] });
   } finally { await page.context().close(); }
 });
 
 test("given the disposable member, when the password is changed and changed back, then both sign in", async ({ browser }) => {
+  // given
   const interim = temporary();
   const page = await openAs(browser, "disposable");
   try {
@@ -63,8 +67,10 @@ test("given the disposable member, when the password is changed and changed back
       await capture(page, "account-security");
       await page.goto("/");
     });
+    // when
     await step("disposable", "change to interim", () => changePassword(page, PASSWORD, interim));
     await capture(page, "after-password-change");
+    // then — each password signs in after its change
     const second = await signsInWith(browser, interim);
     await step("disposable", "change back", () => changePassword(second, interim, PASSWORD));
     await second.context().close();
@@ -76,10 +82,12 @@ test("given the disposable member, when the password is changed and changed back
 });
 
 test("given a forgotten password, when a reset code is mailed and redeemed, then the member is back in with the shared password", async ({ browser }) => {
+  // given
   const interim = temporary();
   const page = await openAs(browser, "visitor");
   const since = new Date();
   try {
+    // when
     await page.getByTestId("sign-in-link").click();
     await page.getByTestId("forgotten-credentials-link").click();
     await page.getByTestId("recovery-username").fill(username());
@@ -87,15 +95,18 @@ test("given a forgotten password, when a reset code is mailed and redeemed, then
     await expect(page.getByTestId("recovery-sent")).toBeVisible();
     await capture(page, "recovery-sent");
     const mail = await latestMailTo(disposableRecord(username()).email, since);
+    // then
     expect(mail, "product: the reset code reached Mailpit").not.toBeNull();
     await renderMail(browser, mail!.html, "mail-reset-code");
     const code = /^Code:\s*(\S+)\s*$/m.exec(mail!.text)?.[1];
     expect(code, "product: the mail carries a code line").toBeTruthy();
+    // when
     await page.getByTestId("recovery-code").fill(code!);
     await page.getByTestId("recovery-new-password").fill(interim);
     await page.getByTestId("recovery-redeem-submit").click();
     await expect(page.getByTestId("recovery-sent").or(page.getByTestId("login-view"))).toBeVisible();
     await capture(page, "recovery-redeemed");
+    // then
     const second = await signsInWith(browser, interim);
     await changePassword(second, interim, PASSWORD);
     await second.context().close();
@@ -107,13 +118,16 @@ test("given a forgotten password, when a reset code is mailed and redeemed, then
 });
 
 test("given a forgotten username, when a reminder is asked for by email, then it is mailed", async ({ browser }) => {
+  // given
   const page = await openAs(browser, "visitor");
   const since = new Date();
   try {
+    // when
     await page.getByTestId("sign-in-link").click();
     await page.getByTestId("forgotten-credentials-link").click();
     await page.getByTestId("recovery-email").fill(disposableRecord(username()).email);
     await page.getByTestId("recovery-usernames-submit").click();
+    // then
     await expect(page.getByTestId("recovery-sent")).toBeVisible();
     await capture(page, "username-reminder-sent");
     const mail = await latestMailTo(disposableRecord(username()).email, since);
@@ -123,6 +137,7 @@ test("given a forgotten username, when a reminder is asked for by email, then it
 });
 
 test("given a deactivated account, when the member signs in, then it is refused until the admin reactivates it", async ({ browser }) => {
+  // given
   const admin = await openAs(browser, "admin");
   try {
     await admin.goto(`/admin/roster/${disposableRecord(username()).personId}`);
@@ -131,13 +146,17 @@ test("given a deactivated account, when the member signs in, then it is refused 
     await reauthenticateIfAsked(admin);
     await expect(admin.getByTestId("admin-save-success")).toBeVisible();
     await capture(admin, "account-deactivated");
+    // when
     const member = await openAs(browser, "visitor");
     await signInByForm(member, username(), PASSWORD);
+    // then
     await expect(member.getByTestId("login-view").getByRole("alert"), "product: a deactivated account is refused").toBeVisible();
     await capture(member, "login-deactivated", { expectedStatuses: [401, 403] });
     await member.context().close();
+    // when
     await admin.getByTestId("toggle-account").click();
     await reauthenticateIfAsked(admin);
+    // then
     await expect(admin.getByTestId("admin-save-success"), "product: the account is reactivated").toBeVisible();
     const back = await signsInWith(browser, PASSWORD);
     await back.context().close();
@@ -147,17 +166,21 @@ test("given a deactivated account, when the member signs in, then it is refused 
 });
 
 test("given the disposable member, when the language is switched in the preferences and back, then both render", async ({ browser }) => {
+  // given
   const page = await openAs(browser, "disposable", { seedLocale: false });
   const original = disposableRecord(username()).locale ?? "de";
   try {
+    // when
     await page.getByTestId("preferences-menu").click();
     await page.locator("#locale-preference").selectOption(original === "de" ? "en" : "de");
     await capture(page, "locale-switched");
+    // then
     await page.reload();
     await expect(page.getByTestId("court-plan-view")).toBeVisible();
     await capture(page, "locale-after-reload");
   } finally {
     await page.context().close();
+    await restoreDisposable(username());
   }
 });
 

@@ -13,6 +13,7 @@ import { disposables, PASSWORD } from "../lib/context";
 const ids = (day: unknown) => new Set((day as { bookingId?: string; id?: string }[]).map((a) => a.bookingId ?? a.id));
 
 test("when the ledger is replayed, then the window holds no booking of this run", async ({ browser }) => {
+  // when
   const page = await openAs(browser, "admin");
   const dry = process.env.CLEANUP_DRY === "1";
   const ledgerIds = new Set(readLedger().map((e) => e.id));
@@ -33,6 +34,7 @@ test("when the ledger is replayed, then the window holds no booking of this run"
   const weeksLeft = weeks.map((w) => w.effectiveFrom).filter((d): d is string => d !== null && ourWeeks.has(d));
   writeFileSync(runPath(`cleanup${dry ? "-dry" : ""}.json`), JSON.stringify({ open, outcome, diff, weeksLeft }, null, 2));
   console.log(JSON.stringify({ open: open.length, failed: outcome.filter((o) => o.outcome === "failed").length, diff }));
+  // then
   if (!dry) expect(diff.flatMap((d) => d.ours), "no booking of this run is left in the window").toEqual([]);
   if (!dry) expect(weeksLeft, "no opening week this run scheduled is left").toEqual([]);
 });
@@ -43,7 +45,7 @@ test("when the run ends, then no reserved slot holds a booking of this run, no w
   const { removed, left, foreign } = await sweep(admin, allSlots());
   const weeks = await clearWeekend();
   for (const username of disposables) await restoreDisposable(username);
-  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks }, null, 2));
+  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks: weeks.removed, foreignWeeks: weeks.foreign }, null, 2));
   // then
   expect(left, "no reserved slot holds a booking of this run").toEqual([]);
   for (const [index, username] of disposables.entries()) expect(await canSignIn(PASSWORD, username), `disposable ${index + 1} signs in`).toBe(true);

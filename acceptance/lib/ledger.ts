@@ -14,5 +14,5 @@ export function readLedger(): Entry[] {
 type Remove = (path: string) => Promise<{ status: () => number }>;
 
 export async function replay(request: APIRequestContext, xsrf: string, entries = readLedger()) {
-  return replayEntries(entries, (path) => request.delete(path, { headers: { "X-XSRF-TOKEN": xsrf } }));
+  return replayEntries(entries, (path: string) => request.delete(path, { headers: { "X-XSRF-TOKEN": xsrf } }));
 }

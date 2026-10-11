@@ -16,6 +16,7 @@ test.beforeEach(() => { test.skip(!onDesksAndTablet(), "admin journeys run on de
 test.setTimeout(120_000);
 
 test("when the admin visits every administration page, then each renders", async ({ browser }) => {
+  // when / then — every page renders in turn
   const page = await openAs(browser, "admin");
   try {
     await page.getByTestId("administration-link").click();
@@ -49,6 +50,7 @@ test("when the admin visits every administration page, then each renders", async
 });
 
 test("when the admin opens a member and a booking card, then the detail pages render without saving", async ({ browser }) => {
+  // when / then — each detail page renders
   const page = await openAs(browser, "admin");
   try {
     await step("admin", "person detail", async () => {

@@ -71,6 +71,7 @@ async function revealBooking(page: Page, id: string) {
 
 for (const key of ["trainer", "youth"] as const) {
   test(`given the ${key}, when a training appointment is arranged, moved and called off, then each step is confirmed`, async ({ browser, lanes }) => {
+    // given
     const card = discovery.cardFor.training;
     const slot = await lanes.take(key);
     const target = await lanes.take(key === "trainer" ? "trainer-move" : "youth-move");
@@ -80,13 +81,16 @@ for (const key of ["trainer", "youth"] as const) {
     try {
       await step(key, "appointments", async () => { await openAppointments(page); await capture(page, "appointments"); await recordSurfaces(page, key); });
       const courts = await (await page.request.get("/api/public/courts")).json() as { id: string; number: number }[];
+      // when
       const result = await step(key, "create series", () => createSeries(page, key, card, courts.find((c) => c.number === slot.court)!.id, slot.date, weekday, slot.start, created));
       created = result.body;
+      // then
       expect(result.status, `product: the series is created (${JSON.stringify(result.body)})`).toBeLessThan(300);
       expect(created.bookingIds, "product: one occurrence created").toHaveLength(1);
       await expect(page.getByTestId("series-created"), "product: the series is confirmed").toBeVisible();
       await capture(page, "series-created");
       const id = created.bookingIds![0];
+      // when / then — the occurrence moves, then is called off
       await step(key, "move", async () => {
         const booking = await revealBooking(page, id);
         await booking.getByTestId("managed-actions").click();
@@ -120,14 +124,17 @@ for (const key of ["trainer", "youth"] as const) {
 }
 
 test("given the sport director, when two league matches are booked, then both appear among the managed appointments", async ({ browser, lanes }) => {
+  // given
   const card = discovery.cardFor.league;
   const page = await openAs(browser, "sport");
   const ids: string[] = [];
   try {
+    // when
     for (const journey of ["league-1", "league-2"] as const) {
       const slot = await lanes.take(journey);
       ids.push(await step("sport", journey, () => bookAt(page, "sport", slot, async () => {}, { card })));
     }
+    // then
     await step("sport", "managed appointments", async () => {
       await openAppointments(page);
       await recordSurfaces(page, "sport");
@@ -138,11 +145,14 @@ test("given the sport director, when two league matches are booked, then both ap
 });
 
 test("given the groundskeeper, when a free court is closed from the plan, then the closure is a managed appointment", async ({ browser, lanes }) => {
+  // given
   const page = await openAs(browser, "grounds");
   const ids: string[] = [];
   try {
     const slot = await lanes.take("grounds-closure");
+    // when
     ids.push(await step("grounds", "close from plan", () => bookAt(page, "grounds", slot, async () => {}, { card: discovery.cardFor.closure })));
+    // then
     await step("grounds", "plan with closure", () => capture(page, "plan-with-closure"));
     await step("grounds", "appointments", async () => {
       await openAppointments(page);
@@ -154,6 +164,7 @@ test("given the groundskeeper, when a free court is closed from the plan, then t
 });
 
 test("given a member booking, when the groundskeeper plans a closure over it, then the preview refuses that occurrence", async ({ browser, lanes }) => {
+  // given
   const member = await openAs(browser, "memberA");
   const grounds = await openAs(browser, "grounds");
   const ids: string[] = [];
@@ -164,6 +175,7 @@ test("given a member booking, when the groundskeeper plans a closure over it, th
     const courts = await (await grounds.request.get("/api/public/courts")).json();
     const courtId = courts.find((c: { number: number }) => String(c.number) === court).id;
     const weekday = new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" }).toUpperCase();
+    // when
     await openAppointments(grounds);
     await grounds.getByTestId("new-series").click();
     await grounds.getByTestId("series-courts").selectOption(courtId);
@@ -173,6 +185,7 @@ test("given a member booking, when the groundskeeper plans a closure over it, th
     await grounds.getByTestId(`series-weekday-${weekday}`).click();
     await grounds.getByTestId("series-occurrence-count").fill("1");
     await grounds.getByTestId("preview-series").click();
+    // then
     await expect(grounds.getByTestId("series-creatable-count")).toBeVisible();
     await capture(grounds, "closure-over-booking-preview");
     await expect(grounds.getByTestId("confirm-series"), "product: a closure over a member booking cannot be confirmed").toBeDisabled();
@@ -183,8 +196,10 @@ test("given a member booking, when the groundskeeper plans a closure over it, th
 });
 
 test("given the treasurer, when the administration area is opened, then what the role sees is recorded", async ({ browser }) => {
+  // given
   const page = await openAs(browser, "treasurer");
   try {
+    // when / then — what the role sees is captured and recorded
     const link = page.getByTestId("administration-link");
     if (await link.isVisible()) {
       await link.click();

@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { loadavg } from "node:os";
 import { writeFileSync } from "node:fs";
-import { apiAs } from "../lib/api";
+import { apiAs, readRoster } from "../lib/api";
 import { canSignIn } from "../lib/disposable";
-import { allSlots, instantOf } from "../lib/lanes";
+import { allSlots, instantOf, lanePlan } from "../lib/lanes";
+import { weekendConflicts } from "../config/lanes.mjs";
 import { config, disposables, PASSWORD, runPath, type PersonaKey } from "../lib/context";
 import { mailAvailable } from "../lib/mail";
 import { profilesOf, resetQuota } from "../config/disposables.mjs";
@@ -11,6 +12,7 @@ import { occupying } from "../lib/core.mjs";
 
 
 test("when the environment is checked before a run, then every precondition holds", async () => {
+  // when
   const admin = await apiAs("admin");
   const checks: Record<string, unknown> = {};
   try {
@@ -25,6 +27,9 @@ test("when the environment is checked before a run, then every precondition hold
     for (const slot of allSlots()) if (!days.has(slot.date)) days.set(slot.date, await (await admin.get(`/api/bookings?date=${slot.date}`)).json());
     checks.occupiedSlots = allSlots().flatMap((s) => occupying(days.get(s.date) as never, courts.find((c) => c.number === s.court)!.id,
       instantOf(s, "start"), instantOf(s, "end")).map((id) => `${s.profile}/${s.journey}: ${id}`));
+    const plan = lanePlan();
+    checks.weekendConflicts = weekendConflicts({ plan, saturday: days.get(plan.saturday) as never ?? [],
+      sunday: await (await admin.get(`/api/bookings?date=${plan.sunday}`)).json() });
     const open: Record<string, number> = {};
     for (const key of ["memberA", "memberB", "memberC", "trainer", "youth", "sport", "grounds"] as PersonaKey[]) {
       const api = await apiAs(key);
@@ -41,7 +46,7 @@ test("when the environment is checked before a run, then every precondition hold
     checks.disposablesSignIn = Object.fromEntries(await Promise.all(disposables.map(async (username, index) => [`disposable ${index + 1}`, await canSignIn(PASSWORD, username)])));
     const weeks = await (await admin.get("/api/admin/opening-hours/schedule")).json() as { effectiveFrom: string | null }[];
     checks.futureWeeks = weeks.slice(1).map((w) => w.effectiveFrom);
-    const roster = await (await admin.post("/api/admin/roster-search", {})).json() as { entries: { username: string | null; email: string | null }[] };
+    const roster = { entries: await readRoster(admin) };
     const resetQuotas: Record<string, unknown> = {};
     for (const [index, username] of disposables.entries()) {
       const email = roster.entries.find((e) => e.username === username)?.email;
@@ -56,10 +61,12 @@ test("when the environment is checked before a run, then every precondition hold
     writeFileSync(runPath("preflight.json"), JSON.stringify(checks, null, 2));
     await admin.dispose();
   }
+  // then
   expect.soft(checks.version, `PRECONDITION: the instance runs ${config.expectedVersion}`).toBe(config.expectedVersion);
   if (config.mail) expect.soft(checks.mail, "PRECONDITION: the mail API answers").toBe(true);
   if (config.metrics) expect.soft(checks.metrics, "PRECONDITION: the metrics endpoint answers").toBe("success");
   expect.soft(checks.occupiedSlots, "PRECONDITION: every reserved slot is free").toEqual([]);
+  expect.soft(checks.weekendConflicts, "PRECONDITION: no club booking lies before a Saturday later opening or on the window's Sunday").toEqual([]);
   for (const [key, count] of Object.entries(checks.openBookings as Record<string, number>)) expect.soft(count, `PRECONDITION: ${key} has at most 6 open bookings`).toBeLessThanOrEqual(6);
   for (const [account, signsIn] of Object.entries(checks.disposablesSignIn as Record<string, boolean>)) {
     expect.soft(signsIn, `PRECONDITION: ${account} signs in with the shared password`).toBe(true);

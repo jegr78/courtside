@@ -1,4 +1,4 @@
-import { hh, hourOf, weekdayOf, windowDays } from "./calendar.mjs";
+import { hh, hourOf, weekdayOf, windowDays, zonedInstant } from "./calendar.mjs";
 
 export const MEMBER_JOURNEYS = ["singles", "doubles", "guest", "participant", "rebook", "contention"];
 export const ROLE_JOURNEYS = ["closure-over-booking", "trainer", "trainer-move", "youth", "youth-move", "league-1", "league-2", "grounds-closure"];
@@ -17,9 +17,22 @@ export const journeysOf = (profile) => [
   ...(OFFLINE_PROFILES.includes(profile) ? ["offline"] : [])
 ];
 
+const governingWeek = (grid, date) => grid.openingWeeks.filter((candidate) => candidate.effectiveFrom === null || candidate.effectiveFrom <= date).at(-1);
+
+export const weekInForce = (grid, date) => governingWeek(grid, date).days.map(({ dayOfWeek, opensAt, closesAt }) => ({ dayOfWeek, opensAt, closesAt }));
+
+export const laterOpeningOf = (slot) => hh(hourOf(slot.end) + 1);
+
+export function weekendConflicts({ plan, saturday, sunday }) {
+  const latest = plan.slots.filter((slot) => slot.journey === "saturday-opening").map(laterOpeningOf).sort().at(-1);
+  const until = latest ? zonedInstant(plan.saturday, latest, plan.timeZone).getTime() : -Infinity;
+  const displaced = [...saturday.filter((a) => Date.parse(a.startsAt) < until), ...sunday].map((a) => a.bookingId);
+  return [...new Set(displaced)];
+}
+
 export function governingHours(grid, date) {
   const weekday = weekdayOf(date);
-  const week = grid.openingWeeks.filter((candidate) => candidate.effectiveFrom === null || candidate.effectiveFrom <= date).at(-1);
+  const week = governingWeek(grid, date);
   const day = week?.days.find((candidate) => candidate.dayOfWeek === weekday);
   return { opensAt: day?.opensAt ?? null, closesAt: day?.closesAt ?? null };
 }

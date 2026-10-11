@@ -2,16 +2,20 @@ import { type Page } from "@playwright/test";
 import { test, expect } from "../lib/fixtures";
 import { capture } from "../lib/checks";
 import { lanePlan } from "../lib/lanes";
-import { hh, hourOf } from "../config/calendar.mjs";
+import { laterOpeningOf } from "../config/lanes.mjs";
 import { latestMailTo } from "../lib/mail";
 import { gotoDay } from "../lib/plan";
 import { openAs } from "../lib/session";
 import { step } from "../lib/steps";
 import { addPartner, bookAt, cancelQuietly, discovery, onDesksAndTablet } from "../lib/journey";
-import { clearWeekend } from "../lib/weekend";
+import { boundWeek, clearWeekend, recordWeek } from "../lib/weekend";
+import { precondition } from "../lib/precondition";
 
 test.beforeEach(() => { test.skip(!onDesksAndTablet(), "opening-hours journeys run on desks, tablet and one phone"); });
-test.beforeEach(async () => { await clearWeekend(); });
+test.beforeEach(async () => {
+  const { foreign } = await clearWeekend();
+  precondition(foreign.length === 0, `the club has scheduled weeks from ${foreign.join(", ")}`);
+});
 test.afterEach(async ({}, info) => { if (info.status !== "skipped") await clearWeekend(); });
 test.setTimeout(150_000);
 
@@ -33,6 +37,7 @@ async function saveWeek(page: Page, effectiveFrom: string) {
   const saved = page.waitForResponse((r) => r.url().includes("/api/admin/opening-hours") && r.request().method() === "PUT");
   await page.getByTestId("save-opening-hours").click();
   expect((await saved).status(), "product: the scheduled week is stored").toBeLessThan(300);
+  recordWeek(effectiveFrom);
   await expect(page.getByTestId(`opening-week-${effectiveFrom}`), "product: the scheduled week is listed").toBeVisible();
   expect(await scheduledWeeks(page), "product: the schedule holds the new week").toContain(effectiveFrom);
 }
@@ -46,9 +51,10 @@ async function removeWeek(page: Page, effectiveFrom: string) {
 }
 
 test("given a member booking early on a Saturday, when the admin schedules a later Saturday opening, then the preview names it, the member is told and removing the week restores the plan", async ({ browser, lanes }) => {
+  // given
   const slot = await lanes.take("saturday-opening");
   const saturday = lanePlan().saturday;
-  const laterOpening = hh(hourOf(slot.end) + 1);
+  const laterOpening = laterOpeningOf(slot);
   const member = await openAs(browser, "memberA");
   const admin = await openAs(browser, "admin");
   const ids: string[] = [];
@@ -56,7 +62,9 @@ test("given a member booking early on a Saturday, when the admin schedules a lat
     const booked = await step("memberA", "book early saturday", () => bookAt(member, "memberA", slot, (p) => addPartner(p, "memberC")));
     ids.push(booked);
     const since = new Date();
+    // when
     await step("admin", "later saturday opening", async () => {
+      await boundWeek(saturday);
       await openOpeningHours(admin, saturday);
       await admin.getByTestId("hours-open-SATURDAY").fill(laterOpening);
       await admin.getByTestId("opening-hours-impact-SATURDAY").click();
@@ -65,6 +73,7 @@ test("given a member booking early on a Saturday, when the admin schedules a lat
       await saveWeek(admin, saturday);
       await capture(admin, "opening-hours-scheduled");
     });
+    // then
     await step("memberA", "displacement mail", async () => {
       const mail = await latestMailTo(discovery.emails.memberA, since);
       expect(mail, "product: memberA is told the booking now lies outside the opening hours").not.toBeNull();
@@ -78,7 +87,9 @@ test("given a member booking early on a Saturday, when the admin schedules a lat
       await expect(member.locator(`[data-testid="outside-slot"][data-date="${saturday}"]`).first(), "product: the closed morning is shown as outside").toBeAttached();
       await capture(member, "plan-later-opening");
     });
+    // when
     await step("admin", "remove scheduled week", () => removeWeek(admin, saturday));
+    // then
     await step("memberA", "plan restored", async () => {
       await member.goto("/");
       await gotoDay(member, saturday);
@@ -97,7 +108,9 @@ test("when the admin closes Sundays from a later date and removes that week agai
   const admin = await openAs(browser, "admin");
   const sunday = lanePlan().sunday;
   try {
+    // when
     await step("admin", "close sunday", async () => {
+      await boundWeek(sunday);
       await openOpeningHours(admin, sunday);
       await admin.getByTestId("hours-closed-SUNDAY").check();
       await expect(admin.getByTestId("hours-open-SUNDAY")).toBeDisabled();
@@ -106,12 +119,14 @@ test("when the admin closes Sundays from a later date and removes that week agai
       await capture(admin, "opening-hours-close-impact");
       await saveWeek(admin, sunday);
     });
+    // then
     await step("admin", "plan with closed sunday", async () => {
       await admin.goto("/");
       await gotoDay(admin, sunday);
       await expect(admin.locator('[data-testid="day-closed"], [data-testid="day-closed-notice"]').first(), "product: the plan shows Sunday as closed").toBeVisible();
       await capture(admin, "plan-closed-day");
     });
+    // when / then — removing the week opens Sunday again
     await step("admin", "reopen sunday", async () => {
       await admin.goto("/admin/facility/opening-hours");
       await expect(admin.getByTestId("opening-weeks")).toBeVisible();

@@ -71,3 +71,7 @@ export async function sweepSlots({ slots, read, cancel, ours }) {
   }
   return { removed, left, foreign };
 }
+
+export function weeksToClear({ scheduled, ours }) {
+  return { remove: scheduled.filter((date) => ours.has(date)), foreign: scheduled.filter((date) => !ours.has(date)) };
+}

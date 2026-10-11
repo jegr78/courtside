@@ -20,13 +20,19 @@ created.
   disposable accounts each profile uses its own.
 - Active booking cards that the trainer, youth director, sport director and groundskeeper may use,
   and an active participant card for the participant journey.
-- At least two active courts. Weekday lanes use the first two courts of `courts`; the weekend
-  journey uses up to three.
-- Opening hours that leave fifteen hours from opening on each weekday of the window, and two hours
-  on its Saturday. A lane day that is closed or too short stops the run before it books anything,
-  naming the profile and the day.
-- No opening week scheduled after today.
-- A mail catcher with the Mailpit API for the journeys that read mail. Without `mail.url` those
+- At least two active courts. Weekday lanes use the first two courts of `courts`; the five
+  Saturday lanes spread over every court in `courts`.
+- Opening hours that leave fifteen hours from opening on each weekday of the window. On its
+  Saturday the five lanes need one hour per court round plus one hour for the later opening: three
+  hours with three courts, four with two. A lane day that is closed or too short stops the run
+  before it books anything, naming the profile and the day.
+- A booking grid whose slot length divides an hour.
+- No opening week scheduled after today, no club booking on the window's Sunday, and none on its
+  Saturday before the latest later opening the weekend journeys schedule. The preflight names
+  each one it finds.
+- Mail delivered to a catcher, never to members. The journeys change opening hours, and the
+  instance tells members about bookings those changes affect.
+- The Mailpit API of that catcher for the journeys that read mail. Without `mail.url` those
   journeys are reported as not checkable, never as passed.
 
 ## Configuration
@@ -81,9 +87,10 @@ and preflight, the journeys on all ten profiles, the postflight and the report.
 Discovery writes `lanes.json`: the window, and for each profile and journey its day, court and
 hour. Preflight then proves every lane slot free before a journey starts.
 
-The harness cancels only bookings it recorded in its ledger. A booking of the club in a reserved
-slot stops the preflight or the journey that needs the slot and is never cancelled; choose another
-`window.start` or other `courts`.
+The harness cancels only bookings and removes only opening weeks it recorded in its ledger. A
+booking or week of the club in its way stops the preflight or the journey that needs it and is
+never touched; choose another `window.start` or other `courts`. Each opening week a journey
+schedules is followed the next day by a copy of the hours in force, so the change governs one day.
 
 The harness starts no log or tunnel process. To attribute server log lines to journey steps, follow
 the instance's logs into the files `logs.app` and `logs.proxy` name for the duration of the run,
@@ -124,8 +131,9 @@ appear under rejected suspicions, harness gaps under their own heading.
 
 Each report also writes `release-summary.md`: the version, the run, the passed, failed and skipped
 cells, and every finding with its assessment and issue. It contains no username, email address,
-person's name, instance host or image; a summary that would is refused. Post it on the release
-parent or the release pull request.
+name of anybody on the roster, instance host or image; a summary that would is refused. Post it on
+the release parent or the release pull request.
 
-Full reports and screenshots are never committed. They stay in the run directory and may be
-shared privately.
+Full reports and screenshots are never committed. The `report/` directory may be shared
+privately. The rest of the run directory stays on the operator's machine: Playwright traces in
+`test-results/` hold the shared password as typed, and `state/` holds signed-in sessions.

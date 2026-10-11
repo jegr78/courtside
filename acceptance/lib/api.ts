@@ -45,3 +45,27 @@ export function apiAs(key: PersonaKey): Promise<Api> {
 export async function anonymousApi(): Promise<Api> {
   return wrap(await request.newContext({ baseURL: BASE }));
 }
+
+// Reauthenticates only when the write asks for it, so a healthy account costs no credential check.
+export async function adminPut(admin: Api, path: string, data: unknown): Promise<APIResponse> {
+  const first = await admin.put(path, data);
+  if (first.status() !== 401 && first.status() !== 403) return first;
+  const reauthenticated = await admin.post("/api/session/reauthentication", { password: PASSWORD });
+  precondition(reauthenticated.ok(), `admin reauthentication answered ${reauthenticated.status()}`);
+  return admin.put(path, data);
+}
+
+export type RosterEntry = { personId: string; username: string | null; roles?: string[]; firstName: string; lastName: string; email: string | null; enabled: boolean; locale?: string | null };
+
+export async function readRoster(api: Api): Promise<RosterEntry[]> {
+  const entries: RosterEntry[] = [];
+  let cursor: string | undefined;
+  do {
+    const answer = await api.post("/api/admin/roster-search", cursor ? { cursor } : {});
+    precondition(answer.ok(), `reading the roster answered ${answer.status()}`);
+    const page = await answer.json() as { entries: RosterEntry[]; nextCursor?: string | null };
+    entries.push(...page.entries);
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor);
+  return entries;
+}

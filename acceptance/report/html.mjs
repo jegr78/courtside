@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { basename, join } from "node:path";
 import { collectFindings } from "./findings.mjs";
 import { applyReview } from "./review.mjs";
-import { releaseSummary } from "./release-summary.mjs";
+import { forbiddenTerms, releaseSummary } from "./release-summary.mjs";
 import { imageMagick } from "./sheets.mjs";
 
 const SEVERITY = { blocker: "Blocker", major: "Major", minor: "Minor", hint: "Hint" };
@@ -185,18 +185,14 @@ ${coverage.rows.map((row) => `<tr><td>${esc(row.flow)}</td>${projects.map((p) =>
 <section><h2>Rejected suspicions</h2><ul>${listOf(reviewed.findings, "capture-artefact")}</ul></section>
 <section><h2>Harness gaps</h2><ul>${listOf(reviewed.findings, "harness-gap")}${observations.map((o) => `<li>${esc(o.project)}: ${esc(o.note)}</li>`).join("")}</ul></section>
 <section><h2>Server logs</h2><p>${logs.length} WARN or ERROR lines, ${logs.filter((line) => line.steps.length === 0).length} not attributed to a step${Object.keys(config.logs).length ? "" : "; no log files were configured"}.</p></section>
-<section><h2>Cleanup</h2><p>${postflight ? `Slots left occupied: ${postflight.left.length}; scheduled weeks removed: ${postflight.weeks.length}.` : "Postflight did not run."} ${cleanup ? `Bookings of this run left in the window: ${cleanup.diff.flatMap((d) => d.ours ?? []).length}.` : ""}</p></section>
+<section><h2>Cleanup</h2><p>${postflight ? `Bookings of this run left in reserved slots: ${postflight.left.length}; club bookings in reserved slots, left untouched: ${(postflight.foreign ?? []).length}; weeks of this run removed: ${postflight.weeks.length}; club weeks left untouched: ${(postflight.foreignWeeks ?? []).length}.` : "Postflight did not run."} ${cleanup ? `Bookings of this run left in the window: ${cleanup.diff.flatMap((d) => d.ours ?? []).length}.` : ""}</p></section>
 <section><h2>Raw page checks</h2><details><summary>${metrics.length} captures, unfiltered</summary><div class="scroll"><table><thead><tr><th>Grade</th><th>Kind</th><th>Check</th><th>Count</th><th>Profiles</th></tr></thead><tbody>
 ${rawGroups(metrics).map((g) => `<tr><td>${SEVERITY[g.severity]}</td><td>${esc(g.kind)}</td><td>${esc(g.title)}</td><td>${g.n}</td><td>${[...g.projects].map(esc).join(", ")}</td></tr>`).join("")}
 </tbody></table></div></details></section>
 </div></body></html>`;
   writeFileSync(join(directory, "index.html"), html);
 
-  const forbidden = {
-    usernames: Object.values(config.personas),
-    hosts: [new URL(config.baseUrl).host],
-    names: Object.values(discovery.lastNames ?? {}).filter(Boolean)
-  };
+  const forbidden = forbiddenTerms(config, discovery);
   let summary;
   try {
     summary = releaseSummary({ version, runId: basename(run), harnessCommit, cells: coverage.cells, reviewed, forbidden });

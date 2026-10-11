@@ -146,7 +146,7 @@ test("given a week that ends with the change from summer time, when local hours 
   assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
 });
 
-import { governingHours, journeysOf, LaneError, planLanes, PROFILE_NAMES, slotIn } from "../acceptance/config/lanes.mjs";
+import { governingHours, journeysOf, LaneError, laterOpeningOf, planLanes, PROFILE_NAMES, slotIn, weekInForce, weekendConflicts } from "../acceptance/config/lanes.mjs";
 import { zonedInstant as at } from "../acceptance/config/calendar.mjs";
 
 const open = (opensAt, closesAt) => () => ({ opensAt, closesAt });
@@ -188,26 +188,60 @@ test("given a closed lane day, when planned, then the refusal names the day", ()
   assert.throws(() => plan((date) => date === "2030-03-13" ? { opensAt: null, closesAt: null } : { opensAt: "06:00", closesAt: "23:00" }), /2030-03-13 is closed/);
 });
 
+const day = (dayOfWeek, opensAt) => ({ dayOfWeek, opensAt, closesAt: "22:00" });
+const week = (effectiveFrom, opensAt) => ({ effectiveFrom, days: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"].map((d) => day(d, opensAt)) });
+
 test("given a booking grid with a later week, when the governing hours of a date are read, then the last started week decides", () => {
   // given
-  const day = (dayOfWeek, opensAt) => ({ dayOfWeek, opensAt, closesAt: "22:00" });
-  const week = (effectiveFrom, opensAt) => ({ effectiveFrom, days: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"].map((d) => day(d, opensAt)) });
   const grid = { openingWeeks: [week(null, "06:00"), week("2030-03-13", "09:00")] };
   // when / then
   assert.equal(governingHours(grid, "2030-03-12").opensAt, "06:00");
   assert.equal(governingHours(grid, "2030-03-13").opensAt, "09:00");
 });
 
-test("given lanes across the change from summer time, when the Sunday slot becomes an instant, then it keeps its local hour", () => {
+test("given windows before and after the change from summer time, when the first lane becomes an instant, then both keep their local hour", () => {
   // given
-  const lanes = planLanes({ start: "2026-10-19", courts: [1, 3, 2], hoursOf: open("06:00", "23:00") });
+  const before = planLanes({ start: "2026-10-19", courts: [1, 3, 2], hoursOf: open("06:00", "23:00") });
+  const after = planLanes({ start: "2026-10-26", courts: [1, 3, 2], hoursOf: open("06:00", "23:00") });
   // when
-  const sunday = at(lanes.sunday, "10:00", "Europe/Berlin");
+  const instant = (plan) => at(plan.slots[0].date, plan.slots[0].start, "Europe/Berlin").toISOString();
   // then
-  assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
+  assert.equal(instant(before), "2026-10-19T04:00:00.000Z", "summer time is two hours ahead");
+  assert.equal(instant(after), "2026-10-26T05:00:00.000Z", "winter time is one hour ahead");
 });
 
-import { admitted, sweepSlots, attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
+test("given a later week in the schedule, when the week in force on a day is read, then its seven days come back without its start", () => {
+  // given
+  const grid = { openingWeeks: [week(null, "06:00"), week("2030-03-13", "09:00")] };
+  // when
+  const days = weekInForce(grid, "2030-03-16");
+  // then
+  assert.equal(days.length, 7);
+  assert.ok(days.every((day) => day.opensAt === "09:00"), "the later week governs");
+  assert.ok(days.every((day) => !("effectiveFrom" in day)));
+});
+
+test("given a Saturday slot, when its later opening is read, then it is one hour after the slot ends", () => {
+  // when / then
+  assert.equal(laterOpeningOf({ start: "08:00", end: "09:00" }), "10:00");
+});
+
+test("given club bookings on the window's weekend, when the weekend journeys are checked, then those a later opening or a closed Sunday would displace are named", () => {
+  // given
+  const plan = { saturday: "2030-03-16", sunday: "2030-03-17", timeZone: "UTC", slots: [
+    { journey: "saturday-opening", date: "2030-03-16", start: "08:00", end: "09:00" },
+    { journey: "saturday-opening", date: "2030-03-16", start: "09:00", end: "10:00" }] };
+  const saturday = [
+    { bookingId: "early", startsAt: "2030-03-16T10:00:00Z", endsAt: "2030-03-16T11:00:00Z" },
+    { bookingId: "late", startsAt: "2030-03-16T11:00:00Z", endsAt: "2030-03-16T12:00:00Z" }];
+  const sunday = [{ bookingId: "sunday", startsAt: "2030-03-17T15:00:00Z", endsAt: "2030-03-17T16:00:00Z" }];
+  // when
+  const conflicts = weekendConflicts({ plan, saturday, sunday });
+  // then
+  assert.deepEqual(conflicts, ["early", "sunday"], "a booking before the latest later opening and every Sunday booking would be displaced");
+});
+
+import { admitted, sweepSlots, weeksToClear, attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
 import { claimRunDirectory, harnessCommit } from "../acceptance/lib/run-directory.mjs";
 import { findExecutable } from "../acceptance/lib/executable.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } from "node:fs";
@@ -252,6 +286,22 @@ test("given a booking of this run that could not be cancelled, when swept, then 
   const outcome = await sweepSlots({ slots: [{ journey: "guest" }], read: async () => ["ours"], cancel: async () => 409, ours: new Set(["ours"]) });
   // then
   assert.deepEqual(outcome.left, [{ journey: "guest", id: "ours" }]);
+});
+
+test("given future weeks of the run and of the club, when the weekend is cleared, then only the run's weeks are removed and the club's are named", () => {
+  // when
+  const plan = weeksToClear({ scheduled: ["2030-03-16", "2030-04-01"], ours: new Set(["2030-03-16", "2030-03-17"]) });
+  // then
+  assert.deepEqual(plan, { remove: ["2030-03-16"], foreign: ["2030-04-01"] });
+});
+
+test("given a ledger with an opening week, when replayed, then that week's schedule entry is removed", async () => {
+  // given
+  const paths = [];
+  // when
+  await replayEntries([{ kind: "opening-week", id: "2030-03-16" }], async (path) => { paths.push(path); return { status: () => 204 }; });
+  // then
+  assert.deepEqual(paths, ["/api/admin/opening-hours/schedule/2030-03-16"]);
 });
 
 const answer = (status, retryAfter) => ({ status: () => status, headers: () => (retryAfter ? { "retry-after": retryAfter } : {}) });
@@ -417,7 +467,7 @@ test("given a known issue without an issue number or an unknown assessment, when
   assert.throws(() => validateReview({ assessments: { k: { assessment: "harness-gap", reason: "", followUp: "f" } }, manual: [] }), /reason/);
 });
 
-import { assertPrivacySafe, releaseSummary } from "../acceptance/report/release-summary.mjs";
+import { assertPrivacySafe, forbiddenTerms, releaseSummary } from "../acceptance/report/release-summary.mjs";
 
 const forbidden = { usernames: ["jane.doe"], hosts: ["club.example.org"], names: ["Jane Doe"] };
 const reviewed = {
@@ -452,6 +502,25 @@ test("given a reason that names a username, an address, a host, a person or an i
   for (const [reason, kind] of [["seen for jane.doe", /username/], ["mail to someone@example.org", /email/], ["on club.example.org", /host/], ["Jane Doe saw it", /name/], ["![shot](a.png)", /image/]]) {
     assert.throws(() => summarise(reason), (error) => kind.test(error.message) && !error.message.includes(reason));
   }
+});
+
+test("given a configuration and a roster, when the forbidden terms are built, then every disposable, every roster name and the bare host are in them", () => {
+  // given
+  const config = { baseUrl: "https://club.example.org:8443", personas: { admin: "jane.doe", disposable: "john.major" }, disposables: ["john.major", "mary.roe"] };
+  const discovery = { roster: [{ username: "richard.doe", firstName: "Richard", lastName: "Doe" }, { username: null, firstName: "Mary", lastName: "Major" }] };
+  // when
+  const terms = forbiddenTerms(config, discovery);
+  // then
+  assert.ok(terms.usernames.includes("mary.roe"), "the second disposable is forbidden");
+  assert.ok(terms.usernames.includes("richard.doe"), "a roster username is forbidden");
+  assert.deepEqual(terms.hosts, ["club.example.org"], "the host without its port");
+  assert.ok(["Richard", "Doe", "Mary", "Major"].every((name) => terms.names.includes(name)), "first and last names are forbidden");
+});
+
+test("given a short surname inside another word, when checked, then the summary is not refused", () => {
+  // when / then
+  assert.doesNotThrow(() => assertPrivacySafe("The bottom row overflows.", { usernames: [], hosts: [], names: ["Ott"] }));
+  assert.throws(() => assertPrivacySafe("Reported by Ott.", { usernames: [], hosts: [], names: ["Ott"] }), /person/);
 });
 
 import { coverageOf } from "../acceptance/report/html.mjs";

@@ -3,14 +3,15 @@ import { writeFileSync } from "node:fs";
 import { config, disposables, persona, runPath, type PersonaKey } from "../lib/context";
 import { resolveWindowStart } from "../config/calendar.mjs";
 import { governingHours, planLanes } from "../config/lanes.mjs";
-import { openAs, xsrf } from "../lib/session";
+import { openAs } from "../lib/session";
+import { apiAs, readRoster } from "../lib/api";
 
 test("when the admin reads the club, then discovery, lanes and baseline are written", async ({ browser }) => {
   // when
   const page = await openAs(browser, "admin");
   const api = page.request;
-  const headers = { "X-XSRF-TOKEN": await xsrf(page) };
   const grid = await (await api.get("/api/public/booking-grid")).json();
+  expect(60 % grid.slotMinutes, `PRECONDITION: the ${grid.slotMinutes}-minute booking grid divides an hour`).toBe(0);
   const timeZone = config.timeZone ?? grid.timeZone;
   const activeCourts = (await (await api.get("/api/public/courts")).json() as { number: number }[]).map((court) => court.number);
   const courts = config.courts ?? activeCourts.slice(0, 3);
@@ -20,12 +21,10 @@ test("when the admin reads the club, then discovery, lanes and baseline are writ
   writeFileSync(runPath("lanes.json"), JSON.stringify(lanes, null, 2));
   const cards = await (await api.get("/api/admin/booking-cards")).json();
   const participantCards = await (await api.get("/api/admin/participant-cards")).json();
-  const rosterResponse = await api.post("/api/admin/roster-search", { data: {}, headers });
-  const roster = await rosterResponse.json();
-  writeFileSync(runPath("roster-raw-shape.json"), JSON.stringify({ status: rosterResponse.status(), keys: Object.keys(roster), count: roster.entries?.length, matching: roster.matching, sampleKeys: Object.keys(roster.entries?.[0] ?? {}) }, null, 2));
+  const roster = { entries: await readRoster(await apiAs("admin")) };
   const keys: PersonaKey[] = ["admin", "trainer", "youth", "sport", "grounds", "treasurer", "memberA", "memberB", "memberC", "disposable"];
-  const entryOf = (key: PersonaKey) => roster.entries.find((e: { username: string }) => e.username === persona(key).username);
-  const entryNamed = (username: string) => roster.entries.find((e: { username: string }) => e.username === username);
+  const entryOf = (key: PersonaKey) => roster.entries.find((e) => e.username === persona(key).username)!;
+  const entryNamed = (username: string) => roster.entries.find((e) => e.username === username)!;
   const days = Object.fromEntries(await Promise.all(lanes.days.map(async (date: string) =>
     [date, await (await api.get(`/api/bookings?date=${date}`)).json()])));
   const active = cards.filter((c: { active: boolean }) => c.active);
@@ -39,6 +38,7 @@ test("when the admin reads the club, then discovery, lanes and baseline are writ
     cardFor: { training: byRole("TRAINER"), youth: byRole("YOUTH_DIRECTOR"), league: byRole("SPORT_DIRECTOR"), closure: byRole("GROUNDSKEEPER"), treasurer: byRole("TREASURER") },
     personIds: Object.fromEntries(keys.map((k) => [k, entryOf(k).personId])),
     emails: Object.fromEntries(keys.map((k) => [k, entryOf(k).email])),
+    roster: roster.entries.map((e: { username: string | null; firstName: string; lastName: string }) => ({ username: e.username, firstName: e.firstName, lastName: e.lastName })),
     lastNames: Object.fromEntries([...keys.map((k) => [k, entryOf(k).lastName]), ...disposables.map((u, i) => [`disposable-${i}`, entryNamed(u).lastName])]),
     disposables: Object.fromEntries(disposables.map((username) => {
       const entry = entryNamed(username);
