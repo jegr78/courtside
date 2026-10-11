@@ -1,5 +1,6 @@
 import json
 
+from schemathesis.core.failures import ContentTypeServerError
 from schemathesis.engine.recorder import CheckFailureInfo
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
 from schemathesis.reporting import ndjson
@@ -42,7 +43,14 @@ media_reason = projected(UndefinedContentType(
 ))
 assert media_reason == {"kind": "media-type", "observed": "undocumented", "expected": ["application/json"]}
 
-serialized = json.dumps([schema_reason, status_reason, media_reason])
+probe_reason = projected(ContentTypeServerError(
+    operation="POST /api/admin/courts",
+    status_code=500,
+    message="response contained a credential",
+))
+assert probe_reason == {"kind": "status", "observedStatus": 500, "expectedStatuses": ["non-5xx"]}
+
+serialized = json.dumps([schema_reason, status_reason, media_reason, probe_reason])
 assert "opaque-object-id" not in serialized
 assert "credential" not in serialized
 assert "session-secret" not in serialized
