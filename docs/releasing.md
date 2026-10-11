@@ -48,7 +48,9 @@ archive records the head branch as its ref, so a fork branch whose name uses cha
 `.`, `_`, `/` and `-` fails `gates-image` instead of running the gates.
 From that workflow the pull request runs `archive-reproducibility`, `mail`, `active-security`,
 `restore` and `upgrade`, the last from the earliest retained nightly whose migrations it still
-carries. The jobs that run the image load it and refer to it by image ID; `mail` and
+carries. A pull request that changes a migration or `upgrade/verify.sql` also upgrades from every
+published origin the next release will support, so a migration that cannot run over a published
+database fails its own pull request rather than the next release. The jobs that run the image load it and refer to it by image ID; `mail` and
 `archive-reproducibility` only bind the archive and read the pinned name it records.
 
 npm advisories and the image CVE scan stay out of pull requests because they move without a change:
