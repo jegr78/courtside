@@ -17,6 +17,7 @@ CREATE TABLE notification (
 );
 
 CREATE UNIQUE INDEX notification_page_idx ON notification (account_id, created_seq DESC);
+CREATE INDEX notification_unread_idx ON notification (account_id) WHERE read_at IS NULL;
 
 -- No row means the channel is on, which is how every account received mail before the choice existed.
 CREATE TABLE message_channel_optout (

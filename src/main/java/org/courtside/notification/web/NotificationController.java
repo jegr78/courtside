@@ -11,7 +11,6 @@ import org.courtside.api.ApiNotificationLink;
 import org.courtside.api.ApiNotificationPage;
 import org.courtside.notification.internal.OwnNotifications;
 import org.courtside.shared.BookingAnnouncement;
-import org.courtside.shared.CursorPage;
 import org.courtside.shared.WireTypes;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,10 +25,10 @@ class NotificationController implements AccountNotificationsApi {
 
     @Override
     public ResponseEntity<ApiNotificationPage> listOwnNotifications(UUID cursor, Integer limit) {
-        CursorPage.Result<OwnNotifications.Entry> page = notifications.page(cursor, limit);
+        OwnNotifications.Page page = notifications.page(cursor, limit);
         return ResponseEntity.ok(new ApiNotificationPage(page.items().stream()
                 .map(NotificationController::toResponse)
-                .toList())
+                .toList(), page.unread())
                 .nextCursor(page.nextCursor()));
     }
 

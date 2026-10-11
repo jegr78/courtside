@@ -10,6 +10,7 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
+import org.courtside.shared.BookingDisplaced;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.courtside.shared.UsernameReminderRequested;
@@ -155,6 +156,25 @@ class NotificationCentreTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAMemberWhoSwitchedEmailOff_whenTheirBookingIsDisplaced_thenOnlyTheCentreTellsThem() {
+        // given
+        UUID bookingId = book(List.of(ParticipantSpec.guest("Richard Miles")));
+        notifications.declineEmail(bookerAccountId);
+
+        // when
+        transactions.executeWithoutResult(status ->
+                events.publishEvent(new BookingDisplaced(bookingId, BookingDisplaced.Closure.COURT_OUT_OF_SERVICE)));
+
+        // then
+        assertThat(notifications.notificationsFor(bookerAccountId))
+                .as("a notice that cannot be switched off still reaches the centre")
+                .containsExactly(MessageKind.BOOKING_CONFIRMED, MessageKind.BOOKING_DISPLACED);
+        assertThat(notifications.mailsQueuedFor(bookerAccountId))
+                .as("with email off the displacement is not mailed; only the earlier confirmation was")
+                .containsExactly(MessageKind.BOOKING_CONFIRMED);
+    }
+
+    @Test
     void givenAMemberWhoDeclinedTheKind_whenTheyBook_thenNeitherTheCentreNorTheMailHoldsIt() {
         // given
         notifications.decline(bookerAccountId, MessageKind.BOOKING_CONFIRMED);
@@ -200,6 +220,25 @@ class NotificationCentreTest extends AbstractIntegrationTest {
         assertThat(notifications.notificationsFor(playerAccountId))
                 .as("somebody who has left the club is not written to")
                 .isEmpty();
+    }
+
+    @Test
+    void whenAnAccountsUnreadEntriesAreCounted_thenThePlannerReadsTheUnreadIndex() {
+        // when
+        String plan = transactions.execute(status -> {
+            jdbc.sql("SET LOCAL enable_seqscan = off").update();
+            return String.join("\n", jdbc.sql("""
+                            EXPLAIN SELECT count(*) FROM notification
+                            WHERE account_id = :accountId AND read_at IS NULL
+                            """)
+                    .param("accountId", bookerAccountId)
+                    .query(String.class)
+                    .list());
+        });
+
+        // then
+        assertThat(plan).as("the unread count reads only the unread entries of one account")
+                .contains("notification_unread_idx");
     }
 
     private UUID book(List<ParticipantSpec> players) {

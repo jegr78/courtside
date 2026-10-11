@@ -2764,11 +2764,16 @@ components:
 
     NotificationPage:
       type: object
-      required: [items]
+      required: [items, unread]
       properties:
         items:
           type: array
           items: { $ref: "#/components/schemas/Notification" }
+        unread:
+          type: integer
+          format: int64
+          minimum: 0
+          description: How many of the account's entries are unread, counted over all of them and not only this page.
         nextCursor:
           type: [string, "null"]
           format: uuid

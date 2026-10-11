@@ -247,6 +247,31 @@ class NotificationControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenUnreadEntriesBeyondThePage_whenAMemberReadsOnePage_thenTheUnreadCountCoversAllOfTheirsAndNoOneElses()
+            throws Exception {
+        // given
+        UUID oldest = notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);
+        UUID read = notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);
+        notifications.markRead(read, EARLIER);
+        UUID newest = notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);
+        notifications.notify(johnAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);
+
+        // when / then
+        mockMvc.perform(get("/api/account/notifications").param("limit", "1").with(as("doe.jane")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].id").value(newest.toString()))
+                .andExpect(jsonPath("$.unread").value(2));
+        mockMvc.perform(get("/api/account/notifications").param("limit", "1")
+                        .param("cursor", newest.toString()).with(as("doe.jane")))
+                .andExpect(jsonPath("$.unread").value(2));
+        mockMvc.perform(post("/api/account/notifications/{id}/read", oldest).with(as("doe.jane")).with(csrf()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/account/notifications").param("limit", "1").with(as("doe.jane")))
+                .andExpect(jsonPath("$.unread").value(1));
+    }
+
+    @Test
     void givenAnotherMembersNotificationAsCursor_whenAMemberPagesOnFromIt_thenThePageIsEmpty() throws Exception {
         // given
         notifications.notify(janeAccountId, MessageKind.BOOKING_REMINDER, null, EARLIER);

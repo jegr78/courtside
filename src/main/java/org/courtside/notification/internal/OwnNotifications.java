@@ -7,7 +7,6 @@ import org.courtside.notification.MessageKind;
 import org.courtside.shared.BookingAnnouncement;
 import org.courtside.shared.BookingAnnouncer;
 import org.courtside.shared.BookingDisplaced;
-import org.courtside.shared.CursorPage;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +38,7 @@ public class OwnNotifications {
 
     // A cursor that is not one of this account's entries matches no sequence, so it reads as the end.
     @Transactional(readOnly = true)
-    public CursorPage.Result<Entry> page(UUID cursor, int limit) {
+    public Page page(UUID cursor, int limit) {
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
             throw new IllegalStateException("Notification page size must be between 1 and " + MAX_PAGE_SIZE);
         }
@@ -68,7 +67,14 @@ public class OwnNotifications {
                 account.getPerson().getId(), shown.stream().map(Stored::bookingId).filter(Objects::nonNull).toList());
         List<Entry> items = shown.stream().map(entry -> entry(entry, visible)).toList();
         UUID next = stored.size() > limit ? items.getLast().id() : null;
-        return new CursorPage.Result<>(items, next);
+        return new Page(items, next, unread(account.getId()));
+    }
+
+    private long unread(UUID accountId) {
+        return jdbc.sql("SELECT count(*) FROM notification WHERE account_id = :accountId AND read_at IS NULL")
+                .param("accountId", accountId)
+                .query(Long.class)
+                .single();
     }
 
     @Transactional
@@ -137,6 +143,13 @@ public class OwnNotifications {
     public enum Target {
         BOOKINGS,
         ACCOUNT_SECURITY
+    }
+
+    public record Page(List<Entry> items, UUID nextCursor, long unread) {
+
+        public Page {
+            items = List.copyOf(items);
+        }
     }
 
     public record Entry(UUID id, MessageKind kind, Instant createdAt, Instant readAt, BookingAnnouncement booking,
