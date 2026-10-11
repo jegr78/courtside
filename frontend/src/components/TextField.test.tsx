@@ -116,3 +116,14 @@ it("given a password field without an id, when it is written, then it does not c
   // then
   expect(unnamed.props).not.toHaveProperty("id");
 });
+
+it("given an empty time field in its label, when it renders, then the label names it and the hint only describes it", () => {
+  // when
+  render(<TextField data-testid="opens-at" type="time" label="Opens at" value="" onChange={() => {}} />);
+
+  // then
+  const field = screen.getByTestId("opens-at");
+  expect(field, "the hint inside the label stays out of the name").toHaveAccessibleName("Opens at");
+  expect(field, "the empty state is announced as a description").toHaveAccessibleDescription("Not set");
+  expect(field).toHaveAttribute("data-empty", "true");
+});
