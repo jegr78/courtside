@@ -81,6 +81,10 @@ and preflight, the journeys on all ten profiles, the postflight and the report.
 Discovery writes `lanes.json`: the window, and for each profile and journey its day, court and
 hour. Preflight then proves every lane slot free before a journey starts.
 
+The harness cancels only bookings it recorded in its ledger. A booking of the club in a reserved
+slot stops the preflight or the journey that needs the slot and is never cancelled; choose another
+`window.start` or other `courts`.
+
 The harness starts no log or tunnel process. To attribute server log lines to journey steps, follow
 the instance's logs into the files `logs.app` and `logs.proxy` name for the duration of the run,
 for example with `docker logs -f --timestamps --since <start> <container> >> <file>` on the host

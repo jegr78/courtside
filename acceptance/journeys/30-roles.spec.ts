@@ -43,7 +43,7 @@ async function createSeries(page: Page, who: PersonaKey, card: string, courtValu
 async function cancelSeries(page: Page, seriesId: string, anchor: string) {
   try {
     await page.request.delete(`/api/booking-series/${seriesId}?scope=WHOLE_SERIES&fromBookingId=${anchor}`, { headers: { "X-XSRF-TOKEN": await xsrf(page) } });
-  } catch { /* the slot sweep cancels what a closed context could not */ }
+  } catch { /* the ledger replay cancels what a closed context could not */ }
 }
 
 async function recordSurfaces(page: Page, key: PersonaKey) {

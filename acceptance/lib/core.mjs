@@ -58,3 +58,16 @@ export async function admitted(call, sleep = pause) {
     await sleep(1000 * Math.max(1, Number(response.headers()["retry-after"] ?? 1)));
   }
 }
+
+// Only bookings in the run's ledger are cancelled; anything else in a reserved slot belongs to the club.
+export async function sweepSlots({ slots, read, cancel, ours }) {
+  const removed = [], left = [], foreign = [];
+  for (const slot of slots) {
+    for (const id of await read(slot)) {
+      if (ours.has(id)) removed.push({ journey: slot.journey, id, status: await cancel(id) });
+      else foreign.push({ journey: slot.journey, id });
+    }
+    left.push(...(await read(slot)).filter((id) => ours.has(id)).map((id) => ({ journey: slot.journey, id })));
+  }
+  return { removed, left, foreign };
+}

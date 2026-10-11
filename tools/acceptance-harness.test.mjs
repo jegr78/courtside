@@ -207,7 +207,7 @@ test("given lanes across the change from summer time, when the Sunday slot becom
   assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
 });
 
-import { admitted, attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
+import { admitted, sweepSlots, attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
 import { claimRunDirectory, harnessCommit } from "../acceptance/lib/run-directory.mjs";
 import { findExecutable } from "../acceptance/lib/executable.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } from "node:fs";
@@ -229,6 +229,29 @@ test("given allocations on several courts and times, when one slot is swept, the
   const chosen = occupying(allocations, "c1", new Date(utc("08:00")), new Date(utc("09:00")));
   // then
   assert.deepEqual(chosen, ["inside", "straddling"]);
+});
+
+test("given a reserved slot holding a booking of this run and one of somebody else, when swept, then only the run's booking is cancelled", async () => {
+  // given
+  const occupants = { rebook: ["ours", "foreign"] };
+  const cancelled = [];
+  // when
+  const outcome = await sweepSlots({
+    slots: [{ journey: "rebook" }],
+    read: async (slot) => occupants[slot.journey].filter((id) => !cancelled.includes(id)),
+    cancel: async (id) => { cancelled.push(id); return 204; },
+    ours: new Set(["ours"])
+  });
+  // then
+  assert.deepEqual(cancelled, ["ours"], "a foreign booking is never cancelled");
+  assert.deepEqual(outcome, { removed: [{ journey: "rebook", id: "ours", status: 204 }], left: [], foreign: [{ journey: "rebook", id: "foreign" }] });
+});
+
+test("given a booking of this run that could not be cancelled, when swept, then it is reported as left", async () => {
+  // when
+  const outcome = await sweepSlots({ slots: [{ journey: "guest" }], read: async () => ["ours"], cancel: async () => 409, ours: new Set(["ours"]) });
+  // then
+  assert.deepEqual(outcome.left, [{ journey: "guest", id: "ours" }]);
 });
 
 const answer = (status, retryAfter) => ({ status: () => status, headers: () => (retryAfter ? { "retry-after": retryAfter } : {}) });

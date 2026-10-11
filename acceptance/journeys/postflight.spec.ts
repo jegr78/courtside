@@ -37,14 +37,14 @@ test("when the ledger is replayed, then the window holds no booking of this run"
   if (!dry) expect(weeksLeft, "no opening week this run scheduled is left").toEqual([]);
 });
 
-test("when the run ends, then every reserved slot is empty, no week is scheduled and the disposable member signs in with the shared password", async () => {
+test("when the run ends, then no reserved slot holds a booking of this run, no week is scheduled and the disposable member signs in with the shared password", async () => {
   const admin = await apiAs("admin");
   // when
-  const { removed, left } = await sweep(admin, allSlots());
+  const { removed, left, foreign } = await sweep(admin, allSlots());
   const weeks = await clearWeekend();
   for (const username of disposables) await restoreDisposable(username);
-  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, weeks }, null, 2));
+  writeFileSync(runPath("postflight.json"), JSON.stringify({ removed, left, foreign, weeks }, null, 2));
   // then
-  expect(left, "every reserved slot is empty").toEqual([]);
+  expect(left, "no reserved slot holds a booking of this run").toEqual([]);
   for (const [index, username] of disposables.entries()) expect(await canSignIn(PASSWORD, username), `disposable ${index + 1} signs in`).toBe(true);
 });

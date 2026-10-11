@@ -51,7 +51,7 @@ export async function cancelQuietly(page: Page, ids: string[]) {
   try {
     const token = await xsrf(page);
     for (const id of ids) await page.request.delete(`/api/bookings/${id}`, { headers: { "X-XSRF-TOKEN": token } });
-  } catch { /* the slot sweep cancels what a closed context could not */ }
+  } catch { /* the ledger replay cancels what a closed context could not */ }
 }
 
 export async function addPartner(page: Page, key: string) {

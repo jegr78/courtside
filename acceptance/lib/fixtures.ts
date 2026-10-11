@@ -16,8 +16,9 @@ export const test = base.extend<{ lanes: { take: (journey: string) => Promise<Sl
       take: async (journey) => {
         const slot = slotFor(info.project.name, journey);
         taken.push(slot);
-        const { removed, left } = await sweep(admin, [slot]);
-        record({ phase: "before", project: info.project.name, test: info.title, removed, left });
+        const { removed, left, foreign } = await sweep(admin, [slot]);
+        record({ phase: "before", project: info.project.name, test: info.title, removed, left, foreign });
+        precondition(foreign.length === 0, `slot ${journey} ${slot.date} ${slot.start} court ${slot.court} holds a booking of the club: ${foreign.map((f) => f.id).join(", ")}`);
         precondition(left.length === 0, `slot ${journey} ${slot.date} ${slot.start} court ${slot.court} could not be cleared`);
         return slot;
       }
@@ -28,7 +29,7 @@ export const test = base.extend<{ lanes: { take: (journey: string) => Promise<Sl
     await new Promise((resolve) => setTimeout(resolve, 2_000));
     const second = await sweep(admin, taken);
     record({ phase: "after", project: info.project.name, test: info.title, status: info.status,
-      removed: [...first.removed, ...second.removed], left: second.left });
+      removed: [...first.removed, ...second.removed], left: second.left, foreign: second.foreign });
     await admin.dispose();
   }
 });

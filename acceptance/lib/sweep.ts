@@ -1,6 +1,7 @@
 import type { Api } from "./api";
-import { occupying } from "./core.mjs";
+import { occupying, sweepSlots } from "./core.mjs";
 import { instantOf, type Slot } from "./lanes";
+import { readLedger } from "./ledger";
 
 type Allocation = { bookingId: string; courtId: string; startsAt: string; endsAt: string };
 
@@ -15,16 +16,14 @@ async function cancelAny(admin: Api, id: string): Promise<number> {
   return (await admin.del(`/api/bookings/${id}`)).status();
 }
 
+const ownBookings = () => new Set(readLedger().flatMap((entry) => entry.kind === "booking" ? [entry.id] : entry.anchor ? [entry.anchor] : []));
+
 export async function sweep(admin: Api, slots: Slot[]) {
   const courts = await (await admin.get("/api/public/courts")).json() as { id: string; number: number }[];
-  const removed: { journey: string; id: string; status: number }[] = [];
-  const left: { journey: string; id: string }[] = [];
-  for (const slot of slots) {
-    const courtId = courts.find((c) => c.number === slot.court)!.id;
-    const read = async () => occupying(await (await admin.get(`/api/bookings?date=${slot.date}`)).json(), courtId,
-      instantOf(slot, "start"), instantOf(slot, "end"));
-    for (const id of await read()) removed.push({ journey: slot.journey, id, status: await cancelAny(admin, id) });
-    left.push(...(await read()).map((id) => ({ journey: slot.journey, id })));
-  }
-  return { removed, left };
+  return sweepSlots({
+    slots, ours: ownBookings(),
+    read: async (slot: Slot) => occupying(await (await admin.get(`/api/bookings?date=${slot.date}`)).json(),
+      courts.find((c) => c.number === slot.court)!.id, instantOf(slot, "start"), instantOf(slot, "end")),
+    cancel: (id: string) => cancelAny(admin, id)
+  }) as Promise<{ removed: { journey: string; id: string; status: number }[]; left: { journey: string; id: string }[]; foreign: { journey: string; id: string }[] }>;
 }
