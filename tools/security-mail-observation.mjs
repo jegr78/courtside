@@ -1,7 +1,7 @@
 export const securityMailObservationSource = Object.freeze({
-  version: "1.31.3",
-  commit: "ae3d9e20e410bf2af1c1b7292bc3b8491b41b30a",
-  imageDigest: "sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d"
+  version: "1.31.5",
+  commit: "4355c8cd7dbe745c6fc6ce8619d23a1a31b746c9",
+  imageDigest: "sha256:94f6b70c1436defae6799d9ac7ff0eeff9540465b842026d5cdb018f1c0234ea"
 });
 import { failureCode } from "./failure-reason.mjs";
 

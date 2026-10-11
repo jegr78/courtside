@@ -412,13 +412,18 @@ class ServerTlsTransportTest {
     @Test
     void givenAModeNoSnippetDefines_whenTheProxyStarts_thenItServesNothing() throws Exception {
         // given
-        ToStringConsumer output = new ToStringConsumer();
         GenericContainer<?> proxy = built(served.authority(), "no-such-mode", SERVED_PORT)
+                .withStartupCheckStrategy(new OneShotStartupCheckStrategy());
+        ToStringConsumer output = new ToStringConsumer();
+        // Caddy's run command exits without logging the adapt error, so validate supplies the reason.
+        GenericContainer<?> validation = built(served.authority(), "no-such-mode", SERVED_PORT)
+                .withCommand("caddy", "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile")
                 .withStartupCheckStrategy(new OneShotStartupCheckStrategy())
                 .withLogConsumer(output);
 
         // when / then
         assertThatThrownBy(proxy::start).isInstanceOf(ContainerLaunchException.class);
+        assertThatThrownBy(validation::start).isInstanceOf(ContainerLaunchException.class);
         assertThat(output.toUtf8String()).contains("File to import not found: no-such-mode");
     }
 
