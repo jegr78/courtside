@@ -207,7 +207,7 @@ test("given lanes across the change from summer time, when the Sunday slot becom
   assert.equal(sunday.toISOString(), "2026-10-25T09:00:00.000Z");
 });
 
-import { attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
+import { admitted, attribute, classify, classifyErrors, occupying, replayEntries } from "../acceptance/lib/core.mjs";
 import { claimRunDirectory, harnessCommit } from "../acceptance/lib/run-directory.mjs";
 import { findExecutable } from "../acceptance/lib/executable.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, chmodSync, rmSync } from "node:fs";
@@ -229,6 +229,29 @@ test("given allocations on several courts and times, when one slot is swept, the
   const chosen = occupying(allocations, "c1", new Date(utc("08:00")), new Date(utc("09:00")));
   // then
   assert.deepEqual(chosen, ["inside", "straddling"]);
+});
+
+const answer = (status, retryAfter) => ({ status: () => status, headers: () => (retryAfter ? { "retry-after": retryAfter } : {}) });
+
+test("given a sign-in refused for capacity, when admitted, then it is sent again after the Retry-After the instance named", async () => {
+  // given
+  const answers = [answer(429, "2"), answer(200)];
+  const waits = [];
+  // when
+  const response = await admitted(async () => answers.shift(), async (ms) => { waits.push(ms); });
+  // then
+  assert.equal(response.status(), 200, "the second attempt's answer is returned");
+  assert.deepEqual(waits, [2000], "the wait follows Retry-After");
+});
+
+test("given an instance that keeps refusing, when admitted, then the fifth refusal is returned instead of waiting forever", async () => {
+  // given
+  let calls = 0;
+  // when
+  const response = await admitted(async () => { calls++; return answer(429); }, async () => undefined);
+  // then
+  assert.equal(response.status(), 429);
+  assert.equal(calls, 5, "five attempts and no more");
 });
 
 test("given an answer that is not a list, when swept, then the refusal says what came back", () => {

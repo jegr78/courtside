@@ -47,3 +47,14 @@ export function attribute(lines, steps) {
     return { at: Number.isNaN(at) ? null : new Date(at).toISOString(), line: line.slice(0, 600), level: line.match(LEVEL)[1], steps: hits, ambiguous: hits.length > 1 };
   });
 }
+
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The instance answers a burst or a busy password check with 429; a refused call changed nothing, so it is sent again.
+export async function admitted(call, sleep = pause) {
+  for (let attempt = 1; ; attempt++) {
+    const response = await call();
+    if (response.status() !== 429 || attempt === 5) return response;
+    await sleep(1000 * Math.max(1, Number(response.headers()["retry-after"] ?? 1)));
+  }
+}

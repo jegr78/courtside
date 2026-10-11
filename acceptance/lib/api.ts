@@ -1,6 +1,7 @@
 import { request, type APIRequestContext, type APIResponse } from "@playwright/test";
 import { config, PASSWORD, persona, type PersonaKey } from "./context";
 import { precondition } from "./precondition";
+import { admitted } from "./core.mjs";
 
 export const BASE = config.baseUrl;
 export type Api = {
@@ -12,15 +13,6 @@ export type Api = {
   dispose: () => Promise<void>;
 };
 
-// Admission answers a burst with 429; idempotent reads and deletes wait out its Retry-After.
-async function admitted(call: () => Promise<APIResponse>): Promise<APIResponse> {
-  for (let attempt = 1; ; attempt++) {
-    const response = await call();
-    if (response.status() !== 429 || attempt === 5) return response;
-    await new Promise((resolve) => setTimeout(resolve, 1000 * Math.max(1, Number(response.headers()["retry-after"] ?? 1))));
-  }
-}
-
 async function wrap(context: APIRequestContext): Promise<Api> {
   await context.get("/api/session");
   const headers = async () => ({ "X-XSRF-TOKEN": (await context.storageState()).cookies.find((c) => c.name.endsWith("XSRF-TOKEN"))?.value ?? "" });
@@ -29,7 +21,7 @@ async function wrap(context: APIRequestContext): Promise<Api> {
     del: (path) => admitted(async () => context.delete(path, { headers: await headers() })),
     put: async (path, data) => context.put(path, { data, headers: await headers() }),
     post: async (path, data, extra = {}) => context.post(path, { data, headers: { ...(await headers()), ...extra } }),
-    postForm: async (path, form) => context.post(path, { form, headers: await headers() }),
+    postForm: (path, form) => admitted(async () => context.post(path, { form, headers: await headers() })),
     dispose: () => context.dispose()
   };
 }
