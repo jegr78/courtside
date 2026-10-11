@@ -307,6 +307,11 @@ The public grid shows occupancy, the booking-card label where appropriate and pa
 does not publish participant names. Owners see their details. Administrators and configured managing
 roles use a separate managed-booking view.
 
+The session reports whether an active card names one of the account's roles other than MEMBER as
+managing role, the same filter the managed-booking view applies, and whether an active card that
+tracks no players permits one of its roles. The client offers the
+managed-booking view and the series form only on those grounds; an administrator always has both.
+
 A member recorded as a participant receives a message and may remove themselves without the
 booker's approval. Removing one participant does not cancel the booking.
 

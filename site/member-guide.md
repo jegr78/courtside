@@ -202,7 +202,7 @@ sie bei den vergangenen Buchungen.
 
 ## Serientermine
 
-Konten mit einer zusätzlichen Rolle können unter *Verwaltung → Vereinstermine* Serien anlegen. Eine Serie legt
+Konten, deren Rolle eine aktive Buchungskarte ohne Spielerliste erlaubt, können unter *Verwaltung → Vereinstermine* Serien anlegen. Eine Serie legt
 gewöhnliche Buchungen nach einem Plan an. Du bestimmst den ersten Termin, die Uhrzeit, Dauer,
 Wochentage, den Abstand in Wochen und das Ende der Serie.
 

@@ -200,7 +200,7 @@ find it among your past bookings.
 
 ## Series
 
-Accounts with an additional role can create a series under *Administration → Club appointments*. A series creates normal
+Accounts whose role an active booking card without a player list allows can create a series under *Administration → Club appointments*. A series creates normal
 bookings from a schedule. You set the first date, time, duration, weekdays, interval in weeks and
 the end of the series.
 

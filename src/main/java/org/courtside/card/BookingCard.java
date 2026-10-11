@@ -18,6 +18,7 @@ import org.courtside.identity.Role;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "booking_card")
@@ -89,6 +90,12 @@ public class BookingCard {
 
     public Set<Role> getAllowedRoles() {
         return Set.copyOf(allowedRoles);
+    }
+
+    public static Set<Role> managementRoles(Set<Role> roles) {
+        return roles.stream()
+                .filter(role -> role != Role.MEMBER)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     public boolean permitsManagement(Set<Role> callerRoles) {

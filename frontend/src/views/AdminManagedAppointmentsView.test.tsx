@@ -29,9 +29,69 @@ describe("AdminManagedAppointmentsView", () => {
     vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [] });
   });
 
-  function show() {
-    render(<MemoryRouter><AdminManagedAppointmentsView /></MemoryRouter>);
+  function show(access = { managesAppointments: true, createsSeries: true }) {
+    render(<MemoryRouter><AdminManagedAppointmentsView {...access} /></MemoryRouter>);
   }
+
+  it("given an account that manages appointments but may create no series, when the page loads, then the list is offered without the series form", async () => {
+    // when
+    show({ managesAppointments: true, createsSeries: false });
+
+    // then
+    expect(await screen.findByTestId("managed-series-series-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("new-series"), "no card lets this role create a series").not.toBeInTheDocument();
+  });
+
+  it("given an account that manages appointments but may create no series, when nothing is scheduled, then the empty list does not point at a series form", async () => {
+    // given
+    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [] });
+
+    // when
+    show({ managesAppointments: true, createsSeries: false });
+
+    // then
+    expect(await screen.findByTestId("managed-empty")).toHaveTextContent(i18n.t("managedAppointments.emptyWithoutSeries"));
+  });
+
+  it("given an account that may create series but manages no card, when the page loads, then the form is offered without the list", async () => {
+    // when
+    show({ managesAppointments: false, createsSeries: true });
+
+    // then
+    expect(await screen.findByTestId("new-series")).toBeInTheDocument();
+    expect(screen.queryByTestId("managed-court-filter"), "no card lets this role manage appointments").not.toBeInTheDocument();
+    expect(api.managedAppointments).not.toHaveBeenCalled();
+  });
+
+  it("given an account that may create series but manages no card, when the page loads, then its heading speaks of series rather than a list", async () => {
+    // when
+    show({ managesAppointments: false, createsSeries: true });
+
+    // then
+    expect(await screen.findByTestId("managed-appointments-title")).toHaveTextContent(i18n.t("managedAppointments.seriesOnlyTitle"));
+    expect(screen.getByTestId("managed-appointments-description")).toHaveTextContent(i18n.t("managedAppointments.seriesOnlyDescription"));
+  });
+
+  it("given an account that may create series but manages no card, when a failure is retried, then the managed list is still not read", async () => {
+    // given
+    vi.spyOn(api, "previewSeries").mockRejectedValue(new Error("unavailable"));
+    show({ managesAppointments: false, createsSeries: true });
+    await userEvent.click(await screen.findByTestId("new-series"));
+    await userEvent.selectOptions(await screen.findByTestId("series-courts"), ["court-1"]);
+    await userEvent.selectOptions(await screen.findByTestId("series-card"), ["card-training"]);
+    await userEvent.type(screen.getByTestId("series-starts-on"), "2026-09-07");
+    await userEvent.type(screen.getByTestId("series-start-time"), "18:00");
+    await userEvent.click(screen.getByTestId("series-weekday-MONDAY"));
+    await userEvent.click(screen.getByTestId("preview-series"));
+    const failure = await screen.findByTestId("load-failure");
+
+    // when
+    await userEvent.click(within(failure).getByTestId("retry-load"));
+
+    // then
+    await waitFor(() => expect(screen.queryByTestId("load-failure")).not.toBeInTheDocument());
+    expect(api.managedAppointments, "a retry reads only what this role may see").not.toHaveBeenCalled();
+  });
 
   it("given recurring work, when upcoming appointments load, then the bounded page is grouped and collapsed", async () => {
     // given / when

@@ -15,7 +15,10 @@ import { SeriesForm } from "./SeriesForm";
 
 const PAGE_SIZE = 20;
 
-export function AdminManagedAppointmentsView() {
+export function AdminManagedAppointmentsView({ managesAppointments, createsSeries }: {
+  managesAppointments: boolean;
+  createsSeries: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<ManagedAppointmentView>("UPCOMING");
   const [courtId, setCourtId] = useState("");
@@ -39,6 +42,7 @@ export function AdminManagedAppointmentsView() {
   const { message: referenceError, report: reportReference, clear: clearReference } = useReportedFailure();
 
   const load = useCallback(async () => {
+    if (!managesAppointments) return;
     const version = ++loadVersion.current;
     setLoading(true);
     setLoadingMore(false);
@@ -56,7 +60,7 @@ export function AdminManagedAppointmentsView() {
     } finally {
       if (version === loadVersion.current) setLoading(false);
     }
-  }, [cardId, clear, courtId, report, view]);
+  }, [cardId, clear, courtId, managesAppointments, report, view]);
 
   const loadReferenceData = useCallback(async () => {
     const [courtResult, cardResult, gridResult] = await Promise.allSettled([
@@ -120,13 +124,15 @@ export function AdminManagedAppointmentsView() {
 
   return <section data-testid="managed-appointments-page" aria-labelledby="managed-appointments-title" className="min-w-0">
     <div>
-      <h1 id="managed-appointments-title" data-testid="managed-appointments-title" className="text-2xl font-bold">{t("managedAppointments.title")}</h1>
-      <p className="text-muted mt-2">{t("managedAppointments.description")}</p>
+      <h1 id="managed-appointments-title" data-testid="managed-appointments-title" className="text-2xl font-bold">{t(managesAppointments ? "managedAppointments.title" : "managedAppointments.seriesOnlyTitle")}</h1>
+      <p data-testid="managed-appointments-description" className="text-muted mt-2">
+        {t(managesAppointments ? "managedAppointments.description" : "managedAppointments.seriesOnlyDescription")}</p>
     </div>
-    {grid && courtsReady && <SeriesForm timeZone={grid.timeZone} courts={courts}
+    {createsSeries && grid && courtsReady && <SeriesForm timeZone={grid.timeZone} courts={courts}
       created={async () => { setSuccess(undefined); await load(); setSuccess(t("series.createdSuccess")); }}
       reportError={(failure) => { setSuccess(undefined); report(failure); }} />}
 
+    {managesAppointments && <>
     <div className="mt-6 flex flex-wrap gap-2" role="group" aria-label={t("managedAppointments.viewLabel")}>
       {(["UPCOMING", "HISTORY"] as ManagedAppointmentView[]).map((candidate) => <Button
         key={candidate} variant={view === candidate ? "primary" : "secondary"}
@@ -153,12 +159,14 @@ export function AdminManagedAppointmentsView() {
         </select>
       </label>
     </div>
+    </>}
 
     {error && <div className="mt-4"><LoadFailure message={error} retry={() => { clear(); void load(); }} /></div>}
     {referenceError && <div className="mt-4"><LoadFailure message={referenceError} retry={() => { clearReference(); void loadReferenceData(); }} /></div>}
     {success && <div className="mt-4"><SuccessFeedback testId="managed-success">{success}</SuccessFeedback></div>}
-    {loading ? <p className="mt-6" role="status">{t("status.loading")}</p>
-      : groups.length === 0 ? <p className="text-muted mt-6">{t("managedAppointments.empty")}</p>
+    {managesAppointments && (loading ? <p className="mt-6" role="status">{t("status.loading")}</p>
+      : groups.length === 0 ? <p data-testid="managed-empty" className="text-muted mt-6">
+        {t(createsSeries ? "managedAppointments.empty" : "managedAppointments.emptyWithoutSeries")}</p>
       : <div data-testid="managed-bookings" className="mt-6 grid gap-4">
         {groups.map((group) => group.series
           ? <details key={group.key} data-testid={`managed-series-${group.key}`} className="surface-raised rounded-lg border">
@@ -177,9 +185,9 @@ export function AdminManagedAppointmentsView() {
               actionsOpen={openActionsId === appointment.id} toggleActions={setOpenActionsId} moveAvailable={courtsReady}
               showDetail={setDetail} cancel={startCancelling} move={startMoving} t={t} />)}</ul>
           </section>)}
-      </div>}
+      </div>)}
 
-    {nextCursor && <Button data-testid="managed-load-more" variant="secondary" className="mt-5" disabled={loadingMore}
+    {managesAppointments && nextCursor && <Button data-testid="managed-load-more" variant="secondary" className="mt-5" disabled={loadingMore}
       onClick={() => void loadMore()}>{t("managedAppointments.loadMore")}</Button>}
     {grid && detail && <ManagedAppointmentDialog bookingId={detail.id} locale={i18n.language} timeZone={grid.timeZone} closed={() => setDetail(undefined)} />}
     {grid && cancelling && <CancelDialog booking={cancelling}

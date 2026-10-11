@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -37,18 +36,12 @@ public class BookingAccessControl {
             return;
         }
         BookingCard card = cards.requireCard(booking.getCardId());
-        if (card.permitsManagement(managementRoles(actorRoles))) {
+        if (card.permitsManagement(BookingCard.managementRoles(actorRoles))) {
             return;
         }
         // The answer hides the refusal from the caller, so the log is where it stays visible.
         securityEvents.authorizationDenied(actor);
         throw new BookingNotFoundException(
                 "Account %s may not manage booking %s".formatted(actor, booking.getId()));
-    }
-
-    Set<Role> managementRoles(Set<Role> roles) {
-        return roles.stream()
-                .filter(role -> role != Role.MEMBER)
-                .collect(Collectors.toUnmodifiableSet());
     }
 }

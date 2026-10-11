@@ -35,7 +35,7 @@ public class ManagedAppointmentQuery {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page list(Set<Role> roles, View view, UUID courtId, UUID cardId, UUID cursor, int limit) {
         validatePageLimit(limit);
-        Set<Role> managementRoles = accessControl.managementRoles(roles);
+        Set<Role> managementRoles = BookingCard.managementRoles(roles);
         if (!roles.contains(Role.ADMIN) && managementRoles.isEmpty()) {
             return new Page(List.of(), null);
         }

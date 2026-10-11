@@ -298,13 +298,45 @@ describe("AppRoutes", () => {
     // when
     render(<RoutedShell initialEntries={["/admin/appointments"]}><AppRoutes session={{
       authenticated: true, username: "coach", displayName: "Casey Coach",
-      roles: ["MEMBER", "TRAINER"], passwordChangeRequired: false
+      roles: ["MEMBER", "TRAINER"], passwordChangeRequired: false, managesAppointments: true, createsSeries: true
     }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
 
     // then
     expect(await screen.findByTestId("managed-appointments-page")).toBeInTheDocument();
     expect(screen.queryByTestId("admin-overview-link")).not.toBeInTheDocument();
     expect(screen.queryByTestId("admin-configuration-link")).not.toBeInTheDocument();
+  });
+
+  it("given a treasurer no active card lets book or manage, when opening club appointments, then the court plan is served instead", () => {
+    // when
+    render(<RoutedShell initialEntries={["/admin/appointments"]}><AppRoutes session={{
+      authenticated: true, username: "roe.john", displayName: "John Roe",
+      roles: ["MEMBER", "TREASURER"], passwordChangeRequired: false, managesAppointments: false, createsSeries: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+
+    // then
+    expect(screen.queryByTestId("managed-appointments-page")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("administration-link")).not.toBeInTheDocument();
+    expect(screen.getByTestId("court-plan-view")).toBeInTheDocument();
+  });
+
+  it("given a treasurer a card names as managing role, when opening club appointments, then the list is served without the series form", async () => {
+    // given
+    vi.spyOn(api, "managedAppointments").mockResolvedValue({ items: [] });
+    vi.spyOn(api, "courts").mockResolvedValue([]);
+    vi.spyOn(api, "bookingCards").mockResolvedValue([]);
+    vi.spyOn(api, "bookingGrid").mockResolvedValue({ timeZone: "Europe/Berlin", slotMinutes: 30, openingWeeks: [], openingHours: [] });
+    vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [] });
+
+    // when
+    render(<RoutedShell initialEntries={["/admin/appointments"]}><AppRoutes session={{
+      authenticated: true, username: "roe.john", displayName: "John Roe",
+      roles: ["MEMBER", "TREASURER"], passwordChangeRequired: false, managesAppointments: true, createsSeries: false
+    }} refreshSession={() => Promise.resolve()} /></RoutedShell>);
+
+    // then
+    expect(await screen.findByTestId("managed-court-filter")).toBeInTheDocument();
+    expect(screen.queryByTestId("new-series")).not.toBeInTheDocument();
   });
 
   it("given an admin session, when opening the court plan, then the member bar carries administration", () => {

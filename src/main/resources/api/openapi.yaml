@@ -323,6 +323,19 @@ components:
           items: { $ref: "#/components/schemas/Role" }
         passwordChangeRequired:
           type: boolean
+        managesAppointments:
+          type: boolean
+          description: |
+            Whether an active booking card names one of the account's roles among its managing
+            roles, so the club appointments list has something to show. Always true for an
+            administrator, false without a session. A client that lacks the field treats it as false.
+        createsSeries:
+          type: boolean
+          description: |
+            Whether an active booking card that tracks no players lets one of the account's roles
+            book it, which is what creating a series requires. A card without booking roles counts
+            for every role. Always true for an administrator, false without a session. A client
+            that lacks the field treats it as false.
 
     RuleType:
       type: string

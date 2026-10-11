@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-11",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "05768233c45a9ce95b597bbf77df1c05008a42c6e7beb7372afe76bfe4677c94",
-  "protectedFieldInventorySha256": "4f16eed4229be447f36a68cbd5c82d5b9f5afb3c6dbad61dcad6c242025d9bad",
-  "productionAuthorizationSha256": "1f03469c0e31b6cedebb3076c9852e7b2b744768152b68018aaa04d9d35e8077",
+  "openApiFieldInventorySha256": "98642894c88771852d724e7cb966b046a19c6d263fdc940e39ebea8b1fb4b6c3",
+  "protectedFieldInventorySha256": "0990e6918c8181d77e5705fb9a9eb8d41b5a475f3773c4dd91260ce300d8ba4c",
+  "productionAuthorizationSha256": "5525acc820dbfefa067439a2a0f1d023c8e3b347b39a237406dc00cb43e85774",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -2922,7 +2922,7 @@
     {
       "id": "own-account-scope",
       "title": "Own account scope",
-      "rule": "The authenticated account identifier selects session, locale, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found.",
+      "rule": "The authenticated account identifier selects session, locale, appointment reach, message-choice, channel-choice and notification state; callers cannot supply another account identifier to these operations, and a notification id outside the account answers as not found.",
       "attributes": [
         "current-account",
         "session-handle"
@@ -2940,15 +2940,18 @@
         "src/main/java/org/courtside/notification/internal/OwnMessageChoices.java#accountId",
         "src/main/java/org/courtside/notification/internal/OwnNotifications.java#page",
         "src/main/java/org/courtside/notification/internal/OwnNotifications.java#markRead",
-        "src/main/java/org/courtside/notification/internal/OwnNotifications.java#accountId"
+        "src/main/java/org/courtside/notification/internal/OwnNotifications.java#accountId",
+        "src/main/java/org/courtside/card/internal/CardAppointmentAccess.java#reachOf"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/identity/AccountSessionLifecycleTest.java#givenTwoActiveSessions_whenOneIsListedAndEnded_thenOnlyPrivacySafeMetadataAndTheOtherRemain",
-        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenNotificationsForTwoMembers_whenOneReadsTheCentre_thenOnlyTheirOwnAreServedWithContentAndLink"
+        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenNotificationsForTwoMembers_whenOneReadsTheCentre_thenOnlyTheirOwnAreServedWithContentAndLink",
+        "src/test/java/org/courtside/identity/SessionAppointmentAccessTest.java#givenACardNamingTheTreasurerOnlyAsManagingRole_whenItReadsTheSession_thenItManagesButCreatesNoSeries"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/identity/internal/AccountSessionServiceTest.java#givenAnUnknownHandle_whenASessionIsEnded_thenNothingIsDeleted",
-        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAnotherMembersNotification_whenAMemberMarksItRead_thenItIsNotFoundAndStaysUnread"
+        "src/test/java/org/courtside/notification/web/NotificationControllerTest.java#givenAnotherMembersNotification_whenAMemberMarksItRead_thenItIsNotFoundAndStaysUnread",
+        "src/test/java/org/courtside/identity/SessionAppointmentAccessTest.java#givenNoActiveCardNamingTheTreasurer_whenItReadsTheSession_thenItNeitherManagesNorCreatesSeries"
       ]
     },
     {
@@ -3025,7 +3028,7 @@
         "src/main/java/org/courtside/booking/Booking.java#withdrawParticipant",
         "src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireManagementAccess",
         "src/main/java/org/courtside/booking/internal/BookingAccessControl.java#requireRoleManagementAccess",
-        "src/main/java/org/courtside/booking/internal/BookingAccessControl.java#managementRoles",
+        "src/main/java/org/courtside/card/BookingCard.java#managementRoles",
         "src/main/java/org/courtside/booking/ParticipationService.java#withdraw",
         "src/main/java/org/courtside/booking/internal/BookingAnnouncements.java#describeVisibleTo",
         "src/main/java/org/courtside/booking/internal/BookingAnnouncements.java#visibleTo",
@@ -3333,13 +3336,15 @@
     {
       "id": "session-identity-read",
       "access": "read",
-      "description": "Session identity fields describe only the account attached to the current session and become absent or empty for an anonymous caller.",
+      "description": "Session identity fields describe only the account attached to the current session and become absent, empty or false for an anonymous caller.",
       "fields": [
         "SessionStatus.username",
         "SessionStatus.displayName",
         "SessionStatus.locale",
         "SessionStatus.roles",
-        "SessionStatus.passwordChangeRequired"
+        "SessionStatus.passwordChangeRequired",
+        "SessionStatus.managesAppointments",
+        "SessionStatus.createsSeries"
       ],
       "operationIds": [
         "getSessionStatus"
