@@ -162,6 +162,13 @@ jobs:
           # The release configuration is checked against the history it claims to cover.
           fetch-depth: 0
       - uses: ./.github/actions/tool-dependencies
+      - name: Verify the acceptance harness
+        working-directory: acceptance
+        run: |
+          npm ci
+          npm run typecheck
+          npx playwright install --with-deps chromium
+          npm test
       - id: actionlint
         name: Read the locked workflow linter version
         run: node tools/workflow-lint.mjs --github-output "$GITHUB_OUTPUT"
