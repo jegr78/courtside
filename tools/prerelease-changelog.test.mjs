@@ -206,3 +206,33 @@ test("given a released 0.1.0, when release-please opens the 0.2.0 line with its 
   assert.match(cumulativeReleaseNotes(normalized, "v0.2.0-rc.1"), /^## 0\.2\.0 \(2026-10-01\)/);
   assert.equal(normalizePrereleaseChangelog(normalized), normalized, "a second run changes nothing");
 });
+
+// Written by release-please 17.6.0's DefaultChangelogNotes for a fix on release/0.1 after v0.1.0.
+const GENERATED_PATCH = `## [0.1.1](https://github.com/jegr78/courtside/compare/v0.1.0...v0.1.1) (2026-10-12)
+
+
+### Bug fixes
+
+* correct the sentence about courts ([bbbbbbb](https://github.com/jegr78/courtside/commit/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb))
+
+`;
+
+test("given this repository's changelog on a release branch, when release-please prepends a patch, then the patch keeps "
+  + "its own section and its notes can be cut", () => {
+  // given
+  const changelog = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  const generated = changelog.replace("## 0.1.0 (", `${GENERATED_PATCH}## 0.1.0 (`);
+  const second = generated.replace("## [0.1.1](", `${GENERATED_PATCH.replaceAll("0.1.1", "0.1.2")
+    .replace("v0.1.0...v0.1.2", "v0.1.1...v0.1.2")}## [0.1.1](`);
+
+  // when
+  const normalized = normalizePrereleaseChangelog(generated);
+
+  // then
+  assert.equal(normalized, generated, "a patch is no candidate delta, so nothing is folded into 0.1.0");
+  assert.equal(normalizePrereleaseChangelog(second), second, "the next patch leaves the earlier one alone");
+  const notes = cumulativeReleaseNotes(normalized, "v0.1.1");
+  assert.match(notes, /^## \[0\.1\.1\]\(https:\/\/github\.com\/jegr78\/courtside\/compare\/v0\.1\.0\.\.\.v0\.1\.1\) \(2026-10-12\)/);
+  assert.match(notes, /\* correct the sentence about courts\n$/, "the release body drops the commit link and ends at 0.1.0");
+  assert.doesNotMatch(notes, /^## 0\.1\.0/m);
+});

@@ -102,14 +102,18 @@ test("given no release to bump from, when the first candidate is proposed, then 
     + " the complete release pipeline as rc.1 before this repository publishes 0.1.0");
 });
 
-test("given 0.1.0 is published, when the strategy is read, then main counts candidates of the next line",
-  () => {
+test("given 0.1.0 is published, when the strategy is read, then a candidate line never records a patch and a release branch "
+  + "never records a candidate", () => {
     // when / then
     assert.equal(config.versioning, "prerelease");
     assert.equal(packageEntry["prerelease-type"], "rc");
-    assert.equal(config.prerelease, true,
-      "main carries the next milestone as candidates; patch releases of 0.1 come from a release branch");
-    assert.match(manifest["."], /^0\.(1\.0|2\.0-rc\.\d+)$/, "the line after 0.1.0 is 0.2.0, opened by a Release-As footer");
+    if (config.prerelease === true) {
+      assert.match(manifest["."], /^\d+\.\d+\.0(?:-rc\.\d+)?$/,
+        "main carries the next milestone as candidates; a patch comes from a release branch");
+    } else {
+      assert.match(manifest["."], /^\d+\.\d+\.\d+$/,
+        "with prerelease off this is a release branch or a graduation, which records released versions only");
+    }
   });
 
 test("given release-please writes a candidate delta, when it updates the release PR, then the changelog is normalized before review",
@@ -232,8 +236,12 @@ test("given the token can publish under this project's name, when the workflow r
     const [guard, release] = workflow.jobs["release-please"].steps;
 
     // when / then
-    assert.deepEqual(triggers, { push: { branches: ["main"] } },
-      "a pull_request trigger would put the token within reach of a fork's code");
+    assert.deepEqual(triggers, { push: { branches: ["main", "release/*"] } },
+      "a pull_request trigger would put the token within reach of a fork's code; release/* is protected like main");
+    assert.equal(release.with["target-branch"], "${{ github.ref_name }}",
+      "a release branch gets its own release pull request, read from its own configuration and manifest");
+    assert.equal(workflow.concurrency.group, "release-please-${{ github.ref }}",
+      "main and a release branch maintain separate pull requests and must not wait on each other");
     assert.deepEqual(workflow.permissions, {},
       "the action authenticates every call with the PAT, so the run's own token needs nothing —"
       + " and a job that grants itself nothing cannot lend anything to a step added later");
