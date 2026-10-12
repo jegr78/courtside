@@ -340,7 +340,7 @@ components:
     RuleType:
       type: string
       enum: [OPENING_HOURS, SLOT_GRID, ADVANCE_WINDOW, MAX_OPEN_BOOKINGS, MAX_BOOKING_DURATION,
-             CANCELLATION_DEADLINE, NO_COURT_BOOKING]
+             CANCELLATION_DEADLINE, NO_COURT_BOOKING, BOOKING_HOURS]
 
     CancelScope:
       type: string

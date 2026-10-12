@@ -3,13 +3,16 @@ package org.courtside;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,8 +26,7 @@ class EnumeratedColumnInListPatternTest {
         String expected = enumValuesOf("org.courtside.rules.RuleType");
 
         // when
-        String actual = sqlInListValues(
-                "V5__rules.sql", "rule_definition_rule_type_known", "rule_type");
+        String actual = latestSqlInListValues("rule_definition_rule_type_known", "rule_type");
 
         // then
         assertThat(actual)
@@ -88,13 +90,38 @@ class EnumeratedColumnInListPatternTest {
                 .collect(Collectors.joining(","));
     }
 
+    private static String latestSqlInListValues(String constraintName, String columnName)
+            throws IOException {
+        try (Stream<Path> migrations = Files.list(Path.of("src/main/resources/db/migration"))) {
+            List<String> declaring = migrations
+                    .map(path -> path.getFileName().toString())
+                    .sorted(Comparator.comparingInt(EnumeratedColumnInListPatternTest::versionOf))
+                    .filter(name -> inList(name, constraintName, columnName).find())
+                    .toList();
+            assertThat(declaring).as("a migration must declare %s", constraintName).isNotEmpty();
+            return sqlInListValues(declaring.getLast(), constraintName, columnName);
+        }
+    }
+
+    private static int versionOf(String migrationFileName) {
+        return Integer.parseInt(migrationFileName.substring(1, migrationFileName.indexOf("__")));
+    }
+
+    private static Matcher inList(String migrationFileName, String constraintName, String columnName) {
+        try {
+            String content = Files.readString(Path.of("src/main/resources/db/migration", migrationFileName));
+            return Pattern
+                    .compile(Pattern.quote(constraintName) + "\\s+CHECK\\s*\\(\\s*"
+                            + Pattern.quote(columnName) + "\\s+IN\\s+\\(([^)]+)\\)")
+                    .matcher(content);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private static String sqlInListValues(
-            String migrationFileName, String constraintName, String columnName) throws IOException {
-        String content = Files.readString(Path.of("src/main/resources/db/migration", migrationFileName));
-        Matcher matcher = Pattern
-                .compile(Pattern.quote(constraintName) + "\\s+CHECK\\s*\\(\\s*"
-                        + Pattern.quote(columnName) + "\\s+IN\\s+\\(([^)]+)\\)")
-                .matcher(content);
+            String migrationFileName, String constraintName, String columnName) {
+        Matcher matcher = inList(migrationFileName, constraintName, columnName);
         assertThat(matcher.find())
                 .as("%s must contain %s with a CHECK on %s IN (...)",
                         migrationFileName, constraintName, columnName)
