@@ -105,3 +105,27 @@ it("given a control that refuses the focus, when tabbing, then the trap moves on
   // then
   expect(screen.getByTestId("after")).toHaveFocus();
 });
+
+it("given the focus on a panel between two controls, when tabbing either way, then it moves to the neighbouring control", async () => {
+  // given
+  render(<Modal labelledBy="heading" closed={vi.fn()}>
+    <h2 id="heading">Move</h2>
+    <button data-testid="before" type="button">Preview</button>
+    <div data-testid="panel" tabIndex={-1}>Blocked</div>
+    <button data-testid="after" type="button">Close</button>
+  </Modal>);
+  screen.getByTestId("panel").focus();
+
+  // when
+  await userEvent.tab();
+
+  // then
+  expect(screen.getByTestId("after"), "Tab continues after the panel rather than at the first control").toHaveFocus();
+
+  // when
+  screen.getByTestId("panel").focus();
+  await userEvent.tab({ shift: true });
+
+  // then
+  expect(screen.getByTestId("before"), "Shift+Tab continues before the panel rather than at the last control").toHaveFocus();
+});
