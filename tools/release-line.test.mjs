@@ -315,19 +315,20 @@ test("given a branch name, when its remote ref is named, then a tag or a local b
   assert.throws(() => remoteRefOf("release/0.1/../main"), /not a release target/);
 });
 
-test("given a branch named like the release tag, when the forward port is checked, then the tag still bounds the range", () => {
+test("given a ref that shadows the release tag's short name, when the forward port is checked, then the tag still bounds the range",
+  () => {
   // given
   const repository = releasedLine();
   const { git } = repository;
   try {
-    git("branch", "v0.1.0", "release/0.1");
+    git("update-ref", "refs/v0.1.0", "release/0.1");
 
     // when
     const verdict = forwardPortVerdict({ git, baseRef: "release/0.1", headRef: "release/0.1", mainRef: "main",
       releasable });
 
     // then
-    assert.equal(verdict.accepted, false, "a branch v0.1.0 at the head would otherwise hide every unported fix");
+    assert.equal(verdict.accepted, false, "git resolves refs/v0.1.0 before refs/tags/v0.1.0 and would hide every unported fix");
   } finally {
     repository.remove();
   }
