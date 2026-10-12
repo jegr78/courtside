@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import test from "node:test";
@@ -213,7 +214,10 @@ test("given a push to a branch named like a release line, when release-please st
     // when / then
     assert.deepEqual(triggersOf(loaded).push.branches, ["main", "release/[0-9]*.[0-9]*"]);
     assert.deepEqual(guard.env, { BRANCH: "${{ github.ref_name }}" });
-    assert.match(guard.run, /\[\[ "\$BRANCH" == main \|\| "\$BRANCH" =~ \^release\/\(0\|\[1-9\]\[0-9\]\*\)\\\.\(0\|\[1-9\]\[0-9\]\*\)\$ \]\]/);
+    const passes = (branch) => spawnSync("bash", ["-c", guard.run], { env: { ...process.env, BRANCH: branch } }).status === 0;
+    assert.deepEqual(["main", "release/0.1", "release/10.12"].filter(passes), ["main", "release/0.1", "release/10.12"]);
+    assert.deepEqual(["release/0.1.1", "release/01.1", "release/0.1-evil", "release/x"].filter(passes), [],
+      "the trigger glob also matches these, so the guard is what keeps the token away from them");
     assert.ok(loaded.jobs["release-please"].steps.indexOf(guard) < loaded.jobs["release-please"].steps.findIndex(
       (step) => step.id === "release"), "the token is not used for a branch the guard refuses");
   });
