@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it, onTestFinished, vi } from "vitest";
-import { api } from "../api/client";
+import { api, type MovePreview } from "../api/client";
 import i18n from "../i18n";
 import { MyBookingsView } from "./MyBookingsView";
 
@@ -582,6 +582,73 @@ it("given a move dialog, when the preview arrives, then the confirm action is a 
   // then
   const confirm = await screen.findByTestId("confirm-move");
   expect(confirm, "a reused button fades from the preview button's colours and fails contrast while it does").not.toBe(previewButton);
+});
+
+it("given a move dialog, when the preview arrives, then the confirm button holds the focus and Escape still closes the dialog", async () => {
+  // given
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("move-booking"));
+  await userEvent.type(screen.getByTestId("move-start-time"), "19:00");
+
+  // when
+  await userEvent.click(screen.getByTestId("preview-move"));
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("confirm-move"), "the focus moves to the button that replaced the preview button").toHaveFocus());
+  expect(screen.getByTestId("confirm-move"), "the confirm button is described by what it will move").toHaveAccessibleDescription("1 occurrence can be moved.");
+  await userEvent.keyboard("{Escape}");
+  expect(screen.queryByTestId("move-dialog"), "Escape closes the dialog after the preview").not.toBeInTheDocument();
+});
+
+it("given a blocked move, when the preview arrives, then the focus stays in the dialog and Escape still closes it", async () => {
+  // given
+  vi.mocked(api.previewSeriesMove).mockResolvedValue({
+    executable: false,
+    moves: [{
+      bookingId: upcomingId,
+      fromStartsAt: "2026-08-12T16:00:00Z",
+      fromEndsAt: "2026-08-12T17:00:00Z",
+      toStartsAt: "2026-08-12T20:00:00Z",
+      toEndsAt: "2026-08-12T21:00:00Z",
+      blockedCourtIds: [],
+      unbookableCourtIds: [],
+      violations: [{ code: "booking.rule.openingHours.closed", params: {} }],
+      executable: false
+    }]
+  });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("move-booking"));
+  await userEvent.type(screen.getByTestId("move-start-time"), "22:00");
+
+  // when
+  await userEvent.click(screen.getByTestId("preview-move"));
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("move-preview"), "the focus lands on the reasons the move is blocked").toHaveFocus());
+  expect(screen.getByTestId("move-preview"), "the focused panel is named by its count").toHaveAccessibleName("1 occurrence can be moved.");
+  await userEvent.keyboard("{Escape}");
+  expect(screen.queryByTestId("move-dialog"), "Escape closes the dialog after a blocked preview").not.toBeInTheDocument();
+});
+
+it("given a member who moved on while the preview loaded, when it arrives, then the focus stays where they put it", async () => {
+  // given
+  let answer: (preview: MovePreview) => void = () => undefined;
+  vi.mocked(api.previewSeriesMove).mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("move-booking"));
+  await userEvent.type(screen.getByTestId("move-start-time"), "19:00");
+  await userEvent.click(screen.getByTestId("preview-move"));
+  screen.getByTestId("scope-WHOLE_SERIES").focus();
+
+  // when
+  await act(() => {
+    answer({ executable: true, moves: [] });
+    return Promise.resolve();
+  });
+
+  // then
+  expect(await screen.findByTestId("confirm-move")).toBeInTheDocument();
+  expect(screen.getByTestId("scope-WHOLE_SERIES"), "a focus the member chose inside the dialog is not taken back").toHaveFocus();
 });
 
 it("given the list reloads, when it shows its loading state, then load more is not offered", async () => {

@@ -61,7 +61,9 @@ function isReachable(control: HTMLElement): boolean {
 // A target may still refuse the focus - hidden by something this filter does not know about - and
 // repeating that jump is exactly the dead end the filter exists to prevent.
 function focusOnward(controls: HTMLElement[], active: HTMLElement, step: number): void {
-  const from = controls.indexOf(active) === -1 ? (step === 1 ? -1 : 0) : controls.indexOf(active);
+  const following = controls.findIndex((control) => active.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING);
+  const next = following === -1 ? controls.length : following;
+  const from = controls.includes(active) ? controls.indexOf(active) : (step === 1 ? next - 1 : next);
   for (let moved = 1; moved <= controls.length; moved += 1) {
     const candidate = controls[(from + step * moved + controls.length * moved) % controls.length];
     candidate.focus();

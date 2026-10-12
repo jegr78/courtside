@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { type Locator, type Page } from "@playwright/test";
-import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, selectJourneyDate, selectPreference, test } from "./fixtures";
+import { backAtTheJourneyInstant, expect, expectAdministrationOverview, onTheVisualDay, routeLongSeries, selectJourneyDate, selectPreference, seriesBookingId, test } from "./fixtures";
+import { journeyInstant } from "./global-setup";
 
 // Locale, theme, viewport and timezone are fixed here; the renderer is fixed by the project,
 // which draws in the pinned image rather than in whatever browser the host provides.
@@ -87,18 +88,152 @@ test("the phone court plan and personal bookings match their reviewed baselines"
 
   // when
   await signIn(page, "doe.jane");
-  await selectJourneyDate(page, journeyService.visualDate);
-
-  // then
-  await phoneScreenshot(page.getByTestId("court-plan-view"), "phone-court-plan.png", dynamicDates(page));
-
-  // when
   await page.getByTestId("my-bookings-link").click();
   await expect(page.getByTestId("upcoming-bookings")).toBeVisible();
 
   // then
   await phoneScreenshot(page.getByTestId("my-bookings-page"), "phone-personal-bookings.png", page.locator("time"));
 });
+
+for (const theme of ["dark", "light"] as const) {
+  const baseline = (surface: string) => theme === "dark" ? `${surface}.png` : `${surface}-light.png`;
+  const capture = async (surface: Locator, name: string, mask?: Locator) => {
+    await expect(surface.page().locator("html"), `the capture is drawn in the ${theme} theme`).toHaveAttribute("data-theme", theme, { timeout: 10_000 });
+    await phoneScreenshot(surface, name, mask);
+  };
+
+  test.describe(`in the ${theme} theme`, () => {
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript((chosen) => window.localStorage.setItem("courtside.theme", chosen), theme);
+    });
+
+    test("given bookings beside a match and a training, when a phone draws the court plan, then its booking labels match the reviewed baseline", async ({ page, journeyService }) => {
+      // given
+      await page.setViewportSize({ width: 390, height: 844 });
+      await signIn(page, "doe.jane");
+
+      // when
+      await selectJourneyDate(page, journeyService.visualDate);
+      await expect(page.getByTestId("own-allocation").first()).toBeVisible({ timeout: 10_000 });
+
+      // then
+      await capture(page.getByTestId("court-plan-view"), baseline("phone-court-plan"), dynamicDates(page));
+    });
+
+    test("given a phone in landscape, when the court plan and its booking dialog are drawn, then both match their reviewed baselines", async ({ page, journeyService }) => {
+      // given
+      await page.setViewportSize({ width: 852, height: 393 });
+      await signIn(page, "doe.jane");
+
+      // when
+      await selectJourneyDate(page, journeyService.visualDate);
+      await expect(page.getByTestId("own-allocation").first()).toBeVisible({ timeout: 10_000 });
+
+      // then
+      await capture(page.getByTestId("court-plan-view"), baseline("phone-landscape-court-plan"), dynamicDates(page));
+
+      // when
+      await page.locator('[data-testid="free-slot"][data-court-number="2"][data-slot="12:00"]').click();
+      await expect(page.getByTestId("booking-dialog").getByTestId("dialog-continues")).toBeVisible({ timeout: 10_000 });
+
+      // then
+      await capture(page.getByTestId("booking-dialog"), baseline("phone-landscape-booking-dialog"));
+    });
+
+    test("given a phone in landscape, when a series move is previewed, then the move dialog matches its reviewed baseline", async ({ page }) => {
+      // given
+      await page.setViewportSize({ width: 852, height: 393 });
+      await signIn(page, "doe.jane");
+      await page.getByTestId("my-bookings-link").click();
+      await expect(page.getByTestId("upcoming-bookings")).toBeVisible({ timeout: 10_000 });
+
+      // when
+      await page.locator(`[data-testid="move-booking"][data-booking-id="${seriesBookingId}"]`).click();
+      const move = page.getByTestId("move-dialog");
+      await move.getByTestId("move-duration").fill("90");
+      await move.getByTestId("preview-move").click();
+      await expect(move.getByTestId("confirm-move")).toBeVisible({ timeout: 10_000 });
+      await move.getByTestId("move-preview").scrollIntoViewIfNeeded();
+
+      // then
+      await capture(move, baseline("phone-landscape-move-dialog"));
+    });
+
+    test("given a phone in landscape, when a long series is to be cancelled whole, then the cancel dialog matches its reviewed baseline", async ({ page, journeyService }) => {
+      // given
+      await routeLongSeries(page, journeyService.visualDate);
+      await page.setViewportSize({ width: 852, height: 393 });
+      await signIn(page, "doe.jane");
+      await page.getByTestId("my-bookings-link").click();
+      await expect(page.getByTestId("upcoming-bookings")).toBeVisible({ timeout: 10_000 });
+
+      // when
+      await page.locator(`[data-testid="personal-cancel"][data-booking-id="${seriesBookingId}"]`).click();
+      const cancel = page.getByRole("dialog");
+      await cancel.getByTestId("scope-WHOLE_SERIES").check();
+      await expect(cancel.locator("li")).toHaveCount(12, { timeout: 10_000 });
+
+      // then
+      await capture(cancel, baseline("phone-landscape-cancel-dialog"));
+    });
+
+    test("given a refused message, when the board reads the message log on a phone, then it matches its reviewed baseline", async ({ page, journeyService }) => {
+      // given
+      const record = "7c000000-0000-0000-0000-0000000000d1";
+      await journeyService.executeSql(`
+        INSERT INTO message_record (id, account_id, kind, state, message_id, reason, status_code, queued_at, settled_at)
+        VALUES ('${record}', '00000000-0000-0000-0000-000000000102', 'CREDENTIALS_NEW_ACCOUNT', 'REFUSED',
+          '<0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0.1759349460000@relay.example.org>', 'SendFailedException', '550',
+          TIMESTAMPTZ '${journeyInstant}', TIMESTAMPTZ '${journeyInstant}');`);
+      try {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await signIn(page, "configuration-admin");
+
+        // when
+        await page.goto("/admin/messages");
+        await expect(page.getByTestId("message-row")).toBeVisible({ timeout: 10_000 });
+
+        // then
+        await capture(page.getByTestId("admin-messages-view"), baseline("phone-message-log"));
+      } finally {
+        await journeyService.executeSql(`DELETE FROM message_record WHERE id = '${record}';`);
+      }
+    });
+
+    test("given a 320 px phone, when the last day of the week is chosen, then the day strip matches its reviewed baseline", async ({ page }) => {
+      // given
+      await page.setViewportSize({ width: 320, height: 640 });
+      await page.goto("/");
+      const strip = page.getByTestId("mobile-week-navigation");
+      await expect(strip).toBeVisible({ timeout: 10_000 });
+
+      // when
+      const lastDay = strip.locator('[data-testid^="day-selector-"]').last();
+      // A tap on a card's visible sliver does not scroll the strip first, as click() would.
+      await lastDay.dispatchEvent("click");
+      await expect(lastDay).toHaveAttribute("aria-pressed", "true", { timeout: 10_000 });
+      await expect(page.getByTestId("week-grid")).toBeVisible({ timeout: 10_000 });
+
+      // then
+      await capture(strip, baseline("phone-day-strip"));
+    });
+
+    test("given German at 320 px, when My messages opens, then its hyphenated heading matches its reviewed baseline", async ({ page }) => {
+      // given
+      await page.addInitScript(() => window.localStorage.setItem("courtside.locale", "de-DE"));
+      await page.setViewportSize({ width: 320, height: 640 });
+      await signIn(page, "doe.jane");
+
+      // when
+      await page.goto("/my-messages");
+      await expect(page.getByTestId("my-messages-view")).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator("html")).toHaveAttribute("lang", "de", { timeout: 10_000 });
+
+      // then
+      await capture(page.getByRole("heading", { level: 1 }), baseline("phone-german-heading"));
+    });
+  });
+}
 
 test("stable administration surfaces match their reviewed baselines", async ({ page, journeyService }) => {
   // given
@@ -280,7 +415,7 @@ function dynamicDates(page: Page): Locator {
 }
 
 // The bar is fixed to the viewport, so a stitched capture would draw it wherever scrolling left it.
-async function phoneScreenshot(surface: Locator, name: string, mask: Locator): Promise<void> {
+async function phoneScreenshot(surface: Locator, name: string, mask?: Locator): Promise<void> {
   const bar = surface.page().getByTestId("primary-navigation-bar");
   await bar.evaluateAll((elements) => elements.forEach((element) => { (element as HTMLElement).style.visibility = "hidden"; }));
   await stableScreenshot(surface, name, mask);

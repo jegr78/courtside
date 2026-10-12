@@ -17,14 +17,25 @@ test("given stable product views, when qualifying the UI, then reviewed pixel ba
     "admin-booking-card",
     "admin-slot-fillers", "admin-roster", "admin-membership-types",
     "admin-import", "admin-export", "admin-utilisation", "admin-audit", "admin-messages",
-    "phone-public-court-plan", "phone-court-plan", "phone-personal-bookings"
+    "phone-public-court-plan", "phone-personal-bookings"
+  ];
+  const phoneSurfacesInBothThemes = [
+    "phone-court-plan", "phone-landscape-court-plan", "phone-landscape-booking-dialog",
+    "phone-landscape-move-dialog", "phone-landscape-cancel-dialog", "phone-message-log",
+    "phone-day-strip", "phone-german-heading"
   ];
   for (const surface of principalSurfaces) {
     assert.match(visual, new RegExp(`\\"${surface}\\.png\\"`));
   }
+  for (const surface of phoneSurfacesInBothThemes) {
+    assert.match(visual, new RegExp(`baseline\\("${surface}"\\)`), `${surface} is captured in both themes`);
+  }
   assert.equal(existsSync(snapshots), true);
   const reviewed = readdirSync(snapshots).filter((file) => file.endsWith(".png"));
-  assert.equal(reviewed.length, principalSurfaces.length);
+  assert.deepEqual(reviewed.sort(), [
+    ...principalSurfaces.map((surface) => `${surface}.png`),
+    ...phoneSurfacesInBothThemes.flatMap((surface) => [`${surface}.png`, `${surface}-light.png`])
+  ].sort());
   assert.deepEqual(reviewed.filter((file) => /-(darwin|linux)\.png$/.test(file)), []);
 });
 
