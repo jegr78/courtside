@@ -21,10 +21,20 @@ async function axeFindings(page: import("@playwright/test").Page): Promise<strin
 
 // axe reads computed colours, so a control still fading into the new theme would be judged mid-way.
 async function transitionsSettled(page: import("@playwright/test").Page) {
-  const moving = () => page.evaluate(() => document.getAnimations()
-    .filter((animation): animation is CSSTransition => animation instanceof CSSTransition && animation.playState === "running")
-    .map((transition) => `${transition.transitionProperty} on ${(transition.effect as KeyframeEffect | null)?.target?.nodeName}`));
-  await expect.poll(moving, { message: "no transition still running when axe scans", timeout: 10_000 }).toEqual([]);
+  const stillMoving = () => page.evaluate(() => {
+    const perElement = new Map<string, number>();
+    for (const animation of document.getAnimations()) {
+      // WebKit keeps finished transitions in getAnimations(), so only running ones count.
+      if (!(animation instanceof CSSTransition) || animation.playState !== "running") continue;
+      const { target, pseudoElement } = animation.effect as KeyframeEffect;
+      const element = `${target?.nodeName}${pseudoElement ?? ""}`;
+      perElement.set(element, (perElement.get(element) ?? 0) + 1);
+    }
+    return [...perElement].map(([element, count]) => `${count} on ${element}`);
+  });
+  await expect.poll(stillMoving, { message: "no transition still running when axe scans", timeout: 10_000, intervals: [50] }).toEqual([]);
+  // An inherited colour follows its parent's finished transition only in the next frame.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
 async function expectNoWcagViolations(page: import("@playwright/test").Page) {
