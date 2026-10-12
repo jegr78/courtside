@@ -128,7 +128,7 @@ describe("AdminBookingCardView", () => {
     // then
     const preview = screen.getByTestId("card-preview");
     expect(preview).toHaveAttribute("data-state", "occupied");
-    expect(preview).toHaveTextContent("Booked");
+    expect(preview).toHaveTextContent("Occupied");
     expect(preview).not.toHaveTextContent("Member booking");
   });
 

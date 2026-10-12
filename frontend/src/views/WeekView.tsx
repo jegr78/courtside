@@ -1,6 +1,7 @@
 import { type CSSProperties, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { allocationLabel } from "../booking/allocationLabel";
+import { shortLabels } from "../booking/shortLabels";
 import {
   api, type Allocation, type BookingCardLegendEntry, type BookingEligibility, type BookingGrid, type PublicCourt
 } from "../api/client";
@@ -62,6 +63,7 @@ interface DayPlanCellProps {
   grid: BookingGrid;
   locale: string;
   t: ReturnType<typeof useTranslation>["t"];
+  shortLabelOf: Map<string, string>;
   book: (courtId: string, slot: string) => void;
   cancel: (allocation: Allocation) => void;
   past: boolean;
@@ -186,6 +188,8 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       allocationBoundaries.get(formatDate(day)) ?? [], weekSlotGeometry.get(formatDate(day)) ?? [])] as const))
     : new Map<string, number>(), [data, currentInstant, allocationBoundaries, weekSlotGeometry]);
   const hasCourts = (data?.courts.length ?? 0) > 0;
+  const shortLabelOf = useMemo(() => shortLabels(data
+    ? [t("booking.viewer"), t("week.occupied"), ...legendCards(data).map((card) => card.label)] : []), [data, t]);
   const days = loadedDays ?? [];
   const renderedWeekStart = days[0] ? formatDate(days[0]) : undefined;
   const selectedAllocations = useMemo(() => selectedDate ? data?.allocations.get(selectedDate) ?? [] : [],
@@ -487,7 +491,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
             </th>
             {data.courts.map((court) => <DayPlanCell key={court.id}
               court={court} slot={slot} date={selectedDate} startsAt={visibleSlotStartsAt}
-              allocations={selectedBoundaries} grid={data.grid} locale={language} t={t}
+              allocations={selectedBoundaries} grid={data.grid} locale={language} t={t} shortLabelOf={shortLabelOf}
               book={openBooking} cancel={openCancellation} past={past} outside={outside}
               canBook={bookingAllowed} firstVisible={slot === slots[0]}
               selected={drag?.courtId === court.id && dragSpan.includes(slot)}
@@ -508,16 +512,16 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     </div>}
     {data && hasCourts && <ul data-testid="court-plan-legend" className="text-muted mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label={t("week.legend")}>
       <li><span className="day-plan-legend free" aria-hidden="true" />{t("week.available")}</li>
-      <li><span className="day-plan-legend own" aria-hidden="true" />{t("week.own")}</li>
+      <li><span data-testid="legend-own" className="day-plan-legend own" aria-hidden="true"><OwnMarker /></span>{t("week.own")}</li>
       <li><span className="day-plan-legend unavailable" aria-hidden="true" />{t("week.unavailable")}</li>
       {hasGenericOccupancy(data) && <li>
-        <span data-testid="legend-occupied" className="day-plan-legend occupied"
-          aria-hidden="true" />{t("week.occupied")}
+        <span data-testid="legend-occupied" className="day-plan-legend day-plan-legend-coded occupied"
+          aria-hidden="true" style={genericOccupancyStyle(data)}>{shortLabelOf.get(t("week.occupied"))}</span>{t("week.occupied")}
       </li>}
       {legendCards(data).map((card) => <li key={`${card.label}:${card.color}`}>
         <span data-testid={card.id ? `legend-card-${card.id}` : "legend-allocation-card"}
-          className="day-plan-legend" aria-hidden="true"
-          style={{ backgroundColor: card.color }} />{card.label}
+          className="day-plan-legend day-plan-legend-coded" aria-hidden="true"
+          style={{ backgroundColor: card.color, color: contrastColor(card.color) }}>{shortLabelOf.get(card.label)}</span>{card.label}
       </li>)}
     </ul>}
     {bookingSelection && data && <BookingDialog
@@ -572,7 +576,7 @@ const DayPlanCell = memo(function DayPlanCell(props: DayPlanCellProps) {
     };
   }, [pressed]);
   return renderCell(props.court, props.slot, props.date, props.startsAt, props.allocations,
-    props.grid.slotMinutes, props.grid.timeZone, props.locale, props.t,
+    props.grid.slotMinutes, props.grid.timeZone, props.locale, props.t, props.shortLabelOf,
     () => props.book(props.court.id, props.slot), props.cancel, props.past, props.outside,
     props.canBook, props.firstVisible, {
       selected: props.selected || pressed === cell,
@@ -606,6 +610,12 @@ function hasGenericOccupancy(data: WeekData): boolean {
       allocations.some((allocation) => allocation.showGenericOccupancy));
 }
 
+function genericOccupancyStyle(data: WeekData): CSSProperties | undefined {
+  const color = data.bookingCards.find((card) => card.showGenericOccupancy)?.color
+    ?? [...data.allocations.values()].flat().find((allocation) => allocation.showGenericOccupancy && !allocation.ownBooking)?.cardColor;
+  return color ? { backgroundColor: color, color: contrastColor(color) } : undefined;
+}
+
 function legendCards(data: WeekData): LegendCard[] {
   const entries = new Map<string, LegendCard>();
   data.bookingCards.filter((card) => !card.showGenericOccupancy).forEach((card) => {
@@ -632,6 +642,7 @@ function renderCell(
   timeZone: string,
   locale: string,
   t: ReturnType<typeof useTranslation>["t"],
+  shortLabelOf: Map<string, string>,
   book: () => void,
   cancel: (allocation: Allocation) => void,
   isPast: boolean,
@@ -652,24 +663,37 @@ function renderCell(
     const duration = (Date.parse(allocation.endsAt) - visibleStartsAt) / 60_000;
     const startedBeforeVisibleSlot = Date.parse(allocation.startsAt) < visibleSlotStartsAt;
     const label = allocationLabel(allocation, t);
+    const shortLabel = allocation.ownBooking && allocation.showGenericOccupancy ? t("booking.viewer")
+      : shortLabelOf.get(allocation.showGenericOccupancy ? t("week.occupied") : allocation.cardLabel) ?? label;
     const period = formatBookingTimeRange(allocation.startsAt, allocation.endsAt, locale, timeZone);
+    const ownLabel = allocation.ownBooking && !allocation.showGenericOccupancy ? `${t("booking.viewer")}, ${label}` : label;
+    const spokenLabel = ownLabel.toLocaleLowerCase().includes(shortLabel.toLocaleLowerCase()) ? ownLabel : `${ownLabel} (${shortLabel})`;
     const className = "day-plan-allocation h-full w-full rounded-md px-3 py-2 text-left font-semibold";
     const state = allocation.ownBooking ? "own" : allocation.showGenericOccupancy ? "occupied" : "card";
     const style = allocation.ownBooking
       ? { backgroundColor: "var(--cs-ball)", color: "var(--cs-shade)" }
       : { backgroundColor: allocation.cardColor, color: contrastColor(allocation.cardColor) };
-    return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className={`${cellClass} p-2 align-top`}>
+    const content = <span className="day-plan-allocation-body">
+      <span className="day-plan-allocation-name">
+        {allocation.ownBooking && <OwnMarker />}
+        <span data-testid="allocation-label" className="day-plan-allocation-full">{label}</span>
+        <span data-testid="allocation-short-label" className="day-plan-allocation-short">{shortLabel}</span>
+      </span>
+      <span data-testid="allocation-period" className="day-plan-allocation-period block text-xs">{period}</span>
+    </span>;
+    return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className={`${cellClass} day-plan-allocation-cell p-2 align-top`}>
+      <span data-testid="allocation-extent" aria-hidden="true" className="day-plan-allocation-extent" style={{ backgroundColor: style.backgroundColor }} />
       {allocation.ownBooking && !isPast && !startedBeforeVisibleSlot ? <button
         type="button"
         data-testid="own-allocation"
         data-booking-id={allocation.bookingId}
         data-card-color={allocation.cardColor}
         data-state={state}
-        aria-label={t("booking.cancelLabel", { label: `${label}, ${period}` })}
+        aria-label={t("booking.cancelLabel", { label: `${spokenLabel}, ${period}` })}
         onClick={() => cancel(allocation)}
         className={className}
         style={style}
-      ><span className="block">{label}</span><span className="block text-xs">{period}</span></button> : <div role="img" aria-label={`${label}, ${period}`} data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}><span className="block">{label}</span><span className="block text-xs">{period}</span></div>}
+      >{content}</button> : <div role="img" aria-label={`${spokenLabel}, ${period}`} data-testid={allocation.ownBooking ? "own-allocation" : "allocation"} data-booking-id={allocation.bookingId} data-card-color={allocation.cardColor} data-state={state} className={className} style={style}>{content}</div>}
     </td>;
   }
   const isCovered = isOccupied(allocations, court.id, slot);
@@ -704,6 +728,12 @@ function renderCell(
   return <td key={court.id} className={`${cellClass} day-plan-free-cell p-1`}>
     {content}
   </td>;
+}
+
+function OwnMarker() {
+  return <svg data-testid="own-marker" className="own-marker" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+    <circle cx="12" cy="7.5" r="4.5" /><path d="M3 22a9 9 0 0 1 18 0z" />
+  </svg>;
 }
 
 function currentLineOffset(currentTime: string, slots: string[], slotMinutes: number, slotHeight: number): number {

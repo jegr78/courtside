@@ -1,5 +1,5 @@
 import { Profiler } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { ApiError, api } from "../api/client";
@@ -81,7 +81,7 @@ beforeEach(async () => {
     startsAt: "2026-08-10T18:00:00+02:00",
     endsAt: "2026-08-10T19:00:00+02:00",
     cardLabel: "Member booking",
-    cardColor: "#176b55",
+    cardColor: "#999999",
     ownBooking: false,
     showGenericOccupancy: true,
     participantCount: 2
@@ -120,7 +120,7 @@ it("given the current week, when it loads, then every day and active court is av
   expect(screen.getByTestId("slot-heading-12:00")).toHaveTextContent("12:00");
   expect(screen.getByTestId("slot-heading-21:30")).toHaveTextContent("21:30");
   const booking = screen.getByTestId("allocation");
-  expect(booking).toHaveStyle({ backgroundColor: "rgb(23, 107, 85)" });
+  expect(booking).toHaveStyle({ backgroundColor: "rgb(153, 153, 153)" });
   expect(booking).toHaveAttribute("data-state", "occupied");
   expect(booking.closest("td")).toHaveAttribute("rowspan", "2");
   expect(screen.getByTestId("slot-heading-12:00").closest("tr")).toHaveStyle({ "--slot-height": "40px" });
@@ -134,7 +134,9 @@ it("given the current week, when it loads, then every day and active court is av
   expect(screen.getByTestId("day-selector-2026-08-10"))
     .toHaveAccessibleName(/38 free slots/);
   expect(screen.getAllByTestId("allocation")).toHaveLength(1);
-  expect(booking).toHaveTextContent("Booked · 2 participants");
+  expect(booking).toHaveTextContent("Occupied · 2 participants");
+  expect(screen.getByTestId("legend-occupied"), "the legend shows the neutral colour the plan draws")
+    .toHaveStyle({ backgroundColor: "rgb(153, 153, 153)" });
 });
 
 it("given the plan cannot be read, when the member tries again, then the week appears without a reload", async () => {
@@ -186,7 +188,7 @@ it("given another supported participant count, when showing the booking, then no
   render(<WeekView today={clubInstant("12:00")} />);
 
   // then
-  expect(await screen.findByTestId("allocation")).toHaveTextContent("Booked · 6 participants");
+  expect(await screen.findByTestId("allocation")).toHaveTextContent("Occupied · 6 participants");
 });
 
 it("given the current week, when opening the next week, then its seven days are loaded", async () => {
@@ -833,6 +835,187 @@ it("given an own member booking, when it is shown, then the viewer marker and ot
   // then
   expect(await screen.findByTestId("own-allocation")).toHaveTextContent("You, Major, Miles");
   expect(screen.getByTestId("own-allocation")).toHaveTextContent("6:00 PM – 7:00 PM");
+});
+
+it("given an own booking, a league match and another member's booking, when the plan is shown, then each carries the short label its legend entry names and keeps its full accessible name", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Member booking",
+    cardColor: "#b85c38",
+    ownBooking: true,
+    showGenericOccupancy: true,
+    participantLastNames: ["Major"],
+    participantCount: 2
+  }, {
+    bookingId: "55555555-5555-5555-5555-555555555555",
+    courtId: courts[1].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T21:00:00+02:00",
+    cardLabel: "League match",
+    cardColor: "#3a4a5c",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: null
+  }, {
+    bookingId: "66666666-6666-6666-6666-666666666666",
+    courtId: courts[1].id,
+    startsAt: "2026-08-10T14:00:00+02:00",
+    endsAt: "2026-08-10T15:00:00+02:00",
+    cardLabel: "Member booking",
+    cardColor: "#999999",
+    ownBooking: false,
+    showGenericOccupancy: true,
+    participantCount: 2
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  const own = await screen.findByTestId("own-allocation");
+  const [occupied, match] = screen.getAllByTestId("allocation");
+  const shortLabel = (allocation: HTMLElement) => within(allocation).getByTestId("allocation-short-label").textContent;
+  expect(within(own).getByTestId("own-marker"), "an own booking is marked by more than its colour").toBeInTheDocument();
+  expect(shortLabel(own)).toBe("You");
+  expect(own).toHaveAccessibleName("You, Major, 6:00 PM – 7:00 PM, cancel booking");
+  expect(shortLabel(match)).toBe("Lea");
+  expect(within(match).getByTestId("allocation-label")).toHaveTextContent("League match");
+  expect(match).toHaveAccessibleName("League match, 6:00 PM – 9:00 PM");
+  expect(within(match).queryByTestId("own-marker"), "only the viewer's own booking carries the marker").toBeNull();
+  expect(shortLabel(occupied)).toBe("Occ");
+  expect(occupied).toHaveAccessibleName("Occupied · 2 participants, 2:00 PM – 3:00 PM");
+  expect(screen.getByTestId("legend-allocation-card").textContent, "the legend decodes the short label of the match").toBe("Lea");
+  expect(screen.getByTestId("legend-card-99999999-9999-9999-9999-999999999999").textContent).toBe("Tra");
+  expect(screen.getByTestId("legend-occupied").textContent, "the legend decodes the short label of a hidden booking").toBe("Occ");
+  expect(within(screen.getByTestId("legend-own")).getByTestId("own-marker"), "the legend shows the marker an own booking carries")
+    .toBeInTheDocument();
+});
+
+it("given an own booking on a card that names its kind, when the plan is shown, then it carries the marker beside that card's short label", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Training",
+    cardColor: "#34584a",
+    ownBooking: true,
+    showGenericOccupancy: false,
+    participantCount: null
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  const own = await screen.findByTestId("own-allocation");
+  expect(within(own).getByTestId("own-marker")).toBeInTheDocument();
+  expect(within(own).getByTestId("allocation-short-label").textContent).toBe("Tra");
+  expect(own).toHaveAccessibleName("You, Training, 6:00 PM – 7:00 PM, cancel booking");
+});
+
+it("given cards that share a long first word, when the plan is shown, then each booking shows a distinct code that its accessible name contains", async () => {
+  // given
+  vi.mocked(api.bookingCardLegend).mockResolvedValue([
+    { id: "a1111111-1111-1111-1111-111111111111", label: "Training Herren", color: "#34584a", showGenericOccupancy: false },
+    { id: "a2222222-2222-2222-2222-222222222222", label: "Training Damen", color: "#3a4a5c", showGenericOccupancy: false }
+  ]);
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Training Herren",
+    cardColor: "#34584a",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: null
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  const allocation = await screen.findByTestId("allocation");
+  expect(within(allocation).getByTestId("allocation-short-label").textContent).toBe("TrH");
+  expect(allocation, "the visible code is part of the accessible name").toHaveAccessibleName("Training Herren (TrH), 6:00 PM – 7:00 PM");
+  expect(screen.getByTestId("legend-card-a2222222-2222-2222-2222-222222222222").textContent).toBe("TrD");
+});
+
+it("given a card that begins with the viewer word, when the plan is shown, then its code differs from the own booking's", async () => {
+  // given
+  vi.mocked(api.bookingCardLegend).mockResolvedValue([
+    { id: "a1111111-1111-1111-1111-111111111111", label: "Youth training", color: "#34584a", showGenericOccupancy: false }
+  ]);
+  vi.mocked(api.allocations).mockResolvedValue([]);
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  expect((await screen.findByTestId("legend-card-a1111111-1111-1111-1111-111111111111")).textContent,
+    "an own booking reads You, so a card must not").toBe("Yout");
+});
+
+it("given a past own booking on a card that names its kind, when the plan is shown, then its accessible name says it is the viewer's", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Training",
+    cardColor: "#34584a",
+    ownBooking: true,
+    showGenericOccupancy: false,
+    participantCount: null
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("20:00")} />);
+
+  // then
+  const own = await screen.findByTestId("own-allocation");
+  expect(own).toHaveRole("img");
+  expect(own, "a past own booking names its owner like every other own booking").toHaveAccessibleName("You, Training, 6:00 PM – 7:00 PM");
+});
+
+it("given a league match from ten to four, when the plan is shown, then one coloured block covers every row of its court and no row below offers the court", async () => {
+  // given
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "55555555-5555-5555-5555-555555555555",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T10:00:00+02:00",
+    endsAt: "2026-08-10T16:00:00+02:00",
+    cardLabel: "League match",
+    cardColor: "#3a4a5c",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: null
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("08:00")} />);
+
+  // then
+  const match = await screen.findByTestId("allocation");
+  const cell = match.closest("td")!;
+  expect(screen.getAllByTestId("allocation"), "the label is drawn once, not once per row").toHaveLength(1);
+  expect(cell).toHaveAttribute("rowspan", "12");
+  expect(within(cell).getByTestId("allocation-extent"), "the block fills the whole span in the card colour")
+    .toHaveStyle({ backgroundColor: "rgb(58, 74, 92)" });
+  expect(within(cell).getByTestId("allocation-extent")).toHaveAttribute("aria-hidden", "true");
+  const offered = screen.getAllByTestId("free-slot").filter((slot) => slot.dataset.courtNumber === "1").map((slot) => slot.dataset.slot);
+  expect(offered.filter((slot) => slot! >= "10:00" && slot! < "16:00"), "no row of the match offers its court").toEqual([]);
+  expect(offered).toContain("16:00");
+  for (const slot of ["10:30", "12:00", "15:30"]) {
+    expect(screen.getByTestId(`slot-row-${slot}`).querySelectorAll("td"), `the ${slot} row leaves the court to the block above`).toHaveLength(1);
+  }
 });
 
 it("given a free slot, when booking it with a guest, then the refreshed allocation is visible", async () => {

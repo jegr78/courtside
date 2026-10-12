@@ -21,6 +21,9 @@ Buchungsart oder den neutralen Text *Belegt*. Das stellt der Verein für jede Bu
 Anzahl der Teilnehmenden ist öffentlich, ihre Namen sind es nicht. Namen siehst du nur bei deinen
 eigenen Buchungen.
 
+Auf einem schmalen Bildschirm zeigt eine Buchung nur ein Kürzel ihrer Buchungsart. Die Legende
+nennt zu jedem Kürzel den vollen Namen. Deine eigenen Buchungen tragen zusätzlich ein Personensymbol.
+
 ![Der Platzplan einer Woche mit einer Spalte je Platz, farbigen Buchungen und der Legende darunter.](screenshots/de/court-plan.png)
 
 ## Anmelden
