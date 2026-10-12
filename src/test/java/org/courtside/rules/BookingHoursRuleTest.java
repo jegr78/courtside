@@ -129,19 +129,19 @@ class BookingHoursRuleTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAYouthBookingWindow_whenTheSlotEndsAtItsEdgeInTheClubZoneButLaterInUtc_thenItIsMeasuredInTheClubZone() {
+    void givenAYouthBookingWindow_whenTheSlotFitsInUtcButNotInTheClubZone_thenItIsMeasuredInTheClubZone() {
         // given
         ruleAdmin.setRule(YOUTH_RULE_SET, RuleType.BOOKING_HOURS, NINE_TO_EIGHT);
-        Instant sixToEightUtc = Instant.parse("2026-05-13T18:00:00Z");
+        Instant sixToSevenUtc = Instant.parse("2026-05-13T18:00:00Z");
         RuleContext context = new RuleContext(courtId, MEMBER_BOOKING_CARD,
-                new TimeSlot(sixToEightUtc, sixToEightUtc.plus(1, ChronoUnit.HOURS)),
+                new TimeSlot(sixToSevenUtc, sixToSevenUtc.plus(1, ChronoUnit.HOURS)),
                 UUID.randomUUID(), YOUTH);
 
         // when
         List<RuleViolation> violations = rule.check(context);
 
         // then
-        assertThat(violations).as("19:00 UTC is 21:00 in Europe/Berlin, past the window")
+        assertThat(violations).as("18:00 to 19:00 UTC is 20:00 to 21:00 in Europe/Berlin, past the window")
                 .extracting(RuleViolation::code)
                 .containsExactly("booking.rule.bookingHours.outside");
     }
@@ -226,6 +226,25 @@ class BookingHoursRuleTest extends AbstractIntegrationTest {
         assertThat(bookingId).isNotNull();
         assertThat(facility.openingSchedule().windowOn(WEDNESDAY))
                 .contains(new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
+    }
+
+    @Test
+    void givenAWindowCoveringTheWholeDay_whenAYouthMemberBooksBeforeTheFacilityOpens_thenTheOpeningHoursStillRefuseIt() {
+        // given
+        ruleAdmin.setRule(YOUTH_RULE_SET, RuleType.BOOKING_HOURS,
+                Map.of("earliestStart", 0, "latestEnd", 1439));
+
+        // when
+        BookingRulesViolatedException refusal = catchThrowableOfType(
+                BookingRulesViolatedException.class,
+                () -> book(youthPersonId, Role.MEMBER, LocalTime.of(6, 0)));
+
+        // then
+        assertThat(refusal).as("a booking window narrows the opening hours and never widens them")
+                .isNotNull();
+        assertThat(refusal.getViolations()).extracting(RuleViolation::code)
+                .contains("booking.rule.openingHours.outside")
+                .doesNotContain("booking.rule.bookingHours.outside");
     }
 
     @Test
