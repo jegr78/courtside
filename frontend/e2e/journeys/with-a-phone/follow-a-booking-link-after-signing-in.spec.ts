@@ -9,7 +9,7 @@ test("given a signed-out member who opens a link to one of their bookings, when 
     await expect(page.getByTestId("court-plan-view")).toBeVisible({ timeout: 10_000 });
     await activate(page.getByTestId("my-bookings-link"));
     await expect(page.getByTestId("participations-title")).toBeVisible({ timeout: 10_000 });
-    const anchor = await page.locator('li[id^="booking-"]').last().getAttribute("id");
+    const anchor = await page.locator('li[id^="booking-"]').last().getAttribute("id", { timeout: 10_000 });
     expect(anchor, "the member holds at least one booking to link to").not.toBeNull();
     await signOut(page);
 

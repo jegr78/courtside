@@ -1,8 +1,8 @@
 import { expect, test } from "../../fixtures";
 import { credentialIn, messageTo } from "../../mailbox";
-import { activate, openTheApplication, reachAdministration, signIn, signOut, walks, writeInto } from "../../journey-walking";
+import { activate, openTheApplication, openTheLink, reachAdministration, signIn, signOut, walks, writeInto } from "../../journey-walking";
 
-test("given a new member whose account the board has just opened, when they read the one-time password the club mailed them and choose one of their own, then they are in and nobody ever saw the password they were given",
+test("given a new member whose account the board has just opened, when they open a link to their messages, read the one-time password the club mailed them and choose one of their own, then they are in where the link led and nobody ever saw the password they were given",
   walks("session-and-own-account", "roster-membership-and-account-administration"),
   async ({ page, language, journeyService }) => {
     // given — the board opens the account, and never chooses the password
@@ -22,7 +22,8 @@ test("given a new member whose account the board has just opened, when they read
     await expect(page.getByTestId("account-username")).toHaveValue("roe.richard");
     await signOut(page);
 
-    // when — the member reads what reached their mailbox and signs in with it
+    // when — the member opens a link into the club, reads what reached their mailbox and signs in with it
+    await openTheLink(page, language, "/my-messages");
     const mailed = await messageTo(journeyService.mailboxURL, "richard.roe@example.org");
     await signIn(page, "roe.richard", credentialIn(mailed, "Einmalpasswort:"));
 
@@ -36,6 +37,8 @@ test("given a new member whose account the board has just opened, when they read
 
     // then
     await signIn(page, "roe.richard", "the-one-they-picked-alone");
-    await expect(page.getByTestId("court-plan-view")).toBeVisible();
+    await expect(page, "the password change keeps the page the link named")
+      .toHaveURL(/\/my-messages$/, { timeout: 10_000 });
+    await expect(page.getByTestId("my-messages-view")).toBeVisible({ timeout: 10_000 });
     await signOut(page);
   });
