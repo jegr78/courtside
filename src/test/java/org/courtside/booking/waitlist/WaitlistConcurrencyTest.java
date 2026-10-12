@@ -49,6 +49,7 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
     private static final TimeSlot SLOT = new TimeSlot(Instant.parse("2026-05-13T16:00:00Z"),
             Instant.parse("2026-05-13T17:00:00Z"));
     private static final String INTRUDER = "waitlist-intruder";
+    private static final String ACCEPTOR = "waitlist-acceptor";
     private static final Duration SETTLE = Duration.ofSeconds(15);
 
     @MockitoSpyBean
@@ -103,7 +104,7 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
             Object answer = invocation.callRealMethod();
             if (Thread.currentThread().getName().equals(INTRUDER)) {
                 checked.countDown();
-                awaitCancellationBlockedOrDone(cancellation);
+                awaitBlockedOrDone(cancellation);
             }
             return answer;
         }).when(rows).offeredCourts(any(), any(), any());
@@ -217,7 +218,7 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnOfferPastItsDeadline_whenItsMemberAcceptsWhileTheSweepRuns_thenItExpiresAndPassesOnOnce()
+    void givenAnOfferPastItsDeadline_whenItsMemberAcceptsAsTheSweepWaits_thenItExpiresAndPassesOnOnce()
             throws Exception {
         // given
         UUID booking = book(holder);
@@ -230,12 +231,7 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
                 .param("due", Timestamp.from(NOW)).param("id", entry).update();
 
         // when
-        List<Boolean> outcomes = race(
-                () -> booked(() -> waitlist.accept(entry, offered.accountId(), offered.personId(), Set.of(Role.MEMBER))),
-                () -> {
-                    queue.sweep();
-                    return true;
-                });
+        List<Boolean> outcomes = acceptWhileTheSweepWaits(entry, offered);
 
         // then
         assertThat(outcomes.getFirst()).as("an offer past its deadline is not accepted").isFalse();
@@ -292,6 +288,32 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
                 .isEqualTo(outcomes.getFirst() ? "BOOKED" : "WITHDRAWN");
     }
 
+    // The acceptance holds the grid lock until the sweep is seen waiting for it, so the sweep runs second.
+    private List<Boolean> acceptWhileTheSweepWaits(UUID entry, Member offered) throws Exception {
+        CountDownLatch holding = new CountDownLatch(1);
+        List<Future<?>> sweeping = new ArrayList<>();
+        doAnswer(invocation -> {
+            Object answer = invocation.callRealMethod();
+            if (Thread.currentThread().getName().equals(ACCEPTOR)) {
+                holding.countDown();
+                awaitBlockedOrDone(sweeping);
+            }
+            return answer;
+        }).when(rows).lockOwn(any(), any());
+        try (ExecutorService accepting = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, ACCEPTOR));
+             ExecutorService sweeper = Executors.newSingleThreadExecutor()) {
+            Future<Boolean> acceptance = accepting.submit(() -> booked(() ->
+                    waitlist.accept(entry, offered.accountId(), offered.personId(), Set.of(Role.MEMBER))));
+            if (!holding.await(40, TimeUnit.SECONDS)) {
+                throw new AssertionError("The acceptance never reached its entry");
+            }
+            sweeping.add(sweeper.submit(() -> queue.sweep()));
+            Boolean accepted = PostgresDiagnostics.await(acceptance, Duration.ofSeconds(40), jdbc, "Acceptance");
+            PostgresDiagnostics.await(sweeping.getFirst(), Duration.ofSeconds(40), jdbc, "Sweep");
+            return List.of(accepted, true);
+        }
+    }
+
     @SafeVarargs
     private List<Boolean> race(Callable<Boolean>... calls) throws Exception {
         CountDownLatch start = new CountDownLatch(1);
@@ -323,10 +345,10 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
         }
     }
 
-    private void awaitCancellationBlockedOrDone(List<Future<?>> cancellation) {
+    private void awaitBlockedOrDone(List<Future<?>> other) {
         long deadline = System.nanoTime() + SETTLE.toNanos();
         while (System.nanoTime() < deadline) {
-            if (!cancellation.isEmpty() && cancellation.getFirst().isDone()) {
+            if (!other.isEmpty() && other.getFirst().isDone()) {
                 return;
             }
             jdbc.sql("SELECT pg_stat_clear_snapshot()").query().singleValue();
@@ -345,7 +367,7 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
                 return;
             }
         }
-        throw new AssertionError("The cancellation neither finished nor waited on a lock. "
+        throw new AssertionError("The other call neither finished nor waited on a lock. "
                 + PostgresDiagnostics.waitsAndLocks(jdbc));
     }
 
