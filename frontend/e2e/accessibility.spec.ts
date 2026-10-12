@@ -32,7 +32,10 @@ async function transitionsSettled(page: import("@playwright/test").Page) {
     }
     return [...perElement].map(([element, count]) => `${count} on ${element}`);
   });
-  await expect.poll(stillMoving, { message: "no transition still running when axe scans", timeout: 10_000, intervals: [50] }).toEqual([]);
+  const quiet = await page.waitForFunction(() => !document.getAnimations().some((animation) =>
+    animation instanceof CSSTransition && animation.playState === "running"), undefined, { polling: 50, timeout: 10_000 })
+    .then(() => true, () => false);
+  if (!quiet) expect(await stillMoving(), "no transition still running when axe scans").toEqual([]);
   // An inherited colour follows its parent's finished transition only in the next frame.
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
