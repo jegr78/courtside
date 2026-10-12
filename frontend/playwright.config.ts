@@ -6,9 +6,9 @@ delete process.env.NO_COLOR;
 process.env.FORCE_COLOR = "0";
 
 const periodicProjects = process.env.COURTSIDE_PERIODIC_BROWSERS === "true" ? [
-  // Firefox keeps its own certificate store, which neither the system store nor a Chromium
-  // argument reaches, so it stays on the origin that needs no certificate at all.
-  { name: "firefox-periodic", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts/, metadata: { plainOrigin: true }, use: { ...devices["Desktop Firefox"] } }
+  // Firefox keeps its own certificate store, which neither the system store nor a Chromium argument
+  // reaches, so it stays on the plain origin; only a worker spec ignores certificate errors for TLS.
+  { name: "firefox-periodic", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts|pwa-first-install\.spec\.ts/, metadata: { plainOrigin: true }, use: { ...devices["Desktop Firefox"] } }
 ] : [];
 
 const projectOrder = process.env.COURTSIDE_PROJECT_ORDER;
@@ -56,7 +56,7 @@ const configuredProjects = [
   { name: "chromium", testIgnore: /accessibility\.spec\.ts|responsive-mobile\.spec\.ts|visual-regression\.spec\.ts|guide-screenshots\.spec\.ts|journeys\//, use: { browserName: "chromium" as const } },
   { name: "chromium-accessibility", testMatch: /accessibility\.spec\.ts/, timeout: accessibilityTestBound, use: { browserName: "chromium" as const } },
   { name: "webkit-core", testMatch: /supported-browser\.spec\.ts|browser-security-smoke\.spec\.ts/, use: { browserName: "webkit" as const } },
-  { name: "webkit-pwa", testMatch: /pwa-browser-compatibility\.spec\.ts/, use: { browserName: "webkit" as const } },
+  { name: "webkit-pwa", testMatch: /pwa-browser-compatibility\.spec\.ts|pwa-first-install\.spec\.ts/, use: { browserName: "webkit" as const } },
   // Both engines, because a phone layout breaks per engine: the booking dialog was swallowed by a
   // bar on WebKit and the footer was covered on Chromium, each invisible to the other.
   { name: "iphone", testMatch: /responsive-mobile\.spec\.ts/, use: { ...devices["iPhone 15"] } },

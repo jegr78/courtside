@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "../i18n";
@@ -8,11 +8,25 @@ const { registerSW } = vi.hoisted(() => ({ registerSW: vi.fn() }));
 
 vi.mock("virtual:pwa-register", () => ({ registerSW }));
 
+const worker = {} as ServiceWorker;
+
+type RejectionListener = (reason: unknown) => void;
+const { process: runtime } = globalThis as unknown as {
+  process: { on(event: "unhandledRejection", listener: RejectionListener): void; off(event: "unhandledRejection", listener: RejectionListener): void };
+};
+
+function registrationHolds(registration: { active: ServiceWorker | null; waiting: ServiceWorker | null }) {
+  const getRegistration = vi.fn().mockResolvedValue(registration);
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration } });
+  return getRegistration;
+}
+
 describe("PwaLifecycle", () => {
   beforeEach(() => registerSW.mockReset());
 
   it("given a waiting service worker, when the user reloads, then the prompt describes the browser action and the new version is activated", async () => {
     // given
+    registrationHolds({ active: worker, waiting: worker });
     const update = vi.fn().mockResolvedValue(undefined);
     let needRefresh: (() => void) | undefined;
     registerSW.mockImplementation((options?: { onNeedRefresh: () => void }) => {
@@ -36,6 +50,56 @@ describe("PwaLifecycle", () => {
     // then
     expect(update).toHaveBeenCalledOnce();
     expect(update).toHaveBeenCalledWith(true);
+  });
+
+  it("given a first install still in the waiting slot, when workbox reports it as waiting, then no update prompt is shown", async () => {
+    // given
+    const getRegistration = registrationHolds({ active: null, waiting: worker });
+    let needRefresh: (() => void) | undefined;
+    registerSW.mockImplementation((options?: { onNeedRefresh: () => void }) => {
+      needRefresh = options?.onNeedRefresh;
+      return vi.fn();
+    });
+    render(<PwaLifecycle />);
+
+    // when
+    await act(async () => {
+      needRefresh?.();
+      await Promise.resolve();
+    });
+
+    // then
+    expect(getRegistration).toHaveBeenCalledOnce();
+    expect(screen.queryByTestId("pwa-update-prompt"), "nothing was deployed, so nothing may be offered").not.toBeInTheDocument();
+  });
+
+  it("given the registration cannot be read, when workbox reports a waiting worker, then no update prompt is shown and nothing is left unhandled", async () => {
+    // given
+    const getRegistration = vi.fn().mockRejectedValue(new DOMException("insecure", "SecurityError"));
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration } });
+    let needRefresh: (() => void) | undefined;
+    registerSW.mockImplementation((options?: { onNeedRefresh: () => void }) => {
+      needRefresh = options?.onNeedRefresh;
+      return vi.fn();
+    });
+    const unhandled = vi.fn();
+    runtime.on("unhandledRejection", unhandled);
+    render(<PwaLifecycle />);
+
+    // when
+    try {
+      await act(async () => {
+        needRefresh?.();
+        await new Promise((settled) => setTimeout(settled, 0));
+      });
+    } finally {
+      runtime.off("unhandledRejection", unhandled);
+    }
+
+    // then
+    expect(getRegistration).toHaveBeenCalledOnce();
+    expect(unhandled, "a registration that cannot be read is no reason to fail").not.toHaveBeenCalled();
+    expect(screen.queryByTestId("pwa-update-prompt")).not.toBeInTheDocument();
   });
 
   it("given no waiting update, when the component loads, then no update prompt is shown", () => {

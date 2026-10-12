@@ -4,6 +4,7 @@ import { registerSW } from "virtual:pwa-register";
 import { Alert } from "./Alert";
 import { Button } from "./Button";
 import { SuccessFeedback } from "./SuccessFeedback";
+import { holdsWaitingUpdate } from "./waitingUpdate";
 
 export function PwaLifecycle() {
   const { t } = useTranslation();
@@ -14,7 +15,9 @@ export function PwaLifecycle() {
   useEffect(() => {
     update.current = registerSW({
       immediate: false,
-      onNeedRefresh: () => setNeedsRefresh(true),
+      onNeedRefresh: () => void navigator.serviceWorker.getRegistration().then((registration) => {
+        if (holdsWaitingUpdate(registration)) setNeedsRefresh(true);
+      }, () => undefined),
       onRegisterError: () => setRegistrationFailed(true)
     });
   }, []);
