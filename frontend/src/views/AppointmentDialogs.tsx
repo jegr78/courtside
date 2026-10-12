@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   api, type CancellationReason, type CancelScope, type ManagedAppointment, type ManagedAppointmentDetail,
@@ -63,6 +63,14 @@ export function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, close
   const [courtIds, setCourtIds] = useState<string[]>(booking.courtIds);
   const [preview, setPreview] = useState<MovePreview>();
   const { message: error, report, clear } = useReportedFailure();
+  const confirmButton = useRef<HTMLButtonElement>(null);
+  const previewPanel = useRef<HTMLDivElement>(null);
+  // The preview replaces the focused button, so the focus is placed again before it falls out of the dialog.
+  useEffect(() => {
+    if (!preview) return;
+    if (preview.executable) confirmButton.current?.focus();
+    else previewPanel.current?.focus();
+  }, [preview]);
   const request: MoveRequest = {
     fromBookingId: booking.id, scope,
     ...(startTime ? { newStartTime: startTime } : {}),
@@ -85,10 +93,10 @@ export function MoveDialog({ booking, courts, timeZone, maxBookingMinutes, close
     <label className="grid gap-1 font-semibold">{t("myBookings.newStartTime")}<DateTimeInput data-testid="move-start-time" type="time" emptyHint={t("myBookings.startUnchanged")} value={startTime} onChange={(event) => { setStartTime(event.target.value); setPreview(undefined); }} className="form-control rounded border px-3 py-2" /></label>
     <label className="grid gap-1 font-semibold">{t("myBookings.newDuration")}<input data-testid="move-duration" type="number" min="1" max={maxBookingMinutes} value={duration} onChange={(event) => { setDuration(event.target.value); setPreview(undefined); }} className="form-control rounded border p-2" /></label>
     <fieldset><legend className="font-semibold">{t("booking.courts")}</legend>{courts.map((court) => <label key={court.id} className="flex gap-2"><input type="checkbox" checked={courtIds.includes(court.id)} onChange={(event) => { setCourtIds((ids) => event.target.checked ? [...ids, court.id] : ids.filter((id) => id !== court.id)); setPreview(undefined); }} />{court.name ?? t("court.number", { number: court.number })}</label>)}</fieldset>
-    {preview && <div data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatBookingPeriod(move.fromStartsAt, move.fromEndsAt, i18n.language, timeZone)} → {formatBookingPeriod(move.toStartsAt, move.toEndsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
+    {preview && <div ref={previewPanel} tabIndex={-1} data-testid="move-preview"><p className="font-semibold">{t("myBookings.previewCount", { count: preview.moves.length })}</p><ul className="mt-2 grid gap-2">{preview.moves.map((move) => <li key={move.bookingId}><p>{formatBookingPeriod(move.fromStartsAt, move.fromEndsAt, i18n.language, timeZone)} → {formatBookingPeriod(move.toStartsAt, move.toEndsAt, i18n.language, timeZone)}</p><MoveReasons move={move} courtNames={courtNames} t={t} /></li>)}</ul></div>}
     </div></DialogBody>
     {error && <div className="shrink-0 px-6 pt-3"><Alert>{error}</Alert></div>}
-    <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4">{preview ? <Button key="confirm-move" variant="primary" data-testid="confirm-move" disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button key="preview-move" variant="secondary" data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
+    <div className="surface-panel border-structural flex shrink-0 gap-2 border-t px-6 py-4">{preview ? <Button ref={confirmButton} key="confirm-move" variant="primary" data-testid="confirm-move" disabled={!preview.executable} onClick={() => void move()}>{t("myBookings.moveConfirm")}</Button> : <Button key="preview-move" variant="secondary" data-testid="preview-move" disabled={courtIds.length === 0 || (!startTime && !duration && courtIds.join() === booking.courtIds.join())} onClick={() => void previewMove()}>{t("myBookings.movePreview")}</Button>}<Button variant="secondary" onClick={closed}>{t("booking.close")}</Button></div>
   </div></Modal>;
 }
 

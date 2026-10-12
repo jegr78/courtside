@@ -584,6 +584,50 @@ it("given a move dialog, when the preview arrives, then the confirm action is a 
   expect(confirm, "a reused button fades from the preview button's colours and fails contrast while it does").not.toBe(previewButton);
 });
 
+it("given a move dialog, when the preview arrives, then the confirm button holds the focus and Escape still closes the dialog", async () => {
+  // given
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("move-booking"));
+  await userEvent.type(screen.getByTestId("move-start-time"), "19:00");
+
+  // when
+  await userEvent.click(screen.getByTestId("preview-move"));
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("confirm-move"), "the focus moves to the button that replaced the preview button").toHaveFocus());
+  await userEvent.keyboard("{Escape}");
+  expect(screen.queryByTestId("move-dialog"), "Escape closes the dialog after the preview").not.toBeInTheDocument();
+});
+
+it("given a blocked move, when the preview arrives, then the focus stays in the dialog and Escape still closes it", async () => {
+  // given
+  vi.mocked(api.previewSeriesMove).mockResolvedValue({
+    executable: false,
+    moves: [{
+      bookingId: upcomingId,
+      fromStartsAt: "2026-08-12T16:00:00Z",
+      fromEndsAt: "2026-08-12T17:00:00Z",
+      toStartsAt: "2026-08-12T20:00:00Z",
+      toEndsAt: "2026-08-12T21:00:00Z",
+      blockedCourtIds: [],
+      unbookableCourtIds: [],
+      violations: [{ code: "booking.rule.openingHours.closed", params: {} }],
+      executable: false
+    }]
+  });
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+  await userEvent.click(await screen.findByTestId("move-booking"));
+  await userEvent.type(screen.getByTestId("move-start-time"), "22:00");
+
+  // when
+  await userEvent.click(screen.getByTestId("preview-move"));
+
+  // then
+  await waitFor(() => expect(screen.getByTestId("move-preview"), "the focus lands on the reasons the move is blocked").toHaveFocus());
+  await userEvent.keyboard("{Escape}");
+  expect(screen.queryByTestId("move-dialog"), "Escape closes the dialog after a blocked preview").not.toBeInTheDocument();
+});
+
 it("given the list reloads, when it shows its loading state, then load more is not offered", async () => {
   // given
   recordedAsCoPlayer();
