@@ -19,6 +19,27 @@ async function axeFindings(page: import("@playwright/test").Page): Promise<strin
     violation.nodes.map((node) => `${violation.id} at ${node.target.join(" ")}`));
 }
 
+// axe reads computed colours, so a control still fading into the new theme would be judged mid-way.
+async function transitionsSettled(page: import("@playwright/test").Page) {
+  const stillMoving = () => page.evaluate(() => {
+    const perElement = new Map<string, number>();
+    for (const animation of document.getAnimations()) {
+      // WebKit keeps finished transitions in getAnimations(), so only running ones count.
+      if (!(animation instanceof CSSTransition) || animation.playState !== "running") continue;
+      const { target, pseudoElement } = animation.effect as KeyframeEffect;
+      const element = `${target?.nodeName}${pseudoElement ?? ""}`;
+      perElement.set(element, (perElement.get(element) ?? 0) + 1);
+    }
+    return [...perElement].map(([element, count]) => `${count} on ${element}`);
+  });
+  const quiet = await page.waitForFunction(() => !document.getAnimations().some((animation) =>
+    animation instanceof CSSTransition && animation.playState === "running"), undefined, { polling: 50, timeout: 10_000 })
+    .then(() => true, () => false);
+  if (!quiet) expect(await stillMoving(), "no transition still running when axe scans").toEqual([]);
+  // An inherited colour follows its parent's finished transition only in the next frame.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
 async function expectNoWcagViolations(page: import("@playwright/test").Page) {
   expect(await axeFindings(page), "an axe rule the page breaks").toEqual([]);
 }
@@ -525,6 +546,7 @@ test.describe("every page", () => {
         const scanInBothThemes = async (where: string) => {
           for (const pass of [1, 2]) {
             const theme = await html.getAttribute("data-theme");
+            await transitionsSettled(page);
             findings.push(...(await axeFindings(page)).map((finding) => `${where} in ${theme}: ${finding}`));
             if (pass === 2) break;
             const other = theme === "dark" ? "light" : "dark";
