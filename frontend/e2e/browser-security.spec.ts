@@ -375,6 +375,23 @@ test("URL and fragment payloads are neither reflected nor executed by the DOM", 
   await expectRenderingContexts("location-input", ["location-input"]);
 });
 
+test("a signed-out board member who opens an administrative page returns to it after sign-in", async ({ page }) => {
+  // given
+  await page.goto("/admin/roster");
+  await expect(page.getByTestId("login-view"), "administration asks who is there instead of sending them home")
+    .toBeVisible({ timeout: 10_000 });
+
+  // when
+  await page.getByTestId("username").fill("configuration-admin");
+  await page.getByTestId("password").fill("temporary-password");
+  await page.getByTestId("login-submit").click();
+
+  // then
+  await expect(page, "sign-in returns to the administrative page that was opened")
+    .toHaveURL(new URL("/admin/roster", page.url()).href, { timeout: 10_000 });
+  await expect(page.getByTestId("admin-roster-view")).toBeVisible({ timeout: 10_000 });
+});
+
 test("a sign-in return target that could leave this origin lands on the start page of this origin", async ({ page }) => {
   for (const target of [
     "//attacker.example/my-bookings",

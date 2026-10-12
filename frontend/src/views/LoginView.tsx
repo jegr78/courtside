@@ -1,14 +1,16 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { loginWithCapacity } from "../api/loginWithCapacity";
 import { isUnauthenticated, problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { returnSearch } from "../navigation/returnTarget";
 
 export function LoginView({ refreshSession, passwordChanged = false }: { refreshSession: (signal?: AbortSignal) => Promise<void>; passwordChanged?: boolean }) {
   const { t } = useTranslation();
+  const { search } = useLocation();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const [waitingSeconds, setWaitingSeconds] = useState<number>();
@@ -63,7 +65,7 @@ export function LoginView({ refreshSession, passwordChanged = false }: { refresh
       <Button variant="primary" type="submit" data-testid="login-submit" disabled={pending}>{t("auth.submit")}</Button>
     </form>
     <p className="mt-6">
-      <Link data-testid="forgotten-credentials-link" to="/account-recovery" className="font-semibold underline underline-offset-4">{t("auth.forgotten")}</Link>
+      <Link data-testid="forgotten-credentials-link" to={`/account-recovery${returnSearch(search)}`} className="font-semibold underline underline-offset-4">{t("auth.forgotten")}</Link>
     </p>
   </section>;
 }

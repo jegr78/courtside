@@ -16,6 +16,15 @@ describe("AccountRecoveryView", () => {
     await i18n.changeLanguage("en");
   });
 
+  it("given recovery reached with a target, when the member goes back to sign in, then the target travels with them", () => {
+    // when
+    render(<MemoryRouter initialEntries={["/account-recovery?returnTo=%2Fmy-bookings"]}><AccountRecoveryView /></MemoryRouter>);
+
+    // then
+    expect(screen.getByTestId("recovery-back-to-login"), "returning to sign-in keeps the page the member opened")
+      .toHaveAttribute("href", "/login?returnTo=%2Fmy-bookings");
+  });
+
   it("given a member who forgot their password, when they name themselves, then a new one is asked for", async () => {
     // given
     const asked = vi.spyOn(api, "requestPasswordReset").mockResolvedValue(undefined);

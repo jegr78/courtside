@@ -520,12 +520,17 @@ includes the session refresh. The browser shows the waiting state, cancels when 
 and does not persist the submitted password. Wrong credentials and unrelated admission failures do
 not trigger capacity retries. Server-side verification capacity and rate limits remain authoritative.
 
-A signed-out visitor who opens a member page reaches the sign-in form with that page's path, query
-and fragment in the `returnTo` parameter. After sign-in, and after a required password change with
-the second sign-in it asks for, the browser returns there. The browser follows the target only when
-it is a relative path on the same origin under every percent-decoding: it starts with one `/`, the
-next character is neither `/` nor `\`, and it holds no control character. Any other target leads to
-the start page.
+Sign-in keeps the page that sent the visitor there. A signed-out visitor who opens a page that
+needs a session, including administration, reaches the sign-in form with that page's path, query
+and fragment in the `returnTo` parameter. A session that ends while a page is open, a sign-out from
+the error page and a session that must first replace its one-time password carry the current page
+the same way. Account recovery and the password form pass the target on. After sign-in the browser
+returns there, also after the second sign-in a required password change asks for. The browser
+follows the target only when its path stays a relative path on the same origin under every
+percent-decoding and NFKC folding: it starts with one `/`, holds no second leading `/`, no `\`, no
+`.` or `..` segment and no control character. Query and fragment cannot change the origin, so they
+are only checked for control characters, before and after one decoding. Any other target leads to
+the start page. A deliberate sign-out carries no target.
 
 A permanent password has 12 to 256 characters. Courtside rejects common passwords, identity terms
 and an issued one-time credential. Password changes also check the Have I Been Pwned range API. Only

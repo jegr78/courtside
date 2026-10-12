@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
+import { currentSignInPath } from "../navigation/returnTarget";
 
 // The router renders this in place of the whole tree, so it carries none of the navigation and
 // offers the two ways out that do not depend on what failed.
@@ -19,7 +20,7 @@ export function ApplicationErrorView() {
     setPending(true);
     try {
       await api.logout();
-      window.location.assign("/login");
+      window.location.assign(currentSignInPath());
     } catch (failure) {
       setError(problemMessage(failure, t));
     } finally {

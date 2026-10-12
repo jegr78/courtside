@@ -65,6 +65,21 @@ it("given the session must not stay open, when signing out from the error page, 
   await waitFor(() => expect(assign).toHaveBeenCalledWith("/login"));
 });
 
+it("given a view faulted on a booking, when signing out from the error page, then sign-in returns to that booking", async () => {
+  // given
+  window.location.pathname = "/my-bookings";
+  window.location.hash = "#booking-42";
+  server.use(http.post("/api/session/logout", () => new HttpResponse(null, { status: 204 })));
+  render(<ApplicationErrorView />);
+
+  // when
+  await userEvent.click(screen.getByTestId("application-error-sign-out"));
+
+  // then
+  await waitFor(() => expect(assign, "the next sign-in leads back to the faulted page")
+    .toHaveBeenCalledWith("/login?returnTo=%2Fmy-bookings%23booking-42"));
+});
+
 it("given the page may just be stale, when reloading from the error page, then the browser reloads", async () => {
   // given
   render(<ApplicationErrorView />);

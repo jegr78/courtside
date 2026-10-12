@@ -36,7 +36,8 @@ on the board sees or chooses that password.
 3. Select *Sign in* again.
 
 If you opened a link to a page in Courtside, such as one of your bookings, Courtside takes you there
-after you sign in. This also applies when you first have to replace your one-time password.
+after you sign in. This also applies when you first have to replace your one-time password. If your
+session ends while a page is open, the next sign-in also takes you back there.
 
 Check the values first if Courtside refuses the sign-in. Your credentials may have expired, or the
 email may not have arrived. In either case, use *Forgotten your password or username?*. Only the

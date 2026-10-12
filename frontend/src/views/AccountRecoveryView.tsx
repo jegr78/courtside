@@ -1,14 +1,16 @@
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { api } from "../api/client";
 import { problemMessage } from "../api/problem-message";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
 import { TextField } from "../components/TextField";
+import { returnSearch } from "../navigation/returnTarget";
 
 export function AccountRecoveryView() {
   const { t } = useTranslation();
+  const { search } = useLocation();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const [done, setDone] = useState<string>();
@@ -66,7 +68,7 @@ export function AccountRecoveryView() {
       <Button variant="secondary" type="submit" data-testid="recovery-usernames-submit" disabled={pending}>{t("recovery.usernames.submit")}</Button>
     </form>
     <p className="mt-8">
-      <Link data-testid="recovery-back-to-login" to="/login" className="font-semibold underline underline-offset-4">{t("recovery.backToSignIn")}</Link>
+      <Link data-testid="recovery-back-to-login" to={`/login${returnSearch(search)}`} className="font-semibold underline underline-offset-4">{t("recovery.backToSignIn")}</Link>
     </p>
   </section>;
 }
