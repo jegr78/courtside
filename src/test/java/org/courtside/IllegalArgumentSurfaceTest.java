@@ -20,6 +20,7 @@ class IllegalArgumentSurfaceTest {
             "org/courtside/booking/BookingRuleCheck.java",
             "org/courtside/booking/series/MoveRequest.java",
             "org/courtside/booking/series/SeriesRule.java",
+            "org/courtside/rules/BookingWindow.java",
             "org/courtside/config/BookingSlotDuration.java",
             "org/courtside/config/CredentialLifetime.java",
             "org/courtside/config/ResetTokenLifetime.java",
