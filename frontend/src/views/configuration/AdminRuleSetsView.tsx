@@ -366,7 +366,7 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
     aria-describedby={rangeId(parameter)} disabled={disabled}
     type={parameter.kind === "TIME_OF_DAY" ? "time" : "number"}
     min={shown(parameter, parameter.minimum)} max={shown(parameter, parameter.maximum)}
-    className="form-control w-24 max-w-40 rounded-lg border px-3 py-1.5"
+    className={`form-control ${parameter.kind === "TIME_OF_DAY" ? "w-[7rem] px-1.5 text-sm" : "w-24 px-3"} max-w-40 rounded-lg border py-1.5`}
     value={edit.params[parameter.name] === undefined ? "" : shown(parameter, edit.params[parameter.name])}
     onChange={(event) => changed({ applies: true, params: entered(edit.params, parameter, event.target.value) })} />;
   const first = type.parameters[0];
@@ -375,7 +375,7 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
     <div className="grid min-w-0 gap-1">
       <h4 data-testid={`rule-${type.ruleType}-title`} className="font-bold">{t(`admin.rules.type.${type.ruleType}`)}</h4>
       {timeWindow && first && last
-        ? <p id={`rule-${type.ruleType}-range`} data-testid={`rule-${type.ruleType}-range`} className="text-muted text-sm">
+        ? <p id={`rule-${type.ruleType}-range`} data-testid={`rule-${type.ruleType}-range`} className="sr-only">
           {t("admin.rules.range", { minimum: shown(first, first.minimum), maximum: shown(last, last.maximum) })}
         </p>
         : type.parameters.map((parameter) => <p key={parameter.name} className="text-sm">
@@ -387,7 +387,7 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
     </div>
     <div className="flex flex-wrap items-center gap-3">
       {timeWindow && first && last
-        ? <span className="flex items-center gap-1">{input(first)}<span aria-hidden="true">–</span>{input(last)}</span>
+        ? <span className="flex items-center gap-0.5">{input(first)}<span aria-hidden="true">–</span>{input(last)}</span>
         : type.parameters.map(input)}
       <label className="flex items-center gap-2 text-sm font-medium">
         <input data-testid={`rule-${type.ruleType}-applies`} type="checkbox" disabled={disabled} checked={edit.applies}
