@@ -207,7 +207,8 @@ class MailTemplatesTest {
     @Test
     void givenAnEmptyValueOtherThanTheLinkOnItsOwnLine_whenRendered_thenTheLineStays() {
         // when
-        String rendered = MailTemplates.fill("test", "First\n{clubName}\nLast", Map.of("clubName", ""));
+        String rendered = MailTemplates.fill("test", "First\n{clubName}\nLast",
+                Map.of("clubName", "", "instanceLink", ""));
 
         // then
         assertThat(rendered).as("only the link may vanish with its line").isEqualTo("First\n\nLast");
