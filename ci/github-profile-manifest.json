@@ -201,6 +201,13 @@
       ]
     },
     {
+      "path": ".github/workflows/release-admission.yml",
+      "profiles": [
+        "full"
+      ],
+      "validators": []
+    },
+    {
       "path": ".github/workflows/release-candidate.yml",
       "profiles": [
         "full"
@@ -209,6 +216,13 @@
     },
     {
       "path": ".github/workflows/release-gates.yml",
+      "profiles": [
+        "full"
+      ],
+      "validators": []
+    },
+    {
+      "path": ".github/workflows/release-line.yml",
       "profiles": [
         "full"
       ],

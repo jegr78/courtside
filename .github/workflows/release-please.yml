@@ -4,10 +4,10 @@ name: release-please
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/[0-9]*.[0-9]*']
 
 concurrency:
-  group: release-please
+  group: release-please-${{ github.ref }}
   cancel-in-progress: false
 
 # The action authenticates with the PAT for every call it makes, so the run needs nothing of its own.
@@ -29,10 +29,18 @@ jobs:
             "docs/security-risks.md scopes."
           exit 1
 
+      - name: Refuse a branch that is no release line
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          [[ "$BRANCH" == main || "$BRANCH" =~ ^release/(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
+            || { echo "::error::$BRANCH is neither main nor release/<major>.<minor>"; exit 1; }
+
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: ${{ github.ref_name }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           skip-github-release: true

@@ -143,8 +143,8 @@ test("given a candidate, when the image is tagged, then no floating tag follows 
     .find((step) => (step.uses ?? "").startsWith("softprops/action-gh-release"));
 
   // when / then
-  assert.equal(meta.with.flavor, undefined,
-    "a flavor input would override the default that holds latest back for a candidate");
+  assert.equal(meta.with.flavor.trim(), "latest=false",
+    "latest is never inferred from the tag; the admission reports it false for every candidate");
   assert.match(String(release.with.prerelease), /contains\(github\.ref_name, '-'\)/,
     "and the GitHub release is marked so its own latest never resolves to a candidate");
   assert.match(document, /a candidate is published under its own version and nothing else/i);
@@ -160,8 +160,11 @@ test("given the tags a release publishes, when the document names them, then it 
 
   // when / then
   assert.deepEqual(patterns, ["{{version}}", "{{major}}.{{minor}}", "{{major}}"]);
-  assert.equal(meta.with.flavor, undefined,
-    "the action's default holds `latest` back for a candidate and moves it for a release, and the document says so");
+  assert.equal(meta.with.flavor.trim(), "latest=false",
+    "the action would move `latest` for every stable tag, a patch of an older line included");
+  assert.ok(meta.with.tags.trim().split("\n").map((line) => line.trim())
+    .includes("type=raw,value=latest,enable=${{ needs.candidate.outputs.latest == 'true' }}"),
+  "only the admission, which knows every published release, decides that a tag becomes latest");
   assert.match(document, /`latest`/,
     "a club pinning latest moves with every release and the document has to name that tag");
   assert.match(document, /`<major>\.<minor>`/);
@@ -176,7 +179,8 @@ test("given a pre-one release, when image tags are generated, then the floating 
 
   // when / then
   assert.equal(major.trim(),
-    "type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}");
+    "type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') && "
+    + "needs.candidate.outputs.latest == 'true' }}");
   assert.match(document, /A `0\.x` release does not publish the floating\s+`0` tag/);
 });
 

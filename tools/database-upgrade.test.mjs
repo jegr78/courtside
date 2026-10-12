@@ -12,6 +12,7 @@ import {
   emptyOriginNotice,
   gitHistory,
   modifiedUpgradeInputs,
+  lineReleaseOrigins,
   nextReleaseOrigins,
   nightlyUpgradeOrigins,
   previousReleaseTag,
@@ -154,6 +155,16 @@ test("given the version main records, when a pull request proves its migrations,
       "before the first release no schema is frozen");
     assert.throws(() => nextReleaseOrigins("0.2", []), /not a semantic version/);
   });
+
+test("given a release branch, when its next patch resolves origins, then the line's published releases are used", () => {
+  // when / then
+  assert.deepEqual(lineReleaseOrigins("0.1.0", ["v0.1.0-rc.12", "v0.1.0", "v0.2.0-rc.1"]), ["v0.1.0"],
+    "0.1.1 upgrades from the release its branch was cut from, not from main's next candidate");
+  assert.deepEqual(lineReleaseOrigins("0.1.1", ["v0.1.0", "v0.1.1", "v0.2.0-rc.1"]), ["v0.1.1"],
+    "the next patch upgrades from the latest patch of its line");
+  assert.throws(() => lineReleaseOrigins("0.2.0-rc.1", ["v0.1.0"]), /records released versions only/,
+    "a branch recording a candidate is not a release branch");
+});
 
 test("given a pull request, when it changes a migration, then the next release's published origins prove it", () => {
   // given

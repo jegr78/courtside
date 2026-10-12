@@ -443,6 +443,9 @@ jobs:
               echo "::notice::$notice"
               echo "$notice" >> "$GITHUB_STEP_SUMMARY"
             fi
+          elif [ "$REQUESTED" = line ]; then
+            published=$(node tools/published-release-tags.mjs)
+            origins=$(node tools/courtside.upgrade-smoke.mjs --line-origins "$GITHUB_REPOSITORY" "$published")
           else
             origins="$REQUESTED"
           fi
