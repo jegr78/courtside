@@ -40,10 +40,10 @@ describe("shortLabels", () => {
 
   it("given a prefix that ends in a space, when shortening the label, then the code carries no trailing space", () => {
     // when
-    const codes = shortLabels(["Platz gesperrt", "Platz frei"]);
+    const codes = shortLabels(["Platz gesperrt", "Platzwart"]);
 
     // then
-    expect(codes.get("Platz gesperrt")).toBe("Platz g");
-    expect(codes.get("Platz frei")).toBe("Platz f");
+    expect(codes.get("Platz gesperrt"), "a code ending in a space would read like the label it differs from").toBe("Platz g");
+    expect(codes.get("Platzwart")).toBe("Platzw");
   });
 });
