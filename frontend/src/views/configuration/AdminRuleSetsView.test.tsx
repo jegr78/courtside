@@ -7,6 +7,7 @@ import i18n from "../../i18n";
 import { UnsavedCount } from "../../test/UnsavedCount";
 import { UnsavedCounts } from "../../test/UnsavedCounts";
 import { UnsavedChangesProvider } from "../../unsaved/UnsavedChangesProvider";
+import { expectTableRolesIndependentOfLayout } from "../../test/tableRoles";
 import { AdminRuleSetsView } from "./AdminRuleSetsView";
 
 describe("AdminRuleSetsView", () => {
@@ -76,6 +77,14 @@ describe("AdminRuleSetsView", () => {
     expect(screen.getByTestId("rule-set-applies-retired")).toHaveTextContent("Nobody");
     expect(screen.getByTestId("rule-set-state-retired")).toHaveTextContent("Retired");
     expect(screen.getByTestId("rule-set-state-rule-set")).toHaveTextContent("Active");
+  });
+
+  it("given a rule set, when the overview is rendered, then its table keeps its roles whatever layout the screen gives it", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    expectTableRolesIndependentOfLayout(await screen.findByTestId("rule-set-overview"));
   });
 
   it("given the rule sets page, when it loads, then the club's identity and deadlines are not on it", async () => {

@@ -6,6 +6,7 @@ import { ApiError, api, type MembershipType, type RosterEntry, type RuleSet } fr
 import i18n from "../i18n";
 import { UnsavedCount } from "../test/UnsavedCount";
 import { UnsavedChangesProvider } from "../unsaved/UnsavedChangesProvider";
+import { expectTableRolesIndependentOfLayout } from "../test/tableRoles";
 import { AdminMembershipTypesView } from "./AdminMembershipTypesView";
 import { AdminRosterView } from "./AdminRosterView";
 
@@ -178,6 +179,15 @@ describe("AdminMembershipTypesView", () => {
     expect(within(header).getByTestId("membership-type-name-type-2")).toHaveValue("Juniors");
     expect(within(header).getByTestId("membership-type-state-type-2")).toHaveTextContent("Retired");
     expect(within(within(card("type-1")).getByRole("rowheader")).getByTestId("membership-type-state-type-1")).toHaveTextContent("Offered");
+  });
+
+  it("given membership types, when the list is rendered, then its table keeps its roles whatever layout the screen gives it", async () => {
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminMembershipTypesView /></UnsavedChangesProvider></MemoryRouter>);
+    await screen.findByTestId("membership-type-type-2");
+
+    // then
+    expectTableRolesIndependentOfLayout(screen.getByRole("table"));
   });
 
   it("given types on rule sets, when the list is read, then each rule set and its rules link sit in the type's row", async () => {

@@ -104,7 +104,7 @@ function SortableHeading({ field, active, direction, label, changed, disabled, f
   changed: (field: RosterSortField) => void; disabled: boolean; focusable: boolean;
 }) {
   const selected = field === active;
-  return <th className="border-b p-2" aria-sort={selected ? (direction === "ASC" ? "ascending" : "descending") : "none"}>
+  return <th role="columnheader" className="border-b p-2" aria-sort={selected ? (direction === "ASC" ? "ascending" : "descending") : "none"}>
     <button type="button" disabled={disabled} tabIndex={focusable ? undefined : -1} className="inline-flex items-center gap-2 underline disabled:no-underline" onClick={() => changed(field)}>
       {label}<span aria-hidden="true">{selected ? (direction === "ASC" ? "↑" : "↓") : "↕"}</span>
     </button>
@@ -318,41 +318,41 @@ export function AdminRosterView() {
           {entries.length === 0
             ? <p data-testid="roster-empty">{t("admin.roster.empty")}</p>
             : <div>
-              <table className="block w-full border-collapse text-left sm:table sm:table-fixed">
-                <thead className="sr-only sm:not-sr-only">
-                  <tr>
+              <table role="table" className="block w-full border-collapse text-left sm:table sm:table-fixed">
+                <thead role="rowgroup" className="sr-only sm:not-sr-only">
+                  <tr role="row">
                     {SORT_FIELDS.slice(0, 3).map(({ field, label }) => <SortableHeading key={field} field={field} active={sortBy} direction={sortDirection} label={t(label)} disabled={pending} focusable={headVisible} changed={(changed) => void changeSort(changed)} />)}
-                    <th className="border-b p-2">{t("admin.roster.columnCredential")}</th>
+                    <th role="columnheader" className="border-b p-2">{t("admin.roster.columnCredential")}</th>
                     {SORT_FIELDS.slice(3).map(({ field, label }) => <SortableHeading key={field} field={field} active={sortBy} direction={sortDirection} label={t(label)} disabled={pending} focusable={headVisible} changed={(changed) => void changeSort(changed)} />)}
                   </tr>
                 </thead>
-                <tbody className="grid gap-3 sm:table-row-group">
-                  {entries.map((entry) => <tr key={entry.personId} data-testid={`roster-row-${entry.personId}`} className="grid gap-2 rounded-xl border p-4 sm:table-row sm:rounded-none sm:border-0 sm:p-0">
-                    <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
+                <tbody role="rowgroup" className="grid gap-3 sm:table-row-group">
+                  {entries.map((entry) => <tr role="row" key={entry.personId} data-testid={`roster-row-${entry.personId}`} className="grid gap-2 rounded-xl border p-4 sm:table-row sm:rounded-none sm:border-0 sm:p-0">
+                    <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
                       <span aria-hidden="true" data-testid="roster-label-name" className="font-medium sm:hidden">{t("admin.roster.columnName")}</span>
                       <Link data-testid={`person-link-${entry.personId}`} className="min-w-0 break-words font-semibold underline" to={`/admin/roster/${entry.personId}`}>
                         {`${entry.lastName}, ${entry.firstName}`}
                       </Link>
                     </td>
-                    <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
+                    <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
                       <span aria-hidden="true" data-testid="roster-label-username" className="font-medium sm:hidden">{t("admin.roster.columnUsername")}</span>
                       <span className="min-w-0 [overflow-wrap:anywhere]">{entry.username ?? "—"}</span>
                     </td>
-                    <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
+                    <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
                       <span aria-hidden="true" data-testid="roster-label-account" className="font-medium sm:hidden">{t("admin.roster.columnAccount")}</span>
                       <AccountMark entry={entry} t={t} />
                     </td>
-                    <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
+                    <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
                       <span aria-hidden="true" data-testid="roster-label-credential" className="font-medium sm:hidden">{t("admin.roster.columnCredential")}</span>
                       <span data-testid={`roster-credential-${entry.personId}`} data-state={entry.credentialState ?? "NONE"} className="min-w-0 break-words">
                         {entry.credentialState ? t(`admin.roster.credential.${entry.credentialState}`) : "—"}
                       </span>
                     </td>
-                    <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
+                    <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
                       <span aria-hidden="true" data-testid="roster-label-membership" className="font-medium sm:hidden">{t("admin.roster.columnMembership")}</span>
                       <span data-testid={`roster-membership-${entry.personId}`} className="min-w-0 break-words">{membershipLabel(entry, typeNames, t)}</span>
                     </td>
-                    <td className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
+                    <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-b sm:p-2">
                       <span aria-hidden="true" data-testid="roster-label-roles" className="font-medium sm:hidden">{t("admin.roster.columnRoles")}</span>
                       <span data-testid={`roster-roles-${entry.personId}`} className="min-w-0 break-words">{roleLabel(entry, t)}</span>
                     </td>

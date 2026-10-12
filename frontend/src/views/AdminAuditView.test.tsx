@@ -6,6 +6,7 @@ import { api, ApiError, type AuditEntry, type ClubConfig } from "../api/client";
 import i18n from "../i18n";
 import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
+import { expectTableRolesIndependentOfLayout } from "../test/tableRoles";
 import { AdminAuditView } from "./AdminAuditView";
 
 const courtAdded: AuditEntry = {
@@ -76,6 +77,18 @@ describe("AdminAuditView", () => {
       expect(within(entry).getByTestId(testId)).toHaveTextContent(label);
       expect(within(entry).getByTestId(testId)).toHaveAttribute("aria-hidden", "true");
     }
+  });
+
+  it("given an entry, when the log is rendered, then its table keeps its roles whatever layout the screen gives it", async () => {
+    // given
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+
+    // when
+    show();
+    await screen.findByTestId("audit-row");
+
+    // then
+    expectTableRolesIndependentOfLayout(screen.getByRole("table"));
   });
 
   it("given an entry with no actor, when it is shown, then the actor names the system", async () => {

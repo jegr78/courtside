@@ -6,6 +6,7 @@ import { api, type ClubConfig, type MessageEntry } from "../api/client";
 import i18n from "../i18n";
 import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
+import { expectTableRolesIndependentOfLayout } from "../test/tableRoles";
 import { AdminMessagesView } from "./AdminMessagesView";
 
 const handedOver: MessageEntry = {
@@ -106,7 +107,7 @@ describe("AdminMessagesView", () => {
   it.each([
     ["en", ["Time", "Recipient", "Message", "State", "Finding", "Message-ID"]],
     ["de", ["Zeitpunkt", "Empfänger", "Nachricht", "Stand", "Befund", "Message-ID"]]
-  ])("given a message on a phone in %s, when its card is read, then every field sits beside its label", async (language, labels) => {
+  ])("given a message in %s, when its row is rendered, then every value shares its cell with a label hidden from screen readers", async (language, labels) => {
     // given
     await i18n.changeLanguage(language);
     vi.spyOn(api, "messages").mockResolvedValue({ entries: [refused], nextCursor: null });
@@ -116,7 +117,6 @@ describe("AdminMessagesView", () => {
     const entry = await screen.findByTestId("message-row");
 
     // then
-    expect(entry).toHaveClass("grid");
     const fields = [
       ["message-label-queued-at", "message-queued-at"],
       ["message-label-recipient", "message-person-link"],
@@ -132,6 +132,18 @@ describe("AdminMessagesView", () => {
       expect(label.closest("td"), `${labelId} shares its cell with ${valueId}`)
         .toContainElement(within(entry).getByTestId(valueId));
     });
+  });
+
+  it("given a message, when the log is rendered, then its table keeps its roles whatever layout the screen gives it", async () => {
+    // given
+    vi.spyOn(api, "messages").mockResolvedValue({ entries: [handedOver, refused], nextCursor: null });
+
+    // when
+    show();
+    await screen.findAllByTestId("message-row");
+
+    // then
+    expectTableRolesIndependentOfLayout(screen.getByRole("table"));
   });
 
   it.each(["en", "de"])("given the state labels in %s, when they are read, then none of them claims delivery",

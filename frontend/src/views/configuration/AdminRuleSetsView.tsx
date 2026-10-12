@@ -253,20 +253,20 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
         <div data-testid="booking-rules" className="grid gap-6 [&>*]:min-w-0 xl:grid-cols-[minmax(0,4fr)_minmax(0,6fr)] xl:items-start">
           <div className="grid gap-4">
             <h2 id="rule-set-overview-heading" className="text-2xl font-bold">{t("admin.ruleSets.overview")}</h2>
-            <table data-testid="rule-set-overview" aria-labelledby="rule-set-overview-heading" className="w-full border-collapse text-left">
-              <thead className="sr-only md:not-sr-only">
-                <tr className="text-muted text-sm">
-                  <th scope="col" className="px-2 py-1 font-semibold">{t("admin.rules.ruleSet")}</th>
-                  <th scope="col" className="px-2 py-1 font-semibold">{t("admin.ruleSets.state")}</th>
-                  <th scope="col" className="px-2 py-1 font-semibold">{t("admin.ruleSets.appliesTo")}</th>
+            <table role="table" data-testid="rule-set-overview" aria-labelledby="rule-set-overview-heading" className="w-full border-collapse text-left">
+              <thead role="rowgroup" className="sr-only md:not-sr-only">
+                <tr role="row" className="text-muted text-sm">
+                  <th role="columnheader" scope="col" className="px-2 py-1 font-semibold">{t("admin.rules.ruleSet")}</th>
+                  <th role="columnheader" scope="col" className="px-2 py-1 font-semibold">{t("admin.ruleSets.state")}</th>
+                  <th role="columnheader" scope="col" className="px-2 py-1 font-semibold">{t("admin.ruleSets.appliesTo")}</th>
                 </tr>
               </thead>
-              <tbody className="grid gap-3 md:table-row-group">
+              <tbody role="rowgroup" className="grid gap-3 md:table-row-group">
                 {ruleSets.map((ruleSet) => {
                   const types = boundTypes(ruleSet.id).map((type) => type.name);
                   const fallback = saved?.noMembershipTypeRuleSetId === ruleSet.id;
-                  return <tr key={ruleSet.id} className="grid gap-2 rounded-xl border p-4 md:table-row md:rounded-none md:border-0 md:p-0">
-                    <th scope="row" className={`${cell} font-normal`}>
+                  return <tr role="row" key={ruleSet.id} className="grid gap-2 rounded-xl border p-4 md:table-row md:rounded-none md:border-0 md:p-0">
+                    <th role="rowheader" scope="row" className={`${cell} font-normal`}>
                       <span aria-hidden="true" className={cellLabel}>{t("admin.rules.ruleSet")}</span>
                       <button type="button" data-testid={`rule-set-choose-${ruleSet.id}`} aria-pressed={ruleSet.id === selectedRuleSetId}
                               disabled={pending} onClick={() => askBeforeChoosing(ruleSet.id)}
@@ -274,13 +274,13 @@ export function AdminRuleSetsView({ configurationChanged }: { configurationChang
                         {ruleSet.name}
                       </button>
                     </th>
-                    <td className={cell}>
+                    <td role="cell" className={cell}>
                       <span aria-hidden="true" className={cellLabel}>{t("admin.ruleSets.state")}</span>
                       <span data-testid={`rule-set-state-${ruleSet.id}`} className={ruleSet.active ? "text-muted" : "font-semibold"}>
                         {t(ruleSet.active ? "admin.ruleSets.active" : "admin.ruleSets.retired")}
                       </span>
                     </td>
-                    <td className={cell}>
+                    <td role="cell" className={cell}>
                       <span aria-hidden="true" className={cellLabel}>{t("admin.ruleSets.appliesTo")}</span>
                       <span data-testid={`rule-set-applies-${ruleSet.id}`} className="min-w-0 break-words">
                         {types.length === 0 && !fallback

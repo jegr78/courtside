@@ -119,16 +119,16 @@ export function AdminCourtsView() {
       </form>
       <form id={FORM} noValidate onSubmit={(event) => void saveCourts(event)} className="grid gap-3">
         <h2 className="text-2xl font-bold">{t("admin.facility.allCourts")}</h2>
-        <table className="block w-full border-collapse text-left lg:table">
-          <thead className="sr-only lg:not-sr-only">
-            <tr>
-              <th className="border-b p-2">{t("admin.facility.number")}</th>
-              <th className="border-b p-2">{t("admin.facility.name")}</th>
-              <th className="border-b p-2">{t("admin.facility.columnStatus")}</th>
-              <th className="border-b p-2">{t("admin.facility.columnImpact")}</th>
+        <table role="table" className="block w-full border-collapse text-left lg:table">
+          <thead role="rowgroup" className="sr-only lg:not-sr-only">
+            <tr role="row">
+              <th role="columnheader" className="border-b p-2">{t("admin.facility.number")}</th>
+              <th role="columnheader" className="border-b p-2">{t("admin.facility.name")}</th>
+              <th role="columnheader" className="border-b p-2">{t("admin.facility.columnStatus")}</th>
+              <th role="columnheader" className="border-b p-2">{t("admin.facility.columnImpact")}</th>
             </tr>
           </thead>
-          <tbody className="grid gap-3 lg:table-row-group">
+          <tbody role="rowgroup" className="grid gap-3 lg:table-row-group">
             {courts.map((court) => <CourtRow
               key={court.id}
               court={court}
@@ -163,21 +163,21 @@ function CourtRow({ court, entry, refused, timeZone, disabled, entered, toggle, 
   const field = "form-control min-h-11 rounded-lg border px-3 py-2";
   const cell = "grid min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-3 lg:table-cell lg:border-b lg:p-2 lg:align-top";
   const label = "font-medium lg:hidden";
-  return <tr data-testid={`court-row-${court.id}`} className="grid gap-3 rounded-xl border p-4 lg:table-row lg:rounded-none lg:border-0 lg:p-0">
-    <td className={cell}>
+  return <tr role="row" data-testid={`court-row-${court.id}`} className="grid gap-3 rounded-xl border p-4 lg:table-row lg:rounded-none lg:border-0 lg:p-0">
+    <td role="cell" className={cell}>
       <span aria-hidden="true" data-testid="court-label-number" className={label}>{t("admin.facility.number")}</span>
       <input data-testid={`edit-court-number-${court.id}`} className={`${field} w-24`} type="number"
              min={MIN_NUMBER} max={MAX_NUMBER} aria-label={t("admin.facility.editNumber")}
              aria-invalid={refused || undefined} disabled={disabled}
              value={entry.number} onChange={(event) => entered({ number: event.target.value })} />
     </td>
-    <td className={cell}>
+    <td role="cell" className={cell}>
       <span aria-hidden="true" data-testid="court-label-name" className={label}>{t("admin.facility.name")}</span>
       <input data-testid={`edit-court-name-${court.id}`} className={`${field} w-full min-w-0 lg:w-56`} maxLength={MAX_NAME}
              aria-label={t("admin.facility.editName")} placeholder={t("admin.facility.unnamedCourt")} disabled={disabled}
              value={entry.name} onChange={(event) => entered({ name: event.target.value })} />
     </td>
-    <td className={cell}>
+    <td role="cell" className={cell}>
       <span aria-hidden="true" data-testid="court-label-status" className={label}>{t("admin.facility.columnStatus")}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-3">
         <span data-testid={`court-status-${court.id}`}>{t(court.active ? "admin.facility.statusActive" : "admin.facility.statusInactive")}</span>
@@ -186,7 +186,7 @@ function CourtRow({ court, entry, refused, timeZone, disabled, entered, toggle, 
         </Button>
       </span>
     </td>
-    <td className="min-w-0 lg:table-cell lg:border-b lg:p-2 lg:align-top">
+    <td role="cell" className="min-w-0 lg:table-cell lg:border-b lg:p-2 lg:align-top">
       <ImpactPanel kind="court" subject={court.id} timeZone={timeZone} ask={() => api.courtImpact(court.id)} reportError={reportError} />
     </td>
   </tr>;
