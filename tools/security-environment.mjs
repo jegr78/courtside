@@ -22,7 +22,7 @@ import { captureResourceAuthentication, resourceSessionProjectionClassPaths } fr
 import { captureSecurityStartupDiagnostics } from "./security-startup-diagnostics.mjs";
 import { inspectReusableImages, verifyReusableImages } from "./immutable-image-reuse.mjs";
 import { attemptStep, failureReason } from "./failure-reason.mjs";
-import { schemathesisConfiguration, schemathesisCredentials } from "./security-schemathesis-configuration.mjs";
+import { schemathesisRunArgs, schemathesisScannerFiles } from "./security-schemathesis-configuration.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
@@ -1098,30 +1098,16 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
       throw new Error("The mounted OpenAPI document differs from the planned contract");
     }
     fixture = await limits.prepareFixtures();
-    await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/courtside-schemathesis.toml"],
-      { input: schemathesisConfiguration(limits.policy) });
-    await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/courtside-credentials.json"],
-      { input: schemathesisCredentials(fixture.client) });
-    await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/sitecustomize.py"],
-      { input: schemathesisReasonProjection });
-    await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/schemathesis_credentials.py"],
-      { input: schemathesisCredentialHook });
+    for (const { path, input } of schemathesisScannerFiles(limits.policy, fixture.client,
+      { reasonProjection: schemathesisReasonProjection, credentialHook: schemathesisCredentialHook })) {
+      await command(["exec", "-i", scanner, "sh", "-c", `umask 077; cat > ${path}`], { input });
+    }
     const events = {};
     let generatedBytes = 0;
     const runMode = async (mode) => {
       const selected = limits.inventory.filter(({ modes }) => modes.includes(mode));
       const reportDirectory = `/tmp/courtside-schemathesis-${mode}`;
-      const args = ["exec", "-e", "PYTHONPATH=/tmp", "-e", "SCHEMATHESIS_HOOKS=schemathesis_credentials", scanner,
-        "st", "--config-file",
-        "/tmp/courtside-schemathesis.toml", "run",
-        "/schema/openapi.yaml", "--url", "http://scanner-gateway:8090", "--phases", limits.policy.phases.join(","),
-        "--mode", mode,
-        "--max-examples", String(limits.policy.maxExamples), "--workers", String(limits.policy.workers),
-        "--seed", String(limits.policy.seed), "--request-timeout", String(limits.policy.requestTimeoutSeconds),
-        "--request-retries", "0", "--max-redirects", "0", "--max-failures", String(limits.policy.maxFailures),
-        "--checks", limits.policy.checks.join(","), "--report", "ndjson", "--report-dir", reportDirectory,
-        "--output-sanitize", "true", "--output-truncate", "true", "--generation-database", ":memory:", "--no-color",
-        ...selected.flatMap(({ operationId }) => ["--include-operation-id", operationId])];
+      const args = schemathesisRunArgs(scanner, limits.policy, mode, selected.map(({ operationId }) => operationId));
       const execution = await command(args, { acceptedExitCodes: [0, 1] });
       if (![0, 1].includes(execution.code)) throw new Error("Schemathesis failed before producing coverage");
       const report = (await command(["exec", scanner, "sh", "-c", `cat ${reportDirectory}/*.ndjson`],

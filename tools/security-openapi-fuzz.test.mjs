@@ -25,6 +25,7 @@ import {
   undocumentedRuntimeRoutes,
   validateOpenApiFuzzEvidence
 } from "./security-openapi-fuzz.mjs";
+import { schemathesisRunArgs, schemathesisScannerFiles } from "./security-schemathesis-configuration.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -820,6 +821,32 @@ test("given a signed-in fuzz client, when its credentials are handed to Schemath
   cookies.delete("__Host-SESSION");
   assert.throws(() => schemathesisCredentials(client), /session/,
     "a fuzz run without a session would measure the sign-in wall instead of the operations");
+});
+
+test("given a signed-in fuzz client, when the scanner is prepared, then Schemathesis loads the credential hook beside the files it reads", () => {
+  // given
+  const cookies = new Map([["__Host-SESSION", "one"], ["__Host-XSRF-TOKEN", "to%2Bken"]]);
+  const client = { cookie: (name) => cookies.get(name), csrfToken: () => "to+ken" };
+  const compose = readFileSync(new URL("../deploy/compose.security.yaml", import.meta.url), "utf8");
+
+  // when
+  const files = schemathesisScannerFiles(openApiFuzzPolicy, client, { reasonProjection: "reason", credentialHook: "hook" });
+  const args = schemathesisRunArgs("scanner", openApiFuzzPolicy, "negative", ["logIn", "logOut"]);
+
+  // then
+  const written = new Map(files.map(({ path, input }) => [path, input]));
+  assert.deepEqual(JSON.parse(written.get("/tmp/courtside-credentials.json")),
+    { session: "one", csrfCookie: "to%2Bken", csrfToken: "to+ken" }, "the hook reads the credentials from this file");
+  assert.equal(written.get("/tmp/schemathesis_credentials.py"), "hook", "the hook module is written into the scanner");
+  assert.equal(written.get("/tmp/sitecustomize.py"), "reason", "the reason projection is written into the scanner");
+  const environment = args.slice(0, args.indexOf("scanner")).filter((arg) => arg !== "exec" && arg !== "-e");
+  assert.deepEqual(environment, ["PYTHONPATH=/tmp", "SCHEMATHESIS_HOOKS=schemathesis_credentials"],
+    "Python finds both modules in /tmp and Schemathesis imports the hook by its module name");
+  assert.match(compose, /SCHEMATHESIS_HOOKS: ""/, "the compose file clears the hooks, so only the run arguments load one");
+  assert.deepEqual(args.filter((arg, index) => args[index - 1] === "--include-operation-id"), ["logIn", "logOut"],
+    "a run covers exactly the selected operations");
+  assert.ok(args.includes("--config-file") && args[args.indexOf("--config-file") + 1] === "/tmp/courtside-schemathesis.toml"
+    && written.has("/tmp/courtside-schemathesis.toml"), "the run reads the configuration that was written");
 });
 
 test("given admission refusals on native cases, when one paced retry is answered, then the case keeps its own verdict", async () => {
