@@ -135,6 +135,8 @@
     { "path": "tools/release-candidate-workflow.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-documentation.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-gates-workflow.test.mjs", "profiles": ["tooling"], "test": true },
+    { "path": "tools/release-line.mjs", "profiles": ["full"], "test": false },
+    { "path": "tools/release-line.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-notes.mjs", "profiles": ["full"], "test": false },
     { "path": "tools/release-notes.test.mjs", "profiles": ["tooling"], "test": true },
     { "path": "tools/release-please-configuration.test.mjs", "profiles": ["tooling"], "test": true },
