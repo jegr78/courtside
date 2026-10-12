@@ -172,6 +172,7 @@ Verstöße gleichzeitig am jeweiligen Feld an.
 |---|---|
 | An diesem Tag ist die Anlage geschlossen | Für den Tag ist keine Öffnungszeit hinterlegt |
 | Buchungen sind nur zwischen zwei Uhrzeiten möglich | Die Buchung liegt außerhalb der Öffnungszeit |
+| Mit deiner Mitgliedsart kannst du nur zwischen zwei Uhrzeiten buchen | Deine Mitgliedsart darf nur einen Teil der Öffnungszeit buchen |
 | Buchungen beginnen im Minutenraster | Der Beginn passt nicht in das Raster des Vereins |
 | Die Dauer muss ein Vielfaches der Rasterlänge sein | Die Dauer passt nicht in das Raster |
 | Du kannst höchstens eine bestimmte Zahl von Tagen im Voraus buchen | Der erlaubte Vorlauf ist überschritten |

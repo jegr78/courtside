@@ -170,6 +170,7 @@ violations at once next to the relevant fields.
 |---|---|
 | The facility is closed on this day | The day has no opening hours |
 | Bookings are only possible between two times | The booking is outside the opening hours |
+| Your membership type may book only between two times | Your membership type may book only part of the opening hours |
 | Bookings start on the minute grid | The start does not match the club's grid |
 | The duration must be a multiple of the grid | The duration does not match the grid |
 | You can only book a certain number of days ahead | The allowed advance period was exceeded |
