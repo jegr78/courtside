@@ -296,8 +296,8 @@ tag; `release.yml` answers the tag and publishes exactly what was qualified.
 
 | Job | What it establishes |
 |---|---|
-| `select` | The green push `build` that finished belongs to a release commit: the manifest changed, exactly one merged `autorelease: pending` pull request is titled for that version, the commit is on the branch the version belongs to and the version is not tagged yet |
-| `preconditions` | A first-attempt build on the release's branch, its nightly-image workflow and its release-gate rehearsal completed for an ancestor of the release commit, and no tracker-written nightly failure remains open |
+| `select` | The green push `build` that finished belongs to a release commit, or for a patch the build dispatched on its release branch, recorded as `patch-release`: the manifest changed, exactly one merged `autorelease: pending` pull request is titled for that version, the commit is on the branch the version belongs to, carries the tools the release workflows call, is no patch of a retired line and, for a patch, has every fix ported to `main`, and the version is not tagged yet |
+| `preconditions` | A first-attempt build on the release's branch, its nightly-image workflow and its release-gate rehearsal completed for an ancestor of the release commit, and, for a release from `main`, no tracker-written nightly failure remains open |
 | `release-build` | Dependency-remediation deadlines hold, CodeQL analyses the sources, npm audit evidence is captured, the release-build security policy holds, and the release notes and upgrade origins are collected. The test suite and the complete browser matrix already ran in the commit's own green push `build`, which `select` requires |
 | `image` | One multi-architecture image and its booking-seed image, pushed as `release-candidate-<sha>-<run id>` |
 | `archive` | `tools/deployment-archive.mjs` packs the reference deployment for that digest into `courtside-deployment-<version>.zip`, under the identity `release.yml` will attest it with |
@@ -305,7 +305,7 @@ tag; `release.yml` answers the tag and publishes exactly what was qualified.
 | `gates` | Calls `release-gates.yml` with the candidate digest, the same workflow the nightly rehearses. Its `mail` job exercises the archive's self-hosted-mail recipe against controlled DNS, TLS and SMTP peers. `active-security` runs the scanners of the `active` profile against the running candidate; the `destructive` profile does not run here. `restore` restores a backup taken from the candidate into it. `security-record` collects the build, image, qualify and active-security evidence into one file, without `upgrade` and `restore`. `archive-reproducibility` builds the archive again from the release commit and requires the same bytes. `npm-audit` holds the release npm policy. `upgrade` migrates a database from each resolved origin into the candidate; the first release has none |
 | `evidence` | The record `release-candidate-evidence-<sha>`: both digests, the archive checksum, the version, the run and the push build, written only when every job above succeeded |
 | `tag` | Writes `v<version>` at the qualified commit through the release token and marks the release pull request `autorelease: tagged`. Creating a tag that exists fails, so a tag never moves |
-| `candidate` | In `release.yml`: the tag sits on the branch its version belongs to and names the version the commit records, and the newest release-mode candidate evidence for that commit verifies, including the archive's checksum |
+| `candidate` | In `release.yml`: the tag sits on the branch its version belongs to, names the version the commit records and belongs to the newest published line, and the newest release-mode candidate evidence for that commit verifies, including the archive's checksum |
 | `publish` | The qualified manifests are signed with cosign and given SBOMs and provenance attestations; the draft release receives the candidate's archive, notes and security record, the version tags are pushed, and only then is the release made visible |
 | `plan-sync` | The release plan's status comment is synchronized with the release just published |
 
@@ -425,6 +425,13 @@ holds an artifact of that name. Dispatch a new run instead.
 release tag when the first fix is needed, for example `release/0.1` from `v0.1.0`, and deleted once
 the next minor is published; its tags remain.
 
+**Required checks.** A ruleset protects `main` and one protects every `release/*` branch alike: a
+pull request, squash merges only, no force push and no deletion without the admin bypass. Both
+require `build`, `Validate PR title` and `release line`. Each rule the `release line` check applies
+is applied again by the candidate's `select` job, so a release that slipped past the check, such as
+the pull request that first brings the check to a branch, is still refused before anything is
+built.
+
 **Opening the next line.** Right after a minor is published, one commit on `main` turns
 `"prerelease"` on and carries the footer that names the next line's first candidate. Without it a
 lone `fix:` on `main` would propose `0.1.1-rc`. The `release line` check refuses a release pull
@@ -434,24 +441,33 @@ one.
 **Cutting the branch.** Create it from the tag's commit, then give it the release tooling `main`
 already has by cherry-picking those commits through pull requests. A release branch keeps its own
 `release-please-config.json` with `"prerelease": false`, so release-please proposes `0.1.1` there.
-Every commit that only brings tooling uses a type the changelog hides, `ci:`, `chore:` or `test:`, so
-release-please lists nothing for it. None may carry a `Release-As:` footer: release-please would
-read it on the branch and propose that version.
+A commit that brings tooling, or a dependency update that would fail a release gate, uses a type
+the changelog hides, such as `ci:` or `chore:`, so release-please lists nothing for it. None may
+carry a `Release-As:` footer: release-please would read it on the branch and propose that version.
+
+**Tooling follows every maintained line.** `release-candidate.yml` runs from `main`, but it and the
+workflows it calls run tools at the release commit. Every tool those workflows name is therefore
+ported to each maintained release branch with the change that starts calling it. The candidate's
+`select` job refuses a commit that lacks one and names it.
 
 **A fix goes to the release branch first.** Its pull request targets `release/<major>.<minor>` and
 lands as one squashed commit. Then pick that commit onto a branch from `main` with
 `git cherry-pick -x <sha>` and open a pull request into `main`. The squash keeps every commit
-message, so the `(cherry picked from commit <sha>)` line reaches `main`. Verify either branch
-locally against the branch it targets: `node tools/courtside.mjs check --base release/0.1`.
+message, so the `(cherry picked from commit <sha>)` line reaches `main`. Verify a fix locally
+against the branch it targets: `node tools/courtside.mjs check --base release/0.1`.
 
 **The forward-port check.** On a release pull request into a release branch, the `release line`
-job lists every commit since the last tag that release-please would put in the patch notes, the
-types its changelog shows and any breaking change, and refuses the release until each one has a
-commit on `main` carrying its `(cherry picked from commit <sha>)` line. It matches that line, not
-the patch content: a port that needed a conflict resolution carries a different diff but the same
-line. A commit that itself came from `main`, such as a dependency update picked because it would
-fail a release gate, needs no port back. The check does not rerun when `main` changes, so rerun
-the job once the port has merged.
+job reads every commit since the last tag. It splits each message as release-please 17.6 does,
+at a blank line before a Conventional Commit header and at nested commit markers. A commit with an
+entry of a type the changelog shows, or with a breaking change, needs a commit on `main` whose
+`(cherry picked from commit <sha>)` line names it. The check reads that line, not the patch
+content: a port that needed a conflict resolution carries a different diff but the same line. A
+commit that came from `main` needs no port back, but only when every entry it releases carries its
+own trailer naming a commit on `main`. A pull request into a release branch that overrides its
+commit message with `BEGIN_COMMIT_OVERRIDE` is refused, because release-please would read the
+override and git does not carry it. The check does not rerun when `main` changes, so rerun the
+job once the port has merged. The candidate repeats the check against the release before the
+pending release pull request.
 
 **Releasing the patch.** release-please maintains a pull request titled
 `chore(release/0.1): release 0.1.1` on the branch. Merging it starts no build, because pushes to a
@@ -463,15 +479,28 @@ gh workflow run build.yml --ref release/0.1
 
 That build runs the nightly image without publishing, the release gates and the nightly release
 evidence. Its upgrade origins are the line's published releases, because `main`'s dated nightlies
-carry migrations the branch lacks. Once it is green, qualify the release commit:
+carry migrations the branch lacks. It plans no registry retention, and it moves the internal
+`nightly-candidate` tag, which every consumer reads by digest, not the published `nightly`. Once it
+is green, qualify the release commit:
 
 ```bash
 gh workflow run release-candidate.yml --ref main -f commit=<sha> -f rehearsal=false
 ```
 
-The candidate accepts that dispatched build as the commit's green build and as its nightly, writes
-`v0.1.1` and `release.yml` promotes it like any release. The image moves `0.1` and `latest`, which is
-right while the line is the newest one maintained.
+`select` records the reason `patch-release`, takes that dispatched build as the commit's green
+build and the preconditions take it as its nightly. The candidate writes `v0.1.1` and `release.yml`
+promotes it like any release.
+
+Two inputs still come from `main`. Nightly failure issues do not hold a patch: the tracker files
+scheduled failures of `main`, and the patch's own build has to deliver complete evidence instead.
+The previous dependency-remediation evidence still comes from candidate runs on `main`, which is
+where every candidate runs. Dependabot keeps one alert history for the repository, so its clocks
+are the same for both lines, and the current state comes from the patch commit's own summaries.
+
+**Latest moves only to the newest release.** The release's admission reads every published
+release. It refuses a patch of a line a newer minor has replaced, and only a stable release that no
+published one precedes gets the `latest` image tag, the floating major tag and the GitHub release's
+Latest mark.
 
 **Checking without releasing.** Two dispatches run the release's own checks and publish nothing.
 `release-admission.yml` takes a tag name and the commit it would point at and reports whether
@@ -482,9 +511,11 @@ gh workflow run release-admission.yml --ref main -f tag=v0.1.1 -f commit=<sha>
 ```
 
 `release-line.yml`, dispatched on a branch with a head commit, judges that head as a release pull
-request into the branch:
+request into the branch. On the release branch it runs the line and forward-port checks; on `main`
+it shows the refusal of a patch:
 
 ```bash
+gh workflow run release-line.yml --ref release/0.1 -f head=<sha>
 gh workflow run release-line.yml --ref main -f head=<sha>
 ```
 
@@ -548,7 +579,8 @@ Ordering follows semantic versioning, so `v0.3.0-rc` precedes `v0.3.0-rc.2`, whi
 ## After the release
 
 The image is at `ghcr.io/jegr78/courtside`, signed. A release is published under up to four tags:
-`<version>`, `<major>.<minor>`, `<major>` and `latest`. A `0.x` release does not publish the floating
+`<version>`, `<major>.<minor>`, `<major>` and `latest`. `latest` and `<major>` follow only a release
+that no published release precedes. A `0.x` release does not publish the floating
 `0` tag because every minor may break compatibility before 1.0. A club pinning `0.2.0` stays where
 it is; one pinning `0.2` or `latest` moves with every matching release. From 1.0 onwards, the
 floating major tag moves with every matching release as well.
