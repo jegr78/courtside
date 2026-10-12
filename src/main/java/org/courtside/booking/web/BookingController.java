@@ -3,6 +3,7 @@ package org.courtside.booking.web;
 import org.courtside.api.ApiAllocation;
 import org.courtside.api.ApiBookingCreated;
 import org.courtside.api.ApiBookingEligibility;
+import org.courtside.api.ApiBookingHours;
 import org.courtside.api.ApiViolation;
 import org.courtside.api.ApiCreateBookingRequest;
 import org.courtside.api.ApiBookingStatus;
@@ -109,7 +110,10 @@ class BookingController implements BookingsApi {
                 .toList();
         return ResponseEntity.ok(new ApiBookingEligibility(violations)
                 .maxBookingMinutes(ruleGate.maxBookingMinutesFor(
-                        personIdOf(account), account.getRoles())));
+                        personIdOf(account), account.getRoles()))
+                .bookingHours(ruleGate.bookingWindowFor(personIdOf(account), account.getRoles())
+                        .map(window -> new ApiBookingHours(window.earliestStart(), window.latestEnd()))
+                        .orElse(null)));
     }
 
     @InitBinder

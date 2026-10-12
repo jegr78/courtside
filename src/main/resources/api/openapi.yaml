@@ -370,7 +370,7 @@ components:
       type: object
       description: |
         Standing rule violations that prevent the signed-in account from booking a court, and the
-        bound its rule set puts on one booking's length.
+        bounds its rule set puts on one booking's length and on the hours it may book.
       required: [violations]
       properties:
         violations:
@@ -383,6 +383,24 @@ components:
             bounds it. A client offers no longer period than this; the server refuses one anyway
             with `booking.rule.maxBookingDuration.exceeded`, so the field shortens a list rather
             than deciding anything.
+        bookingHours:
+          oneOf:
+            - $ref: "#/components/schemas/BookingHours"
+            - type: "null"
+          description: |
+            The hours of the day inside which this account's rule set lets it book, or absent where
+            nothing narrows the opening hours. The server refuses a booking outside them with
+            `booking.rule.bookingHours.outside`.
+
+    BookingHours:
+      type: object
+      description: |
+        A window of club-local wall-clock time. A booking starts no earlier than `earliestStart`
+        and ends no later than `latestEnd` on the same day.
+      required: [earliestStart, latestEnd]
+      properties:
+        earliestStart: { $ref: "#/components/schemas/LocalTime" }
+        latestEnd: { $ref: "#/components/schemas/LocalTime" }
 
     FieldError:
       type: object

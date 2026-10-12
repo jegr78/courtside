@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.LocalTime;
 import java.util.Set;
 import java.util.UUID;
 
@@ -141,6 +142,54 @@ class BookingEligibilityControllerTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/booking-eligibility"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.maxBookingMinutes").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "miles.richard", roles = "MEMBER")
+    void givenAMemberWhoseRuleSetLimitsBookingHours_whenReadingEligibility_thenTheWindowIsReturned()
+            throws Exception {
+        // given
+        UUID personId = identity.createPerson("Richard", "Miles", "miles.richard@example.org");
+        identity.createEnabledAccount(personId, "miles.richard", Set.of(Role.MEMBER));
+        members.assignMembership(personId, members.membershipTypeMeasuredBy("Juniors",
+                rules.ruleSetLimitingBookingHours("Junior hours", LocalTime.of(9, 0), LocalTime.of(20, 0))));
+
+        // when / then
+        mockMvc.perform(get("/api/booking-eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingHours.earliestStart").value("09:00:00"))
+                .andExpect(jsonPath("$.bookingHours.latestEnd").value("20:00:00"));
+    }
+
+    @Test
+    @WithMockUser(username = "roe.john", roles = "MEMBER")
+    void givenAMemberWhoseRuleSetLimitsNoHours_whenReadingEligibility_thenNoWindowIsReturned()
+            throws Exception {
+        // given
+        createAccountWithMembership("John", "Roe", "roe.john", Role.MEMBER, false);
+
+        // when / then
+        mockMvc.perform(get("/api/booking-eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.violations").isEmpty())
+                .andExpect(jsonPath("$.bookingHours").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "major.mary", roles = "ADMIN")
+    void givenAnAdministratorWhoseRuleSetLimitsBookingHours_whenReadingEligibility_thenNoWindowIsReturned()
+            throws Exception {
+        // given
+        UUID personId = identity.createPerson("Mary", "Major", "major.mary@example.org");
+        identity.createEnabledAccount(personId, "major.mary", Set.of(Role.ADMIN));
+        members.assignMembership(personId, members.membershipTypeMeasuredBy("Juniors",
+                rules.ruleSetLimitingBookingHours("Junior hours", LocalTime.of(9, 0), LocalTime.of(20, 0))));
+
+        // when / then
+        mockMvc.perform(get("/api/booking-eligibility"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.violations").isEmpty())
+                .andExpect(jsonPath("$.bookingHours").doesNotExist());
     }
 
     @Test
