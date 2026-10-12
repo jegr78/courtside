@@ -290,6 +290,11 @@ You then learn only here that somebody added you as a player, that a change affe
 that the club cancelled one. Courtside always emails credentials, your username and reset codes,
 because you are not signed in when you need them.
 
+When your club has set up Courtside's address, an email about a booking ends with a link. It leads to
+the booking or to *My bookings*, and a waitlist offer leads to your place on the waitlist. The
+calendar entry of a confirmation carries the same link. Emails with credentials, your username or a
+reset code never contain a link. If one of them does, it does not come from Courtside.
+
 Save your choices. They apply to future messages only.
 
 ![Notifications with your messages and your choices.](../screenshots/en/notification-choices.png)
