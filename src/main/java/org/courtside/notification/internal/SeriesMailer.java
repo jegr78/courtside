@@ -69,11 +69,11 @@ class SeriesMailer implements MessageComposer {
                         QueuedMessage.PREVIOUS_ENDS_AT, moved.previousEndsAt().toString()));
     }
 
-    // The holder changing their own series knows it, so only somebody else's change is announced.
+    // Whoever made the change knows it, so the holder's own change reaches nobody.
     private void announceChange(List<UUID> bookingIds, UUID actorAccountId, MessageKind kind,
                                 Map<String, String> details) {
         SequencedMap<UUID, BookingAnnouncement> affected = bookings.describeAll(bookingIds);
-        if (affected.isEmpty() || actorAccountId.equals(affected.firstEntry().getValue().bookedByAccountId())) {
+        if (affected.isEmpty()) {
             return;
         }
         Map<String, String> parameters = new HashMap<>(details);
