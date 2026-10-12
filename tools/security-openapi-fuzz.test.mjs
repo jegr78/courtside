@@ -18,6 +18,7 @@ import {
   runOpenApiMutationCases,
   runOpenApiFuzzAssessment,
   schemathesisConfiguration,
+  schemathesisCredentials,
   runtimeOperations,
   securityImportCases,
   securityImportSourceRequest,
@@ -786,11 +787,8 @@ test("given a refusal that survived Schemathesis' own retries, when normalizing 
 });
 
 test("given the fuzz policy, when rendering the Schemathesis configuration, then it paces by Retry-After and expects no 429 from a data check", () => {
-  // given
-  const client = { header: () => "__Host-SESSION=one", csrfToken: () => "token" };
-
   // when
-  const configuration = schemathesisConfiguration(client, openApiFuzzPolicy);
+  const configuration = schemathesisConfiguration(openApiFuzzPolicy);
 
   // then
   const firstTable = configuration.indexOf("\n[");
@@ -805,7 +803,23 @@ test("given the fuzz policy, when rendering the Schemathesis configuration, then
       `${check} must not accept a 429 that survived the retries`);
     assert.deepEqual(statuses, openApiFuzzPolicy.expectedStatuses[check]);
   }
-  assert.match(configuration, /^headers = \{ Cookie = "__Host-SESSION=one", X-XSRF-TOKEN = "token" \}\n/);
+  assert.doesNotMatch(configuration, /headers|Cookie|XSRF/,
+    "a configured header is sent even when a case negates the credential it carries");
+});
+
+test("given a signed-in fuzz client, when its credentials are handed to Schemathesis, then the hook receives each one separately", () => {
+  // given
+  const cookies = new Map([["__Host-SESSION", "one"], ["__Host-XSRF-TOKEN", "to%2Bken"]]);
+  const client = { cookie: (name) => cookies.get(name), csrfToken: () => "to+ken" };
+
+  // when
+  const credentials = JSON.parse(schemathesisCredentials(client));
+
+  // then
+  assert.deepEqual(credentials, { session: "one", csrfCookie: "to%2Bken", csrfToken: "to+ken" });
+  cookies.delete("__Host-SESSION");
+  assert.throws(() => schemathesisCredentials(client), /session/,
+    "a fuzz run without a session would measure the sign-in wall instead of the operations");
 });
 
 test("given admission refusals on native cases, when one paced retry is answered, then the case keeps its own verdict", async () => {

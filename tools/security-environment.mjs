@@ -22,11 +22,12 @@ import { captureResourceAuthentication, resourceSessionProjectionClassPaths } fr
 import { captureSecurityStartupDiagnostics } from "./security-startup-diagnostics.mjs";
 import { inspectReusableImages, verifyReusableImages } from "./immutable-image-reuse.mjs";
 import { attemptStep, failureReason } from "./failure-reason.mjs";
-import { schemathesisConfiguration } from "./security-schemathesis-configuration.mjs";
+import { schemathesisConfiguration, schemathesisCredentials } from "./security-schemathesis-configuration.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const composeFile = join(root, "deploy", "compose.security.yaml");
 const schemathesisReasonProjection = readFileSync(join(root, "security", "schemathesis_reason.py"), "utf8");
+const schemathesisCredentialHook = readFileSync(join(root, "security", "schemathesis_credentials.py"), "utf8");
 const stateRoot = join(root, "build", "security");
 const reservationImage = deployedCaddyImage();
 export const securityStateRoot = stateRoot;
@@ -1097,17 +1098,21 @@ export async function runOpenApiFuzzer(plan, stopFile, limits) {
       throw new Error("The mounted OpenAPI document differs from the planned contract");
     }
     fixture = await limits.prepareFixtures();
-    const config = schemathesisConfiguration(fixture.client, limits.policy);
     await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/courtside-schemathesis.toml"],
-      { input: config });
+      { input: schemathesisConfiguration(limits.policy) });
+    await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/courtside-credentials.json"],
+      { input: schemathesisCredentials(fixture.client) });
     await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/sitecustomize.py"],
       { input: schemathesisReasonProjection });
+    await command(["exec", "-i", scanner, "sh", "-c", "umask 077; cat > /tmp/schemathesis_credentials.py"],
+      { input: schemathesisCredentialHook });
     const events = {};
     let generatedBytes = 0;
     const runMode = async (mode) => {
       const selected = limits.inventory.filter(({ modes }) => modes.includes(mode));
       const reportDirectory = `/tmp/courtside-schemathesis-${mode}`;
-      const args = ["exec", "-e", "PYTHONPATH=/tmp", scanner, "st", "--config-file",
+      const args = ["exec", "-e", "PYTHONPATH=/tmp", "-e", "SCHEMATHESIS_HOOKS=schemathesis_credentials", scanner,
+        "st", "--config-file",
         "/tmp/courtside-schemathesis.toml", "run",
         "/schema/openapi.yaml", "--url", "http://scanner-gateway:8090", "--phases", limits.policy.phases.join(","),
         "--mode", mode,

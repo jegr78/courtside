@@ -296,6 +296,22 @@ test("given changed assessment bytes, when the required build runs, then paired 
   assert.match(build, /candidate-ref "\$HEAD_REF"/);
 });
 
+test("given a scanner update, when the comparison runs, then both Schemathesis adapters are proven against the pinned image first", () => {
+  // given
+  const comparison = jobIn(build, "tool-update-comparison");
+
+  // when
+  const adapters = comparison.slice(comparison.indexOf("Verify the Schemathesis adapters"),
+    comparison.indexOf("Run paired active assessments"));
+
+  // then
+  assert.match(adapters, /IMAGE=\$\(jq -r \.image security\/openapi-fuzz-policy\.json\)/);
+  assert.match(adapters, /schemathesis_reason_integration\.py:\/projection\/integration\.py:ro[\s\S]*\/projection\/integration\.py/,
+    "the reason projection decides whether a scanner failure is triaged or left unsupported");
+  assert.match(adapters, /schemathesis_credentials_integration\.py:\/projection\/credentials_integration\.py:ro[\s\S]*\/projection\/credentials_integration\.py/,
+    "the credential hook decides whether a negated credential is really left out");
+});
+
 test("given a paired comparison, when both sides run, then they assess the candidate revision's target", () => {
   // given
   const comparison = jobIn(build, "tool-update-comparison");
