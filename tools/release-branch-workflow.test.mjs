@@ -42,6 +42,9 @@ test("given a build dispatched on a release branch, when it finishes, then it ru
     assert.equal(jobs["release-gates"].with["upgrade-origins"],
       "${{ startsWith(github.ref, 'refs/heads/release/') && 'line' || 'nightly' }}",
       "main's nightlies carry migrations a release branch lacks, so a patch upgrades from its line's releases");
+    assert.equal(jobs.gates.with["upgrade-origins"],
+      "${{ startsWith(github.base_ref, 'release/') && 'line' || 'nightly' }}",
+      "a pull request into a release branch upgrades from its line's releases too");
     assert.equal(jobs["nightly-release-evidence"].if, "${{ always() && (github.event_name == 'schedule' || "
       + "((github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main') || "
       + `${releaseDispatch}) }}`, "the release-branch build records the same evidence contract");

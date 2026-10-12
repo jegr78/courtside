@@ -697,6 +697,7 @@ jobs:
     uses: ./.github/workflows/release-gates.yml
     with:
       image-source: artifact
+      upgrade-origins: ${{ startsWith(github.base_ref, 'release/') && 'line' || 'nightly' }}
       upgrade-base: ${{ github.event.pull_request.base.sha }}
       image-artifact: gate-image-${{ github.run_id }}
       image-digest: ${{ needs.gates-image.outputs.image-id }}
