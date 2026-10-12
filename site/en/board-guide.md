@@ -16,7 +16,7 @@ The sidebar leads to the overview at the top and divides administration below it
 | **Club** | Setup, club profile, deadlines and reminders, booking rules |
 | **Facility** | Courts, opening hours, booking cards and slot fillers |
 | **People** | People, accounts, membership types and imports |
-| **Records** | Statistics, data exports, change log and message log |
+| **Records** | Statistics, data exports, change log, message log and operational log |
 
 The same sidebar returns you to the court plan.
 

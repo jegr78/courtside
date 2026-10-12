@@ -18,7 +18,7 @@ Die Seitenleiste führt oben zur Übersicht und ordnet die Verwaltung darunter i
 | **Verein** | Einrichtung, Vereinsprofil, Fristen und Erinnerungen, Buchungsregeln |
 | **Anlage** | Plätze, Öffnungszeiten, Buchungskarten und Platzfüller |
 | **Mitglieder** | Personen, Konten, Mitgliedsarten und Import |
-| **Nachweise** | Statistik, Datenexport, Änderungsprotokoll und Nachrichtenprotokoll |
+| **Nachweise** | Statistik, Datenexport, Änderungsprotokoll, Nachrichtenprotokoll und Betriebsprotokoll |
 
 Über dieselbe Leiste kehrst du zum Platzplan zurück.
 
