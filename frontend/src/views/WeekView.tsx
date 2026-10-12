@@ -19,6 +19,7 @@ import {
   weekDays, zonedDateTime
 } from "../time/clubZone";
 import { hoursOn } from "../time/openingHours";
+import { leavesBookingHours } from "../time/bookingHours";
 import { dateTimeFormatter } from "../time/dateTimeFormatter";
 import { violationMessage } from "../api/problem-message";
 
@@ -238,6 +239,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     for (let index = from; step > 0 ? index <= to : index >= to; index += step) {
       if (!isBookable(courtId, slots[index])) break;
       if (data && exceedsTheBound((span.length + 1) * data.grid.slotMinutes)) break;
+      if (data && eligibility?.bookingHours && leavesBookingHours(slots[index], data.grid.slotMinutes, eligibility.bookingHours)) break;
       span.push(slots[index]);
     }
     return step > 0 ? span : span.reverse();
@@ -525,6 +527,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
       allocations={data.allocations.get(bookingSelection.date) ?? []}
       canChooseSeveralCourts={canChooseSeveralCourts}
       maxBookingMinutes={eligibility?.maxBookingMinutes ?? undefined}
+      bookingHours={eligibility?.bookingHours ?? undefined}
       closed={() => setBookingSelection(undefined)}
       created={async () => {
         setBookingSelection(undefined);

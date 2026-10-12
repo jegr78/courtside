@@ -6,6 +6,7 @@ import {
   type ClubConfig,
   type MembershipType,
   type RuleDefinition,
+  type RuleParameter,
   type RuleSet,
   type RuleType,
   type RuleTypeConfiguration
@@ -364,17 +365,18 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
       {type.parameters.map((parameter) => <p key={parameter.name} className="text-sm">
         <label htmlFor={`rule-${type.ruleType}-${parameter.name}`}>{t(`admin.rules.parameter.${parameter.name}`)}</label>
         {" "}<span id={`rule-${type.ruleType}-${parameter.name}-range`} data-testid={`rule-${type.ruleType}-${parameter.name}-range`} className="text-muted whitespace-nowrap">
-          {t("admin.rules.range", { minimum: parameter.minimum, maximum: parameter.maximum })}
+          {t("admin.rules.range", { minimum: shown(parameter, parameter.minimum), maximum: shown(parameter, parameter.maximum) })}
         </span>
       </p>)}
     </div>
     <div className="flex flex-wrap items-center gap-3">
       {type.parameters.map((parameter) => <input key={parameter.name} id={`rule-${type.ruleType}-${parameter.name}`} data-testid={`rule-${type.ruleType}-${parameter.name}`}
-                                                 aria-describedby={`rule-${type.ruleType}-${parameter.name}-range`} disabled={disabled} type="number"
-                                                 min={parameter.minimum} max={parameter.maximum}
-                                                 className="form-control w-24 max-w-40 rounded-lg border px-3 py-1.5"
-                                                 value={edit.params[parameter.name] ?? ""}
-                                                 onChange={(event) => changed({ applies: true, params: { ...edit.params, [parameter.name]: Number(event.target.value) } })} />)}
+                                                 aria-describedby={`rule-${type.ruleType}-${parameter.name}-range`} disabled={disabled}
+                                                 type={parameter.kind === "TIME_OF_DAY" ? "time" : "number"}
+                                                 min={shown(parameter, parameter.minimum)} max={shown(parameter, parameter.maximum)}
+                                                 className={`form-control ${parameter.kind === "TIME_OF_DAY" ? "w-32" : "w-24"} max-w-40 rounded-lg border px-3 py-1.5`}
+                                                 value={edit.params[parameter.name] === undefined ? "" : shown(parameter, edit.params[parameter.name])}
+                                                 onChange={(event) => changed({ applies: true, params: entered(edit.params, parameter, event.target.value) })} />)}
       <label className="flex items-center gap-2 text-sm font-medium">
         <input data-testid={`rule-${type.ruleType}-applies`} type="checkbox" disabled={disabled} checked={edit.applies}
                onChange={(event) => changed(event.target.checked ? { applies: true, params: stored.params } : { applies: false, params: {} })} />
@@ -383,6 +385,18 @@ function RuleEditor({ type, stored, edit, disabled, changed }: { type: RuleTypeC
     </div>
     {type.parameters.length === 0 && <p data-testid={`rule-${type.ruleType}-description`} className="text-muted text-sm sm:col-span-2">{t(`admin.rules.description.${type.ruleType}`, { defaultValue: "" })}</p>}
   </article>;
+}
+
+function shown(parameter: RuleParameter, value: number): string | number {
+  if (parameter.kind !== "TIME_OF_DAY") return value;
+  return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
+}
+
+function entered(params: Record<string, number>, parameter: RuleParameter, value: string): Record<string, number> {
+  if (parameter.kind !== "TIME_OF_DAY") return { ...params, [parameter.name]: Number(value) };
+  if (value === "") return Object.fromEntries(Object.entries(params).filter(([name]) => name !== parameter.name));
+  const [hours, minutes] = value.split(":").map(Number);
+  return { ...params, [parameter.name]: hours * 60 + minutes };
 }
 
 function GlobalRuleLink({ ruleType }: { ruleType: RuleType }) {

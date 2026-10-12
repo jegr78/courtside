@@ -31,8 +31,8 @@ describe("AdminRuleSetsView", () => {
     vi.spyOn(api, "ruleTypes").mockResolvedValue([
       { ruleType: "OPENING_HOURS", configurable: false, parameters: [] },
       { ruleType: "SLOT_GRID", configurable: false, parameters: [] },
-      { ruleType: "ADVANCE_WINDOW", configurable: true, parameters: [{ name: "maxDays", minimum: 1, maximum: 365 }] },
-      { ruleType: "CANCELLATION_DEADLINE", configurable: true, parameters: [{ name: "minMinutes", minimum: 0, maximum: 525600 }] },
+      { ruleType: "ADVANCE_WINDOW", configurable: true, parameters: [{ name: "maxDays", minimum: 1, maximum: 365, kind: "NUMBER" }] },
+      { ruleType: "CANCELLATION_DEADLINE", configurable: true, parameters: [{ name: "minMinutes", minimum: 0, maximum: 525600, kind: "NUMBER" }] },
       { ruleType: "NO_COURT_BOOKING", configurable: true, parameters: [] }
     ]);
     vi.spyOn(api, "rules").mockResolvedValue([
@@ -219,6 +219,54 @@ describe("AdminRuleSetsView", () => {
     await waitFor(() => expect(setRule).toHaveBeenCalledWith("rule-set", "ADVANCE_WINDOW", { maxDays: 14 }));
     expect(await screen.findByTestId("admin-save-success")).toHaveTextContent("The booking rules were saved.");
     expect(screen.queryByTestId("save-booking-rules")).not.toBeInTheDocument();
+  });
+
+  it("given a rule whose parameters are times of day, when the board sets a window, then it is entered as times and written as minutes after midnight", async () => {
+    // given
+    vi.mocked(api.ruleTypes).mockResolvedValue([
+      { ruleType: "BOOKING_HOURS", configurable: true, parameters: [
+        { name: "earliestStart", minimum: 0, maximum: 1438, kind: "TIME_OF_DAY" },
+        { name: "latestEnd", minimum: 1, maximum: 1439, kind: "TIME_OF_DAY" }
+      ] }
+    ]);
+    vi.mocked(api.rules).mockResolvedValue([]);
+    const setRule = vi.spyOn(api, "setRule").mockResolvedValue({
+      ruleType: "BOOKING_HOURS", params: { earliestStart: 540, latestEnd: 1200 }
+    });
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+    const earliestStart = await screen.findByTestId("rule-BOOKING_HOURS-earliestStart");
+    const latestEnd = screen.getByTestId("rule-BOOKING_HOURS-latestEnd");
+    await waitFor(() => expect(earliestStart).toBeEnabled());
+
+    // when
+    fireEvent.change(earliestStart, { target: { value: "09:00" } });
+    fireEvent.change(latestEnd, { target: { value: "20:00" } });
+    fireEvent.click(screen.getByTestId("save-booking-rules"));
+
+    // then
+    expect(earliestStart, "a board thinks of 20:00, not of 1200").toHaveAttribute("type", "time");
+    expect(screen.getByTestId("rule-BOOKING_HOURS-latestEnd-range")).toHaveTextContent(
+      i18n.t("admin.rules.range", { minimum: "00:01", maximum: "23:59" }));
+    await waitFor(() => expect(setRule).toHaveBeenCalledWith("rule-set", "BOOKING_HOURS", { earliestStart: 540, latestEnd: 1200 }));
+  });
+
+  it("given a stored window, when it arrives, then the inputs show it as times of day", async () => {
+    // given
+    vi.mocked(api.ruleTypes).mockResolvedValue([
+      { ruleType: "BOOKING_HOURS", configurable: true, parameters: [
+        { name: "earliestStart", minimum: 0, maximum: 1438, kind: "TIME_OF_DAY" },
+        { name: "latestEnd", minimum: 1, maximum: 1439, kind: "TIME_OF_DAY" }
+      ] }
+    ]);
+    vi.mocked(api.rules).mockResolvedValue([{ ruleType: "BOOKING_HOURS", params: { earliestStart: 480, latestEnd: 1200 } }]);
+
+    // when
+    render(<MemoryRouter><UnsavedChangesProvider><AdminRuleSetsView configurationChanged={() => undefined} /></UnsavedChangesProvider></MemoryRouter>);
+
+    // then
+    await waitFor(() => expect(screen.getByTestId("rule-BOOKING_HOURS-earliestStart")).toHaveValue("08:00"));
+    expect(screen.getByTestId("rule-BOOKING_HOURS-latestEnd")).toHaveValue("20:00");
+    expect(screen.getByTestId("rule-BOOKING_HOURS-applies")).toBeChecked();
   });
 
   // A rule editor that reads its values from a prop through an effect claims unsaved work for the

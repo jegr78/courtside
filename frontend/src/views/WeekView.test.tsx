@@ -1453,6 +1453,65 @@ it("given no bound is reported, when the dialog opens, then the closing time is 
   expect(screen.getByTestId("booking-duration-hint")).toHaveTextContent(i18n.t("booking.durationHint"));
 });
 
+it("given a rule set limits the booking hours, when the dialog opens inside them, then it names the window and offers nothing past its end", async () => {
+  // given
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], bookingHours: { earliestStart: "08:00:00", latestEnd: "09:00:00" } });
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  const duration = await screen.findByTestId("booking-duration");
+  expect(duration).toContainHTML('value="60"');
+  expect(duration, "a period ending after 09:00 is one the server refuses").not.toContainHTML('value="90"');
+  const hoursBound = screen.getByTestId("booking-hours-bound");
+  expect(hoursBound, "the member reads the window before submitting").toHaveTextContent(
+    i18n.t("booking.hoursBound", { earliestStart: "08:00", latestEnd: "09:00" }));
+  expect(duration.getAttribute("aria-describedby")?.split(" "), "the window describes the list it shortens").toContain(hoursBound.id);
+  expect(screen.getByTestId("booking-submit")).toBeEnabled();
+});
+
+it("given a rule set limits the booking hours, when the dialog opens on a slot outside them, then it says so and refuses to submit", async () => {
+  // given
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], bookingHours: { earliestStart: "09:00:00", latestEnd: "20:00:00" } });
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  const outside = await screen.findByTestId("booking-outside-hours");
+  expect(outside).toHaveTextContent(i18n.t("booking.rule.bookingHours.outside", { earliestStart: "09:00", latestEnd: "20:00" }));
+  expect(screen.getByTestId("booking-submit")).toBeDisabled();
+});
+
+it("given a rule set limits the booking hours, when dragging past their end, then the period stops at the end", async () => {
+  // given
+  vi.mocked(api.bookingEligibility).mockResolvedValue({ violations: [], bookingHours: { earliestStart: "08:00:00", latestEnd: "09:00:00" } });
+  render(<WeekView today={clubInstant("07:00")} />);
+  const start = await findFreeSlot(2, "08:00");
+
+  // when
+  dragAcross(start, [freeSlot(2, "08:30"), freeSlot(2, "09:00"), freeSlot(2, "09:30")]);
+
+  // then
+  expect(await screen.findByTestId("booking-duration"), "a drag silently shortened on release would surprise the member").toHaveValue("60");
+});
+
+it("given no booking hours are reported, when the dialog opens, then no window is claimed", async () => {
+  // given
+  render(<WeekView today={clubInstant("07:00")} />);
+
+  // when
+  await userEvent.click(await findFreeSlot(2, "08:00"));
+
+  // then
+  expect(await screen.findByTestId("booking-duration")).toContainHTML('value="120"');
+  expect(screen.queryByTestId("booking-hours-bound")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("booking-outside-hours")).not.toBeInTheDocument();
+});
+
 it("given the member field, when the dialog opens, then one heading names it", async () => {
   // given
   render(<WeekView today={clubInstant("07:00")} />);
