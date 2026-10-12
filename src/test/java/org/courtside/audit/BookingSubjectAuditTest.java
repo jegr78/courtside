@@ -161,6 +161,34 @@ class BookingSubjectAuditTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenASeriesWhoseFirstOccurrenceWasCancelled_whenBothEntriesShareAPage_thenEachIsDescribed()
+            throws Exception {
+        // given
+        UUID seriesId = bookings.createSeries(backCourt, TRAINING_CARD, LocalDate.of(2026, 5, 14),
+                LocalTime.of(18, 0), 90, 3, administratorAccountId, administratorPersonId, Set.of(Role.ADMIN));
+        UUID firstOccurrence = bookings.firstOccurrenceOf(seriesId);
+        bookings.cancelBooking(firstOccurrence, administratorAccountId, Set.of(Role.ADMIN));
+
+        // when
+        String body = mockMvc.perform(get("/api/admin/audit").param("limit", "100").with(user(administrator)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // then
+        Instant firstStart = LocalDate.of(2026, 5, 14).atTime(18, 0).atZone(CLUB_ZONE).toInstant();
+        TimeSlot firstSlot = new TimeSlot(firstStart, firstStart.plusSeconds(90 * 60));
+        List<String> eventTypes = JsonPath.read(body, "$.entries[*].eventType");
+        int creation = eventTypes.indexOf("booking.series.created");
+        int cancellation = eventTypes.indexOf("booking.booking.cancelled");
+        assertThat((String) JsonPath.read(body, "$.entries[" + creation + "].subjectName"))
+                .as("the series stays described while its first occurrence is on the same page")
+                .isEqualTo("Back Court");
+        assertThat(periodOf(body, creation)).isEqualTo(firstSlot);
+        assertThat((String) JsonPath.read(body, "$.entries[" + cancellation + "].subjectName")).isEqualTo("Back Court");
+        assertThat(periodOf(body, cancellation)).isEqualTo(firstSlot);
+    }
+
+    @Test
     void givenAnEntryAboutABookingNothingResolves_whenItIsRead_thenItCarriesNeitherNameNorPeriod()
             throws Exception {
         // given

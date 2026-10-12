@@ -25,12 +25,19 @@ class BookingSubjectDescriptions implements BookingSubjects {
         if (subjectIds.isEmpty()) {
             return Map.of();
         }
-        Map<UUID, List<BookingSubjectRow>> rowsBySubject = allocations.describeSubjects(subjectIds).stream()
-                .collect(Collectors.groupingBy(BookingSubjectRow::subjectId, LinkedHashMap::new, Collectors.toList()));
         Map<UUID, BookingSubject> described = new LinkedHashMap<>();
-        rowsBySubject.forEach((subjectId, rows) -> described.put(subjectId, new BookingSubject(
-                rows.stream().map(BookingSubjectRow::courtId).distinct().toList(),
-                new TimeSlot(rows.getFirst().startsAt(), rows.getFirst().endsAt()))));
+        described.putAll(subjects(allocations.describeSeriesByFirstOccurrence(subjectIds)));
+        described.putAll(subjects(allocations.describeBookings(subjectIds)));
         return described;
+    }
+
+    private static Map<UUID, BookingSubject> subjects(List<BookingSubjectRow> rows) {
+        Map<UUID, BookingSubject> subjects = new LinkedHashMap<>();
+        rows.stream()
+                .collect(Collectors.groupingBy(BookingSubjectRow::subjectId, LinkedHashMap::new, Collectors.toList()))
+                .forEach((subjectId, subjectRows) -> subjects.put(subjectId, new BookingSubject(
+                        subjectRows.stream().map(BookingSubjectRow::courtId).distinct().toList(),
+                        new TimeSlot(subjectRows.getFirst().startsAt(), subjectRows.getFirst().endsAt()))));
+        return subjects;
     }
 }

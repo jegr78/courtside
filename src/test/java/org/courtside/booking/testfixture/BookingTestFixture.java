@@ -73,6 +73,10 @@ public class BookingTestFixture {
                 List.of(ParticipantSpec.member(namedPersonId)), null));
     }
 
+    public UUID firstOccurrenceOf(UUID seriesId) {
+        return bookings.findConfirmedBySeriesOrderedByStart(seriesId).getFirst().getId();
+    }
+
     // The row a recurring booking leaves behind, without the preview the creation path needs:
     // what an answer about a person reads is this row and not how it was arrived at.
     public UUID recordSeries(UUID courtId, UUID cardId, java.time.LocalDate startsOn,
