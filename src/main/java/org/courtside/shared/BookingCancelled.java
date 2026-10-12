@@ -1,11 +1,13 @@
 package org.courtside.shared;
 
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
 
 @NullMarked
-public record BookingCancelled(UUID bookingId, UUID cancelledByAccountId) implements DomainEventRecord {
+public record BookingCancelled(UUID bookingId, UUID cancelledByAccountId, @Nullable CancellationReason reason)
+        implements DomainEventRecord {
 
     static final String TYPE = "booking.booking.cancelled";
 

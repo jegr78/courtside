@@ -65,7 +65,8 @@ class MessageChoiceControllerTest extends AbstractIntegrationTest {
                         .map(Enum::name).toList());
         assertThat(choices).allMatch(Choice::enabled, "nothing is switched off before anybody chose");
         assertThat(declinable(choices)).containsExactlyInAnyOrder(
-                "BOOKING_CONFIRMED", "BOOKING_PLAYER_WITHDREW", "BOOKING_REMINDER");
+                "BOOKING_CONFIRMED", "BOOKING_PLAYER_WITHDREW", "BOOKING_REMINDER", "BOOKING_CANCELLED",
+                "BOOKING_SERIES_CREATED");
     }
 
     @Test

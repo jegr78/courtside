@@ -14,7 +14,12 @@ public enum MessageKind {
     BOOKING_PLAYER_RECORDED("booking.playerRecorded", false, false),
     BOOKING_PLAYER_WITHDREW("booking.playerWithdrew", true, false),
     BOOKING_DISPLACED("booking.displaced", false, false),
-    BOOKING_REMINDER("booking.reminder", true, false);
+    BOOKING_REMINDER("booking.reminder", true, false),
+    BOOKING_CANCELLED("booking.cancelled", true, false),
+    BOOKING_CANCELLED_BY_CLUB("booking.cancelledByClub", false, false),
+    BOOKING_SERIES_CREATED("booking.seriesCreated", true, false),
+    BOOKING_SERIES_CANCELLED_BY_CLUB("booking.seriesCancelledByClub", false, false),
+    BOOKING_SERIES_MOVED_BY_CLUB("booking.seriesMovedByClub", false, false);
 
     private final String templateKey;
     private final boolean declinable;

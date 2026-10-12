@@ -3,14 +3,20 @@ package org.courtside.notification.internal;
 import lombok.RequiredArgsConstructor;
 import org.courtside.config.ClubIdentity;
 import org.courtside.shared.BookingAnnouncement;
+import org.courtside.shared.CancellationReason;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
+import java.time.format.TextStyle;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 @Component
@@ -30,8 +36,37 @@ class BookingWording {
                 "card", booking.cardLabel());
     }
 
+    // Time, courts and card come from the first occurrence given, which a date moved on its own may not share.
+    Map<String, String> ofSeries(List<BookingAnnouncement> occurrences, Locale locale) {
+        Map<String, String> values = new HashMap<>(of(occurrences.getFirst(), locale));
+        values.put("weekdays", occurrences.stream()
+                .map(occurrence -> ZonedDateTime.ofInstant(occurrence.startsAt(), club.zoneId()).getDayOfWeek())
+                .collect(Collectors.toCollection(TreeSet::new)).stream()
+                .map(weekday -> weekday.getDisplayName(TextStyle.FULL, locale))
+                .collect(Collectors.joining(", ")));
+        values.put("first", day(occurrences.getFirst().startsAt(), locale));
+        values.put("last", day(occurrences.getLast().startsAt(), locale));
+        values.put("count", String.valueOf(occurrences.size()));
+        return values;
+    }
+
+    Map<String, String> previous(Instant startsAt, Instant endsAt, List<BookingAnnouncement.AnnouncedCourt> courts,
+                                 Locale locale) {
+        return Map.of("previousFrom", time(startsAt), "previousTo", time(endsAt),
+                "previousCourts", courtNames(courts, locale));
+    }
+
+    String reason(Optional<CancellationReason> reason, Locale locale) {
+        return templates.render("booking.cancellationReason." + reason.map(Enum::name).orElse("none"),
+                locale, Map.of());
+    }
+
     private String courts(BookingAnnouncement booking, Locale locale) {
-        return booking.courts().stream()
+        return courtNames(booking.courts(), locale);
+    }
+
+    private String courtNames(List<BookingAnnouncement.AnnouncedCourt> courts, Locale locale) {
+        return courts.stream()
                 .map(court -> court.name() == null || court.name().isBlank()
                         ? templates.render("booking.court", locale,
                                 Map.of("number", String.valueOf(court.number())))

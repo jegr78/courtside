@@ -1,6 +1,7 @@
 package org.courtside.booking;
 
 import org.courtside.shared.TimeSlot;
+import org.courtside.shared.CancellationReason;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -60,6 +61,10 @@ public class Booking implements Persistable<UUID> {
     @Column(name = "cancelled_by")
     private UUID cancelledBy;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancellation_reason")
+    private CancellationReason cancellationReason;
+
     @Column(name = "moved_at")
     private Instant movedAt;
 
@@ -116,13 +121,14 @@ public class Booking implements Persistable<UUID> {
         this.remindedAt = null;
     }
 
-    public boolean cancel(UUID cancelledBy, Instant at) {
+    public boolean cancel(UUID cancelledBy, Instant at, CancellationReason reason) {
         if (status == BookingStatus.CANCELLED) {
             return false;
         }
         this.status = BookingStatus.CANCELLED;
         this.cancelledBy = cancelledBy;
         this.cancelledAt = at;
+        this.cancellationReason = reason;
         allocations.forEach(CourtAllocation::cancel);
         return true;
     }

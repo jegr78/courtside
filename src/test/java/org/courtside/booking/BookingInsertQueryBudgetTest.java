@@ -72,7 +72,7 @@ class BookingInsertQueryBudgetTest extends AbstractIntegrationTest {
         // given
         Booking saved = bookings.saveAndFlush(booking);
         UUID actor = UUID.randomUUID();
-        saved.cancel(actor, Instant.parse("2026-04-02T10:00:00Z"));
+        saved.cancel(actor, Instant.parse("2026-04-02T10:00:00Z"), null);
 
         // when
         bookings.saveAndFlush(saved);

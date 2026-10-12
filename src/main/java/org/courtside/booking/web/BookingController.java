@@ -1,5 +1,6 @@
 package org.courtside.booking.web;
 
+import org.courtside.api.ApiCancellationReason;
 import org.courtside.api.ApiAllocation;
 import org.courtside.api.ApiBookingCreated;
 import org.courtside.api.ApiBookingEligibility;
@@ -149,9 +150,9 @@ class BookingController implements BookingsApi {
     }
 
     @Override
-    public ResponseEntity<Void> cancelBooking(UUID id) {
+    public ResponseEntity<Void> cancelBooking(UUID id, ApiCancellationReason reason) {
         UserAccount account = currentUser.requireAccount();
-        bookings.cancel(id, account.getId(), account.getRoles());
+        bookings.cancel(id, account.getId(), account.getRoles(), ApiCancellationReasons.of(reason));
         return ResponseEntity.noContent().build();
     }
 
@@ -239,8 +240,8 @@ class BookingController implements BookingsApi {
         Map<UUID, Long> participantCounts = bookings.participantCountsFor(
                 page.bookings().stream().map(Booking::getId).toList());
         List<ApiManagedAppointment> items = page.bookings().stream()
-                .map(booking -> toManagedAppointment(
-                        booking, cardsById, participantCounts.getOrDefault(booking.getId(), 0L)))
+                .map(booking -> toManagedAppointment(booking, cardsById,
+                        participantCounts.getOrDefault(booking.getId(), 0L), account.getId()))
                 .toList();
         return ResponseEntity.ok(new ApiManagedAppointmentPage(items).nextCursor(page.nextCursor()));
     }
@@ -261,14 +262,15 @@ class BookingController implements BookingsApi {
                 booking.getAllocations().stream().map(CourtAllocation::getCourtId).toList(),
                 WireTypes.toOffsetDateTime(allocation.getStartsAt()),
                 WireTypes.toOffsetDateTime(allocation.getEndsAt()), card.getLabel(), card.getColor(),
-                ApiBookingStatus.fromValue(booking.getStatus().name()), participants.size(), participants)
+                ApiBookingStatus.fromValue(booking.getStatus().name()), participants.size(),
+                account.getId().equals(booking.getBookedBy()), participants)
                 .seriesId(booking.getSeriesId())
                 .note(booking.getNote()));
     }
 
     private ApiManagedAppointment toManagedAppointment(Booking booking,
                                                         Map<UUID, BookingCard> cardsById,
-                                                        long participantCount) {
+                                                        long participantCount, UUID callerAccountId) {
         CourtAllocation allocation = booking.getAllocations().getFirst();
         BookingCard card = cardsById.get(booking.getCardId());
         if (card == null) {
@@ -279,7 +281,8 @@ class BookingController implements BookingsApi {
                 booking.getAllocations().stream().map(CourtAllocation::getCourtId).toList(),
                 WireTypes.toOffsetDateTime(allocation.getStartsAt()),
                 WireTypes.toOffsetDateTime(allocation.getEndsAt()), card.getLabel(), card.getColor(),
-                ApiBookingStatus.fromValue(booking.getStatus().name()), Math.toIntExact(participantCount))
+                ApiBookingStatus.fromValue(booking.getStatus().name()), Math.toIntExact(participantCount),
+                callerAccountId.equals(booking.getBookedBy()))
                 .seriesId(booking.getSeriesId());
     }
 

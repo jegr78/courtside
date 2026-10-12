@@ -222,10 +222,10 @@ class BookingServiceTest extends AbstractIntegrationTest {
         UUID originalActor = UUID.randomUUID();
         Booking booking = new Booking(MEMBER_BOOKING_CARD, someUser, null, SIX_PM);
         booking.allocate(courtId, new TimeSlot(SIX_PM, SEVEN_PM));
-        booking.cancel(originalActor, SEVEN_PM);
+        booking.cancel(originalActor, SEVEN_PM, null);
 
         // when
-        booking.cancel(UUID.randomUUID(), EIGHT_PM);
+        booking.cancel(UUID.randomUUID(), EIGHT_PM, null);
 
         // then
         assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);

@@ -164,6 +164,24 @@ for (const locale of ["de", "en"]) {
     await expectNoWcagViolations(page);
   });
 
+  test(`${locale} the cancel dialog for somebody else's appointment with its reason meets automated WCAG 2.2 AA checks`, async ({ page }) => {
+    // given
+    await page.goto("/");
+    await selectPreference(page, "#locale-preference", locale);
+    await signIn(page, "sport.major");
+    await page.getByTestId("administration-link").click();
+    await expect(page.getByTestId("managed-appointments-page")).toBeVisible({ timeout: 10_000 });
+    const appointment = page.getByTestId("booking-70000000-0000-0000-0000-000000000004");
+
+    // when
+    await appointment.getByTestId("managed-actions").click();
+    await appointment.getByTestId("managed-cancel").click();
+    await expect(page.getByTestId("cancellation-reason")).toBeVisible({ timeout: 10_000 });
+
+    // then
+    await expectNoWcagViolations(page);
+  });
+
   test(`${locale} setup and administration configuration meet automated WCAG 2.2 AA checks`, async ({ page }) => {
     // given
     await page.goto("/");

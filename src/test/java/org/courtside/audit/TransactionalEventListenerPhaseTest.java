@@ -17,11 +17,13 @@ class TransactionalEventListenerPhaseTest {
     private static final List<String> WRITES_IN_THE_COMMITTING_TRANSACTION = List.of(
             "org/courtside/audit/internal/DomainEventWriter.java",
             "org/courtside/notification/internal/BookingMailer.java",
+            "org/courtside/notification/internal/CancellationMailer.java",
             "org/courtside/notification/internal/CredentialMailer.java",
             "org/courtside/notification/internal/DisplacementMailer.java",
             "org/courtside/notification/internal/ParticipationMailer.java",
             "org/courtside/notification/internal/PasswordResetCodeMailer.java",
             "org/courtside/notification/internal/ReminderMailer.java",
+            "org/courtside/notification/internal/SeriesMailer.java",
             "org/courtside/notification/internal/UsernameReminderMailer.java");
 
     @Test

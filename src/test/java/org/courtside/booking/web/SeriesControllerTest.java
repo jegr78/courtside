@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -64,6 +65,9 @@ class SeriesControllerTest extends AbstractIntegrationTest {
     @Autowired
     private BookingSeriesRepository series;
 
+    @Autowired
+    private JdbcClient jdbc;
+
     private UUID courtId;
     private UUID trainerPersonId;
 
@@ -80,6 +84,8 @@ class SeriesControllerTest extends AbstractIntegrationTest {
         identity.createAccount(trainer, "trainer.john", Set.of(Role.TRAINER));
         UUID member = identity.createPerson("Jane", "Doe", "jane@example.org");
         identity.createAccount(member, "doe.jane", Set.of(Role.MEMBER));
+        identity.createAccount(identity.createPerson("Richard", "Miles", "richard@example.org"), "miles.richard",
+                Set.of(Role.ADMIN));
     }
 
     @Test
@@ -238,6 +244,52 @@ class SeriesControllerTest extends AbstractIntegrationTest {
                         .param("scope", "WHOLE_SERIES")
                         .with(csrf()))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void givenATrainersSeries_whenAnAdminCancelsItNamingAReason_thenEveryOccurrenceKeepsTheReason() throws Exception {
+        // given
+        String created = createSeriesAs("trainer.john");
+        UUID seriesId = UUID.fromString(JsonPath.read(created, "$.seriesId"));
+        UUID firstBookingId = UUID.fromString(JsonPath.<List<String>>read(created, "$.bookingIds").getFirst());
+
+        // when
+        mockMvc.perform(delete("/api/booking-series/{id}", seriesId)
+                        .param("fromBookingId", firstBookingId.toString())
+                        .param("scope", "WHOLE_SERIES")
+                        .param("reason", "WEATHER")
+                        .with(user("miles.richard").roles("ADMIN"))
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // then
+        assertThat(jdbc.sql("SELECT DISTINCT cancellation_reason FROM booking WHERE series_id = :seriesId")
+                .param("seriesId", seriesId).query(String.class).list())
+                .containsExactly("WEATHER");
+    }
+
+    @Test
+    @WithMockUser(username = "trainer.john", roles = "TRAINER")
+    void givenAnOwnedSeries_whenTheHolderNamesAReason_thenTheReasonIsRefusedAndNothingIsCancelled() throws Exception {
+        // given
+        String created = createSeriesAs("trainer.john");
+        UUID seriesId = UUID.fromString(JsonPath.read(created, "$.seriesId"));
+        UUID firstBookingId = UUID.fromString(JsonPath.<List<String>>read(created, "$.bookingIds").getFirst());
+
+        // when
+        mockMvc.perform(delete("/api/booking-series/{id}", seriesId)
+                        .param("fromBookingId", firstBookingId.toString())
+                        .param("scope", "WHOLE_SERIES")
+                        .param("reason", "WEATHER")
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("urn:courtside:error:cancellation-reason-not-allowed"))
+                .andExpect(jsonPath("$.violations[0].code").value("booking.cancellationReason.ownBooking"));
+
+        // then
+        assertThat(jdbc.sql("SELECT count(*) FROM booking WHERE series_id = :seriesId AND status = 'CANCELLED'")
+                .param("seriesId", seriesId).query(Long.class).single())
+                .isZero();
     }
 
     @Test

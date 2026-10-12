@@ -11,11 +11,15 @@ final class AnnouncedBooking {
     }
 
     static BookingAnnouncement current(BookingAnnouncer bookings, UUID bookingId) {
-        BookingAnnouncement booking = bookings.describe(bookingId)
-                .orElseThrow(() -> new MessageUndeliverableException("BookingGone"));
+        BookingAnnouncement booking = existing(bookings, bookingId);
         if (booking.cancelled()) {
             throw new MessageUndeliverableException("BookingCancelled");
         }
         return booking;
+    }
+
+    static BookingAnnouncement existing(BookingAnnouncer bookings, UUID bookingId) {
+        return bookings.describe(bookingId)
+                .orElseThrow(() -> new MessageUndeliverableException("BookingGone"));
     }
 }

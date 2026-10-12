@@ -463,6 +463,28 @@ it("given a series occurrence, when cancelling following occurrences, then ids a
   )).resolves.toBeUndefined();
 });
 
+it("given a reason, when cancelling a booking and a series, then the code travels as a query parameter", async () => {
+  // given
+  const reasons: (string | null)[] = [];
+  server.use(
+    http.delete("/api/bookings/33333333-3333-3333-3333-333333333333", ({ request }) => {
+      reasons.push(new URL(request.url).searchParams.get("reason"));
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.delete("/api/booking-series/11111111-1111-1111-1111-111111111111", ({ request }) => {
+      reasons.push(new URL(request.url).searchParams.get("reason"));
+      return new HttpResponse(null, { status: 204 });
+    }));
+
+  // when
+  await api.cancelBooking("33333333-3333-3333-3333-333333333333", "MAINTENANCE");
+  await api.cancelSeries("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "THIS", "WEATHER");
+  await api.cancelBooking("33333333-3333-3333-3333-333333333333");
+
+  // then
+  expect(reasons).toEqual(["MAINTENANCE", "WEATHER", null]);
+});
+
 it("given a scoped move, when previewing it, then the language-neutral request is posted", async () => {
   // given
   const move = {

@@ -109,6 +109,7 @@ export type ManagedAppointmentPage = components["schemas"]["ManagedAppointmentPa
 export type ManagedAppointmentDetail = components["schemas"]["ManagedAppointmentDetail"];
 export type ManagedAppointmentView = components["schemas"]["ManagedAppointmentView"];
 export type CancelScope = components["schemas"]["CancelScope"];
+export type CancellationReason = components["schemas"]["CancellationReason"];
 export type MoveRequest = components["schemas"]["MoveRequest"];
 export type MovePreview = components["schemas"]["MovePreview"];
 export type MoveExecuted = components["schemas"]["MoveExecuted"];
@@ -614,7 +615,9 @@ export const api = {
     body: JSON.stringify(booking)
   }),
   bookingEligibility: () => request<BookingEligibility>("/api/booking-eligibility"),
-  cancelBooking: (bookingId: string) => request<void>(`/api/bookings/${bookingId}`, { method: "DELETE" }),
+  cancelBooking: (bookingId: string, reason?: CancellationReason) => request<void>(
+    `/api/bookings/${bookingId}?${new URLSearchParams(reason ? { reason } : {})}`, { method: "DELETE" }
+  ),
   personalBookings: (options: { view?: PersonalBookingView; cursor?: string; limit?: number } = {}) => request<PersonalBookingPage>(
     `/api/my/bookings?${new URLSearchParams({
       limit: String(options.limit ?? 50),
@@ -648,8 +651,8 @@ export const api = {
   createSeries: (series: CreateSeriesRequest) => request<SeriesCreated>("/api/booking-series", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(series)
   }),
-  cancelSeries: (seriesId: string, fromBookingId: string, scope: CancelScope) => request<void>(
-    `/api/booking-series/${seriesId}?${new URLSearchParams({ fromBookingId, scope })}`,
+  cancelSeries: (seriesId: string, fromBookingId: string, scope: CancelScope, reason?: CancellationReason) => request<void>(
+    `/api/booking-series/${seriesId}?${new URLSearchParams({ fromBookingId, scope, ...(reason ? { reason } : {}) })}`,
     { method: "DELETE" }
   ),
   previewSeriesMove: (seriesId: string, move: MoveRequest) => request<MovePreview>(

@@ -1,0 +1,30 @@
+ALTER TABLE booking
+    ADD COLUMN cancellation_reason text,
+    ADD CONSTRAINT booking_cancellation_reason_known CHECK (
+        cancellation_reason IN ('COURT_CONDITION', 'WEATHER', 'CLUB_EVENT', 'MAINTENANCE', 'OTHER')),
+    ADD CONSTRAINT booking_cancellation_reason_only_when_cancelled CHECK (
+        cancellation_reason IS NULL OR status = 'CANCELLED');
+
+ALTER TABLE message_record
+    DROP CONSTRAINT message_record_kind_known,
+    ADD CONSTRAINT message_record_kind_known CHECK (
+        kind IN ('CREDENTIALS_NEW_ACCOUNT', 'CREDENTIALS_PASSWORD_RESET', 'BOOKING_CONFIRMED',
+                 'BOOKING_PLAYER_RECORDED', 'BOOKING_PLAYER_WITHDREW', 'BOOKING_DISPLACED',
+                 'BOOKING_REMINDER', 'ACCOUNT_USERNAME_REMINDER', 'ACCOUNT_PASSWORD_RESET_CODE',
+                 'BOOKING_CANCELLED', 'BOOKING_CANCELLED_BY_CLUB', 'BOOKING_SERIES_CREATED',
+                 'BOOKING_SERIES_CANCELLED_BY_CLUB', 'BOOKING_SERIES_MOVED_BY_CLUB'));
+
+ALTER TABLE notification
+    DROP CONSTRAINT notification_kind_known,
+    ADD CONSTRAINT notification_kind_known CHECK (
+        kind IN ('CREDENTIALS_NEW_ACCOUNT', 'CREDENTIALS_PASSWORD_RESET', 'BOOKING_CONFIRMED',
+                 'BOOKING_PLAYER_RECORDED', 'BOOKING_PLAYER_WITHDREW', 'BOOKING_DISPLACED',
+                 'BOOKING_REMINDER', 'ACCOUNT_USERNAME_REMINDER', 'ACCOUNT_PASSWORD_RESET_CODE',
+                 'BOOKING_CANCELLED', 'BOOKING_CANCELLED_BY_CLUB', 'BOOKING_SERIES_CREATED',
+                 'BOOKING_SERIES_CANCELLED_BY_CLUB', 'BOOKING_SERIES_MOVED_BY_CLUB'));
+
+ALTER TABLE message_optout
+    DROP CONSTRAINT message_optout_kind_declinable,
+    ADD CONSTRAINT message_optout_kind_declinable CHECK (
+        kind IN ('BOOKING_CONFIRMED', 'BOOKING_PLAYER_WITHDREW', 'BOOKING_REMINDER',
+                 'BOOKING_CANCELLED', 'BOOKING_SERIES_CREATED'));

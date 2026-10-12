@@ -1,6 +1,7 @@
 package org.courtside.notification.internal;
 
 import org.courtside.notification.MessageKind;
+import org.courtside.shared.CancellationReason;
 import org.junit.jupiter.api.Test;
 
 import java.util.Locale;
@@ -31,7 +32,11 @@ class MailTemplatesTest {
             entry("expiresOn", "1 May 2026"), entry("day", "Wednesday, 13 May 2026"),
             entry("from", "18:00"), entry("to", "19:00"), entry("courts", "Court 1"),
             entry("card", "Member booking"), entry("player", "John Roe"),
-            entry("closure", "A court your booking is on has been taken out of service"));
+            entry("closure", "A court your booking is on has been taken out of service"),
+            entry("weekdays", "Tuesday"), entry("first", "Tuesday, 19 May 2026"),
+            entry("last", "Tuesday, 2 June 2026"), entry("count", "3"),
+            entry("reason", "Reason: the weather."), entry("previousFrom", "17:00"), entry("previousTo", "19:00"),
+            entry("previousCourts", "Court 2"));
 
     private final MailTemplates templates = new MailTemplates();
 
@@ -43,6 +48,20 @@ class MailTemplatesTest {
 
         // then
         assertThat(german).isEqualTo(english).containsAll(KEYS);
+    }
+
+    @Test
+    void givenEveryCancellationReason_whenRenderedInEitherLocale_thenEachHasItsOwnSentence() {
+        // when / then
+        for (Locale locale : new Locale[] {Locale.GERMAN, Locale.ENGLISH}) {
+            Set<String> sentences = Stream.concat(Stream.of(CancellationReason.values()).map(Enum::name),
+                            Stream.of("none"))
+                    .map(code -> templates.render("booking.cancellationReason." + code, locale, Map.of()))
+                    .collect(Collectors.toSet());
+            assertThat(sentences).as("one distinct sentence per code and one for none in %s", locale)
+                    .hasSize(CancellationReason.values().length + 1)
+                    .allSatisfy(sentence -> assertThat(sentence).isNotBlank().doesNotContain("{"));
+        }
     }
 
     @Test

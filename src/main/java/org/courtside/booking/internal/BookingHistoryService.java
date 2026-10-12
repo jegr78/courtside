@@ -27,7 +27,8 @@ public class BookingHistoryService implements PersonBookingHistory {
         requireIdentifier(accountId, "account");
         return bookings.findByBookedByOrderByCreatedAtAscIdAsc(accountId).stream()
                 .map(booking -> new Made(booking.getId(), booking.getCreatedAt(), booking.getStatus(),
-                        booking.getCancelledAt(), booking.getNote(), reservationsOf(booking)))
+                        booking.getCancelledAt(), booking.getCancellationReason(), booking.getNote(),
+                        reservationsOf(booking)))
                 .toList();
     }
 

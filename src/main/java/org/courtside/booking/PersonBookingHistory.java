@@ -1,5 +1,7 @@
 package org.courtside.booking;
 
+import org.courtside.shared.CancellationReason;
+
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,7 +16,7 @@ public interface PersonBookingHistory {
     }
 
     record Made(UUID bookingId, Instant createdAt, BookingStatus status, Instant cancelledAt,
-                String note, List<Reservation> reservations) {
+                CancellationReason cancellationReason, String note, List<Reservation> reservations) {
 
         public Made {
             reservations = List.copyOf(reservations);

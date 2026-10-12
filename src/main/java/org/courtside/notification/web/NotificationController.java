@@ -1,6 +1,7 @@
 package org.courtside.notification.web;
 
 import lombok.RequiredArgsConstructor;
+import org.courtside.api.ApiCancellationReason;
 import org.courtside.api.AccountNotificationsApi;
 import org.courtside.api.ApiMessageKind;
 import org.courtside.api.ApiNotification;
@@ -45,7 +46,9 @@ class NotificationController implements AccountNotificationsApi {
                 WireTypes.toOffsetDateTime(entry.createdAt()), link)
                 .readAt(WireTypes.toOffsetDateTime(entry.readAt()))
                 .booking(entry.booking() == null ? null : toResponse(entry.booking()))
-                .closure(entry.closure() == null ? null : ApiNotificationClosure.fromValue(entry.closure().name()));
+                .closure(entry.closure() == null ? null : ApiNotificationClosure.fromValue(entry.closure().name()))
+                .cancellationReason(entry.cancellationReason() == null ? null
+                        : ApiCancellationReason.fromValue(entry.cancellationReason().name()));
     }
 
     private static ApiNotificationBooking toResponse(BookingAnnouncement booking) {

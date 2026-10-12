@@ -293,7 +293,7 @@ it("given a series occurrence, when cancelling this and following, then the seri
   await userEvent.click(screen.getByTestId("confirm-cancellation"));
 
   // then
-  await waitFor(() => expect(api.cancelSeries).toHaveBeenCalledWith(seriesId, upcomingId, "THIS_AND_FOLLOWING"));
+  await waitFor(() => expect(api.cancelSeries).toHaveBeenCalledWith(seriesId, upcomingId, "THIS_AND_FOLLOWING", undefined));
   expect(screen.getByRole("status")).toHaveTextContent("Booking cancelled.");
 });
 

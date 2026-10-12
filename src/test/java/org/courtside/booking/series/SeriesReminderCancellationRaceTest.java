@@ -96,7 +96,7 @@ class SeriesReminderCancellationRaceTest extends AbstractIntegrationTest {
 
         Callable<Void> cancelTheSeries = () -> {
             seriesService.cancel(series.seriesId(), bookingIds.getFirst(), CancelScope.WHOLE_SERIES,
-                    trainer, Set.of(Role.TRAINER));
+                    trainer, Set.of(Role.TRAINER), null);
             return null;
         };
         Callable<Void> runTheReminderSweep = () -> {
@@ -161,7 +161,7 @@ class SeriesReminderCancellationRaceTest extends AbstractIntegrationTest {
                 awaitAnotherSessionBlockedOnALock();
             }
             return answer;
-        }).when(occurrenceCancellation).cancelOccurrence(any(), any(), any());
+        }).when(occurrenceCancellation).cancelOccurrence(any(), any(), any(), any());
     }
 
     private void awaitAnotherSessionBlockedOnALock() {

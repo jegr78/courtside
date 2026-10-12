@@ -200,6 +200,10 @@ Until its date, the cancelled booking sits in the folded section of cancelled bo
 upcoming ones, so it never pushes a booking that still stands down the list. After its date you
 find it among your past bookings.
 
+Members recorded as players in the booking learn of the cancellation. If the club cancels your
+booking, you learn of it as well. If the club chose a reason, the message names it. Otherwise ask
+the club.
+
 ![Upcoming bookings with the cancellation button, the past ones folded away below them.](../screenshots/en/my-bookings.png)
 
 ## Series
@@ -215,6 +219,8 @@ Keep these rules in mind:
   *Whole series*.
 * Before a move, Courtside shows the affected bookings and any conflicts.
 * A series contains no player list. It appears as occupied time in the court plan.
+* Once the series exists, you receive one summary of it instead of a confirmation per date.
+* If the club cancels or moves dates of your series, you receive one message covering all of them.
 
 ![The series form with courts, booking type, period and weekdays.](../screenshots/en/series-form.png)
 
@@ -239,7 +245,9 @@ Below the list you choose what you receive. You can disable:
 
 * booking confirmations,
 * reminders before a booking,
-* messages when somebody withdraws from your booking.
+* messages when somebody withdraws from your booking,
+* messages that the member who booked cancelled a booking you were recorded in,
+* the summary of a new series.
 
 A disabled message no longer reaches you at all, neither here nor by email.
 
@@ -247,12 +255,14 @@ Courtside always sends:
 
 * credentials for a new or reset account,
 * notice that somebody added you as a player,
-* notice of a change that affects your booking.
+* notice of a change that affects your booking,
+* notice that the club cancelled a booking that concerns you,
+* notice that the club cancelled or moved dates of your series.
 
-Separately, you choose whether you also get an email. Without email your messages still appear
-here. You then learn only here that somebody added you as a player or that a change affects your
-booking. Courtside always emails credentials, your username and reset codes, because you are not
-signed in when you need them.
+Separately, you choose whether you also get an email. Without email your messages still appear here.
+You then learn only here that somebody added you as a player, that a change affects your booking or
+that the club cancelled one. Courtside always emails credentials, your username and reset codes,
+because you are not signed in when you need them.
 
 Save your choices. They apply to future messages only.
 

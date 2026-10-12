@@ -8,6 +8,7 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,6 +30,7 @@ import org.courtside.booking.internal.BookingNotFoundException;
 import org.courtside.booking.internal.BookingRuleGate;
 import org.courtside.booking.internal.CardEligibilityPolicy;
 import org.courtside.booking.internal.CourtAllocationRepository;
+import org.courtside.booking.internal.CancellationReasonNotAllowedException;
 import org.courtside.booking.internal.CourtOccupancy;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantCardCapacity;
@@ -40,6 +42,7 @@ import org.courtside.config.ClubTimeZone;
 import org.courtside.facility.FacilityService;
 import org.courtside.identity.Role;
 import org.courtside.rules.RuleViolation;
+import org.courtside.shared.CancellationReason;
 import org.courtside.shared.SeriesCancelled;
 import org.courtside.shared.SeriesCreated;
 import org.courtside.shared.SeriesMoved;
@@ -200,20 +203,23 @@ public class SeriesService {
 
     @Transactional
     public int cancel(UUID seriesId, UUID fromBookingId, CancelScope scope,
-                      UUID cancelledBy, Set<Role> cancellerRoles) {
+                      UUID cancelledBy, Set<Role> cancellerRoles, CancellationReason reason) {
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
-        lockSeries(seriesId);
+        BookingSeries series = lockSeries(seriesId);
         bookingRepository.lockBySeriesId(seriesId);
         discardPreLockState();
         requireManagementAccessTo(seriesId, fromBookingId, cancelledBy, cancellerRoles);
+        if (reason != null && cancelledBy.equals(series.getCreatedBy())) {
+            throw new CancellationReasonNotAllowedException();
+        }
 
         List<UUID> affected = affectedBookings(seriesId, fromBookingId, scope).stream()
                 .map(Booking::getId)
                 .toList();
         affected.forEach(bookingId ->
-                occurrences.cancelOccurrence(bookingId, cancelledBy, cancellerRoles));
+                occurrences.cancelOccurrence(bookingId, cancelledBy, cancellerRoles, reason));
         if (!affected.isEmpty()) {
-            events.publishEvent(new SeriesCancelled(seriesId, affected, cancelledBy));
+            events.publishEvent(new SeriesCancelled(seriesId, affected, cancelledBy, reason));
         }
         return affected.size();
     }
@@ -294,6 +300,14 @@ public class SeriesService {
                     movingIds, targets);
         });
 
+        MovePreview.Move earliest = preview.moves().stream()
+                .min(Comparator.comparing(move -> move.from().start()))
+                .orElse(null);
+        List<UUID> previousCourts = earliest == null ? List.of() : executions.stream()
+                .filter(execution -> execution.booking().getId().equals(earliest.bookingId()))
+                .findFirst()
+                .map(execution -> currentCourtsOf(execution.booking()))
+                .orElse(List.of());
         executions.forEach(execution -> execution.booking().clearAllocations());
         bookingRepository.flush();
 
@@ -309,8 +323,9 @@ public class SeriesService {
             }
             throw e;
         }
-        if (!movingIds.isEmpty()) {
-            events.publishEvent(new SeriesMoved(request.seriesId(), movingIds, movedBy));
+        if (earliest != null) {
+            events.publishEvent(new SeriesMoved(request.seriesId(), movingIds, movedBy,
+                    earliest.from().start(), earliest.from().end(), previousCourts));
         }
         return executions.size();
     }
@@ -419,8 +434,8 @@ public class SeriesService {
         }
     }
 
-    private void lockSeries(UUID seriesId) {
-        seriesRepository.findForUpdateById(seriesId)
+    private BookingSeries lockSeries(UUID seriesId) {
+        return seriesRepository.findForUpdateById(seriesId)
                 .orElseThrow(() -> new SeriesNotFoundException("No booking series with id " + seriesId));
     }
 

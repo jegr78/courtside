@@ -12,6 +12,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.testfixture.NotificationTestFixture;
+import org.courtside.shared.CancellationReason;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterEach;
@@ -147,6 +148,39 @@ class NotificationControllerTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.items[0].booking.startsAt").value("2026-05-12T16:00:00Z"))
                 .andExpect(jsonPath("$.items[0].booking.cardLabel").exists())
                 .andExpect(jsonPath("$.items[0].link.bookingId").value(janesBooking.toString()));
+    }
+
+    @Test
+    void givenABookingTheClubCancelledForAReason_whenThePlayerReadsTheCentre_thenTheEntryNamesTheReason()
+            throws Exception {
+        // given
+        UUID janesBooking = bookNaming(johnPersonId, SIX_PM, SEVEN_PM);
+        UUID board = identity.createEnabledAccount(identity.createPerson("Richard", "Miles"), "miles.richard",
+                Set.of(Role.ADMIN));
+
+        // when
+        bookings.cancel(janesBooking, board, Set.of(Role.ADMIN), CancellationReason.COURT_CONDITION);
+
+        // then
+        mockMvc.perform(get("/api/account/notifications").with(as("roe.john")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].kind").value("BOOKING_CANCELLED_BY_CLUB"))
+                .andExpect(jsonPath("$.items[0].cancellationReason").value("COURT_CONDITION"))
+                .andExpect(jsonPath("$.items[0].booking.cancelled").value(true))
+                .andExpect(jsonPath("$.items[0].link.bookingId").value(janesBooking.toString()));
+    }
+
+    @Test
+    void givenAnEntryStoredWithAnUnknownReasonCode_whenTheCentreIsRead_thenItNamesNoReason() throws Exception {
+        // given
+        UUID janesBooking = bookNaming(johnPersonId, SIX_PM, SEVEN_PM);
+        notifications.notifyCancelled(johnAccountId, janesBooking, "RAIN", Instant.parse("2026-05-12T12:00:00Z"));
+
+        // when / then
+        mockMvc.perform(get("/api/account/notifications").with(as("roe.john")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].kind").value("BOOKING_CANCELLED_BY_CLUB"))
+                .andExpect(jsonPath("$.items[0].cancellationReason").doesNotExist());
     }
 
     @Test
