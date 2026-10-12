@@ -637,7 +637,7 @@ input[type="time"] {
   }
 
   .day-plan-allocation {
-    padding: 0.25rem;
+    padding: 0.25rem 0.125rem;
     overflow: hidden;
     font-size: 0.75rem;
     line-height: 1.2;
@@ -645,6 +645,10 @@ input[type="time"] {
 
   .day-plan-allocation-extent {
     inset: 0.125rem;
+  }
+
+  .day-plan-allocation-name {
+    gap: 0.125rem;
   }
 
   .day-plan-allocation-full,

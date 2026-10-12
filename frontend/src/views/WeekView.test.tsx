@@ -81,7 +81,7 @@ beforeEach(async () => {
     startsAt: "2026-08-10T18:00:00+02:00",
     endsAt: "2026-08-10T19:00:00+02:00",
     cardLabel: "Member booking",
-    cardColor: "#176b55",
+    cardColor: "#999999",
     ownBooking: false,
     showGenericOccupancy: true,
     participantCount: 2
@@ -120,7 +120,7 @@ it("given the current week, when it loads, then every day and active court is av
   expect(screen.getByTestId("slot-heading-12:00")).toHaveTextContent("12:00");
   expect(screen.getByTestId("slot-heading-21:30")).toHaveTextContent("21:30");
   const booking = screen.getByTestId("allocation");
-  expect(booking).toHaveStyle({ backgroundColor: "rgb(23, 107, 85)" });
+  expect(booking).toHaveStyle({ backgroundColor: "rgb(153, 153, 153)" });
   expect(booking).toHaveAttribute("data-state", "occupied");
   expect(booking.closest("td")).toHaveAttribute("rowspan", "2");
   expect(screen.getByTestId("slot-heading-12:00").closest("tr")).toHaveStyle({ "--slot-height": "40px" });
@@ -866,7 +866,7 @@ it("given an own booking, a league match and another member's booking, when the 
     startsAt: "2026-08-10T14:00:00+02:00",
     endsAt: "2026-08-10T15:00:00+02:00",
     cardLabel: "Member booking",
-    cardColor: "#176b55",
+    cardColor: "#999999",
     ownBooking: false,
     showGenericOccupancy: true,
     participantCount: 2
@@ -917,6 +917,49 @@ it("given an own booking on a card that names its kind, when the plan is shown, 
   expect(within(own).getByTestId("own-marker")).toBeInTheDocument();
   expect(within(own).getByTestId("allocation-short-label").textContent).toBe("Tra");
   expect(own).toHaveAccessibleName("You, Training, 6:00 PM – 7:00 PM, cancel booking");
+});
+
+it("given cards that share a long first word, when the plan is shown, then each booking shows a distinct code that its accessible name contains", async () => {
+  // given
+  vi.mocked(api.bookingCardLegend).mockResolvedValue([
+    { id: "a1111111-1111-1111-1111-111111111111", label: "Training Herren", color: "#34584a", showGenericOccupancy: false },
+    { id: "a2222222-2222-2222-2222-222222222222", label: "Training Damen", color: "#3a4a5c", showGenericOccupancy: false }
+  ]);
+  vi.mocked(api.allocations).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    bookingId: "44444444-4444-4444-4444-444444444444",
+    courtId: courts[0].id,
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    cardLabel: "Training Herren",
+    cardColor: "#34584a",
+    ownBooking: false,
+    showGenericOccupancy: false,
+    participantCount: null
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  const allocation = await screen.findByTestId("allocation");
+  expect(within(allocation).getByTestId("allocation-short-label").textContent).toBe("TrH");
+  expect(allocation, "the visible code is part of the accessible name").toHaveAccessibleName("Training Herren (TrH), 6:00 PM – 7:00 PM");
+  expect(screen.getByTestId("legend-card-a2222222-2222-2222-2222-222222222222").textContent).toBe("TrD");
+});
+
+it("given a card that begins with the viewer word, when the plan is shown, then its code differs from the own booking's", async () => {
+  // given
+  vi.mocked(api.bookingCardLegend).mockResolvedValue([
+    { id: "a1111111-1111-1111-1111-111111111111", label: "Youth training", color: "#34584a", showGenericOccupancy: false }
+  ]);
+  vi.mocked(api.allocations).mockResolvedValue([]);
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  expect((await screen.findByTestId("legend-card-a1111111-1111-1111-1111-111111111111")).textContent,
+    "an own booking reads You, so a card must not").toBe("Yout");
 });
 
 it("given a past own booking on a card that names its kind, when the plan is shown, then its accessible name says it is the viewer's", async () => {

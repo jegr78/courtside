@@ -189,7 +189,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     : new Map<string, number>(), [data, currentInstant, allocationBoundaries, weekSlotGeometry]);
   const hasCourts = (data?.courts.length ?? 0) > 0;
   const shortLabelOf = useMemo(() => shortLabels(data
-    ? [t("week.occupied"), ...legendCards(data).map((card) => card.label)] : []), [data, t]);
+    ? [t("booking.viewer"), t("week.occupied"), ...legendCards(data).map((card) => card.label)] : []), [data, t]);
   const days = loadedDays ?? [];
   const renderedWeekStart = days[0] ? formatDate(days[0]) : undefined;
   const selectedAllocations = useMemo(() => selectedDate ? data?.allocations.get(selectedDate) ?? [] : [],
@@ -666,7 +666,8 @@ function renderCell(
     const shortLabel = allocation.ownBooking && allocation.showGenericOccupancy ? t("booking.viewer")
       : shortLabelOf.get(allocation.showGenericOccupancy ? t("week.occupied") : allocation.cardLabel) ?? label;
     const period = formatBookingTimeRange(allocation.startsAt, allocation.endsAt, locale, timeZone);
-    const spokenLabel = allocation.ownBooking && !allocation.showGenericOccupancy ? `${t("booking.viewer")}, ${label}` : label;
+    const ownLabel = allocation.ownBooking && !allocation.showGenericOccupancy ? `${t("booking.viewer")}, ${label}` : label;
+    const spokenLabel = ownLabel.toLocaleLowerCase().includes(shortLabel.toLocaleLowerCase()) ? ownLabel : `${ownLabel} (${shortLabel})`;
     const className = "day-plan-allocation h-full w-full rounded-md px-3 py-2 text-left font-semibold";
     const state = allocation.ownBooking ? "own" : allocation.showGenericOccupancy ? "occupied" : "card";
     const style = allocation.ownBooking
@@ -678,7 +679,7 @@ function renderCell(
         <span data-testid="allocation-label" className="day-plan-allocation-full">{label}</span>
         <span data-testid="allocation-short-label" className="day-plan-allocation-short">{shortLabel}</span>
       </span>
-      <span className="day-plan-allocation-period block text-xs">{period}</span>
+      <span data-testid="allocation-period" className="day-plan-allocation-period block text-xs">{period}</span>
     </span>;
     return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className={`${cellClass} day-plan-allocation-cell p-2 align-top`}>
       <span data-testid="allocation-extent" aria-hidden="true" className="day-plan-allocation-extent" style={{ backgroundColor: style.backgroundColor }} />
