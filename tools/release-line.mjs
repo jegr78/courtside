@@ -69,10 +69,13 @@ function commitsBetween(git, from, to) {
     });
 }
 
+const nestedCommitPattern = /\r?\n\r?\n(?=(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\(.*?\))?: )/;
+
 function released(message, releasable) {
-  const header = headerPattern.exec(message);
-  return header !== null && (releasable.has(header[1]) || header[2] === "!"
-    || /^BREAKING[ -]CHANGE: /m.test(message));
+  return message.split(nestedCommitPattern).some((part) => {
+    const header = headerPattern.exec(part);
+    return header !== null && (releasable.has(header[1]) || header[2] === "!" || /^BREAKING[ -]CHANGE: /m.test(part));
+  });
 }
 
 export function forwardPortVerdict({ git, baseRef, headRef, mainRef, releasable }) {

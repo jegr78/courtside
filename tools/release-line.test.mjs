@@ -332,3 +332,28 @@ test("given a branch named like the release tag, when the forward port is checke
     repository.remove();
   }
 });
+
+test("given a commit whose body release-please splits into a fix, when the forward port is checked, then the fix needs a port",
+  () => {
+    // given
+    const repository = releasedLine();
+    const { git, commit } = repository;
+    try {
+      git("switch", "--quiet", "main");
+      git("cherry-pick", "-x", repository.fix);
+      git("switch", "--quiet", "release/0.1");
+      const nested = commit("ci: tidy the workflow\n\nfix: correct the closing hours sentence", "close.txt");
+      const bulleted = commit("ci: tidy the workflow again\n\n* fix: an earlier commit of this branch", "tidy.txt");
+
+      // when
+      const verdict = forwardPortVerdict({ git, baseRef: "release/0.1", headRef: "release/0.1", mainRef: "main",
+        releasable });
+
+      // then
+      assert.deepEqual(verdict.missing, [`${nested} ci: tidy the workflow`],
+        "release-please 17.6 lists a paragraph starting with fix: as its own entry, a bulleted squash line it does not");
+      assert.ok(!verdict.missing.some((entry) => entry.startsWith(bulleted)));
+    } finally {
+      repository.remove();
+    }
+  });
