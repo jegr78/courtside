@@ -527,7 +527,7 @@ A cancelled booking is announced to its holder and its players, except the accou
 it. When the holder cancels, the message says the booking is gone. When anybody else cancels, an
 administrator or an account the card lets manage it, the message says the club cancelled it. Neither
 names the person who acted. The product records no reason for a cancellation, so the club's message
-refers the member to the club. Cancelling or moving a series sends nothing yet.
+refers the member to the club. Cancelling or moving a series sends nothing.
 
 Each message is a `message_record` with account, kind, `Message-ID`, time and state. The states are
 `queued`, `handed_over`, `refused` and `failed`. `handed_over` means the relay accepted the message,
@@ -572,7 +572,8 @@ Credentials, displacement, participant-addition and club-cancellation notices ca
 kinds, because no other product path tells the member that somebody else wrote them into a booking
 or took one away. A holder's own cancellation and the series summary can be declined, like the
 confirmation: My bookings already shows what they say. A declined email channel stops the mail for
-displacement, participant-addition and club-cancellation notices as well; the centre then replaces it, and every centre page carries the
+displacement, participant-addition and club-cancellation notices as well; the centre then replaces
+it, and every centre page carries the
 account's unread count, which the primary navigation shows beside the centre's entry. An account
 without an address still receives its entries.
 
