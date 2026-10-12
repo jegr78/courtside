@@ -117,8 +117,10 @@ test("given a pull request into main or a release branch, when the release line 
       BASE: "${{ github.event_name == 'pull_request' && github.base_ref || github.ref_name }}",
       HEAD: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.head }}"
     });
-    assert.equal(check.run.trim(),
+    assert.equal(check.run.trim().split("\n").at(-1),
       'node tools/release-line.mjs pull-request --base "$BASE" --head "$HEAD" --summary "$GITHUB_STEP_SUMMARY"');
+    assert.match(check.run, /^if \[ ! -f tools\/release-line\.mjs \]; then\n\s+echo "::notice::[^"]+"\n\s+exit 0\nfi\n/,
+      "only a base that does not carry the tool yet, as on the pull request adding it, passes without it");
     for (const step of job.steps.filter((candidate) => candidate.run)) {
       assert.doesNotMatch(step.run, /\$\{\{/, `${step.name} reads its values through env`);
     }

@@ -36,4 +36,9 @@ jobs:
         env:
           BASE: ${{ github.event_name == 'pull_request' && github.base_ref || github.ref_name }}
           HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.head }}
-        run: node tools/release-line.mjs pull-request --base "$BASE" --head "$HEAD" --summary "$GITHUB_STEP_SUMMARY"
+        run: |
+          if [ ! -f tools/release-line.mjs ]; then
+            echo "::notice::$BASE carries no release line check yet; the pull request that adds it cannot be judged by it"
+            exit 0
+          fi
+          node tools/release-line.mjs pull-request --base "$BASE" --head "$HEAD" --summary "$GITHUB_STEP_SUMMARY"
