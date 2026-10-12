@@ -3273,12 +3273,12 @@ components:
 
   responses:
     Unauthenticated:
-      description: No session, or a state-changing request without a CSRF token.
+      description: No session, or a session that has ended.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
     Forbidden:
-      description: Authenticated, but not allowed to do this.
+      description: Refused, because a state-changing request carries no valid CSRF token or the caller may not do this.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -3440,6 +3440,8 @@ paths:
       responses:
         "204":
           description: Logged out.
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/session/reauthentication:
     post:
@@ -3530,6 +3532,8 @@ paths:
             The request was accepted. Whether a message follows is deliberately not said.
         "400":
           $ref: "#/components/responses/Invalid"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":
@@ -3576,6 +3580,8 @@ paths:
           description: The password is set and every session for the account has ended.
         "400":
           $ref: "#/components/responses/Invalid"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":
@@ -3616,6 +3622,8 @@ paths:
             The request was accepted. Whether any message follows is deliberately not said.
         "400":
           $ref: "#/components/responses/Invalid"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":
@@ -3787,6 +3795,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":
@@ -3838,6 +3848,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
         "415":
@@ -3890,6 +3902,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":
@@ -3952,6 +3966,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "429":
@@ -4198,6 +4214,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":
@@ -4576,6 +4594,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
         "429":
