@@ -86,3 +86,40 @@ test("given the release jobs that read a branch or a dispatch input, when their 
     }
     assert.deepEqual(candidate.preconditions.permissions, { actions: "read", contents: "read", issues: "read" });
   });
+
+test("given a pull request into main or a release branch, when the release line workflow runs, then the base's tool judges it",
+  () => {
+    // given
+    const loaded = workflow("release-line.yml");
+    const triggers = triggersOf(loaded);
+    const job = loaded.jobs["release-line"];
+    const checkout = job.steps.find((step) => String(step.uses).startsWith("actions/checkout@"));
+    const fetch = job.steps.find((step) => step.name === "Fetch the pull request head");
+    const check = job.steps.find((step) => step.name === "Check the release line and its forward ports");
+
+    // when / then
+    assert.deepEqual(triggers.pull_request, { branches: ["main", "release/*"] },
+      "every pull request reports the check, so it can be required without blocking ordinary ones");
+    assert.equal(triggers.pull_request_target, undefined, "the check reads code, so it never runs with base-repo authority");
+    assert.deepEqual(Object.keys(triggers.workflow_dispatch.inputs), ["head"],
+      "a dispatch on a real branch checks a head against it, which is how a refusal is exercised without a release");
+    assert.equal(job.name, "release line");
+    assert.deepEqual(loaded.permissions, {});
+    assert.deepEqual(job.permissions, { contents: "read" });
+    assert.equal(checkout.with.ref, "${{ github.event.pull_request.base.sha || github.sha }}",
+      "the pull request under review must not be able to rewrite the tool that judges it");
+    assert.equal(checkout.with["fetch-depth"], 0);
+    assert.equal(checkout.with["persist-credentials"], false);
+    assert.equal(fetch.if, "github.event_name == 'pull_request'");
+    assert.equal(fetch.env.NUMBER, "${{ github.event.pull_request.number }}");
+    assert.match(fetch.run, /git fetch --no-tags origin "\+refs\/pull\/\$NUMBER\/head:refs\/remotes\/pull\/head"/);
+    assert.deepEqual(check.env, {
+      BASE: "${{ github.event_name == 'pull_request' && github.base_ref || github.ref_name }}",
+      HEAD: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.head }}"
+    });
+    assert.equal(check.run.trim(),
+      'node tools/release-line.mjs pull-request --base "$BASE" --head "$HEAD" --summary "$GITHUB_STEP_SUMMARY"');
+    for (const step of job.steps.filter((candidate) => candidate.run)) {
+      assert.doesNotMatch(step.run, /\$\{\{/, `${step.name} reads its values through env`);
+    }
+  });

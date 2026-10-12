@@ -185,6 +185,9 @@ export function main(arguments_, git = runGit) {
   const options = optionsOf(arguments_);
   const refOf = remoteRefOf;
   if (options.command === "pull-request") {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(options.head)) {
+      throw new Error("--head must name a commit or a ref, such as a full sha");
+    }
     const base = targetBranch(options.base);
     const head = git("rev-parse", "--verify", `${options.head}^{commit}`);
     const releaseBranch = releaseBranchOf(recordedVersion(git, head));

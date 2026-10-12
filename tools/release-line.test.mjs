@@ -6,6 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   forwardPortVerdict,
+  main,
   lineVerdict,
   pullRequestVerdicts,
   releasableTypes,
@@ -357,4 +358,20 @@ test("given a commit whose body release-please splits into a fix, when the forwa
     } finally {
       repository.remove();
     }
+  });
+
+test("given a head or tag argument that git could read as an option, when the tool starts, then it refuses before running git",
+  () => {
+    // given
+    const calls = [];
+    const git = (...arguments_) => {
+      calls.push(arguments_);
+      return "";
+    };
+
+    // when / then
+    assert.throws(() => main(["pull-request", "--base", "main", "--head", "--output=/tmp/x"], git), /--head must name/);
+    assert.throws(() => main(["pull-request", "--base", "main", "--head", "main;id"], git), /--head must name/);
+    assert.throws(() => main(["admit-tag", "--tag", "v0.1.1", "--commit", "HEAD"], git), /full 40-character sha/);
+    assert.deepEqual(calls, [], "nothing reached git");
   });
