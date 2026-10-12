@@ -473,7 +473,8 @@ input[type="time"] {
   height: 100%;
 }
 
-.day-plan-allocation {
+.day-plan-allocation-body {
+  display: block;
   container-type: inline-size;
 }
 
@@ -505,6 +506,8 @@ input[type="time"] {
 
   .day-plan-allocation-short {
     display: block;
+    min-width: 0;
+    overflow: hidden;
     white-space: nowrap;
   }
 }

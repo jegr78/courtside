@@ -665,14 +665,14 @@ function renderCell(
     const style = allocation.ownBooking
       ? { backgroundColor: "var(--cs-ball)", color: "var(--cs-shade)" }
       : { backgroundColor: allocation.cardColor, color: contrastColor(allocation.cardColor) };
-    const content = <>
+    const content = <span className="day-plan-allocation-body">
       <span className="day-plan-allocation-name">
         {allocation.ownBooking && <OwnMarker />}
         <span data-testid="allocation-label" className="day-plan-allocation-full">{label}</span>
         <span data-testid="allocation-short-label" className="day-plan-allocation-short">{shortLabel}</span>
       </span>
       <span className="day-plan-allocation-period block text-xs">{period}</span>
-    </>;
+    </span>;
     return <td key={court.id} rowSpan={Math.max(1, Math.ceil(duration / slotMinutes))} className={`${cellClass} p-2 align-top`}>
       {allocation.ownBooking && !isPast && !startedBeforeVisibleSlot ? <button
         type="button"
