@@ -35,8 +35,12 @@ test("given an administrator's first visit, when a person page opens while the s
       await page.goto("/");
       await page.goto(personPage);
       await expect(page.getByTestId("person-first-name")).toBeVisible({ timeout: 10_000 });
-      await page.evaluate(() => navigator.serviceWorker.ready.then(() =>
-        new Promise((rendered) => requestAnimationFrame(() => requestAnimationFrame(rendered)))));
+      const activated = await page.evaluate(() => Promise.race([
+        navigator.serviceWorker.ready.then(() => new Promise<boolean>((rendered) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => rendered(true))))),
+        new Promise<boolean>((expired) => setTimeout(() => expired(false), 10_000))
+      ]));
+      expect(activated, `visit ${visit}: the service worker activates within ten seconds`).toBe(true);
       if (await page.getByTestId("pwa-update-prompt").count() > 0) prompted.push(visit);
     } finally {
       await context.close();

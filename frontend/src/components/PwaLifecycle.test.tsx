@@ -10,6 +10,11 @@ vi.mock("virtual:pwa-register", () => ({ registerSW }));
 
 const worker = {} as ServiceWorker;
 
+type RejectionListener = (reason: unknown) => void;
+const { process: runtime } = globalThis as unknown as {
+  process: { on(event: "unhandledRejection", listener: RejectionListener): void; off(event: "unhandledRejection", listener: RejectionListener): void };
+};
+
 function registrationHolds(registration: { active: ServiceWorker | null; waiting: ServiceWorker | null }) {
   const getRegistration = vi.fn().mockResolvedValue(registration);
   Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration } });
@@ -66,6 +71,35 @@ describe("PwaLifecycle", () => {
     // then
     expect(getRegistration).toHaveBeenCalledOnce();
     expect(screen.queryByTestId("pwa-update-prompt"), "nothing was deployed, so nothing may be offered").not.toBeInTheDocument();
+  });
+
+  it("given the registration cannot be read, when workbox reports a waiting worker, then no update prompt is shown and nothing is left unhandled", async () => {
+    // given
+    const getRegistration = vi.fn().mockRejectedValue(new DOMException("insecure", "SecurityError"));
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { getRegistration } });
+    let needRefresh: (() => void) | undefined;
+    registerSW.mockImplementation((options?: { onNeedRefresh: () => void }) => {
+      needRefresh = options?.onNeedRefresh;
+      return vi.fn();
+    });
+    const unhandled = vi.fn();
+    runtime.on("unhandledRejection", unhandled);
+    render(<PwaLifecycle />);
+
+    // when
+    try {
+      await act(async () => {
+        needRefresh?.();
+        await new Promise((settled) => setTimeout(settled, 0));
+      });
+    } finally {
+      runtime.off("unhandledRejection", unhandled);
+    }
+
+    // then
+    expect(getRegistration).toHaveBeenCalledOnce();
+    expect(unhandled, "a registration that cannot be read is no reason to fail").not.toHaveBeenCalled();
+    expect(screen.queryByTestId("pwa-update-prompt")).not.toBeInTheDocument();
   });
 
   it("given no waiting update, when the component loads, then no update prompt is shown", () => {
