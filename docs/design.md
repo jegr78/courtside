@@ -351,7 +351,7 @@ offers it to the first entry still eligible. A disabled account, an inactive or 
 unbookable court or a refused booking rule closes that entry as skipped and the next one is asked.
 The offer reserves the court for the club's offer window, 15 minutes unless the board changes it,
 and ends at the slot's start at the latest. While it stands, the booking write and a series move
-refuse the court to every other account, and the court plan shows it as reserved without naming
+refuse the court to every other account, a new series skips that date as taken, and the court plan shows it as reserved without naming
 anybody. The member accepts in Courtside, which turns the reservation into an ordinary booking under
 every rule in one transaction; a refused rule leaves the offer standing until its deadline. Declining
 or leaving passes the offer on at once. The member's own booking of the slot closes their entry,

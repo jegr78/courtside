@@ -33,6 +33,8 @@ import org.courtside.booking.internal.CourtAllocationRepository;
 import org.courtside.booking.internal.CancellationReasonNotAllowedException;
 import org.courtside.booking.internal.CourtOccupancy;
 import org.courtside.booking.internal.CourtReservations;
+import org.courtside.booking.internal.CourtReservations.Reserved;
+import org.courtside.booking.internal.CourtReservedException;
 import org.courtside.booking.internal.CourtUnavailableException;
 import org.courtside.booking.internal.ParticipantCardCapacity;
 import org.courtside.booking.internal.ParticipantsInvalidException;
@@ -165,7 +167,7 @@ public class SeriesService {
                             rule.courtIds(), rule.cardId(), slot,
                             bookedBy, bookedByPersonId, callerRoles, note, List.of(), series.getId()));
                     created.add(bookingId);
-                } catch (CourtUnavailableException | BookingRulesViolatedException e) {
+                } catch (CourtUnavailableException | CourtReservedException | BookingRulesViolatedException e) {
                     skipped.add(start);
                 }
             }
@@ -252,9 +254,10 @@ public class SeriesService {
         List<List<RuleViolation>> ruleViolations = includeViolations
                 ? moveRuleViolations(planned, callerRoles)
                 : planned.stream().map(ignored -> List.<RuleViolation>of()).toList();
+        List<Reserved> reserved = reservedAround(planned);
         List<MovePreview.Move> moves = IntStream.range(0, planned.size())
                 .mapToObj(index -> toPreviewMove(
-                        planned.get(index), planned, movingIds, targets, ruleViolations.get(index)))
+                        planned.get(index), planned, movingIds, targets, ruleViolations.get(index), reserved))
                 .toList();
 
         return new MovePreview(moves);
@@ -331,12 +334,24 @@ public class SeriesService {
             }
             throw e;
         }
-        preview.moves().forEach(move -> reservations.released(vacatedCourts.get(move.bookingId()), move.from()));
+        releaseVacated(preview.moves(), vacatedCourts);
         if (earliest != null) {
             events.publishEvent(new SeriesMoved(request.seriesId(), movingIds, movedBy,
                     earliest.from().start(), earliest.from().end(), previousCourts));
         }
         return executions.size();
+    }
+
+    // One window over every vacated slot keeps the hand-over at one lookup however long the series is.
+    private void releaseVacated(List<MovePreview.Move> moves, Map<UUID, List<UUID>> vacatedCourts) {
+        if (moves.isEmpty()) {
+            return;
+        }
+        Set<UUID> courts = new LinkedHashSet<>();
+        moves.forEach(move -> courts.addAll(vacatedCourts.get(move.bookingId())));
+        Instant from = moves.stream().map(move -> move.from().start()).min(Instant::compareTo).orElseThrow();
+        Instant to = moves.stream().map(move -> move.from().end()).max(Instant::compareTo).orElseThrow();
+        reservations.released(List.copyOf(courts), new TimeSlot(from, to));
     }
 
     private record MoveExecution(Booking booking, List<UUID> courtIds, TimeSlot slot) {
@@ -375,14 +390,25 @@ public class SeriesService {
                 from, to, courts);
     }
 
+    private List<Reserved> reservedAround(List<PlannedMove> planned) {
+        if (planned.isEmpty()) {
+            return List.of();
+        }
+        Instant from = planned.stream().map(move -> move.to().start()).min(Instant::compareTo).orElseThrow();
+        Instant to = planned.stream().map(move -> move.to().end()).max(Instant::compareTo).orElseThrow();
+        return reservations.reservedBetween(from, to);
+    }
+
     private MovePreview.Move toPreviewMove(PlannedMove move, List<PlannedMove> planned,
                                            List<UUID> movingIds,
                                            List<ParticipantCardCapacity.Target> targets,
-                                           List<RuleViolation> ruleViolations) {
+                                           List<RuleViolation> ruleViolations,
+                                           List<Reserved> reserved) {
         Set<UUID> blocked = new LinkedHashSet<>(allocations.findOccupiedCourtsExcluding(
                 move.courts(), move.to().start(), move.to().end(), movingIds));
         blocked.addAll(conflictingCourts(move, planned));
-        blocked.addAll(reservations.reservedCourts(move.courts(), move.to(), move.bookedBy()));
+        reserved.stream().filter(held -> held.blocks(move.courts(), move.to(), move.bookedBy()))
+                .forEach(held -> blocked.add(held.courtId()));
         Booking booking = bookingRepository.findWithParticipantsById(move.bookingId()).orElseThrow();
         List<RuleViolation> violations = new ArrayList<>(ruleViolations);
         violations.addAll(participantCardCapacity.violationsFor(

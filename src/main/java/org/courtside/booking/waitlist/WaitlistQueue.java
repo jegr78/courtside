@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.courtside.booking.BookingRuleCheck;
 import org.courtside.booking.internal.BookingRuleGate;
 import org.courtside.booking.internal.CourtReservations;
+import org.courtside.booking.internal.CourtReservations.Reserved;
 import org.courtside.booking.internal.CourtReservedException;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
@@ -56,8 +57,10 @@ class WaitlistQueue implements CourtReservations {
 
     @Override
     @Transactional(readOnly = true)
-    public List<UUID> reservedCourts(List<UUID> courtIds, TimeSlot slot, UUID accountId) {
-        return rows.offeredCourts(courtIds, slot, accountId);
+    public List<Reserved> reservedBetween(Instant from, Instant to) {
+        return rows.offeredBetween(from, to).stream()
+                .map(entry -> new Reserved(entry.courtId(), entry.slot(), entry.accountId()))
+                .toList();
     }
 
     @Override

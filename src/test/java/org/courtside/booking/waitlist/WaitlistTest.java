@@ -6,7 +6,10 @@ import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.internal.CourtReservedException;
+import org.courtside.booking.series.SeriesCreationResult;
 import org.courtside.booking.series.SeriesMoveConflictException;
+import org.courtside.booking.series.SeriesRule;
+import org.courtside.booking.series.SeriesService;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
@@ -50,6 +53,9 @@ class WaitlistTest extends AbstractIntegrationTest {
 
     @Autowired
     private BookingService bookings;
+
+    @Autowired
+    private SeriesService series;
 
     @Autowired
     private BookingTestFixture bookingFixture;
@@ -395,6 +401,39 @@ class WaitlistTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> bookingFixture.moveWholeSeries(series, LocalTime.of(18, 0), board.accountId(),
                 Set.of(Role.ADMIN))).isInstanceOf(SeriesMoveConflictException.class);
+    }
+
+    @Test
+    void givenAnOffer_whenTheBoardCreatesASeriesOverTheReservedCourt_thenThatDateIsSkippedAndTheRestBooked() {
+        // given
+        offerTo(first);
+        Member board = member("Mary", "Roe", Role.ADMIN);
+        SeriesRule rule = new SeriesRule(List.of(court), TRAINING_CARD, LocalDate.of(2026, 5, 13), LocalTime.of(18, 0),
+                60, 1, Set.of(DayOfWeek.WEDNESDAY), null, 2);
+        List<Instant> starts = List.of(SLOT.start(), shifted(SLOT, 7).start());
+
+        // when
+        SeriesCreationResult result = series.create(rule, starts, board.accountId(), board.personId(),
+                Set.of(Role.ADMIN), null);
+
+        // then
+        assertThat(result.skipped()).as("the reserved date is skipped like a taken one").containsExactly(SLOT.start());
+        assertThat(result.bookingIds()).hasSize(1);
+    }
+
+    @Test
+    void givenAMemberWaitingBehindASeries_whenTheBoardMovesTheSeriesAway_thenTheVacatedSlotIsOfferedToThem() {
+        // given
+        Member board = member("Mary", "Roe", Role.ADMIN);
+        UUID moved = bookingFixture.createSeries(court, TRAINING_CARD, LocalDate.of(2026, 5, 13),
+                LocalTime.of(18, 0), 60, 2, board.accountId(), board.personId(), Set.of(Role.ADMIN));
+        UUID entry = join(first, SLOT);
+
+        // when
+        bookingFixture.moveWholeSeries(moved, LocalTime.of(20, 0), board.accountId(), Set.of(Role.ADMIN));
+
+        // then
+        assertThat(stateOf(entry)).as("a move hands the slot it vacates to the queue").isEqualTo("OFFERED");
     }
 
     @Test
