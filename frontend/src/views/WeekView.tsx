@@ -94,6 +94,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
   const planRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const dayNavigationRef = useRef<HTMLElement>(null);
+  const dayListRef = useRef<HTMLDivElement>(null);
   const eligibilityRequest = useRef(0);
   const shownDate = useRef<string>(undefined);
   const scrolledToNowOn = useRef<string>(undefined);
@@ -362,12 +363,13 @@ export function WeekView({ today, clock = systemClock, canBook = true,
     return () => observer.disconnect();
   }, [hasCourts]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const activeDay = selectedDate
-      ? dayNavigationRef.current?.querySelector(`[data-testid="day-selector-${selectedDate}"]`)
+      ? dayListRef.current?.querySelector(`[data-testid="day-selector-${selectedDate}"]`)
       : undefined;
     if (activeDay instanceof HTMLElement && typeof activeDay.scrollIntoView === "function") {
-      activeDay.scrollIntoView({ block: "nearest", inline: "nearest" });
+      // Start snapping pulls a nearest-aligned card back by one, so a cut card aligns to its own start.
+      activeDay.scrollIntoView({ block: "nearest", inline: isCutBy(activeDay, dayListRef.current) ? "start" : "nearest" });
     }
   }, [renderedWeekStart, selectedDate]);
 
@@ -390,7 +392,7 @@ export function WeekView({ today, clock = systemClock, canBook = true,
 
     {data && hasCourts && <nav ref={dayNavigationRef} data-testid="mobile-week-navigation" className="week-day-navigation mt-5"
       aria-label={t("week.chooseDate")}>
-      <div data-testid="mobile-week-days" className="week-day-list">
+      <div ref={dayListRef} data-testid="mobile-week-days" className="week-day-list">
         <Button variant="secondary" type="button" data-testid="mobile-week-previous"
           className="mobile-week-control shrink-0 px-3" onClick={() => setWeekOffset((offset) => offset - 1)}
           aria-label={t("week.previous")}>‹</Button>
@@ -707,6 +709,13 @@ function currentLineOffset(currentTime: string, slots: string[], slotMinutes: nu
   if (row === -1) return 0;
   const into = Math.min(slotMinutes, now - timeToMinutes(slots[row]));
   return (row + into / slotMinutes) * slotHeight;
+}
+
+function isCutBy(day: HTMLElement, list: HTMLElement | null): boolean {
+  if (!list) return false;
+  const card = day.getBoundingClientRect();
+  const visible = list.getBoundingClientRect();
+  return card.left < visible.left || card.right > visible.right;
 }
 
 function scrollToSlot(plan: HTMLDivElement | null, slot?: string) {
