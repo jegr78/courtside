@@ -77,7 +77,7 @@ function bookingSubjectKind(eventType: string): "booking" | "series" | undefined
 
 function bookingSubjectLabel(entry: AuditEntry, kind: "booking" | "series", t: TFunction, language: string, timeZone: string): string {
   const period = entry.subjectPeriod;
-  if (!period) return t(`audit.subject.${kind}Unresolved`);
+  if (!period) return t(`audit.subject.${kind}Unresolved`, { subjectId: entry.subjectId });
   return t(`audit.subject.${kind}`, {
     courts: entry.subjectName ?? t("audit.subject.courtsUnknown"),
     period: formatBookingPeriod(period.startsAt, period.endsAt, language, timeZone)

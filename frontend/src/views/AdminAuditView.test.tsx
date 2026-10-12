@@ -171,10 +171,10 @@ describe("AdminAuditView", () => {
   });
 
   it.each([
-    ["booking.booking.cancelled", "Deleted booking"],
-    ["booking.participant.recorded", "Deleted booking"],
-    ["booking.series.cancelled", "Deleted series"]
-  ])("given a %s entry nothing resolves, when it is shown, then the subject cell says %s instead of an identifier", async (eventType, label) => {
+    ["booking.booking.cancelled", "Booking not found"],
+    ["booking.participant.recorded", "Booking not found"],
+    ["booking.series.cancelled", "Series not found"]
+  ])("given a %s entry nothing resolves, when it is shown, then the subject cell says %s and keeps the identifier to follow up", async (eventType, label) => {
     // given
     const entry: AuditEntry = { ...courtAdded, eventType, parameters: {}, subjectName: null, subjectPeriod: null };
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
@@ -185,11 +185,11 @@ describe("AdminAuditView", () => {
 
     // then
     const subject = within(row(entry.id)).getByTestId("audit-subject");
-    expect(subject).toHaveTextContent(label);
-    expect(subject).not.toHaveTextContent(entry.subjectId);
+    expect(subject).toHaveTextContent(`${label}: ${entry.subjectId}`);
+    expect(subject).not.toHaveTextContent(/deleted/i);
   });
 
-  it("given a German reader and a series nothing resolves, when it is shown, then the subject cell says so in German", async () => {
+  it("given a German reader and a series nothing resolves, when it is shown, then the subject cell says so in German beside the identifier", async () => {
     // given
     await i18n.changeLanguage("de");
     const entry: AuditEntry = { ...courtAdded, eventType: "booking.series.created", parameters: {}, subjectName: null };
@@ -200,7 +200,7 @@ describe("AdminAuditView", () => {
     await screen.findByTestId("audit-row");
 
     // then
-    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent("Gelöschte Serie");
+    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(`Serie nicht auffindbar: ${entry.subjectId}`);
   });
 
   it("given an opening-hours entry with no subject name, when it is shown, then the subject cell names the weekday, translated", async () => {
