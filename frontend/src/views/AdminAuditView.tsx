@@ -165,7 +165,7 @@ export function AdminAuditView() {
                   </td>
                   <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
                     <span aria-hidden="true" data-testid="audit-label-subject" className="font-medium sm:hidden">{t("audit.column.subject")}</span>
-                    <span data-testid="audit-subject" className="min-w-0 [overflow-wrap:anywhere]">{subjectLabel(entry, t)}</span>
+                    <span data-testid="audit-subject" className="min-w-0 [overflow-wrap:anywhere]">{subjectLabel(entry, t, language, club.timeZone)}</span>
                   </td>
                   <td role="cell" className="grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3 sm:table-cell sm:border-t sm:p-2">
                     <span aria-hidden="true" data-testid="audit-label-actor" className="font-medium sm:hidden">{t("audit.column.actor")}</span>

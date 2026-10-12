@@ -7,6 +7,7 @@ import i18n from "../i18n";
 import { ClubConfigurationProvider } from "../club/ClubConfigurationProvider";
 import { WithClubConfiguration } from "../test/ClubConfiguration";
 import { expectTableRolesIndependentOfLayout } from "../test/tableRoles";
+import { formatBookingPeriod } from "../time/clubZone";
 import { AdminAuditView } from "./AdminAuditView";
 
 const courtAdded: AuditEntry = {
@@ -130,6 +131,76 @@ describe("AdminAuditView", () => {
 
     // then
     expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(entry.subjectId);
+  });
+
+  it("given a booking entry, when it is shown, then the subject cell names its courts and its slot in the club time zone", async () => {
+    // given
+    const entry: AuditEntry = {
+      ...courtAdded, eventType: "booking.booking.cancelled", parameters: {}, subjectName: "Centre Court, Back Court",
+      subjectPeriod: { startsAt: "2026-05-13T16:00:00Z", endsAt: "2026-05-13T17:00:00Z" }
+    };
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
+
+    // when
+    show({ club: { ...clubConfig, timeZone: "America/New_York" } });
+    await screen.findByTestId("audit-row");
+
+    // then
+    const subject = within(row(entry.id)).getByTestId("audit-subject");
+    expect(subject).toHaveTextContent(
+      `Centre Court, Back Court, ${formatBookingPeriod("2026-05-13T16:00:00Z", "2026-05-13T17:00:00Z", "en", "America/New_York")}`);
+    expect(subject).not.toHaveTextContent(formatBookingPeriod("2026-05-13T16:00:00Z", "2026-05-13T17:00:00Z", "en", "UTC"));
+    expect(subject).not.toHaveTextContent(entry.subjectId);
+  });
+
+  it("given a series entry, when it is shown, then the subject cell names it a series with its courts and first appointment", async () => {
+    // given
+    const entry: AuditEntry = {
+      ...courtAdded, eventType: "booking.series.moved", parameters: {}, subjectName: "Back Court",
+      subjectPeriod: { startsAt: "2026-05-14T16:00:00Z", endsAt: "2026-05-14T17:30:00Z" }
+    };
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
+
+    // when
+    show();
+    await screen.findByTestId("audit-row");
+
+    // then
+    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent(
+      `Series, Back Court, from ${formatBookingPeriod("2026-05-14T16:00:00Z", "2026-05-14T17:30:00Z", "en", "Europe/Berlin")}`);
+  });
+
+  it.each([
+    ["booking.booking.cancelled", "Deleted booking"],
+    ["booking.participant.recorded", "Deleted booking"],
+    ["booking.series.cancelled", "Deleted series"]
+  ])("given a %s entry nothing resolves, when it is shown, then the subject cell says %s instead of an identifier", async (eventType, label) => {
+    // given
+    const entry: AuditEntry = { ...courtAdded, eventType, parameters: {}, subjectName: null, subjectPeriod: null };
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
+
+    // when
+    show();
+    await screen.findByTestId("audit-row");
+
+    // then
+    const subject = within(row(entry.id)).getByTestId("audit-subject");
+    expect(subject).toHaveTextContent(label);
+    expect(subject).not.toHaveTextContent(entry.subjectId);
+  });
+
+  it("given a German reader and a series nothing resolves, when it is shown, then the subject cell says so in German", async () => {
+    // given
+    await i18n.changeLanguage("de");
+    const entry: AuditEntry = { ...courtAdded, eventType: "booking.series.created", parameters: {}, subjectName: null };
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [entry], nextCursor: null });
+
+    // when
+    show();
+    await screen.findByTestId("audit-row");
+
+    // then
+    expect(within(row(entry.id)).getByTestId("audit-subject")).toHaveTextContent("Gelöschte Serie");
   });
 
   it("given an opening-hours entry with no subject name, when it is shown, then the subject cell names the weekday, translated", async () => {
