@@ -18,7 +18,7 @@ async function administratorSession(browser: Browser, origin: BrowserContextOpti
   }
 }
 
-test("given an administrator's first visit, when a person page opens while the service worker installs, then no update is offered", async ({ browserName, journeyService, pinnedBrowser }) => {
+test("given an administrator's first visit, when a person page opens straight after the first page, then no update is offered", async ({ browserName, journeyService, pinnedBrowser }) => {
   // given
   await journeyService.executeSql(
     "UPDATE user_account SET password_change_required = false WHERE username = 'bootstrap-admin'");

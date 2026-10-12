@@ -250,7 +250,9 @@ test("given a first service-worker install, when browsers are qualified, then Fi
   assert.match(playwright, /name: "firefox-periodic", testMatch: \/[^/]*pwa-first-install\\\.spec\\\.ts/);
   assert.match(playwright, /name: "webkit-pwa", testMatch: \/[^/]*pwa-first-install\\\.spec\\\.ts/);
   assert.match(firstInstall, /ignoreHTTPSErrors: browserName === "firefox"/);
-  const firstPage = firstInstall.slice(firstInstall.indexOf('await page.goto("/")'), firstInstall.indexOf("await page.goto(personPage)"));
+  const [opened, navigated] = [firstInstall.indexOf('await page.goto("/")'), firstInstall.indexOf("await page.goto(personPage)")];
+  assert.ok(opened >= 0 && navigated > opened, "the journey opens the first page and then the person page");
+  const firstPage = firstInstall.slice(opened, navigated);
   assert.match(firstPage, /if \(browserName === "webkit"\) \{\s*const installed = await page\.evaluate\(\(\) => Promise\.race\(\[\s*navigator\.serviceWorker\.ready/,
     "WebKit must wait for the worker before it navigates, or its install sticks");
   assert.equal(firstPage.match(/serviceWorker\.ready/g)?.length, 1,
