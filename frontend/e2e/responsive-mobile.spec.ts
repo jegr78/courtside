@@ -1368,20 +1368,23 @@ for (const phone of landscapePhones) {
     await expect(dialog.getByTestId("move-preview"), "the preview is reachable by scrolling the form").toBeInViewport({ timeout: 10_000 });
   });
 
-  test(`given a phone in landscape at ${phone.width} x ${phone.height}, when a long series is to be cancelled whole, then the confirmation stays on screen`, async ({ page }) => {
+  test(`given a phone in landscape at ${phone.width} x ${phone.height}, when a long series is to be cancelled whole, then the confirmation stays on screen`, async ({ page, journeyService }) => {
     // given
     await page.route("**/api/my/bookings?**", async (route) => {
-      const response = await route.fetch();
-      const listed = await response.json() as { items: { id: string; startsAt: string; endsAt: string }[] };
-      const series = listed.items.find((booking) => booking.id === seriesBookingId);
+      const view = new URL(route.request().url()).searchParams.get("view");
+      if (view && view !== "UPCOMING") return route.continue();
       const week = 7 * 24 * 60 * 60 * 1000;
-      const later = series ? Array.from({ length: 11 }, (_, index) => ({
-        ...series,
-        id: `70000000-0000-0000-0000-0000000001${String(index).padStart(2, "0")}`,
-        startsAt: new Date(Date.parse(series.startsAt) + (index + 1) * week).toISOString(),
-        endsAt: new Date(Date.parse(series.endsAt) + (index + 1) * week).toISOString()
-      })) : [];
-      await route.fulfill({ response, json: { ...listed, items: [...listed.items, ...later] } });
+      const first = Date.parse(`${journeyService.visualDate}T07:00:00Z`);
+      await route.fulfill({ json: { items: Array.from({ length: 12 }, (_, index) => ({
+        id: index === 0 ? seriesBookingId : `70000000-0000-0000-0000-0000000001${String(index).padStart(2, "0")}`,
+        seriesId: "73000000-0000-0000-0000-000000000001",
+        courtIds: ["dddddddd-0000-0000-0000-000000000001"],
+        startsAt: new Date(first + index * week).toISOString(),
+        endsAt: new Date(first + index * week + 60 * 60 * 1000).toISOString(),
+        cardLabel: "Member booking",
+        cardColor: "#176b55",
+        status: "CONFIRMED"
+      })) } });
     });
     await page.setViewportSize(phone);
     await signIn(page, "doe.jane");
