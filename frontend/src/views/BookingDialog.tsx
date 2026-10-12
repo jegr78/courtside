@@ -21,8 +21,13 @@ export interface BookingSelection {
   durationMinutes?: number;
 }
 
+export interface WaitlistSelection {
+  startsAt: string;
+  endsAt: string;
+}
+
 export function BookingDialog({ selection, grid, courts, allocations, canChooseSeveralCourts,
-  maxBookingMinutes, bookingHours, closed, created, conflicted }: {
+  maxBookingMinutes, bookingHours, closed, created, conflicted, waitlist }: {
   selection: BookingSelection;
   grid: BookingGrid;
   courts: PublicCourt[];
@@ -33,6 +38,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   closed: () => void;
   created: () => Promise<void>;
   conflicted: () => Promise<void>;
+  waitlist?: WaitlistSelection;
 }) {
   const { t, i18n } = useTranslation();
   const [bookingCards, setBookingCards] = useState<PublicBookingCard[]>([]);
@@ -86,7 +92,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
     clear();
     setViolations([]);
     try {
-      const { startsAt, endsAt } = bookingTimeSlot(
+      const { startsAt, endsAt } = waitlist ?? bookingTimeSlot(
         selection.date, selection.slot, grid.timeZone, selectedDuration
       );
       const participants = [
@@ -94,14 +100,20 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
         ...guestNames.map((name) => name.trim()).filter(Boolean).map((guestName) => ({ guestName })),
         ...participantCardIds.filter(Boolean).map((participantCardId) => ({ cardId: participantCardId }))
       ];
-      await api.createBooking({
-        courtIds,
-        cardId,
-        startsAt,
-        endsAt,
-        note: note.trim() || undefined,
-        participants
-      }, requestKey);
+      if (waitlist) {
+        await api.joinWaitlist({
+          courtId: selection.courtId, cardId, startsAt, endsAt, note: note.trim() || undefined, participants
+        });
+      } else {
+        await api.createBooking({
+          courtIds,
+          cardId,
+          startsAt,
+          endsAt,
+          note: note.trim() || undefined,
+          participants
+        }, requestKey);
+      }
       await created();
     } catch (failure) {
       if (failure instanceof ApiError && failure.problem?.type === COURT_UNAVAILABLE) setRefusedAsTaken(true);
@@ -128,13 +140,13 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
 
   const fieldViolations = (field: string) => violations.filter((violation) => violation.field === field);
   const describedBy = (field: string) => fieldViolations(field).length > 0 ? `booking-${field}-errors` : undefined;
-  const durations = useMemo(() => availableDurations(selection, grid, courtIds, allocations, maxBookingMinutes, bookingHours),
-    [selection, grid, courtIds, allocations, maxBookingMinutes, bookingHours]);
+  const durations = useMemo(() => waitlist ? [] : availableDurations(selection, grid, courtIds, allocations, maxBookingMinutes, bookingHours),
+    [waitlist, selection, grid, courtIds, allocations, maxBookingMinutes, bookingHours]);
   const hours = bookingHours && { earliestStart: bookingHours.earliestStart.slice(0, 5), latestEnd: bookingHours.latestEnd.slice(0, 5) };
-  const outsideHours = bookingHours !== undefined && leavesBookingHours(selection.slot, grid.slotMinutes, bookingHours);
+  const outsideHours = !waitlist && bookingHours !== undefined && leavesBookingHours(selection.slot, grid.slotMinutes, bookingHours);
   // A list emptied by the bound is a different thing from one emptied by an occupied court: the
   // second is the conflict the server reports on submit, and saying so is its job and not ours.
-  const boundLeavesNoPeriod = maxBookingMinutes !== undefined && maxBookingMinutes !== null
+  const boundLeavesNoPeriod = !waitlist && maxBookingMinutes !== undefined && maxBookingMinutes !== null
     && maxBookingMinutes < grid.slotMinutes;
   const showsBound = maxBookingMinutes !== undefined && maxBookingMinutes !== null && !boundLeavesNoPeriod;
   const durationDescription = [showsBound && "booking-duration-bound", hours && !outsideHours && "booking-hours-bound", "booking-duration-hint"]
@@ -142,8 +154,8 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   const slotTaken = refusedAsTaken && durations.length === 0;
   const selectedDuration = durations.includes(durationMinutes) || slotTaken
     ? durationMinutes : durations[0] ?? grid.slotMinutes;
-  const period = useMemo(() => bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration),
-    [selection.date, selection.slot, grid.timeZone, selectedDuration]);
+  const period = useMemo(() => waitlist ?? bookingTimeSlot(selection.date, selection.slot, grid.timeZone, selectedDuration),
+    [waitlist, selection.date, selection.slot, grid.timeZone, selectedDuration]);
   const chosenPlayers = 1 + selectedMembers.length
     + guestNames.filter((name) => name.trim()).length
     + participantCardIds.filter(Boolean).length;
@@ -152,10 +164,11 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
   return <Modal labelledBy="booking-heading" closed={closed}>
     <form data-testid="booking-dialog" onSubmit={(event) => void submit(event)} className="surface-panel flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
       <DialogBody>
-      <h3 id="booking-heading" className="text-xl font-bold">{t("booking.title")}</h3>
+      <h3 id="booking-heading" className="text-xl font-bold">{t(waitlist ? "waitlist.title" : "booking.title")}</h3>
       <p data-testid="booking-period" aria-live="polite" className="mt-2 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
-      {!slotTaken && <>
+      {waitlist && <p data-testid="waitlist-explanation" className="text-muted mt-2 text-sm">{t("waitlist.explanation")}</p>}
+      {!slotTaken && !waitlist && <>
       <label className="mt-5 grid gap-2 font-medium">{t("booking.duration")}
         <select data-testid="booking-duration" aria-describedby={durationDescription} value={selectedDuration} onChange={(event) => setDurationMinutes(Number(event.target.value))} className="form-control rounded-lg border px-3 py-3">
           {durations.map((minutes) => <option key={minutes} value={minutes}>{t("booking.durationMinutes", { count: minutes })}</option>)}
@@ -171,7 +184,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </>}
       {boundLeavesNoPeriod && <Alert tone="warning" testId="booking-no-duration">{t("booking.boundBelowSlotGrid")}</Alert>}
       {hours && outsideHours && <Alert tone="warning" testId="booking-outside-hours">{violationMessage("booking.rule.bookingHours.outside", hours, t)}</Alert>}
-      {canChooseSeveralCourts
+      {canChooseSeveralCourts && !waitlist
         ? <fieldset className="mt-5 grid gap-2" aria-invalid={fieldViolations("courtIds").length > 0} aria-describedby={describedBy("courtIds")}>
           <legend className="font-semibold">{t("booking.courts")}</legend>
           {courts.map((court) => <label key={court.id} className="flex gap-2">
@@ -244,7 +257,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       </div>}
       <div className="surface-panel border-structural flex shrink-0 justify-end gap-3 border-t px-6 py-4">
         <Button variant="secondary" type="button" data-testid="booking-close" onClick={closed}>{t("booking.close")}</Button>
-        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || outsideHours || slotTaken}>{t("booking.submit")}</Button>
+        <Button variant="primary" type="submit" data-testid="booking-submit" disabled={submitting || courtIds.length === 0 || !cardId || boundLeavesNoPeriod || outsideHours || (slotTaken && !waitlist)}>{t(waitlist ? "waitlist.submit" : "booking.submit")}</Button>
       </div>
     </form>
   </Modal>;

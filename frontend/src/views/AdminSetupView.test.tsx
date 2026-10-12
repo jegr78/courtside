@@ -21,7 +21,7 @@ const configuration: AdminClubConfig = {
   timeZone: "Europe/Berlin",
   newAccountCredentialHours: 168,
   passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-  bookingReminderHours: 24,
+  bookingReminderHours: 24, waitlistOfferMinutes: 15,
   logoUploaded: false,
   logoFallbackUrl: null,
   noMembershipTypeRuleSetId: null

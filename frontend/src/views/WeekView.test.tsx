@@ -75,6 +75,8 @@ beforeEach(async () => {
   vi.spyOn(api, "bookingEligibility").mockResolvedValue({ violations: [] });
   vi.spyOn(api, "createBooking").mockResolvedValue({ id: "77777777-7777-7777-7777-777777777777" });
   vi.spyOn(api, "cancelBooking").mockResolvedValue(undefined);
+  vi.spyOn(api, "reservedSlots").mockResolvedValue([]);
+  vi.spyOn(api, "joinWaitlist").mockResolvedValue({ id: "88888888-8888-8888-8888-888888888888" });
   vi.spyOn(api, "allocations").mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
     bookingId: "33333333-3333-3333-3333-333333333333",
     courtId: courts[0].id,
@@ -886,10 +888,10 @@ it("given an own booking, a league match and another member's booking, when the 
   expect(own).toHaveAccessibleName("You, Major, 6:00 PM – 7:00 PM, cancel booking");
   expect(shortLabel(match)).toBe("Lea");
   expect(within(match).getByTestId("allocation-label")).toHaveTextContent("League match");
-  expect(match).toHaveAccessibleName("League match, 6:00 PM – 9:00 PM");
+  expect(match).toHaveAccessibleName("Join the waitlist for League match, 6:00 PM – 9:00 PM");
   expect(within(match).queryByTestId("own-marker"), "only the viewer's own booking carries the marker").toBeNull();
   expect(shortLabel(occupied)).toBe("Occ");
-  expect(occupied).toHaveAccessibleName("Occupied · 2 participants, 2:00 PM – 3:00 PM");
+  expect(occupied).toHaveAccessibleName("Join the waitlist for Occupied · 2 participants, 2:00 PM – 3:00 PM");
   expect(screen.getByTestId("legend-allocation-card").textContent, "the legend decodes the short label of the match").toBe("Lea");
   expect(screen.getByTestId("legend-card-99999999-9999-9999-9999-999999999999").textContent).toBe("Tra");
   expect(screen.getByTestId("legend-occupied").textContent, "the legend decodes the short label of a hidden booking").toBe("Occ");
@@ -945,7 +947,7 @@ it("given cards that share a long first word, when the plan is shown, then each 
   // then
   const allocation = await screen.findByTestId("allocation");
   expect(within(allocation).getByTestId("allocation-short-label").textContent).toBe("TrH");
-  expect(allocation, "the visible code is part of the accessible name").toHaveAccessibleName("Training Herren (TrH), 6:00 PM – 7:00 PM");
+  expect(allocation, "the visible code is part of the accessible name").toHaveAccessibleName("Join the waitlist for Training Herren (TrH), 6:00 PM – 7:00 PM");
   expect(screen.getByTestId("legend-card-a2222222-2222-2222-2222-222222222222").textContent).toBe("TrD");
 });
 
@@ -2383,4 +2385,94 @@ it("given a retained dialog model, when its court, occupancy, hours, bound, zone
   expect(screen.getByTestId("booking-period")).toHaveTextContent("Aug 11, 2026, 1:00 PM – 2:00 PM");
   await act(async () => { await i18n.changeLanguage("de"); });
   expect(screen.getByTestId("booking-period")).toHaveTextContent("13:00");
+});
+
+it("given another member's booking ahead, when the member opens it, then joining its waitlist sends that court and period", async () => {
+  // given
+  render(<WeekView today={clubInstant("12:00")} />);
+  const taken = await screen.findByTestId("allocation");
+  expect(taken.tagName, "a taken court is reachable by keyboard").toBe("BUTTON");
+
+  // when
+  await userEvent.click(taken);
+  expect(screen.getByTestId("waitlist-explanation")).toHaveTextContent("first member on the waitlist");
+  expect(screen.queryByTestId("booking-duration"), "the period is the taken one and not chosen").toBeNull();
+  await userEvent.type(screen.getByTestId("guest-name"), "John Roe");
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  await waitFor(() => expect(api.joinWaitlist).toHaveBeenCalledWith(expect.objectContaining({
+    courtId: courts[0].id,
+    cardId: "55555555-5555-5555-5555-555555555555",
+    startsAt: "2026-08-10T18:00:00+02:00",
+    endsAt: "2026-08-10T19:00:00+02:00",
+    participants: [{ guestName: "John Roe" }]
+  })));
+  expect(api.createBooking).not.toHaveBeenCalled();
+  expect(screen.getByRole("status")).toHaveTextContent("You are on the waitlist.");
+});
+
+it("given the waitlist refuses a second entry, when the member joins again, then the reason is shown in the dialog", async () => {
+  // given
+  vi.mocked(api.joinWaitlist).mockRejectedValue(new ApiError(409, {
+    type: "urn:courtside:error:waitlist-entry-exists", title: "Already on the waitlist", status: 409,
+    violations: [{ code: "waitlist.entry.exists", params: {} }]
+  }));
+  render(<WeekView today={clubInstant("12:00")} />);
+  await userEvent.click(await screen.findByTestId("allocation"));
+  await userEvent.type(screen.getByTestId("guest-name"), "John Roe");
+
+  // when
+  await userEvent.click(screen.getByTestId("booking-submit"));
+
+  // then
+  expect(await screen.findByText("You are already on the waitlist for this court.")).toBeInTheDocument();
+  expect(screen.getByTestId("booking-dialog")).toBeInTheDocument();
+});
+
+it("given a court reserved for somebody else, when the plan is shown, then it reads as reserved and names nobody", async () => {
+  // given
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  vi.mocked(api.reservedSlots).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    courtId: courts[1].id, startsAt: "2026-08-10T16:00:00+02:00", endsAt: "2026-08-10T17:00:00+02:00", ownEntryId: null
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  const reserved = await screen.findByTestId("allocation");
+  expect(reserved.dataset.state).toBe("reserved");
+  expect(reserved).toHaveAccessibleName("Join the waitlist for Reserved, 4:00 PM – 5:00 PM");
+  expect(reserved.dataset.bookingId, "a reservation has no booking a member could address").toBeUndefined();
+  expect(screen.getByTestId("legend-reserved")).toHaveTextContent("Res");
+  expect(within(screen.getByTestId("court-plan-legend")).getByText("Reserved")).toBeInTheDocument();
+});
+
+it("given a court reserved for the viewer, when the plan is shown, then it leads to the offer instead of the waitlist", async () => {
+  // given
+  vi.mocked(api.allocations).mockResolvedValue([]);
+  vi.mocked(api.reservedSlots).mockImplementation((date) => Promise.resolve(date === "2026-08-10" ? [{
+    courtId: courts[1].id, startsAt: "2026-08-10T16:00:00+02:00", endsAt: "2026-08-10T17:00:00+02:00",
+    ownEntryId: "99999999-0000-0000-0000-000000000001"
+  }] : []));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  const offer = await screen.findByTestId("own-reservation");
+  expect(offer).toHaveAttribute("href", "/my-bookings#waitlist-99999999-0000-0000-0000-000000000001");
+  expect(offer).toHaveAccessibleName("Open your offer: Reserved for you, 4:00 PM – 5:00 PM");
+  expect(within(offer).getByTestId("own-marker")).toBeInTheDocument();
+});
+
+it("given a visitor who cannot book, when the plan is shown, then a taken court offers no waitlist", async () => {
+  // when
+  render(<WeekView today={clubInstant("12:00")} canBook={false} />);
+
+  // then
+  const taken = await screen.findByTestId("allocation");
+  expect(taken).toHaveAttribute("role", "img");
+  expect(api.joinWaitlist).not.toHaveBeenCalled();
 });

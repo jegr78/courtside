@@ -23,7 +23,7 @@ const config: AdminClubConfig = {
   clubName: "Example Tennis Club", primaryColor: "#b85c38", accentColor: "#d7e24b",
   defaultLocale: "en", supportedLocales: ["de", "en"], slotMinutes: 30, timeZone: "Europe/Berlin",
   newAccountCredentialHours: 168, passwordResetCredentialHours: 24, passwordResetTokenMinutes: 60,
-  bookingReminderHours: 24, logoUploaded: false
+  bookingReminderHours: 24, waitlistOfferMinutes: 15, logoUploaded: false
 };
 const adults: MembershipType = { id: "type-1", name: "Adults", ruleSetId: "rule-set", active: true, grantsAccount: false };
 const jane: RosterEntry = {

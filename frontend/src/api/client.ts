@@ -113,6 +113,10 @@ export type CancellationReason = components["schemas"]["CancellationReason"];
 export type MoveRequest = components["schemas"]["MoveRequest"];
 export type MovePreview = components["schemas"]["MovePreview"];
 export type MoveExecuted = components["schemas"]["MoveExecuted"];
+export type JoinWaitlistRequest = components["schemas"]["JoinWaitlistRequest"];
+export type WaitlistJoined = components["schemas"]["WaitlistJoined"];
+export type WaitlistEntry = components["schemas"]["WaitlistEntry"];
+export type ReservedSlot = components["schemas"]["ReservedSlot"];
 
 export interface BookingExportParameters extends Record<string, string> {
   from: string;
@@ -630,6 +634,17 @@ export const api = {
   ),
   withdrawParticipation: (bookingId: string) => request<void>(
     `/api/my/participations/${bookingId}`, { method: "DELETE" }
+  ),
+  reservedSlots: (date: string) => request<ReservedSlot[]>(
+    `/api/reserved-slots?${new URLSearchParams({ date })}`
+  ),
+  waitlistEntries: () => request<WaitlistEntry[]>("/api/my/waitlist"),
+  joinWaitlist: (entry: JoinWaitlistRequest) => request<WaitlistJoined>("/api/my/waitlist", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(entry)
+  }),
+  leaveWaitlist: (entryId: string) => request<void>(`/api/my/waitlist/${entryId}`, { method: "DELETE" }),
+  acceptWaitlistOffer: (entryId: string) => request<BookingCreated>(
+    `/api/my/waitlist/${entryId}/acceptance`, { method: "POST" }
   ),
   managedAppointments: (options: {
     view?: ManagedAppointmentView; courtId?: string; cardId?: string; cursor?: string; limit?: number;
