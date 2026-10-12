@@ -44,6 +44,8 @@ import static org.mockito.Mockito.doAnswer;
 class WaitlistConcurrencyTest extends AbstractIntegrationTest {
 
     private static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID TRAINING_CARD = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
     private static final TimeSlot SLOT = new TimeSlot(Instant.parse("2026-05-13T16:00:00Z"),
             Instant.parse("2026-05-13T17:00:00Z"));
     private static final String INTRUDER = "waitlist-intruder";
@@ -54,6 +56,9 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired
     private WaitlistService waitlist;
+
+    @Autowired
+    private WaitlistQueue queue;
 
     @Autowired
     private BookingService bookings;
@@ -184,15 +189,20 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
         }));
 
         // when
+        List<Boolean> outcomes = new ArrayList<>();
         try (ExecutorService pool = Executors.newFixedThreadPool(racing.size())) {
             List<Future<Boolean>> running = racing.stream().map(pool::submit).toList();
             start.countDown();
             for (Future<Boolean> future : running) {
-                PostgresDiagnostics.await(future, Duration.ofSeconds(40), jdbc, "Racing call");
+                outcomes.add(PostgresDiagnostics.await(future, Duration.ofSeconds(40), jdbc, "Racing call"));
             }
         }
 
         // then
+        assertThat(outcomes.subList(0, 2)).as("the offer's member always gets to accept or decline it").contains(true);
+        assertThat(stateOf(entry)).as("the offer ends as the member's booking or their decline, never left standing")
+                .isIn("BOOKED", "LEFT");
+        assertThat(offeredOnCourt()).isEmpty();
         assertThat(confirmedOnCourt()).as("never two bookings on one court and time").isLessThanOrEqualTo(1);
         assertThat(offeredOnCourt().size() + confirmedOnCourt())
                 .as("a booking and an offer never hold the slot together").isLessThanOrEqualTo(1);
@@ -200,11 +210,108 @@ class WaitlistConcurrencyTest extends AbstractIntegrationTest {
                         SELECT b.booked_by FROM booking b JOIN court_allocation a ON a.booking_id = b.id
                         WHERE a.court_id = :court AND a.status = 'CONFIRMED'
                         """).param("court", court).query(UUID.class).list();
-        String state = jdbc.sql("SELECT state FROM waitlist_entry WHERE id = :id").param("id", entry)
-                .query(String.class).single();
+        String state = stateOf(entry);
         if (!holders.isEmpty() && !holders.getFirst().equals(offered.accountId())) {
             assertThat(state).as("somebody else books the slot only after its offer was declined").isEqualTo("LEFT");
         }
+    }
+
+    @Test
+    void givenAnOfferPastItsDeadline_whenItsMemberAcceptsWhileTheSweepRuns_thenItExpiresAndPassesOnOnce()
+            throws Exception {
+        // given
+        UUID booking = book(holder);
+        Member offered = member(1);
+        Member next = member(2);
+        UUID entry = join(offered);
+        UUID following = join(next);
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+        jdbc.sql("UPDATE waitlist_entry SET offer_expires_at = :due WHERE id = :id")
+                .param("due", Timestamp.from(NOW)).param("id", entry).update();
+
+        // when
+        List<Boolean> outcomes = race(
+                () -> booked(() -> waitlist.accept(entry, offered.accountId(), offered.personId(), Set.of(Role.MEMBER))),
+                () -> {
+                    queue.sweep();
+                    return true;
+                });
+
+        // then
+        assertThat(outcomes.getFirst()).as("an offer past its deadline is not accepted").isFalse();
+        assertThat(stateOf(entry)).isEqualTo("EXPIRED");
+        assertThat(offeredOnCourt()).as("the next member is offered the slot exactly once").containsExactly(following);
+        assertThat(confirmedOnCourt()).isZero();
+    }
+
+    @Test
+    void givenAnOpenOffer_whenItsMemberAcceptsWhileTheSweepRuns_thenTheAcceptanceStandsAndNothingPassesOn()
+            throws Exception {
+        // given
+        UUID booking = book(holder);
+        Member offered = member(1);
+        UUID entry = join(offered);
+        UUID following = join(member(2));
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+
+        // when
+        List<Boolean> outcomes = race(
+                () -> booked(() -> waitlist.accept(entry, offered.accountId(), offered.personId(), Set.of(Role.MEMBER))),
+                () -> {
+                    queue.sweep();
+                    return true;
+                });
+
+        // then
+        assertThat(outcomes.getFirst()).as("an open offer is accepted whatever the sweep does").isTrue();
+        assertThat(stateOf(entry)).isEqualTo("BOOKED");
+        assertThat(stateOf(following)).isEqualTo("WAITING");
+        assertThat(confirmedOnCourt()).isEqualTo(1);
+    }
+
+    @Test
+    void givenAnOffer_whenItsMemberAcceptsWhileTheBoardBooksTheCourt_thenExactlyOneOfThemHoldsIt() throws Exception {
+        // given
+        UUID booking = book(holder);
+        Member offered = member(1);
+        UUID entry = join(offered);
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+        UUID boardPerson = identity.createPerson("Mary", "Major", "mary.major@example.org");
+        UUID board = identity.createEnabledAccount(boardPerson, "major.mary", Set.of(Role.ADMIN));
+
+        // when
+        List<Boolean> outcomes = race(
+                () -> booked(() -> waitlist.accept(entry, offered.accountId(), offered.personId(), Set.of(Role.MEMBER))),
+                () -> booked(() -> bookings.create(new CreateBookingCommand(List.of(court), TRAINING_CARD, SLOT, board,
+                        boardPerson, Set.of(Role.ADMIN), null, List.of(), null))));
+
+        // then
+        assertThat(outcomes).as("exactly one of them takes the court").containsExactlyInAnyOrder(true, false);
+        assertThat(confirmedOnCourt()).isEqualTo(1);
+        assertThat(stateOf(entry)).as("the member's acceptance or the board's withdrawal decides the offer")
+                .isEqualTo(outcomes.getFirst() ? "BOOKED" : "WITHDRAWN");
+    }
+
+    @SafeVarargs
+    private List<Boolean> race(Callable<Boolean>... calls) throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        List<Boolean> outcomes = new ArrayList<>();
+        try (ExecutorService pool = Executors.newFixedThreadPool(calls.length)) {
+            List<Future<Boolean>> running = java.util.Arrays.stream(calls).<Callable<Boolean>>map(call -> () -> {
+                start.await();
+                return call.call();
+            }).map(pool::submit).toList();
+            start.countDown();
+            for (Future<Boolean> future : running) {
+                outcomes.add(PostgresDiagnostics.await(future, Duration.ofSeconds(40), jdbc, "Racing call"));
+            }
+        }
+        return outcomes;
+    }
+
+    private String stateOf(UUID entry) {
+        return jdbc.sql("SELECT state FROM waitlist_entry WHERE id = :id").param("id", entry)
+                .query(String.class).single();
     }
 
     private boolean booked(Callable<?> attempt) throws Exception {

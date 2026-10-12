@@ -144,8 +144,10 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
   Mitglied einen neuen Code anfordern.
 * **Angebotsfrist der Warteliste** legt fest, wie viele Minuten ein frei gewordener Platz für das
   Mitglied reserviert bleibt, das auf der Warteliste an der Reihe ist. Vorgeschlagen sind 15 Minuten.
-  Das Angebot endet spätestens mit dem Beginn der Zeit. Während es gilt, kann niemand sonst den Platz
-  buchen, auch der Vorstand nicht. Erst danach geht er an das nächste Mitglied.
+  Das Angebot endet spätestens mit dem Beginn der Zeit. Während es gilt, können andere Mitglieder und
+  Trainer den Platz nicht buchen, und ihre Serien überspringen diesen Termin. Der Vorstand und eine
+  Sperrung gehen vor: Bucht ein Admin den Platz, legt eine Serie darüber oder verschiebt eine dorthin,
+  oder sperrt jemand den Platz, endet das Angebot. Das Mitglied sieht das unter *Meine Buchungen*.
 
 ![Die Fristen für Einmalpasswörter und Codes und die Erinnerung vor einer Buchung.](screenshots/de/deadlines.png)
 

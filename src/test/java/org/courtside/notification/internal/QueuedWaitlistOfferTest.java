@@ -1,5 +1,8 @@
 package org.courtside.notification.internal;
 
+import jakarta.mail.Address;
+import jakarta.mail.SendFailedException;
+import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.testfixture.BookingTestFixture;
@@ -8,12 +11,14 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
+import org.courtside.shared.WaitlistAnnouncer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -27,6 +32,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -58,6 +64,9 @@ class QueuedWaitlistOfferTest extends AbstractIntegrationTest {
 
     @Autowired
     private JdbcClient jdbc;
+
+    @Autowired
+    private WaitlistAnnouncer announcer;
 
     private UUID court;
     private UUID holderAccount;
@@ -112,6 +121,60 @@ class QueuedWaitlistOfferTest extends AbstractIntegrationTest {
 
         // then
         assertThat(outcome()).containsEntry("state", "HANDED_OVER");
+    }
+
+    @Test
+    void givenAnOpenOffer_whenTheRelayRefusesItsRecipient_thenTheOfferPassesToTheNextMember() throws Exception {
+        // given
+        UUID nextPerson = identity.createPerson("John", "Roe", "john.roe@example.org");
+        UUID nextAccount = identity.createEnabledAccount(nextPerson, "roe.john", Set.of(Role.MEMBER));
+        UUID booking = bookings.createBookingNamingMember(court, MEMBER_CARD, SLOT, holderAccount, holderPerson,
+                Set.of(Role.MEMBER), null, partnerPerson);
+        UUID entry = bookings.joinWaitlist(court, MEMBER_CARD, SLOT, waitingAccount, waitingPerson, partnerPerson);
+        UUID next = bookings.joinWaitlist(court, MEMBER_CARD, SLOT, nextAccount, nextPerson, partnerPerson);
+        bookings.cancelBooking(booking, holderAccount, Set.of(Role.MEMBER));
+        doAnswer(invocation -> {
+            MimeMessage sent = invocation.getArgument(0);
+            if (sent.getAllRecipients()[0].toString().contains("mary.major")) {
+                throw refusal();
+            }
+            return null;
+        }).when(sender).send(any(MimeMessage.class));
+
+        // when
+        outbox.deliverDue();
+
+        // then
+        assertThat(outcome()).containsEntry("state", "REFUSED");
+        assertThat(stateOf(entry)).as("an offer that cannot reach its member does not hold the court").isEqualTo("SKIPPED");
+        assertThat(stateOf(next)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenAnOfferTakenMeanwhile_whenItsMailIsReportedRefused_thenTheBookingStands() {
+        // given
+        UUID booking = bookings.createBookingNamingMember(court, MEMBER_CARD, SLOT, holderAccount, holderPerson,
+                Set.of(Role.MEMBER), null, partnerPerson);
+        UUID entry = bookings.joinWaitlist(court, MEMBER_CARD, SLOT, waitingAccount, waitingPerson, partnerPerson);
+        bookings.cancelBooking(booking, holderAccount, Set.of(Role.MEMBER));
+        bookings.acceptWaitlistOffer(entry, waitingAccount, waitingPerson);
+
+        // when
+        announcer.offerUndeliverable(entry);
+
+        // then
+        assertThat(stateOf(entry)).as("a refusal arriving after the offer ended changes nothing").isEqualTo("BOOKED");
+    }
+
+    private String stateOf(UUID entry) {
+        return jdbc.sql("SELECT state FROM waitlist_entry WHERE id = :id").param("id", entry)
+                .query(String.class).single();
+    }
+
+    private static MailSendException refusal() throws Exception {
+        return new MailSendException(Map.of("<a-message-id@example.org>",
+                new SendFailedException("550 5.1.1 user unknown", null, new Address[0],
+                        new Address[0], new Address[]{new InternetAddress("mary.major@example.org")})));
     }
 
     private Map<String, Object> outcome() {

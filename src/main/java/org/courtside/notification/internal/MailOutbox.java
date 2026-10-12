@@ -151,6 +151,7 @@ class MailOutbox {
             settle(claimed, record -> messages.failed(record, undeliverable.reason()));
         } catch (MailRecipientRefusedException refusal) {
             settle(claimed, record -> messages.refused(record, refusal.diagnosis(), refusal.statusCode()));
+            reportRefusal(message);
         } catch (RuntimeException failure) {
             String diagnosis = diagnosisOf(failure);
             if (claimed.attempts() >= ATTEMPTS) {
@@ -161,6 +162,15 @@ class MailOutbox {
                 Instant next = clock.instant().plus(gapAfter(claimed.attempts()));
                 settle(claimed, record -> messages.retry(record, diagnosis, next));
             }
+        }
+    }
+
+    private void reportRefusal(QueuedMessage message) {
+        try {
+            composerFor(message.kind()).refused(message);
+        } catch (RuntimeException failure) {
+            log.warn("A refused {} message for account {} could not be reported back: {}", message.kind(),
+                    message.accountId(), chainOf(failure));
         }
     }
 

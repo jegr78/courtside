@@ -8,6 +8,7 @@ import org.courtside.booking.ParticipantSpec;
 import org.courtside.booking.internal.CourtReservedException;
 import org.courtside.booking.series.SeriesCreationResult;
 import org.courtside.booking.series.SeriesMoveConflictException;
+import org.courtside.booking.series.SeriesPreview;
 import org.courtside.booking.series.SeriesRule;
 import org.courtside.booking.series.SeriesService;
 import org.courtside.booking.testfixture.BookingTestFixture;
@@ -15,6 +16,7 @@ import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
+import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,11 +38,13 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class, BookingTestFixture.class})
+@Import({FacilityTestFixture.class, IdentityTestFixture.class, ConfigTestFixture.class, BookingTestFixture.class,
+        MemberTestFixture.class})
 class WaitlistTest extends AbstractIntegrationTest {
 
     static final UUID MEMBER_CARD = UUID.fromString("11111111-1111-1111-1111-111111111111");
     static final UUID TRAINING_CARD = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    static final UUID COURT_CLOSED = UUID.fromString("44444444-4444-4444-4444-444444444444");
     static final Instant NOW = Instant.parse("2026-05-12T10:00:00Z");
     static final TimeSlot SLOT = new TimeSlot(Instant.parse("2026-05-13T16:00:00Z"),
             Instant.parse("2026-05-13T17:00:00Z"));
@@ -68,6 +72,9 @@ class WaitlistTest extends AbstractIntegrationTest {
 
     @Autowired
     private ConfigTestFixture configuration;
+
+    @Autowired
+    private MemberTestFixture memberships;
 
     @Autowired
     private JdbcClient jdbc;
@@ -136,6 +143,22 @@ class WaitlistTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> join(first, SLOT))
+                .isInstanceOfSatisfying(WaitlistEntryExistsException.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("waitlist.entry.exists"));
+        assertThat(entries()).isEqualTo(1);
+    }
+
+    @Test
+    void givenAnOpenEntry_whenTheMemberJoinsAnOverlappingTimeOnTheSameCourt_thenItIsRefusedAsTheSameWait() {
+        // given
+        book(holder, SLOT);
+        join(first, SLOT);
+        TimeSlot overlapping = new TimeSlot(SLOT.start().plus(30, ChronoUnit.MINUTES),
+                SLOT.end().plus(30, ChronoUnit.MINUTES));
+
+        // when / then
+        assertThatThrownBy(() -> join(first, overlapping))
+                .as("one account cannot stack offer windows over one court and time")
                 .isInstanceOfSatisfying(WaitlistEntryExistsException.class, failure ->
                         assertThat(failure.getCode()).isEqualTo("waitlist.entry.exists"));
         assertThat(entries()).isEqualTo(1);
@@ -236,6 +259,20 @@ class WaitlistTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnAcceptedOfferWhoseBookingWasCancelled_whenTheMemberAcceptsAgain_thenThereIsNoOfferToTake() {
+        // given
+        UUID entry = offerTo(first);
+        UUID booking = waitlist.accept(entry, first.accountId(), first.personId(), Set.of(Role.MEMBER));
+        bookings.cancel(booking, first.accountId(), Set.of(Role.MEMBER));
+
+        // when / then
+        assertThatThrownBy(() -> waitlist.accept(entry, first.accountId(), first.personId(), Set.of(Role.MEMBER)))
+                .as("a cancelled booking is not handed back as the answer to an acceptance")
+                .isInstanceOfSatisfying(WaitlistNoOfferException.class, failure ->
+                        assertThat(failure.problemType().slug()).isEqualTo("waitlist-no-offer"));
+    }
+
+    @Test
     void givenAnOffer_whenTheMemberBooksTheSlotThemselves_thenTheirEntryClosesAsBooked() {
         // given
         UUID entry = offerTo(first);
@@ -321,6 +358,101 @@ class WaitlistTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenTheFirstMemberAtTheirBookingLimit_whenTheSlotFrees_thenTheRuleSkipsThemForTheNext() {
+        // given
+        memberships.assignMembership(first.personId(), memberships.membershipTypeMeasuredBy("Standard",
+                UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001")));
+        UUID booking = book(holder, SLOT);
+        UUID firstEntry = join(first, SLOT);
+        UUID secondEntry = join(second, SLOT);
+        book(first, shifted(SLOT, 1));
+        book(first, shifted(SLOT, 2));
+
+        // when
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(stateOf(firstEntry)).as("an offer passes the booking rules first").isEqualTo("SKIPPED");
+        assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenTheFirstMembersPlayersNoLongerAllowed_whenTheSlotFrees_thenTheyAreSkippedForTheNext() {
+        // given
+        UUID booking = book(holder, SLOT);
+        UUID firstEntry = waitlist.join(new JoinWaitlistCommand(court, MEMBER_CARD, SLOT, first.accountId(),
+                first.personId(), Set.of(Role.MEMBER), null, List.of(ParticipantSpec.guest("Guest"))));
+        UUID secondEntry = join(second, SLOT);
+        jdbc.sql("UPDATE booking_card SET guest_allowed = false WHERE id = :id").param("id", MEMBER_CARD).update();
+
+        // when
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(stateOf(firstEntry)).as("an offer passes the player checks of a booking").isEqualTo("SKIPPED");
+        assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenTheCourtTakenOutOfService_whenTheSlotFrees_thenNobodyIsOfferedIt() {
+        // given
+        UUID booking = book(holder, SLOT);
+        UUID firstEntry = join(first, SLOT);
+        UUID secondEntry = join(second, SLOT);
+        facility.deactivateCourt(court);
+
+        // when
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+
+        // then
+        assertThat(List.of(stateOf(firstEntry), stateOf(secondEntry)))
+                .as("a court nobody can book is offered to nobody").containsOnly("SKIPPED");
+    }
+
+    @Test
+    void givenAnOfferWhoseMemberLosesTheCard_whenTheSweepRuns_thenTheOfferEndsAndPassesOn() {
+        // given
+        Member trainer = member("Jane", "Roe", Role.TRAINER);
+        UUID booking = book(holder, SLOT);
+        UUID trainerEntry = waitlist.join(new JoinWaitlistCommand(court, TRAINING_CARD, SLOT, trainer.accountId(),
+                trainer.personId(), Set.of(Role.TRAINER), null, List.of()));
+        UUID secondEntry = join(second, SLOT);
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+        assertThat(stateOf(trainerEntry)).isEqualTo("OFFERED");
+        jdbc.sql("UPDATE booking_card SET active = false WHERE id = :id").param("id", TRAINING_CARD).update();
+
+        // when
+        queue.sweep();
+
+        // then
+        assertThat(stateOf(trainerEntry)).as("an offer its member may no longer take ends at once").isEqualTo("SKIPPED");
+        assertThat(stateOf(secondEntry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenThreeMembersWaiting_whenEachOfferIsDeclinedInTurn_thenTheyAreOfferedInTheOrderTheyJoined() {
+        // given
+        Member third = member("Mary", "Doe", Role.MEMBER);
+        UUID booking = book(holder, SLOT);
+        UUID firstEntry = join(first, SLOT);
+        UUID secondEntry = join(second, SLOT);
+        UUID thirdEntry = join(third, SLOT);
+        List<UUID> offered = new java.util.ArrayList<>();
+
+        // when
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+        offered.add(offeredEntry());
+        waitlist.leave(offered.getLast(), first.accountId());
+        offered.add(offeredEntry());
+        waitlist.leave(offered.getLast(), second.accountId());
+        offered.add(offeredEntry());
+
+        // then
+        assertThat(offered).as("each decline passes the offer to the next in joining order")
+                .containsExactly(firstEntry, secondEntry, thirdEntry);
+    }
+
+    @Test
     void givenTheFirstMembersAccountDisabled_whenTheSlotFrees_thenTheyAreSkippedForTheNext() {
         // given
         UUID booking = book(holder, SLOT);
@@ -391,22 +523,127 @@ class WaitlistTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenAnOffer_whenTheBoardMovesASeriesOntoTheReservedCourt_thenTheMoveIsBlocked() {
+    void givenAnOffer_whenATrainerMovesASeriesOntoTheReservedCourt_thenTheMoveIsBlocked() {
         // given
-        offerTo(first);
+        UUID entry = offerTo(first);
+        Member trainer = member("Mary", "Roe", Role.TRAINER);
+        UUID series = bookingFixture.createSeries(court, TRAINING_CARD, LocalDate.of(2026, 5, 13),
+                LocalTime.of(20, 0), 60, 1, trainer.accountId(), trainer.personId(), Set.of(Role.TRAINER));
+
+        // when / then
+        assertThatThrownBy(() -> bookingFixture.moveWholeSeries(series, LocalTime.of(18, 0), trainer.accountId(),
+                Set.of(Role.TRAINER))).isInstanceOf(SeriesMoveConflictException.class);
+        assertThat(stateOf(entry)).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void givenAnOffer_whenTheBoardMovesASeriesOntoTheReservedCourt_thenTheClubTakesItAndTheOfferIsWithdrawn() {
+        // given
+        UUID entry = offerTo(first);
         Member board = member("Mary", "Roe", Role.ADMIN);
         UUID series = bookingFixture.createSeries(court, TRAINING_CARD, LocalDate.of(2026, 5, 13),
                 LocalTime.of(20, 0), 60, 1, board.accountId(), board.personId(), Set.of(Role.ADMIN));
 
-        // when / then
-        assertThatThrownBy(() -> bookingFixture.moveWholeSeries(series, LocalTime.of(18, 0), board.accountId(),
-                Set.of(Role.ADMIN))).isInstanceOf(SeriesMoveConflictException.class);
+        // when
+        bookingFixture.moveWholeSeries(series, LocalTime.of(18, 0), board.accountId(), Set.of(Role.ADMIN));
+
+        // then
+        assertThat(stateOf(entry)).as("the board goes before a reservation").isEqualTo("WITHDRAWN");
+        assertThat(confirmedOnCourt()).isEqualTo(1);
     }
 
     @Test
-    void givenAnOffer_whenTheBoardCreatesASeriesOverTheReservedCourt_thenThatDateIsSkippedAndTheRestBooked() {
+    void givenATrainersOwnOffer_whenTheyMoveTheirSeriesOntoIt_thenTheirEntryClosesAsBooked() {
+        // given
+        Member trainer = member("Mary", "Roe", Role.TRAINER);
+        UUID booking = book(holder, SLOT);
+        UUID entry = waitlist.join(new JoinWaitlistCommand(court, TRAINING_CARD, SLOT, trainer.accountId(),
+                trainer.personId(), Set.of(Role.TRAINER), null, List.of()));
+        bookings.cancel(booking, holder.accountId(), Set.of(Role.MEMBER));
+        UUID series = bookingFixture.createSeries(court, TRAINING_CARD, LocalDate.of(2026, 5, 13),
+                LocalTime.of(20, 0), 60, 1, trainer.accountId(), trainer.personId(), Set.of(Role.TRAINER));
+
+        // when
+        bookingFixture.moveWholeSeries(series, LocalTime.of(18, 0), trainer.accountId(), Set.of(Role.TRAINER));
+
+        // then
+        assertThat(stateOf(entry)).as("moving onto one's own reservation takes it").isEqualTo("BOOKED");
+        assertThat(jdbc.sql("SELECT booking_id FROM waitlist_entry WHERE id = :id").param("id", entry)
+                .query(UUID.class).single()).isEqualTo(bookingFixture.firstOccurrenceOf(series));
+    }
+
+    @Test
+    void givenAnOffer_whenTheBoardBooksTheReservedCourt_thenTheClubTakesItAndTheOfferIsWithdrawn() {
+        // given
+        UUID entry = offerTo(first);
+        Member board = member("Mary", "Roe", Role.ADMIN);
+
+        // when
+        bookings.create(new CreateBookingCommand(List.of(court), TRAINING_CARD, SLOT, board.accountId(),
+                board.personId(), Set.of(Role.ADMIN), null, List.of(), null));
+
+        // then
+        assertThat(stateOf(entry)).as("the board goes before a reservation").isEqualTo("WITHDRAWN");
+        assertThat(jdbc.sql("SELECT count(*) FROM waitlist_entry WHERE state = 'OFFERED'").query(Integer.class)
+                .single()).as("a court the club took is offered to nobody else").isZero();
+    }
+
+    @Test
+    void givenAnOffer_whenTheGroundskeeperClosesTheReservedCourt_thenTheClosureTakesItAndTheOfferIsWithdrawn() {
+        // given
+        UUID entry = offerTo(first);
+        Member groundskeeper = member("Mary", "Roe", Role.GROUNDSKEEPER);
+
+        // when
+        bookings.create(new CreateBookingCommand(List.of(court), COURT_CLOSED, SLOT, groundskeeper.accountId(),
+                groundskeeper.personId(), Set.of(Role.GROUNDSKEEPER), null, List.of(), null));
+
+        // then
+        assertThat(stateOf(entry)).as("a closure goes before a reservation").isEqualTo("WITHDRAWN");
+    }
+
+    @Test
+    void givenAnOffer_whenATrainerPreviewsASeriesOverTheReservedCourt_thenThatDateShowsTheCourtTaken() {
         // given
         offerTo(first);
+        Member trainer = member("Mary", "Roe", Role.TRAINER);
+        Member board = member("John", "Major", Role.ADMIN);
+        SeriesRule rule = new SeriesRule(List.of(court), TRAINING_CARD, LocalDate.of(2026, 5, 13), LocalTime.of(18, 0),
+                60, 1, Set.of(DayOfWeek.WEDNESDAY), null, 2);
+
+        // when
+        SeriesPreview seenByTrainer = series.preview(rule, trainer.accountId(), trainer.personId(), Set.of(Role.TRAINER));
+        SeriesPreview seenByBoard = series.preview(rule, board.accountId(), board.personId(), Set.of(Role.ADMIN));
+
+        // then
+        assertThat(seenByTrainer.occurrences()).extracting(occurrence -> occurrence.blockedCourtIds().isEmpty())
+                .as("the preview skips what the creation would skip").containsExactly(false, true);
+        assertThat(seenByBoard.occurrences()).extracting(occurrence -> occurrence.blockedCourtIds().isEmpty())
+                .as("the board goes before a reservation").containsExactly(true, true);
+    }
+
+    @Test
+    void givenAnOffer_whenATrainerCreatesASeriesOverTheReservedCourt_thenThatDateIsSkippedAndTheRestBooked() {
+        // given
+        offerTo(first);
+        Member trainer = member("Mary", "Roe", Role.TRAINER);
+        SeriesRule rule = new SeriesRule(List.of(court), TRAINING_CARD, LocalDate.of(2026, 5, 13), LocalTime.of(18, 0),
+                60, 1, Set.of(DayOfWeek.WEDNESDAY), null, 2);
+        List<Instant> starts = List.of(SLOT.start(), shifted(SLOT, 7).start());
+
+        // when
+        SeriesCreationResult result = series.create(rule, starts, trainer.accountId(), trainer.personId(),
+                Set.of(Role.TRAINER), null);
+
+        // then
+        assertThat(result.skipped()).as("the reserved date is skipped like a taken one").containsExactly(SLOT.start());
+        assertThat(result.bookingIds()).hasSize(1);
+    }
+
+    @Test
+    void givenAnOffer_whenTheBoardCreatesASeriesOverTheReservedCourt_thenEveryDateIsBookedAndTheOfferWithdrawn() {
+        // given
+        UUID entry = offerTo(first);
         Member board = member("Mary", "Roe", Role.ADMIN);
         SeriesRule rule = new SeriesRule(List.of(court), TRAINING_CARD, LocalDate.of(2026, 5, 13), LocalTime.of(18, 0),
                 60, 1, Set.of(DayOfWeek.WEDNESDAY), null, 2);
@@ -417,8 +654,8 @@ class WaitlistTest extends AbstractIntegrationTest {
                 Set.of(Role.ADMIN), null);
 
         // then
-        assertThat(result.skipped()).as("the reserved date is skipped like a taken one").containsExactly(SLOT.start());
-        assertThat(result.bookingIds()).hasSize(1);
+        assertThat(result.skipped()).isEmpty();
+        assertThat(stateOf(entry)).isEqualTo("WITHDRAWN");
     }
 
     @Test
@@ -500,6 +737,10 @@ class WaitlistTest extends AbstractIntegrationTest {
 
     private static TimeSlot shifted(TimeSlot slot, int days) {
         return new TimeSlot(slot.start().plus(days, ChronoUnit.DAYS), slot.end().plus(days, ChronoUnit.DAYS));
+    }
+
+    private UUID offeredEntry() {
+        return jdbc.sql("SELECT id FROM waitlist_entry WHERE state = 'OFFERED'").query(UUID.class).single();
     }
 
     private String stateOf(UUID entry) {

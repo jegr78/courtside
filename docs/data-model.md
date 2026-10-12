@@ -116,10 +116,10 @@ whether a court is free.
 | `waitlist_participant` | The players named on joining, one row per slot, in the shape of `booking_participant` | `waitlist_entry`, `person`, `participant_card` |
 
 The entries for one court, start and end form that slot's queue, in the order of `joined_seq`. An
-entry is `WAITING` or `OFFERED` while it is open and `BOOKED`, `LEFT`, `EXPIRED`, `SKIPPED` or
-`ENDED` once closed, and `waitlist_entry_open_until_closed` ties `closed_at` to that split.
-`waitlist_entry_one_open_per_account` is a partial unique index: an account holds at most one open
-entry for a slot. An offer has a deadline no later than the slot's start, and
+entry is `WAITING` or `OFFERED` while it is open and `BOOKED`, `LEFT`, `EXPIRED`, `SKIPPED`,
+`WITHDRAWN` or `ENDED` once closed, and `waitlist_entry_open_until_closed` ties `closed_at` to that split.
+`waitlist_entry_one_open_per_account` is a GiST exclusion over open rows: an account holds at most
+one open entry for a court at any moment, so it cannot stack offer windows with overlapping times. An offer has a deadline no later than the slot's start, and
 `waitlist_entry_one_offer` is a GiST exclusion over `OFFERED` rows of the same form as
 `court_allocation_no_overlap`, so no two offers ever hold the same court at the same time.
 

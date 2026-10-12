@@ -20,7 +20,7 @@ CREATE TABLE waitlist_entry (
 
     CONSTRAINT waitlist_entry_period CHECK (ends_at > starts_at),
     CONSTRAINT waitlist_entry_state_known CHECK (
-        state IN ('WAITING', 'OFFERED', 'BOOKED', 'LEFT', 'EXPIRED', 'SKIPPED', 'ENDED')),
+        state IN ('WAITING', 'OFFERED', 'BOOKED', 'LEFT', 'EXPIRED', 'SKIPPED', 'WITHDRAWN', 'ENDED')),
     CONSTRAINT waitlist_entry_open_until_closed CHECK (
         (state IN ('WAITING', 'OFFERED')) = (closed_at IS NULL)),
     CONSTRAINT waitlist_entry_offer_has_deadline CHECK (
@@ -32,12 +32,15 @@ CREATE TABLE waitlist_entry (
     CONSTRAINT waitlist_entry_one_offer EXCLUDE USING gist (
         court_id WITH =,
         tstzrange(starts_at, ends_at, '[)') WITH &&
-    ) WHERE (state = 'OFFERED')
+    ) WHERE (state = 'OFFERED'),
+    -- One open wait per account, court and time, so nobody stacks offer windows over one court.
+    CONSTRAINT waitlist_entry_one_open_per_account EXCLUDE USING gist (
+        account_id WITH =,
+        court_id WITH =,
+        tstzrange(starts_at, ends_at, '[)') WITH &&
+    ) WHERE (state IN ('WAITING', 'OFFERED'))
 );
 
-CREATE UNIQUE INDEX waitlist_entry_one_open_per_account
-    ON waitlist_entry (account_id, court_id, starts_at, ends_at)
-    WHERE state IN ('WAITING', 'OFFERED');
 CREATE INDEX waitlist_entry_queue ON waitlist_entry (court_id, starts_at, joined_seq)
     WHERE state IN ('WAITING', 'OFFERED');
 CREATE INDEX waitlist_entry_account ON waitlist_entry (account_id);

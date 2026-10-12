@@ -44,6 +44,10 @@ public class BookingTestFixture {
         waitlist.leave(entryId, accountId);
     }
 
+    public UUID acceptWaitlistOffer(UUID entryId, UUID accountId, UUID personId) {
+        return waitlist.accept(entryId, accountId, personId, Set.of(Role.MEMBER));
+    }
+
     public UUID createBookingWithGuest(UUID courtId, UUID cardId, TimeSlot slot,
                                        UUID bookerPersonId, Set<Role> roles, String guestName) {
         return bookingService.create(new CreateBookingCommand(

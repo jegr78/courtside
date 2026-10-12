@@ -136,8 +136,10 @@ Open *Club → Deadlines and reminders*.
   request a new code after it expires.
 * **Waitlist offer window** sets how many minutes a freed court stays reserved for the member whose
   turn it is on its waitlist. 15 minutes is the suggested value. The offer ends when the time starts
-  at the latest. While it stands, nobody else can book the court, the board included. Only then does
-  it pass to the next member.
+  at the latest. While it stands, other members and trainers cannot book the court, and their series
+  skip that date. The board and a closure go first: when an admin books the court, creates a series
+  over it or moves one onto it, or someone closes the court, the offer ends. The member sees this in
+  *My bookings*.
 
 ![Lifetimes for one-time passwords and codes and the reminder before a booking.](../screenshots/en/deadlines.png)
 

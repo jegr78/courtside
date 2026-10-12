@@ -18,6 +18,7 @@ import org.courtside.identity.CurrentUser;
 import org.courtside.identity.UserAccount;
 import org.courtside.shared.TimeSlot;
 import org.courtside.shared.WireTypes;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.InitBinder;
@@ -72,7 +73,7 @@ class WaitlistController implements WaitlistApi {
         UUID id = waitlist.join(new JoinWaitlistCommand(request.getCourtId(), request.getCardId(),
                 new TimeSlot(WireTypes.toInstant(request.getStartsAt()), WireTypes.toInstant(request.getEndsAt())),
                 account.getId(), account.getPerson().getId(), account.getRoles(), request.getNote(), participants));
-        return ResponseEntity.created(URI.create("/api/my/waitlist/" + id)).body(new ApiWaitlistJoined(id));
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiWaitlistJoined(id));
     }
 
     @Override

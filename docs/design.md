@@ -339,30 +339,37 @@ booker's approval. Removing one participant does not cancel the booking.
 A member may queue for a court and period somebody else holds by selecting it in the court plan. The
 entry names the card, players and note the eventual booking will carry, and joining runs every check
 a booking of that slot runs except that its court is free. A slot nobody else holds, a second open
-entry for the same slot and a 21st entry whose slot has not ended are refused. Each court, start and
-end has its own first-in, first-out queue.
+entry on the same court at an overlapping time and a 21st entry whose slot has not ended are
+refused. The 21 counts closed entries too until their slot ends, so joining and leaving in turn
+cannot get round it. Each court, start and end has its own first-in, first-out queue.
 
 The waitlist is part of `booking`, in `booking.waitlist`. The booking write has to refuse a
 reservation and an acceptance has to write a booking, so a module of its own would depend on
 `booking` while `booking` depended on it.
 
 When a cancellation, a cancelled series or a moved series frees the slot, the same transaction
-offers it to the first entry still eligible. A disabled account, an inactive or forbidden card, an
-unbookable court or a refused booking rule closes that entry as skipped and the next one is asked.
-The offer reserves the court for the club's offer window, 15 minutes unless the board changes it,
-and ends at the slot's start at the latest. While it stands, the booking write and a series move
-refuse the court to every other account, a new series skips that date as taken, and the court plan shows it as reserved without naming
-anybody. The member accepts in Courtside, which turns the reservation into an ordinary booking under
-every rule in one transaction; a refused rule leaves the offer standing until its deadline. Declining
-or leaving passes the offer on at once. The member's own booking of the slot closes their entry,
-and a sweep every 30 seconds expires offers past their deadline and passes them on, closes entries
-whose slot has started, deletes entries whose slot has ended and offers any free slot a queue still
-waits for.
+offers it to the first entry that passes every check a booking of the slot would pass, with the
+card, players and note named on joining. A disabled account or any refused check closes that entry
+as skipped and the next one is asked. The offer reserves the court for the club's offer window, 15
+minutes unless the board changes it, and ends at the slot's start at the latest. While it stands,
+the booking write and a series move refuse the court to every other account, a new series and its
+preview treat that date as taken, and the court plan shows it as reserved without naming anybody.
+The board and a closure go first: a booking by an admin or on the closure card, a series an admin
+creates and a series move an admin makes take the court and close the offer as withdrawn. The
+member accepts in Courtside, which turns the reservation into an ordinary booking under every rule
+in one transaction; a refused rule leaves the offer standing until its deadline. Declining or
+leaving passes the offer on at once. The member's own booking of the slot, or a move of their own
+series onto it, closes their entry as booked. A definite refusal of the offer mail by the
+recipient's server skips an offer that is still open and passes it on, because its member will not
+hear of it by mail. A sweep every 30 seconds expires offers past their deadline, skips offers whose
+member no longer passes the checks, passes both on, closes entries whose slot has started, deletes
+entries whose slot has ended and offers any free slot a queue still waits for.
 
 Every path that writes a booking, cancels one, moves a series or changes a queue first takes the
 lock the booking grid coordination holds on the club configuration row, so a booking and an offer
-never meet on one court. A GiST exclusion over offered entries backs this up in the database. A
-member sees only their own entries and their state, never another waiting member or a position.
+never meet on one court. GiST exclusions back this up in the database: one over offered entries
+per court and time, one over each account's open entries per court and time. A member sees only
+their own entries and their state, never another waiting member or a position.
 
 ## Configuration and administration
 
@@ -585,7 +592,7 @@ its row to the next pass after the lease, which can send that message a second t
 
 A transport failure reschedules the row after 15 seconds and then after gaps three times as long,
 and fails it on the sixth attempt, about half an hour after the first. A definite recipient refusal
-is not retried. A message fails at once when its booking or recipient is gone, its booking was
+is not retried, and for a waitlist offer that is still open it skips the offer and passes it on. A message fails at once when its booking or recipient is gone, its booking was
 cancelled and the message is not the one announcing that, a series message finds no occurrence
 left, or, for a reminder, its booking has already started by the time it is due. Every outcome
 stays on the row with its reason, and the message statistics count the messages that needed a

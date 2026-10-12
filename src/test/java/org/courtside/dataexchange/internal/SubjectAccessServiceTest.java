@@ -56,6 +56,9 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
     @Autowired
     private NotificationTestFixture notifications;
 
+    @Autowired
+    private org.springframework.jdbc.core.simple.JdbcClient jdbc;
+
     private UUID courtId;
 
     @BeforeEach
@@ -115,6 +118,31 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
                 .satisfies(entry -> assertThat(entry.startsAt()).isEqualTo(SIX_PM));
         assertThat(answer.waitlistsNamedIn().toString()).as("nothing names who made the other entry")
                 .doesNotContain(otherAccount.toString()).doesNotContain("Roe");
+    }
+
+    @Test
+    void givenAWaitlistEntryWhoseSlotHasEnded_whenTheAnswerIsProduced_thenItIsNotInIt() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID holderPerson = roster.addPerson("Mary", "Major", "mary.major@example.org");
+        UUID holderAccount = identity.createEnabledAccount(holderPerson, "major.mary", Set.of(Role.MEMBER));
+        TimeSlot slot = new TimeSlot(SIX_PM, SEVEN_PM);
+        bookings.createBookingNamingMember(courtId, MEMBER_BOOKING_CARD, slot, holderAccount, holderPerson,
+                Set.of(Role.MEMBER), null, personId);
+        UUID own = bookings.joinWaitlist(courtId, MEMBER_BOOKING_CARD, slot, accountId, personId, holderPerson);
+        jdbc.sql("""
+                        UPDATE waitlist_entry SET starts_at = starts_at - interval '2 days',
+                            ends_at = ends_at - interval '2 days', state = 'ENDED', closed_at = starts_at
+                        WHERE id = :id
+                        """).param("id", own).update();
+
+        // when
+        SubjectAccessRecord answer = subjectAccess.answerFor(personId);
+
+        // then
+        assertThat(answer.waitlistEntries()).as("an entry the sweep forgets is no longer part of the answer")
+                .isEmpty();
     }
 
     @Test

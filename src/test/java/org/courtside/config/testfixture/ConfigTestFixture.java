@@ -84,6 +84,6 @@ public class ConfigTestFixture {
                 new BookingSlotDuration(current.slotMinutes()), current.timeZone(),
                 new CredentialLifetime(current.newAccountCredentialHours()),
                 new CredentialLifetime(current.passwordResetCredentialHours()),
-                new ResetTokenLifetime(60), new ReminderLeadTime(reminderHours), ruleSetId);
+                new ResetTokenLifetime(60), new ReminderLeadTime(reminderHours), ruleSetId, null);
     }
 }

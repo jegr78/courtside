@@ -224,12 +224,15 @@ steht unter *Benachrichtigungen* und unter *Meine Buchungen*, per E-Mail nur, we
 hast. Die Reservierung gilt so lange, wie der Verein es eingestellt hat, höchstens bis zum Beginn der
 Zeit. Wählst du *Buchen*, wird daraus deine Buchung mit den eingetragenen Mitspielern. Lehnst du ab
 oder läuft die Zeit ab, geht der Platz an das nächste Mitglied. Darfst du den Platz inzwischen nicht
-mehr buchen, überspringt Courtside dich.
+mehr buchen oder lehnt dein Mailserver die Nachricht mit dem Angebot ab, überspringt Courtside dich.
+Belegt der Verein den Platz selbst, etwa für eine Sperrung, endet dein Angebot.
 
 Unter *Meine Buchungen* siehst du nur deine eigenen Einträge. Wer sonst wartet und an welcher Stelle
 du stehst, zeigt Courtside niemandem. Du kannst eine Warteliste jederzeit verlassen. Buchst du den
-Platz selbst oder beginnt die Zeit, endet dein Eintrag. Du kannst auf höchstens 20 Wartelisten
-zugleich stehen.
+Platz selbst oder beginnt die Zeit, endet dein Eintrag. Auf demselben Platz kannst du nur auf eine
+Zeit zugleich warten, die sich mit einer anderen überschneidet. Du kannst höchstens 20 Einträge haben,
+deren Zeit noch nicht vorbei ist. Dazu zählen auch Einträge, die du verlassen hast, bis ihre Zeit
+vorbei ist.
 
 ![Der Dialog für die Warteliste eines belegten Platzes mit Buchungsart und Mitspielern.](screenshots/de/waitlist-dialog.png)
 

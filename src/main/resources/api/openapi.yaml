@@ -1853,9 +1853,11 @@ components:
           type: string
           format: date-time
           description: Must be after `startsAt`.
-        note: { type: [string, "null"] }
+        note: { type: [string, "null"], maxLength: 500 }
         participants:
           type: array
+          # A card permits at most 20 players, so no court takes more.
+          maxItems: 20
           items: { $ref: "#/components/schemas/ParticipantRequest" }
 
     JoinWaitlistRequest:
@@ -1872,9 +1874,11 @@ components:
           type: string
           format: date-time
           description: Must be after `startsAt`.
-        note: { type: [string, "null"] }
+        note: { type: [string, "null"], maxLength: 500 }
         participants:
           type: array
+          # A card permits at most 20 players, so no court takes more.
+          maxItems: 20
           items: { $ref: "#/components/schemas/ParticipantRequest" }
 
     WaitlistJoined:
@@ -1885,11 +1889,12 @@ components:
 
     WaitlistEntryState:
       type: string
-      enum: [WAITING, OFFERED, BOOKED, LEFT, EXPIRED, SKIPPED, ENDED]
+      enum: [WAITING, OFFERED, BOOKED, LEFT, EXPIRED, SKIPPED, WITHDRAWN, ENDED]
       description: |
         `WAITING` until the slot frees and it is this entry's turn, `OFFERED` while the slot is
         reserved for the member, then one closed state: booked, left or declined, expired, skipped
-        because the member was no longer eligible, or ended with the slot's start.
+        because the member was no longer eligible or the offer could not reach them, withdrawn
+        because the club took the court, or ended with the slot's start.
 
     WaitlistEntry:
       type: object
@@ -4640,7 +4645,7 @@ paths:
         Joining checks the card, the players and every booking rule as a booking of that slot
         would, and it is the member's consent to hear of an offer in the notification centre. A
         slot nobody else holds answers `409` with `urn:courtside:error:waitlist-slot-not-taken`,
-        a second open entry for the same slot `409` with
+        a second open entry on the same court at an overlapping time `409` with
         `urn:courtside:error:waitlist-entry-exists`, and a member holding 20 entries whose slot
         has not ended `409` with `urn:courtside:error:waitlist-limit-reached`. When the slot
         frees, the first eligible member in the queue receives an offer that reserves it for the
@@ -4655,9 +4660,7 @@ paths:
             schema: { $ref: "#/components/schemas/JoinWaitlistRequest" }
       responses:
         "201":
-          description: Queued.
-          headers:
-            Location: { $ref: "#/components/headers/Location" }
+          description: Queued. The entry is read back from the list of the member's own entries.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/WaitlistJoined" }

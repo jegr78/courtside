@@ -45,19 +45,6 @@ public record ChangeClubConfigurationCommand(
         }
     }
 
-    // A request that leaves the offer window out keeps the one the club chose.
-    public ChangeClubConfigurationCommand(String clubName, String primaryColor, String accentColor, String logoUrl,
-                                          String imprintUrl, String privacyUrl, String documentationUrl,
-                                          String shortName, String defaultLocale, BookingSlotDuration slotDuration,
-                                          String timeZone, CredentialLifetime newAccountCredential,
-                                          CredentialLifetime passwordResetCredential,
-                                          ResetTokenLifetime passwordResetToken, ReminderLeadTime bookingReminder,
-                                          UUID noMembershipTypeRuleSetId) {
-        this(clubName, primaryColor, accentColor, logoUrl, imprintUrl, privacyUrl, documentationUrl, shortName,
-                defaultLocale, slotDuration, timeZone, newAccountCredential, passwordResetCredential,
-                passwordResetToken, bookingReminder, noMembershipTypeRuleSetId, null);
-    }
-
     private static void requirePresent(Object value, String field) {
         if (value == null) {
             throw new IllegalArgumentException("A club configuration change needs a " + field);

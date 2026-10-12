@@ -49,7 +49,7 @@ public class WaitlistService {
         try {
             rows.insert(id, command, clock.instant());
         } catch (DataIntegrityViolationException failure) {
-            if (SqlConstraintViolation.matches(failure, SqlConstraintViolation.UNIQUE_VIOLATION, ONE_OPEN_ENTRY)) {
+            if (SqlConstraintViolation.matches(failure, SqlConstraintViolation.EXCLUSION_VIOLATION, ONE_OPEN_ENTRY)) {
                 throw new WaitlistEntryExistsException(failure);
             }
             throw failure;
@@ -70,12 +70,13 @@ public class WaitlistService {
         }
     }
 
-    // Accepting twice answers with the booking the first acceptance made.
+    // Accepting twice answers with the booking the first acceptance made while that booking stands.
     @Transactional
     public UUID accept(UUID entryId, UUID accountId, UUID personId, Set<Role> roles) {
         grid.lock();
         WaitlistEntry entry = rows.lockOwn(entryId, accountId).orElseThrow(WaitlistEntryNotFoundException::new);
-        if (entry.state() == WaitlistState.BOOKED && entry.bookingId() != null) {
+        if (entry.state() == WaitlistState.BOOKED && entry.bookingId() != null
+                && rows.confirmedBooking(entry.bookingId())) {
             return entry.bookingId();
         }
         if (entry.state() != WaitlistState.OFFERED || !entry.offerExpiresAt().isAfter(clock.instant())) {

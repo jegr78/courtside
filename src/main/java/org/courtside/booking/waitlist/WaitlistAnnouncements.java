@@ -3,6 +3,7 @@ package org.courtside.booking.waitlist;
 import lombok.RequiredArgsConstructor;
 import org.courtside.card.BookingCard;
 import org.courtside.card.CardService;
+import org.courtside.config.BookingGridCoordination;
 import org.courtside.facility.Court;
 import org.courtside.facility.FacilityService;
 import org.courtside.shared.BookingAnnouncement;
@@ -29,6 +30,18 @@ class WaitlistAnnouncements implements WaitlistAnnouncer {
     private final FacilityService facility;
     private final CardService cards;
     private final Clock clock;
+    private final WaitlistQueue queue;
+    private final BookingGridCoordination grid;
+
+    @Override
+    @Transactional
+    public void offerUndeliverable(UUID entryId) {
+        grid.lock();
+        rows.find(entryId).filter(entry -> entry.state() == WaitlistState.OFFERED).ifPresent(entry -> {
+            rows.close(entry.id(), WaitlistState.SKIPPED, clock.instant());
+            queue.offerFreeQueues(List.of(entry.courtId()), entry.slot());
+        });
+    }
 
     @Override
     @Transactional(readOnly = true)

@@ -221,11 +221,13 @@ When the court frees, Courtside reserves it for the first member on the waitlist
 in *Notifications* and in *My bookings*, and by email only if you chose email. The reservation lasts
 as long as the club has set, at most until the time starts. Select *Book* to turn it into your
 booking with the players you named. If you decline or the time runs out, the court goes to the next
-member. If you may no longer book the court, Courtside skips you.
+member. If you may no longer book the court or your mail server refuses the message with the offer,
+Courtside skips you. If the club takes the court itself, for a closure for example, your offer ends.
 
 *My bookings* lists only your own entries. Courtside shows nobody who else waits or where you stand.
 You can leave a waitlist at any time. Your entry ends when you book the court yourself or its time
-starts. You can be on at most 20 waitlists at a time.
+starts. On one court you can wait for only one of several overlapping times. You can hold at most 20
+entries whose time has not passed yet. Entries you left count too until their time has passed.
 
 ![The dialog for the waitlist of a taken court with the kind of booking and the players.](../screenshots/en/waitlist-dialog.png)
 

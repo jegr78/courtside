@@ -100,14 +100,13 @@ class WaitlistControllerTest extends AbstractIntegrationTest {
         book(holder);
 
         // when
-        String location = mockMvc.perform(post("/api/my/waitlist").with(csrf())
+        mockMvc.perform(post("/api/my/waitlist").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(joinBody(MEMBER_CARD, SLOT)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isString())
-                .andReturn().getResponse().getHeader("Location");
+                .andExpect(header().doesNotExist("Location"));
 
         // then
-        assertThat(location).startsWith("/api/my/waitlist/");
         mockMvc.perform(get("/api/my/waitlist"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
@@ -144,6 +143,43 @@ class WaitlistControllerTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("endsAt"))
                 .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.ChronologicalSlot"));
+        assertThat(entries()).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "major.mary", roles = "MEMBER")
+    void givenAnOversizedNote_whenAMemberJoins_thenTheFieldIsRefused() throws Exception {
+        // given
+        book(holder);
+        String body = joinBody(MEMBER_CARD, SLOT).replace("\"participants\"", "\"note\": \"%s\", \"participants\""
+                .formatted("x".repeat(501)));
+
+        // when / then
+        mockMvc.perform(post("/api/my/waitlist").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("note"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"))
+                .andExpect(jsonPath("$.fieldErrors[0].params.max").value(500));
+        assertThat(entries()).isZero();
+    }
+
+    @Test
+    @WithMockUser(username = "major.mary", roles = "MEMBER")
+    void givenMorePlayersThanACourtHolds_whenAMemberJoins_thenTheFieldIsRefused() throws Exception {
+        // given
+        book(holder);
+        String players = String.join(", ", java.util.Collections.nCopies(21, "{\"guestName\": \"Guest\"}"));
+        String body = joinBody(MEMBER_CARD, SLOT).replace("[{\"personId\": \"%s\"}]".formatted(partner.personId()),
+                "[" + players + "]");
+
+        // when / then
+        mockMvc.perform(post("/api/my/waitlist").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("participants"))
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("validation.Size"))
+                .andExpect(jsonPath("$.fieldErrors[0].params.max").value(20));
         assertThat(entries()).isZero();
     }
 

@@ -8,6 +8,7 @@ public enum WaitlistState {
     LEFT,
     EXPIRED,
     SKIPPED,
+    WITHDRAWN,
     ENDED;
 
     boolean isOpen() {

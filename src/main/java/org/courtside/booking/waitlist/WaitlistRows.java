@@ -130,6 +130,19 @@ class WaitlistRows {
                 .list();
     }
 
+    boolean confirmedBooking(UUID bookingId) {
+        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM booking WHERE id = :id AND status = 'CONFIRMED')")
+                .param("id", bookingId)
+                .query(Boolean.class)
+                .single();
+    }
+
+    List<WaitlistEntry> openOffers() {
+        return jdbc.sql("SELECT " + COLUMNS + " FROM waitlist_entry WHERE state = 'OFFERED' ORDER BY joined_seq")
+                .query(ENTRY)
+                .list();
+    }
+
     List<UUID> offeredCourts(Collection<UUID> courtIds, TimeSlot slot, UUID exceptAccountId) {
         if (courtIds.isEmpty()) {
             return List.of();
@@ -239,6 +252,56 @@ class WaitlistRows {
                         """)
                 .param("id", id)
                 .param("state", state.name())
+                .param("now", timestamp(now))
+                .update();
+    }
+
+    void withdrawOverlapping(Collection<UUID> courtIds, TimeSlot slot, UUID exceptAccountId, Instant now) {
+        jdbc.sql("""
+                        UPDATE waitlist_entry SET state = 'WITHDRAWN', closed_at = :now
+                        WHERE state = 'OFFERED' AND court_id IN (:courtIds)
+                          AND starts_at < :endsAt AND ends_at > :startsAt
+                          AND (CAST(:accountId AS uuid) IS NULL OR account_id <> CAST(:accountId AS uuid))
+                        """)
+                .param("courtIds", courtIds)
+                .param("startsAt", timestamp(slot.start()))
+                .param("endsAt", timestamp(slot.end()))
+                .param("accountId", exceptAccountId)
+                .param("now", timestamp(now))
+                .update();
+    }
+
+    void withdraw(Collection<UUID> ids, Instant now) {
+        if (ids.isEmpty()) {
+            return;
+        }
+        jdbc.sql("UPDATE waitlist_entry SET state = 'WITHDRAWN', closed_at = :now WHERE id IN (:ids) AND state = 'OFFERED'")
+                .param("ids", ids)
+                .param("now", timestamp(now))
+                .update();
+    }
+
+    List<WaitlistEntry> openOfAccountBetween(UUID accountId, Instant from, Instant to) {
+        return jdbc.sql("SELECT " + COLUMNS + """
+                         FROM waitlist_entry
+                        WHERE account_id = :accountId AND state IN ('WAITING', 'OFFERED')
+                          AND starts_at < :to AND ends_at > :from
+                        FOR UPDATE
+                        """)
+                .param("accountId", accountId)
+                .param("from", timestamp(from))
+                .param("to", timestamp(to))
+                .query(ENTRY)
+                .list();
+    }
+
+    void closeBooked(UUID id, UUID bookingId, Instant now) {
+        jdbc.sql("""
+                        UPDATE waitlist_entry SET state = 'BOOKED', closed_at = :now, booking_id = :bookingId
+                        WHERE id = :id AND state IN ('WAITING', 'OFFERED')
+                        """)
+                .param("id", id)
+                .param("bookingId", bookingId)
                 .param("now", timestamp(now))
                 .update();
     }

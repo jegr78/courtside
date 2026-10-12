@@ -2,21 +2,18 @@ package org.courtside.booking.waitlist;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.courtside.booking.BookingRuleCheck;
-import org.courtside.booking.internal.BookingRuleGate;
+import org.courtside.booking.CreateBookingCommand;
+import org.courtside.booking.internal.BookingDrafts;
 import org.courtside.booking.internal.CourtReservations;
 import org.courtside.booking.internal.CourtReservations.Reserved;
 import org.courtside.booking.internal.CourtReservedException;
-import org.courtside.card.BookingCard;
-import org.courtside.card.CardService;
 import org.courtside.config.BookingGridCoordination;
 import org.courtside.config.WaitlistOfferPolicy;
-import org.courtside.facility.FacilityService;
-import org.courtside.identity.Role;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
 import org.courtside.shared.TimeSlot;
 import org.courtside.shared.WaitlistOffered;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -27,7 +24,6 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -39,9 +35,7 @@ class WaitlistQueue implements CourtReservations {
     private final BookingGridCoordination grid;
     private final WaitlistOfferPolicy policy;
     private final UserAccountRepository accounts;
-    private final CardService cards;
-    private final FacilityService facility;
-    private final BookingRuleGate ruleGate;
+    private final ObjectProvider<BookingDrafts> drafts;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
@@ -56,10 +50,22 @@ class WaitlistQueue implements CourtReservations {
     }
 
     @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void withdrawFor(List<UUID> courtIds, TimeSlot slot, UUID accountId) {
+        rows.withdrawOverlapping(courtIds, slot, accountId, clock.instant());
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void withdraw(Collection<UUID> entryIds) {
+        rows.withdraw(entryIds, clock.instant());
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<Reserved> reservedBetween(Instant from, Instant to) {
         return rows.offeredBetween(from, to).stream()
-                .map(entry -> new Reserved(entry.courtId(), entry.slot(), entry.accountId()))
+                .map(entry -> new Reserved(entry.id(), entry.courtId(), entry.slot(), entry.accountId()))
                 .toList();
     }
 
@@ -76,6 +82,28 @@ class WaitlistQueue implements CourtReservations {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
+    public void bookedAll(UUID accountId, List<Placement> placements) {
+        if (accountId == null || placements.isEmpty()) {
+            return;
+        }
+        Instant from = placements.stream().map(placement -> placement.slot().start()).min(Instant::compareTo).orElseThrow();
+        Instant to = placements.stream().map(placement -> placement.slot().end()).max(Instant::compareTo).orElseThrow();
+        for (WaitlistEntry entry : rows.openOfAccountBetween(accountId, from, to)) {
+            placements.stream()
+                    .filter(placement -> placement.courtIds().contains(entry.courtId())
+                            && placement.slot().overlaps(entry.slot()))
+                    .findFirst()
+                    .ifPresent(placement -> {
+                        rows.closeBooked(entry.id(), placement.bookingId(), clock.instant());
+                        if (entry.state() == WaitlistState.OFFERED) {
+                            offerFreeQueues(List.of(entry.courtId()), entry.slot());
+                        }
+                    });
+        }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public void released(List<UUID> courtIds, TimeSlot slot) {
         offerFreeQueues(courtIds, slot);
     }
@@ -87,13 +115,25 @@ class WaitlistQueue implements CourtReservations {
         grid.lock();
         Instant now = clock.instant();
         int expired = rows.expireDue(now);
+        int lapsed = closeIneligibleOffers(now);
         int ended = rows.endStarted(now);
         int deleted = rows.deleteEnded(now);
         int offered = offerFreeQueues(null, null);
-        if (expired + ended + deleted + offered > 0) {
-            log.info("Waitlist sweep: {} offers expired, {} entries ended, {} removed, {} offers made",
-                    expired, ended, deleted, offered);
+        if (expired + lapsed + ended + deleted + offered > 0) {
+            log.info("Waitlist sweep: {} offers expired, {} no longer eligible, {} entries ended, {} removed, "
+                    + "{} offers made", expired, lapsed, ended, deleted, offered);
         }
+    }
+
+    private int closeIneligibleOffers(Instant now) {
+        int closed = 0;
+        for (WaitlistEntry offer : rows.openOffers()) {
+            if (!eligible(offer)) {
+                rows.close(offer.id(), WaitlistState.SKIPPED, now);
+                closed += 1;
+            }
+        }
+        return closed;
     }
 
     int offerFreeQueues(Collection<UUID> courtIds, TimeSlot window) {
@@ -128,18 +168,8 @@ class WaitlistQueue implements CourtReservations {
     // A disabled account cannot sign in to see an offer, so it would only hold the court for nothing.
     private boolean eligible(WaitlistEntry entry) {
         Optional<UserAccount> account = accounts.findById(entry.accountId()).filter(UserAccount::isEnabled);
-        if (account.isEmpty()) {
-            return false;
-        }
-        Set<Role> roles = account.get().getRoles();
-        Optional<BookingCard> card = cards.findCard(entry.cardId()).filter(BookingCard::isActive);
-        if (card.isEmpty() || !(roles.contains(Role.ADMIN) || card.get().permits(roles))) {
-            return false;
-        }
-        if (!facility.findUnbookableCourts(List.of(entry.courtId())).isEmpty()) {
-            return false;
-        }
-        return ruleGate.violationsFor(new BookingRuleCheck(List.of(entry.courtId()), entry.cardId(), entry.slot(),
-                entry.accountId(), account.get().getPerson().getId(), roles)).isEmpty();
+        return account.isPresent() && drafts.getObject().isBookable(new CreateBookingCommand(List.of(entry.courtId()),
+                entry.cardId(), entry.slot(), entry.accountId(), account.get().getPerson().getId(),
+                account.get().getRoles(), entry.note(), rows.participants(entry.id()), null));
     }
 }

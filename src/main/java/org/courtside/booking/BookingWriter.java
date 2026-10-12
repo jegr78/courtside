@@ -25,6 +25,7 @@ import org.courtside.identity.PersonRepository;
 import org.courtside.identity.Role;
 import org.courtside.shared.BookingCancelled;
 import org.courtside.shared.CancellationReason;
+import org.courtside.shared.DomainFailure;
 import org.courtside.shared.BookingConfirmed;
 import org.courtside.shared.ParticipantRecorded;
 import org.courtside.shared.SqlConstraintViolation;
@@ -33,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -82,6 +84,20 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts {
         bookable(command);
     }
 
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = DomainFailure.class)
+    public boolean isBookable(CreateBookingCommand command) {
+        if (!facility.findUnbookableCourts(command.courtIds()).isEmpty()) {
+            return false;
+        }
+        try {
+            bookable(command);
+            return true;
+        } catch (DomainFailure refused) {
+            return false;
+        }
+    }
+
     private List<ParticipantSpec> bookable(CreateBookingCommand command) {
         facility.requireBookableCourts(command.courtIds());
         BookingCard card = cardEligibility.requireEligible(command.cardId(), command.callerRoles());
@@ -94,7 +110,11 @@ class BookingWriter implements SeriesOccurrenceCancellation, BookingDrafts {
     UUID write(CreateBookingCommand command, String idempotencyKey, String requestFingerprint) {
         bookingGridCoordination.lock();
         List<ParticipantSpec> slots = bookable(command);
-        reservations.requireUnreserved(command.courtIds(), command.slot(), command.bookedBy());
+        if (CourtReservations.overriddenBy(command.callerRoles(), command.cardId())) {
+            reservations.withdrawFor(command.courtIds(), command.slot(), command.bookedBy());
+        } else {
+            reservations.requireUnreserved(command.courtIds(), command.slot(), command.bookedBy());
+        }
         requireAvailableCourts(command, idempotencyKey);
 
         Booking booking = new Booking(

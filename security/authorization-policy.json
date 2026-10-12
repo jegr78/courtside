@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "reviewedAt": "2026-10-12",
   "purpose": "This is the normative authorization policy for the shipped Courtside API. OpenAPI defines the transport shape; this policy defines who may perform each operation, which resource attributes narrow that permission, and which protected fields each projection may read or write.",
-  "openApiFieldInventorySha256": "bb184fa3ed5821621cc683e013e7f35ca6c6016a9f454269f4fe1481d2023c41",
+  "openApiFieldInventorySha256": "4a037c7b09176c9d1a4e3f2c8058ad38bd6b627a7bd00444fd1ba473f02673d6",
   "protectedFieldInventorySha256": "174231e5d10a1e24a00993b2bba95b73d1749ba62780a85d608afed778bf0512",
-  "productionAuthorizationSha256": "067933b2b20e2fe460a074ca079bd915b04227a0c092838e4830cdcc7c205fd4",
+  "productionAuthorizationSha256": "cdb8f62a981afb98772436b70e965f1e7403f4d2ae1d48b2902d3b91b0b526e7",
   "ordinaryFields": [
     "Problem.detail",
     "Problem.fieldErrors",
@@ -1018,7 +1018,6 @@
     "joinWaitlist:request:JoinWaitlistRequest.endsAt",
     "joinWaitlist:request:JoinWaitlistRequest.startsAt",
     "joinWaitlist:response:$response.header.Accept",
-    "joinWaitlist:response:$response.header.Location",
     "joinWaitlist:response:$response.header.Retry-After",
     "joinWaitlist:response:FieldError.code",
     "joinWaitlist:response:FieldError.field",
@@ -3170,7 +3169,7 @@
     {
       "id": "waitlist-ownership",
       "title": "Waitlist entry ownership",
-      "rule": "The current account selects which waitlist entries are read, left and accepted; another account's entry answers as not found, no response names another waiting account or a position, and a reserved court refuses every other account's booking.",
+      "rule": "The current account selects which waitlist entries are read, left and accepted; another account's entry answers as not found, no response names another waiting account or a position, and a reserved court refuses every other account's booking unless an admin books it or it is closed, which withdraws the offer.",
       "attributes": [
         "current-account",
         "waitlist-entry-owner"
@@ -3186,17 +3185,20 @@
         "src/main/java/org/courtside/booking/web/WaitlistController.java#joinWaitlist",
         "src/main/java/org/courtside/booking/web/WaitlistController.java#leaveWaitlist",
         "src/main/java/org/courtside/booking/web/WaitlistController.java#acceptWaitlistOffer",
-        "src/main/java/org/courtside/booking/internal/CourtReservations.java#blocks"
+        "src/main/java/org/courtside/booking/internal/CourtReservations.java#blocks",
+        "src/main/java/org/courtside/booking/internal/CourtReservations.java#overriddenBy"
       ],
       "positiveTests": [
         "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenATakenCourt_whenAMemberJoinsItsWaitlist_thenTheEntryIsTheirsAndNamesNoPosition",
         "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnOffer_whenTheMemberAcceptsIt_thenTheCourtIsTheirBooking",
-        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAWaitingEntry_whenTheMemberLeavesIt_thenItIsClosed"
+        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAWaitingEntry_whenTheMemberLeavesIt_thenItIsClosed",
+        "src/test/java/org/courtside/booking/waitlist/WaitlistTest.java#givenAnOffer_whenTheBoardBooksTheReservedCourt_thenTheClubTakesItAndTheOfferIsWithdrawn"
       ],
       "negativeTests": [
         "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnotherMembersOffer_whenAMemberAcceptsIt_thenItIsNotFoundAndNothingIsBooked",
         "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnotherMembersEntry_whenAMemberLeavesIt_thenItIsNotFoundAndKeepsWaiting",
-        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnOffer_whenAnotherMemberBooksTheCourt_thenItIsReservedForTheWaitingMember"
+        "src/test/java/org/courtside/booking/web/WaitlistControllerTest.java#givenAnOffer_whenAnotherMemberBooksTheCourt_thenItIsReservedForTheWaitingMember",
+        "src/test/java/org/courtside/booking/waitlist/WaitlistTest.java#givenAnOffer_whenATrainerMovesASeriesOntoTheReservedCourt_thenTheMoveIsBlocked"
       ]
     },
     {
