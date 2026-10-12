@@ -205,7 +205,7 @@ the table holds two kinds of entry. Six segments are the administrative surfaces
 board configures: `facility.court.added`, `card.bookingCard.changed`, `config.club.changed`,
 `rules.ruleSet.changed`, `roster.person.corrected` and `dataexchange.source.described`, each with
 siblings. The other two arrive in the course of ordinary use, because the writer records every
-event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the four
+event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the eight
 other booking entries, and `identity.account.credentialsRequested`, which names the account a
 credential was issued for. A board's request is written beside
 `roster.account.credentialsRequested`, which names the person, because the roster reaches

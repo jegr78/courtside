@@ -2,8 +2,8 @@ package org.courtside.booking.series;
 
 import org.courtside.AbstractIntegrationTest;
 import org.courtside.PostgresDiagnostics;
-import org.courtside.booking.BookingService;
 import org.courtside.booking.BookingStatus;
+import org.courtside.booking.internal.SeriesOccurrenceCancellation;
 import org.courtside.booking.testfixture.BookingTestFixture;
 import org.courtside.config.testfixture.ConfigTestFixture;
 import org.courtside.facility.testfixture.FacilityTestFixture;
@@ -53,7 +53,7 @@ class SeriesReminderCancellationRaceTest extends AbstractIntegrationTest {
     private SeriesService seriesService;
 
     @MockitoSpyBean
-    private BookingService bookingService;
+    private SeriesOccurrenceCancellation occurrenceCancellation;
 
     @Autowired
     private BookingTestFixture reminders;
@@ -161,7 +161,7 @@ class SeriesReminderCancellationRaceTest extends AbstractIntegrationTest {
                 awaitAnotherSessionBlockedOnALock();
             }
             return answer;
-        }).when(bookingService).cancel(any(), any(), any());
+        }).when(occurrenceCancellation).cancelOccurrence(any(), any(), any());
     }
 
     private void awaitAnotherSessionBlockedOnALock() {

@@ -116,14 +116,15 @@ public class Booking implements Persistable<UUID> {
         this.remindedAt = null;
     }
 
-    public void cancel(UUID cancelledBy, Instant at) {
+    public boolean cancel(UUID cancelledBy, Instant at) {
         if (status == BookingStatus.CANCELLED) {
-            return;
+            return false;
         }
         this.status = BookingStatus.CANCELLED;
         this.cancelledBy = cancelledBy;
         this.cancelledAt = at;
         allocations.forEach(CourtAllocation::cancel);
+        return true;
     }
 
     public List<CourtAllocation> getAllocations() {

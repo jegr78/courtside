@@ -170,6 +170,9 @@ Repositories persist state and do not decide policy.
 
 State-changing services publish typed domain events. The audit listener runs before commit and
 writes its row in the same transaction. A covered change cannot commit without its audit event.
+Series creation is the exception: each occurrence commits on its own, and the series event commits
+in a transaction of its own after them, also when a later occurrence fails unexpectedly. A crash
+between the last occurrence commit and the event commit leaves those occurrences without an event.
 
 Mail listeners run before commit, like the audit listener, and store the notification-centre entry
 and the outbox message in the same transaction. A committed change therefore always has its queued message, and a change whose
@@ -178,6 +181,14 @@ listener never talks to the relay, so a failed handover cannot roll back a chang
 Publishing such an event outside a transaction is refused. Other after-commit listeners run through
 Spring Modulith's event publication registry, whose incomplete publications remain available after
 a restart.
+
+`booking` publishes an event when a booking is confirmed, cancelled or displaced or falls due for
+its reminder, when a participant is recorded or withdraws, and when a series is created, cancelled
+or moved. A series change is one event naming the series and every occurrence it touched,
+and no occurrence announces itself beside it. Cancelling an occurrence as a single booking announces
+that booking alone. Cancellations and moves name the acting account, so a consumer can tell an
+owner's change from a board's. A cancellation that finds the booking already cancelled changes
+nothing and announces nothing.
 
 Events contain identifiers and non-personal change descriptions. Free text, names and email
 addresses are not copied into audit payloads. Stored event payloads evolve additively.
@@ -251,7 +262,8 @@ A series ends by date or occurrence count, never both or neither. Expansion is b
 configured horizon, and the preview reports truncation.
 
 Creation tolerates partial success because the creator approves skipped dates. Each occurrence is
-checked again when written. Moving and cancelling a series are atomic across the selected scope:
+checked again when written and commits on its own, and the series is announced with the occurrences
+that committed. Moving and cancelling a series are atomic across the selected scope:
 one occurrence, this and following, or the complete series.
 
 ## Booking rules and flow
