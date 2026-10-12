@@ -6,19 +6,12 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.EnumSet;
-import java.util.Set;
 
 // Credential messages never carry a link, so a genuine one gives members a rule to hold a fake against.
 @Component
 class InstanceLinks {
 
     static final String PLACEHOLDER = "instanceLink";
-    static final Set<MessageKind> LINKED = EnumSet.of(MessageKind.BOOKING_CONFIRMED,
-            MessageKind.BOOKING_PLAYER_RECORDED, MessageKind.BOOKING_PLAYER_WITHDREW, MessageKind.BOOKING_DISPLACED,
-            MessageKind.BOOKING_REMINDER, MessageKind.BOOKING_CANCELLED, MessageKind.BOOKING_CANCELLED_BY_CLUB,
-            MessageKind.BOOKING_SERIES_CREATED, MessageKind.BOOKING_SERIES_CANCELLED_BY_CLUB,
-            MessageKind.BOOKING_SERIES_MOVED_BY_CLUB, MessageKind.WAITLIST_OFFER);
 
     private final String origin;
 

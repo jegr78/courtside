@@ -41,9 +41,6 @@ class MailTemplatesTest {
             entry("previousCourts", "Court 2"), entry("until", "18:15"), entry("untilDay", "Wednesday, 13 May 2026"),
             entry("instanceLink", "https://courts.example.org/my-bookings"));
 
-    private static final Set<MessageKind> CREDENTIAL_KINDS = Set.of(MessageKind.CREDENTIALS_NEW_ACCOUNT,
-            MessageKind.CREDENTIALS_PASSWORD_RESET, MessageKind.ACCOUNT_PASSWORD_RESET_CODE,
-            MessageKind.ACCOUNT_USERNAME_REMINDER);
 
     private final MailTemplates templates = new MailTemplates();
 
@@ -219,7 +216,7 @@ class MailTemplatesTest {
         // when / then
         for (Locale locale : new Locale[] {Locale.GERMAN, Locale.ENGLISH}) {
             ResourceBundle bundle = ResourceBundle.getBundle("mail", locale);
-            for (MessageKind kind : InstanceLinks.LINKED) {
+            for (MessageKind kind : InstanceLinksTest.LINKED) {
                 assertThat(bundle.getString(kind.templateKey() + ".body")).as("%s in %s", kind, locale)
                         .endsWith("\n{instanceLink}");
                 assertThat(bundle.getString(kind.templateKey() + ".subject")).as("%s in %s", kind, locale)
@@ -231,7 +228,7 @@ class MailTemplatesTest {
     @Test
     void whenReadingTheShippedCredentialMessages_thenNoneCarriesALinkOrAnAddress() {
         // given
-        Set<MessageKind> credentialKinds = new HashSet<>(CREDENTIAL_KINDS);
+        Set<MessageKind> credentialKinds = new HashSet<>(InstanceLinksTest.CREDENTIAL_KINDS);
         for (MessageKind kind : MessageKind.values()) {
             String body = ResourceBundle.getBundle("mail", Locale.ENGLISH).getString(kind.templateKey() + ".body");
             if (body.contains("{credential}") || body.contains("{resetCode}")) {
