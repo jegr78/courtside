@@ -6,6 +6,7 @@ import { problemReference, violationMessage } from "../api/problem-message";
 import { useReportedFailure } from "../failures/useReportedFailure";
 import { Alert } from "../components/Alert";
 import { Button } from "../components/Button";
+import { DialogBody } from "../components/DialogBody";
 import { Modal } from "../components/Modal";
 import { bookingTimeSlot, formatBookingPeriod, zonedDateTime } from "../time/clubZone";
 import { leavesBookingHours } from "../time/bookingHours";
@@ -150,7 +151,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
 
   return <Modal labelledBy="booking-heading" closed={closed}>
     <form data-testid="booking-dialog" onSubmit={(event) => void submit(event)} className="surface-panel flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
-      <div className="overflow-y-auto p-6">
+      <DialogBody>
       <h3 id="booking-heading" className="text-xl font-bold">{t("booking.title")}</h3>
       <p data-testid="booking-period" aria-live="polite" className="mt-2 font-semibold">{formatBookingPeriod(period.startsAt, period.endsAt, i18n.language, grid.timeZone)}</p>
       <FieldViolations id="booking-startsAt-errors" violations={fieldViolations("startsAt")} />
@@ -235,7 +236,7 @@ export function BookingDialog({ selection, grid, courts, allocations, canChooseS
       <FieldViolations id="booking-note-errors" violations={fieldViolations("note")} />
       </details>
       </div>
-      </div>
+      </DialogBody>
       {/* Outside the scrolling form, so a refusal shows beside the button that caused it. */}
       {(fieldViolations("general").length > 0 || error) && <div data-testid="booking-outcome" className="shrink-0 grid gap-2 px-6 pt-3">
         <FieldViolations id="booking-general-errors" violations={fieldViolations("general")} />
