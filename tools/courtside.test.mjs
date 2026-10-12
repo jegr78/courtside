@@ -16,7 +16,7 @@ import { assertPerformanceStateOwnership } from "./immutable-image-reuse.mjs";
 import {
   assertFunnelShareable, classifyFunnelConfig, executableNames, frontendInstallPlan, funnelPlan,
   funnelResetPlan, lifecyclePlan, listenerOutputMatches, parseArguments, parseTailscaleNodeStatus, newBootstrapPassword,
-  openBackupForRestore, packagedApplicationJar, processPlans, requiredPorts, restoreDatabase, runInteractive,
+  developmentEnvironment, openBackupForRestore, packagedApplicationJar, processPlans, requiredPorts, restoreDatabase, runInteractive,
   runLifecyclePlans, startProcesses,
   startPerformance,
   assertPerformanceSource,
@@ -649,6 +649,37 @@ test("given POSIX development, when planning processes, then no command shell is
   assert.equal(plans.frontend.command, "npm");
   assert.equal(plans.backend.detached, true);
   assert.equal(plans.frontend.detached, true);
+});
+
+test("given the mail settings the backend verifies at startup, when planning development, then every one is set", () => {
+  // given
+  const verifier = readFileSync(new URL("../src/main/java/org/courtside/notification/internal/MailSettings.java",
+    import.meta.url), "utf8");
+  const required = [...verifier.matchAll(/require(?:Present|Address)\(problems, "([A-Z_]+)"/g)].map((match) => match[1]);
+
+  // when
+  const environment = developmentEnvironment({});
+
+  // then
+  assert.ok(required.length >= 3, `MailSettings names no required variable the test can read: ${required}`);
+  for (const variable of required) {
+    assert.ok(environment[variable], `dev must set ${variable}, or the backend refuses to start`);
+  }
+});
+
+test("given more than one Spring Boot application under src/main, when running the backend, then the plugin names the product", () => {
+  // given
+  const pom = readFileSync(new URL("../pom.xml", import.meta.url), "utf8");
+  const plugin = pom.slice(pom.indexOf("<artifactId>spring-boot-maven-plugin</artifactId>"));
+
+  // when
+  const mainClass = plugin.slice(0, plugin.indexOf("</plugin>")).match(/<mainClass>([\w.]+)<\/mainClass>/)?.[1];
+
+  // then
+  assert.equal(mainClass, "org.courtside.CourtsideApplication",
+    "spring-boot:run must not have to choose between CourtsideApplication and the fixture applications");
+  assert.ok(existsSync(new URL(`../src/main/java/${mainClass.replaceAll(".", "/")}.java`, import.meta.url)),
+    `${mainClass} must exist`);
 });
 
 function childProcess(pid) {

@@ -1969,6 +1969,21 @@ function readUatState() {
   }
 }
 
+export function developmentEnvironment(environment = process.env) {
+  return {
+    ...environment,
+    COURTSIDE_DEMO_CONFIRM_DISPOSABLE: "true",
+    COURTSIDE_COOKIE_SECURE: "false",
+    COURTSIDE_ENVIRONMENT: "DEVELOPMENT",
+    COURTSIDE_MAIL_RELAY_HOST: "mail.invalid",
+    COURTSIDE_MAIL_FROM: "no-reply@example.org",
+    COURTSIDE_MAIL_REPLY_TO: "board@example.org",
+    SPRING_DATASOURCE_URL: "jdbc:postgresql://127.0.0.1:5432/courtside_dev",
+    SPRING_DATASOURCE_USERNAME: "courtside",
+    SPRING_DATASOURCE_PASSWORD: "courtside-dev"
+  };
+}
+
 async function startDevelopment(options) {
   for (const port of requiredPorts(options, runningDevServices())) {
     if (!await isPortAvailable(port)) {
@@ -1977,15 +1992,7 @@ async function startDevelopment(options) {
   }
   runInteractive({ command: "docker", args: [...devComposeArgs, "up", "-d", "--wait", "db", "api-ui", "api-proxy"] });
   const plans = processPlans(options);
-  const environment = {
-    ...process.env,
-    COURTSIDE_DEMO_CONFIRM_DISPOSABLE: "true",
-    COURTSIDE_COOKIE_SECURE: "false",
-    COURTSIDE_ENVIRONMENT: "DEVELOPMENT",
-    SPRING_DATASOURCE_URL: "jdbc:postgresql://127.0.0.1:5432/courtside_dev",
-    SPRING_DATASOURCE_USERNAME: "courtside",
-    SPRING_DATASOURCE_PASSWORD: "courtside-dev"
-  };
+  const environment = developmentEnvironment();
   validateExecutable(platformPlan(executableNames().npm, ["--version"], process.platform));
   if (!existsSync(join(root, "frontend", "node_modules"))) {
     runInteractive(frontendInstallPlan());
