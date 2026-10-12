@@ -67,6 +67,8 @@ class ResponseHeaderSurfaceTest extends AbstractIntegrationTest {
             "an identifier this application generated",
             "org/courtside/booking/web/SeriesController.java Location",
             "an identifier this application generated",
+            "org/courtside/booking/web/WaitlistController.java Location",
+            "an identifier this application generated",
             "org/courtside/dataexchange/web/ExternalReferenceAdminController.java Location",
             "a stored identifier, escaped into one path segment",
             "org/courtside/dataexchange/web/ExportAdminController.java CONTENT_DISPOSITION",

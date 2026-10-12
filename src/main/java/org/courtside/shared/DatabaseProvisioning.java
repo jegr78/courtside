@@ -184,6 +184,10 @@ public final class DatabaseProvisioning {
                   JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
                  WHERE namespace.nspname = 'public'
                    AND relation.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')
+                   -- PostgreSQL moves a serial or identity sequence with its table and refuses to move it alone.
+                   AND NOT EXISTS (SELECT FROM pg_depend link
+                                    WHERE link.classid = 'pg_class'::regclass AND link.objid = relation.oid
+                                      AND link.refclassid = 'pg_class'::regclass AND link.deptype IN ('a', 'i'))
                 UNION ALL
                 SELECT format('ALTER FUNCTION %s OWNER TO %I', procedure.oid::regprocedure, ?)
                   FROM pg_proc procedure
