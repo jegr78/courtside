@@ -1126,7 +1126,7 @@ const de = {
   "myMessages.description": "Hier entscheidest du, was der Verein dir schickt. Abgewählt heißt: Diese Nachricht bekommst du nicht mehr, weder hier noch per E-Mail. Alle anderen weiterhin.",
   "myMessages.declinable": "Was du abwählen kannst",
   "myMessages.mandatory": "Was der Verein immer schickt",
-  "myMessages.mandatoryReason": "Diese Nachrichten lassen sich nicht abschalten: Ohne sie kommst du nicht an dein Konto und erfährst nicht von einer Sperrung unter deiner Buchung, davon, dass jemand dich eingetragen hat, oder davon, dass der Verein eine Buchung storniert oder verlegt hat.",
+  "myMessages.mandatoryReason": "Diese Nachrichten lassen sich nicht abschalten: Ohne sie kommst du nicht an dein Konto und erfährst nicht von einer Sperrung unter deiner Buchung, davon, dass jemand dich eingetragen hat, davon, dass der Verein eine Buchung storniert oder verlegt hat, oder davon, dass ein Platz frei wird, auf den du wartest.",
   "myMessages.save": "Auswahl speichern",
   "myMessages.saved": "Deine Auswahl wurde gespeichert.",
   "myMessages.savedStateShown": "Angezeigt sind die Einstellungen, die jetzt gespeichert sind.",

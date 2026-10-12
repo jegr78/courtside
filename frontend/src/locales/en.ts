@@ -1128,7 +1128,7 @@ const en: Record<keyof typeof de, string> = {
   "myMessages.description": "Choose what the club sends you. An unchecked kind no longer reaches you, neither here nor by email; everything else keeps arriving.",
   "myMessages.declinable": "What you can switch off",
   "myMessages.mandatory": "What the club always sends",
-  "myMessages.mandatoryReason": "These cannot be switched off: without them you cannot reach your account, and you would not hear about a closure under your booking, that somebody recorded you in one, or that the club cancelled or moved one.",
+  "myMessages.mandatoryReason": "These cannot be switched off: without them you cannot reach your account, and you would not hear about a closure under your booking, that somebody recorded you in one, that the club cancelled or moved one, or that a court you are waiting for has come free.",
   "myMessages.save": "Save choice",
   "myMessages.saved": "Your choice was saved.",
   "myMessages.savedStateShown": "The settings shown are the ones saved now.",
