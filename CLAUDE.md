@@ -116,7 +116,8 @@ fails on the missing `BuildProperties` bean.
 * **Sequence:** unit tests → implementation → integration tests → E2E.
 * **Targeted runs during red/green:** `./mvnw test -Dtest=ClassName`. Before the final push, commit
   the reviewed branch and run `node tools/courtside.mjs check`; it uses the protected test-profile
-  contract against `origin/main` and verifies that exact commit in a detached worktree. A `full`
+  contract against the target branch, `origin/main` unless `--base release/<major>.<minor>` names a
+  release line, and verifies that exact commit in a detached worktree. A `full`
   classification runs cheap workflow and documentation gates first, a clean Maven verification
   without browser journeys, a fresh immutable-image Compose smoke, and then the browser and WebKit
   reliability gates. Those tasks are read from the runner rather than from the contract so a
@@ -294,6 +295,20 @@ away.
 ## Git Workflow
 
 * **Default branch:** `main`. Feature work on `feat/<short-description>`.
+* **`main` carries the next milestone; `release/<major>.<minor>` carries the patches of the newest
+  published line.** A release branch is cut from its release tag when the first fix is needed and
+  deleted when the next minor is published. Right after a minor is published, one commit on `main`
+  turns `"prerelease"` on with a footer naming the next line's first candidate; the `release line`
+  check refuses a patch version proposed on `main`. `docs/releasing.md` describes the release path.
+* **A fix for a published line lands on its release branch first, then on `main`.** Fix where it
+  shipped: the pull request into `release/<major>.<minor>` is reviewed against the code clubs run,
+  and the port points back at that commit, never the other way round. Port it with
+  `git cherry-pick -x <squash sha>` onto a branch from `main` and a pull request into `main`; its
+  `(cherry picked from commit <sha>)` line survives the squash. The release branch's release pull
+  request is refused until every released change since the last tag has that line on `main`. Only
+  a dependency update that would fail a release gate goes the other way, picked from `main`.
+* **A commit that reaches a release branch without being a fix uses a type the changelog hides**
+  (`ci:`, `chore:`, `test:`) and never carries a `Release-As:` footer.
 * **Commits:** English Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`,
   `refactor:`). Commit frequently; push only after manual verification.
 * **A commit message has to be one release-please can parse.** Its parser reads every message that
@@ -313,9 +328,9 @@ away.
 
 ### Everything reaches `main` through a pull request
 
-`main` is protected: a pull request and a green `build` check, with a bypass for the
-repository-admin role. The bypass exists for a bootstrap that has already happened — do not
-reach for it. A branch pushed straight to `main` skips the review the repository is now public
+`main` and every `release/*` branch are protected alike: a pull request and a green `build` check,
+with a bypass for the repository-admin role. The bypass exists for a bootstrap that has already
+happened — do not reach for it. A branch pushed straight to `main` skips the review the repository is now public
 enough to need.
 
 * **Squash is the only merge method.** Merge commits and rebase merges are disabled on the
@@ -368,9 +383,10 @@ enough to need.
 
 * **Finalise a branch in cost order.** Complete targeted red/green checks first, then obtain the
   required whole-branch review and resolve every finding with targeted verification. Only after the
-  review is clean, fetch `origin/main`, rebase the uncommitted work with autostash if the base moved,
-  inspect the resulting diff and conflicts, and commit. Run `node tools/courtside.mjs check` as the
-  final verification. It selects the protected profile and builds the committed HEAD in a detached
+  review is clean, fetch the target branch, `origin/main` or the `origin/release/<major>.<minor>` a
+  fix targets, rebase the uncommitted work with autostash if the base moved, inspect the resulting
+  diff and conflicts, and commit. Run `node tools/courtside.mjs check`, with `--base` naming a
+  release line, as the final verification. It selects the protected profile and builds the committed HEAD in a detached
   worktree, so the live tree remains available while it runs. Do not run a separate
   `./mvnw clean verify` as well. `--full` remains the manual escalation when the selected profile is
   insufficient for a known risk. Do not spend a final run on a base already known to be stale or
@@ -385,7 +401,7 @@ enough to need.
   candidate and create a fresh tag with a new owner and time before retrying.
 
   Once the window is held, retain the exact annotated-tag object ID as the ownership token and fetch
-  `origin/main` again. Compare it with the base commit recorded by the green verification. If they
+  the target branch again. Compare it with the base commit recorded by the green verification. If they
   match, push immediately: no build runs while the window is held in this common path. If the base
   moved, rebase onto it and inspect the intervening commits and the resulting diff.
 
