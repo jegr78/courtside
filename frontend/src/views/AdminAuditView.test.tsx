@@ -338,6 +338,27 @@ describe("AdminAuditView", () => {
     expect(screen.getByTestId("audit-filter-event-type")).toHaveValue("");
   });
 
+  it("given a time filter in use, when the filters are cleared, then both time filters show as empty again", async () => {
+    // given
+    vi.spyOn(api, "searchAudit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+    vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("audit-row");
+    expect(screen.getByTestId("audit-filter-from"), "an unused filter starts empty").toHaveAttribute("data-empty", "true");
+    fireEvent.change(screen.getByTestId("audit-filter-from"), { target: { value: "2026-09-19T10:00" } });
+    expect(screen.getByTestId("audit-filter-from"), "a chosen time is shown").not.toHaveAttribute("data-empty");
+
+    // when
+    await user.click(screen.getByTestId("audit-filter-clear"));
+
+    // then
+    for (const testId of ["audit-filter-from", "audit-filter-to"]) {
+      expect(screen.getByTestId(testId), `${testId} no longer looks active`).toHaveAttribute("data-empty", "true");
+      expect(screen.getByTestId(testId), `${testId} is announced as not set`).toHaveAccessibleDescription("Not set");
+    }
+  });
+
   it("given a broad search reaches the server scan limit, when its page is shown, then it is not presented as complete", async () => {
     // given
     vi.spyOn(api, "audit").mockResolvedValue({ entries: [courtAdded], nextCursor: null });

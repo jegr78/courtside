@@ -222,6 +222,39 @@ input[type="time"] {
     box-shadow: none;
   }
 
+  .date-time-field {
+    position: relative;
+    display: grid;
+    min-width: 0;
+  }
+
+  .date-time-field input[data-empty]:not(:focus) {
+    -webkit-text-fill-color: transparent;
+  }
+
+  .date-time-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 1.75rem 0 0.75rem;
+    color: var(--cs-muted);
+    font-size: 0.875rem;
+    font-weight: 400;
+    pointer-events: none;
+  }
+
+  .date-time-empty > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .date-time-field:focus-within .date-time-empty {
+    display: none;
+  }
+
   .focus-ring:focus-visible {
     outline: 2px solid var(--cs-focus);
     outline-offset: 2px;

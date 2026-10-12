@@ -1,5 +1,6 @@
 import { type HTMLInputTypeAttribute, type InputHTMLAttributes, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { DateTimeInput, type DateTimeType } from "./DateTimeInput";
 
 interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "id"> {
   label: string;
@@ -14,15 +15,17 @@ export function TextField<T extends HTMLInputTypeAttribute = "text">(
   if (type === "password" && id !== undefined) {
     return <PasswordField label={label} id={id} className={className} {...props} />;
   }
+  const inputClassName = `form-control w-full min-w-0 rounded-lg border px-3 py-3 ${className}`;
   return <label className="grid min-w-0 gap-2 font-medium" htmlFor={id}>
     {label}
-    <input
-      id={id}
-      type={type}
-      className={`form-control w-full min-w-0 rounded-lg border px-3 py-3 ${className}`}
-      {...props}
-    />
+    {isDateTimeType(type)
+      ? <DateTimeInput id={id} type={type} className={inputClassName} {...props} />
+      : <input id={id} type={type} className={inputClassName} {...props} />}
   </label>;
+}
+
+function isDateTimeType(type: unknown): type is DateTimeType {
+  return type === "date" || type === "time" || type === "datetime-local";
 }
 
 function PasswordField({ label, id, className = "", ...props }: FieldProps & { id: string }) {

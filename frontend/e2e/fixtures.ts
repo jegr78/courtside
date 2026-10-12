@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { expect, test as base, type Browser, type BrowserContext, type BrowserContextOptions, type Metadata, type Page } from "@playwright/test";
+import { expect, test as base, type Browser, type BrowserContext, type BrowserContextOptions, type Locator, type Metadata, type Page } from "@playwright/test";
 import { journeyInstant, type JourneyService, type JourneyStart } from "./global-setup";
 import { connectJourneyService, type JourneyControlReference } from "./journey-control";
 import { diagnoseUnexpectedBrowserTest, observeBrowserDisconnect } from "./browser-diagnostics";
@@ -195,6 +195,32 @@ export async function selectPreference(page: Page, selector: "#locale-preference
   await menu.click();
   await page.locator(selector).selectOption(value);
   await menu.click();
+}
+
+export function textFill(field: Locator): Promise<string> {
+  return field.evaluate((element) => getComputedStyle(element).getPropertyValue("-webkit-text-fill-color"));
+}
+
+export const transparentText = "rgba(0, 0, 0, 0)";
+
+export async function expectShownAsEmpty(field: Locator, engine: string): Promise<void> {
+  const testId = await field.getAttribute("data-testid");
+  const hint = field.page().getByTestId(`${testId}-empty`);
+  await field.scrollIntoViewIfNeeded();
+  await expect(field, `${engine} marks ${testId} as empty`).toHaveAttribute("data-empty", "true", { timeout: 10_000 });
+  await expect.poll(() => textFill(field), { message: `${engine} paints no ghost value into ${testId}`, timeout: 10_000 }).toBe(transparentText);
+  await expect(hint, `${engine} shows the empty hint of ${testId}`).toBeVisible({ timeout: 10_000 });
+  const [fieldBox, hintBox] = [await field.boundingBox(), await hint.boundingBox()];
+  expect(fieldBox !== null && hintBox !== null
+    && hintBox.x >= fieldBox.x - 1 && hintBox.y >= fieldBox.y - 1
+    && hintBox.x + hintBox.width <= fieldBox.x + fieldBox.width + 1
+    && hintBox.y + hintBox.height <= fieldBox.y + fieldBox.height + 1,
+  `${engine} lays the hint of ${testId} inside the field, field ${JSON.stringify(fieldBox)}, hint ${JSON.stringify(hintBox)}`).toBe(true);
+  const input = await field.elementHandle();
+  expect(await hint.evaluate((element, target) => {
+    const bounds = element.getBoundingClientRect();
+    return document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2) === target;
+  }, input), `${engine} lets a tap on the hint of ${testId} reach the field`).toBe(true);
 }
 
 export { expect };

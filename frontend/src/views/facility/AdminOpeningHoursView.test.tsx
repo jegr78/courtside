@@ -130,6 +130,26 @@ describe("AdminOpeningHoursView", () => {
     expect(saveWeek, "an untouched first day leaves today to the server's clock").toHaveBeenCalledWith(undefined, week({}));
   });
 
+  it("given an open day, when it is closed, then its time fields show as empty rather than holding a time", async () => {
+    // given
+    show();
+    const user = userEvent.setup();
+    await screen.findByTestId("hours-closed-MONDAY");
+
+    // when
+    await user.click(screen.getByTestId("hours-closed-MONDAY"));
+
+    // then
+    for (const testId of ["hours-open-MONDAY", "hours-close-MONDAY"]) {
+      const field = screen.getByTestId(testId);
+      expect(field, `${testId} cannot be edited on a closed day`).toBeDisabled();
+      expect(field, `${testId} is marked empty so no ghost time shows`).toHaveAttribute("data-empty", "true");
+      expect(field, `${testId} is announced as not set`).toHaveAccessibleDescription("Not set");
+    }
+    expect(screen.getByTestId("hours-open-TUESDAY"), "a day closed from the start shows as empty too").toHaveAttribute("data-empty", "true");
+    expect(screen.getByTestId("hours-open-MONDAY-empty"), "a closed day shows the empty hint").toBeVisible();
+  });
+
   it("given a day the server rejects, when the week is saved, then the message lands on that day", async () => {
     // given
     vi.spyOn(api, "setAdminWeeklyOpeningHours").mockRejectedValue(new ApiError(400, {

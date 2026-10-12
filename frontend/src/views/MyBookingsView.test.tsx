@@ -317,6 +317,20 @@ it("given a series occurrence, when previewing and confirming a move, then the s
   expect(screen.getByRole("status")).toHaveTextContent("Booking moved.");
 });
 
+it("given a move nobody has edited, when the dialog opens, then the empty start time says the start stays unchanged", async () => {
+  // given
+  render(<MyBookingsView now={new Date("2026-08-11T12:00:00Z")} />);
+
+  // when
+  await userEvent.click(await screen.findByTestId("move-booking"));
+
+  // then
+  const start = screen.getByTestId("move-start-time");
+  expect(start, "an empty start keeps the current one and is announced so").toHaveAccessibleDescription("Unchanged");
+  expect(screen.getByTestId("move-start-time-empty"), "the hint shows the same meaning").toHaveTextContent("Unchanged");
+  expect(start, "the start field starts empty").toHaveAttribute("data-empty", "true");
+});
+
 it("given differently long occurrences, when previewing a move, then each returned period is shown", async () => {
   // given
   vi.mocked(api.previewSeriesMove).mockResolvedValue({

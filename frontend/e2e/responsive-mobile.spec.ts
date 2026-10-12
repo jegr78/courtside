@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Page } from "@playwright/test";
 import { declaredRoutes, routePattern, type DeclaredRoute } from "./declared-routes";
-import { expect, expectAdministrationOverview, selectJourneyDate, test } from "./fixtures";
+import { expect, expectAdministrationOverview, expectShownAsEmpty, selectJourneyDate, test } from "./fixtures";
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => {
@@ -1078,3 +1078,22 @@ for (const phone of [{ name: "iPhone SE", width: 375, height: 667 }, { name: "la
       .toMatchObject({ insideStrip: true, clearOfNow: true });
   });
 }
+
+test("a closed day on a phone shows its opening times as empty rather than as a ghost time", async ({ page, browserName }) => {
+  // given
+  await signIn(page, "configuration-admin");
+  await expect(page.getByTestId("administration-link"), "the administrator is signed in").toBeVisible();
+  await page.goto("/admin/facility/opening-hours");
+  await expect(page.getByTestId("admin-opening-hours-view"), "the opening hours open").toBeVisible();
+
+  // when
+  await page.getByTestId("hours-closed-SUNDAY").check();
+
+  // then
+  for (const testId of ["hours-open-SUNDAY", "hours-close-SUNDAY"]) {
+    const field = page.getByTestId(testId);
+    await expect(field, `${browserName} locks ${testId} on a closed day`).toBeDisabled();
+    await expectShownAsEmpty(field, browserName);
+  }
+  await expectNoHorizontalOverflow(page);
+});

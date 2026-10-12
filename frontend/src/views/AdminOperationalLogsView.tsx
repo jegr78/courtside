@@ -9,6 +9,7 @@ import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
 import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
+import { DateTimeInput } from "../components/DateTimeInput";
 import { formatDateTime, zonedDateTime } from "../time/clubZone";
 
 interface Filters {
@@ -130,10 +131,10 @@ export function AdminOperationalLogsView() {
         <input data-testid="operational-log-trace-filter" className="form-control rounded-lg border px-3 py-2 font-mono" minLength={32} maxLength={32} pattern="[A-Fa-f0-9]{32}" value={draft.traceId} onChange={(event) => change("traceId", event.target.value)} />
       </label>
       <label className="grid gap-2 font-semibold">{t("operationalLogs.filter.from")}
-        <input data-testid="operational-log-from-filter" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={draft.from} onChange={(event) => change("from", event.target.value)} />
+        <DateTimeInput data-testid="operational-log-from-filter" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={draft.from} onChange={(event) => change("from", event.target.value)} />
       </label>
       <label className="grid gap-2 font-semibold">{t("operationalLogs.filter.to")}
-        <input data-testid="operational-log-to-filter" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={draft.to} onChange={(event) => change("to", event.target.value)} />
+        <DateTimeInput data-testid="operational-log-to-filter" type="datetime-local" className="form-control rounded-lg border px-3 py-2" value={draft.to} onChange={(event) => change("to", event.target.value)} />
       </label>
       <div className="flex flex-wrap gap-3 lg:col-span-3">
         <Button variant="primary" data-testid="operational-log-apply" type="submit">{t("operationalLogs.filter.apply")}</Button>
