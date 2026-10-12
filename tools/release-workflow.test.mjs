@@ -25,7 +25,7 @@ test("given a release commit, when its push build qualifies it for a candidate, 
   const build = yaml.load(readFileSync(new URL("../.github/workflows/build.yml", import.meta.url), "utf8")).jobs;
 
   // when / then
-  assert.deepEqual(build.browser.strategy.matrix.group, ["functional-a", "functional-b", "webkit-accessibility"]);
+  assert.deepEqual(build.browser.strategy.matrix.group, ["functional-a", "functional-b", "chromium-accessibility", "webkit-accessibility"]);
   assert.match(build.browser.if, /github\.event_name != 'pull_request' \|\|/,
     "a push build runs every browser group, so the green build a candidate requires ran the WebKit axe shard");
   assert.match(pom, /<id>npm-e2e<\/id>[\s\S]+?<skip>\$\{frontend\.e2e\.skip\}<\/skip>/);

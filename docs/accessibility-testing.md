@@ -8,7 +8,7 @@ practice rather than a WCAG tag. A sweep opens every page the router declares, i
 light theme, at desk and phone width, with the series form open and the statistics and
 operational-log tables filled, because a table only fails the scrollable-region rule while it
 overflows. Chromium covers all browser journeys;
-Chromium is the blocking automated WCAG rule gate. WebKit runs blocking core compatibility
+Chromium is the blocking automated WCAG rule gate and runs in its own shard. WebKit runs blocking core compatibility
 journeys. The WebKit plus axe combination runs in its own pull-request browser shard and blocks a
 merge as well; the scheduled reliability path repeats it. Keyboard, dialog focus, reflow, reduced-motion and forced-colour checks complement
 axe because a scanner cannot decide whether a workflow is usable.

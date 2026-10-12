@@ -27,6 +27,16 @@ describe("browser project groups", () => {
       "webkit-accessibility")).toThrow(/does not match/i);
   });
 
+  it("given the Chromium axe sweep, when the groups are resolved, then it runs in a shard of its own", () => {
+    // when
+    const selected = browserProjectGroup(projects, "chromium-accessibility").map(({ name }) => name);
+
+    // then
+    expect(selected, "the axe sweep carries its own job deadline").toEqual(["chromium-accessibility"]);
+    expect(browserProjectGroup(projects, "functional-b").map(({ name }) => name), "the phone shard no longer carries the axe sweep")
+      .not.toContain("chromium-accessibility");
+  });
+
   it("given an unknown or incomplete group, when it is resolved, then the gate fails closed", () => {
     // when / then
     expect(() => browserProjectGroup(projects, "unknown")).toThrow(/unsupported browser project group/i);

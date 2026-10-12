@@ -535,7 +535,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [functional-a, functional-b, webkit-accessibility]
+        group: [functional-a, functional-b, chromium-accessibility, webkit-accessibility]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

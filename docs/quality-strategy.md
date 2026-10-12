@@ -85,8 +85,8 @@ Modified, explicitly classified paths may select `docs`, `backend`, `frontend`, 
 combination. Backend changes run backend, tooling and security verification; frontend changes run frontend,
 tooling and security verification. Frontend compilation, lint, unit tests and coverage finish before
 the browser jobs consume the same packaged candidate. Blocking visual and guide snapshots run first;
-only then do two stable functional shards cover Chromium, WebKit, accessibility, phone layouts and
-the journey catalogue. A third shard runs the WebKit accessibility project. On both phone projects, every page the router declares must render its text
+only then do two stable functional shards cover Chromium, WebKit, phone layouts and
+the journey catalogue. The Chromium and the WebKit accessibility projects each run in a shard of their own. On both phone projects, every page the router declares must render its text
 at 10 px or more and keep each control inside the viewport's width. A full selection also starts a fresh Compose project from an image built for
 that commit and proves its application, database and log-collector wait contract.
 Backend, frontend and full selections can change the image, so they also build and qualify an image
@@ -323,7 +323,7 @@ assertions.
 The pull-request browser gate makes two separate product claims. The blocking visual and guide
 snapshots run as the first browser job, so a known pixel regression stops the more expensive
 functional shards. Chromium runs the blocking
-automated WCAG 2.2 AA rule scan, while WebKit runs blocking core compatibility journeys. WebKit
+automated WCAG 2.2 AA rule scan in a shard of its own, while WebKit runs blocking core compatibility journeys. WebKit
 plus axe runs in a blocking shard of its own. Browser process loss, an internal engine error, a lost target or a test-level
 timeout makes the harness outcome incomplete. A failed product assertion remains a product
 failure. The retained browser outcome records those claims separately, and neither class can turn
