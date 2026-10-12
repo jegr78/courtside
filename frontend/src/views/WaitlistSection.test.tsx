@@ -45,6 +45,20 @@ it("given an open offer and a waiting entry, when the section shows, then each n
     .not.toMatch(/position|place \d|#\d/i);
 });
 
+it("given an offer the club took the court from, when the section shows, then it says so and offers nothing to do", async () => {
+  // given
+  vi.mocked(api.waitlistEntries).mockResolvedValue([{ ...offered, state: "WITHDRAWN", offerExpiresAt: null }]);
+
+  // when
+  show();
+
+  // then
+  const withdrawn = await screen.findByTestId(`waitlist-entry-${offered.id}`);
+  expect(within(withdrawn).getByTestId("waitlist-entry-state")).toHaveTextContent("The club took the court itself");
+  expect(within(withdrawn).queryByTestId("waitlist-accept")).toBeNull();
+  expect(within(withdrawn).queryByTestId("waitlist-leave"), "a closed entry has nothing left to leave").toBeNull();
+});
+
 it("given an open offer, when the member books it, then the acceptance is sent and the bookings reload", async () => {
   // given
   const accepting = vi.spyOn(api, "acceptWaitlistOffer").mockResolvedValue({ id: "bbbbbbbb-0000-0000-0000-000000000001" });

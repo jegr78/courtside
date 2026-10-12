@@ -1448,6 +1448,7 @@ it("given the dialog opens, then the common case is visible and the rest sits be
   expect(screen.getByTestId("booking-note")).toBeVisible();
   await userEvent.type(screen.getByTestId("booking-note"), "Clay court");
   expect(screen.getByTestId("booking-note")).toHaveValue("Clay court");
+  expect(screen.getByTestId("booking-note"), "the note stops where the server stops").toHaveAttribute("maxLength", "500");
 });
 
 it("given a refusal about a field behind the disclosure, when it arrives, then the disclosure is open", async () => {
@@ -2429,6 +2430,17 @@ it("given the waitlist refuses a second entry, when the member joins again, then
   await waitFor(() => expect(document.querySelector('[data-code="waitlist.entry.exists"]'))
     .toHaveTextContent("You are already on the waitlist for this court."));
   expect(screen.getByTestId("booking-dialog")).toBeInTheDocument();
+});
+
+it("given the week loads, when the bookings are still on their way, then the reservations are already asked for", async () => {
+  // given
+  vi.mocked(api.allocations).mockReturnValue(new Promise(() => undefined));
+
+  // when
+  render(<WeekView today={clubInstant("12:00")} />);
+
+  // then
+  await waitFor(() => expect(api.reservedSlots, "reservations do not wait for the bookings").toHaveBeenCalledTimes(7));
 });
 
 it("given a court reserved for somebody else, when the plan is shown, then it reads as reserved and names nobody", async () => {

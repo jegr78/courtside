@@ -124,12 +124,10 @@ export function WeekView({ today, clock = systemClock, canBook = true,
         const clubToday = dateInTimeZone(referenceInstant, grid.timeZone);
         const weekStart = addDays(startOfWeek(clubToday), weekOffset * 7);
         const days = weekDays(weekStart);
-        const dailyAllocations = await Promise.all(days.map(async (day) => [
-          formatDate(day), await api.allocations(formatDate(day))
-        ] as const));
-        const dailyReservations = await Promise.all(days.map(async (day) => [
-          formatDate(day), await reservationsOn(formatDate(day))
-        ] as const));
+        const [dailyAllocations, dailyReservations] = await Promise.all([
+          Promise.all(days.map(async (day) => [formatDate(day), await api.allocations(formatDate(day))] as const)),
+          Promise.all(days.map(async (day) => [formatDate(day), await reservationsOn(formatDate(day))] as const))
+        ]);
         if (active) {
           setSelectedDate((current) => current && days.some((day) => formatDate(day) === current)
             ? current
