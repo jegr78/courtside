@@ -147,23 +147,22 @@ describe("AppRoutes", () => {
     expect(screen.getByTestId("current-address")).toHaveTextContent(/^\/my-bookings#booking-42$/);
   });
 
-  it.each([
-    ["a protocol-relative host", "%2F%2Fattacker.example"],
-    ["a backslash host", "%2F%5Cattacker.example"],
-    ["an absolute URL", "https%3A%2F%2Fattacker.example%2Fmy-bookings"],
-    ["a tab", "%2F%09%2Fattacker.example"],
-    ["a newline", "%2F%0A%2Fattacker.example"]
-  ])("given a sign-in that carries %s, when the member is signed in, then the start page is shown", (_, target) => {
-    // when
-    render(
-      <RoutedShell initialEntries={[`/login?returnTo=${target}`]}>
-        <AppRoutes session={signedInMember} refreshSession={() => Promise.resolve()} />
-        <CurrentAddress />
-      </RoutedShell>
-    );
+  it("given a sign-in whose target could leave this origin, when the member is signed in, then the start page is shown", () => {
+    for (const target of ["%2F%2Fattacker.example", "%2F%5Cattacker.example", "https%3A%2F%2Fattacker.example",
+      "%2F%09%2Fattacker.example", "%2F%0A%2Fattacker.example"]) {
+      // when
+      const { unmount } = render(
+        <RoutedShell initialEntries={[`/login?returnTo=${target}`]}>
+          <AppRoutes session={signedInMember} refreshSession={() => Promise.resolve()} />
+          <CurrentAddress />
+        </RoutedShell>
+      );
 
-    // then
-    expect(screen.getByTestId("current-address")).toHaveTextContent(/^\/$/);
+      // then
+      expect(screen.getByTestId("current-address"), `${target} must not decide where sign-in leads`)
+        .toHaveTextContent(/^\/$/);
+      unmount();
+    }
   });
 
   it("given an administrator who just replaced the password, when a link was opened, then the link wins over administration", async () => {

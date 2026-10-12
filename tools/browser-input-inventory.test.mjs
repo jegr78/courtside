@@ -14,9 +14,9 @@ const LOCATION_READ = /\b(?:window\.)?location\.(?:protocol|href|search|hash|pat
 
 const BOUNDARIES = {
   "src/App.tsx useLocation": {
-    value: "the address the browser is on",
-    classification: "decides which shell the route is shown in, and never a right",
-    test: "src/App.test.tsx#given an admin session, when opening an administrative page, then the member bar gives way to it"
+    value: "the address the browser is on, and the returnTo target in its query",
+    classification: "decides which shell the route is shown in and, once returnTarget accepts it as a same-origin path, which page follows sign-in; never a right",
+    test: "src/App.test.tsx#given a sign-in whose target could leave this origin, when the member is signed in, then the start page is shown"
   },
   "src/api/client.ts document.cookie": {
     value: "the readable CSRF cookie the instance issued",

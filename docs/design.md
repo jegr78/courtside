@@ -520,6 +520,13 @@ includes the session refresh. The browser shows the waiting state, cancels when 
 and does not persist the submitted password. Wrong credentials and unrelated admission failures do
 not trigger capacity retries. Server-side verification capacity and rate limits remain authoritative.
 
+A signed-out visitor who opens a member page reaches the sign-in form with that page's path, query
+and fragment in the `returnTo` parameter. After sign-in, and after a required password change with
+the second sign-in it asks for, the browser returns there. The browser follows the target only when
+it is a relative path on the same origin under every percent-decoding: it starts with one `/`, the
+next character is neither `/` nor `\`, and it holds no control character. Any other target leads to
+the start page.
+
 A permanent password has 12 to 256 characters. Courtside rejects common passwords, identity terms
 and an issued one-time credential. Password changes also check the Have I Been Pwned range API. Only
 the first five hexadecimal characters of its SHA-1 protocol digest leave the instance. Failure of

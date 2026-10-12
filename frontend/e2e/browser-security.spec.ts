@@ -396,9 +396,9 @@ test("a sign-in return target that could leave this origin lands on the start pa
       await page.getByTestId("login-submit").click();
 
       // then
-      await expect(page.getByTestId("court-plan-view")).toBeVisible({ timeout: 10_000 });
       await expect(page, `${JSON.stringify(target)} must not decide where sign-in leads`)
         .toHaveURL(startPage, { timeout: 10_000 });
+      await expect(page.getByTestId("court-plan-view")).toBeVisible({ timeout: 10_000 });
     });
   }
 });

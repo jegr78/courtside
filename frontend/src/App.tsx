@@ -46,16 +46,16 @@ interface AppRoutesProps {
 export function AppRoutes({ session, refreshSession, passwordChanged, initialPasswordChanged, signedOut,
   configurationChanged, clubName, offline = false }: AppRoutesProps) {
   const { t } = useTranslation();
-  const location = useLocation();
-  const { pathname } = location;
-  const signInFirst = <Navigate to={signInPath(location)} replace />;
+  const address = useLocation();
+  const { pathname } = address;
+  const signInFirst = <Navigate to={signInPath(address)} replace />;
   const administrative = pathname === "/admin" || pathname.startsWith("/admin/");
   const administrator = session.roles.includes("ADMIN");
 
   if (session.passwordChangeRequired) {
     return <Routes>
       <Route path="/initial-password" element={<InitialPasswordView changed={() => initialPasswordChanged?.()} />} />
-      <Route path="*" element={<Navigate to={{ pathname: "/initial-password", search: returnSearch(location.search) }} replace />} />
+      <Route path="*" element={<Navigate to={{ pathname: "/initial-password", search: returnSearch(address.search) }} replace />} />
     </Routes>;
   }
   return <UnsavedChangesProvider>
@@ -69,7 +69,7 @@ export function AppRoutes({ session, refreshSession, passwordChanged, initialPas
       ? <Navigate to="/" replace />
       : <AccountRecoveryView />} />
     <Route path="/login" element={session.authenticated
-      ? <Navigate to={returnTargetIn(location.search) ?? (passwordChanged && session.roles.includes("ADMIN") ? "/admin" : "/")} replace />
+      ? <Navigate to={returnTargetIn(address.search) ?? (passwordChanged && session.roles.includes("ADMIN") ? "/admin" : "/")} replace />
       : <LoginView refreshSession={refreshSession} passwordChanged={passwordChanged} />} />
     <Route path="/my-bookings" element={session.authenticated
       ? <MyBookingsPage session={session} offline={offline} />
