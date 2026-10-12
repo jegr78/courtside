@@ -1,20 +1,26 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, expectAdministrationOverview, selectJourneyDate, selectPreference, test } from "./fixtures";
 import { productFailure } from "./browser-diagnostics";
+import { routePattern } from "./declared-routes";
+import { become, concretePath, PERSONAS, personas, routerPages, settled } from "./page-sweep";
 import { STANDARD_RULE_SET } from "./shipped-rows";
 
-async function expectNoWcagViolations(page: import("@playwright/test").Page) {
-  const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(results.violations).toEqual([]);
+// axe tags these best-practice only, so a scan by WCAG tags alone never runs them.
+const STRUCTURE_RULES = ["page-has-heading-one", "heading-order", "empty-table-header"];
+
+async function axeFindings(page: import("@playwright/test").Page): Promise<string[]> {
+  const scan = await new AxeBuilder({ page }).options({
+    runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
+    rules: Object.fromEntries(STRUCTURE_RULES.map((rule) => [rule, { enabled: true }]))
+  }).analyze();
+  const ran = new Set([...scan.passes, ...scan.violations, ...scan.incomplete, ...scan.inapplicable].map((rule) => rule.id));
+  expect(STRUCTURE_RULES.filter((rule) => !ran.has(rule)), "a structure rule axe left out of the scan").toEqual([]);
+  return scan.violations.flatMap((violation) =>
+    violation.nodes.map((node) => `${violation.id} at ${node.target.join(" ")}`));
 }
 
-async function expectPageHasHeadingOne(page: import("@playwright/test").Page) {
-  const results = await new AxeBuilder({ page })
-    .withRules(["page-has-heading-one"])
-    .analyze();
-  expect(results.violations).toEqual([]);
+async function expectNoWcagViolations(page: import("@playwright/test").Page) {
+  expect(await axeFindings(page), "an axe rule the page breaks").toEqual([]);
 }
 
 async function signIn(page: import("@playwright/test").Page, username: string) {
@@ -101,7 +107,6 @@ for (const locale of ["de", "en"]) {
     const pageHeading = page.getByRole("heading", { level: 1 });
     await expect(pageHeading).toBeVisible();
     await expect(pageHeading).toHaveText(locale === "de" ? "Platzplan" : "Court plan");
-    await expectPageHasHeadingOne(page);
     await expectNoWcagViolations(page);
     await selectJourneyDate(page, journeyService.visualDate);
     await page.locator('[data-testid="free-slot"][data-state="free"]').first().click();
@@ -436,6 +441,121 @@ for (const locale of ["de", "en"]) {
     }
   });
 }
+
+const operationalLogPage = {
+  availability: "AVAILABLE",
+  retentionTruncated: false,
+  searchIncomplete: false,
+  droppedRecords: 0,
+  entries: [1, 2, 3].map((index) => ({
+    id: `7d000000-0000-0000-0000-00000000000${index}`,
+    occurredAt: `2030-03-11T0${index}:00:00Z`,
+    source: "APPLICATION",
+    severity: "WARN",
+    message: "Mail relay relay.example.org refused the connection on port 587 and the message stays queued",
+    traceId: "4bf92f3577b34da6a3ce929d0e0e4736"
+  }))
+};
+
+// The tables that scroll sideways on a phone, which the sweep must see rendered to judge them.
+const awaitedContent: Record<string, string[]> = {
+  "/admin/utilisation": ["statistics-hours-scroll", "statistics-messages-scroll"],
+  "/admin/operational-logs": ["operational-logs-scroll"]
+};
+
+// A page whose content only appears after a step, so the sweep scans that state as well.
+const furtherStates: Record<string, (page: import("@playwright/test").Page) => Promise<void>> = {
+  "/admin/appointments": async (page) => {
+    await page.getByTestId("new-series").click();
+    await expect(page.getByTestId("series-form"), "the series form opens").toBeVisible({ timeout: 10_000 });
+  }
+};
+
+async function standInsForEmptyTables(page: import("@playwright/test").Page) {
+  await page.route("**/api/admin/operational-logs/search", (route) => route.fulfill({ json: operationalLogPage }));
+  await page.route("**/api/admin/statistics/messages**", async (route) => {
+    const asked = new URL(route.request().url()).searchParams;
+    await route.fulfill({ json: {
+      period: { from: asked.get("from") ?? "2030-02-01", to: asked.get("to") ?? "2030-02-28", timeZone: "Europe/Berlin" },
+      kinds: ["BOOKING_CONFIRMED", "BOOKING_REMINDER"].map((kind) => ({ kind, queued: 1, handedOver: 12, refused: 2, failed: 1, retried: 3 })),
+      previous: null
+    } });
+  });
+}
+
+const sweptSides = [
+  { side: "member", board: false },
+  { side: "board", board: true }
+];
+const sweptWidths = [
+  { device: "desk", viewport: { width: 1280, height: 720 } },
+  { device: "phone", viewport: { width: 393, height: 852 } }
+];
+
+test.describe("every page", () => {
+  // WebKit routes no request a service worker makes, so the stand-ins would be bypassed.
+  test.use({ serviceWorkers: "block" });
+
+  for (const { side, board } of sweptSides) {
+    for (const { device, viewport } of sweptWidths) {
+      test(`given a ${device}, when every ${side} page is opened in both themes, then axe finds nothing`, async ({ page }) => {
+        // given
+        await standInsForEmptyTables(page);
+        await page.setViewportSize(viewport);
+        const pages = routerPages().filter((route) => route.path.startsWith("/admin") === board);
+        const landed = new Set<string>();
+        const unresolved: string[] = [];
+        const findings: string[] = [];
+        const html = page.locator("html");
+        const scanInBothThemes = async (where: string) => {
+          for (const pass of [1, 2]) {
+            const theme = await html.getAttribute("data-theme");
+            findings.push(...(await axeFindings(page)).map((finding) => `${where} in ${theme}: ${finding}`));
+            if (pass === 2) break;
+            const other = theme === "dark" ? "light" : "dark";
+            await selectPreference(page, "#theme-preference", other);
+            await expect(html, "the page switches to the other theme").toHaveAttribute("data-theme", other, { timeout: 10_000 });
+          }
+        };
+
+        // when
+        for (const persona of PERSONAS) {
+          const paths = pages.filter((route) => personas(route.path).includes(persona)).map((route) => route.path);
+          if (paths.length === 0) continue;
+          await become(page, persona);
+          for (const path of paths) {
+            const concrete = await concretePath(page, path);
+            if (concrete === undefined) {
+              unresolved.push(`${path} as ${persona}`);
+              continue;
+            }
+            await page.goto(concrete);
+            await settled(page);
+            expect(await page.evaluate(() => navigator.serviceWorker.controller === null), "no service worker answers in place of the stand-ins").toBe(true);
+            const at = new URL(page.url()).pathname;
+            landed.add(at);
+            for (const testId of awaitedContent[at] ?? []) {
+              await expect(page.getByTestId(testId), `${at} shows its wide table ${testId}`).toBeVisible({ timeout: 10_000 });
+            }
+            await scanInBothThemes(`${at} as ${persona}`);
+            const further = furtherStates[at];
+            if (further) {
+              await further(page);
+              await scanInBothThemes(`${at} further as ${persona}`);
+            }
+          }
+        }
+
+        // then
+        const missed = pages.filter((route) => !route.redirect && ![...landed].some((path) => routePattern(route.path).test(path)));
+        expect.soft(unresolved, "a parameter route whose list page links to no instance").toEqual([]);
+        expect.soft(missed.map((route) => route.path), "a page the sweep never reached").toEqual([]);
+        expect(findings, "an axe rule a page breaks").toEqual([]);
+      });
+    }
+  }
+});
+
 
 test("initial password and validation states meet automated WCAG 2.2 AA checks", async ({ page }) => {
   // given

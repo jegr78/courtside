@@ -962,6 +962,7 @@ const de = {
   "validation.rejected": "Dieses Feld wurde abgelehnt.",
   "auth.logout": "Abmelden",
   "status.loading": "Courtside wird geladen …",
+  "table.scrollRegion": "{{name}}, Tabelle",
   "unsaved.title": "Ungespeicherte Änderungen",
   "unsaved.question_one": "Eine Änderung ist noch nicht gespeichert. Wenn du die Seite verlässt, geht sie verloren.",
   "unsaved.question_other": "{{count}} Änderungen sind noch nicht gespeichert. Wenn du die Seite verlässt, gehen sie verloren.",

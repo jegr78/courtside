@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { type Page } from "@playwright/test";
-import { declaredRoutes, routePattern, type DeclaredRoute } from "./declared-routes";
+import { routePattern } from "./declared-routes";
+import { become, concretePath, PERSONAS, personas, routerPages } from "./page-sweep";
 import { expect, expectAdministrationOverview, expectShownAsEmpty, routeLongSeries, selectJourneyDate, seriesBookingId, test } from "./fixtures";
 import { LEAGUE_MATCH_CARD, MEMBER_BOOKING_CARD } from "./shipped-rows";
 
@@ -986,30 +985,6 @@ test("courts and slot fillers show each entry's name, status and actions on a ph
   await expectNoHorizontalOverflow(page);
 });
 
-type Persona = "signed out" | "doe.jane" | "configuration-admin" | "bootstrap-admin";
-
-function routerPages(): DeclaredRoute[] {
-  const read = (file: string) => readFileSync(resolve(import.meta.dirname, "../src", file), "utf8");
-  return [...declaredRoutes(read("App.tsx")), ...declaredRoutes(read("views/AdminRoutes.tsx"), "/admin")];
-}
-
-// The one page a session only reaches while its password still has to be changed.
-function personas(path: string): Persona[] {
-  if (path === "/initial-password") return ["bootstrap-admin"];
-  return path.startsWith("/admin") ? ["configuration-admin"] : ["signed out", "doe.jane"];
-}
-
-async function concretePath(page: Page, path: string): Promise<string | undefined> {
-  if (!path.includes("/:")) return path;
-  await page.goto(path.slice(0, path.indexOf("/:")));
-  await page.waitForLoadState("networkidle");
-  const pattern = routePattern(path);
-  const instance = async () => (await page.locator("a[href]").evaluateAll((links) =>
-    links.map((link) => new URL((link as HTMLAnchorElement).href).pathname))).find((href) => pattern.test(href));
-  await expect.poll(instance, { timeout: 15_000 }).toBeDefined().catch(() => undefined);
-  return instance();
-}
-
 async function phoneLegibility(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const width = document.documentElement.clientWidth;
@@ -1066,14 +1041,6 @@ async function phoneLegibility(page: Page): Promise<string[]> {
   });
 }
 
-async function become(page: Page, persona: Persona) {
-  await page.context().clearCookies();
-  if (persona === "signed out") return;
-  await signIn(page, persona);
-  const signedIn = { "doe.jane": "my-bookings-link", "configuration-admin": "administration-link", "bootstrap-admin": "initial-password-view" };
-  await expect(page.getByTestId(signedIn[persona])).toBeVisible();
-}
-
 test("given the narrowest supported phone, when a member opens each of their pages, then none scrolls sideways", async ({ page }) => {
   // given
   await page.setViewportSize({ width: 320, height: 640 });
@@ -1119,7 +1086,7 @@ test("given a German word longer than a 320 px line, when a heading wraps it, th
 test("every page keeps its text legible and its controls on screen at phone width", async ({ page }) => {
   // given
   const pages = routerPages();
-  const visits = (["signed out", "doe.jane", "configuration-admin", "bootstrap-admin"] as Persona[])
+  const visits = PERSONAS
     .map((persona) => ({ persona, paths: pages.filter((route) => personas(route.path).includes(persona)).map((route) => route.path) }));
   const landed = new Set<string>();
   const findings: string[] = [];

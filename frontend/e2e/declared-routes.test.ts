@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { resolve, sep } from "node:path";
 import { expect, it } from "vitest";
-import { declaredRoutes, routePattern } from "./declared-routes";
+import { declaredRoutes, ROUTER_FILES, routePattern } from "./declared-routes";
 
 it("given nested, index, layout and catch-all routes, when the tree is read, then every page appears once with its full path", () => {
   // given
@@ -41,6 +41,21 @@ it("given the application's own router, when it is read, then every administrati
   // then
   expect(destinations.length, "the navigation's destinations are read").toBeGreaterThan(10);
   expect(unmatched, "a destination the router does not declare").toEqual([]);
+});
+
+it("given the application's sources, when they are searched for route declarations, then only the files the sweeps read declare any", () => {
+  // given
+  const sources = resolve(import.meta.dirname, "../src");
+
+  // when
+  const declaring = readdirSync(sources, { recursive: true, encoding: "utf8" })
+    .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
+    .filter((file) => /<Route\b/.test(readFileSync(resolve(sources, file), "utf8")))
+    .map((file) => file.split(sep).join("/"))
+    .sort();
+
+  // then
+  expect(declaring, "a router file the page sweeps would never open").toEqual(ROUTER_FILES.map(({ file }) => file).sort());
 });
 
 it("when a parameter route is matched, then only one path segment fills the parameter", () => {

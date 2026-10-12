@@ -55,6 +55,18 @@ describe("SeriesForm", () => {
     expect(unnamed).not.toHaveTextContent(/^2$/);
   });
 
+  it("given the page's level-one heading, when the form opens, then its title follows one level below", async () => {
+    // given
+    show();
+
+    // when
+    await userEvent.click(await screen.findByTestId("new-series"));
+
+    // then
+    expect(screen.getByTestId("series-form").querySelector("#series-title"), "the form's title sits directly under the page heading").toHaveRole("heading");
+    expect(screen.getByTestId("series-form").querySelector("#series-title")?.tagName, "a level skipped is a page a screen reader cannot outline").toBe("H2");
+  });
+
   it("given focus inside the series form, when the form is cancelled, then focus returns to its opener", async () => {
     // given
     show();

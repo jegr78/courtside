@@ -7,6 +7,7 @@ import { problemMessage } from "../api/problem-message";
 import { useClubConfiguration } from "../club/registry";
 import { Alert } from "../components/Alert";
 import { LoadFailure } from "../components/LoadFailure";
+import { ScrollRegion } from "../components/ScrollRegion";
 import { useRetry } from "../failures/useRetry";
 import { Button } from "../components/Button";
 import { DateTimeInput } from "../components/DateTimeInput";
@@ -155,7 +156,7 @@ export function AdminOperationalLogsView() {
             {page.droppedRecords > 0 && <Alert tone="warning" testId="operational-logs-dropped-warning">{t("operationalLogs.droppedWarning", { count: page.droppedRecords })}</Alert>}
             {entries.length === 0
               ? <p data-testid="operational-logs-empty">{t("operationalLogs.empty")}</p>
-              : <div className="overflow-x-auto"><table className="w-full text-left">
+              : <ScrollRegion subject={t("operationalLogs.title")} testId="operational-logs-scroll"><table className="w-full text-left">
                 <thead><tr>
                   <th scope="col" className="p-2">{t("operationalLogs.column.time")}</th>
                   <th scope="col" className="p-2">{t("operationalLogs.column.source")}</th>
@@ -170,7 +171,7 @@ export function AdminOperationalLogsView() {
                   <td data-testid="operational-log-message" className="p-2 break-words">{entry.message}</td>
                   <td data-testid="operational-log-trace" className="p-2 font-mono text-sm break-all">{entry.traceId ?? t("operationalLogs.trace.none")}</td>
                 </tr>)}</tbody>
-              </table></div>}
+              </table></ScrollRegion>}
             {page.nextCursor && <Button variant="secondary" data-testid="operational-logs-load-more" disabled={pending} className="justify-self-start" type="button" onClick={() => void readNextPage()}>{t("operationalLogs.more")}</Button>}
           </>}
       </>}

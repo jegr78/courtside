@@ -163,7 +163,7 @@ export function MyBookingsView({ now, offline = false }: {
     setAction(chosen);
   };
   return <section className="mt-4 sm:mt-8" aria-labelledby="my-bookings-title">
-    <h2 id="my-bookings-title" data-testid="my-bookings-title" className="text-2xl font-bold">{t("myBookings.title")}</h2>
+    <h1 id="my-bookings-title" data-testid="my-bookings-title" className="text-2xl font-bold">{t("myBookings.title")}</h1>
     {offline && refreshedAt && grid && <p data-testid="bookings-offline-as-of" role="status"
       className="surface-raised border-structural mt-4 rounded-xl border px-4 py-3">
       {t("myBookings.offlineAsOf", { time: formatDateTime(refreshedAt, i18n.language, grid.timeZone) })}
@@ -249,7 +249,7 @@ function BookingSection({ testId, title, titleHidden = false, empty, bookings, c
 }) {
   const groups = groupBookings(bookings);
   return <section data-testid={testId}>
-    {title && <h3 className={titleHidden ? "sr-only" : "text-xl font-semibold"}>{title}</h3>}
+    {title && <h2 className={titleHidden ? "sr-only" : "text-xl font-semibold"}>{title}</h2>}
     {groups.length === 0 ? <p className={titleHidden ? "text-muted" : "text-muted mt-3"}>{empty}</p> : <div className={`grid gap-3 sm:gap-4 ${titleHidden ? "" : "mt-3"}`}>{groups.map((group) =>
       <article key={group.key} className="border-structural rounded-xl border p-3 sm:p-4">
         <ul className="grid gap-3">{group.bookings.map((booking) => <li key={booking.id} id={`booking-${booking.id}`} tabIndex={-1} data-testid={`booking-${booking.id}`} data-status={booking.status} className="focus-ring border-structural grid gap-1 border-b pb-3 last:border-0 last:pb-0">

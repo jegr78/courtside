@@ -112,6 +112,8 @@ it("given past and upcoming occurrences, when loaded, then the series is grouped
   expect(await screen.findByTestId("upcoming-bookings")).toHaveTextContent("Upcoming");
   const title = screen.getByTestId("my-bookings-title");
   expect(title).toHaveRole("heading");
+  expect(title.tagName, "the page's title is its one level-one heading").toBe("H1");
+  expect(screen.getByTestId("upcoming-bookings").querySelector("h2"), "the upcoming list sits one level below the title").toHaveTextContent("Upcoming");
   expect(title).toHaveTextContent("My bookings");
   expect(screen.getByTestId("past-bookings")).toHaveTextContent(i18n.t("myBookings.pastCount", { count: 1 }));
   expect(screen.getAllByTestId("series-marker")).toHaveLength(2);

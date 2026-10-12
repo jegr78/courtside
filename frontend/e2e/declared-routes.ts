@@ -62,3 +62,8 @@ export function declaredRoutes(source: string, base = ""): DeclaredRoute[] {
 export function routePattern(path: string): RegExp {
   return new RegExp(`^${path.replace(/:[^/]+/g, "[^/]+")}$`);
 }
+
+export const ROUTER_FILES = [
+  { file: "App.tsx", base: "" },
+  { file: "views/AdminRoutes.tsx", base: "/admin" }
+] as const;
