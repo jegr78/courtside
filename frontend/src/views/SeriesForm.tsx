@@ -192,7 +192,7 @@ export function SeriesForm({ timeZone, courts, created, reportError }: {
         : <TextField data-testid="series-ends-on" disabled={pending} type="date" label={t("series.endsOn")} value={draft.endsOn} onChange={(event) => change({ endsOn: event.target.value })} />}
     </div>
 
-    <TextField data-testid="series-note" disabled={pending} label={t("series.note")} value={draft.note} onChange={(event) => change({ note: event.target.value })} />
+    <TextField data-testid="series-note" maxLength={500} disabled={pending} label={t("series.note")} value={draft.note} onChange={(event) => change({ note: event.target.value })} />
 
     <div className="flex flex-wrap gap-3">
       <Button variant="secondary" data-testid="preview-series" disabled={pending || !isComplete(draft)} type="button" onClick={() => void readPreview()}>

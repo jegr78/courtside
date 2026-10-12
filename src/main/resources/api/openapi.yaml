@@ -2147,7 +2147,7 @@ components:
           minimum: 1
           maximum: 200
           description: Mutually exclusive with `endsOn`.
-        note: { type: [string, "null"] }
+        note: { type: [string, "null"], maxLength: 500 }
 
     CreateSeriesRequest:
       description: |
