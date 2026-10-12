@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       commit:
-        description: The commit on main to qualify, or the branch head for a rehearsal
+        description: The commit on main or on a release branch to qualify, or the branch head for a rehearsal
         required: true
         type: string
       rehearsal:
@@ -34,6 +34,7 @@ jobs:
       commit: ${{ steps.selection.outputs.commit }}
       version: ${{ steps.selection.outputs.version }}
       tag: ${{ steps.selection.outputs.tag }}
+      branch: ${{ steps.selection.outputs.branch }}
       rehearsal: ${{ steps.selection.outputs.rehearsal }}
       build-run-id: ${{ steps.selection.outputs.build-run-id }}
       build-run-attempt: ${{ steps.selection.outputs.build-run-attempt }}
@@ -76,31 +77,9 @@ jobs:
 
       - name: Demand a nightly that verified this release
         env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          BRANCH: ${{ needs.select.outputs.branch }}
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api --paginate \
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/build.yml/runs?branch=${DEFAULT_BRANCH}&status=success&per_page=100" \
-            --slurp | jq -r 'map(.workflow_runs[])[] |
-              select(.event == "schedule" or .event == "workflow_dispatch") | select(.run_attempt == 1) |
-              select(.head_sha | test("^[a-f0-9]{40}$")) | "\(.id) \(.head_sha)"' > nightly-runs.txt
-          verified=""
-          while read -r id head; do
-            git cat-file -e "${head}^{commit}" 2>/dev/null || continue
-            git merge-base --is-ancestor "$head" "$COMMIT" || continue
-            rm -rf nightly-evidence
-            mkdir -p nightly-evidence
-            gh run download "$id" --dir nightly-evidence \
-              --name "nightly-release-evidence-${id}-1" || continue
-            node tools/nightly-release-evidence.mjs \
-              --evidence nightly-evidence/evidence.json \
-              --commit "$head" --run-id "$id" || continue
-            verified="$id"
-            break
-          done < nightly-runs.txt
-          test -n "$verified" \
-            || { echo "::error::no green first-attempt build with a completed nightly release rehearsal verified a commit this candidate builds on"; exit 1; }
-          rm -rf nightly-runs.txt nightly-evidence
+        run: node tools/nightly-release-evidence.mjs --find --branch "$BRANCH" --commit "$COMMIT"
 
       - name: Refuse unresolved nightly failures
         env:

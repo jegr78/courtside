@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { validateNightlyReleaseEvidence } from "./nightly-release-evidence.mjs";
+import { findNightlyRelease, nightlyRunsOf, validateNightlyReleaseEvidence } from "./nightly-release-evidence.mjs";
 
 const require = createRequire(new URL("../frontend/package.json", import.meta.url));
 const yaml = require("js-yaml");
@@ -91,4 +91,48 @@ test("given an incomplete or repeated run, when it is checked, then it cannot qu
   for (const candidate of cases) {
     assert.throws(() => validateNightlyReleaseEvidence(candidate, { commit, runId }));
   }
+});
+
+function run(overrides = {}) {
+  return { id: runId, head_sha: commit, head_branch: "main", event: "schedule", run_attempt: 1, ...overrides };
+}
+
+test("given recorded build runs, when the nightly candidates are read, then only first attempts on the branch count", () => {
+  // given
+  const pages = [{ workflow_runs: [
+    run(),
+    run({ id: 124, event: "push" }),
+    run({ id: 125, run_attempt: 2 }),
+    run({ id: 126, head_branch: "release/0.1", event: "workflow_dispatch" }),
+    run({ id: 127, head_sha: "main" })
+  ] }, { workflow_runs: [run({ id: 128, event: "workflow_dispatch" })] }];
+
+  // when / then
+  assert.deepEqual(nightlyRunsOf(pages, "main"), [{ id: runId, head: commit }, { id: 128, head: commit }],
+    "a push build rehearses no gates and a re-run attempt proves nothing on its first try");
+  assert.deepEqual(nightlyRunsOf(pages, "release/0.1"), [{ id: 126, head: commit }],
+    "a patch reads the dispatched build of its own release branch, never a main nightly");
+});
+
+test("given nightly candidates, when evidence is found, then the first ancestor whose evidence verifies is chosen", () => {
+  // given
+  const runs = [{ id: 130, head: "c".repeat(40) }, { id: 129, head: commit }, { id: runId, head: commit }];
+  const evidence = new Map([[129, null], [runId, generated()]]);
+
+  // when
+  const found = findNightlyRelease({ runs, isAncestor: (head) => head === commit,
+    evidenceOf: (id) => evidence.get(id) ?? null, branch: "main" });
+
+  // then
+  assert.deepEqual(found, { commit, runId }, "a run without downloadable evidence is skipped, not trusted");
+});
+
+test("given no nightly whose evidence verifies, when evidence is found, then the release is refused for that branch", () => {
+  // when / then
+  assert.throws(() => findNightlyRelease({ runs: [{ id: runId, head: commit }], isAncestor: () => true,
+    evidenceOf: () => generated({ releaseGates: "skipped" }), branch: "release/0.1" }),
+  /no green first-attempt build on release\/0\.1 with a completed nightly release rehearsal verified a commit this candidate builds on/);
+  assert.throws(() => findNightlyRelease({ runs: [{ id: runId, head: commit }], isAncestor: () => false,
+    evidenceOf: () => generated(), branch: "main" }), /no green first-attempt build on main/,
+  "a nightly of a commit the release does not build on proves nothing about it");
 });
