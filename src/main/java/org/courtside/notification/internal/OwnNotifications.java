@@ -100,7 +100,7 @@ public class OwnNotifications {
         BookingAnnouncement booking = stored.bookingId() == null ? null : visible.get(stored.bookingId());
         return new Entry(stored.id(), stored.kind(), stored.createdAt(), stored.readAt(), booking,
                 closureOf(stored.parameters().get(QueuedMessage.CLOSURE)),
-                CancellationReasons.of(stored.parameters().get(QueuedMessage.REASON)), targetOf(stored.kind()),
+                StoredCancellationReasons.of(stored.parameters().get(QueuedMessage.REASON)), targetOf(stored.kind()),
                 booking == null ? null : stored.bookingId());
     }
 

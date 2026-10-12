@@ -94,7 +94,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
 
         // when
         int cancelled = seriesService.cancel(result.seriesId(), result.bookingIds().get(2),
-                CancelScope.THIS, trainer, Set.of(Role.TRAINER));
+                CancelScope.THIS, trainer, Set.of(Role.TRAINER), null);
 
         // then
         assertThat(cancelled).isEqualTo(1);
@@ -116,7 +116,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         BookingRulesViolatedException failure = org.assertj.core.api.Assertions.catchThrowableOfType(
                 BookingRulesViolatedException.class,
                 () -> seriesService.cancel(result.seriesId(), result.bookingIds().getFirst(),
-                        CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER)));
+                        CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER), null));
 
         // then
         assertThat(failure.getViolations()).extracting(RuleViolation::code)
@@ -139,7 +139,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
 
         // when
         int cancelled = seriesService.cancel(result.seriesId(), result.bookingIds().get(2),
-                CancelScope.THIS_AND_FOLLOWING, trainer, Set.of(Role.TRAINER));
+                CancelScope.THIS_AND_FOLLOWING, trainer, Set.of(Role.TRAINER), null);
 
         // then
         assertThat(cancelled).isEqualTo(3);
@@ -155,7 +155,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
 
         // when
         int cancelled = seriesService.cancel(result.seriesId(), result.bookingIds().get(2),
-                CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER));
+                CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER), null);
 
         // then
         assertThat(cancelled).isEqualTo(5);
@@ -170,7 +170,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
 
         // when
         seriesService.cancel(result.seriesId(), result.bookingIds().getFirst(),
-                CancelScope.WHOLE_SERIES, youthDirector, Set.of(Role.YOUTH_DIRECTOR));
+                CancelScope.WHOLE_SERIES, youthDirector, Set.of(Role.YOUTH_DIRECTOR), null);
 
         // then
         assertThat(result.bookingIds()).allSatisfy(bookingId ->
@@ -183,11 +183,11 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         // given
         SeriesCreationResult result = createSeries(3);
         seriesService.cancel(result.seriesId(), result.bookingIds().getFirst(),
-                CancelScope.THIS, trainer, Set.of(Role.TRAINER));
+                CancelScope.THIS, trainer, Set.of(Role.TRAINER), null);
 
         // when
         int cancelled = seriesService.cancel(result.seriesId(), result.bookingIds().getFirst(),
-                CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER));
+                CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER), null);
 
         // then
         assertThat(cancelled).isEqualTo(2);
@@ -197,7 +197,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
     void givenAnUnknownSeries_whenCancelling_thenTheBookingItNamesDecidesTheAnswer() {
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(UUID.randomUUID(), UUID.randomUUID(),
-                CancelScope.THIS, trainer, Set.of(Role.TRAINER)))
+                CancelScope.THIS, trainer, Set.of(Role.TRAINER), null))
                 .as("the booking is looked up before the series is spoken of, so an unknown series"
                         + " cannot be told apart from one this caller may not reach")
                 .isInstanceOf(BookingNotFoundException.class);
@@ -211,7 +211,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(theirs.seriesId(),
-                other.bookingIds().getFirst(), CancelScope.THIS, trainer, Set.of(Role.TRAINER)))
+                other.bookingIds().getFirst(), CancelScope.THIS, trainer, Set.of(Role.TRAINER), null))
                 .as("the caller manages the booking, so the series may be spoken of — and it says"
                         + " the booking is not in it, which is also what an unknown series says")
                 .isInstanceOf(SeriesRequestInvalidException.class);
@@ -224,7 +224,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), UUID.randomUUID(),
-                CancelScope.THIS_AND_FOLLOWING, trainer, Set.of(Role.TRAINER)))
+                CancelScope.THIS_AND_FOLLOWING, trainer, Set.of(Role.TRAINER), null))
                 .isInstanceOf(BookingNotFoundException.class);
     }
 
@@ -235,7 +235,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), UUID.randomUUID(),
-                CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER)))
+                CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER), null))
                 .isInstanceOf(BookingNotFoundException.class);
     }
 
@@ -250,7 +250,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
 
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), result.bookingIds().getFirst(),
-                CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER)))
+                CancelScope.WHOLE_SERIES, trainer, Set.of(Role.TRAINER), null))
                 .isInstanceOf(BookingNotFoundException.class)
                 .hasMessageContaining("may not manage");
         assertThat(statusesOf(result)).allMatch(BookingStatus.CONFIRMED::equals);
@@ -262,11 +262,11 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         SeriesCreationResult result = createSeries(2);
         UUID cancelledOccurrence = result.bookingIds().getFirst();
         seriesService.cancel(result.seriesId(), cancelledOccurrence, CancelScope.THIS,
-                trainer, Set.of(Role.TRAINER));
+                trainer, Set.of(Role.TRAINER), null);
 
         // when / then
         assertThatThrownBy(() -> seriesService.cancel(result.seriesId(), cancelledOccurrence,
-                CancelScope.THIS, UUID.randomUUID(), Set.of(Role.MEMBER)))
+                CancelScope.THIS, UUID.randomUUID(), Set.of(Role.MEMBER), null))
                 .isInstanceOf(BookingNotFoundException.class)
                 .hasMessageContaining("may not manage");
     }
@@ -292,7 +292,7 @@ class SeriesCancellationTest extends AbstractIntegrationTest {
         Callable<Void> cancelTheSeries = () -> {
             await(firstCancellationIsInPlace);
             seriesService.cancel(result.seriesId(), bookingId, CancelScope.WHOLE_SERIES,
-                    secondActor, Set.of(Role.ADMIN));
+                    secondActor, Set.of(Role.ADMIN), null);
             return null;
         };
 

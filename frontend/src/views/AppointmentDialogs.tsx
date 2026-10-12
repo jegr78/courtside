@@ -33,8 +33,8 @@ export function CancelDialog({ booking, seriesBookings, hasMoreBookings, timeZon
   const foreign = "ownBooking" in booking && !booking.ownBooking;
   async function submit() {
     try {
-      if (booking.seriesId) await (reason ? api.cancelSeries(booking.seriesId, booking.id, scope, reason) : api.cancelSeries(booking.seriesId, booking.id, scope));
-      else await (reason ? api.cancelBooking(booking.id, reason) : api.cancelBooking(booking.id));
+      if (booking.seriesId) await api.cancelSeries(booking.seriesId, booking.id, scope, reason);
+      else await api.cancelBooking(booking.id, reason);
       await completed();
     } catch (failure) { report(failure); }
   }

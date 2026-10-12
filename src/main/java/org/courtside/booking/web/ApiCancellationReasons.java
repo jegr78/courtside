@@ -3,9 +3,9 @@ package org.courtside.booking.web;
 import org.courtside.api.ApiCancellationReason;
 import org.courtside.shared.CancellationReason;
 
-final class CancellationReasons {
+final class ApiCancellationReasons {
 
-    private CancellationReasons() {
+    private ApiCancellationReasons() {
     }
 
     static CancellationReason of(ApiCancellationReason reason) {

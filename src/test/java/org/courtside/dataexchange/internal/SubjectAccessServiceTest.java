@@ -10,6 +10,7 @@ import org.courtside.member.testfixture.MemberTestFixture;
 import org.courtside.notification.MessageKind;
 import org.courtside.notification.PersonMessageHistory;
 import org.courtside.notification.testfixture.NotificationTestFixture;
+import org.courtside.shared.CancellationReason;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -111,6 +112,27 @@ class SubjectAccessServiceTest extends AbstractIntegrationTest {
         assertThat(answer.declinedMessages())
                 .extracting(declined -> declined.kind().name())
                 .containsExactly("BOOKING_REMINDER");
+    }
+
+    @Test
+    void givenCentreEntriesAboutCancellations_whenTheAnswerIsProduced_thenEachCarriesTheReasonItStored() {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        UUID accountId = identity.createEnabledAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID bookingId = UUID.randomUUID();
+        notifications.notifyCancelled(accountId, bookingId, "WEATHER", SIX_PM);
+        notifications.notifyCancelled(accountId, bookingId, "RAIN", SEVEN_PM);
+
+        // when
+        SubjectAccessRecord answer = subjectAccess.answerFor(personId);
+
+        // then
+        assertThat(answer.notifications())
+                .extracting(notification -> notification.kind().name(),
+                        PersonMessageHistory.Notification::cancellationReason)
+                .as("a code this version does not know answers as none rather than failing the export")
+                .containsExactly(tuple("BOOKING_CANCELLED_BY_CLUB", CancellationReason.WEATHER),
+                        tuple("BOOKING_CANCELLED_BY_CLUB", null));
     }
 
     @Test

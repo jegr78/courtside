@@ -171,6 +171,19 @@ class NotificationControllerTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void givenAnEntryStoredWithAnUnknownReasonCode_whenTheCentreIsRead_thenItNamesNoReason() throws Exception {
+        // given
+        UUID janesBooking = bookNaming(johnPersonId, SIX_PM, SEVEN_PM);
+        notifications.notifyCancelled(johnAccountId, janesBooking, "RAIN", Instant.parse("2026-05-12T12:00:00Z"));
+
+        // when / then
+        mockMvc.perform(get("/api/account/notifications").with(as("roe.john")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].kind").value("BOOKING_CANCELLED_BY_CLUB"))
+                .andExpect(jsonPath("$.items[0].cancellationReason").doesNotExist());
+    }
+
+    @Test
     void givenAPlayerWhoLeftTheBooking_whenTheyReadTheCentre_thenTheEntryNoLongerDescribesOrLinksIt()
             throws Exception {
         // given

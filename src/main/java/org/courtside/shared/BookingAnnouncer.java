@@ -17,6 +17,9 @@ public interface BookingAnnouncer {
     // Cancelled ones included, earliest first, and an id naming no booking is left out.
     SequencedMap<UUID, BookingAnnouncement> describeAll(Collection<UUID> bookingIds);
 
+    // In the order given, and a court that no longer exists is left out.
+    List<BookingAnnouncement.AnnouncedCourt> describeCourts(List<UUID> courtIds);
+
     // The occurrences still confirmed, earliest first.
     List<BookingAnnouncement> describeSeries(UUID seriesId);
 }

@@ -21,6 +21,7 @@ record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> param
     static final String BOOKINGS = "bookingIds";
     static final String PREVIOUS_STARTS_AT = "previousStartsAt";
     static final String PREVIOUS_ENDS_AT = "previousEndsAt";
+    static final String PREVIOUS_COURTS = "previousCourtIds";
 
     QueuedMessage {
         parameters = parameters == null ? Map.of() : Map.copyOf(parameters);
@@ -43,14 +44,23 @@ record QueuedMessage(UUID accountId, MessageKind kind, Map<String, String> param
         if (stored == null) {
             return Optional.empty();
         }
-        return Optional.of(Arrays.stream(CancellationReason.values())
-                .filter(reason -> reason.name().equals(stored))
-                .findFirst()
-                .orElseThrow(() -> new MessageUndeliverableException("ParameterMalformed")));
+        CancellationReason reason = StoredCancellationReasons.of(stored);
+        if (reason == null) {
+            throw new MessageUndeliverableException("ParameterMalformed");
+        }
+        return Optional.of(reason);
     }
 
     List<UUID> bookings() {
-        return Arrays.stream(required(BOOKINGS).split(",")).map(QueuedMessage::uuid).toList();
+        return ids(BOOKINGS);
+    }
+
+    List<UUID> previousCourts() {
+        return ids(PREVIOUS_COURTS);
+    }
+
+    private List<UUID> ids(String name) {
+        return Arrays.stream(required(name).split(",")).map(QueuedMessage::uuid).toList();
     }
 
     Instant previousStartsAt() {

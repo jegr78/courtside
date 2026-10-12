@@ -346,6 +346,22 @@ describe("AdminManagedAppointmentsView", () => {
     await waitFor(() => expect(cancel).toHaveBeenCalledWith("series-1", first.id, "THIS", "WEATHER"));
   });
 
+  it("given somebody else's single appointment, when the board cancels it naming a reason, then the booking is cancelled with it", async () => {
+    // given
+    const cancel = vi.spyOn(api, "cancelBooking").mockResolvedValue(undefined);
+    const single = { ...first, id: "33333333-3333-3333-3333-333333333333", seriesId: null, ownBooking: false };
+    vi.mocked(api.managedAppointments).mockResolvedValue({ items: [single] });
+    show();
+    await userEvent.click(within(await screen.findByTestId(`booking-${single.id}`)).getByTestId("managed-cancel"));
+
+    // when
+    await userEvent.selectOptions(screen.getByTestId("cancellation-reason"), "MAINTENANCE");
+    await userEvent.click(screen.getByTestId("confirm-cancellation"));
+
+    // then
+    await waitFor(() => expect(cancel).toHaveBeenCalledWith(single.id, "MAINTENANCE"), { timeout: 10_000 });
+  });
+
   it("given the board's own series, when cancelling it, then no reason is offered", async () => {
     // given
     const cancel = vi.spyOn(api, "cancelSeries").mockResolvedValue(undefined);
@@ -358,7 +374,7 @@ describe("AdminManagedAppointmentsView", () => {
     // then
     expect(screen.queryByTestId("cancellation-reason")).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId("confirm-cancellation"));
-    await waitFor(() => expect(cancel).toHaveBeenCalledWith("series-1", first.id, "THIS"));
+    await waitFor(() => expect(cancel).toHaveBeenCalledWith("series-1", first.id, "THIS", undefined));
   });
 
   it("given a confirmed cancellation, when the next action starts, then the earlier confirmation leaves", async () => {

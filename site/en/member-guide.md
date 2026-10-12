@@ -259,10 +259,10 @@ Courtside always sends:
 * notice that the club cancelled a booking that concerns you,
 * notice that the club cancelled or moved dates of your series.
 
-Separately, you choose whether you also get an email. Without email your messages still appear
-here. You then learn only here that somebody added you as a player, that a change affects your
-booking or that the club cancelled one. Courtside always emails credentials, your username and reset codes, because you are not
-signed in when you need them.
+Separately, you choose whether you also get an email. Without email your messages still appear here.
+You then learn only here that somebody added you as a player, that a change affects your booking or
+that the club cancelled one. Courtside always emails credentials, your username and reset codes,
+because you are not signed in when you need them.
 
 Save your choices. They apply to future messages only.
 

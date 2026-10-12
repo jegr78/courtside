@@ -1,7 +1,6 @@
 package org.courtside.notification.internal;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.courtside.config.ClubIdentity;
 import org.courtside.identity.UserAccount;
 import org.courtside.identity.UserAccountRepository;
@@ -25,7 +24,6 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 class SeriesMailer implements MessageComposer {
@@ -41,10 +39,6 @@ class SeriesMailer implements MessageComposer {
     // The first occurrence is what the centre entry shows and links to.
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     void on(SeriesCreated created) {
-        if (created.bookingIds().isEmpty()) {
-            log.warn("Series {} was announced without an occurrence", created.seriesId());
-            return;
-        }
         String first = created.bookingIds().getFirst().toString();
         bookings.describe(created.bookingIds().getFirst()).ifPresent(booking -> audience.of(booking).forEach(account ->
                 outbox.queue(account.getId(), MessageKind.BOOKING_SERIES_CREATED, Map.of(
@@ -66,23 +60,28 @@ class SeriesMailer implements MessageComposer {
     void on(SeriesMoved moved) {
         announceChange(moved.bookingIds(), moved.movedByAccountId(), MessageKind.BOOKING_SERIES_MOVED_BY_CLUB,
                 Map.of(QueuedMessage.PREVIOUS_STARTS_AT, moved.previousStartsAt().toString(),
-                        QueuedMessage.PREVIOUS_ENDS_AT, moved.previousEndsAt().toString()));
+                        QueuedMessage.PREVIOUS_ENDS_AT, moved.previousEndsAt().toString(),
+                        QueuedMessage.PREVIOUS_COURTS, moved.previousCourtIds().stream().map(UUID::toString)
+                                .collect(Collectors.joining(","))));
     }
 
-    // Whoever made the change knows it, so the holder's own change reaches nobody.
+    // Only the holder is told, so the dates of a series never reach a third account.
     private void announceChange(List<UUID> bookingIds, UUID actorAccountId, MessageKind kind,
                                 Map<String, String> details) {
         SequencedMap<UUID, BookingAnnouncement> affected = bookings.describeAll(bookingIds);
         if (affected.isEmpty()) {
             return;
         }
+        UUID holder = affected.firstEntry().getValue().bookedByAccountId();
+        if (holder.equals(actorAccountId)) {
+            return;
+        }
         Map<String, String> parameters = new HashMap<>(details);
         parameters.put(QueuedMessage.BOOKING, affected.firstEntry().getKey().toString());
         parameters.put(QueuedMessage.BOOKINGS, bookingIds.stream().map(UUID::toString)
                 .collect(Collectors.joining(",")));
-        audience.of(affected.firstEntry().getValue()).stream()
-                .filter(account -> !account.getId().equals(actorAccountId))
-                .forEach(account -> outbox.queue(account.getId(), kind, parameters));
+        MessageRecipient.enabled(accounts.findById(holder))
+                .ifPresent(account -> outbox.queue(account.getId(), kind, parameters));
     }
 
     @Override
@@ -108,7 +107,8 @@ class SeriesMailer implements MessageComposer {
             values.put("reason", wording.reason(message.reason(), locale));
         }
         if (message.kind() == MessageKind.BOOKING_SERIES_MOVED_BY_CLUB) {
-            values.putAll(wording.previous(message.previousStartsAt(), message.previousEndsAt()));
+            values.putAll(wording.previous(message.previousStartsAt(), message.previousEndsAt(),
+                    bookings.describeCourts(message.previousCourts()), locale));
         }
         String key = message.kind().templateKey();
         handOver.accept(new OutgoingMail(account.getPerson().getEmail(),

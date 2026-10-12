@@ -223,16 +223,16 @@ entries come from `member`.
 with the product; read the constraint rather than a list here. A message somebody declined leaves no
 row at all: it did not fail, it was not sent.
 
-A `QUEUED` row is a message waiting in the outbox. Its `parameters` hold what the message is
-written from: a booking id, a series id, the comma-separated ids of the series occurrences a change
-touched, a closure kind, a cancellation reason code, the previous start and end of moved
-occurrences or the person who withdrew. They never hold rendered text, an address or a credential: a message is composed from the current rows when it is handed over, and
-a generated credential or reset code exists only in that transaction. `next_attempt_at` says when the
-row is next due, `attempts` counts the claims made for it and `retries` the failed handovers that
-were scheduled again. On a `QUEUED` row, `reason` names the last failed attempt; on a settled row it
-names why the message failed or was refused. Settling a row clears both `parameters` and
-`next_attempt_at`, and CHECK constraints refuse a settled row that keeps either, and `parameters`
-that are anything but an object of strings.
+A `QUEUED` row is a message waiting in the outbox. Its `parameters` hold what the message is written
+from: a booking id, a series id, the comma-separated ids of the series occurrences a change touched,
+a closure kind, a cancellation reason code, the previous start and end of moved occurrences or the
+person who withdrew. They never hold rendered text, an address or a credential: a message is
+composed from the current rows when it is handed over, and a generated credential or reset code
+exists only in that transaction. `next_attempt_at` says when the row is next due, `attempts` counts
+the claims made for it and `retries` the failed handovers that were scheduled again. On a `QUEUED`
+row, `reason` names the last failed attempt; on a settled row it names why the message failed or was
+refused. Settling a row clears both `parameters` and `next_attempt_at`, and CHECK constraints refuse
+a settled row that keeps either, and `parameters` that are anything but an object of strings.
 
 A `notification` row is written with the outbox row in the same transaction, and also when no mail
 is queued because the account has no address or switched email off. Its `parameters` keep only the

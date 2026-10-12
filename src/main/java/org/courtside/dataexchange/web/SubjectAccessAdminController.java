@@ -139,6 +139,8 @@ class SubjectAccessAdminController implements AdminSubjectAccessApi {
                 ApiBookingStatus.fromValue(booking.status().name()),
                 toReservations(booking.reservations()))
                 .cancelledAt(WireTypes.toOffsetDateTime(booking.cancelledAt()))
+                .cancellationReason(booking.cancellationReason() == null ? null
+                        : ApiCancellationReason.fromValue(booking.cancellationReason().name()))
                 .note(booking.note());
     }
 

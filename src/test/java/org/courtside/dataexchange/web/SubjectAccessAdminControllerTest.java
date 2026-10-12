@@ -10,6 +10,7 @@ import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.member.testfixture.MemberTestFixture;
+import org.courtside.shared.CancellationReason;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.AfterEach;
@@ -331,6 +332,29 @@ class SubjectAccessAdminControllerTest extends AbstractIntegrationTest {
 
     private static org.springframework.test.web.servlet.RequestBuilder export(UUID personId) {
         return post("/api/admin/export/person/" + personId).with(csrf());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    void givenABookingTheClubCancelledForAReason_whenABoardAsks_thenTheBookingAndTheEntryNameTheReason()
+            throws Exception {
+        // given
+        UUID personId = roster.addPerson("Jane", "Doe", "jane.doe@example.org");
+        roster.giveAccount(personId, "jane.doe", Set.of(Role.MEMBER));
+        UUID accountId = identity.accountIdOf(personId);
+        UUID board = identity.createEnabledAccount(identity.createPerson("Richard", "Miles"), "miles.richard",
+                Set.of(Role.ADMIN));
+        UUID bookingId = bookings.createBookingWithGuest(courtId, MEMBER_BOOKING_CARD,
+                new TimeSlot(SIX_PM, SEVEN_PM), accountId, personId, Set.of(Role.MEMBER), NOTE, GUEST);
+        bookings.cancelForTheClub(bookingId, board, CancellationReason.WEATHER);
+
+        // when / then
+        mockMvc.perform(export(personId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bookingsMade[0].bookingId").value(bookingId.toString()))
+                .andExpect(jsonPath("$.bookingsMade[0].cancellationReason").value("WEATHER"))
+                .andExpect(jsonPath("$.notifications[?(@.kind == 'BOOKING_CANCELLED_BY_CLUB')].cancellationReason")
+                        .value(hasItem("WEATHER")));
     }
 
     private UUID importSource() {

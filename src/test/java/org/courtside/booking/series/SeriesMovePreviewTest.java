@@ -226,7 +226,7 @@ class SeriesMovePreviewTest extends AbstractIntegrationTest {
         SeriesCreationResult series = createSeries(2);
         UUID cancelledOccurrence = series.bookingIds().getFirst();
         seriesService.cancel(series.seriesId(), cancelledOccurrence, CancelScope.THIS,
-                trainer, Set.of(Role.TRAINER));
+                trainer, Set.of(Role.TRAINER), null);
 
         // when / then
         assertThatThrownBy(() -> seriesService.previewMove(new MoveRequest(

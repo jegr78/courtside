@@ -96,7 +96,7 @@ class SeriesReminderCancellationRaceTest extends AbstractIntegrationTest {
 
         Callable<Void> cancelTheSeries = () -> {
             seriesService.cancel(series.seriesId(), bookingIds.getFirst(), CancelScope.WHOLE_SERIES,
-                    trainer, Set.of(Role.TRAINER));
+                    trainer, Set.of(Role.TRAINER), null);
             return null;
         };
         Callable<Void> runTheReminderSweep = () -> {

@@ -4,9 +4,9 @@ import org.courtside.shared.CancellationReason;
 
 import java.util.Arrays;
 
-final class CancellationReasons {
+final class StoredCancellationReasons {
 
-    private CancellationReasons() {
+    private StoredCancellationReasons() {
     }
 
     // An entry stored with a code this version no longer knows reads as one that names none.

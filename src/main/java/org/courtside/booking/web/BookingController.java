@@ -152,7 +152,7 @@ class BookingController implements BookingsApi {
     @Override
     public ResponseEntity<Void> cancelBooking(UUID id, ApiCancellationReason reason) {
         UserAccount account = currentUser.requireAccount();
-        bookings.cancel(id, account.getId(), account.getRoles(), CancellationReasons.of(reason));
+        bookings.cancel(id, account.getId(), account.getRoles(), ApiCancellationReasons.of(reason));
         return ResponseEntity.noContent().build();
     }
 

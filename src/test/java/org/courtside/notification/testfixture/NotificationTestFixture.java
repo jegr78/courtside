@@ -59,6 +59,23 @@ public class NotificationTestFixture {
         return id;
     }
 
+    public UUID notifyCancelled(UUID accountId, UUID bookingId, String reason, Instant at) {
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO notification (id, account_id, kind, parameters, created_at)
+                        VALUES (:id, :accountId, 'BOOKING_CANCELLED_BY_CLUB',
+                                jsonb_build_object('bookingId', CAST(:bookingId AS text), 'reason', CAST(:reason AS text)),
+                                :at)
+                        """)
+                .param("id", id)
+                .param("accountId", accountId)
+                .param("bookingId", bookingId.toString())
+                .param("reason", reason)
+                .param("at", java.sql.Timestamp.from(at))
+                .update();
+        return id;
+    }
+
     public UUID notifyDisplaced(UUID accountId, UUID bookingId, String closure, Instant at) {
         UUID id = UUID.randomUUID();
         jdbc.sql("""

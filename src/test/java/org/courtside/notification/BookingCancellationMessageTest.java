@@ -5,12 +5,12 @@ import org.courtside.AbstractIntegrationTest;
 import org.courtside.booking.BookingService;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
-import org.courtside.booking.internal.CancellationReasonNotAllowedException;
 import org.courtside.facility.testfixture.FacilityTestFixture;
 import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.CancellationReason;
+import org.courtside.shared.CodedDomainFailure;
 import org.courtside.shared.OpeningWindow;
 import org.courtside.shared.TimeSlot;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,12 +30,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.verify;
 
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class})
 class BookingCancellationMessageTest extends AbstractIntegrationTest {
@@ -47,6 +44,8 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
 
     @MockitoSpyBean
     private JavaMailSender sender;
+
+    private SentMail mail;
 
     @Autowired
     private BookingService bookings;
@@ -73,6 +72,7 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
     @BeforeEach
     void aBookingWithACoPlayerAndABoard() {
         doNothing().when(sender).send(any(MimeMessage.class));
+        mail = new SentMail(sender);
         courtId = facility.createCourt(1, "Court 1");
         for (DayOfWeek day : DayOfWeek.values()) {
             facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
@@ -107,7 +107,7 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
         assertThat(stateOf(playerAccountId, MessageKind.BOOKING_CANCELLED))
                 .as("a cancellation notice is composed although its booking is cancelled")
                 .isEqualTo("HANDED_OVER");
-        assertThat(bodiesTo("john.roe@example.org")).singleElement().asString()
+        assertThat(mail.bodiesTo("john.roe@example.org")).singleElement().asString()
                 .contains("Mittwoch, 13. Mai 2026", "18:00", "19:00", "Court 1", "storniert")
                 .doesNotContain("Jane").doesNotContain("Doe");
     }
@@ -130,7 +130,7 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
                 .as("the board account that cancelled is not told what it did")
                 .isEmpty();
         assertThat(stateOf(bookerAccountId, MessageKind.BOOKING_CANCELLED_BY_CLUB)).isEqualTo("HANDED_OVER");
-        assertThat(bodiesTo("jane.doe@example.org")).singleElement().asString()
+        assertThat(mail.bodiesTo("jane.doe@example.org")).singleElement().asString()
                 .contains("hat diese Buchung storniert", "Mittwoch, 13. Mai 2026", "Court 1")
                 .doesNotContain("Richard").doesNotContain("Miles");
     }
@@ -146,7 +146,7 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
         bookings.cancel(bookingId, boardAccountId, Set.of(Role.ADMIN));
 
         // then
-        assertThat(bodiesTo("john.roe@example.org")).singleElement().asString()
+        assertThat(mail.bodiesTo("john.roe@example.org")).singleElement().asString()
                 .contains("has cancelled this booking", "Wednesday, May 13, 2026", "Court 1");
     }
 
@@ -230,10 +230,10 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
         bookings.cancel(bookingId, boardAccountId, Set.of(Role.ADMIN), CancellationReason.MAINTENANCE);
 
         // then
-        assertThat(bodiesTo("jane.doe@example.org")).singleElement().asString()
+        assertThat(mail.bodiesTo("jane.doe@example.org")).singleElement().asString()
                 .contains("Grund: Wartungsarbeiten.")
                 .doesNotContain("Frage deinen Verein");
-        assertThat(bodiesTo("john.roe@example.org")).singleElement().asString()
+        assertThat(mail.bodiesTo("john.roe@example.org")).singleElement().asString()
                 .contains("Reason: maintenance work.");
         assertThat(jdbc.sql("SELECT parameters::text FROM notification WHERE kind = 'BOOKING_CANCELLED_BY_CLUB'")
                 .query(String.class).list())
@@ -254,7 +254,7 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
         bookings.cancel(bookingId, boardAccountId, Set.of(Role.ADMIN));
 
         // then
-        assertThat(bodiesTo("jane.doe@example.org")).singleElement().asString()
+        assertThat(mail.bodiesTo("jane.doe@example.org")).singleElement().asString()
                 .contains("Frage deinen Verein, wenn du den Grund wissen möchtest.")
                 .doesNotContain("Grund:");
     }
@@ -267,7 +267,7 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> bookings.cancel(bookingId, bookerAccountId, Set.of(Role.MEMBER),
                 CancellationReason.WEATHER))
-                .isInstanceOfSatisfying(CancellationReasonNotAllowedException.class, failure ->
+                .isInstanceOfSatisfying(CodedDomainFailure.class, failure ->
                         assertThat(failure.getCode()).isEqualTo("booking.cancellationReason.ownBooking"));
         assertThat(jdbc.sql("SELECT status FROM booking WHERE id = :id").param("id", bookingId)
                 .query(String.class).single())
@@ -289,30 +289,5 @@ class BookingCancellationMessageTest extends AbstractIntegrationTest {
                 .param("kind", kind.name())
                 .query(String.class)
                 .single();
-    }
-
-    private List<Object> bodiesTo(String address) throws Exception {
-        var captured = forClass(MimeMessage.class);
-        verify(sender, atLeast(0)).send(captured.capture());
-        return captured.getAllValues().stream()
-                .filter(message -> address.equals(recipientOf(message)))
-                .map(BookingCancellationMessageTest::contentOf)
-                .toList();
-    }
-
-    private static Object contentOf(MimeMessage message) {
-        try {
-            return message.getContent();
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static String recipientOf(MimeMessage message) {
-        try {
-            return message.getAllRecipients()[0].toString();
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
     }
 }

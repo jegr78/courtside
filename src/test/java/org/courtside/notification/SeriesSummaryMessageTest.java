@@ -27,11 +27,8 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.verify;
 
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class})
 class SeriesSummaryMessageTest extends AbstractIntegrationTest {
@@ -41,6 +38,8 @@ class SeriesSummaryMessageTest extends AbstractIntegrationTest {
 
     @MockitoSpyBean
     private JavaMailSender sender;
+
+    private SentMail mail;
 
     @Autowired
     private SeriesService series;
@@ -63,6 +62,7 @@ class SeriesSummaryMessageTest extends AbstractIntegrationTest {
     @BeforeEach
     void aTrainerWhoPlansAWeeklySession() {
         doNothing().when(sender).send(any(MimeMessage.class));
+        mail = new SentMail(sender);
         courtId = facility.createCourt(1, "Court 1");
         for (DayOfWeek day : DayOfWeek.values()) {
             facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
@@ -87,7 +87,7 @@ class SeriesSummaryMessageTest extends AbstractIntegrationTest {
                 .param("accountId", trainerAccountId).query(String.class).single())
                 .as("the centre leads to the first occurrence and stores nothing else")
                 .isEqualTo("{\"bookingId\": \"" + created.bookingIds().getFirst() + "\"}");
-        assertThat(bodiesTo("mary.major@example.org")).singleElement().asString()
+        assertThat(mail.bodiesTo("mary.major@example.org")).singleElement().asString()
                 .contains("Dienstag", "18:00", "20:00", "Court 1", "Training",
                         "Dienstag, 19. Mai 2026", "Dienstag, 2. Juni 2026", "Termine: 3");
     }
@@ -101,7 +101,7 @@ class SeriesSummaryMessageTest extends AbstractIntegrationTest {
         createSeries(2);
 
         // then
-        assertThat(bodiesTo("mary.major@example.org")).singleElement().asString()
+        assertThat(mail.bodiesTo("mary.major@example.org")).singleElement().asString()
                 .contains("Tuesday", "18:00", "20:00", "Court 1", "Tuesday, May 19, 2026",
                         "Tuesday, May 26, 2026", "Occurrences: 2");
     }
@@ -141,30 +141,5 @@ class SeriesSummaryMessageTest extends AbstractIntegrationTest {
                 .map(occurrence -> occurrence.slot().start())
                 .toList();
         return series.create(rule, starts, trainerAccountId, null, Set.of(Role.TRAINER), null);
-    }
-
-    private List<Object> bodiesTo(String address) throws Exception {
-        var captured = forClass(MimeMessage.class);
-        verify(sender, atLeast(0)).send(captured.capture());
-        return captured.getAllValues().stream()
-                .filter(message -> address.equals(recipientOf(message)))
-                .map(SeriesSummaryMessageTest::contentOf)
-                .toList();
-    }
-
-    private static Object contentOf(MimeMessage message) {
-        try {
-            return message.getContent();
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static String recipientOf(MimeMessage message) {
-        try {
-            return message.getAllRecipients()[0].toString();
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
     }
 }

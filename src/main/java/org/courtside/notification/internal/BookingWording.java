@@ -36,7 +36,7 @@ class BookingWording {
                 "card", booking.cardLabel());
     }
 
-    // The first occurrence stands for the series' time, courts and card, which its occurrences share.
+    // Time, courts and card come from the first occurrence given, which a date moved on its own may not share.
     Map<String, String> ofSeries(List<BookingAnnouncement> occurrences, Locale locale) {
         Map<String, String> values = new HashMap<>(of(occurrences.getFirst(), locale));
         values.put("weekdays", occurrences.stream()
@@ -50,8 +50,10 @@ class BookingWording {
         return values;
     }
 
-    Map<String, String> previous(Instant startsAt, Instant endsAt) {
-        return Map.of("previousFrom", time(startsAt), "previousTo", time(endsAt));
+    Map<String, String> previous(Instant startsAt, Instant endsAt, List<BookingAnnouncement.AnnouncedCourt> courts,
+                                 Locale locale) {
+        return Map.of("previousFrom", time(startsAt), "previousTo", time(endsAt),
+                "previousCourts", courtNames(courts, locale));
     }
 
     String reason(Optional<CancellationReason> reason, Locale locale) {
@@ -60,7 +62,11 @@ class BookingWording {
     }
 
     private String courts(BookingAnnouncement booking, Locale locale) {
-        return booking.courts().stream()
+        return courtNames(booking.courts(), locale);
+    }
+
+    private String courtNames(List<BookingAnnouncement.AnnouncedCourt> courts, Locale locale) {
+        return courts.stream()
                 .map(court -> court.name() == null || court.name().isBlank()
                         ? templates.render("booking.court", locale,
                                 Map.of("number", String.valueOf(court.number())))

@@ -91,7 +91,7 @@ class SeriesController implements BookingSeriesApi {
                                              ApiCancellationReason reason) {
         UserAccount account = currentUser.requireAccount();
         series.cancel(id, fromBookingId, CancelScope.valueOf(scope.getValue()),
-                account.getId(), account.getRoles(), CancellationReasons.of(reason));
+                account.getId(), account.getRoles(), ApiCancellationReasons.of(reason));
         return ResponseEntity.noContent().build();
     }
 

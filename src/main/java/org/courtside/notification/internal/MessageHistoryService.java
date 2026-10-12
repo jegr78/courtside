@@ -61,7 +61,7 @@ public class MessageHistoryService implements PersonMessageHistory {
                         rs.getTimestamp("created_at").toInstant(),
                         rs.getTimestamp("read_at") == null ? null : rs.getTimestamp("read_at").toInstant(),
                         bookingIdOf(rs.getString("booking_id")), closureOf(rs.getString("closure")),
-                        CancellationReasons.of(rs.getString("reason"))))
+                        StoredCancellationReasons.of(rs.getString("reason"))))
                 .list();
     }
 

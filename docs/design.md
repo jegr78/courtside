@@ -184,11 +184,11 @@ a restart.
 
 `booking` publishes an event when a booking is confirmed, cancelled or displaced or falls due for
 its reminder, when a participant is recorded or withdraws, and when a series is created, cancelled
-or moved. A series change is one event naming the series and every occurrence it touched,
-and no occurrence announces itself beside it. Cancelling an occurrence as a single booking announces
-that booking alone. Cancellations and moves name the acting account, so a consumer can tell an
-owner's change from a board's. A cancellation carries its reason code when one was given, and a
-move the slot its earliest occurrence held before. A cancellation that finds the booking already
+or moved. A series change is one event naming the series and every occurrence it touched, and no
+occurrence announces itself beside it. Cancelling an occurrence as a single booking announces that
+booking alone. Cancellations and moves name the acting account, so a consumer can tell an owner's
+change from a board's. A cancellation carries its reason code when one was given, and a move the
+slot and courts its earliest occurrence held before. A cancellation that finds the booking already
 cancelled changes nothing and announces nothing.
 
 Events contain identifiers and non-personal change descriptions. Free text, names and email
@@ -519,10 +519,10 @@ runtime. A message uses the recipient account's language.
 
 Current messages cover generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,
-booking cancellations and new series. A series sends no confirmation per occurrence. Its holder and
-any player receive one summary naming the card, weekdays, time, courts, first and last date and the
-number of occurrences, and its centre entry leads to the first occurrence. Displacement informs
-people but does not cancel the booking.
+booking cancellations and new series. A series sends no confirmation per occurrence. Its holder
+receives one summary naming the card, weekdays, time, courts, first and last date and the number of
+occurrences, and its centre entry leads to the first occurrence. Displacement informs people but
+does not cancel the booking.
 
 A cancelled booking is announced to its holder and its players, except the account that cancelled
 it. When the holder cancels, the message says the booking is gone. When anybody else cancels, an
@@ -530,12 +530,13 @@ administrator or an account the card lets manage it, the message says the club c
 names the person who acted. Whoever cancels somebody else's booking or series may choose a reason
 from a fixed list of codes, never free text. The booking keeps the code, the event and the centre
 entry carry it, and the club's message names it or, without one, refers the member to the club. A
-holder cancelling their own booking cannot name a reason; the request is refused and cancels nothing.
+holder cancelling their own booking cannot name a reason; the request is refused and cancels
+nothing.
 
-When somebody other than the holder cancels or moves occurrences of a series, the holder and any
-player receive one message for the whole change, never one per occurrence. It names the card,
-weekdays, time, courts, the first and last affected date and their number, the reason of a
-cancellation and the previous time of a move. The holder's own change to their series sends nothing.
+When somebody other than the holder cancels or moves occurrences of a series, only the holder
+receives one message for the whole change, never one per occurrence. It names the card, weekdays,
+time, courts, the first and last affected date and their number, the reason of a cancellation and
+the previous time and courts of a move. The holder's own change to their series sends nothing.
 
 Each message is a `message_record` with account, kind, `Message-ID`, time and state. The states are
 `queued`, `handed_over`, `refused` and `failed`. `handed_over` means the relay accepted the message,

@@ -2,7 +2,6 @@ package org.courtside.notification;
 
 import jakarta.mail.internet.MimeMessage;
 import org.courtside.AbstractIntegrationTest;
-import org.courtside.booking.internal.CancellationReasonNotAllowedException;
 import org.courtside.booking.series.CancelScope;
 import org.courtside.booking.series.MoveRequest;
 import org.courtside.booking.series.SeriesCreationResult;
@@ -13,6 +12,7 @@ import org.courtside.identity.Role;
 import org.courtside.identity.testfixture.IdentityTestFixture;
 import org.courtside.notification.testfixture.NotificationTestFixture;
 import org.courtside.shared.CancellationReason;
+import org.courtside.shared.CodedDomainFailure;
 import org.courtside.shared.OpeningWindow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,12 +32,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.verify;
 
 @Import({FacilityTestFixture.class, IdentityTestFixture.class, NotificationTestFixture.class})
 class SeriesChangeMessageTest extends AbstractIntegrationTest {
@@ -47,6 +44,8 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
 
     @MockitoSpyBean
     private JavaMailSender sender;
+
+    private SentMail mail;
 
     @Autowired
     private SeriesService series;
@@ -64,6 +63,7 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
     private JdbcClient jdbc;
 
     private UUID courtId;
+    private UUID secondCourtId;
     private UUID trainerAccountId;
     private UUID boardAccountId;
     private SeriesCreationResult created;
@@ -71,7 +71,9 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
     @BeforeEach
     void aTrainersWeeklySessionAndABoard() {
         doNothing().when(sender).send(any(MimeMessage.class));
+        mail = new SentMail(sender);
         courtId = facility.createCourt(1, "Court 1");
+        secondCourtId = facility.createCourt(2, "Court 2");
         for (DayOfWeek day : DayOfWeek.values()) {
             facility.setOpeningHours(day, new OpeningWindow(LocalTime.of(8, 0), LocalTime.of(22, 0)));
         }
@@ -104,7 +106,7 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
                 .containsExactly(MessageKind.BOOKING_SERIES_CREATED, MessageKind.BOOKING_SERIES_CANCELLED_BY_CLUB);
         assertThat(notifications.mailsQueuedFor(trainerAccountId))
                 .containsExactly(MessageKind.BOOKING_SERIES_CREATED, MessageKind.BOOKING_SERIES_CANCELLED_BY_CLUB);
-        assertThat(bodiesTo("mary.major@example.org")).singleElement().asString()
+        assertThat(mail.bodiesTo("mary.major@example.org")).singleElement().asString()
                 .contains("Dienstag, 18:00 bis 20:00", "Court 1", "Training",
                         "Erster stornierter Termin: Dienstag, 26. Mai 2026",
                         "Letzter stornierter Termin: Dienstag, 2. Juni 2026", "Stornierte Termine: 2",
@@ -129,10 +131,10 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
 
         // when
         series.cancel(created.seriesId(), created.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
-                boardAccountId, Set.of(Role.ADMIN));
+                boardAccountId, Set.of(Role.ADMIN), null);
 
         // then
-        assertThat(bodiesTo("mary.major@example.org")).singleElement().asString()
+        assertThat(mail.bodiesTo("mary.major@example.org")).singleElement().asString()
                 .contains("Tuesday, 18:00 to 20:00", "First cancelled date: Tuesday, May 19, 2026",
                         "Last cancelled date: Tuesday, June 2, 2026", "Cancelled dates: 3",
                         "Contact your club if you want to know why.");
@@ -142,7 +144,7 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
     void whenTheHolderCancelsTheirOwnSeries_thenNobodyIsWrittenTo() {
         // when
         series.cancel(created.seriesId(), created.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
-                trainerAccountId, Set.of(Role.TRAINER));
+                trainerAccountId, Set.of(Role.TRAINER), null);
 
         // then
         assertThat(notifications.notificationsFor(trainerAccountId))
@@ -154,7 +156,7 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
         // when / then
         assertThatThrownBy(() -> series.cancel(created.seriesId(), created.bookingIds().getFirst(),
                 CancelScope.WHOLE_SERIES, trainerAccountId, Set.of(Role.TRAINER), CancellationReason.OTHER))
-                .isInstanceOfSatisfying(CancellationReasonNotAllowedException.class, failure ->
+                .isInstanceOfSatisfying(CodedDomainFailure.class, failure ->
                         assertThat(failure.getCode()).isEqualTo("booking.cancellationReason.ownBooking"));
         assertThat(jdbc.sql("SELECT count(*) FROM booking WHERE status = 'CONFIRMED'").query(Long.class).single())
                 .isEqualTo(3L);
@@ -169,9 +171,48 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
         // then
         assertThat(notifications.notificationsFor(trainerAccountId))
                 .containsExactly(MessageKind.BOOKING_SERIES_CREATED, MessageKind.BOOKING_SERIES_MOVED_BY_CLUB);
-        assertThat(bodiesTo("mary.major@example.org")).singleElement().asString()
-                .contains("Bisher: 18:00 bis 20:00", "Jetzt: Dienstag, 19:00 bis 21:00",
+        assertThat(mail.bodiesTo("mary.major@example.org")).singleElement().asString()
+                .contains("Bisher: 18:00 bis 20:00, Platz: Court 1", "Jetzt: Dienstag, 19:00 bis 21:00, Platz: Court 1",
                         "Erster verlegter Termin: Dienstag, 26. Mai 2026", "Verlegte Termine: 2");
+    }
+
+    @Test
+    void whenTheBoardMovesOnlyTheCourts_thenTheMessageNamesTheOldAndTheNewCourt() throws Exception {
+        // when
+        series.move(new MoveRequest(created.seriesId(), created.bookingIds().get(1), CancelScope.THIS_AND_FOLLOWING,
+                null, null, List.of(secondCourtId)), boardAccountId, Set.of(Role.ADMIN));
+
+        // then
+        assertThat(mail.bodiesTo("mary.major@example.org")).singleElement().asString()
+                .contains("Bisher: 18:00 bis 20:00, Platz: Court 1", "Jetzt: Dienstag, 18:00 bis 20:00, Platz: Court 2");
+    }
+
+    @Test
+    void givenAnEnglishHolder_whenTheBoardMovesTimeAndCourt_thenTheMessageNamesBothChanges() throws Exception {
+        // given
+        jdbc.sql("UPDATE user_account SET locale = 'en' WHERE id = :id").param("id", trainerAccountId).update();
+
+        // when
+        series.move(new MoveRequest(created.seriesId(), created.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
+                LocalTime.of(19, 0), null, List.of(secondCourtId)), boardAccountId, Set.of(Role.ADMIN));
+
+        // then
+        assertThat(mail.bodiesTo("mary.major@example.org")).singleElement().asString()
+                .contains("Before: 18:00 to 20:00, court: Court 1", "Now: Tuesday, 19:00 to 21:00, court: Court 2",
+                        "Moved dates: 3");
+    }
+
+    @Test
+    void givenAReason_whenTheHolderCancelsDatesTheBoardAlreadyCancelled_thenTheReasonIsStillRefused() {
+        // given
+        series.cancel(created.seriesId(), created.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
+                boardAccountId, Set.of(Role.ADMIN), null);
+
+        // when / then
+        assertThatThrownBy(() -> series.cancel(created.seriesId(), created.bookingIds().getFirst(),
+                CancelScope.WHOLE_SERIES, trainerAccountId, Set.of(Role.TRAINER), CancellationReason.WEATHER))
+                .isInstanceOfSatisfying(CodedDomainFailure.class, failure ->
+                        assertThat(failure.getCode()).isEqualTo("booking.cancellationReason.ownBooking"));
     }
 
     @Test
@@ -192,7 +233,7 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
 
         // when
         series.cancel(created.seriesId(), created.bookingIds().getFirst(), CancelScope.WHOLE_SERIES,
-                boardAccountId, Set.of(Role.ADMIN));
+                boardAccountId, Set.of(Role.ADMIN), null);
 
         // then
         assertThat(notifications.notificationsFor(trainerAccountId))
@@ -200,30 +241,5 @@ class SeriesChangeMessageTest extends AbstractIntegrationTest {
         assertThat(notifications.mailsQueuedFor(trainerAccountId))
                 .as("the channel choice stops the mail of a kind that cannot be declined")
                 .containsExactly(MessageKind.BOOKING_SERIES_CREATED);
-    }
-
-    private List<Object> bodiesTo(String address) throws Exception {
-        var captured = forClass(MimeMessage.class);
-        verify(sender, atLeast(0)).send(captured.capture());
-        return captured.getAllValues().stream()
-                .filter(message -> address.equals(recipientOf(message)))
-                .map(SeriesChangeMessageTest::contentOf)
-                .toList();
-    }
-
-    private static Object contentOf(MimeMessage message) {
-        try {
-            return message.getContent();
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private static String recipientOf(MimeMessage message) {
-        try {
-            return message.getAllRecipients()[0].toString();
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
     }
 }

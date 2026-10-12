@@ -35,7 +35,8 @@ class MailTemplatesTest {
             entry("closure", "A court your booking is on has been taken out of service"),
             entry("weekdays", "Tuesday"), entry("first", "Tuesday, 19 May 2026"),
             entry("last", "Tuesday, 2 June 2026"), entry("count", "3"),
-            entry("reason", "Reason: the weather."), entry("previousFrom", "17:00"), entry("previousTo", "19:00"));
+            entry("reason", "Reason: the weather."), entry("previousFrom", "17:00"), entry("previousTo", "19:00"),
+            entry("previousCourts", "Court 2"));
 
     private final MailTemplates templates = new MailTemplates();
 

@@ -351,8 +351,8 @@ components:
       type: string
       description: |
         Why somebody other than the holder cancelled a booking, as a code the client and the
-        messages translate. There is no free text, so a reason names nobody and never needs
-        correcting.
+        messages translate. There is no free text, so a reason names nobody. It is fixed with the
+        cancellation, because the message that names it has already gone out.
       enum: [COURT_CONDITION, WEATHER, CLUB_EVENT, MAINTENANCE, OTHER]
 
     BookingStatus:
@@ -3046,6 +3046,8 @@ components:
         createdAt: { type: string, format: date-time }
         status: { $ref: "#/components/schemas/BookingStatus" }
         cancelledAt: { type: [string, "null"], format: date-time }
+        cancellationReason:
+          $ref: "#/components/schemas/CancellationReason"
         note:
           type: [string, "null"]
           description: What this person wrote on the booking, and `null` where they wrote nothing.

@@ -15,6 +15,7 @@ import org.courtside.booking.series.SeriesRule;
 import org.courtside.booking.CreateBookingCommand;
 import org.courtside.booking.ParticipantSpec;
 import org.courtside.identity.Role;
+import org.courtside.shared.CancellationReason;
 import org.courtside.shared.TimeSlot;
 
 import java.util.List;
@@ -97,6 +98,10 @@ public class BookingTestFixture {
 
     // What the scheduler calls, so a test elsewhere can watch what a due reminder produces
     // without reaching into this module.
+    public void cancelForTheClub(UUID bookingId, UUID boardAccountId, CancellationReason reason) {
+        bookingService.cancel(bookingId, boardAccountId, Set.of(Role.ADMIN), reason);
+    }
+
     public void remindWhatIsDue() {
         reminders.remindWhatIsDue();
     }

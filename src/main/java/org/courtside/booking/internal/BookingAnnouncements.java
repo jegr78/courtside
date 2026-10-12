@@ -93,6 +93,14 @@ class BookingAnnouncements implements BookingAnnouncer {
 
     @Override
     @Transactional(readOnly = true)
+    public List<BookingAnnouncement.AnnouncedCourt> describeCourts(List<UUID> courtIds) {
+        Map<UUID, BookingAnnouncement.AnnouncedCourt> courts = facility.allCourts().stream()
+                .collect(Collectors.toMap(Court::getId, BookingAnnouncements::announcedCourt));
+        return courtIds.stream().map(courts::get).filter(Objects::nonNull).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<BookingAnnouncement> describeSeries(UUID seriesId) {
         return List.copyOf(announcementsOf(bookings.findConfirmedBySeriesOrderedByStart(seriesId)).values());
     }
