@@ -32,6 +32,7 @@ The current product includes:
 - a public multi-court day plan;
 - personal and role-managed bookings;
 - recurring and multi-court bookings;
+- a first-in, first-out waitlist for taken courts;
 - configurable booking rules;
 - people, memberships, accounts, roles and sessions;
 - repeatable membership snapshot imports;
@@ -183,8 +184,8 @@ Spring Modulith's event publication registry, whose incomplete publications rema
 a restart.
 
 `booking` publishes an event when a booking is confirmed, cancelled or displaced or falls due for
-its reminder, when a participant is recorded or withdraws, and when a series is created, cancelled
-or moved. A series change is one event naming the series and every occurrence it touched, and no
+its reminder, when a participant is recorded or withdraws, when a series is created, cancelled
+or moved, and when a freed slot is offered to a waiting member. A series change is one event naming the series and every occurrence it touched, and no
 occurrence announces itself beside it. Cancelling an occurrence as a single booking announces that
 booking alone. Cancellations and moves name the acting account, so a consumer can tell an owner's
 change from a board's. A cancellation carries its reason code when one was given, and a move the
@@ -332,6 +333,36 @@ managed-booking view and the series form only on those grounds; an administrator
 
 A member recorded as a participant receives a message and may remove themselves without the
 booker's approval. Removing one participant does not cancel the booking.
+
+### Waitlist
+
+A member may queue for a court and period somebody else holds by selecting it in the court plan. The
+entry names the card, players and note the eventual booking will carry, and joining runs every check
+a booking of that slot runs except that its court is free. A slot nobody else holds, a second open
+entry for the same slot and a 21st entry whose slot has not ended are refused. Each court, start and
+end has its own first-in, first-out queue.
+
+The waitlist is part of `booking`, in `booking.waitlist`. The booking write has to refuse a
+reservation and an acceptance has to write a booking, so a module of its own would depend on
+`booking` while `booking` depended on it.
+
+When a cancellation, a cancelled series or a moved series frees the slot, the same transaction
+offers it to the first entry still eligible. A disabled account, an inactive or forbidden card, an
+unbookable court or a refused booking rule closes that entry as skipped and the next one is asked.
+The offer reserves the court for the club's offer window, 15 minutes unless the board changes it,
+and ends at the slot's start at the latest. While it stands, the booking write and a series move
+refuse the court to every other account, and the court plan shows it as reserved without naming
+anybody. The member accepts in Courtside, which turns the reservation into an ordinary booking under
+every rule in one transaction; a refused rule leaves the offer standing until its deadline. Declining
+or leaving passes the offer on at once. The member's own booking of the slot closes their entry,
+and a sweep every 30 seconds expires offers past their deadline and passes them on, closes entries
+whose slot has started, deletes entries whose slot has ended and offers any free slot a queue still
+waits for.
+
+Every path that writes a booking, cancels one, moves a series or changes a queue first takes the
+lock the booking grid coordination holds on the club configuration row, so a booking and an offer
+never meet on one court. A GiST exclusion over offered entries backs this up in the database. A
+member sees only their own entries and their state, never another waiting member or a position.
 
 ## Configuration and administration
 
@@ -519,7 +550,7 @@ runtime. A message uses the recipient account's language.
 
 Current messages cover generated credentials, password-reset codes, username reminders, booking
 confirmations, participant additions and withdrawals, displaced bookings, upcoming reminders,
-booking cancellations and new series. A series sends no confirmation per occurrence. Its holder
+booking cancellations, new series and waitlist offers. A series sends no confirmation per occurrence. Its holder
 receives one summary naming the card, weekdays, time, courts, first and last date and the number of
 occurrences, and its centre entry leads to the first occurrence. Displacement informs people but
 does not cancel the booking.
@@ -568,7 +599,9 @@ whether or not mail goes out. An entry stores the kind, the identifiers it conce
 read, never rendered text. The centre resolves the booking an entry concerns when it is read and
 links to a page of the client by target, so an entry cannot lead off the instance. It names and
 links that booking only while the account owns it or plays in it; an entry about a booking the
-account has left stays listed without either. An account reads
+account has left stays listed without either. A waitlist offer's entry names the offered slot, its
+deadline and whether it is still open while the account's own entry exists, and links to it in My
+bookings. An account reads
 and marks only its own entries; another account's id answers
 `urn:courtside:error:notification-not-found`. The entry has no channel of its own, so another
 channel can be added beside email without changing it.
@@ -577,6 +610,10 @@ Members choose optional message kinds and, separately, channels. No opt-out mean
 declined kind reaches the account on no channel, the centre included. A declined email channel
 stops mail and keeps the entry. Credentials, password-reset codes and username reminders are mailed
 whatever the channel choice says, because whoever asks for them cannot sign in to read the centre.
+A waitlist offer cannot be disabled either: joining the queue is the consent to hear of it, and
+leaving the queue is how a member stops it. It always reaches the centre, follows the email channel
+choice and is handed to the relay before ordinary booking mail because it runs out within minutes.
+A mail composed after the offer was taken, declined or expired fails instead of being sent.
 Credentials, displacement, participant-addition notices and the club's cancellations and series
 moves cannot be disabled as kinds, because no other product path tells the member that somebody
 else wrote them into a booking, took one away or moved it. A holder's own cancellation and the

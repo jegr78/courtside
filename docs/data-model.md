@@ -108,6 +108,27 @@ cannot commit half a series.
 The occurrences a series produces are ordinary `booking` rows. Nothing reads the recipe to decide
 whether a court is free.
 
+## Waiting for a taken court
+
+| Table | Holds | References |
+|---|---|---|
+| `waitlist_entry` | One account waiting for one court and period somebody else holds: the card, note and state, when it joined, and the offer's start and deadline | `user_account`, `court`, `booking_card`, `booking` |
+| `waitlist_participant` | The players named on joining, one row per slot, in the shape of `booking_participant` | `waitlist_entry`, `person`, `participant_card` |
+
+The entries for one court, start and end form that slot's queue, in the order of `joined_seq`. An
+entry is `WAITING` or `OFFERED` while it is open and `BOOKED`, `LEFT`, `EXPIRED`, `SKIPPED` or
+`ENDED` once closed, and `waitlist_entry_open_until_closed` ties `closed_at` to that split.
+`waitlist_entry_one_open_per_account` is a partial unique index: an account holds at most one open
+entry for a slot. An offer has a deadline no later than the slot's start, and
+`waitlist_entry_one_offer` is a GiST exclusion over `OFFERED` rows of the same form as
+`court_allocation_no_overlap`, so no two offers ever hold the same court at the same time.
+
+An offered entry reserves its court without a `court_allocation` row. The booking write refuses the
+court to every other account while the offer stands, under the same lock that serialises booking
+writes, cancellations and the waitlist sweep. `booking_id` names the booking an accepted offer or the
+member's own booking of the slot became. The sweep deletes every entry whose slot has ended, and an
+account's entries go with the account.
+
 ## People, memberships and accounts
 
 | Table | Holds | References |
@@ -166,8 +187,9 @@ holding none, from `club_config.no_membership_type_rule_set_id`.
 board can change without a deployment: the club name and the short name shown under an installed
 app's icon, the two brand colours, an uploaded logo, the imprint, privacy and documentation links,
 the default locale, the time zone, the booking slot length,
-how long issued credentials stay valid, how many minutes a mailed reset code stays redeemable, and
-how many hours before a booking the reminder goes out.
+how long issued credentials stay valid, how many minutes a mailed reset code stays redeemable,
+how many hours before a booking the reminder goes out, and how many minutes a freed court stays
+reserved for the member whose turn it is on its waitlist, 1 to 1440 and 15 by default.
 
 The time zone is checked against `pg_timezone_names` by a trigger, so a typo is refused where it is
 written rather than at the next reminder. The logo is stored in the row itself, content, media type
@@ -211,7 +233,7 @@ the table holds two kinds of entry. Six segments are the administrative surfaces
 board configures: `facility.court.added`, `card.bookingCard.changed`, `config.club.changed`,
 `rules.ruleSet.changed`, `roster.person.corrected` and `dataexchange.source.described`, each with
 siblings. The other two arrive in the course of ordinary use, because the writer records every
-event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the eight
+event a module publishes rather than a list it keeps: `booking.booking.confirmed` and the nine
 other booking entries, and `identity.account.credentialsRequested`, which names the account a
 credential was issued for. A board's request is written beside
 `roster.account.credentialsRequested`, which names the person, because the roster reaches
@@ -224,7 +246,7 @@ with the product; read the constraint rather than a list here. A message somebod
 row at all: it did not fail, it was not sent.
 
 A `QUEUED` row is a message waiting in the outbox. Its `parameters` hold what the message is written
-from: a booking id, a series id, the comma-separated ids of the series occurrences a change touched,
+from: a booking id, a waitlist entry id, a series id, the comma-separated ids of the series occurrences a change touched,
 a closure kind, a cancellation reason code, the previous start and end of moved occurrences or the
 person who withdrew. They never hold rendered text, an address or a credential: a message is
 composed from the current rows when it is handed over, and a generated credential or reset code
@@ -236,7 +258,7 @@ a settled row that keeps either, and `parameters` that are anything but an objec
 
 A `notification` row is written with the outbox row in the same transaction, and also when no mail
 is queued because the account has no address or switched email off. Its `parameters` keep only the
-booking id, the closure kind and the cancellation reason code; the person who withdrew, the series
+booking id, the waitlist entry id, the closure kind and the cancellation reason code; the person who withdrew, the series
 id, the occurrence ids and the previous times stay in the outbox. `read_at` is empty until
 the account marks the entry read, and a partial index over each account's unread entries serves the
 unread count. `notification.kind` follows the same CHECK as `message_record.kind`, and

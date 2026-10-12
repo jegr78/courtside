@@ -206,6 +206,27 @@ the club.
 
 ![Upcoming bookings with the cancellation button, the past ones folded away below them.](../screenshots/en/my-bookings.png)
 
+## Waiting for a taken court
+
+If a court is taken at the time you want, you can join its waitlist.
+
+1. Select the taken time in the court plan.
+2. Choose the kind of booking and your players as for a booking.
+3. Select *Join the waitlist*.
+
+Courtside checks the same rules as for a booking. Each court and time has its own waitlist. Whoever
+joins first is offered the court first.
+
+When the court frees, Courtside reserves it for the first member on the waitlist. Your offer appears
+in *Notifications* and in *My bookings*, and by email only if you chose email. The reservation lasts
+as long as the club has set, at most until the time starts. Select *Book* to turn it into your
+booking with the players you named. If you decline or the time runs out, the court goes to the next
+member. If you may no longer book the court, Courtside skips you.
+
+*My bookings* lists only your own entries. Courtside shows nobody who else waits or where you stand.
+You can leave a waitlist at any time. Your entry ends when you book the court yourself or its time
+starts. You can be on at most 20 waitlists at a time.
+
 ## Series
 
 Accounts whose role an active booking card without a player list allows can create a series under *Administration → Club appointments*. A series creates normal
@@ -257,7 +278,8 @@ Courtside always sends:
 * notice that somebody added you as a player,
 * notice of a change that affects your booking,
 * notice that the club cancelled a booking that concerns you,
-* notice that the club cancelled or moved dates of your series.
+* notice that the club cancelled or moved dates of your series,
+* an offer from a waitlist you are on. Leave the waitlist to stop it.
 
 Separately, you choose whether you also get an email. Without email your messages still appear here.
 You then learn only here that somebody added you as a player, that a change affects your booking or

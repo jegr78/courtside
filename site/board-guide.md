@@ -142,6 +142,10 @@ Statusleiste der installierten App übernimmt die Primärfarbe beim nächsten Ö
 * Stelle getrennt ein, wie lange Einmalpasswörter für neue und zurückgesetzte Konten gelten.
 * Der Code zum Zurücksetzen darf zwischen 15 Minuten und einem Tag gültig sein. Nach Ablauf muss das
   Mitglied einen neuen Code anfordern.
+* **Angebotsfrist der Warteliste** legt fest, wie viele Minuten ein frei gewordener Platz für das
+  Mitglied reserviert bleibt, das auf der Warteliste an der Reihe ist. Vorgeschlagen sind 15 Minuten.
+  Das Angebot endet spätestens mit dem Beginn der Zeit. Während es gilt, kann niemand sonst den Platz
+  buchen, auch der Vorstand nicht. Erst danach geht er an das nächste Mitglied.
 
 ![Die Fristen für Einmalpasswörter und Codes und die Erinnerung vor einer Buchung.](screenshots/de/deadlines.png)
 
