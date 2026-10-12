@@ -330,8 +330,8 @@ away.
 
 `main` and every `release/*` branch are protected alike: a pull request and a green `build` check,
 with a bypass for the repository-admin role. The bypass exists for a bootstrap that has already
-happened — do not reach for it. A branch pushed straight to `main` skips the review the repository is now public
-enough to need.
+happened — do not reach for it. A branch pushed straight to `main` skips the review the repository
+is now public enough to need.
 
 * **Squash is the only merge method.** Merge commits and rebase merges are disabled on the
   repository, so every pull request lands as exactly one commit on `main` and the history stays
@@ -386,8 +386,8 @@ enough to need.
   review is clean, fetch the target branch, `origin/main` or the `origin/release/<major>.<minor>` a
   fix targets, rebase the uncommitted work with autostash if the base moved, inspect the resulting
   diff and conflicts, and commit. Run `node tools/courtside.mjs check`, with `--base` naming a
-  release line, as the final verification. It selects the protected profile and builds the committed HEAD in a detached
-  worktree, so the live tree remains available while it runs. Do not run a separate
+  release line, as the final verification. It selects the protected profile and builds the committed
+  HEAD in a detached worktree, so the live tree remains available while it runs. Do not run a separate
   `./mvnw clean verify` as well. `--full` remains the manual escalation when the selected profile is
   insufficient for a known risk. Do not spend a final run on a base already known to be stale or
   before the review can still change the branch.
